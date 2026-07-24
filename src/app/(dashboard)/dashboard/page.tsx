@@ -32,6 +32,11 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  const { count: projectCount } = await supabase
+    .from("projects")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", user.id);
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 lg:grid-cols-2">
@@ -41,7 +46,7 @@ export default async function DashboardPage() {
 
       <QuickActions />
 
-      <StatsGrid profile={profile} />
+      <StatsGrid profile={profile} projectCount={projectCount ?? 0} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

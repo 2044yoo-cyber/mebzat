@@ -47,7 +47,13 @@ function StatCard({
   );
 }
 
-export function StatsGrid({ profile }: { profile: Profile }) {
+export function StatsGrid({
+  profile,
+  projectCount = 0,
+}: {
+  profile: Profile;
+  projectCount?: number;
+}) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       <StatCard
@@ -62,8 +68,8 @@ export function StatsGrid({ profile }: { profile: Profile }) {
       <StatCard
         icon={FolderKanban}
         label="Projects"
-        value={0}
-        href="/projects/new"
+        value={projectCount}
+        href={projectCount > 0 ? "/projects" : "/projects/new"}
       />
     </div>
   );

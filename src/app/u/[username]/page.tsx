@@ -5,6 +5,7 @@ import { DashboardNav } from "@/components/layout/dashboard-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ProfileDisplay } from "@/components/profile/profile-display";
+import { ProfileProjects } from "@/components/projects/profile-projects";
 import { createClient } from "@/lib/supabase/server";
 
 export async function generateMetadata(props: {
@@ -59,8 +60,9 @@ export default async function PublicProfilePage(props: {
       ) : (
         <SiteHeader />
       )}
-      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
+      <main className="mx-auto w-full max-w-4xl flex-1 space-y-8 px-6 py-10">
         <ProfileDisplay profile={profile} isOwner={isOwner} />
+        <ProfileProjects ownerId={profile.id} includeDrafts={isOwner} />
       </main>
       <SiteFooter />
     </div>

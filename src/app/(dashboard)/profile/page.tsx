@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { ProfileDisplay } from "@/components/profile/profile-display";
+import { ProfileProjects } from "@/components/projects/profile-projects";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ProfilePage() {
@@ -23,5 +24,10 @@ export default async function ProfilePage() {
     redirect("/dashboard");
   }
 
-  return <ProfileDisplay profile={profile} isOwner />;
+  return (
+    <div className="space-y-8">
+      <ProfileDisplay profile={profile} isOwner />
+      <ProfileProjects ownerId={profile.id} includeDrafts />
+    </div>
+  );
 }

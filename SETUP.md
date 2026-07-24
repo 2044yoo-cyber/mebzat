@@ -32,6 +32,12 @@ Open **SQL Editor** in the Supabase dashboard and run, in order:
    — adds the `profile_views` counter shown on the dashboard stats and
    the owner's own profile header, incremented whenever someone else
    views a profile at `/u/[username]`.
+4. [`supabase/migrations/0004_projects.sql`](supabase/migrations/0004_projects.sql)
+   — adds the `projects` and `project_images` tables, the
+   `project-images` storage bucket, RLS (published projects are public,
+   drafts and writes owner-only), and a view counter. Powers the Project
+   Showcase (`/projects`, `/projects/new`, `/projects/[id]`) and the
+   projects section on profiles.
 
 If you use the Supabase CLI instead: `supabase link` then `supabase db push`.
 

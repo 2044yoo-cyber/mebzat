@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/projects", label: "Projects" },
   { href: "/profile", label: "My profile" },
 ];
 

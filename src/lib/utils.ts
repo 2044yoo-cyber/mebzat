@@ -29,3 +29,12 @@ export function formatRelativeTime(date: string | Date) {
 
   return "just now"
 }
+
+export function slugify(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+}
