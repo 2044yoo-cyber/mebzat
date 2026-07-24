@@ -28,6 +28,10 @@ Open **SQL Editor** in the Supabase dashboard and run, in order:
    — makes `email` nullable (phone-only sign-ups have none) and updates
    the trigger to auto-generate a username so new users never have to
    fill in a form before landing on the dashboard.
+3. [`supabase/migrations/0003_profile_views.sql`](supabase/migrations/0003_profile_views.sql)
+   — adds the `profile_views` counter shown on the dashboard stats and
+   the owner's own profile header, incremented whenever someone else
+   views a profile at `/u/[username]`.
 
 If you use the Supabase CLI instead: `supabase link` then `supabase db push`.
 

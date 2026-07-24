@@ -1,5 +1,5 @@
-// Hand-authored to match supabase/migrations/0001_init_profiles.sql and
-// 0002_progressive_profile.sql.
+// Hand-authored to match supabase/migrations/0001_init_profiles.sql,
+// 0002_progressive_profile.sql, and 0003_profile_views.sql.
 // Once the Supabase project is linked, regenerate with:
 //   npx supabase gen types typescript --linked > src/types/database.types.ts
 
@@ -19,7 +19,12 @@ export type VerificationStatus = "unverified" | "pending" | "verified";
 export interface Database {
   public: {
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      increment_profile_views: {
+        Args: { profile_id: string };
+        Returns: undefined;
+      };
+    };
     Tables: {
       profiles: {
         Row: {
@@ -44,6 +49,7 @@ export interface Database {
           verification_status: VerificationStatus;
           onboarding_completed: boolean;
           onboarding_step: number;
+          profile_views: number;
           created_at: string;
           updated_at: string;
         };
@@ -69,6 +75,7 @@ export interface Database {
           verification_status?: VerificationStatus;
           onboarding_completed?: boolean;
           onboarding_step?: number;
+          profile_views?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -94,6 +101,7 @@ export interface Database {
           verification_status?: VerificationStatus;
           onboarding_completed?: boolean;
           onboarding_step?: number;
+          profile_views?: number;
           created_at?: string;
           updated_at?: string;
         };

@@ -9,7 +9,14 @@ const AUTH_ROUTES = [
   "/forgot-password",
   "/verify-email",
 ];
-const PROTECTED_ROUTES = ["/dashboard", "/profile"];
+const PROTECTED_ROUTES = [
+  "/dashboard",
+  "/profile",
+  "/directory",
+  "/projects",
+  "/products",
+  "/map",
+];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

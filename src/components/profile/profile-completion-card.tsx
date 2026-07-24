@@ -16,10 +16,11 @@ export function ProfileCompletionCard({ profile }: { profile: Profile }) {
   }
 
   return (
-    <Card className="p-5">
+    <Card className="h-full justify-center p-5">
       <CardHeader className="gap-3 p-0">
         <div className="flex items-center justify-between">
-          <CardTitle>Complete your profile ({percent}%)</CardTitle>
+          <CardTitle>Complete your profile</CardTitle>
+          <span className="text-sm font-semibold text-brand">{percent}%</span>
         </div>
         <Progress value={percent} />
         <CardDescription>
@@ -35,7 +36,7 @@ export function ProfileCompletionCard({ profile }: { profile: Profile }) {
           href="/profile/edit"
           className={cn(buttonVariants({ size: "sm" }), "w-fit")}
         >
-          Complete profile <ArrowRight className="size-4" />
+          Complete Profile <ArrowRight className="size-4" />
         </Link>
       </CardHeader>
     </Card>

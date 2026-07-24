@@ -1,13 +1,15 @@
-import { Building2, MapPin } from "lucide-react";
+import { redirect } from "next/navigation";
 
+import { NearbySuppliersMap } from "@/components/dashboard/nearby-suppliers-map";
+import { QuickActions } from "@/components/dashboard/quick-actions";
+import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { RecentMessagesPreview } from "@/components/dashboard/recent-messages-preview";
+import { RecentNotifications } from "@/components/dashboard/recent-notifications";
+import { RecommendedProfessionals } from "@/components/dashboard/recommended-professionals";
+import { StatsGrid } from "@/components/dashboard/stats-grid";
+import { TrendingProducts } from "@/components/dashboard/trending-products";
+import { WelcomeCard } from "@/components/dashboard/welcome-card";
 import { ProfileCompletionCard } from "@/components/profile/profile-completion-card";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ACCOUNT_TYPE_MAP } from "@/lib/constants/account-types";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
@@ -16,55 +18,43 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (!user) {
+    redirect("/login");
+  }
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", user!.id)
+    .eq("id", user.id)
     .single();
 
-  const accountType = profile?.account_type
-    ? ACCOUNT_TYPE_MAP[profile.account_type]
-    : null;
+  if (!profile) {
+    redirect("/login");
+  }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome back{profile?.full_name ? `, ${profile.full_name}` : ""}
-        </h1>
-        <p className="text-muted-foreground">
-          Here&apos;s what&apos;s happening with your Medosha presence.
-        </p>
+    <div className="space-y-6">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <WelcomeCard profile={profile} />
+        <ProfileCompletionCard profile={profile} />
       </div>
 
-      {profile && <ProfileCompletionCard profile={profile} />}
+      <QuickActions />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="p-5">
-          <CardHeader className="p-0">
-            <Building2 className="size-5 text-brand" />
-            <CardTitle className="mt-2">
-              {accountType?.label ?? "Account type"}
-            </CardTitle>
-            <CardDescription>
-              {accountType?.description ?? "Not set yet"}
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <StatsGrid profile={profile} />
 
-        <Card className="p-5">
-          <CardHeader className="p-0">
-            <MapPin className="size-5 text-brand" />
-            <CardTitle className="mt-2">
-              {profile?.location_city || profile?.location_country
-                ? [profile?.location_city, profile?.location_country]
-                    .filter(Boolean)
-                    .join(", ")
-                : "Location"}
-            </CardTitle>
-            <CardDescription>Where you&apos;re based</CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <RecentActivity profile={profile} />
+          <RecommendedProfessionals currentUserId={user.id} />
+          <TrendingProducts />
+        </div>
+
+        <div className="space-y-6">
+          <NearbySuppliersMap />
+          <RecentMessagesPreview />
+          <RecentNotifications />
+        </div>
       </div>
     </div>
   );
