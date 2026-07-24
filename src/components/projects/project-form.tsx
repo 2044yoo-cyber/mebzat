@@ -7,6 +7,7 @@ import {
   updateProject,
   type ProjectFormState,
 } from "@/app/(dashboard)/projects/actions";
+import { MaterialSelector } from "@/components/projects/material-selector";
 import { ProjectImagesInput } from "@/components/projects/project-images-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -206,14 +207,12 @@ export function ProjectForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="materials">Materials</Label>
-        <Input
-          id="materials"
-          name="materials"
-          defaultValue={project?.materials.join(", ") ?? ""}
-          placeholder="Concrete, Glass, Timber, Steel"
-        />
-        <p className="text-xs text-muted-foreground">Separate with commas.</p>
+        <Label>Materials</Label>
+        <MaterialSelector defaultValue={project?.materials ?? []} />
+        <p className="text-xs text-muted-foreground">
+          Pick from suggestions or add your own — chips you select are saved
+          with the project.
+        </p>
       </div>
 
       <div className="space-y-2">
