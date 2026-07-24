@@ -38,6 +38,14 @@ Open **SQL Editor** in the Supabase dashboard and run, in order:
    drafts and writes owner-only), and a view counter. Powers the Project
    Showcase (`/projects`, `/projects/new`, `/projects/[id]`) and the
    projects section on profiles.
+5. [`supabase/migrations/0005_marketplace.sql`](supabase/migrations/0005_marketplace.sql)
+   — adds the marketplace: `product_categories` (seeded), `products`,
+   `product_images`, and `product_favorites` tables, the `product-images`
+   storage bucket, RLS (published products public; drafts, writes, and
+   favorites owner-only), a view counter, and full-text search index.
+   Powers `/marketplace`, `/marketplace/[id]`, `/products`,
+   `/products/new`, and `/saved`. The marketplace pages render an empty
+   "being set up" state until this migration is applied.
 
 If you use the Supabase CLI instead: `supabase link` then `supabase db push`.
 

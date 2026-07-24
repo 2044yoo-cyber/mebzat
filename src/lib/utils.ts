@@ -18,6 +18,23 @@ const relativeTimeFormatter = new Intl.RelativeTimeFormat("en", {
   numeric: "auto",
 })
 
+export function formatPrice(
+  amount: number | null | undefined,
+  currency = "USD",
+) {
+  if (amount == null) return "Price on request";
+  try {
+    return new Intl.NumberFormat("en", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    }).format(amount);
+  } catch {
+    // Unknown currency code — fall back to a plain number + code.
+    return `${currency} ${amount.toLocaleString()}`;
+  }
+}
+
 export function formatRelativeTime(date: string | Date) {
   const diff = new Date(date).getTime() - Date.now()
 

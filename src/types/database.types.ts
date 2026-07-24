@@ -1,5 +1,5 @@
-// Hand-authored to match supabase/migrations/0001_init_profiles.sql,
-// 0002_progressive_profile.sql, 0003_profile_views.sql, and 0004_projects.sql.
+// Hand-authored to match supabase/migrations/0001_init_profiles.sql through
+// 0005_marketplace.sql.
 // Once the Supabase project is linked, regenerate with:
 //   npx supabase gen types typescript --linked > src/types/database.types.ts
 
@@ -30,6 +30,10 @@ export type BuildingType =
   | "renovation"
   | "other";
 
+export type ProductStatus = "draft" | "published";
+
+export type StockStatus = "in_stock" | "made_to_order" | "out_of_stock";
+
 export interface Database {
   public: {
     Views: Record<string, never>;
@@ -40,6 +44,10 @@ export interface Database {
       };
       increment_project_views: {
         Args: { project_id: string };
+        Returns: undefined;
+      };
+      increment_product_views: {
+        Args: { product_id: string };
         Returns: undefined;
       };
     };
@@ -224,6 +232,150 @@ export interface Database {
         };
         Relationships: [];
       };
+      product_categories: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          icon: string | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          icon?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          name?: string;
+          icon?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      products: {
+        Row: {
+          id: string;
+          owner_id: string;
+          category_id: string | null;
+          title: string;
+          slug: string;
+          description: string | null;
+          brand: string | null;
+          price: number | null;
+          currency: string;
+          unit: string | null;
+          stock_status: StockStatus;
+          specs: Record<string, string>;
+          location_city: string | null;
+          location_country: string | null;
+          delivery_available: boolean;
+          cover_image_url: string | null;
+          status: ProductStatus;
+          views: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          category_id?: string | null;
+          title: string;
+          slug: string;
+          description?: string | null;
+          brand?: string | null;
+          price?: number | null;
+          currency?: string;
+          unit?: string | null;
+          stock_status?: StockStatus;
+          specs?: Record<string, string>;
+          location_city?: string | null;
+          location_country?: string | null;
+          delivery_available?: boolean;
+          cover_image_url?: string | null;
+          status?: ProductStatus;
+          views?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          category_id?: string | null;
+          title?: string;
+          slug?: string;
+          description?: string | null;
+          brand?: string | null;
+          price?: number | null;
+          currency?: string;
+          unit?: string | null;
+          stock_status?: StockStatus;
+          specs?: Record<string, string>;
+          location_city?: string | null;
+          location_country?: string | null;
+          delivery_available?: boolean;
+          cover_image_url?: string | null;
+          status?: ProductStatus;
+          views?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      product_images: {
+        Row: {
+          id: string;
+          product_id: string;
+          url: string;
+          caption: string | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          url: string;
+          caption?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          url?: string;
+          caption?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      product_favorites: {
+        Row: {
+          id: string;
+          user_id: string;
+          product_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          product_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          product_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
   };
 }
@@ -233,3 +385,10 @@ export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 export type ProjectImage =
   Database["public"]["Tables"]["project_images"]["Row"];
+export type ProductCategory =
+  Database["public"]["Tables"]["product_categories"]["Row"];
+export type Product = Database["public"]["Tables"]["products"]["Row"];
+export type ProductImage =
+  Database["public"]["Tables"]["product_images"]["Row"];
+export type ProductFavorite =
+  Database["public"]["Tables"]["product_favorites"]["Row"];
