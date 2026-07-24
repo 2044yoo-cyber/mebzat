@@ -16,6 +16,10 @@ const PROTECTED_ROUTES = [
   "/projects",
   "/products",
   "/map",
+  "/saved",
+  "/messages",
+  "/settings",
+  "/help",
 ];
 
 export async function updateSession(request: NextRequest) {

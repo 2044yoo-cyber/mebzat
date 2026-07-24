@@ -26,8 +26,11 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-full flex-col">
       <DashboardNav
-        fullName={profile?.full_name ?? null}
-        avatarUrl={profile?.avatar_url ?? null}
+        profile={{
+          fullName: profile?.full_name ?? null,
+          email: user.email ?? null,
+          avatarUrl: profile?.avatar_url ?? null,
+        }}
       />
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
         {children}

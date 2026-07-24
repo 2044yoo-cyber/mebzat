@@ -2,20 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, User as UserIcon } from "lucide-react";
 
-import { signOut } from "@/app/(dashboard)/actions";
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLinkItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { UserNav, type NavProfile } from "@/components/layout/user-nav";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -24,20 +14,8 @@ const LINKS = [
   { href: "/profile", label: "My profile" },
 ];
 
-export function DashboardNav({
-  fullName,
-  avatarUrl,
-}: {
-  fullName: string | null;
-  avatarUrl: string | null;
-}) {
+export function DashboardNav({ profile }: { profile: NavProfile }) {
   const pathname = usePathname();
-  const initials = (fullName ?? "M")
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
   return (
     <header className="glass sticky top-0 z-50 border-b">
@@ -62,26 +40,7 @@ export function DashboardNav({
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <DropdownMenu>
-            <DropdownMenuTrigger className="rounded-full outline-none ring-brand focus-visible:ring-2">
-              <Avatar className="size-8">
-                <AvatarImage src={avatarUrl ?? undefined} alt={fullName ?? ""} />
-                <AvatarFallback>{initials}</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLinkItem render={<Link href="/profile" />}>
-                <UserIcon className="size-4" /> My profile
-              </DropdownMenuLinkItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => signOut()}
-              >
-                <LogOut className="size-4" /> Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <UserNav initialProfile={profile} />
         </div>
       </div>
     </header>
