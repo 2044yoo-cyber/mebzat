@@ -40,7 +40,7 @@ export async function signUpWithEmail(
     password,
     options: {
       data: { full_name: fullName },
-      emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
+      emailRedirectTo: `${origin}/auth/callback?next=/dashboard`,
     },
   });
 

@@ -20,7 +20,7 @@ export default async function EditProfilePage() {
     .single();
 
   if (!profile) {
-    redirect("/onboarding");
+    redirect("/dashboard");
   }
 
   return (

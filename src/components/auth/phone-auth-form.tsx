@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { phoneOtpSchema, phoneSchema } from "@/lib/validations/auth";
 
-export function PhoneAuthForm({ next = "/onboarding" }: { next?: string }) {
+export function PhoneAuthForm({ next = "/dashboard" }: { next?: string }) {
   const router = useRouter();
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");

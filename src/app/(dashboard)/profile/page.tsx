@@ -32,7 +32,7 @@ export default async function ProfilePage() {
     .single();
 
   if (!profile) {
-    redirect("/onboarding");
+    redirect("/dashboard");
   }
 
   const accountType = profile.account_type

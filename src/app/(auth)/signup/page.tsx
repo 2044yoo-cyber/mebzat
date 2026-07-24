@@ -33,7 +33,7 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (state.status === "signed-in") {
-      router.push("/onboarding");
+      router.push("/dashboard");
     }
   }, [state.status, router]);
 
@@ -45,7 +45,7 @@ export default function SignUpPage() {
           <CardTitle>Check your inbox</CardTitle>
           <CardDescription>
             We sent you a confirmation link. Click it to activate your
-            account and finish setting up your profile.
+            account and get started.
           </CardDescription>
         </CardHeader>
       </Card>

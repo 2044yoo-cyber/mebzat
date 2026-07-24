@@ -1,7 +1,6 @@
-import Link from "next/link";
-import { ArrowRight, Building2, MapPin } from "lucide-react";
+import { Building2, MapPin } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button";
+import { ProfileCompletionCard } from "@/components/profile/profile-completion-card";
 import {
   Card,
   CardDescription,
@@ -9,7 +8,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ACCOUNT_TYPE_MAP } from "@/lib/constants/account-types";
-import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
@@ -20,7 +18,7 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, account_type, location_city, location_country")
+    .select("*")
     .eq("id", user!.id)
     .single();
 
@@ -39,7 +37,9 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {profile && <ProfileCompletionCard profile={profile} />}
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <Card className="p-5">
           <CardHeader className="p-0">
             <Building2 className="size-5 text-brand" />
@@ -64,22 +64,6 @@ export default async function DashboardPage() {
             </CardTitle>
             <CardDescription>Where you&apos;re based</CardDescription>
           </CardHeader>
-        </Card>
-
-        <Card className="flex flex-col justify-between p-5">
-          <CardHeader className="p-0">
-            <CardTitle>Complete your profile</CardTitle>
-            <CardDescription>
-              A complete profile gets discovered more often in search and on
-              the map.
-            </CardDescription>
-          </CardHeader>
-          <Link
-            href="/profile/edit"
-            className={cn(buttonVariants({ size: "sm" }), "mt-4 w-fit")}
-          >
-            Edit profile <ArrowRight className="size-4" />
-          </Link>
         </Card>
       </div>
     </div>

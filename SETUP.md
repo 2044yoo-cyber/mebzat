@@ -16,16 +16,24 @@ shell. This is what's needed to run it against a real Supabase project.
    NEXT_PUBLIC_SITE_URL=http://localhost:3000
    ```
 
-## 2. Run the database migration
+## 2. Run the database migrations
 
-Open **SQL Editor** in the Supabase dashboard and run the contents of
-[`supabase/migrations/0001_init_profiles.sql`](supabase/migrations/0001_init_profiles.sql).
+Open **SQL Editor** in the Supabase dashboard and run, in order:
 
-This creates the `profiles` table, RLS policies, the `avatars`/`covers`
-storage buckets, and the trigger that creates a profile row whenever a
-user signs up.
+1. [`supabase/migrations/0001_init_profiles.sql`](supabase/migrations/0001_init_profiles.sql)
+   — creates the `profiles` table, RLS policies, the `avatars`/`covers`
+   storage buckets, and the trigger that creates a profile row whenever a
+   user signs up.
+2. [`supabase/migrations/0002_progressive_profile.sql`](supabase/migrations/0002_progressive_profile.sql)
+   — makes `email` nullable (phone-only sign-ups have none) and updates
+   the trigger to auto-generate a username so new users never have to
+   fill in a form before landing on the dashboard.
 
 If you use the Supabase CLI instead: `supabase link` then `supabase db push`.
+
+**Without these, signup will fail** once Supabase's own email/rate-limit
+checks pass — the trigger that creates a profile row has nothing to
+insert into, which aborts the whole signup transaction.
 
 ## 3. Configure Auth URLs
 
@@ -61,7 +69,7 @@ The app supports both of Supabase's confirmation link formats:
   below, they're handled by `src/app/auth/confirm/route.ts`:
 
   ```
-  {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type={{ .Type }}&next=/onboarding
+  {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type={{ .Type }}&next=/dashboard
   ```
 
 Either works; you don't have to change the default templates for Phase 1.
@@ -73,8 +81,14 @@ npm install
 npm run dev
 ```
 
-Visit `http://localhost:3000`, sign up, complete onboarding, and edit your
-profile.
+Visit `http://localhost:3000` and sign up — you land straight on the
+dashboard with a "Complete your profile" card. Fill in the rest whenever
+you want via **Edit profile**.
+
+Note: Supabase's default (non-custom-SMTP) email sending has a low rate
+limit, and rejects some non-deliverable domains (e.g. `example.com`) as
+invalid. Use a real inbox or a disposable one like `@mailinator.com` when
+testing signup.
 
 ## Known dev-mode quirk
 

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 
-export function GoogleButton({ next = "/onboarding" }: { next?: string }) {
+export function GoogleButton({ next = "/dashboard" }: { next?: string }) {
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {

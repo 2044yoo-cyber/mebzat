@@ -7,10 +7,6 @@ const accountTypeValues = ACCOUNT_TYPES.map((t) => t.value) as [
   ...string[],
 ];
 
-export const accountTypeSchema = z.object({
-  accountType: z.enum(accountTypeValues),
-});
-
 export const ORGANIZATION_ACCOUNT_TYPES = new Set([
   "company",
   "supplier",
@@ -22,6 +18,7 @@ export const ORGANIZATION_ACCOUNT_TYPES = new Set([
 ]);
 
 export const profileDetailsSchema = z.object({
+  accountType: z.enum(accountTypeValues),
   fullName: z.string().trim().min(2, "Enter your full name"),
   companyName: z.string().trim().optional().or(z.literal("")),
   username: z

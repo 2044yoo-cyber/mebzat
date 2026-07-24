@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
-import { profileDetailsSchema } from "@/lib/validations/onboarding";
+import { profileDetailsSchema } from "@/lib/validations/profile";
+import type { AccountType } from "@/types/database.types";
 
 export type EditProfileState = {
   error?: string;
@@ -16,6 +17,7 @@ export async function updateProfile(
   formData: FormData,
 ): Promise<EditProfileState> {
   const parsed = profileDetailsSchema.safeParse({
+    accountType: formData.get("accountType"),
     fullName: formData.get("fullName"),
     companyName: formData.get("companyName"),
     username: formData.get("username"),
@@ -46,6 +48,7 @@ export async function updateProfile(
   }
 
   const {
+    accountType,
     fullName,
     companyName,
     username,
@@ -61,6 +64,7 @@ export async function updateProfile(
   const { error } = await supabase
     .from("profiles")
     .update({
+      account_type: accountType as AccountType,
       full_name: fullName,
       company_name: companyName || null,
       username,
@@ -84,5 +88,6 @@ export async function updateProfile(
   }
 
   revalidatePath("/profile");
+  revalidatePath("/dashboard");
   return { success: true };
 }

@@ -1,4 +1,5 @@
-// Hand-authored to match supabase/migrations/0001_init_profiles.sql.
+// Hand-authored to match supabase/migrations/0001_init_profiles.sql and
+// 0002_progressive_profile.sql.
 // Once the Supabase project is linked, regenerate with:
 //   npx supabase gen types typescript --linked > src/types/database.types.ts
 
@@ -27,7 +28,7 @@ export interface Database {
           username: string | null;
           full_name: string | null;
           company_name: string | null;
-          email: string;
+          email: string | null;
           phone: string | null;
           phone_verified: boolean;
           avatar_url: string | null;
@@ -52,7 +53,7 @@ export interface Database {
           username?: string | null;
           full_name?: string | null;
           company_name?: string | null;
-          email: string;
+          email: string | null;
           phone?: string | null;
           phone_verified?: boolean;
           avatar_url?: string | null;

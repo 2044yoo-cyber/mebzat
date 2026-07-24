@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -12,8 +12,16 @@ import { CoverUpload } from "@/components/profile/cover-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ORGANIZATION_ACCOUNT_TYPES } from "@/lib/validations/onboarding";
+import { ACCOUNT_TYPES } from "@/lib/constants/account-types";
+import { ORGANIZATION_ACCOUNT_TYPES } from "@/lib/validations/profile";
 import type { AccountType, Profile } from "@/types/database.types";
 
 const initialState: EditProfileState = {};
@@ -23,6 +31,9 @@ export function EditProfileForm({ profile }: { profile: Profile }) {
     updateProfile,
     initialState,
   );
+  const [accountType, setAccountType] = useState<AccountType>(
+    profile.account_type ?? "individual",
+  );
 
   useEffect(() => {
     if (state.success) {
@@ -30,9 +41,7 @@ export function EditProfileForm({ profile }: { profile: Profile }) {
     }
   }, [state.success]);
 
-  const isOrganization = profile.account_type
-    ? ORGANIZATION_ACCOUNT_TYPES.has(profile.account_type as AccountType)
-    : false;
+  const isOrganization = ORGANIZATION_ACCOUNT_TYPES.has(accountType);
   const displayName = profile.company_name || profile.full_name || "Unnamed";
 
   return (
@@ -48,6 +57,26 @@ export function EditProfileForm({ profile }: { profile: Profile }) {
       </div>
 
       <form action={formAction} className="space-y-4 p-6">
+        <div className="space-y-2">
+          <Label htmlFor="accountType">Account type</Label>
+          <Select
+            name="accountType"
+            value={accountType}
+            onValueChange={(value) => setAccountType(value as AccountType)}
+          >
+            <SelectTrigger id="accountType" className="w-full">
+              <SelectValue placeholder="Choose account type" />
+            </SelectTrigger>
+            <SelectContent>
+              {ACCOUNT_TYPES.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="fullName">
             {isOrganization ? "Your name" : "Full name"}
