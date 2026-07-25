@@ -8,6 +8,8 @@ import {
   Store,
 } from "lucide-react";
 
+import { CompanyCard } from "@/components/companies/company-card";
+import type { CompanyCardData } from "@/components/companies/company-card";
 import { HeroSearch } from "@/components/home/hero-search";
 import { TrendingCategories } from "@/components/home/trending-categories";
 import { Reveal } from "@/components/layout/reveal";
@@ -19,6 +21,7 @@ import type { ProfileCardData } from "@/components/profile/profile-card";
 import { ProjectCard } from "@/components/projects/project-card";
 import type { ProjectCardData } from "@/components/projects/project-card";
 import { buttonVariants } from "@/components/ui/button";
+import { getCompanies } from "@/lib/data/companies";
 import { getMarketplaceProducts, getProductCategories, withFavorites } from "@/lib/data/products";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -67,12 +70,14 @@ export default async function Home() {
   const [
     categories,
     featuredProductsResult,
+    featuredCompaniesResult,
     { data: projectsData },
     { data: professionalsData },
     { data: auth },
   ] = await Promise.all([
     getProductCategories(),
     getMarketplaceProducts({ sort: "popular", pageSize: 8 }),
+    getCompanies({ pageSize: 6 }),
     supabase
       .from("projects")
       .select(
@@ -100,6 +105,7 @@ export default async function Home() {
   );
   const projects = (projectsData ?? []) as ProjectCardData[];
   const professionals = (professionalsData ?? []) as ProfileCardData[];
+  const companies = featuredCompaniesResult.companies as CompanyCardData[];
 
   return (
     <div className="flex min-h-full flex-col">
@@ -193,6 +199,22 @@ export default async function Home() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {professionals.map((professional) => (
                 <ProfileCard key={professional.username} profile={professional} />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Featured companies */}
+        {companies.length > 0 && (
+          <Section>
+            <SectionHeader
+              title="Featured companies"
+              href="/companies"
+              linkLabel="All companies"
+            />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {companies.map((company) => (
+                <CompanyCard key={company.id} company={company} />
               ))}
             </div>
           </Section>

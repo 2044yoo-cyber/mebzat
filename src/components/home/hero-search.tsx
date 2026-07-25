@@ -11,7 +11,7 @@ const TABS = [
   { key: "products", label: "Products", base: "/marketplace" },
   { key: "individual", label: "Professionals", base: "/directory/individual" },
   { key: "supplier", label: "Suppliers", base: "/directory/supplier" },
-  { key: "company", label: "Companies", base: "/directory/company" },
+  { key: "company", label: "Companies", base: "/companies" },
 ] as const;
 
 export function HeroSearch() {

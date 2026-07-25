@@ -1,5 +1,5 @@
 // Hand-authored to match supabase/migrations/0001_init_profiles.sql through
-// 0005_marketplace.sql.
+// 0006_companies.sql.
 // Once the Supabase project is linked, regenerate with:
 //   npx supabase gen types typescript --linked > src/types/database.types.ts
 
@@ -34,6 +34,8 @@ export type ProductStatus = "draft" | "published";
 
 export type StockStatus = "in_stock" | "made_to_order" | "out_of_stock";
 
+export type ClaimStatus = "pending" | "approved" | "rejected";
+
 export interface Database {
   public: {
     Views: Record<string, never>;
@@ -48,6 +50,14 @@ export interface Database {
       };
       increment_product_views: {
         Args: { product_id: string };
+        Returns: undefined;
+      };
+      increment_company_views: {
+        Args: { company_id: string };
+        Returns: undefined;
+      };
+      approve_company_claim: {
+        Args: { claim_id: string };
         Returns: undefined;
       };
     };
@@ -376,6 +386,135 @@ export interface Database {
         };
         Relationships: [];
       };
+      companies: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          category: string | null;
+          description: string | null;
+          logo_url: string | null;
+          cover_url: string | null;
+          website: string | null;
+          email: string | null;
+          phone: string | null;
+          address: string | null;
+          city: string | null;
+          country: string | null;
+          latitude: number | null;
+          longitude: number | null;
+          employees_count: number | null;
+          projects_completed: number;
+          followers_count: number;
+          rating: number | null;
+          verified: boolean;
+          is_claimed: boolean;
+          owner_id: string | null;
+          import_source: string | null;
+          external_ref: string | null;
+          views: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          category?: string | null;
+          description?: string | null;
+          logo_url?: string | null;
+          cover_url?: string | null;
+          website?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          address?: string | null;
+          city?: string | null;
+          country?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
+          employees_count?: number | null;
+          projects_completed?: number;
+          followers_count?: number;
+          rating?: number | null;
+          verified?: boolean;
+          is_claimed?: boolean;
+          owner_id?: string | null;
+          import_source?: string | null;
+          external_ref?: string | null;
+          views?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          name?: string;
+          category?: string | null;
+          description?: string | null;
+          logo_url?: string | null;
+          cover_url?: string | null;
+          website?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          address?: string | null;
+          city?: string | null;
+          country?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
+          employees_count?: number | null;
+          projects_completed?: number;
+          followers_count?: number;
+          rating?: number | null;
+          verified?: boolean;
+          is_claimed?: boolean;
+          owner_id?: string | null;
+          import_source?: string | null;
+          external_ref?: string | null;
+          views?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      company_claims: {
+        Row: {
+          id: string;
+          company_id: string;
+          claimant_id: string;
+          status: ClaimStatus;
+          role_at_company: string | null;
+          contact_email: string | null;
+          contact_phone: string | null;
+          message: string | null;
+          created_at: string;
+          decided_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          company_id: string;
+          claimant_id: string;
+          status?: ClaimStatus;
+          role_at_company?: string | null;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          message?: string | null;
+          created_at?: string;
+          decided_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          company_id?: string;
+          claimant_id?: string;
+          status?: ClaimStatus;
+          role_at_company?: string | null;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          message?: string | null;
+          created_at?: string;
+          decided_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
   };
 }
@@ -392,3 +531,6 @@ export type ProductImage =
   Database["public"]["Tables"]["product_images"]["Row"];
 export type ProductFavorite =
   Database["public"]["Tables"]["product_favorites"]["Row"];
+export type Company = Database["public"]["Tables"]["companies"]["Row"];
+export type CompanyClaim =
+  Database["public"]["Tables"]["company_claims"]["Row"];

@@ -46,6 +46,13 @@ Open **SQL Editor** in the Supabase dashboard and run, in order:
    Powers `/marketplace`, `/marketplace/[id]`, `/products`,
    `/products/new`, and `/saved`. The marketplace pages render an empty
    "being set up" state until this migration is applied.
+6. [`supabase/migrations/0006_companies.sql`](supabase/migrations/0006_companies.sql)
+   — adds the `companies` and `company_claims` tables, the `company-assets`
+   storage bucket, RLS (public directory; owner-only writes; imported rows
+   stay read-only until claimed), an `approve_company_claim` RPC
+   (service-role), and a view counter. Powers the business directory
+   (`/companies`, `/companies/[slug]`) and the claim flow. Companies can be
+   imported without a user account (unclaimed) and claimed later.
 
 If you use the Supabase CLI instead: `supabase link` then `supabase db push`.
 
