@@ -77,6 +77,13 @@ and upserts everything else on a stable key. Demo logins are
 `demo01@medosha.test` … `demo50@medosha.test` (password
 `medosha-demo-1234`).
 
+Product, project, and company images are **context-matched** — each item's
+title/category maps to a descriptive keyword phrase
+(`scripts/lib/images.ts`) that drives a keyword image provider, so a kitchen
+sink shows a kitchen sink (never a random photo). URLs are deterministic, so
+they stay stable across reseeds; unmatched items fall back to a branded
+Medosha placeholder.
+
 To import "unclaimed" business listings (the Business Import system) —
 businesses that exist without a user account and show a "Claim this
 business" button until an owner verifies ownership:

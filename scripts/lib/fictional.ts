@@ -3,8 +3,15 @@
 // - Names combine common Ethiopian given names + patronymics into fictional
 //   persons (not any specific real individual).
 // - Emails use the reserved @medosha.test domain.
-// - Avatars/logos/photos are generated placeholders (DiceBear / picsum.photos).
+// - Avatars are generated (DiceBear); product/project/company images are
+//   context-matched placeholders keyed off the item (see ./images.ts).
 
+import {
+  architectureCover,
+  companyCover,
+  productImages,
+  projectImages,
+} from "./images";
 import { chance, intBetween, makeRng, pick, pickSome, type Rng } from "./rng";
 
 // --- Pools -----------------------------------------------------------------
@@ -146,10 +153,6 @@ export function avatarUrl(seed: string) {
   return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed)}&radius=50&backgroundType=gradientLinear`;
 }
 
-export function photoUrl(seed: string, w: number, h: number) {
-  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/${w}/${h}`;
-}
-
 // --- Records ---------------------------------------------------------------
 
 export type DemoUser = {
@@ -208,7 +211,7 @@ export function makeUsers(count: number): DemoUser[] {
         ? `${pick(rng, CITY_WORDS)} ${pick(rng, COMPANY_TRADES)} ${pick(rng, COMPANY_SUFFIX)}`
         : null,
       avatarUrl: avatarUrl(fullName),
-      coverUrl: photoUrl(`cover-${username}`, 1200, 400),
+      coverUrl: architectureCover(username),
       verified: chance(rng, 0.35),
     });
   }
@@ -233,7 +236,7 @@ export type DemoCompany = {
   rating: number;
   verified: boolean;
   claimed: boolean;
-  logoUrl: string;
+  logoUrl: string | null;
   coverUrl: string;
 };
 
@@ -270,8 +273,10 @@ export function makeCompanies(count: number): DemoCompany[] {
       rating: Math.round((3 + rng() * 2) * 10) / 10,
       verified: claimed && chance(rng, 0.7),
       claimed,
-      logoUrl: photoUrl(`logo-${slug}`, 200, 200),
-      coverUrl: photoUrl(`ccover-${slug}`, 1200, 400),
+      // Logo left blank on purpose — the UI shows a neutral building icon,
+      // which reads better than a generic image per business.
+      logoUrl: null,
+      coverUrl: companyCover(trade, `company-${num}`),
     });
   }
   return companies;
@@ -306,13 +311,14 @@ export function makeProjects(count: number): DemoProject[] {
     const title = `${style} ${noun} in ${city}`;
     const slug = slugify(`${title}-${num}`);
     const year = intBetween(rng, 2016, 2025);
-    const imageCount = intBetween(rng, 2, 4);
+    const buildingType = pick(rng, BUILDING_TYPES);
+    const imageCount = intBetween(rng, 3, 4);
     projects.push({
       key: `project-${num}`,
       title,
       slug,
       description: `A ${style.toLowerCase()} ${noun.toLowerCase()} completed in ${city}. The design balances function and aesthetics using durable, locally-sourced materials.`,
-      buildingType: pick(rng, BUILDING_TYPES),
+      buildingType,
       style,
       city,
       country: COUNTRY,
@@ -321,9 +327,7 @@ export function makeProjects(count: number): DemoProject[] {
       materials: pickSome(rng, MATERIALS, intBetween(rng, 3, 6)),
       completionDate: `${year}-${String(intBetween(rng, 1, 12)).padStart(2, "0")}-15`,
       views: intBetween(rng, 0, 4000),
-      images: Array.from({ length: imageCount }, (_, k) =>
-        photoUrl(`proj-${num}-${k}`, 1200, 900),
-      ),
+      images: projectImages(title, buildingType, style, `project-${num}`, imageCount),
     });
   }
   return projects;
@@ -364,7 +368,7 @@ export function makeProducts(count: number): DemoProduct[] {
     while (slugs.has(slug)) slug = `${slug}-x`;
     slugs.add(slug);
 
-    const imageCount = intBetween(rng, 1, 3);
+    const imageCount = intBetween(rng, 3, 5);
     products.push({
       key: `product-${num}`,
       title,
@@ -385,9 +389,8 @@ export function makeProducts(count: number): DemoProduct[] {
         Warranty: pick(rng, ["6 months", "1 year", "2 years", "None"]),
         Material: pick(rng, MATERIALS),
       },
-      images: Array.from({ length: imageCount }, (_, k) =>
-        photoUrl(`prod-${num}-${k}`, 800, 800),
-      ),
+      // Context-aware images matched to the product title/category.
+      images: productImages(title, categorySlug, `product-${num}`, imageCount),
     });
   }
   return products;
