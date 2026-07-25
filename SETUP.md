@@ -60,6 +60,35 @@ If you use the Supabase CLI instead: `supabase link` then `supabase db push`.
 checks pass — the trigger that creates a profile row has nothing to
 insert into, which aborts the whole signup transaction.
 
+### Seed development data (optional)
+
+Once the migrations above are applied, populate the app with a fictional
+demo dataset (50 users, 20 companies, 50 projects, 200 products). The data
+is **for development/testing/demos only** — all names, emails, and images
+are fictional or generated placeholders (no real people). It reads your
+service-role key from `.env.local`.
+
+```bash
+npm run seed
+```
+
+The script is **idempotent** — safe to re-run; it matches users by email
+and upserts everything else on a stable key. Demo logins are
+`demo01@medosha.test` … `demo50@medosha.test` (password
+`medosha-demo-1234`).
+
+To import "unclaimed" business listings (the Business Import system) —
+businesses that exist without a user account and show a "Claim this
+business" button until an owner verifies ownership:
+
+```bash
+npm run import:businesses            # imports scripts/data/businesses.sample.json
+npm run import:businesses path.json  # or a custom source file
+```
+
+Both scripts fail fast with a clear message if the required migrations
+haven't been applied yet.
+
 ## 3. Configure Auth URLs
 
 In **Authentication → URL Configuration**:

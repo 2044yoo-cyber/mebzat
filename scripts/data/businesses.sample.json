@@ -1,0 +1,109 @@
+{
+  "source": "sample-addis-directory",
+  "businesses": [
+    {
+      "ref": "ad-0001",
+      "name": "Habesha Cement Depot",
+      "category": "Building Materials",
+      "description": "Cement, rebar, and aggregates supplier serving contractors across Addis Ababa.",
+      "city": "Addis Ababa",
+      "country": "Ethiopia",
+      "address": "12 Megenagna Road",
+      "phone": "+251911223344",
+      "email": "info@habeshacement.example",
+      "employeesCount": 24,
+      "rating": 4.3
+    },
+    {
+      "ref": "ad-0002",
+      "name": "Blue Nile Interiors",
+      "category": "Interiors",
+      "description": "Interior fit-out and furniture for offices and hospitality projects.",
+      "city": "Bahir Dar",
+      "country": "Ethiopia",
+      "address": "5 Tana Avenue",
+      "phone": "+251912334455",
+      "email": "hello@bluenileinteriors.example",
+      "employeesCount": 12,
+      "rating": 4.6
+    },
+    {
+      "ref": "ad-0003",
+      "name": "Rift Valley Steel Works",
+      "category": "Steel",
+      "description": "Structural steel fabrication and roofing sheets for commercial builds.",
+      "city": "Adama",
+      "country": "Ethiopia",
+      "address": "88 Industrial Zone",
+      "phone": "+251913445566",
+      "email": "sales@riftvalleysteel.example",
+      "employeesCount": 63,
+      "rating": 4.1
+    },
+    {
+      "ref": "ad-0004",
+      "name": "Sheba Tiles & Marble",
+      "category": "Flooring",
+      "description": "Porcelain tile, marble, and granite for residential and commercial floors.",
+      "city": "Hawassa",
+      "country": "Ethiopia",
+      "address": "23 Lakeside Street",
+      "phone": "+251914556677",
+      "email": "orders@shebatiles.example",
+      "employeesCount": 18,
+      "rating": 4.4
+    },
+    {
+      "ref": "ad-0005",
+      "name": "Entoto Electrical Supplies",
+      "category": "Electrical",
+      "description": "Cables, distribution boards, and solar kits for builders and electricians.",
+      "city": "Addis Ababa",
+      "country": "Ethiopia",
+      "address": "40 Kazanchis Road",
+      "phone": "+251915667788",
+      "email": "support@entotoelectrical.example",
+      "employeesCount": 9,
+      "rating": 4.0
+    },
+    {
+      "ref": "ad-0006",
+      "name": "Axum Builders PLC",
+      "category": "Contractors",
+      "description": "General contractor delivering residential and mixed-use projects.",
+      "city": "Mekelle",
+      "country": "Ethiopia",
+      "address": "7 Adwa Street",
+      "phone": "+251916778899",
+      "email": "projects@axumbuilders.example",
+      "employeesCount": 140,
+      "rating": 4.2
+    },
+    {
+      "ref": "ad-0007",
+      "name": "Lalibela Timber & Joinery",
+      "category": "Furniture",
+      "description": "Custom joinery, doors, and cabinetry made from locally-sourced timber.",
+      "city": "Gondar",
+      "country": "Ethiopia",
+      "address": "16 Fasil Road",
+      "phone": "+251917889900",
+      "email": "shop@lalibelatimber.example",
+      "employeesCount": 15,
+      "rating": 4.5
+    },
+    {
+      "ref": "ad-0008",
+      "name": "Sidama Paint & Coatings",
+      "category": "Paint",
+      "description": "Interior and exterior paints, primers, and protective coatings.",
+      "city": "Jimma",
+      "country": "Ethiopia",
+      "address": "31 Market Street",
+      "phone": "+251918990011",
+      "email": "info@sidamapaint.example",
+      "employeesCount": 21,
+      "rating": 3.9
+    }
+  ]
+}
