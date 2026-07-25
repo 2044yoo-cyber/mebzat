@@ -21,8 +21,11 @@ export async function generateMetadata(props: {
 
 export default async function DirectoryPage(props: {
   params: Promise<{ type: string }>;
+  searchParams: Promise<{ q?: string | string[] }>;
 }) {
   const { type } = await props.params;
+  const { q: rawQ } = await props.searchParams;
+  const q = (Array.isArray(rawQ) ? rawQ[0] : rawQ)?.trim() ?? "";
 
   if (!isAccountType(type)) {
     notFound();
@@ -34,19 +37,24 @@ export default async function DirectoryPage(props: {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const query = supabase
+  let query = supabase
     .from("profiles")
     .select(
       "username, full_name, company_name, avatar_url, account_type, location_city, location_country",
     )
     .eq("account_type", type)
-    .not("username", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(24);
+    .not("username", "is", null);
 
-  const { data: profiles } = user
-    ? await query.neq("id", user.id)
-    : await query;
+  if (q) {
+    const term = q.replace(/[,()%]/g, " ").trim();
+    query = query.or(
+      `full_name.ilike.%${term}%,company_name.ilike.%${term}%,username.ilike.%${term}%`,
+    );
+  }
+
+  query = query.order("created_at", { ascending: false }).limit(24);
+
+  const { data: profiles } = user ? await query.neq("id", user.id) : await query;
 
   return (
     <div className="space-y-6">
@@ -54,7 +62,9 @@ export default async function DirectoryPage(props: {
         <h1 className="text-2xl font-semibold tracking-tight">
           Find {entry.label}s
         </h1>
-        <p className="text-muted-foreground">{entry.description}</p>
+        <p className="text-muted-foreground">
+          {q ? `Results for “${q}”` : entry.description}
+        </p>
       </div>
 
       {profiles && profiles.length > 0 ? (
