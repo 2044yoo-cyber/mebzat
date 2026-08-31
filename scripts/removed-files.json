@@ -1,0 +1,54 @@
+{
+  "note": "Files this project has deleted. `npm run prune` removes them from an install that was updated by extracting an archive over the top, because tar adds and overwrites but never deletes. A leftover file still imports what it always imported, so the build fails on a module that was removed on purpose.",
+  "removed": [
+    {
+      "version": "workspace-shell",
+      "reason": "The three-column app shell replaced the per-section website chrome. These layouts each rendered SiteHeader and SiteFooter, which the shell now owns; leaving them in place gives two headers on twelve routes, or a build error once site-header.tsx is gone.",
+      "paths": [
+        "src/app/city/layout.tsx",
+        "src/app/community/layout.tsx",
+        "src/app/companies/layout.tsx",
+        "src/app/equipment/layout.tsx",
+        "src/app/events/layout.tsx",
+        "src/app/hire/layout.tsx",
+        "src/app/jobs/layout.tsx",
+        "src/app/marketplace/layout.tsx",
+        "src/app/price-exchange/layout.tsx",
+        "src/app/property/layout.tsx",
+        "src/app/search/layout.tsx",
+        "src/app/services/layout.tsx",
+        "src/components/layout/site-header.tsx",
+        "src/components/layout/main-nav.tsx",
+        "src/components/layout/dashboard-nav.tsx"
+      ]
+    },
+    {
+      "version": "medosha-city",
+      "reason": "Superseded by city-canvas.tsx, which keeps one persistent map instead of rebuilding it on every filter change.",
+      "paths": [
+        "src/components/property/city-map.tsx"
+      ]
+    },
+    {
+      "version": "scripts-folder",
+      "reason": "The maintenance scripts moved into scripts/ and their imports became relative to it — './lib/admin' resolves to scripts/lib/admin. A copy still sitting at the project root resolves that same import against the root, where there is no lib/ at all, and `next build` fails type checking on a file the app never runs. tsconfig includes **/*.ts, so a stray root script breaks the build even though nothing imports it. These are the root-level names an older install could be carrying, hyphenated and not.",
+      "paths": [
+        "migrateimages.ts",
+        "migrate-images.ts",
+        "findimages.ts",
+        "find-images.ts",
+        "importimages.ts",
+        "import-images.ts",
+        "importbusinesses.ts",
+        "import-businesses.ts",
+        "seed.ts",
+        "seedecosystem.ts",
+        "seed-ecosystem.ts",
+        "seedpriceexchange.ts",
+        "seed-price-exchange.ts",
+        "images.ts",
+        "admin.ts"
+      ]
+    }
+  ]
+}

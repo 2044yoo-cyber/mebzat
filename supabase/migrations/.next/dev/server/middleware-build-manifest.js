@@ -1,0 +1,50 @@
+globalThis.__BUILD_MANIFEST = {
+  "pages": {
+    "/_app": [
+      "static/chunks/1uwy_next_dist_compiled_0spf9u8._.js",
+      "static/chunks/1uwy_next_dist_shared_lib_1v2qet8._.js",
+      "static/chunks/1uwy_next_dist_client_1e5ggtt._.js",
+      "static/chunks/1uwy_next_dist_0x_iypm._.js",
+      "static/chunks/1uwy_next_app_1s-fyct.js",
+      "static/chunks/[next]_entry_page-loader_ts_19acjkh._.js",
+      "static/chunks/1uwy_react-dom_1pc21ag._.js",
+      "static/chunks/1uwy_0wqsxs9._.js",
+      "static/chunks/[root-of-the-server]__0618fkh._.js",
+      "static/chunks/supabase_migrations_pages__app_0du2_q-._.js",
+      "static/chunks/turbopack-supabase_migrations_pages__app_0xc5ct2._.js"
+    ],
+    "/_error": [
+      "static/chunks/1uwy_next_dist_compiled_0spf9u8._.js",
+      "static/chunks/1uwy_next_dist_shared_lib_03ohnb8._.js",
+      "static/chunks/1uwy_next_dist_client_1e5ggtt._.js",
+      "static/chunks/1uwy_next_dist_1qle8m0._.js",
+      "static/chunks/[next]_entry_page-loader_ts_0xpok9z._.js",
+      "static/chunks/1uwy_react-dom_1pc21ag._.js",
+      "static/chunks/1uwy_0wqsxs9._.js",
+      "static/chunks/[root-of-the-server]__0nzu0h0._.js",
+      "static/chunks/supabase_migrations_pages__error_0du2_q-._.js",
+      "static/chunks/turbopack-supabase_migrations_pages__error_1-2ehsk._.js"
+    ]
+  },
+  "devFiles": [],
+  "polyfillFiles": [
+    "static/chunks/1uwy_next_dist_build_polyfills_polyfill-nomodule.js"
+  ],
+  "lowPriorityFiles": [
+    "static/development/_buildManifest.js",
+    "static/development/_ssgManifest.js",
+    "static/development/_clientMiddlewareManifest.js"
+  ],
+  "rootMainFiles": [
+    "static/chunks/[turbopack]_browser_dev_hmr-client_hmr-client_ts_02ugrx3._.js",
+    "static/chunks/1uwy_next_dist_compiled_next-devtools_index_1pq0h6o.js",
+    "static/chunks/1uwy_next_dist_compiled_react-dom_0-_xsg2._.js",
+    "static/chunks/1uwy_next_dist_compiled_react-server-dom-turbopack_1-wk22d._.js",
+    "static/chunks/1uwy_next_dist_compiled_217c0o3._.js",
+    "static/chunks/1uwy_next_dist_client_0ypvm-0._.js",
+    "static/chunks/1uwy_next_dist_0tp7i-y._.js",
+    "static/chunks/1uwy_@swc_helpers_cjs_1gvi8fr._.js",
+    "static/chunks/supabase_migrations_1anvha4._.js",
+    "static/chunks/turbopack-supabase_migrations_20tusww._.js"
+  ]
+};

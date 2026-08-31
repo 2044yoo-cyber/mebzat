@@ -1,0 +1,12438 @@
+module.exports = [
+"[project]/supabase/migrations/node_modules/@base-ui/react/avatar/index.parts.mjs [app-ssr] (ecmascript) <locals>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([]);
+;
+;
+;
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/getStateAttributesProps.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "getStateAttributesProps",
+    ()=>getStateAttributesProps
+]);
+function getStateAttributesProps(state, customMapping) {
+    const props = {};
+    /* eslint-disable-next-line guard-for-in */ for(const key in state){
+        const value = state[key];
+        if (customMapping?.hasOwnProperty(key)) {
+            const customProps = customMapping[key](value);
+            if (customProps != null) {
+                Object.assign(props, customProps);
+            }
+            continue;
+        }
+        if (value === true) {
+            props[`data-${key.toLowerCase()}`] = '';
+        } else if (value) {
+            props[`data-${key.toLowerCase()}`] = value.toString();
+        }
+    }
+    return props;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/resolveClassName.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+/**
+ * If the provided className is a string, it will be returned as is.
+ * Otherwise, the function will call the className function with the state as the first argument.
+ *
+ * @param className
+ * @param state
+ */ __turbopack_context__.s([
+    "resolveClassName",
+    ()=>resolveClassName
+]);
+function resolveClassName(className, state) {
+    return typeof className === 'function' ? className(state) : className;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/resolveStyle.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+/**
+ * If the provided style is an object, it will be returned as is.
+ * Otherwise, the function will call the style function with the state as the first argument.
+ *
+ * @param style
+ * @param state
+ */ __turbopack_context__.s([
+    "resolveStyle",
+    ()=>resolveStyle
+]);
+function resolveStyle(style, state) {
+    return typeof style === 'function' ? style(state) : style;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/merge-props/mergeProps.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "makeEventPreventable",
+    ()=>makeEventPreventable,
+    "mergeClassNames",
+    ()=>mergeClassNames,
+    "mergeProps",
+    ()=>mergeProps,
+    "mergePropsN",
+    ()=>mergePropsN
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeObjects$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/mergeObjects.mjs [app-ssr] (ecmascript)");
+;
+const EMPTY_PROPS = {};
+function mergeProps(a, b, c, d, e) {
+    if (!c && !d && !e && !a) {
+        return createInitialMergedProps(b);
+    }
+    // We need to mutably own `merged`.
+    let merged = createInitialMergedProps(a);
+    if (b) {
+        merged = mergeInto(merged, b);
+    }
+    if (c) {
+        merged = mergeInto(merged, c);
+    }
+    if (d) {
+        merged = mergeInto(merged, d);
+    }
+    if (e) {
+        merged = mergeInto(merged, e);
+    }
+    return merged;
+}
+function mergePropsN(props) {
+    if (props.length === 0) {
+        return EMPTY_PROPS;
+    }
+    if (props.length === 1) {
+        return createInitialMergedProps(props[0]);
+    }
+    // We need to mutably own `merged`.
+    let merged = createInitialMergedProps(props[0]);
+    for(let i = 1; i < props.length; i += 1){
+        merged = mergeInto(merged, props[i]);
+    }
+    return merged;
+}
+function createInitialMergedProps(inputProps) {
+    if (isPropsGetter(inputProps)) {
+        // Getter-returned handlers intentionally keep their existing semantics.
+        return {
+            ...resolvePropsGetter(inputProps, EMPTY_PROPS)
+        };
+    }
+    return copyInitialProps(inputProps);
+}
+function mergeInto(merged, inputProps) {
+    if (isPropsGetter(inputProps)) {
+        return resolvePropsGetter(inputProps, merged);
+    }
+    return mutablyMergeInto(merged, inputProps);
+}
+function copyInitialProps(inputProps) {
+    const copiedProps = {
+        ...inputProps
+    };
+    // `copiedProps` is our fresh own-object copy, so iterating with `for...in` is safe here.
+    // eslint-disable-next-line guard-for-in
+    for(const propName in copiedProps){
+        const propValue = copiedProps[propName];
+        if (isEventHandler(propName, propValue)) {
+            copiedProps[propName] = wrapEventHandler(propValue);
+        }
+    }
+    return copiedProps;
+}
+/**
+ * Merges two sets of props. In case of conflicts, the external props take precedence.
+ */ function mutablyMergeInto(mergedProps, externalProps) {
+    if (!externalProps) {
+        return mergedProps;
+    }
+    // eslint-disable-next-line guard-for-in
+    for(const propName in externalProps){
+        const externalPropValue = externalProps[propName];
+        switch(propName){
+            case 'style':
+                {
+                    mergedProps[propName] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeObjects$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeObjects"])(mergedProps.style, externalPropValue);
+                    break;
+                }
+            case 'className':
+                {
+                    mergedProps[propName] = mergeClassNames(mergedProps.className, externalPropValue);
+                    break;
+                }
+            default:
+                {
+                    if (isEventHandler(propName, externalPropValue)) {
+                        mergedProps[propName] = mergeEventHandlers(mergedProps[propName], externalPropValue);
+                    } else {
+                        mergedProps[propName] = externalPropValue;
+                    }
+                }
+        }
+    }
+    return mergedProps;
+}
+function isEventHandler(key, value) {
+    // This approach is more efficient than using a regex.
+    const code0 = key.charCodeAt(0);
+    const code1 = key.charCodeAt(1);
+    const code2 = key.charCodeAt(2);
+    return code0 === 111 /* o */  && code1 === 110 /* n */  && code2 >= 65 /* A */  && code2 <= 90 /* Z */  && (typeof value === 'function' || typeof value === 'undefined');
+}
+function isPropsGetter(inputProps) {
+    return typeof inputProps === 'function';
+}
+function resolvePropsGetter(inputProps, previousProps) {
+    if (isPropsGetter(inputProps)) {
+        return inputProps(previousProps);
+    }
+    return inputProps ?? EMPTY_PROPS;
+}
+function mergeEventHandlers(ourHandler, theirHandler) {
+    if (!theirHandler) {
+        return ourHandler;
+    }
+    if (!ourHandler) {
+        return wrapEventHandler(theirHandler);
+    }
+    return (...args)=>{
+        const event = args[0];
+        if (isSyntheticEvent(event)) {
+            const baseUIEvent = event;
+            makeEventPreventable(baseUIEvent);
+            const result = theirHandler(...args);
+            if (!baseUIEvent.baseUIHandlerPrevented) {
+                ourHandler?.(...args);
+            }
+            return result;
+        }
+        const result = theirHandler(...args);
+        ourHandler?.(...args);
+        return result;
+    };
+}
+function wrapEventHandler(handler) {
+    if (!handler) {
+        return handler;
+    }
+    return (...args)=>{
+        const event = args[0];
+        if (isSyntheticEvent(event)) {
+            makeEventPreventable(event);
+        }
+        return handler(...args);
+    };
+}
+function makeEventPreventable(event) {
+    event.preventBaseUIHandler = ()=>{
+        event.baseUIHandlerPrevented = true;
+    };
+    return event;
+}
+function mergeClassNames(ourClassName, theirClassName) {
+    if (theirClassName) {
+        if (ourClassName) {
+            // eslint-disable-next-line prefer-template
+            return theirClassName + ' ' + ourClassName;
+        }
+        return theirClassName;
+    }
+    return ourClassName;
+}
+function isSyntheticEvent(event) {
+    return event != null && typeof event === 'object' && 'nativeEvent' in event;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useRenderElement",
+    ()=>useRenderElement
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useMergedRefs.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$getReactElementRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/getReactElementRef.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeObjects$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/mergeObjects.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$warn$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/warn.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$getStateAttributesProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/getStateAttributesProps.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveClassName$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/resolveClassName.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveStyle$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/resolveStyle.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/merge-props/mergeProps.mjs [app-ssr] (ecmascript)");
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+function useRenderElement(element, componentProps, params = {}) {
+    const renderProp = componentProps.render;
+    const outProps = useRenderElementProps(componentProps, params);
+    if (params.enabled === false) {
+        return null;
+    }
+    const state = params.state ?? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+    return evaluateRenderProp(element, renderProp, outProps, state);
+}
+/**
+ * Computes render element final props.
+ */ function useRenderElementProps(componentProps, params = {}) {
+    const { className: classNameProp, style: styleProp, render: renderProp } = componentProps;
+    const { state = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"], ref, props, stateAttributesMapping, enabled = true } = params;
+    const className = enabled ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveClassName$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveClassName"])(classNameProp, state) : undefined;
+    const style = enabled ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveStyle$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveStyle"])(styleProp, state) : undefined;
+    const stateProps = enabled ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$getStateAttributesProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getStateAttributesProps"])(state, stateAttributesMapping) : __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+    const resolvedProps = enabled && props ? resolveRenderFunctionProps(props) : undefined;
+    // Ensure outProps is always a new mutable object when enabled, never EMPTY_OBJECT.
+    // This prevents potential TypeError when setting ref, className, or style properties,
+    // since EMPTY_OBJECT is frozen and mutations would fail in strict mode.
+    const outProps = enabled ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeObjects$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeObjects"])(stateProps, resolvedProps) ?? {} : __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+    // SAFETY: The `useMergedRefs` functions use a single hook to store the same value,
+    // switching between them at runtime is safe. If this assertion fails, React will
+    // throw at runtime anyway.
+    // This also skips the `useMergedRefs` call on the server, which is fine because
+    // refs are not used on the server side.
+    /* eslint-disable react-hooks/rules-of-hooks */ if (typeof document !== 'undefined') {
+        if (!enabled) {
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMergedRefs"])(null, null);
+        } else if (Array.isArray(ref)) {
+            outProps.ref = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMergedRefsN"])([
+                outProps.ref,
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$getReactElementRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getReactElementRef"])(renderProp),
+                ...ref
+            ]);
+        } else {
+            outProps.ref = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMergedRefs"])(outProps.ref, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$getReactElementRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getReactElementRef"])(renderProp), ref);
+        }
+    }
+    if (!enabled) {
+        return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+    }
+    if (className !== undefined) {
+        outProps.className = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeClassNames"])(outProps.className, className);
+    }
+    if (style !== undefined) {
+        outProps.style = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeObjects$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeObjects"])(outProps.style, style);
+    }
+    return outProps;
+}
+function resolveRenderFunctionProps(props) {
+    if (Array.isArray(props)) {
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergePropsN"])(props);
+    }
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeProps"])(undefined, props);
+}
+// The symbol React uses internally for lazy components
+// https://github.com/facebook/react/blob/a0566250b210499b4c5677f5ac2eedbd71d51a1b/packages/shared/ReactSymbols.js#L31
+//
+// TODO delete once https://github.com/facebook/react/issues/32392 is fixed
+const REACT_LAZY_TYPE = Symbol.for('react.lazy');
+const COMPONENT_IDENTIFIER_PATTERN = /^[A-Z][A-Za-z0-9$]*$/;
+const LOWERCASE_CHARACTER_PATTERN = /[a-z]/;
+function evaluateRenderProp(element, render, props, state) {
+    if (render) {
+        if (typeof render === 'function') {
+            if ("TURBOPACK compile-time truthy", 1) {
+                warnIfRenderPropLooksLikeComponent(render);
+            }
+            return render(props, state);
+        }
+        const mergedProps = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeProps"])(props, render.props);
+        mergedProps.ref = props.ref;
+        let newElement = render;
+        // Workaround for https://github.com/facebook/react/issues/32392
+        // This works because the toArray() logic unwrap lazy element type in
+        // https://github.com/facebook/react/blob/a0566250b210499b4c5677f5ac2eedbd71d51a1b/packages/react/src/ReactChildren.js#L186
+        if (newElement?.$$typeof === REACT_LAZY_TYPE) {
+            const children = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Children"].toArray(render);
+            newElement = children[0];
+        }
+        // There is a high number of indirections, the error message thrown by React.cloneElement() is
+        // hard to use for developers, this logic provides a better context.
+        //
+        // Our general guideline is to never change the control flow depending on the environment.
+        // However, React.cloneElement() throws if React.isValidElement() is false,
+        // so we can throw before with custom message.
+        if ("TURBOPACK compile-time truthy", 1) {
+            if (!/*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isValidElement"](newElement)) {
+                // TODO: fix mui/no-guarded-throw
+                // eslint-disable-next-line mui/no-guarded-throw
+                throw new Error([
+                    'Base UI: The `render` prop was provided an invalid React element as `React.isValidElement(render)` is `false`.',
+                    'A valid React element must be provided to the `render` prop because it is cloned with props to replace the default element.',
+                    'https://base-ui.com/r/invalid-render-prop'
+                ].join('\n'));
+            }
+        }
+        return /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["cloneElement"](newElement, mergedProps);
+    }
+    if (element) {
+        if (typeof element === 'string') {
+            return renderTag(element, props);
+        }
+    }
+    // Unreachable, but the typings on `useRenderElement` need to be reworked
+    // to annotate it correctly.
+    throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: Render element or function are not defined.' : "TURBOPACK unreachable");
+}
+function warnIfRenderPropLooksLikeComponent(renderFn) {
+    const functionName = renderFn.name;
+    if (functionName.length === 0) {
+        return;
+    }
+    if (!COMPONENT_IDENTIFIER_PATTERN.test(functionName)) {
+        return;
+    }
+    if (!LOWERCASE_CHARACTER_PATTERN.test(functionName)) {
+        return;
+    }
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$warn$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["warn"])(`The \`render\` prop received a function named \`${functionName}\` that starts with an uppercase letter.`, 'This usually means a React component was passed directly as `render={Component}`.', 'Base UI calls `render` as a plain function, which can break the Rules of Hooks during reconciliation.', 'If this is an intentional render callback, rename it to start with a lowercase letter.', 'Use `render={<Component />}` or `render={(props) => <Component {...props} />}` instead.', 'https://base-ui.com/r/invalid-render-prop');
+}
+function renderTag(Tag, props) {
+    if (Tag === 'button') {
+        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createElement"])("button", {
+            type: "button",
+            ...props,
+            key: props.key
+        });
+    }
+    if (Tag === 'img') {
+        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createElement"])("img", {
+            alt: "",
+            ...props,
+            key: props.key
+        });
+    }
+    return /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createElement"](Tag, props);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/avatar/root/AvatarRootContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "AvatarRootContext",
+    ()=>AvatarRootContext,
+    "useAvatarRootContext",
+    ()=>useAvatarRootContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const AvatarRootContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) AvatarRootContext.displayName = "AvatarRootContext";
+function useAvatarRootContext() {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](AvatarRootContext);
+    if (context === undefined) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: AvatarRootContext is missing. Avatar parts must be placed within <Avatar.Root>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/avatar/root/stateAttributesMapping.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "avatarStateAttributesMapping",
+    ()=>avatarStateAttributesMapping
+]);
+const avatarStateAttributesMapping = {
+    imageLoadingStatus: ()=>null
+};
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/avatar/root/AvatarRoot.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "AvatarRoot",
+    ()=>AvatarRoot
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$AvatarRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/root/AvatarRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/root/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+/**
+ * Displays a user's profile picture, initials, or fallback icon.
+ * Renders a `<span>` element.
+ *
+ * Documentation: [Base UI Avatar](https://base-ui.com/react/components/avatar)
+ */ var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+const AvatarRoot = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function AvatarRoot(componentProps, forwardedRef) {
+    const { className, render, style, ...elementProps } = componentProps;
+    const [imageLoadingStatus, setImageLoadingStatus] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"]('idle');
+    const state = {
+        imageLoadingStatus
+    };
+    const contextValue = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            imageLoadingStatus,
+            setImageLoadingStatus
+        }), [
+        imageLoadingStatus,
+        setImageLoadingStatus
+    ]);
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('span', componentProps, {
+        state,
+        ref: forwardedRef,
+        props: elementProps,
+        stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["avatarStateAttributesMapping"]
+    });
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$AvatarRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AvatarRootContext"].Provider, {
+        value: contextValue,
+        children: element
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) AvatarRoot.displayName = "AvatarRoot";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/resolveRef.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+/**
+ * If the provided argument is a ref object, returns its `current` value.
+ * Otherwise, returns the argument itself.
+ */ __turbopack_context__.s([
+    "resolveRef",
+    ()=>resolveRef
+]);
+function resolveRef(maybeRef) {
+    if (maybeRef == null) {
+        return maybeRef;
+    }
+    return 'current' in maybeRef ? maybeRef.current : maybeRef;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/stateAttributesMapping.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "TransitionStatusDataAttributes",
+    ()=>TransitionStatusDataAttributes,
+    "transitionStatusMapping",
+    ()=>transitionStatusMapping
+]);
+let TransitionStatusDataAttributes = /*#__PURE__*/ function(TransitionStatusDataAttributes) {
+    /**
+   * Present when the component is animating in.
+   */ TransitionStatusDataAttributes["startingStyle"] = "data-starting-style";
+    /**
+   * Present when the component is animating out.
+   */ TransitionStatusDataAttributes["endingStyle"] = "data-ending-style";
+    return TransitionStatusDataAttributes;
+}({});
+const STARTING_HOOK = {
+    [TransitionStatusDataAttributes.startingStyle]: ''
+};
+const ENDING_HOOK = {
+    [TransitionStatusDataAttributes.endingStyle]: ''
+};
+const transitionStatusMapping = {
+    transitionStatus (value) {
+        if (value === 'starting') {
+            return STARTING_HOOK;
+        }
+        if (value === 'ending') {
+            return ENDING_HOOK;
+        }
+        return null;
+    }
+};
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/useAnimationsFinished.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useAnimationsFinished",
+    ()=>useAnimationsFinished
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-dom.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useAnimationFrame.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/resolveRef.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+function useAnimationsFinished(elementOrRef, waitForStartingStyleRemoved = false, treatAbortedAsFinished = true) {
+    const frame = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationFrame"])();
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((fnToExecute, /**
+   * An optional [AbortSignal](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal) that
+   * can be used to abort `fnToExecute` before all the animations have finished.
+   * @default null
+   */ signal = null)=>{
+        frame.cancel();
+        const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveRef"])(elementOrRef);
+        if (element == null) {
+            return;
+        }
+        const resolvedElement = element;
+        const done = ()=>{
+            // Synchronously flush the unmounting of the component so that the browser doesn't
+            // paint: https://github.com/mui/base-ui/issues/979
+            __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["flushSync"](fnToExecute);
+        };
+        if (typeof resolvedElement.getAnimations !== 'function' || globalThis.BASE_UI_ANIMATIONS_DISABLED) {
+            fnToExecute();
+            return;
+        }
+        function exec() {
+            Promise.all(resolvedElement.getAnimations().map((animation)=>animation.finished)).then(()=>{
+                if (!signal?.aborted) {
+                    done();
+                }
+            }).catch(()=>{
+                if (treatAbortedAsFinished) {
+                    if (!signal?.aborted) {
+                        done();
+                    }
+                    return;
+                }
+                const currentAnimations = resolvedElement.getAnimations();
+                if (!signal?.aborted && currentAnimations.length > 0 && currentAnimations.some((animation)=>animation.pending || animation.playState !== 'finished')) {
+                    // Sometimes animations can be aborted because a property they depend on changes while the animation plays.
+                    // In such cases, we need to re-check if any new animations have started.
+                    exec();
+                }
+            });
+        }
+        if (waitForStartingStyleRemoved) {
+            const startingStyleAttribute = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TransitionStatusDataAttributes"].startingStyle;
+            // If `[data-starting-style]` isn't present, fall back to waiting one more frame
+            // to give "open" animations a chance to be registered.
+            if (!resolvedElement.hasAttribute(startingStyleAttribute)) {
+                frame.request(exec);
+                return;
+            }
+            // Wait for `[data-starting-style]` to have been removed.
+            const attributeObserver = new MutationObserver(()=>{
+                if (!resolvedElement.hasAttribute(startingStyleAttribute)) {
+                    attributeObserver.disconnect();
+                    exec();
+                }
+            });
+            attributeObserver.observe(resolvedElement, {
+                attributes: true,
+                attributeFilter: [
+                    startingStyleAttribute
+                ]
+            });
+            signal?.addEventListener('abort', ()=>attributeObserver.disconnect(), {
+                once: true
+            });
+            return;
+        }
+        frame.request(exec);
+    });
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/useOpenChangeComplete.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useOpenChangeComplete",
+    ()=>useOpenChangeComplete
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useAnimationsFinished$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useAnimationsFinished.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+function useOpenChangeComplete(parameters) {
+    const { enabled = true, open, ref, onComplete: onCompleteParam } = parameters;
+    const onComplete = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(onCompleteParam);
+    const runOnceAnimationsFinish = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useAnimationsFinished$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationsFinished"])(ref, open, false);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!enabled) {
+            return undefined;
+        }
+        const abortController = new AbortController();
+        runOnceAnimationsFinish(onComplete, abortController.signal);
+        return ()=>{
+            abortController.abort();
+        };
+    }, [
+        enabled,
+        open,
+        onComplete,
+        runOnceAnimationsFinish
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/useTransitionStatus.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useTransitionStatus",
+    ()=>useTransitionStatus
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useAnimationFrame.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+function useTransitionStatus(open, enableIdleState = false, deferEndingState = false) {
+    const [transitionStatus, setTransitionStatus] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](open && enableIdleState ? 'idle' : undefined);
+    const [mounted, setMounted] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](open);
+    if (open && !mounted) {
+        setMounted(true);
+        setTransitionStatus('starting');
+    }
+    if (!open && mounted && transitionStatus !== 'ending' && !deferEndingState) {
+        setTransitionStatus('ending');
+    }
+    if (!open && !mounted && transitionStatus === 'ending') {
+        setTransitionStatus(undefined);
+    }
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open && mounted && transitionStatus !== 'ending' && deferEndingState) {
+            const frame = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AnimationFrame"].request(()=>{
+                setTransitionStatus('ending');
+            });
+            return ()=>{
+                __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AnimationFrame"].cancel(frame);
+            };
+        }
+        return undefined;
+    }, [
+        open,
+        mounted,
+        transitionStatus,
+        deferEndingState
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open || enableIdleState) {
+            return undefined;
+        }
+        const frame = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AnimationFrame"].request(()=>{
+            // Avoid `flushSync` here due to Firefox.
+            // See https://github.com/mui/base-ui/pull/3424
+            setTransitionStatus(undefined);
+        });
+        return ()=>{
+            __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AnimationFrame"].cancel(frame);
+        };
+    }, [
+        enableIdleState,
+        open
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open || !enableIdleState) {
+            return undefined;
+        }
+        if (open && mounted && transitionStatus !== 'idle') {
+            setTransitionStatus('starting');
+        }
+        const frame = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AnimationFrame"].request(()=>{
+            setTransitionStatus('idle');
+        });
+        return ()=>{
+            __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AnimationFrame"].cancel(frame);
+        };
+    }, [
+        enableIdleState,
+        open,
+        mounted,
+        transitionStatus
+    ]);
+    return {
+        mounted,
+        setMounted,
+        transitionStatus
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/avatar/image/useImageLoadingStatus.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useImageLoadingStatus",
+    ()=>useImageLoadingStatus
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+function useImageLoadingStatus(src, { referrerPolicy, crossOrigin, sizes, srcSet }) {
+    const [loadingStatus, setLoadingStatus] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"]('idle');
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!src && !srcSet) {
+            setLoadingStatus('error');
+            return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["NOOP"];
+        }
+        let isMounted = true;
+        const image = new window.Image();
+        const updateStatus = (status)=>()=>{
+                if (!isMounted) {
+                    return;
+                }
+                setLoadingStatus(status);
+            };
+        setLoadingStatus('loading');
+        image.onload = updateStatus('loaded');
+        image.onerror = updateStatus('error');
+        if (referrerPolicy) {
+            image.referrerPolicy = referrerPolicy;
+        }
+        image.crossOrigin = crossOrigin ?? null;
+        if (sizes) {
+            image.sizes = sizes;
+        }
+        if (srcSet) {
+            image.srcset = srcSet;
+        }
+        if (src) {
+            image.src = src;
+        }
+        // Fast path for cached/decoded images
+        if (image.complete) {
+            setLoadingStatus(image.naturalWidth > 0 ? 'loaded' : 'error');
+        }
+        return ()=>{
+            isMounted = false;
+        };
+    }, [
+        src,
+        srcSet,
+        sizes,
+        crossOrigin,
+        referrerPolicy
+    ]);
+    return loadingStatus;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/avatar/image/AvatarImage.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "AvatarImage",
+    ()=>AvatarImage
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$AvatarRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/root/AvatarRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/root/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useOpenChangeComplete$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useOpenChangeComplete.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useTransitionStatus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useTransitionStatus.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$image$2f$useImageLoadingStatus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/image/useImageLoadingStatus.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const stateAttributesMapping = {
+    ...__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["avatarStateAttributesMapping"],
+    ...__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["transitionStatusMapping"]
+};
+const AvatarImage = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function AvatarImage(componentProps, forwardedRef) {
+    const { className, render, onLoadingStatusChange: onLoadingStatusChangeProp, style, ...elementProps } = componentProps;
+    const { setImageLoadingStatus } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$AvatarRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAvatarRootContext"])();
+    const imageLoadingStatus = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$image$2f$useImageLoadingStatus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useImageLoadingStatus"])(elementProps.src, elementProps);
+    const isVisible = imageLoadingStatus === 'loaded';
+    const { mounted, transitionStatus, setMounted } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useTransitionStatus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTransitionStatus"])(isVisible);
+    const imageRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const handleLoadingStatusChange = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((status)=>{
+        onLoadingStatusChangeProp?.(status);
+        setImageLoadingStatus(status);
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (imageLoadingStatus !== 'idle') {
+            handleLoadingStatusChange(imageLoadingStatus);
+        }
+    }, [
+        imageLoadingStatus,
+        handleLoadingStatusChange
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        return ()=>setImageLoadingStatus('idle');
+    }, [
+        setImageLoadingStatus
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useOpenChangeComplete$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useOpenChangeComplete"])({
+        open: isVisible,
+        ref: imageRef,
+        onComplete () {
+            if (!isVisible) {
+                setMounted(false);
+            }
+        }
+    });
+    const state = {
+        imageLoadingStatus,
+        transitionStatus
+    };
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('img', componentProps, {
+        state,
+        ref: [
+            forwardedRef,
+            imageRef
+        ],
+        props: elementProps,
+        stateAttributesMapping,
+        enabled: mounted
+    });
+    if (!mounted) {
+        return null;
+    }
+    return element;
+});
+if ("TURBOPACK compile-time truthy", 1) AvatarImage.displayName = "AvatarImage";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/avatar/fallback/AvatarFallback.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "AvatarFallback",
+    ()=>AvatarFallback
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$AvatarRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/root/AvatarRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/root/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+const AvatarFallback = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function AvatarFallback(componentProps, forwardedRef) {
+    const { className, render, delay, style, ...elementProps } = componentProps;
+    const { imageLoadingStatus } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$AvatarRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAvatarRootContext"])();
+    const [delayPassed, setDelayPassed] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](delay === undefined);
+    const timeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (delay !== undefined) {
+            timeout.start(delay, ()=>setDelayPassed(true));
+        } else {
+            // Once the fallback is shown without a delay, keep it visible. Otherwise a later
+            // `undefined` -> number change would re-hide an already-visible fallback.
+            setDelayPassed(true);
+        }
+        return timeout.clear;
+    }, [
+        timeout,
+        delay
+    ]);
+    const state = {
+        imageLoadingStatus
+    };
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('span', componentProps, {
+        state,
+        ref: forwardedRef,
+        props: elementProps,
+        stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["avatarStateAttributesMapping"],
+        enabled: imageLoadingStatus !== 'loaded' && (delay === undefined || delayPassed)
+    });
+    return element;
+});
+if ("TURBOPACK compile-time truthy", 1) AvatarFallback.displayName = "AvatarFallback";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/avatar/index.parts.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "Fallback",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$fallback$2f$AvatarFallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AvatarFallback"],
+    "Image",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$image$2f$AvatarImage$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AvatarImage"],
+    "Root",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$AvatarRoot$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AvatarRoot"]
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$index$2e$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/index.parts.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$root$2f$AvatarRoot$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/root/AvatarRoot.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$image$2f$AvatarImage$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/image/AvatarImage.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$fallback$2f$AvatarFallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/fallback/AvatarFallback.mjs [app-ssr] (ecmascript)");
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/avatar/index.parts.mjs [app-ssr] (ecmascript) <export * as Avatar>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "Avatar",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$index$2e$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$avatar$2f$index$2e$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/avatar/index.parts.mjs [app-ssr] (ecmascript)");
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/root/CompositeRootContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "CompositeRootContext",
+    ()=>CompositeRootContext,
+    "useCompositeRootContext",
+    ()=>useCompositeRootContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const CompositeRootContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) CompositeRootContext.displayName = "CompositeRootContext";
+function useCompositeRootContext(optional = false) {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](CompositeRootContext);
+    if (context === undefined && !optional) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: CompositeRootContext is missing. Composite parts must be placed within <Composite.Root>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/useFocusableWhenDisabled.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useFocusableWhenDisabled",
+    ()=>useFocusableWhenDisabled
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+function useFocusableWhenDisabled(parameters) {
+    const { focusableWhenDisabled, disabled, composite = false, tabIndex: tabIndexProp = 0, isNativeButton } = parameters;
+    const isFocusableComposite = composite && focusableWhenDisabled !== false;
+    const isNonFocusableComposite = composite && focusableWhenDisabled === false;
+    // we can't explicitly assign `undefined` to any of these props because it
+    // would otherwise prevent subsequently merged props from setting them
+    const props = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        const additionalProps = {
+            // allow Tabbing away from focusableWhenDisabled elements
+            onKeyDown (event) {
+                if (disabled && focusableWhenDisabled && event.key !== 'Tab') {
+                    event.preventDefault();
+                }
+            }
+        };
+        if (!composite) {
+            additionalProps.tabIndex = tabIndexProp;
+            if (!isNativeButton && disabled) {
+                additionalProps.tabIndex = focusableWhenDisabled ? tabIndexProp : -1;
+            }
+        }
+        if (isNativeButton && (focusableWhenDisabled || isFocusableComposite) || !isNativeButton && disabled) {
+            additionalProps['aria-disabled'] = disabled;
+        }
+        if (isNativeButton && (!focusableWhenDisabled || isNonFocusableComposite)) {
+            additionalProps.disabled = disabled;
+        }
+        return additionalProps;
+    }, [
+        composite,
+        disabled,
+        focusableWhenDisabled,
+        isFocusableComposite,
+        isNonFocusableComposite,
+        isNativeButton,
+        tabIndexProp
+    ]);
+    return {
+        props
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/use-button/useButton.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useButton",
+    ()=>useButton
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$error$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/error.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$safeReact$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/safeReact.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/merge-props/mergeProps.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$root$2f$CompositeRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/root/CompositeRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$useFocusableWhenDisabled$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/useFocusableWhenDisabled.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+function useButton(parameters = {}) {
+    const { disabled = false, focusableWhenDisabled, tabIndex = 0, native: isNativeButton = true, composite: compositeProp } = parameters;
+    const elementRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const compositeRootContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$root$2f$CompositeRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeRootContext"])(true);
+    const isCompositeItem = compositeProp ?? compositeRootContext !== undefined;
+    const { props: focusableWhenDisabledProps } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$useFocusableWhenDisabled$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFocusableWhenDisabled"])({
+        focusableWhenDisabled,
+        disabled,
+        composite: isCompositeItem,
+        tabIndex,
+        isNativeButton
+    });
+    if ("TURBOPACK compile-time truthy", 1) {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+            if (!elementRef.current) {
+                return;
+            }
+            const isButtonTag = isButtonElement(elementRef.current);
+            if (isNativeButton) {
+                if (!isButtonTag) {
+                    const ownerStackMessage = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$safeReact$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SafeReact"].captureOwnerStack?.() || '';
+                    const message = 'A component that acts as a button expected a native <button> because the ' + '`nativeButton` prop is true. Rendering a non-<button> removes native button ' + 'semantics, which can impact forms and accessibility. Use a real <button> in the ' + '`render` prop, or set `nativeButton` to `false`.';
+                    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$error$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["error"])(`${message}${ownerStackMessage}`);
+                }
+            } else if (isButtonTag) {
+                const ownerStackMessage = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$safeReact$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SafeReact"].captureOwnerStack?.() || '';
+                const message = 'A component that acts as a button expected a non-<button> because the `nativeButton` ' + 'prop is false. Rendering a <button> keeps native behavior while Base UI applies ' + 'non-native attributes and handlers, which can add unintended extra attributes (such ' + 'as `role` or `aria-disabled`). Use a non-<button> in the `render` prop, or set ' + '`nativeButton` to `true`.';
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$error$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["error"])(`${message}${ownerStackMessage}`);
+            }
+        }, [
+            isNativeButton
+        ]);
+    }
+    // handles a disabled composite button rendering another button, e.g.
+    // <Toolbar.Button disabled render={<Menu.Trigger />} />
+    // the `disabled` prop needs to pass through 2 `useButton`s then finally
+    // delete the `disabled` attribute from DOM
+    const updateDisabled = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"](()=>{
+        const element = elementRef.current;
+        if (!isButtonElement(element)) {
+            return;
+        }
+        if (isCompositeItem && disabled && focusableWhenDisabledProps.disabled === undefined && element.disabled) {
+            element.disabled = false;
+        }
+    }, [
+        disabled,
+        focusableWhenDisabledProps.disabled,
+        isCompositeItem
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(updateDisabled, [
+        updateDisabled
+    ]);
+    const getButtonProps = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((externalProps = {})=>{
+        const { onClick: externalOnClick, onMouseDown: externalOnMouseDown, onKeyUp: externalOnKeyUp, onKeyDown: externalOnKeyDown, onPointerDown: externalOnPointerDown, ...otherExternalProps } = externalProps;
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeProps"])({
+            onClick (event) {
+                if (disabled) {
+                    event.preventDefault();
+                    return;
+                }
+                externalOnClick?.(event);
+            },
+            onMouseDown (event) {
+                if (!disabled) {
+                    externalOnMouseDown?.(event);
+                }
+            },
+            onKeyDown (event) {
+                if (disabled) {
+                    return;
+                }
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["makeEventPreventable"])(event);
+                externalOnKeyDown?.(event);
+                if (event.baseUIHandlerPrevented) {
+                    return;
+                }
+                const isCurrentTarget = event.target === event.currentTarget;
+                const currentTarget = event.currentTarget;
+                const isButton = isButtonElement(currentTarget);
+                const isLink = !isNativeButton && isValidLinkElement(currentTarget);
+                const shouldClick = isCurrentTarget && (isNativeButton ? isButton : !isLink);
+                const isEnterKey = event.key === 'Enter';
+                const isSpaceKey = event.key === ' ';
+                const role = currentTarget.getAttribute('role');
+                const isTextNavigationRole = role?.startsWith('menuitem') || role === 'option' || role === 'gridcell';
+                if (isCurrentTarget && isCompositeItem && isSpaceKey) {
+                    if (event.defaultPrevented && isTextNavigationRole) {
+                        return;
+                    }
+                    event.preventDefault();
+                    if (isLink || isNativeButton && isButton) {
+                        currentTarget.click();
+                        event.preventBaseUIHandler();
+                    } else if (shouldClick) {
+                        externalOnClick?.(event);
+                        event.preventBaseUIHandler();
+                    }
+                    return;
+                }
+                // Keyboard accessibility for native and non-native elements.
+                if (shouldClick) {
+                    if (!isNativeButton && (isSpaceKey || isEnterKey)) {
+                        event.preventDefault();
+                    }
+                    if (!isNativeButton && isEnterKey) {
+                        externalOnClick?.(event);
+                    }
+                }
+            },
+            onKeyUp (event) {
+                if (disabled) {
+                    return;
+                }
+                // calling preventDefault in keyUp on a <button> will not dispatch a click event if Space is pressed
+                // https://codesandbox.io/p/sandbox/button-keyup-preventdefault-dn7f0
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["makeEventPreventable"])(event);
+                externalOnKeyUp?.(event);
+                if (event.target === event.currentTarget && isNativeButton && isCompositeItem && isButtonElement(event.currentTarget) && event.key === ' ') {
+                    event.preventDefault();
+                    return;
+                }
+                if (event.baseUIHandlerPrevented) {
+                    return;
+                }
+                // Keyboard accessibility for non interactive elements
+                if (event.target === event.currentTarget && !isNativeButton && !isCompositeItem && event.key === ' ') {
+                    externalOnClick?.(event);
+                }
+            },
+            onPointerDown (event) {
+                if (disabled) {
+                    event.preventDefault();
+                    return;
+                }
+                externalOnPointerDown?.(event);
+            }
+        }, isNativeButton ? {
+            type: 'button'
+        } : {
+            role: 'button'
+        }, focusableWhenDisabledProps, otherExternalProps);
+    }, [
+        disabled,
+        focusableWhenDisabledProps,
+        isCompositeItem,
+        isNativeButton
+    ]);
+    const buttonRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((element)=>{
+        elementRef.current = element;
+        updateDisabled();
+    });
+    return {
+        getButtonProps,
+        buttonRef
+    };
+}
+function isButtonElement(elem) {
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(elem) && elem.tagName === 'BUTTON';
+}
+function isValidLinkElement(elem) {
+    return Boolean(elem?.tagName === 'A' && elem?.href);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/button/Button.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "Button",
+    ()=>Button
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$use$2d$button$2f$useButton$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/use-button/useButton.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+const Button = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function Button(componentProps, forwardedRef) {
+    const { render, className, disabled = false, focusableWhenDisabled = false, nativeButton = true, style, ...elementProps } = componentProps;
+    const { getButtonProps, buttonRef } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$use$2d$button$2f$useButton$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useButton"])({
+        disabled,
+        focusableWhenDisabled,
+        native: nativeButton
+    });
+    const state = {
+        disabled
+    };
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('button', componentProps, {
+        state,
+        ref: [
+            forwardedRef,
+            buttonRef
+        ],
+        props: [
+            elementProps,
+            getButtonProps
+        ]
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) Button.displayName = "Button";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/index.parts.mjs [app-ssr] (ecmascript) <locals>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([]);
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositionerContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuPositionerContext",
+    ()=>MenuPositionerContext,
+    "useMenuPositionerContext",
+    ()=>useMenuPositionerContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const MenuPositionerContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) MenuPositionerContext.displayName = "MenuPositionerContext";
+function useMenuPositionerContext(optional) {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](MenuPositionerContext);
+    if (context === undefined && !optional) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: MenuPositionerContext is missing. MenuPositioner parts must be placed within <Menu.Positioner>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuRootContext",
+    ()=>MenuRootContext,
+    "useMenuRootContext",
+    ()=>useMenuRootContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const MenuRootContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) MenuRootContext.displayName = "MenuRootContext";
+function useMenuRootContext(optional) {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](MenuRootContext);
+    if (context === undefined && !optional) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: MenuRootContext is missing. Menu parts must be placed within <Menu.Root>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/popupStateMapping.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "CommonPopupDataAttributes",
+    ()=>CommonPopupDataAttributes,
+    "CommonTriggerDataAttributes",
+    ()=>CommonTriggerDataAttributes,
+    "popupStateMapping",
+    ()=>popupStateMapping,
+    "pressableTriggerOpenStateMapping",
+    ()=>pressableTriggerOpenStateMapping,
+    "triggerOpenStateMapping",
+    ()=>triggerOpenStateMapping
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+;
+let CommonPopupDataAttributes = function(CommonPopupDataAttributes) {
+    /**
+   * Present when the popup is open.
+   */ CommonPopupDataAttributes["open"] = "data-open";
+    /**
+   * Present when the popup is closed.
+   */ CommonPopupDataAttributes["closed"] = "data-closed";
+    /**
+   * Present when the popup is animating in.
+   */ CommonPopupDataAttributes[CommonPopupDataAttributes["startingStyle"] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TransitionStatusDataAttributes"].startingStyle] = "startingStyle";
+    /**
+   * Present when the popup is animating out.
+   */ CommonPopupDataAttributes[CommonPopupDataAttributes["endingStyle"] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TransitionStatusDataAttributes"].endingStyle] = "endingStyle";
+    /**
+   * Present when the anchor is hidden.
+   */ CommonPopupDataAttributes["anchorHidden"] = "data-anchor-hidden";
+    /**
+   * Indicates which side the popup is positioned relative to the trigger.
+   * @type { 'top' | 'bottom' | 'left' | 'right' | 'inline-end' | 'inline-start'}
+   */ CommonPopupDataAttributes["side"] = "data-side";
+    /**
+   * Indicates how the popup is aligned relative to specified side.
+   * @type {'start' | 'center' | 'end'}
+   */ CommonPopupDataAttributes["align"] = "data-align";
+    return CommonPopupDataAttributes;
+}({});
+let CommonTriggerDataAttributes = /*#__PURE__*/ function(CommonTriggerDataAttributes) {
+    /**
+   * Present when the popup is open.
+   */ CommonTriggerDataAttributes["popupOpen"] = "data-popup-open";
+    /**
+   * Present when a pressable trigger is pressed.
+   */ CommonTriggerDataAttributes["pressed"] = "data-pressed";
+    return CommonTriggerDataAttributes;
+}({});
+const TRIGGER_HOOK = {
+    [CommonTriggerDataAttributes.popupOpen]: ''
+};
+const PRESSABLE_TRIGGER_HOOK = {
+    [CommonTriggerDataAttributes.popupOpen]: '',
+    [CommonTriggerDataAttributes.pressed]: ''
+};
+const POPUP_OPEN_HOOK = {
+    [CommonPopupDataAttributes.open]: ''
+};
+const POPUP_CLOSED_HOOK = {
+    [CommonPopupDataAttributes.closed]: ''
+};
+const ANCHOR_HIDDEN_HOOK = {
+    [CommonPopupDataAttributes.anchorHidden]: ''
+};
+const triggerOpenStateMapping = {
+    open (value) {
+        if (value) {
+            return TRIGGER_HOOK;
+        }
+        return null;
+    }
+};
+const pressableTriggerOpenStateMapping = {
+    open (value) {
+        if (value) {
+            return PRESSABLE_TRIGGER_HOOK;
+        }
+        return null;
+    }
+};
+const popupStateMapping = {
+    open (value) {
+        if (value) {
+            return POPUP_OPEN_HOOK;
+        }
+        return POPUP_CLOSED_HOOK;
+    },
+    anchorHidden (value) {
+        if (value) {
+            return ANCHOR_HIDDEN_HOOK;
+        }
+        return null;
+    }
+};
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/arrow/MenuArrow.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuArrow",
+    ()=>MenuArrow
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositionerContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popupStateMapping.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+const MenuArrow = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuArrow(componentProps, forwardedRef) {
+    const { render, className, style, ...elementProps } = componentProps;
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const { arrowRef, side, align, arrowUncentered, arrowStyles } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuPositionerContext"])();
+    const open = store.useState('open');
+    const state = {
+        open,
+        side,
+        align,
+        uncentered: arrowUncentered
+    };
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        ref: [
+            arrowRef,
+            forwardedRef
+        ],
+        stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["popupStateMapping"],
+        state,
+        props: {
+            style: arrowStyles,
+            'aria-hidden': true,
+            ...elementProps
+        }
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuArrow.displayName = "MenuArrow";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/context-menu/root/ContextMenuRootContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "ContextMenuRootContext",
+    ()=>ContextMenuRootContext,
+    "useContextMenuRootContext",
+    ()=>useContextMenuRootContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const ContextMenuRootContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) ContextMenuRootContext.displayName = "ContextMenuRootContext";
+function useContextMenuRootContext(optional = true) {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](ContextMenuRootContext);
+    if (context === undefined && !optional) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: ContextMenuRootContext is missing. ContextMenu parts must be placed within <ContextMenu.Root>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "cancelOpen",
+    ()=>cancelOpen,
+    "chipRemovePress",
+    ()=>chipRemovePress,
+    "clearPress",
+    ()=>clearPress,
+    "closePress",
+    ()=>closePress,
+    "closeWatcher",
+    ()=>closeWatcher,
+    "decrementPress",
+    ()=>decrementPress,
+    "disabled",
+    ()=>disabled,
+    "drag",
+    ()=>drag,
+    "escapeKey",
+    ()=>escapeKey,
+    "focusOut",
+    ()=>focusOut,
+    "imperativeAction",
+    ()=>imperativeAction,
+    "incrementPress",
+    ()=>incrementPress,
+    "initial",
+    ()=>initial,
+    "inputBlur",
+    ()=>inputBlur,
+    "inputChange",
+    ()=>inputChange,
+    "inputClear",
+    ()=>inputClear,
+    "inputPaste",
+    ()=>inputPaste,
+    "inputPress",
+    ()=>inputPress,
+    "itemPress",
+    ()=>itemPress,
+    "keyboard",
+    ()=>keyboard,
+    "linkPress",
+    ()=>linkPress,
+    "listNavigation",
+    ()=>listNavigation,
+    "missing",
+    ()=>missing,
+    "none",
+    ()=>none,
+    "outsidePress",
+    ()=>outsidePress,
+    "pointer",
+    ()=>pointer,
+    "scrub",
+    ()=>scrub,
+    "siblingOpen",
+    ()=>siblingOpen,
+    "swipe",
+    ()=>swipe,
+    "trackPress",
+    ()=>trackPress,
+    "triggerFocus",
+    ()=>triggerFocus,
+    "triggerHover",
+    ()=>triggerHover,
+    "triggerPress",
+    ()=>triggerPress,
+    "wheel",
+    ()=>wheel,
+    "windowResize",
+    ()=>windowResize
+]);
+const none = 'none';
+const triggerPress = 'trigger-press';
+const triggerHover = 'trigger-hover';
+const triggerFocus = 'trigger-focus';
+const outsidePress = 'outside-press';
+const itemPress = 'item-press';
+const closePress = 'close-press';
+const linkPress = 'link-press';
+const clearPress = 'clear-press';
+const chipRemovePress = 'chip-remove-press';
+const trackPress = 'track-press';
+const incrementPress = 'increment-press';
+const decrementPress = 'decrement-press';
+const inputChange = 'input-change';
+const inputClear = 'input-clear';
+const inputBlur = 'input-blur';
+const inputPaste = 'input-paste';
+const inputPress = 'input-press';
+const focusOut = 'focus-out';
+const escapeKey = 'escape-key';
+const closeWatcher = 'close-watcher';
+const listNavigation = 'list-navigation';
+const keyboard = 'keyboard';
+const pointer = 'pointer';
+const drag = 'drag';
+const wheel = 'wheel';
+const scrub = 'scrub';
+const cancelOpen = 'cancel-open';
+const siblingOpen = 'sibling-open';
+const disabled = 'disabled';
+const missing = 'missing';
+const initial = 'initial';
+const imperativeAction = 'imperative-action';
+const swipe = 'swipe';
+const windowResize = 'window-resize';
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "REASONS",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript)");
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/backdrop/MenuBackdrop.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuBackdrop",
+    ()=>MenuBackdrop
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popupStateMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$context$2d$menu$2f$root$2f$ContextMenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/context-menu/root/ContextMenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+const stateAttributesMapping = {
+    ...__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["popupStateMapping"],
+    ...__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["transitionStatusMapping"]
+};
+const MenuBackdrop = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuBackdrop(componentProps, forwardedRef) {
+    const { render, className, style, ...elementProps } = componentProps;
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const open = store.useState('open');
+    const mounted = store.useState('mounted');
+    const transitionStatus = store.useState('transitionStatus');
+    const lastOpenChangeReason = store.useState('lastOpenChangeReason');
+    const contextMenuContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$context$2d$menu$2f$root$2f$ContextMenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContextMenuRootContext"])();
+    const state = {
+        open,
+        transitionStatus
+    };
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        ref: contextMenuContext?.backdropRef ? [
+            forwardedRef,
+            contextMenuContext.backdropRef
+        ] : forwardedRef,
+        state,
+        stateAttributesMapping,
+        props: [
+            {
+                role: 'presentation',
+                hidden: !mounted,
+                style: {
+                    pointerEvents: lastOpenChangeReason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover ? 'none' : undefined,
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none'
+                }
+            },
+            elementProps
+        ]
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuBackdrop.displayName = "MenuBackdrop";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/checkbox-item/MenuCheckboxItemContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuCheckboxItemContext",
+    ()=>MenuCheckboxItemContext,
+    "useMenuCheckboxItemContext",
+    ()=>useMenuCheckboxItemContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const MenuCheckboxItemContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) MenuCheckboxItemContext.displayName = "MenuCheckboxItemContext";
+function useMenuCheckboxItemContext() {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](MenuCheckboxItemContext);
+    if (context === undefined) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: MenuCheckboxItemContext is missing. MenuCheckboxItem parts must be placed within <Menu.CheckboxItem>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/item/useMenuItemCommonProps.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useMenuItemCommonProps",
+    ()=>useMenuItemCommonProps
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/platform/parts.mjs [app-ssr] (ecmascript) <export * as platform>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$context$2d$menu$2f$root$2f$ContextMenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/context-menu/root/ContextMenuRootContext.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+function useMenuItemCommonProps(params) {
+    const { closeOnClick, highlighted, id, nodeId, store, typingRef, itemRef, itemMetadata } = params;
+    const { events: menuEvents } = store.useState('floatingTreeRoot');
+    const open = store.useState('open');
+    const contextMenuContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$context$2d$menu$2f$root$2f$ContextMenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContextMenuRootContext"])(true);
+    const isContextMenu = contextMenuContext !== undefined;
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            id,
+            role: 'menuitem',
+            tabIndex: open && highlighted ? 0 : -1,
+            onKeyDown (event) {
+                if (event.key === ' ' && typingRef?.current) {
+                    event.preventDefault();
+                }
+            },
+            onMouseMove (event) {
+                if (!nodeId) {
+                    return;
+                }
+                // Inform the floating tree that a menu item within this menu was hovered/moved over
+                // so unrelated descendant submenus can be closed.
+                menuEvents.emit('itemhover', {
+                    nodeId,
+                    target: event.currentTarget
+                });
+            },
+            onClick (event) {
+                if (closeOnClick) {
+                    menuEvents.emit('close', {
+                        domEvent: event,
+                        reason: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].itemPress
+                    });
+                }
+            },
+            onMouseUp (event) {
+                if (contextMenuContext) {
+                    const initialCursorPoint = contextMenuContext.initialCursorPointRef.current;
+                    contextMenuContext.initialCursorPointRef.current = null;
+                    if (isContextMenu && initialCursorPoint && Math.abs(event.clientX - initialCursorPoint.x) <= 1 && Math.abs(event.clientY - initialCursorPoint.y) <= 1) {
+                        return;
+                    }
+                    // On non-macOS platforms, this mouseup belongs to the right-click gesture
+                    // that opened the context menu, so it must not activate an item.
+                    if (isContextMenu && !__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].os.mac && event.button === 2) {
+                        return;
+                    }
+                }
+                if (itemRef.current && store.context.allowMouseUpTriggerRef.current && (!isContextMenu || event.button === 2)) {
+                    // This fires whenever the user clicks on the trigger, moves the cursor, and releases it over the item.
+                    // We trigger the click and override the `closeOnClick` preference to always close the menu.
+                    if (!itemMetadata || itemMetadata.type === 'regular-item') {
+                        itemRef.current.click();
+                    }
+                }
+            }
+        }), [
+        closeOnClick,
+        highlighted,
+        id,
+        menuEvents,
+        nodeId,
+        open,
+        store,
+        typingRef,
+        itemRef,
+        contextMenuContext,
+        isContextMenu,
+        itemMetadata
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/item/useMenuItem.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "REGULAR_ITEM",
+    ()=>REGULAR_ITEM,
+    "useMenuItem",
+    ()=>useMenuItem
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useMergedRefs.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$use$2d$button$2f$useButton$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/use-button/useButton.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/merge-props/mergeProps.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItemCommonProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/item/useMenuItemCommonProps.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+const REGULAR_ITEM = {
+    type: 'regular-item'
+};
+function useMenuItem(params) {
+    const { closeOnClick, disabled: disabledProp = false, highlighted, id, store, typingRef = store.context.typingRef, nativeButton, itemMetadata, nodeId } = params;
+    const rootDisabled = store.useState('disabled');
+    const disabled = disabledProp || rootDisabled;
+    const itemRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const { getButtonProps, buttonRef } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$use$2d$button$2f$useButton$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useButton"])({
+        disabled,
+        focusableWhenDisabled: true,
+        native: nativeButton,
+        composite: true
+    });
+    const commonProps = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItemCommonProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuItemCommonProps"])({
+        closeOnClick,
+        highlighted,
+        id,
+        nodeId,
+        store,
+        typingRef,
+        itemRef,
+        itemMetadata
+    });
+    const getItemProps = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((externalProps)=>{
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeProps"])(commonProps, {
+            onMouseEnter () {
+                if (itemMetadata.type !== 'submenu-trigger') {
+                    return;
+                }
+                itemMetadata.setActive();
+            }
+        }, externalProps, getButtonProps);
+    }, [
+        commonProps,
+        getButtonProps,
+        itemMetadata
+    ]);
+    const mergedRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMergedRefs"])(itemRef, buttonRef);
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            getItemProps,
+            itemRef: mergedRef
+        }), [
+        getItemProps,
+        mergedRef
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/CompositeListContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "CompositeListContext",
+    ()=>CompositeListContext,
+    "useCompositeListContext",
+    ()=>useCompositeListContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+const CompositeListContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"]({
+    register: ()=>{},
+    unregister: ()=>{},
+    subscribeMapChange: ()=>{
+        return ()=>{};
+    },
+    elementsRef: {
+        current: []
+    },
+    nextIndexRef: {
+        current: 0
+    }
+});
+if ("TURBOPACK compile-time truthy", 1) CompositeListContext.displayName = "CompositeListContext";
+function useCompositeListContext() {
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](CompositeListContext);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/useCompositeListItem.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "IndexGuessBehavior",
+    ()=>IndexGuessBehavior,
+    "useCompositeListItem",
+    ()=>useCompositeListItem
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$CompositeListContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/CompositeListContext.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+let IndexGuessBehavior = /*#__PURE__*/ function(IndexGuessBehavior) {
+    IndexGuessBehavior[IndexGuessBehavior["None"] = 0] = "None";
+    IndexGuessBehavior[IndexGuessBehavior["GuessFromOrder"] = 1] = "GuessFromOrder";
+    return IndexGuessBehavior;
+}({});
+function useCompositeListItem(params = {}) {
+    const { label, metadata, textRef, indexGuessBehavior, index: externalIndex } = params;
+    const { register, unregister, subscribeMapChange, elementsRef, labelsRef, nextIndexRef } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$CompositeListContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeListContext"])();
+    const indexRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](-1);
+    const [index, setIndex] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](externalIndex ?? (indexGuessBehavior === IndexGuessBehavior.GuessFromOrder ? ()=>{
+        if (indexRef.current === -1) {
+            const newIndex = nextIndexRef.current;
+            nextIndexRef.current += 1;
+            indexRef.current = newIndex;
+        }
+        return indexRef.current;
+    } : -1));
+    const componentRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const ref = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((node)=>{
+        componentRef.current = node;
+        if (index !== -1 && node !== null) {
+            elementsRef.current[index] = node;
+            if (labelsRef) {
+                const isLabelDefined = label !== undefined;
+                labelsRef.current[index] = isLabelDefined ? label : textRef?.current?.textContent ?? node.textContent;
+            }
+        }
+    }, [
+        index,
+        elementsRef,
+        labelsRef,
+        label,
+        textRef
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (externalIndex != null) {
+            return undefined;
+        }
+        const node = componentRef.current;
+        if (node) {
+            register(node, metadata);
+            return ()=>{
+                unregister(node);
+            };
+        }
+        return undefined;
+    }, [
+        externalIndex,
+        register,
+        unregister,
+        metadata
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (externalIndex != null) {
+            return undefined;
+        }
+        return subscribeMapChange((map)=>{
+            const i = componentRef.current ? map.get(componentRef.current)?.index : null;
+            if (i != null) {
+                setIndex(i);
+            }
+        });
+    }, [
+        externalIndex,
+        subscribeMapChange,
+        setIndex
+    ]);
+    return {
+        ref,
+        index
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/useBaseUiId.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useBaseUiId",
+    ()=>useBaseUiId
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useId.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+function useBaseUiId(idOverride) {
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useId"])(idOverride, 'base-ui');
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/checkbox-item/MenuCheckboxItemDataAttributes.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuCheckboxItemDataAttributes",
+    ()=>MenuCheckboxItemDataAttributes
+]);
+let MenuCheckboxItemDataAttributes = /*#__PURE__*/ function(MenuCheckboxItemDataAttributes) {
+    /**
+   * Present when the menu checkbox item is checked.
+   */ MenuCheckboxItemDataAttributes["checked"] = "data-checked";
+    /**
+   * Present when the menu checkbox item is not checked.
+   */ MenuCheckboxItemDataAttributes["unchecked"] = "data-unchecked";
+    /**
+   * Present when the menu checkbox item is disabled.
+   */ MenuCheckboxItemDataAttributes["disabled"] = "data-disabled";
+    /**
+   * Present when the menu checkbox item is highlighted.
+   */ MenuCheckboxItemDataAttributes["highlighted"] = "data-highlighted";
+    return MenuCheckboxItemDataAttributes;
+}({});
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/utils/stateAttributesMapping.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "itemMapping",
+    ()=>itemMapping
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2f$MenuCheckboxItemDataAttributes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/checkbox-item/MenuCheckboxItemDataAttributes.mjs [app-ssr] (ecmascript)");
+;
+;
+const itemMapping = {
+    checked (value) {
+        if (value) {
+            return {
+                [__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2f$MenuCheckboxItemDataAttributes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuCheckboxItemDataAttributes"].checked]: ''
+            };
+        }
+        return {
+            [__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2f$MenuCheckboxItemDataAttributes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuCheckboxItemDataAttributes"].unchecked]: ''
+        };
+    },
+    ...__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["transitionStatusMapping"]
+};
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "createChangeEventDetails",
+    ()=>createChangeEventDetails,
+    "createGenericEventDetails",
+    ()=>createGenericEventDetails
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+;
+;
+function createChangeEventDetails(reason, event, trigger, customProperties) {
+    let canceled = false;
+    let allowPropagation = false;
+    const custom = customProperties ?? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+    const details = {
+        reason,
+        event: event ?? new Event('base-ui'),
+        cancel () {
+            canceled = true;
+        },
+        allowPropagation () {
+            allowPropagation = true;
+        },
+        get isCanceled () {
+            return canceled;
+        },
+        get isPropagationAllowed () {
+            return allowPropagation;
+        },
+        trigger,
+        ...custom
+    };
+    return details;
+}
+function createGenericEventDetails(reason, event, customProperties) {
+    const custom = customProperties ?? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+    const details = {
+        reason,
+        event: event ?? new Event('base-ui'),
+        ...custom
+    };
+    return details;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/checkbox-item/MenuCheckboxItem.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuCheckboxItem",
+    ()=>MenuCheckboxItem
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useControlled$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useControlled.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2f$MenuCheckboxItemContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/checkbox-item/MenuCheckboxItemContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/item/useMenuItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/useCompositeListItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useBaseUiId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$utils$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/utils/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositionerContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const MenuCheckboxItem = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuCheckboxItem(componentProps, forwardedRef) {
+    const { render, className, id: idProp, label, nativeButton = false, disabled = false, closeOnClick = false, checked: checkedProp, defaultChecked, onCheckedChange, style, ...elementProps } = componentProps;
+    const listItem = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeListItem"])({
+        label
+    });
+    const menuPositionerContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuPositionerContext"])(true);
+    const id = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useBaseUiId"])(idProp);
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const highlighted = store.useState('isActive', listItem.index);
+    const itemProps = store.useState('itemProps');
+    const [checked, setChecked] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useControlled$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useControlled"])({
+        controlled: checkedProp,
+        default: defaultChecked ?? false,
+        name: 'MenuCheckboxItem',
+        state: 'checked'
+    });
+    const { getItemProps, itemRef } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuItem"])({
+        closeOnClick,
+        disabled,
+        highlighted,
+        id,
+        store,
+        nativeButton,
+        nodeId: menuPositionerContext?.context.nodeId,
+        itemMetadata: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["REGULAR_ITEM"]
+    });
+    const state = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            disabled,
+            highlighted,
+            checked
+        }), [
+        disabled,
+        highlighted,
+        checked
+    ]);
+    function handleClick(event) {
+        const details = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].itemPress, event.nativeEvent, undefined, {
+            preventUnmountOnClose () {}
+        });
+        onCheckedChange?.(!checked, details);
+        if (details.isCanceled) {
+            return;
+        }
+        setChecked((currentlyChecked)=>!currentlyChecked);
+    }
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        state,
+        stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$utils$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["itemMapping"],
+        props: [
+            itemProps,
+            {
+                role: 'menuitemcheckbox',
+                'aria-checked': checked,
+                onClick: handleClick
+            },
+            elementProps,
+            getItemProps
+        ],
+        ref: [
+            itemRef,
+            forwardedRef,
+            listItem.ref
+        ]
+    });
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2f$MenuCheckboxItemContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuCheckboxItemContext"].Provider, {
+        value: state,
+        children: element
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuCheckboxItem.displayName = "MenuCheckboxItem";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/checkbox-item-indicator/MenuCheckboxItemIndicator.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuCheckboxItemIndicator",
+    ()=>MenuCheckboxItemIndicator
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2f$MenuCheckboxItemContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/checkbox-item/MenuCheckboxItemContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$utils$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/utils/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useTransitionStatus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useTransitionStatus.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useOpenChangeComplete$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useOpenChangeComplete.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+const MenuCheckboxItemIndicator = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuCheckboxItemIndicator(componentProps, forwardedRef) {
+    const { render, className, style, keepMounted = false, ...elementProps } = componentProps;
+    const item = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2f$MenuCheckboxItemContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuCheckboxItemContext"])();
+    const indicatorRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const { transitionStatus, setMounted } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useTransitionStatus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTransitionStatus"])(item.checked);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useOpenChangeComplete$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useOpenChangeComplete"])({
+        open: item.checked,
+        ref: indicatorRef,
+        onComplete () {
+            if (!item.checked) {
+                setMounted(false);
+            }
+        }
+    });
+    const state = {
+        checked: item.checked,
+        disabled: item.disabled,
+        highlighted: item.highlighted,
+        transitionStatus
+    };
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('span', componentProps, {
+        state,
+        ref: [
+            forwardedRef,
+            indicatorRef
+        ],
+        stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$utils$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["itemMapping"],
+        props: {
+            'aria-hidden': true,
+            ...elementProps
+        },
+        enabled: keepMounted || item.checked
+    });
+    return element;
+});
+if ("TURBOPACK compile-time truthy", 1) MenuCheckboxItemIndicator.displayName = "MenuCheckboxItemIndicator";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/group/MenuGroupContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuGroupContext",
+    ()=>MenuGroupContext,
+    "useMenuGroupRootContext",
+    ()=>useMenuGroupRootContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const MenuGroupContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) MenuGroupContext.displayName = "MenuGroupContext";
+function useMenuGroupRootContext() {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](MenuGroupContext);
+    if (context === undefined) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: MenuGroupContext is missing. Menu group parts must be used within <Menu.Group> or <Menu.RadioGroup>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/group/MenuGroup.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuGroup",
+    ()=>MenuGroup
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$group$2f$MenuGroupContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/group/MenuGroupContext.mjs [app-ssr] (ecmascript)");
+/**
+ * Groups related menu items with the corresponding label.
+ * Renders a `<div>` element.
+ *
+ * Documentation: [Base UI Menu](https://base-ui.com/react/components/menu)
+ */ var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+const MenuGroup = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuGroup(componentProps, forwardedRef) {
+    const { render, className, style, ...elementProps } = componentProps;
+    const [labelId, setLabelId] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](undefined);
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        ref: forwardedRef,
+        props: {
+            role: 'group',
+            'aria-labelledby': labelId,
+            ...elementProps
+        }
+    });
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$group$2f$MenuGroupContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuGroupContext"].Provider, {
+        value: setLabelId,
+        children: element
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuGroup.displayName = "MenuGroup";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/group-label/MenuGroupLabel.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuGroupLabel",
+    ()=>MenuGroupLabel
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useBaseUiId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$group$2f$MenuGroupContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/group/MenuGroupContext.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+const MenuGroupLabel = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuGroupLabel(componentProps, forwardedRef) {
+    const { render, className, style, id: idProp, ...elementProps } = componentProps;
+    const id = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useBaseUiId"])(idProp);
+    const setLabelId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$group$2f$MenuGroupContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuGroupRootContext"])();
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        setLabelId(id);
+        return ()=>{
+            setLabelId(undefined);
+        };
+    }, [
+        setLabelId,
+        id
+    ]);
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        ref: forwardedRef,
+        props: {
+            id,
+            role: 'presentation',
+            ...elementProps
+        }
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuGroupLabel.displayName = "MenuGroupLabel";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/item/MenuItem.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuItem",
+    ()=>MenuItem
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/item/useMenuItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useBaseUiId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/useCompositeListItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositionerContext.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+const MenuItem = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuItem(componentProps, forwardedRef) {
+    const { render, className, id: idProp, label, nativeButton = false, disabled = false, closeOnClick = true, style, ...elementProps } = componentProps;
+    const listItem = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeListItem"])({
+        label
+    });
+    const menuPositionerContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuPositionerContext"])(true);
+    const id = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useBaseUiId"])(idProp);
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const highlighted = store.useState('isActive', listItem.index);
+    const itemProps = store.useState('itemProps');
+    const { getItemProps, itemRef } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuItem"])({
+        closeOnClick,
+        disabled,
+        highlighted,
+        id,
+        store,
+        nativeButton,
+        nodeId: menuPositionerContext?.context.nodeId,
+        itemMetadata: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["REGULAR_ITEM"]
+    });
+    const state = {
+        disabled,
+        highlighted
+    };
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        state,
+        props: [
+            itemProps,
+            elementProps,
+            getItemProps
+        ],
+        ref: [
+            itemRef,
+            forwardedRef,
+            listItem.ref
+        ]
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuItem.displayName = "MenuItem";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/link-item/MenuLinkItem.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuLinkItem",
+    ()=>MenuLinkItem
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useBaseUiId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/useCompositeListItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositionerContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItemCommonProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/item/useMenuItemCommonProps.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$use$2d$button$2f$useButton$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/use-button/useButton.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/merge-props/mergeProps.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const MenuLinkItem = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuLinkItem(componentProps, forwardedRef) {
+    const { render, className, id: idProp, label, closeOnClick = false, style, ...elementProps } = componentProps;
+    const linkRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const listItem = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeListItem"])({
+        label
+    });
+    const menuPositionerContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuPositionerContext"])(true);
+    const nodeId = menuPositionerContext?.context.nodeId;
+    const id = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useBaseUiId"])(idProp);
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const highlighted = store.useState('isActive', listItem.index);
+    const itemProps = store.useState('itemProps');
+    const typingRef = store.context.typingRef;
+    const { getButtonProps, buttonRef } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$use$2d$button$2f$useButton$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useButton"])({
+        native: false,
+        composite: true
+    });
+    const commonProps = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItemCommonProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuItemCommonProps"])({
+        closeOnClick,
+        highlighted,
+        id,
+        nodeId,
+        store,
+        typingRef,
+        itemRef: linkRef
+    });
+    function getItemProps(externalProps) {
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeProps"])(commonProps, externalProps, getButtonProps);
+    }
+    const state = {
+        highlighted
+    };
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('a', componentProps, {
+        state,
+        props: [
+            itemProps,
+            elementProps,
+            getItemProps
+        ],
+        ref: [
+            linkRef,
+            buttonRef,
+            forwardedRef,
+            listItem.ref
+        ]
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuLinkItem.displayName = "MenuLinkItem";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/FocusGuard.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "FocusGuard",
+    ()=>FocusGuard
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/platform/parts.mjs [app-ssr] (ecmascript) <export * as platform>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$visuallyHidden$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/visuallyHidden.mjs [app-ssr] (ecmascript)");
+/**
+ * @internal
+ */ var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+const FocusGuard = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function FocusGuard(props, ref) {
+    const [role, setRole] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"]();
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        // Unlike NVDA and JAWS, VoiceOver's virtual cursor triggers `onFocus` as
+        // it moves — but only on focusable/role-button elements through WebKit's
+        // NSAccessibility path. Setting `role="button"` lets the focus trap catch
+        // the cursor.
+        if (__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].screenReader.voiceOver && __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].engine.webkit) {
+            setRole('button');
+        }
+    }, []);
+    const restProps = {
+        tabIndex: 0,
+        // Role is only for VoiceOver
+        role
+    };
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])("span", {
+        ...props,
+        ref: ref,
+        style: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$visuallyHidden$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["visuallyHidden"],
+        "aria-hidden": role ? undefined : true,
+        ...restProps,
+        "data-base-ui-focus-guard": ""
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) FocusGuard.displayName = "FocusGuard";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "activeElement",
+    ()=>activeElement,
+    "contains",
+    ()=>contains,
+    "getTarget",
+    ()=>getTarget
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+;
+function activeElement(doc) {
+    let element = doc.activeElement;
+    while(element?.shadowRoot?.activeElement != null){
+        element = element.shadowRoot.activeElement;
+    }
+    return element;
+}
+function contains(parent, child) {
+    if (!parent || !child) {
+        return false;
+    }
+    const rootNode = child.getRootNode?.();
+    // First, attempt with the faster native method.
+    if (parent.contains(child)) {
+        return true;
+    }
+    // Then fall back to traversing out of shadow roots when needed.
+    if (rootNode && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isShadowRoot"])(rootNode)) {
+        let next = child;
+        while(next){
+            if (parent === next) {
+                return true;
+            }
+            next = next.parentNode || next.host;
+        }
+    }
+    return false;
+}
+function getTarget(event) {
+    if ('composedPath' in event) {
+        return event.composedPath()[0];
+    }
+    // TS assumes `composedPath()` always exists, but older browsers without
+    // shadow DOM support still fall back to `target`.
+    return event.target;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/constants.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "ACTIVE_KEY",
+    ()=>ACTIVE_KEY,
+    "ARROW_DOWN",
+    ()=>ARROW_DOWN,
+    "ARROW_LEFT",
+    ()=>ARROW_LEFT,
+    "ARROW_RIGHT",
+    ()=>ARROW_RIGHT,
+    "ARROW_UP",
+    ()=>ARROW_UP,
+    "FOCUSABLE_ATTRIBUTE",
+    ()=>FOCUSABLE_ATTRIBUTE,
+    "SELECTED_KEY",
+    ()=>SELECTED_KEY,
+    "TYPEABLE_SELECTOR",
+    ()=>TYPEABLE_SELECTOR
+]);
+const FOCUSABLE_ATTRIBUTE = 'data-base-ui-focusable';
+const ACTIVE_KEY = 'active';
+const SELECTED_KEY = 'selected';
+const TYPEABLE_SELECTOR = "input:not([type='hidden']):not([disabled])," + "[contenteditable]:not([contenteditable='false']),textarea:not([disabled])";
+const ARROW_LEFT = 'ArrowLeft';
+const ARROW_RIGHT = 'ArrowRight';
+const ARROW_UP = 'ArrowUp';
+const ARROW_DOWN = 'ArrowDown';
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "getFloatingFocusElement",
+    ()=>getFloatingFocusElement,
+    "isEventTargetWithin",
+    ()=>isEventTargetWithin,
+    "isInteractiveElement",
+    ()=>isInteractiveElement,
+    "isRootElement",
+    ()=>isRootElement,
+    "isTargetInsideEnabledTrigger",
+    ()=>isTargetInsideEnabledTrigger,
+    "isTypeableCombobox",
+    ()=>isTypeableCombobox,
+    "isTypeableElement",
+    ()=>isTypeableElement,
+    "matchesFocusVisible",
+    ()=>matchesFocusVisible
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/platform/parts.mjs [app-ssr] (ecmascript) <export * as platform>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/constants.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+;
+;
+;
+;
+;
+function isTargetInsideEnabledTrigger(target, triggerElements) {
+    if (!(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(target)) {
+        return false;
+    }
+    const targetElement = target;
+    if (triggerElements.hasElement(targetElement)) {
+        return !targetElement.hasAttribute('data-trigger-disabled');
+    }
+    for (const [, trigger] of triggerElements.entries()){
+        if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(trigger, targetElement)) {
+            return !trigger.hasAttribute('data-trigger-disabled');
+        }
+    }
+    return false;
+}
+function isEventTargetWithin(event, node) {
+    if (node == null) {
+        return false;
+    }
+    if ('composedPath' in event) {
+        return event.composedPath().includes(node);
+    }
+    // TS thinks `event` is of type never as it assumes all browsers support composedPath, but browsers without shadow dom don't
+    const eventAgain = event;
+    return eventAgain.target != null && node.contains(eventAgain.target);
+}
+function isRootElement(element) {
+    return element.matches('html,body');
+}
+function isTypeableElement(element) {
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(element) && element.matches(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TYPEABLE_SELECTOR"]);
+}
+function isInteractiveElement(element) {
+    return element?.closest(`button,a[href],[role="button"],select,[tabindex]:not([tabindex="-1"]),${__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TYPEABLE_SELECTOR"]}`) != null;
+}
+function isTypeableCombobox(element) {
+    if (!element) {
+        return false;
+    }
+    return element.getAttribute('role') === 'combobox' && isTypeableElement(element);
+}
+function matchesFocusVisible(element) {
+    // We don't want to block focus from working with `visibleOnly`
+    // (JSDOM doesn't match `:focus-visible` when the element has `:focus`)
+    if (!element || __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].env.jsdom) {
+        return true;
+    }
+    try {
+        return element.matches(':focus-visible');
+    } catch (_e) {
+        return true;
+    }
+}
+function getFloatingFocusElement(floatingElement) {
+    if (!floatingElement) {
+        return null;
+    }
+    // Try to find the element that has `{...getFloatingProps()}` spread on it.
+    // This indicates the floating element is acting as a positioning wrapper, and
+    // so focus should be managed on the child element with the event handlers and
+    // aria props.
+    return floatingElement.hasAttribute(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FOCUSABLE_ATTRIBUTE"]) ? floatingElement : floatingElement.querySelector(`[${__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FOCUSABLE_ATTRIBUTE"]}]`) || floatingElement;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/event.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "isClickLikeEvent",
+    ()=>isClickLikeEvent,
+    "isMouseLikePointerType",
+    ()=>isMouseLikePointerType,
+    "isReactEvent",
+    ()=>isReactEvent,
+    "isVirtualClick",
+    ()=>isVirtualClick,
+    "isVirtualPointerEvent",
+    ()=>isVirtualPointerEvent,
+    "stopEvent",
+    ()=>stopEvent
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/platform/parts.mjs [app-ssr] (ecmascript) <export * as platform>");
+;
+function stopEvent(event) {
+    event.preventDefault();
+    event.stopPropagation();
+}
+function isReactEvent(event) {
+    return 'nativeEvent' in event;
+}
+function isVirtualClick(event) {
+    if (event.pointerType === '' && event.isTrusted) {
+        return true;
+    }
+    if (__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].os.android && event.pointerType) {
+        return event.type === 'click' && event.buttons === 1;
+    }
+    return event.detail === 0 && !event.pointerType;
+}
+function isVirtualPointerEvent(event) {
+    if (__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].env.jsdom) {
+        return false;
+    }
+    return !__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].os.android && event.width === 0 && event.height === 0 || __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].os.android && event.width === 1 && event.height === 1 && event.pressure === 0 && event.detail === 0 && event.pointerType === 'mouse' || // iOS VoiceOver returns 0.333• for width/height.
+    event.width < 1 && event.height < 1 && event.pressure === 0 && event.detail === 0 && event.pointerType === 'touch';
+}
+function isMouseLikePointerType(pointerType, strict) {
+    // On some Linux machines with Chromium, mouse inputs return a `pointerType`
+    // of "pen": https://github.com/floating-ui/floating-ui/issues/2015
+    const values = [
+        'mouse',
+        'pen'
+    ];
+    if (!strict) {
+        values.push('', undefined);
+    }
+    return values.includes(pointerType);
+}
+function isClickLikeEvent(event) {
+    const type = event.type;
+    return type === 'click' || type === 'mousedown' || type === 'keydown' || type === 'keyup';
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/composite.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "createGridCellMap",
+    ()=>createGridCellMap,
+    "findNonDisabledListIndex",
+    ()=>findNonDisabledListIndex,
+    "getGridCellIndexOfCorner",
+    ()=>getGridCellIndexOfCorner,
+    "getGridCellIndices",
+    ()=>getGridCellIndices,
+    "getGridNavigatedIndex",
+    ()=>getGridNavigatedIndex,
+    "getMaxListIndex",
+    ()=>getMaxListIndex,
+    "getMinListIndex",
+    ()=>getMinListIndex,
+    "isDifferentGridRow",
+    ()=>isDifferentGridRow,
+    "isElementVisible",
+    ()=>isElementVisible,
+    "isHiddenByStyles",
+    ()=>isHiddenByStyles,
+    "isIndexOutOfListBounds",
+    ()=>isIndexOutOfListBounds,
+    "isListIndexDisabled",
+    ()=>isListIndexDisabled
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/event.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/constants.mjs [app-ssr] (ecmascript)");
+;
+;
+;
+;
+function isDifferentGridRow(index, cols, prevRow) {
+    return Math.floor(index / cols) !== prevRow;
+}
+function isIndexOutOfListBounds(list, index) {
+    return index < 0 || index >= list.length;
+}
+function getMinListIndex(listRef, disabledIndices) {
+    return findNonDisabledListIndex(listRef.current, {
+        disabledIndices
+    });
+}
+function getMaxListIndex(listRef, disabledIndices) {
+    return findNonDisabledListIndex(listRef.current, {
+        decrement: true,
+        startingIndex: listRef.current.length,
+        disabledIndices
+    });
+}
+function findNonDisabledListIndex(list, { startingIndex = -1, decrement = false, disabledIndices, amount = 1 } = {}) {
+    let index = startingIndex;
+    do {
+        index += decrement ? -amount : amount;
+    }while (index >= 0 && index <= list.length - 1 && isListIndexDisabled(list, index, disabledIndices))
+    return index;
+}
+function getGridNavigatedIndex(list, { event, orientation, loopFocus, onLoop, rtl, cols, disabledIndices, minIndex, maxIndex, prevIndex, stopEvent: stop = false }) {
+    let nextIndex = prevIndex;
+    let verticalDirection;
+    if (event.key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_UP"]) {
+        verticalDirection = 'up';
+    } else if (event.key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_DOWN"]) {
+        verticalDirection = 'down';
+    }
+    if (verticalDirection) {
+        // -------------------------------------------------------------------------
+        // Detect row structure only when handling vertical navigation. This keeps
+        // the non-vertical key paths free from row inference work.
+        // -------------------------------------------------------------------------
+        const rows = [];
+        const rowIndexMap = [];
+        let hasRoleRow = false;
+        let visibleItemCount = 0;
+        {
+            let currentRowEl = null;
+            let currentRowIndex = -1;
+            list.forEach((el, idx)=>{
+                if (el == null) {
+                    return;
+                }
+                visibleItemCount += 1;
+                const rowEl = el.closest('[role="row"]');
+                if (rowEl) {
+                    hasRoleRow = true;
+                }
+                if (rowEl !== currentRowEl || currentRowIndex === -1) {
+                    currentRowEl = rowEl;
+                    currentRowIndex += 1;
+                    rows[currentRowIndex] = [];
+                }
+                rows[currentRowIndex].push(idx);
+                rowIndexMap[idx] = currentRowIndex;
+            });
+        }
+        let hasDomRows = false;
+        let inferredDomCols = 0;
+        if (hasRoleRow) {
+            for (const row of rows){
+                const rowLength = row.length;
+                if (rowLength > inferredDomCols) {
+                    inferredDomCols = rowLength;
+                }
+                if (rowLength !== cols) {
+                    hasDomRows = true;
+                }
+            }
+        }
+        const hasVirtualizedGaps = hasDomRows && visibleItemCount < list.length;
+        const verticalCols = inferredDomCols || cols;
+        const navigateVertically = (direction)=>{
+            if (!hasDomRows || prevIndex === -1) {
+                return undefined;
+            }
+            const currentRow = rowIndexMap[prevIndex];
+            if (currentRow == null) {
+                return undefined;
+            }
+            const colInRow = rows[currentRow].indexOf(prevIndex);
+            const step = direction === 'up' ? -1 : 1;
+            for(let nextRow = currentRow + step, i = 0; i < rows.length; i += 1, nextRow += step){
+                if (nextRow < 0 || nextRow >= rows.length) {
+                    if (!loopFocus || hasVirtualizedGaps) {
+                        return undefined;
+                    }
+                    nextRow = nextRow < 0 ? rows.length - 1 : 0;
+                    if (onLoop) {
+                        const clampedCol = Math.min(colInRow, rows[nextRow].length - 1);
+                        const targetItemIndex = rows[nextRow][clampedCol] ?? rows[nextRow][0];
+                        const returnedItemIndex = onLoop(event, prevIndex, targetItemIndex);
+                        nextRow = rowIndexMap[returnedItemIndex] ?? nextRow;
+                    }
+                }
+                const targetRow = rows[nextRow];
+                for(let col = Math.min(colInRow, targetRow.length - 1); col >= 0; col -= 1){
+                    const candidate = targetRow[col];
+                    if (!isListIndexDisabled(list, candidate, disabledIndices)) {
+                        return candidate;
+                    }
+                }
+            }
+            return undefined;
+        };
+        const navigateVerticallyWithInferredRows = (direction)=>{
+            if (!hasVirtualizedGaps || prevIndex === -1) {
+                return undefined;
+            }
+            const colInRow = prevIndex % verticalCols;
+            const rowStep = direction === 'up' ? -verticalCols : verticalCols;
+            const lastRowStart = maxIndex - maxIndex % verticalCols;
+            const rowCount = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["floor"])(maxIndex / verticalCols) + 1;
+            for(let rowStart = prevIndex - colInRow + rowStep, i = 0; i < rowCount; i += 1, rowStart += rowStep){
+                if (rowStart < 0 || rowStart > maxIndex) {
+                    if (!loopFocus) {
+                        return undefined;
+                    }
+                    rowStart = rowStart < 0 ? lastRowStart : 0;
+                }
+                const rowEnd = Math.min(rowStart + verticalCols - 1, maxIndex);
+                for(let candidate = Math.min(rowStart + colInRow, rowEnd); candidate >= rowStart; candidate -= 1){
+                    if (!isListIndexDisabled(list, candidate, disabledIndices)) {
+                        return candidate;
+                    }
+                }
+            }
+            return undefined;
+        };
+        if (stop) {
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+        }
+        const verticalCandidate = navigateVertically(verticalDirection) ?? navigateVerticallyWithInferredRows(verticalDirection);
+        if (verticalCandidate !== undefined) {
+            nextIndex = verticalCandidate;
+        } else if (prevIndex === -1) {
+            nextIndex = verticalDirection === 'up' ? maxIndex : minIndex;
+        } else {
+            nextIndex = findNonDisabledListIndex(list, {
+                startingIndex: prevIndex,
+                amount: verticalCols,
+                decrement: verticalDirection === 'up',
+                disabledIndices
+            });
+            if (loopFocus) {
+                if (verticalDirection === 'up' && (prevIndex - verticalCols < minIndex || nextIndex < 0)) {
+                    const col = prevIndex % verticalCols;
+                    const maxCol = maxIndex % verticalCols;
+                    const offset = maxIndex - (maxCol - col);
+                    if (maxCol === col) {
+                        nextIndex = maxIndex;
+                    } else {
+                        nextIndex = maxCol > col ? offset : offset - verticalCols;
+                    }
+                    if (onLoop) {
+                        nextIndex = onLoop(event, prevIndex, nextIndex);
+                    }
+                }
+                if (verticalDirection === 'down' && prevIndex + verticalCols > maxIndex) {
+                    nextIndex = findNonDisabledListIndex(list, {
+                        startingIndex: prevIndex % verticalCols - verticalCols,
+                        amount: verticalCols,
+                        disabledIndices
+                    });
+                    if (onLoop) {
+                        nextIndex = onLoop(event, prevIndex, nextIndex);
+                    }
+                }
+            }
+        }
+        if (isIndexOutOfListBounds(list, nextIndex)) {
+            nextIndex = prevIndex;
+        }
+    }
+    // Remains on the same row/column.
+    if (orientation === 'both') {
+        const prevRow = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["floor"])(prevIndex / cols);
+        if (event.key === (rtl ? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_LEFT"] : __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_RIGHT"])) {
+            if (stop) {
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+            }
+            if (prevIndex % cols !== cols - 1) {
+                nextIndex = findNonDisabledListIndex(list, {
+                    startingIndex: prevIndex,
+                    disabledIndices
+                });
+                if (loopFocus && isDifferentGridRow(nextIndex, cols, prevRow)) {
+                    nextIndex = findNonDisabledListIndex(list, {
+                        startingIndex: prevIndex - prevIndex % cols - 1,
+                        disabledIndices
+                    });
+                    if (onLoop) {
+                        nextIndex = onLoop(event, prevIndex, nextIndex);
+                    }
+                }
+            } else if (loopFocus) {
+                nextIndex = findNonDisabledListIndex(list, {
+                    startingIndex: prevIndex - prevIndex % cols - 1,
+                    disabledIndices
+                });
+                if (onLoop) {
+                    nextIndex = onLoop(event, prevIndex, nextIndex);
+                }
+            }
+            if (isDifferentGridRow(nextIndex, cols, prevRow)) {
+                nextIndex = prevIndex;
+            }
+        }
+        if (event.key === (rtl ? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_RIGHT"] : __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_LEFT"])) {
+            if (stop) {
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+            }
+            if (prevIndex % cols !== 0) {
+                nextIndex = findNonDisabledListIndex(list, {
+                    startingIndex: prevIndex,
+                    decrement: true,
+                    disabledIndices
+                });
+                if (loopFocus && isDifferentGridRow(nextIndex, cols, prevRow)) {
+                    nextIndex = findNonDisabledListIndex(list, {
+                        startingIndex: prevIndex + (cols - prevIndex % cols),
+                        decrement: true,
+                        disabledIndices
+                    });
+                    if (onLoop) {
+                        nextIndex = onLoop(event, prevIndex, nextIndex);
+                    }
+                }
+            } else if (loopFocus) {
+                nextIndex = findNonDisabledListIndex(list, {
+                    startingIndex: prevIndex + (cols - prevIndex % cols),
+                    decrement: true,
+                    disabledIndices
+                });
+                if (onLoop) {
+                    nextIndex = onLoop(event, prevIndex, nextIndex);
+                }
+            }
+            if (isDifferentGridRow(nextIndex, cols, prevRow)) {
+                nextIndex = prevIndex;
+            }
+        }
+        const lastRow = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["floor"])(maxIndex / cols) === prevRow;
+        if (isIndexOutOfListBounds(list, nextIndex)) {
+            if (loopFocus && lastRow) {
+                nextIndex = event.key === (rtl ? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_RIGHT"] : __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_LEFT"]) ? maxIndex : findNonDisabledListIndex(list, {
+                    startingIndex: prevIndex - prevIndex % cols - 1,
+                    disabledIndices
+                });
+                if (onLoop) {
+                    nextIndex = onLoop(event, prevIndex, nextIndex);
+                }
+            } else {
+                nextIndex = prevIndex;
+            }
+        }
+    }
+    return nextIndex;
+}
+function createGridCellMap(sizes, cols, dense) {
+    const cellMap = [];
+    let startIndex = 0;
+    sizes.forEach(({ width, height }, index)=>{
+        if (width > cols) {
+            if ("TURBOPACK compile-time truthy", 1) {
+                // TODO: fix mui/no-guarded-throw
+                // eslint-disable-next-line mui/no-guarded-throw
+                throw new Error(`[Floating UI]: Invalid grid - item width at index ${index} is greater than grid columns`);
+            }
+        }
+        let itemPlaced = false;
+        if (dense) {
+            startIndex = 0;
+        }
+        while(!itemPlaced){
+            const targetCells = [];
+            for(let i = 0; i < width; i += 1){
+                for(let j = 0; j < height; j += 1){
+                    targetCells.push(startIndex + i + j * cols);
+                }
+            }
+            if (startIndex % cols + width <= cols && targetCells.every((cell)=>cellMap[cell] == null)) {
+                targetCells.forEach((cell)=>{
+                    cellMap[cell] = index;
+                });
+                itemPlaced = true;
+            } else {
+                startIndex += 1;
+            }
+        }
+    });
+    // convert into a non-sparse array
+    return [
+        ...cellMap
+    ];
+}
+function getGridCellIndexOfCorner(index, sizes, cellMap, cols, corner) {
+    if (index === -1) {
+        return -1;
+    }
+    const firstCellIndex = cellMap.indexOf(index);
+    const sizeItem = sizes[index];
+    switch(corner){
+        case 'tl':
+            return firstCellIndex;
+        case 'tr':
+            if (!sizeItem) {
+                return firstCellIndex;
+            }
+            return firstCellIndex + sizeItem.width - 1;
+        case 'bl':
+            if (!sizeItem) {
+                return firstCellIndex;
+            }
+            return firstCellIndex + (sizeItem.height - 1) * cols;
+        case 'br':
+            return cellMap.lastIndexOf(index);
+        default:
+            return -1;
+    }
+}
+function getGridCellIndices(indices, cellMap) {
+    return cellMap.flatMap((index, cellIndex)=>indices.includes(index) ? [
+            cellIndex
+        ] : []);
+}
+function isListIndexDisabled(list, index, disabledIndices) {
+    const isExplicitlyDisabled = typeof disabledIndices === 'function' ? disabledIndices(index) : disabledIndices?.includes(index) ?? false;
+    if (isExplicitlyDisabled) {
+        return true;
+    }
+    const element = list[index];
+    if (!element) {
+        return false;
+    }
+    if (!isElementVisible(element)) {
+        return true;
+    }
+    return !disabledIndices && (element.hasAttribute('disabled') || element.getAttribute('aria-disabled') === 'true');
+}
+function isHiddenByStyles(styles) {
+    return styles.visibility === 'hidden' || styles.visibility === 'collapse';
+}
+function isElementVisible(element, styles = element ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getComputedStyle"])(element) : null) {
+    if (!element || !element.isConnected || !styles || isHiddenByStyles(styles)) {
+        return false;
+    }
+    if (typeof element.checkVisibility === 'function') {
+        return element.checkVisibility();
+    }
+    return styles.display !== 'none' && styles.display !== 'contents';
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/tabbable.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "disableFocusInside",
+    ()=>disableFocusInside,
+    "enableFocusInside",
+    ()=>enableFocusInside,
+    "focusable",
+    ()=>focusable,
+    "getNextTabbable",
+    ()=>getNextTabbable,
+    "getPreviousTabbable",
+    ()=>getPreviousTabbable,
+    "getTabbableAfterElement",
+    ()=>getTabbableAfterElement,
+    "getTabbableBeforeElement",
+    ()=>getTabbableBeforeElement,
+    "isOutsideEvent",
+    ()=>isOutsideEvent,
+    "isTabbable",
+    ()=>isTabbable,
+    "tabbable",
+    ()=>tabbable
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/composite.mjs [app-ssr] (ecmascript)");
+;
+;
+;
+;
+const CANDIDATE_SELECTOR = 'a[href],button,input,select,textarea,summary,details,iframe,object,embed,[tabindex],[contenteditable]:not([contenteditable="false"]),audio[controls],video[controls]';
+function getParentElement(element) {
+    const assignedSlot = element.assignedSlot;
+    if (assignedSlot) {
+        return assignedSlot;
+    }
+    if (element.parentElement) {
+        return element.parentElement;
+    }
+    const rootNode = element.getRootNode();
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isShadowRoot"])(rootNode) ? rootNode.host : null;
+}
+function getDetailsSummary(details) {
+    for (const child of Array.from(details.children)){
+        if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(child) === 'summary') {
+            return child;
+        }
+    }
+    return null;
+}
+function isWithinOpenDetailsSummary(element, details) {
+    const summary = getDetailsSummary(details);
+    return !!summary && (element === summary || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(summary, element));
+}
+function isFocusableCandidate(element) {
+    const nodeName = element ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(element) : '';
+    return element != null && element.matches(CANDIDATE_SELECTOR) && (nodeName !== 'summary' || element.parentElement != null && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(element.parentElement) === 'details' && getDetailsSummary(element.parentElement) === element) && (nodeName !== 'details' || getDetailsSummary(element) == null) && (nodeName !== 'input' || element.type !== 'hidden');
+}
+function isFocusableElement(element) {
+    if (!isFocusableCandidate(element) || !element.isConnected || element.matches(':disabled')) {
+        return false;
+    }
+    for(let current = element; current; current = getParentElement(current)){
+        const isAncestor = current !== element;
+        const isSlot = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(current) === 'slot';
+        if (current.hasAttribute('inert')) {
+            return false;
+        }
+        if (isAncestor && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(current) === 'details' && !current.open && !isWithinOpenDetailsSummary(element, current) || current.hasAttribute('hidden') || !isSlot && !isVisibleInTabbableTree(current, isAncestor)) {
+            return false;
+        }
+    }
+    return true;
+}
+function isVisibleInTabbableTree(element, isAncestor) {
+    const styles = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getComputedStyle"])(element);
+    if (!isAncestor) {
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElementVisible"])(element, styles);
+    }
+    return styles.display !== 'none';
+}
+function getTabIndex(element) {
+    const tabIndex = element.tabIndex;
+    if (tabIndex < 0) {
+        const nodeName = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(element);
+        if (nodeName === 'details' || nodeName === 'audio' || nodeName === 'video' || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(element) && element.isContentEditable) {
+            return 0;
+        }
+    }
+    return tabIndex;
+}
+function getNamedRadioInput(element) {
+    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(element) !== 'input') {
+        return null;
+    }
+    const input = element;
+    return input.type === 'radio' && input.name !== '' ? input : null;
+}
+function isTabbableRadio(element, candidates) {
+    const input = getNamedRadioInput(element);
+    if (!input) {
+        return true;
+    }
+    const checkedRadio = candidates.find((candidate)=>{
+        const radio = getNamedRadioInput(candidate);
+        return radio?.name === input.name && radio.form === input.form && radio.checked;
+    });
+    if (checkedRadio) {
+        return checkedRadio === input;
+    }
+    return candidates.find((candidate)=>{
+        const radio = getNamedRadioInput(candidate);
+        return radio?.name === input.name && radio.form === input.form;
+    }) === input;
+}
+function getComposedChildren(container) {
+    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(container) && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(container) === 'slot') {
+        const assignedElements = container.assignedElements({
+            flatten: true
+        });
+        if (assignedElements.length > 0) {
+            return assignedElements;
+        }
+    }
+    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(container) && container.shadowRoot) {
+        return Array.from(container.shadowRoot.children);
+    }
+    return Array.from(container.children);
+}
+function appendCandidates(container, list) {
+    getComposedChildren(container).forEach((child)=>{
+        if (isFocusableCandidate(child)) {
+            list.push(child);
+        }
+        appendCandidates(child, list);
+    });
+}
+function appendMatchingElements(container, selector, list) {
+    getComposedChildren(container).forEach((child)=>{
+        if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(child) && child.matches(selector)) {
+            list.push(child);
+        }
+        appendMatchingElements(child, selector, list);
+    });
+}
+function isTabbable(element) {
+    return isFocusableElement(element) && getTabIndex(element) >= 0;
+}
+function focusable(container) {
+    const candidates = [];
+    appendCandidates(container, candidates);
+    return candidates.filter(isFocusableElement);
+}
+function tabbable(container) {
+    const candidates = focusable(container);
+    return candidates.filter((element)=>getTabIndex(element) >= 0 && isTabbableRadio(element, candidates));
+}
+function getTabbableIn(container, dir) {
+    const list = tabbable(container);
+    const len = list.length;
+    if (len === 0) {
+        return undefined;
+    }
+    const active = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(container));
+    const index = list.indexOf(active);
+    // eslint-disable-next-line no-nested-ternary
+    const nextIndex = index === -1 ? dir === 1 ? 0 : len - 1 : index + dir;
+    return list[nextIndex];
+}
+function getNextTabbable(referenceElement) {
+    return getTabbableIn((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(referenceElement).body, 1) || referenceElement;
+}
+function getPreviousTabbable(referenceElement) {
+    return getTabbableIn((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(referenceElement).body, -1) || referenceElement;
+}
+function getTabbableNearElement(referenceElement, dir) {
+    if (!referenceElement) {
+        return null;
+    }
+    const list = tabbable((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(referenceElement).body);
+    const elementCount = list.length;
+    if (elementCount === 0) {
+        return null;
+    }
+    const index = list.indexOf(referenceElement);
+    if (index === -1) {
+        return null;
+    }
+    const nextIndex = (index + dir + elementCount) % elementCount;
+    return list[nextIndex];
+}
+function getTabbableAfterElement(referenceElement) {
+    return getTabbableNearElement(referenceElement, 1);
+}
+function getTabbableBeforeElement(referenceElement) {
+    return getTabbableNearElement(referenceElement, -1);
+}
+function isOutsideEvent(event, container) {
+    const containerElement = container || event.currentTarget;
+    const relatedTarget = event.relatedTarget;
+    return !relatedTarget || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(containerElement, relatedTarget);
+}
+function disableFocusInside(container) {
+    const tabbableElements = tabbable(container);
+    tabbableElements.forEach((element)=>{
+        element.dataset.tabindex = element.getAttribute('tabindex') || '';
+        element.setAttribute('tabindex', '-1');
+    });
+}
+function enableFocusInside(container) {
+    const elements = [];
+    appendMatchingElements(container, '[data-tabindex]', elements);
+    elements.forEach((element)=>{
+        const tabindex = element.dataset.tabindex;
+        delete element.dataset.tabindex;
+        if (tabindex) {
+            element.setAttribute('tabindex', tabindex);
+        } else {
+            element.removeAttribute('tabindex');
+        }
+    });
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/nodes.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+/* eslint-disable @typescript-eslint/no-loop-func */ __turbopack_context__.s([
+    "getDeepestNode",
+    ()=>getDeepestNode,
+    "getNodeAncestors",
+    ()=>getNodeAncestors,
+    "getNodeChildren",
+    ()=>getNodeChildren
+]);
+function getNodeChildren(nodes, id, onlyOpenChildren = true) {
+    const directChildren = nodes.filter((node)=>node.parentId === id);
+    return directChildren.flatMap((child)=>[
+            ...!onlyOpenChildren || child.context?.open ? [
+                child
+            ] : [],
+            ...getNodeChildren(nodes, child.id, onlyOpenChildren)
+        ]);
+}
+function getDeepestNode(nodes, id) {
+    let deepestNodeId;
+    let maxDepth = -1;
+    function findDeepest(nodeId, depth) {
+        if (depth > maxDepth) {
+            deepestNodeId = nodeId;
+            maxDepth = depth;
+        }
+        const children = getNodeChildren(nodes, nodeId);
+        children.forEach((child)=>{
+            findDeepest(child.id, depth + 1);
+        });
+    }
+    findDeepest(id, 0);
+    return nodes.find((node)=>node.id === deepestNodeId);
+}
+function getNodeAncestors(nodes, id) {
+    let allAncestors = [];
+    let currentParentId = nodes.find((node)=>node.id === id)?.parentId;
+    while(currentParentId){
+        const currentNode = nodes.find((node)=>node.id === currentParentId);
+        currentParentId = currentNode?.parentId;
+        if (currentNode) {
+            allAncestors = allAncestors.concat(currentNode);
+        }
+    }
+    return allAncestors;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/createAttribute.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "createAttribute",
+    ()=>createAttribute
+]);
+function createAttribute(name) {
+    return `data-base-ui-${name}`;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/enqueueFocus.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "enqueueFocus",
+    ()=>enqueueFocus
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+;
+let rafId = 0;
+function enqueueFocus(el, options = {}) {
+    const { preventScroll = false, sync = false, shouldFocus } = options;
+    cancelAnimationFrame(rafId);
+    function exec() {
+        if (shouldFocus && !shouldFocus()) {
+            return;
+        }
+        el?.focus({
+            preventScroll
+        });
+    }
+    if (sync) {
+        exec();
+        return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["NOOP"];
+    }
+    const currentRafId = requestAnimationFrame(exec);
+    rafId = currentRafId;
+    return ()=>{
+        if (rafId === currentRafId) {
+            cancelAnimationFrame(currentRafId);
+            rafId = 0;
+        }
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/markOthers.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "markOthers",
+    ()=>markOthers
+]);
+// Modified to add conditional `aria-hidden` support:
+// https://github.com/theKashey/aria-hidden/blob/9220c8f4a4fd35f63bee5510a9f41a37264382d4/src/index.ts
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+;
+;
+const counters = {
+    inert: new WeakMap(),
+    'aria-hidden': new WeakMap()
+};
+const markerName = 'data-base-ui-inert';
+const uncontrolledElementsSets = {
+    inert: new WeakSet(),
+    'aria-hidden': new WeakSet()
+};
+let markerCounterMap = new WeakMap();
+let lockCount = 0;
+function getUncontrolledElementsSet(controlAttribute) {
+    return uncontrolledElementsSets[controlAttribute];
+}
+function unwrapHost(node) {
+    if (!node) {
+        return null;
+    }
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isShadowRoot"])(node) ? node.host : unwrapHost(node.parentNode);
+}
+const correctElements = (parent, targets)=>targets.map((target)=>{
+        if (parent.contains(target)) {
+            return target;
+        }
+        const correctedTarget = unwrapHost(target);
+        if (parent.contains(correctedTarget)) {
+            return correctedTarget;
+        }
+        return null;
+    }).filter((x)=>x != null);
+const buildKeepSet = (targets)=>{
+    const keep = new Set();
+    targets.forEach((target)=>{
+        let node = target;
+        while(node && !keep.has(node)){
+            keep.add(node);
+            node = node.parentNode;
+        }
+    });
+    return keep;
+};
+const collectOutsideElements = (root, keepElements, stopElements)=>{
+    const outside = [];
+    const walk = (parent)=>{
+        if (!parent || stopElements.has(parent)) {
+            return;
+        }
+        Array.from(parent.children).forEach((node)=>{
+            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(node) === 'script') {
+                return;
+            }
+            if (keepElements.has(node)) {
+                walk(node);
+            } else {
+                outside.push(node);
+            }
+        });
+    };
+    walk(root);
+    return outside;
+};
+function applyAttributeToOthers(uncorrectedAvoidElements, body, ariaHidden, inert, { mark = true }) {
+    let controlAttribute = null;
+    if (inert) {
+        controlAttribute = 'inert';
+    } else if (ariaHidden) {
+        controlAttribute = 'aria-hidden';
+    }
+    let counterMap = null;
+    let uncontrolledElementsSet = null;
+    const avoidElements = correctElements(body, uncorrectedAvoidElements);
+    const markerTargets = mark ? collectOutsideElements(body, buildKeepSet(avoidElements), new Set(avoidElements)) : [];
+    const hiddenElements = [];
+    const markedElements = [];
+    if (controlAttribute) {
+        const map = counters[controlAttribute];
+        const currentUncontrolledElementsSet = getUncontrolledElementsSet(controlAttribute);
+        uncontrolledElementsSet = currentUncontrolledElementsSet;
+        counterMap = map;
+        const ariaLiveElements = correctElements(body, Array.from(body.querySelectorAll('[aria-live]')));
+        const controlElements = avoidElements.concat(ariaLiveElements);
+        const controlTargets = collectOutsideElements(body, buildKeepSet(controlElements), new Set(controlElements));
+        controlTargets.forEach((node)=>{
+            const attr = node.getAttribute(controlAttribute);
+            const alreadyHidden = attr !== null && attr !== 'false';
+            const counterValue = (map.get(node) || 0) + 1;
+            map.set(node, counterValue);
+            hiddenElements.push(node);
+            if (counterValue === 1 && alreadyHidden) {
+                currentUncontrolledElementsSet.add(node);
+            }
+            if (!alreadyHidden) {
+                node.setAttribute(controlAttribute, controlAttribute === 'inert' ? '' : 'true');
+            }
+        });
+    }
+    if (mark) {
+        markerTargets.forEach((node)=>{
+            const markerValue = (markerCounterMap.get(node) || 0) + 1;
+            markerCounterMap.set(node, markerValue);
+            markedElements.push(node);
+            if (markerValue === 1) {
+                node.setAttribute(markerName, '');
+            }
+        });
+    }
+    lockCount += 1;
+    return ()=>{
+        if (counterMap) {
+            hiddenElements.forEach((element)=>{
+                const currentCounterValue = counterMap.get(element) || 0;
+                const counterValue = currentCounterValue - 1;
+                counterMap.set(element, counterValue);
+                if (!counterValue) {
+                    if (!uncontrolledElementsSet?.has(element) && controlAttribute) {
+                        element.removeAttribute(controlAttribute);
+                    }
+                    uncontrolledElementsSet?.delete(element);
+                }
+            });
+        }
+        if (mark) {
+            markedElements.forEach((element)=>{
+                const markerValue = (markerCounterMap.get(element) || 0) - 1;
+                markerCounterMap.set(element, markerValue);
+                if (!markerValue) {
+                    element.removeAttribute(markerName);
+                }
+            });
+        }
+        lockCount -= 1;
+        if (!lockCount) {
+            counters.inert = new WeakMap();
+            counters['aria-hidden'] = new WeakMap();
+            uncontrolledElementsSets.inert = new WeakSet();
+            uncontrolledElementsSets['aria-hidden'] = new WeakSet();
+            markerCounterMap = new WeakMap();
+        }
+    };
+}
+function markOthers(avoidElements, options = {}) {
+    const { ariaHidden = false, inert = false, mark = true } = options;
+    const body = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(avoidElements[0]).body;
+    return applyAttributeToOthers(avoidElements, body, ariaHidden, inert, {
+        mark
+    });
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/constants.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "BASE_UI_SWIPE_IGNORE_ATTRIBUTE",
+    ()=>BASE_UI_SWIPE_IGNORE_ATTRIBUTE,
+    "BASE_UI_SWIPE_IGNORE_SELECTOR",
+    ()=>BASE_UI_SWIPE_IGNORE_SELECTOR,
+    "CLICK_TRIGGER_IDENTIFIER",
+    ()=>CLICK_TRIGGER_IDENTIFIER,
+    "DISABLED_TRANSITIONS_STYLE",
+    ()=>DISABLED_TRANSITIONS_STYLE,
+    "DROPDOWN_COLLISION_AVOIDANCE",
+    ()=>DROPDOWN_COLLISION_AVOIDANCE,
+    "LEGACY_SWIPE_IGNORE_ATTRIBUTE",
+    ()=>LEGACY_SWIPE_IGNORE_ATTRIBUTE,
+    "LEGACY_SWIPE_IGNORE_SELECTOR",
+    ()=>LEGACY_SWIPE_IGNORE_SELECTOR,
+    "PATIENT_CLICK_THRESHOLD",
+    ()=>PATIENT_CLICK_THRESHOLD,
+    "POPUP_COLLISION_AVOIDANCE",
+    ()=>POPUP_COLLISION_AVOIDANCE,
+    "TYPEAHEAD_RESET_MS",
+    ()=>TYPEAHEAD_RESET_MS,
+    "ownerVisuallyHidden",
+    ()=>ownerVisuallyHidden
+]);
+const TYPEAHEAD_RESET_MS = 500;
+const PATIENT_CLICK_THRESHOLD = 500;
+const DISABLED_TRANSITIONS_STYLE = {
+    style: {
+        transition: 'none'
+    }
+};
+const CLICK_TRIGGER_IDENTIFIER = 'data-base-ui-click-trigger';
+const BASE_UI_SWIPE_IGNORE_ATTRIBUTE = 'data-base-ui-swipe-ignore';
+const LEGACY_SWIPE_IGNORE_ATTRIBUTE = 'data-swipe-ignore';
+const BASE_UI_SWIPE_IGNORE_SELECTOR = `[${BASE_UI_SWIPE_IGNORE_ATTRIBUTE}]`;
+const LEGACY_SWIPE_IGNORE_SELECTOR = `[${LEGACY_SWIPE_IGNORE_ATTRIBUTE}]`;
+const DROPDOWN_COLLISION_AVOIDANCE = {
+    fallbackAxisSide: 'none'
+};
+const POPUP_COLLISION_AVOIDANCE = {
+    fallbackAxisSide: 'end'
+};
+const ownerVisuallyHidden = {
+    clipPath: 'inset(50%)',
+    position: 'fixed',
+    top: 0,
+    left: 0
+};
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingPortal.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "FloatingPortal",
+    ()=>FloatingPortal,
+    "useFloatingPortalNode",
+    ()=>useFloatingPortalNode,
+    "usePortalContext",
+    ()=>usePortalContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-dom.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/addEventListener.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/mergeCleanups.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$FocusGuard$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/FocusGuard.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/tabbable.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createAttribute$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/createAttribute.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/constants.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const PortalContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](null);
+if ("TURBOPACK compile-time truthy", 1) PortalContext.displayName = "PortalContext";
+const usePortalContext = ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](PortalContext);
+const attr = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createAttribute$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createAttribute"])('portal');
+function useFloatingPortalNode(props = {}) {
+    const { ref, container: containerProp, componentProps = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"], elementProps } = props;
+    const uniqueId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useId"])();
+    const portalContext = usePortalContext();
+    const parentPortalNode = portalContext?.portalNode;
+    const [containerElement, setContainerElement] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
+    const [portalNode, setPortalNode] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
+    const setPortalNodeRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((node)=>{
+        if (node !== null) {
+            // the useIsoLayoutEffect below watching containerProp / parentPortalNode
+            // sets setPortalNode(null) when the container becomes null or changes.
+            // So even though the ref callback now ignores null, the portal node still gets cleared.
+            setPortalNode(node);
+        }
+    });
+    const containerRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        // Wait for the container to be resolved if explicitly `null`.
+        if (containerProp === null) {
+            if (containerRef.current) {
+                containerRef.current = null;
+                setPortalNode(null);
+                setContainerElement(null);
+            }
+            return;
+        }
+        // React 17 does not use React.useId().
+        if (uniqueId == null) {
+            return;
+        }
+        const resolvedContainer = (containerProp && ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isNode"])(containerProp) ? containerProp : containerProp.current)) ?? parentPortalNode ?? document.body;
+        if (resolvedContainer == null) {
+            if (containerRef.current) {
+                containerRef.current = null;
+                setPortalNode(null);
+                setContainerElement(null);
+            }
+            return;
+        }
+        if (containerRef.current !== resolvedContainer) {
+            containerRef.current = resolvedContainer;
+            setPortalNode(null);
+            setContainerElement(resolvedContainer);
+        }
+    }, [
+        containerProp,
+        parentPortalNode,
+        uniqueId
+    ]);
+    const portalElement = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        ref: [
+            ref,
+            setPortalNodeRef
+        ],
+        props: [
+            {
+                id: uniqueId,
+                [attr]: ''
+            },
+            elementProps
+        ]
+    });
+    // This `createPortal` call injects `portalElement` into the `container`.
+    // Another call inside `FloatingPortal`/`FloatingPortalLite` then injects the children into `portalElement`.
+    const portalSubtree = containerElement && portalElement ? /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createPortal"](portalElement, containerElement) : null;
+    return {
+        portalNode,
+        portalSubtree
+    };
+}
+const FloatingPortal = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function FloatingPortal(componentProps, forwardedRef) {
+    const { render, className, style, children, container, renderGuards, ...elementProps } = componentProps;
+    const { portalNode, portalSubtree } = useFloatingPortalNode({
+        container,
+        ref: forwardedRef,
+        componentProps,
+        elementProps
+    });
+    const beforeOutsideRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const afterOutsideRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const beforeInsideRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const afterInsideRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const [focusManagerState, setFocusManagerState] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
+    const focusInsideDisabledRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    const modal = focusManagerState?.modal;
+    const open = focusManagerState?.open;
+    const shouldRenderGuards = typeof renderGuards === 'boolean' ? renderGuards : !!focusManagerState && !focusManagerState.modal && focusManagerState.open && !!portalNode;
+    // https://codesandbox.io/s/tabbable-portal-f4tng?file=/src/TabbablePortal.tsx
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!portalNode || modal) {
+            return undefined;
+        }
+        // Make sure elements inside the portal element are tabbable only when the
+        // portal has already been focused, either by tabbing into a focus trap
+        // element outside or using the mouse.
+        function onFocus(event) {
+            if (portalNode && event.relatedTarget && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isOutsideEvent"])(event)) {
+                if (event.type === 'focusin') {
+                    if (focusInsideDisabledRef.current) {
+                        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["enableFocusInside"])(portalNode);
+                        focusInsideDisabledRef.current = false;
+                    }
+                } else {
+                    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["disableFocusInside"])(portalNode);
+                    focusInsideDisabledRef.current = true;
+                }
+            }
+        }
+        // Listen to the event on the capture phase so they run before the focus
+        // trap elements onFocus prop is called.
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeCleanups"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(portalNode, 'focusin', onFocus, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(portalNode, 'focusout', onFocus, true));
+    }, [
+        portalNode,
+        modal
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!portalNode || open !== true || !focusInsideDisabledRef.current) {
+            return;
+        }
+        // Restore tabbability before the focus manager's queued focus-on-open step runs.
+        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["enableFocusInside"])(portalNode);
+        focusInsideDisabledRef.current = false;
+    }, [
+        open,
+        portalNode
+    ]);
+    const portalContextValue = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            beforeOutsideRef,
+            afterOutsideRef,
+            beforeInsideRef,
+            afterInsideRef,
+            portalNode,
+            setFocusManagerState
+        }), [
+        portalNode
+    ]);
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxs"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
+        children: [
+            portalSubtree,
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxs"])(PortalContext.Provider, {
+                value: portalContextValue,
+                children: [
+                    shouldRenderGuards && portalNode && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$FocusGuard$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FocusGuard"], {
+                        "data-type": "outside",
+                        ref: beforeOutsideRef,
+                        onFocus: (event)=>{
+                            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isOutsideEvent"])(event, portalNode)) {
+                                beforeInsideRef.current?.focus();
+                            } else {
+                                const domReference = focusManagerState ? focusManagerState.domReference : null;
+                                const prevTabbable = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getPreviousTabbable"])(domReference);
+                                prevTabbable?.focus();
+                            }
+                        }
+                    }),
+                    shouldRenderGuards && portalNode && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])("span", {
+                        "aria-owns": portalNode.id,
+                        style: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ownerVisuallyHidden"]
+                    }),
+                    portalNode && /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createPortal"](children, portalNode),
+                    shouldRenderGuards && portalNode && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$FocusGuard$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FocusGuard"], {
+                        "data-type": "outside",
+                        ref: afterOutsideRef,
+                        onFocus: (event)=>{
+                            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isOutsideEvent"])(event, portalNode)) {
+                                afterInsideRef.current?.focus();
+                            } else {
+                                const domReference = focusManagerState ? focusManagerState.domReference : null;
+                                const nextTabbable = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNextTabbable"])(domReference);
+                                nextTabbable?.focus();
+                                if (focusManagerState?.closeOnFocusOut) {
+                                    focusManagerState?.onOpenChange(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].focusOut, event.nativeEvent));
+                                }
+                            }
+                        }
+                    })
+                ]
+            })
+        ]
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) FloatingPortal.displayName = "FloatingPortal";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/createEventEmitter.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "createEventEmitter",
+    ()=>createEventEmitter
+]);
+function createEventEmitter() {
+    const map = new Map();
+    return {
+        emit (event, data) {
+            map.get(event)?.forEach((listener)=>listener(data));
+        },
+        on (event, listener) {
+            if (!map.has(event)) {
+                map.set(event, new Set());
+            }
+            map.get(event).add(listener);
+        },
+        off (event, listener) {
+            map.get(event)?.delete(listener);
+        }
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTreeStore.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "FloatingTreeStore",
+    ()=>FloatingTreeStore
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createEventEmitter$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/createEventEmitter.mjs [app-ssr] (ecmascript)");
+;
+class FloatingTreeStore {
+    nodesRef = {
+        current: []
+    };
+    events = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createEventEmitter$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createEventEmitter"])();
+    addNode(node) {
+        this.nodesRef.current.push(node);
+    }
+    removeNode(node) {
+        const index = this.nodesRef.current.findIndex((n)=>n === node);
+        if (index !== -1) {
+            this.nodesRef.current.splice(index, 1);
+        }
+    }
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "FloatingNode",
+    ()=>FloatingNode,
+    "FloatingTree",
+    ()=>FloatingTree,
+    "useFloatingNodeId",
+    ()=>useFloatingNodeId,
+    "useFloatingParentNodeId",
+    ()=>useFloatingParentNodeId,
+    "useFloatingTree",
+    ()=>useFloatingTree
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useRefWithInit.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTreeStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTreeStore.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+const FloatingNodeContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](null);
+if ("TURBOPACK compile-time truthy", 1) FloatingNodeContext.displayName = "FloatingNodeContext";
+const FloatingTreeContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](null);
+/**
+ * Returns the parent node id for nested floating elements, if available.
+ * Returns `null` for top-level floating elements.
+ */ if ("TURBOPACK compile-time truthy", 1) FloatingTreeContext.displayName = "FloatingTreeContext";
+const useFloatingParentNodeId = ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](FloatingNodeContext)?.id || null;
+const useFloatingTree = (externalTree)=>{
+    const contextTree = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](FloatingTreeContext);
+    return externalTree ?? contextTree;
+};
+function useFloatingNodeId(externalTree) {
+    const id = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useId"])();
+    const tree = useFloatingTree(externalTree);
+    const parentId = useFloatingParentNodeId();
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!id) {
+            return undefined;
+        }
+        const node = {
+            id,
+            parentId
+        };
+        tree?.addNode(node);
+        return ()=>{
+            tree?.removeNode(node);
+        };
+    }, [
+        tree,
+        id,
+        parentId
+    ]);
+    return id;
+}
+function FloatingNode(props) {
+    const { children, id } = props;
+    const parentId = useFloatingParentNodeId();
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(FloatingNodeContext.Provider, {
+        value: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+                id,
+                parentId
+            }), [
+            id,
+            parentId
+        ]),
+        children: children
+    });
+}
+function FloatingTree(props) {
+    const { children, externalTree } = props;
+    const tree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRefWithInit"])(()=>externalTree ?? new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTreeStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingTreeStore"]()).current;
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(FloatingTreeContext.Provider, {
+        value: tree,
+        children: children
+    });
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingFocusManager.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "FloatingFocusManager",
+    ()=>FloatingFocusManager
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/addEventListener.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/mergeCleanups.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useMergedRefs.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useValueAsRef.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/platform/parts.mjs [app-ssr] (ecmascript) <export * as platform>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useAnimationFrame.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__getWindow__as__ownerWindow$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript) <export getWindow as ownerWindow>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$FocusGuard$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/FocusGuard.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/event.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/tabbable.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/nodes.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/composite.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createAttribute$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/createAttribute.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$enqueueFocus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/enqueueFocus.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$markOthers$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/markOthers.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingPortal$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingPortal.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/constants.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/resolveRef.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+function getEventType(event, lastInteractionType) {
+    const win = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__getWindow__as__ownerWindow$3e$__["ownerWindow"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event));
+    if (event instanceof win.KeyboardEvent) {
+        return 'keyboard';
+    }
+    if (event instanceof win.FocusEvent) {
+        // Focus events can be caused by a preceding pointer interaction (e.g., focusout on outside press).
+        // Prefer the last known pointer type if provided, else treat as keyboard.
+        return lastInteractionType || 'keyboard';
+    }
+    if ('pointerType' in event) {
+        return event.pointerType || 'keyboard';
+    }
+    if ('touches' in event) {
+        return 'touch';
+    }
+    if (event instanceof win.MouseEvent) {
+        // onClick events may not contain pointer events, and will fall through to here
+        return lastInteractionType || (event.detail === 0 ? 'keyboard' : 'mouse');
+    }
+    return '';
+}
+const LIST_LIMIT = 20;
+let previouslyFocusedElements = [];
+function clearDisconnectedPreviouslyFocusedElements() {
+    previouslyFocusedElements = previouslyFocusedElements.filter((entry)=>{
+        return entry.deref()?.isConnected;
+    });
+}
+function addPreviouslyFocusedElement(element) {
+    clearDisconnectedPreviouslyFocusedElements();
+    if (element && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(element) !== 'body') {
+        previouslyFocusedElements.push(new WeakRef(element));
+        if (previouslyFocusedElements.length > LIST_LIMIT) {
+            previouslyFocusedElements = previouslyFocusedElements.slice(-LIST_LIMIT);
+        }
+    }
+}
+function getPreviouslyFocusedElement() {
+    clearDisconnectedPreviouslyFocusedElements();
+    return previouslyFocusedElements[previouslyFocusedElements.length - 1]?.deref();
+}
+function getFirstTabbableElement(container) {
+    if (!container) {
+        return null;
+    }
+    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isTabbable"])(container)) {
+        return container;
+    }
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["tabbable"])(container)[0] || container;
+}
+function handleTabIndex(floatingFocusElement) {
+    if (floatingFocusElement.hasAttribute('tabindex') && !floatingFocusElement.hasAttribute('data-tabindex')) {
+        return;
+    }
+    if (!floatingFocusElement.getAttribute('role')?.includes('dialog')) {
+        return;
+    }
+    const focusableElements = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["focusable"])(floatingFocusElement);
+    const tabbableContent = focusableElements.filter((element)=>{
+        const dataTabIndex = element.getAttribute('data-tabindex') || '';
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isTabbable"])(element) || element.hasAttribute('data-tabindex') && !dataTabIndex.startsWith('-');
+    });
+    const tabIndex = floatingFocusElement.getAttribute('tabindex');
+    if (tabbableContent.length === 0) {
+        if (tabIndex !== '0') {
+            floatingFocusElement.setAttribute('tabindex', '0');
+            // Mark our own write so the externally-managed early-return above doesn't
+            // mistake it for a user-authored `tabindex` and freeze management.
+            floatingFocusElement.setAttribute('data-tabindex', '0');
+        }
+    } else if (tabIndex !== '-1' || floatingFocusElement.hasAttribute('data-tabindex') && floatingFocusElement.getAttribute('data-tabindex') !== '-1') {
+        floatingFocusElement.setAttribute('tabindex', '-1');
+        floatingFocusElement.setAttribute('data-tabindex', '-1');
+    }
+}
+function FloatingFocusManager(props) {
+    const { context, children, disabled = false, initialFocus = true, returnFocus = true, restoreFocus = false, modal = true, closeOnFocusOut = true, openInteractionType = '', nextFocusableElement, previousFocusableElement, beforeContentFocusGuardRef, externalTree, getInsideElements } = props;
+    const store = 'rootStore' in context ? context.rootStore : context;
+    const open = store.useState('open');
+    const domReference = store.useState('domReferenceElement');
+    const floating = store.useState('floatingElement');
+    const { events, dataRef } = store.context;
+    const getNodeId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>dataRef.current.floatingContext?.nodeId);
+    const ignoreInitialFocus = initialFocus === false;
+    // If the reference is a combobox and is typeable (e.g. input/textarea),
+    // there are different focus semantics. The guards should not be rendered, but
+    // aria-hidden should be applied to all nodes still. Further, the visually
+    // hidden dismiss button should only appear at the end of the list, not the
+    // start.
+    const isUntrappedTypeableCombobox = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isTypeableCombobox"])(domReference) && ignoreInitialFocus;
+    const initialFocusRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(initialFocus);
+    const returnFocusRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(returnFocus);
+    const openInteractionTypeRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(openInteractionType);
+    const openRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(open);
+    const tree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingTree"])(externalTree);
+    const portalContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingPortal$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["usePortalContext"])();
+    const preventReturnFocusRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    const isPointerDownRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    const pointerDownOutsideRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    const lastFocusedTabbableRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const closeTypeRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"]('');
+    const lastInteractionTypeRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"]('');
+    const beforeGuardRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const afterGuardRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const mergedBeforeGuardRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMergedRefs"])(beforeGuardRef, beforeContentFocusGuardRef, portalContext?.beforeInsideRef);
+    const mergedAfterGuardRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMergedRefs"])(afterGuardRef, portalContext?.afterInsideRef);
+    const blurTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const pointerDownTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const restoreFocusFrame = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationFrame"])();
+    const isInsidePortal = portalContext != null;
+    const floatingFocusElement = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["getFloatingFocusElement"])(floating);
+    const getTabbableContent = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((container = floatingFocusElement)=>{
+        return container ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["tabbable"])(container) : [];
+    });
+    const getResolvedInsideElements = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>getInsideElements?.().filter((element)=>element != null) ?? []);
+    // Prevent Tab from escaping the modal when there are no tabbable elements.
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (disabled || !modal) {
+            return undefined;
+        }
+        function onKeyDown(event) {
+            if (event.key === 'Tab') {
+                // The focus guards have nothing to focus, so we need to stop the event.
+                if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floatingFocusElement, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floatingFocusElement))) && getTabbableContent().length === 0 && !isUntrappedTypeableCombobox) {
+                    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+                }
+            }
+        }
+        const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floatingFocusElement);
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'keydown', onKeyDown);
+    }, [
+        disabled,
+        floatingFocusElement,
+        modal,
+        isUntrappedTypeableCombobox,
+        getTabbableContent
+    ]);
+    // Track pointer/keyboard interactions to disambiguate focus and outside presses.
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (disabled || !open) {
+            return undefined;
+        }
+        const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floatingFocusElement);
+        function clearPointerDownOutside() {
+            pointerDownOutsideRef.current = false;
+        }
+        function onPointerDown(event) {
+            const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event);
+            const insideElements = getResolvedInsideElements();
+            const pointerTargetInside = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floating, target) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(domReference, target) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(portalContext?.portalNode, target) || insideElements.some((element)=>element === target || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(element, target));
+            pointerDownOutsideRef.current = !pointerTargetInside;
+            lastInteractionTypeRef.current = event.pointerType || 'keyboard';
+            if (target?.closest(`[${__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CLICK_TRIGGER_IDENTIFIER"]}]`)) {
+                isPointerDownRef.current = true;
+                // Reset on the next tick so a single click on a click-trigger doesn't
+                // permanently suppress focus-out closing for the lifetime of the instance.
+                pointerDownTimeout.start(0, ()=>{
+                    isPointerDownRef.current = false;
+                });
+            }
+        }
+        function onKeyDown() {
+            lastInteractionTypeRef.current = 'keyboard';
+        }
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeCleanups"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'pointerdown', onPointerDown, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'pointerup', clearPointerDownOutside, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'pointercancel', clearPointerDownOutside, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'keydown', onKeyDown, true), // Avoid a stale `true` leaking into the next open (e.g. keep-mounted popups)
+        // if the popup dismissed between pointerdown and pointerup.
+        clearPointerDownOutside);
+    }, [
+        disabled,
+        floating,
+        domReference,
+        floatingFocusElement,
+        open,
+        portalContext,
+        pointerDownTimeout,
+        getResolvedInsideElements
+    ]);
+    // Close on focus out and restore focus within the floating tree when needed.
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (disabled || !closeOnFocusOut) {
+            return undefined;
+        }
+        const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floatingFocusElement);
+        // In Safari, buttons lose focus when pressing them.
+        function handlePointerDown() {
+            isPointerDownRef.current = true;
+            pointerDownTimeout.start(0, ()=>{
+                isPointerDownRef.current = false;
+            });
+        }
+        function handleFocusIn(event) {
+            const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event);
+            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isTabbable"])(target)) {
+                lastFocusedTabbableRef.current = target;
+            }
+        }
+        function handleFocusOutside(event) {
+            const relatedTarget = event.relatedTarget;
+            const currentTarget = event.currentTarget;
+            const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event);
+            // When focus is lost to the body (e.g. on a backdrop press), record the element that
+            // had focus so a confirmation dialog opened while the body is focused can return focus
+            // to it. Scoped to `modal` to avoid non-modal popups polluting the shared stack.
+            if (modal && relatedTarget == null && target != null && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floating, target)) {
+                addPreviouslyFocusedElement(target);
+            }
+            queueMicrotask(()=>{
+                const nodeId = getNodeId();
+                const triggers = store.context.triggerElements;
+                const insideElements = getResolvedInsideElements();
+                const isRelatedFocusGuard = relatedTarget?.hasAttribute((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createAttribute$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createAttribute"])('focus-guard')) && [
+                    beforeGuardRef.current,
+                    afterGuardRef.current,
+                    portalContext?.beforeInsideRef.current,
+                    portalContext?.afterInsideRef.current,
+                    portalContext?.beforeOutsideRef.current,
+                    portalContext?.afterOutsideRef.current,
+                    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveRef"])(previousFocusableElement),
+                    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveRef"])(nextFocusableElement)
+                ].includes(relatedTarget);
+                const movedToUnrelatedNode = !((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(domReference, relatedTarget) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floating, relatedTarget) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(relatedTarget, floating) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(portalContext?.portalNode, relatedTarget) || insideElements.some((element)=>element === relatedTarget || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(element, relatedTarget)) || relatedTarget != null && triggers.hasElement(relatedTarget) || triggers.hasMatchingElement((trigger)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(trigger, relatedTarget)) || isRelatedFocusGuard || tree && ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeChildren"])(tree.nodesRef.current, nodeId).find((node)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(node.context?.elements.floating, relatedTarget) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(node.context?.elements.domReference, relatedTarget)) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeAncestors"])(tree.nodesRef.current, nodeId).find((node)=>[
+                        node.context?.elements.floating,
+                        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["getFloatingFocusElement"])(node.context?.elements.floating)
+                    ].includes(relatedTarget) || node.context?.elements.domReference === relatedTarget)));
+                if (currentTarget === domReference && floatingFocusElement) {
+                    handleTabIndex(floatingFocusElement);
+                }
+                // Restore focus to the previous tabbable element index to prevent
+                // focus from being lost outside the floating tree.
+                if (restoreFocus && currentTarget !== domReference && !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElementVisible"])(target) && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])(doc) === doc.body) {
+                    // Let `FloatingPortal` effect knows that focus is still inside the
+                    // floating tree.
+                    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(floatingFocusElement)) {
+                        floatingFocusElement.focus();
+                        // If explicitly requested to restore focus to the popup container, do not search
+                        // for the next/previous tabbable element.
+                        if (restoreFocus === 'popup') {
+                            // If the element is removed on pointerdown, focus tries to move it,
+                            // but since it's removed at the same time, focus gets lost as it
+                            // happens after the .focus() call above.
+                            // In this case, focus needs to be moved asynchronously.
+                            restoreFocusFrame.request(()=>{
+                                floatingFocusElement.focus();
+                            });
+                            return;
+                        }
+                    }
+                    const tabbableContent = getTabbableContent();
+                    const prevTabbable = lastFocusedTabbableRef.current;
+                    const nodeToFocus = (prevTabbable && tabbableContent.includes(prevTabbable) ? prevTabbable : null) || tabbableContent[tabbableContent.length - 1] || floatingFocusElement;
+                    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(nodeToFocus)) {
+                        nodeToFocus.focus();
+                    }
+                }
+                // https://github.com/floating-ui/floating-ui/issues/3060
+                if (dataRef.current.insideReactTree) {
+                    dataRef.current.insideReactTree = false;
+                    return;
+                }
+                // Focus did not move inside the floating tree, and there are no tabbable
+                // portal guards to handle closing.
+                if ((isUntrappedTypeableCombobox ? true : !modal) && relatedTarget && movedToUnrelatedNode && !isPointerDownRef.current && (// Fix React 18 Strict Mode returnFocus due to double rendering.
+                // For an "untrapped" typeable combobox (input role=combobox with
+                // initialFocus=false), re-opening the popup and tabbing out should still close it even
+                // when the previously focused element (e.g. the next tabbable outside the popup) is
+                // focused again. Otherwise, the popup remains open on the second Tab sequence:
+                // click input -> Tab (closes) -> click input -> Tab.
+                // Allow closing when `isUntrappedTypeableCombobox` regardless of the previously focused element.
+                isUntrappedTypeableCombobox || relatedTarget !== getPreviouslyFocusedElement())) {
+                    preventReturnFocusRef.current = true;
+                    store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].focusOut, event));
+                }
+            });
+        }
+        function markInsideReactTree() {
+            if (pointerDownOutsideRef.current) {
+                return;
+            }
+            dataRef.current.insideReactTree = true;
+            blurTimeout.start(0, ()=>{
+                dataRef.current.insideReactTree = false;
+            });
+        }
+        const domReferenceElement = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(domReference) ? domReference : null;
+        if (!floating && !domReferenceElement) {
+            return undefined;
+        }
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeCleanups"])(domReferenceElement && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(domReferenceElement, 'focusout', handleFocusOutside), domReferenceElement && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(domReferenceElement, 'pointerdown', handlePointerDown), floating && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(floating, 'focusin', handleFocusIn), floating && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(floating, 'focusout', handleFocusOutside), floating && portalContext && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(floating, 'focusout', markInsideReactTree, true));
+    }, [
+        disabled,
+        domReference,
+        floating,
+        floatingFocusElement,
+        modal,
+        tree,
+        portalContext,
+        store,
+        closeOnFocusOut,
+        restoreFocus,
+        getTabbableContent,
+        isUntrappedTypeableCombobox,
+        getNodeId,
+        dataRef,
+        blurTimeout,
+        pointerDownTimeout,
+        restoreFocusFrame,
+        nextFocusableElement,
+        previousFocusableElement,
+        getResolvedInsideElements
+    ]);
+    // Hide everything outside the floating tree from assistive tech while open.
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (disabled || !floating || !open) {
+            return undefined;
+        }
+        // Don't hide portals nested within the parent portal.
+        const portalNodes = Array.from(portalContext?.portalNode?.querySelectorAll(`[${(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createAttribute$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createAttribute"])('portal')}]`) || []);
+        const ancestors = tree ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeAncestors"])(tree.nodesRef.current, getNodeId()) : [];
+        const rootAncestorComboboxDomReference = ancestors.find((node)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isTypeableCombobox"])(node.context?.elements.domReference || null))?.context?.elements.domReference;
+        const controlInsideElements = [
+            floating,
+            ...portalNodes,
+            beforeGuardRef.current,
+            afterGuardRef.current,
+            portalContext?.beforeOutsideRef.current,
+            portalContext?.afterOutsideRef.current,
+            ...getResolvedInsideElements()
+        ];
+        const insideElements = [
+            ...controlInsideElements,
+            rootAncestorComboboxDomReference,
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveRef"])(previousFocusableElement),
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveRef"])(nextFocusableElement),
+            isUntrappedTypeableCombobox ? domReference : null
+        ].filter((x)=>x != null);
+        const ariaHiddenCleanup = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$markOthers$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["markOthers"])(insideElements, {
+            ariaHidden: modal || isUntrappedTypeableCombobox,
+            mark: false
+        });
+        const markerInsideElements = [
+            floating,
+            ...portalNodes
+        ].filter((x)=>x != null);
+        const markerCleanup = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$markOthers$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["markOthers"])(markerInsideElements);
+        return ()=>{
+            markerCleanup();
+            ariaHiddenCleanup();
+        };
+    }, [
+        open,
+        disabled,
+        domReference,
+        floating,
+        modal,
+        portalContext,
+        isUntrappedTypeableCombobox,
+        tree,
+        getNodeId,
+        nextFocusableElement,
+        previousFocusableElement,
+        getResolvedInsideElements
+    ]);
+    // Focus the initial element when the floating element opens.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open || disabled || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(floatingFocusElement)) {
+            return;
+        }
+        const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floatingFocusElement);
+        const previouslyFocusedElement = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])(doc);
+        // Wait for any layout effect state setters to execute to set `tabIndex`.
+        queueMicrotask(()=>{
+            const initialFocusValueOrFn = initialFocusRef.current;
+            const resolvedInitialFocus = typeof initialFocusValueOrFn === 'function' ? initialFocusValueOrFn(openInteractionTypeRef.current || '') : initialFocusValueOrFn;
+            // `null` should fallback to default behavior in case of an empty ref.
+            if (resolvedInitialFocus === undefined || resolvedInitialFocus === false) {
+                return;
+            }
+            const focusAlreadyInsideFloatingEl = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floatingFocusElement, previouslyFocusedElement);
+            if (focusAlreadyInsideFloatingEl) {
+                return;
+            }
+            let focusableElements = null;
+            const getDefaultFocusElement = ()=>{
+                if (focusableElements == null) {
+                    focusableElements = getTabbableContent(floatingFocusElement);
+                }
+                return focusableElements[0] || floatingFocusElement;
+            };
+            let elToFocus;
+            if (resolvedInitialFocus === true || resolvedInitialFocus === null) {
+                elToFocus = getDefaultFocusElement();
+            } else {
+                elToFocus = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveRef"])(resolvedInitialFocus);
+            }
+            elToFocus = elToFocus || getDefaultFocusElement();
+            const hadFocusInside = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floatingFocusElement, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])(doc));
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$enqueueFocus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["enqueueFocus"])(elToFocus, {
+                preventScroll: elToFocus === floatingFocusElement,
+                shouldFocus () {
+                    // This focus is queued on the next animation frame. If the floating element has closed
+                    // before it runs — e.g. tabbing out of a kept-mounted popup — don't pull focus back
+                    // onto the initial element after it has legitimately moved elsewhere.
+                    if (!openRef.current) {
+                        return false;
+                    }
+                    if (hadFocusInside) {
+                        return true;
+                    }
+                    const currentActiveElement = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])(doc);
+                    const focusMovedInside = currentActiveElement !== elToFocus && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floatingFocusElement, currentActiveElement);
+                    return !focusMovedInside;
+                }
+            });
+        });
+    }, [
+        disabled,
+        open,
+        floatingFocusElement,
+        getTabbableContent,
+        initialFocusRef,
+        openInteractionTypeRef,
+        openRef
+    ]);
+    // Track return focus targets and restore focus on unmount/close.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (disabled || !floatingFocusElement) {
+            return undefined;
+        }
+        const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floatingFocusElement);
+        const elementFocusedBeforeOpen = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])(doc);
+        // Only nullish interaction types represent programmatic opens. The empty
+        // string default is intentionally not treated as programmatic.
+        const preferPreviousFocus = openInteractionTypeRef.current == null;
+        addPreviouslyFocusedElement(elementFocusedBeforeOpen);
+        // Dismissing via outside press should always ignore `returnFocus` to
+        // prevent unwanted scrolling.
+        function onOpenChangeLocal(details) {
+            if (!details.open) {
+                closeTypeRef.current = getEventType(details.nativeEvent, lastInteractionTypeRef.current);
+            }
+            if (details.reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover && details.nativeEvent.type === 'mouseleave') {
+                preventReturnFocusRef.current = true;
+            }
+            if (details.reason !== __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].outsidePress) {
+                return;
+            }
+            if (details.nested) {
+                preventReturnFocusRef.current = false;
+            } else if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isVirtualClick"])(details.nativeEvent) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isVirtualPointerEvent"])(details.nativeEvent)) {
+                preventReturnFocusRef.current = false;
+            } else {
+                let isPreventScrollSupported = false;
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floatingFocusElement).createElement('div').focus({
+                    get preventScroll () {
+                        isPreventScrollSupported = true;
+                        return false;
+                    }
+                });
+                if (isPreventScrollSupported) {
+                    preventReturnFocusRef.current = false;
+                } else {
+                    preventReturnFocusRef.current = true;
+                }
+            }
+        }
+        events.on('openchange', onOpenChangeLocal);
+        function getReturnElement() {
+            const returnFocusValueOrFn = returnFocusRef.current;
+            let resolvedReturnFocusValue = typeof returnFocusValueOrFn === 'function' ? returnFocusValueOrFn(closeTypeRef.current) : returnFocusValueOrFn;
+            // `null` should fallback to default behavior in case of an empty ref.
+            if (resolvedReturnFocusValue === undefined || resolvedReturnFocusValue === false) {
+                return null;
+            }
+            if (resolvedReturnFocusValue === null) {
+                resolvedReturnFocusValue = true;
+            }
+            const referenceReturnElement = domReference?.isConnected ? domReference : null;
+            const previousReturnElement = elementFocusedBeforeOpen?.isConnected && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeName"])(elementFocusedBeforeOpen) !== 'body' ? elementFocusedBeforeOpen : null;
+            let defaultReturnElement = preferPreviousFocus ? previousReturnElement || referenceReturnElement : referenceReturnElement || previousReturnElement;
+            if (!defaultReturnElement) {
+                defaultReturnElement = getPreviouslyFocusedElement() || null;
+            }
+            if (typeof resolvedReturnFocusValue === 'boolean') {
+                return defaultReturnElement;
+            }
+            return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveRef"])(resolvedReturnFocusValue) || defaultReturnElement || null;
+        }
+        return ()=>{
+            events.off('openchange', onOpenChangeLocal);
+            const activeEl = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])(doc);
+            const insideElements = getResolvedInsideElements();
+            const isFocusInsideFloatingTree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floating, activeEl) || insideElements.some((element)=>element === activeEl || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(element, activeEl)) || tree && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeChildren"])(tree.nodesRef.current, getNodeId(), false).some((node)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(node.context?.elements.floating, activeEl));
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            const returnFocusValueOrFn = returnFocusRef.current;
+            const returnElement = getReturnElement();
+            queueMicrotask(()=>{
+                // This is `returnElement`, if it's tabbable, or its first tabbable child.
+                const tabbableReturnElement = getFirstTabbableElement(returnElement);
+                const hasExplicitReturnFocus = typeof returnFocusValueOrFn !== 'boolean';
+                if (returnFocusValueOrFn && !preventReturnFocusRef.current && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(tabbableReturnElement) && (// If the focus moved somewhere else after mount, avoid returning focus
+                // since it likely entered a different element which should be
+                // respected: https://github.com/floating-ui/floating-ui/issues/2607
+                !hasExplicitReturnFocus && tabbableReturnElement !== activeEl && activeEl !== doc.body ? isFocusInsideFloatingTree : true)) {
+                    tabbableReturnElement.focus({
+                        preventScroll: true
+                    });
+                }
+                preventReturnFocusRef.current = false;
+            });
+        };
+    }, [
+        disabled,
+        floating,
+        floatingFocusElement,
+        returnFocusRef,
+        openInteractionTypeRef,
+        events,
+        tree,
+        domReference,
+        getNodeId,
+        getResolvedInsideElements
+    ]);
+    // Safari may randomly scroll to the bottom of the page if an input inside a popup has focus
+    // when the popup unmounts from the DOM.
+    // By blurring it before the popup unmounts, we can prevent this behavior.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].engine.webkit || open || !floating) {
+            return;
+        }
+        const activeEl = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floating));
+        if (!(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(activeEl) || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isTypeableElement"])(activeEl)) {
+            return;
+        }
+        if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floating, activeEl)) {
+            activeEl.blur();
+        }
+    }, [
+        open,
+        floating
+    ]);
+    // Synchronize the `context` & `modal` value to the FloatingPortal context.
+    // It will decide whether or not it needs to render its own guards.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (disabled || !portalContext) {
+            return undefined;
+        }
+        portalContext.setFocusManagerState({
+            modal,
+            closeOnFocusOut,
+            open,
+            onOpenChange: store.setOpen,
+            domReference
+        });
+        return ()=>{
+            portalContext.setFocusManagerState(null);
+        };
+    }, [
+        disabled,
+        portalContext,
+        modal,
+        open,
+        store,
+        closeOnFocusOut,
+        domReference
+    ]);
+    // Keep the floating element tabIndex in sync and clear stale focus records.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (disabled || !floatingFocusElement) {
+            return undefined;
+        }
+        handleTabIndex(floatingFocusElement);
+        return ()=>{
+            queueMicrotask(clearDisconnectedPreviouslyFocusedElements);
+        };
+    }, [
+        disabled,
+        floatingFocusElement
+    ]);
+    const shouldRenderGuards = !disabled && (modal ? !isUntrappedTypeableCombobox : true) && (isInsidePortal || modal);
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxs"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
+        children: [
+            shouldRenderGuards && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$FocusGuard$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FocusGuard"], {
+                "data-type": "inside",
+                ref: mergedBeforeGuardRef,
+                onFocus: (event)=>{
+                    if (modal) {
+                        const els = getTabbableContent();
+                        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$enqueueFocus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["enqueueFocus"])(els[els.length - 1]);
+                    } else if (portalContext?.portalNode) {
+                        preventReturnFocusRef.current = false;
+                        if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isOutsideEvent"])(event, portalContext.portalNode)) {
+                            const nextTabbable = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNextTabbable"])(domReference);
+                            nextTabbable?.focus();
+                        } else {
+                            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveRef"])(previousFocusableElement ?? portalContext.beforeOutsideRef)?.focus();
+                        }
+                    }
+                }
+            }),
+            children,
+            shouldRenderGuards && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$FocusGuard$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FocusGuard"], {
+                "data-type": "inside",
+                ref: mergedAfterGuardRef,
+                onFocus: (event)=>{
+                    if (modal) {
+                        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$enqueueFocus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["enqueueFocus"])(getTabbableContent()[0]);
+                    } else if (portalContext?.portalNode) {
+                        if (closeOnFocusOut) {
+                            preventReturnFocusRef.current = true;
+                        }
+                        if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isOutsideEvent"])(event, portalContext.portalNode)) {
+                            const prevTabbable = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getPreviousTabbable"])(domReference);
+                            prevTabbable?.focus();
+                        } else {
+                            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$resolveRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["resolveRef"])(nextFocusableElement ?? portalContext.afterOutsideRef)?.focus();
+                        }
+                    }
+                }
+            })
+        ]
+    });
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverInteractionSharedState.mjs [app-ssr] (ecmascript) <locals>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "HoverInteraction",
+    ()=>HoverInteraction,
+    "applySafePolygonPointerEventsMutation",
+    ()=>applySafePolygonPointerEventsMutation,
+    "clearSafePolygonPointerEventsMutation",
+    ()=>clearSafePolygonPointerEventsMutation,
+    "useHoverInteractionSharedState",
+    ()=>useHoverInteractionSharedState
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useOnMount$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useOnMount.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useRefWithInit.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals>");
+'use client';
+;
+;
+;
+;
+;
+class HoverInteraction {
+    constructor(){
+        this.pointerType = undefined;
+        this.interactedInside = false;
+        this.handler = undefined;
+        this.blockMouseMove = true;
+        this.performedPointerEventsMutation = false;
+        this.pointerEventsScopeElement = null;
+        this.pointerEventsReferenceElement = null;
+        this.pointerEventsFloatingElement = null;
+        this.restTimeoutPending = false;
+        this.openChangeTimeout = new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Timeout"]();
+        this.restTimeout = new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Timeout"]();
+        this.handleCloseOptions = undefined;
+    }
+    static create() {
+        return new HoverInteraction();
+    }
+    dispose = ()=>{
+        this.openChangeTimeout.clear();
+        this.restTimeout.clear();
+    };
+    disposeEffect = ()=>{
+        return this.dispose;
+    };
+}
+const pointerEventsMutationOwnerByScopeElement = new WeakMap();
+function clearSafePolygonPointerEventsMutation(instance) {
+    if (!instance.performedPointerEventsMutation) {
+        return;
+    }
+    const scopeElement = instance.pointerEventsScopeElement;
+    if (scopeElement && pointerEventsMutationOwnerByScopeElement.get(scopeElement) === instance) {
+        instance.pointerEventsScopeElement?.style.removeProperty('pointer-events');
+        instance.pointerEventsReferenceElement?.style.removeProperty('pointer-events');
+        instance.pointerEventsFloatingElement?.style.removeProperty('pointer-events');
+        pointerEventsMutationOwnerByScopeElement.delete(scopeElement);
+    }
+    instance.performedPointerEventsMutation = false;
+    instance.pointerEventsScopeElement = null;
+    instance.pointerEventsReferenceElement = null;
+    instance.pointerEventsFloatingElement = null;
+}
+function applySafePolygonPointerEventsMutation(instance, options) {
+    const { scopeElement, referenceElement, floatingElement } = options;
+    const existingOwner = pointerEventsMutationOwnerByScopeElement.get(scopeElement);
+    if (existingOwner && existingOwner !== instance) {
+        clearSafePolygonPointerEventsMutation(existingOwner);
+    }
+    clearSafePolygonPointerEventsMutation(instance);
+    instance.performedPointerEventsMutation = true;
+    instance.pointerEventsScopeElement = scopeElement;
+    instance.pointerEventsReferenceElement = referenceElement;
+    instance.pointerEventsFloatingElement = floatingElement;
+    pointerEventsMutationOwnerByScopeElement.set(scopeElement, instance);
+    scopeElement.style.pointerEvents = 'none';
+    referenceElement.style.pointerEvents = 'auto';
+    floatingElement.style.pointerEvents = 'auto';
+}
+function useHoverInteractionSharedState(store) {
+    const data = store.context.dataRef.current;
+    const instance = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRefWithInit"])(()=>data.hoverInteractionState ?? HoverInteraction.create()).current;
+    if (!data.hoverInteractionState) {
+        data.hoverInteractionState = instance;
+    }
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useOnMount$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useOnMount"])(data.hoverInteractionState.disposeEffect);
+    return data.hoverInteractionState;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverShared.mjs [app-ssr] (ecmascript) <locals>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "getDelay",
+    ()=>getDelay,
+    "getRestMs",
+    ()=>getRestMs,
+    "isClickLikeOpenEvent",
+    ()=>isClickLikeOpenEvent,
+    "isHoverOpenEvent",
+    ()=>isHoverOpenEvent
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/event.mjs [app-ssr] (ecmascript)");
+;
+;
+function resolveValue(value, pointerType) {
+    if (pointerType != null && !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isMouseLikePointerType"])(pointerType)) {
+        return 0;
+    }
+    if (typeof value === 'function') {
+        return value();
+    }
+    return value;
+}
+function getDelay(value, prop, pointerType) {
+    const result = resolveValue(value, pointerType);
+    if (typeof result === 'number') {
+        return result;
+    }
+    return result?.[prop];
+}
+function getRestMs(value) {
+    if (typeof value === 'function') {
+        return value();
+    }
+    return value;
+}
+function isClickLikeOpenEvent(openEventType, interactedInside) {
+    return interactedInside || openEventType === 'click' || openEventType === 'mousedown';
+}
+function isHoverOpenEvent(openEventType) {
+    return openEventType?.includes('mouse') && openEventType !== 'mousedown';
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals> <export isTargetInsideEnabledTrigger as isInsideEnabledTrigger>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "isInsideEnabledTrigger",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isTargetInsideEnabledTrigger"]
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals>");
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverFloatingInteraction.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useHoverFloatingInteraction",
+    ()=>useHoverFloatingInteraction
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/addEventListener.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/mergeCleanups.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/nodes.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverInteractionSharedState$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverInteractionSharedState.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverShared$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverShared.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__$3c$export__isTargetInsideEnabledTrigger__as__isInsideEnabledTrigger$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals> <export isTargetInsideEnabledTrigger as isInsideEnabledTrigger>");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+function useHoverFloatingInteraction(context, parameters = {}) {
+    const { enabled = true, closeDelay: closeDelayProp = 0, nodeId: nodeIdProp } = parameters;
+    const store = 'rootStore' in context ? context.rootStore : context;
+    const open = store.useState('open');
+    const floatingElement = store.useState('floatingElement');
+    const domReferenceElement = store.useState('domReferenceElement');
+    const { dataRef } = store.context;
+    const tree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingTree"])();
+    const parentId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingParentNodeId"])();
+    const instance = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverInteractionSharedState$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["useHoverInteractionSharedState"])(store);
+    const childClosedTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const isClickLikeOpenEvent = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverShared$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isClickLikeOpenEvent"])(dataRef.current.openEvent?.type, instance.interactedInside);
+    });
+    const isHoverOpen = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverShared$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isHoverOpenEvent"])(dataRef.current.openEvent?.type);
+    });
+    const clearPointerEvents = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverInteractionSharedState$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["clearSafePolygonPointerEventsMutation"])(instance);
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open) {
+            instance.pointerType = undefined;
+            instance.restTimeoutPending = false;
+            instance.interactedInside = false;
+            clearPointerEvents();
+        }
+    }, [
+        open,
+        instance,
+        clearPointerEvents
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        return clearPointerEvents;
+    }, [
+        clearPointerEvents
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!enabled) {
+            return undefined;
+        }
+        if (open && instance.handleCloseOptions?.blockPointerEvents && isHoverOpen() && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(domReferenceElement) && floatingElement) {
+            const ref = domReferenceElement;
+            const floatingEl = floatingElement;
+            const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floatingElement);
+            const parentFloating = tree?.nodesRef.current.find((node)=>node.id === parentId)?.context?.elements.floating;
+            if (parentFloating) {
+                parentFloating.style.pointerEvents = '';
+            }
+            // A keep-mounted submenu can appear in the tree before it opens, so a
+            // cached scope or parent lookup may resolve to the submenu itself. That
+            // would not shield sibling items in the parent menu.
+            const cachedScopeElement = instance.pointerEventsScopeElement !== floatingEl ? instance.pointerEventsScopeElement : null;
+            const parentScopeElement = parentFloating !== floatingEl ? parentFloating : null;
+            const scopeElement = instance.handleCloseOptions?.getScope?.() ?? cachedScopeElement ?? parentScopeElement ?? ref.closest('[data-rootownerid]') ?? doc.body;
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverInteractionSharedState$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["applySafePolygonPointerEventsMutation"])(instance, {
+                scopeElement,
+                referenceElement: ref,
+                floatingElement: floatingEl
+            });
+            return ()=>{
+                clearPointerEvents();
+            };
+        }
+        return undefined;
+    }, [
+        enabled,
+        open,
+        domReferenceElement,
+        floatingElement,
+        instance,
+        isHoverOpen,
+        tree,
+        parentId,
+        clearPointerEvents
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!enabled) {
+            return undefined;
+        }
+        function hasParentChildren() {
+            return !!(tree && parentId && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeChildren"])(tree.nodesRef.current, parentId).length > 0);
+        }
+        function closeWithDelay(event) {
+            const closeDelay = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverShared$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["getDelay"])(closeDelayProp, 'close', instance.pointerType);
+            const close = ()=>{
+                store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover, event));
+                tree?.events.emit('floating.closed', event);
+            };
+            if (closeDelay) {
+                instance.openChangeTimeout.start(closeDelay, close);
+            } else {
+                instance.openChangeTimeout.clear();
+                close();
+            }
+        }
+        function handleInteractInside(event) {
+            const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event);
+            if (!(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isInteractiveElement"])(target)) {
+                instance.interactedInside = false;
+                return;
+            }
+            instance.interactedInside = target?.closest('[aria-haspopup]') != null;
+        }
+        function onFloatingMouseEnter() {
+            instance.openChangeTimeout.clear();
+            childClosedTimeout.clear();
+            tree?.events.off('floating.closed', onNodeClosed);
+            clearPointerEvents();
+        }
+        function onFloatingMouseLeave(event) {
+            if (hasParentChildren() && tree) {
+                tree.events.on('floating.closed', onNodeClosed);
+                return;
+            }
+            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__$3c$export__isTargetInsideEnabledTrigger__as__isInsideEnabledTrigger$3e$__["isInsideEnabledTrigger"])(event.relatedTarget, store.context.triggerElements)) {
+                // If the mouse is leaving the reference element to another trigger, don't explicitly close the popup
+                // as it will be moved.
+                return;
+            }
+            const currentNodeId = dataRef.current.floatingContext?.nodeId ?? nodeIdProp;
+            const relatedTarget = event.relatedTarget;
+            const isMovingIntoDescendantFloating = tree && currentNodeId && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(relatedTarget) && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeChildren"])(tree.nodesRef.current, currentNodeId, false).some((node)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(node.context?.elements.floating, relatedTarget));
+            if (isMovingIntoDescendantFloating) {
+                return;
+            }
+            // If the safePolygon handler is active, let it handle the close logic.
+            if (instance.handler) {
+                instance.handler(event);
+                return;
+            }
+            clearPointerEvents();
+            if (isHoverOpen() && !isClickLikeOpenEvent()) {
+                closeWithDelay(event);
+            }
+        }
+        function onNodeClosed(event) {
+            if (!tree || !parentId || hasParentChildren()) {
+                return;
+            }
+            // Allow the mouseenter event to fire in case child was closed because mouse moved into parent.
+            childClosedTimeout.start(0, ()=>{
+                tree.events.off('floating.closed', onNodeClosed);
+                store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover, event));
+                tree.events.emit('floating.closed', event);
+            });
+        }
+        const floating = floatingElement;
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeCleanups"])(floating && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(floating, 'mouseenter', onFloatingMouseEnter), floating && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(floating, 'mouseleave', onFloatingMouseLeave), floating && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(floating, 'pointerdown', handleInteractInside, true), ()=>{
+            tree?.events.off('floating.closed', onNodeClosed);
+        });
+    }, [
+        enabled,
+        floatingElement,
+        store,
+        dataRef,
+        closeDelayProp,
+        nodeIdProp,
+        isHoverOpen,
+        isClickLikeOpenEvent,
+        clearPointerEvents,
+        instance,
+        tree,
+        parentId,
+        childClosedTimeout
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/toolbar/root/ToolbarRootContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "ToolbarRootContext",
+    ()=>ToolbarRootContext,
+    "useToolbarRootContext",
+    ()=>useToolbarRootContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const ToolbarRootContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) ToolbarRootContext.displayName = "ToolbarRootContext";
+function useToolbarRootContext(optional) {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](ToolbarRootContext);
+    if (context === undefined && !optional) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: ToolbarRootContext is missing. Toolbar parts must be placed within <Toolbar.Root>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/composite.mjs [app-ssr] (ecmascript) <locals>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "ALT",
+    ()=>ALT,
+    "ARROW_DOWN",
+    ()=>ARROW_DOWN,
+    "ARROW_KEYS",
+    ()=>ARROW_KEYS,
+    "ARROW_LEFT",
+    ()=>ARROW_LEFT,
+    "ARROW_RIGHT",
+    ()=>ARROW_RIGHT,
+    "ARROW_UP",
+    ()=>ARROW_UP,
+    "COMPOSITE_KEYS",
+    ()=>COMPOSITE_KEYS,
+    "CONTROL",
+    ()=>CONTROL,
+    "END",
+    ()=>END,
+    "HOME",
+    ()=>HOME,
+    "HORIZONTAL_KEYS",
+    ()=>HORIZONTAL_KEYS,
+    "HORIZONTAL_KEYS_WITH_EXTRA_KEYS",
+    ()=>HORIZONTAL_KEYS_WITH_EXTRA_KEYS,
+    "META",
+    ()=>META,
+    "MODIFIER_KEYS",
+    ()=>MODIFIER_KEYS,
+    "PAGE_DOWN",
+    ()=>PAGE_DOWN,
+    "PAGE_UP",
+    ()=>PAGE_UP,
+    "SHIFT",
+    ()=>SHIFT,
+    "VERTICAL_KEYS",
+    ()=>VERTICAL_KEYS,
+    "VERTICAL_KEYS_WITH_EXTRA_KEYS",
+    ()=>VERTICAL_KEYS_WITH_EXTRA_KEYS,
+    "isNativeInput",
+    ()=>isNativeInput,
+    "scrollIntoViewIfNeeded",
+    ()=>scrollIntoViewIfNeeded
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+;
+;
+const ARROW_UP = 'ArrowUp';
+const ARROW_DOWN = 'ArrowDown';
+const ARROW_LEFT = 'ArrowLeft';
+const ARROW_RIGHT = 'ArrowRight';
+const HOME = 'Home';
+const END = 'End';
+const PAGE_UP = 'PageUp';
+const PAGE_DOWN = 'PageDown';
+const HORIZONTAL_KEYS = new Set([
+    ARROW_LEFT,
+    ARROW_RIGHT
+]);
+const HORIZONTAL_KEYS_WITH_EXTRA_KEYS = new Set([
+    ARROW_LEFT,
+    ARROW_RIGHT,
+    HOME,
+    END
+]);
+const VERTICAL_KEYS = new Set([
+    ARROW_UP,
+    ARROW_DOWN
+]);
+const VERTICAL_KEYS_WITH_EXTRA_KEYS = new Set([
+    ARROW_UP,
+    ARROW_DOWN,
+    HOME,
+    END
+]);
+const ARROW_KEYS = new Set([
+    ...HORIZONTAL_KEYS,
+    ...VERTICAL_KEYS
+]);
+const COMPOSITE_KEYS = new Set([
+    ...ARROW_KEYS,
+    HOME,
+    END
+]);
+const SHIFT = 'Shift';
+const CONTROL = 'Control';
+const ALT = 'Alt';
+const META = 'Meta';
+const MODIFIER_KEYS = new Set([
+    SHIFT,
+    CONTROL,
+    ALT,
+    META
+]);
+function isInputElement(element) {
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(element) && element.tagName === 'INPUT';
+}
+function isNativeInput(element) {
+    if (isInputElement(element) && element.selectionStart != null) {
+        return true;
+    }
+    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(element) && element.tagName === 'TEXTAREA') {
+        return true;
+    }
+    return false;
+}
+function scrollIntoViewIfNeeded(scrollContainer, element, direction, orientation) {
+    if (!scrollContainer || !element || !element.scrollTo) {
+        return;
+    }
+    let targetX = scrollContainer.scrollLeft;
+    let targetY = scrollContainer.scrollTop;
+    const isOverflowingX = scrollContainer.clientWidth < scrollContainer.scrollWidth;
+    const isOverflowingY = scrollContainer.clientHeight < scrollContainer.scrollHeight;
+    if (isOverflowingX && orientation !== 'vertical') {
+        const elementOffsetLeft = getOffset(scrollContainer, element, 'left');
+        const containerStyles = getStyles(scrollContainer);
+        const elementStyles = getStyles(element);
+        if (direction === 'ltr') {
+            if (elementOffsetLeft + element.offsetWidth + elementStyles.scrollMarginRight > scrollContainer.scrollLeft + scrollContainer.clientWidth - containerStyles.scrollPaddingRight) {
+                // overflow to the right, scroll to align right edges
+                targetX = elementOffsetLeft + element.offsetWidth + elementStyles.scrollMarginRight - scrollContainer.clientWidth + containerStyles.scrollPaddingRight;
+            } else if (elementOffsetLeft - elementStyles.scrollMarginLeft < scrollContainer.scrollLeft + containerStyles.scrollPaddingLeft) {
+                // overflow to the left, scroll to align left edges
+                targetX = elementOffsetLeft - elementStyles.scrollMarginLeft - containerStyles.scrollPaddingLeft;
+            }
+        }
+        if (direction === 'rtl') {
+            if (elementOffsetLeft - elementStyles.scrollMarginRight < scrollContainer.scrollLeft + containerStyles.scrollPaddingLeft) {
+                // overflow to the left, scroll to align left edges
+                targetX = elementOffsetLeft - elementStyles.scrollMarginLeft - containerStyles.scrollPaddingLeft;
+            } else if (elementOffsetLeft + element.offsetWidth + elementStyles.scrollMarginRight > scrollContainer.scrollLeft + scrollContainer.clientWidth - containerStyles.scrollPaddingRight) {
+                // overflow to the right, scroll to align right edges
+                targetX = elementOffsetLeft + element.offsetWidth + elementStyles.scrollMarginRight - scrollContainer.clientWidth + containerStyles.scrollPaddingRight;
+            }
+        }
+    }
+    if (isOverflowingY && orientation !== 'horizontal') {
+        const elementOffsetTop = getOffset(scrollContainer, element, 'top');
+        const containerStyles = getStyles(scrollContainer);
+        const elementStyles = getStyles(element);
+        if (elementOffsetTop - elementStyles.scrollMarginTop < scrollContainer.scrollTop + containerStyles.scrollPaddingTop) {
+            // overflow upwards, align top edges
+            targetY = elementOffsetTop - elementStyles.scrollMarginTop - containerStyles.scrollPaddingTop;
+        } else if (elementOffsetTop + element.offsetHeight + elementStyles.scrollMarginBottom > scrollContainer.scrollTop + scrollContainer.clientHeight - containerStyles.scrollPaddingBottom) {
+            // overflow downwards, align bottom edges
+            targetY = elementOffsetTop + element.offsetHeight + elementStyles.scrollMarginBottom - scrollContainer.clientHeight + containerStyles.scrollPaddingBottom;
+        }
+    }
+    scrollContainer.scrollTo({
+        left: targetX,
+        top: targetY,
+        behavior: 'auto'
+    });
+}
+function getOffset(ancestor, element, side) {
+    const propName = side === 'left' ? 'offsetLeft' : 'offsetTop';
+    let result = 0;
+    while(element.offsetParent){
+        result += element[propName];
+        if (element.offsetParent === ancestor) {
+            break;
+        }
+        element = element.offsetParent;
+    }
+    return result;
+}
+function getStyles(element) {
+    const styles = getComputedStyle(element);
+    return {
+        scrollMarginTop: parseFloat(styles.scrollMarginTop) || 0,
+        scrollMarginRight: parseFloat(styles.scrollMarginRight) || 0,
+        scrollMarginBottom: parseFloat(styles.scrollMarginBottom) || 0,
+        scrollMarginLeft: parseFloat(styles.scrollMarginLeft) || 0,
+        scrollPaddingTop: parseFloat(styles.scrollPaddingTop) || 0,
+        scrollPaddingRight: parseFloat(styles.scrollPaddingRight) || 0,
+        scrollPaddingBottom: parseFloat(styles.scrollPaddingBottom) || 0,
+        scrollPaddingLeft: parseFloat(styles.scrollPaddingLeft) || 0
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/getDisabledMountTransitionStyles.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "getDisabledMountTransitionStyles",
+    ()=>getDisabledMountTransitionStyles
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/constants.mjs [app-ssr] (ecmascript)");
+;
+;
+function getDisabledMountTransitionStyles(transitionStatus) {
+    return transitionStatus === 'starting' ? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DISABLED_TRANSITIONS_STYLE"] : __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/popup/MenuPopup.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuPopup",
+    ()=>MenuPopup
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingFocusManager$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingFocusManager.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverFloatingInteraction$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverFloatingInteraction.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositionerContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popupStateMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useOpenChangeComplete$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useOpenChangeComplete.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$toolbar$2f$root$2f$ToolbarRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/toolbar/root/ToolbarRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/composite.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$getDisabledMountTransitionStyles$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/getDisabledMountTransitionStyles.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const stateAttributesMapping = {
+    ...__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["popupStateMapping"],
+    ...__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["transitionStatusMapping"]
+};
+const MenuPopup = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuPopup(componentProps, forwardedRef) {
+    const { render, className, style, finalFocus, ...elementProps } = componentProps;
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const { side, align } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuPositionerContext"])();
+    const insideToolbar = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$toolbar$2f$root$2f$ToolbarRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useToolbarRootContext"])(true) != null;
+    const open = store.useState('open');
+    const transitionStatus = store.useState('transitionStatus');
+    const popupProps = store.useState('popupProps');
+    const mounted = store.useState('mounted');
+    const instantType = store.useState('instantType');
+    const triggerElement = store.useState('activeTriggerElement');
+    const parent = store.useState('parent');
+    const lastOpenChangeReason = store.useState('lastOpenChangeReason');
+    const rootId = store.useState('rootId');
+    const floatingContext = store.useState('floatingRootContext');
+    const floatingTreeRoot = store.useState('floatingTreeRoot');
+    const closeDelay = store.useState('closeDelay');
+    const activeTriggerElement = store.useState('activeTriggerElement');
+    const hoverEnabled = store.useState('hoverEnabled');
+    const disabled = store.useState('disabled');
+    const openMethod = store.useState('openMethod');
+    const isContextMenu = parent.type === 'context-menu';
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useOpenChangeComplete$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useOpenChangeComplete"])({
+        open,
+        ref: store.context.popupRef,
+        onComplete () {
+            if (open) {
+                store.context.onOpenChangeComplete?.(true);
+            }
+        }
+    });
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        function handleClose(event) {
+            store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(event.reason, event.domEvent));
+        }
+        floatingTreeRoot.events.on('close', handleClose);
+        return ()=>{
+            floatingTreeRoot.events.off('close', handleClose);
+        };
+    }, [
+        floatingTreeRoot.events,
+        store
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverFloatingInteraction$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useHoverFloatingInteraction"])(floatingContext, {
+        enabled: hoverEnabled && !disabled && !isContextMenu && parent.type !== 'menubar',
+        closeDelay
+    });
+    const setPopupElement = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((element)=>{
+        store.set('popupElement', element);
+    }, [
+        store
+    ]);
+    const state = {
+        transitionStatus,
+        side,
+        align,
+        open,
+        nested: parent.type === 'menu',
+        instant: instantType
+    };
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        state,
+        ref: [
+            forwardedRef,
+            store.context.popupRef,
+            setPopupElement
+        ],
+        stateAttributesMapping,
+        props: [
+            popupProps,
+            {
+                onKeyDown (event) {
+                    if (insideToolbar && __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["COMPOSITE_KEYS"].has(event.key)) {
+                        event.stopPropagation();
+                    }
+                }
+            },
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$getDisabledMountTransitionStyles$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getDisabledMountTransitionStyles"])(transitionStatus),
+            elementProps,
+            {
+                'data-rootownerid': rootId
+            }
+        ]
+    });
+    let returnFocus = parent.type === undefined || isContextMenu;
+    if (triggerElement || parent.type === 'menubar' && lastOpenChangeReason !== __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].outsidePress) {
+        returnFocus = true;
+    }
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingFocusManager$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingFocusManager"], {
+        context: floatingContext,
+        openInteractionType: openMethod,
+        modal: isContextMenu,
+        disabled: !mounted,
+        returnFocus: finalFocus === undefined ? returnFocus : finalFocus,
+        initialFocus: parent.type !== 'menu',
+        restoreFocus: true,
+        externalTree: parent.type !== 'menubar' ? floatingTreeRoot : undefined,
+        previousFocusableElement: activeTriggerElement,
+        nextFocusableElement: parent.type === undefined ? store.context.triggerFocusTargetRef : undefined,
+        beforeContentFocusGuardRef: parent.type === undefined ? store.context.beforeContentFocusGuardRef : undefined,
+        children: element
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuPopup.displayName = "MenuPopup";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/portal/MenuPortalContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuPortalContext",
+    ()=>MenuPortalContext,
+    "useMenuPortalContext",
+    ()=>useMenuPortalContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const MenuPortalContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) MenuPortalContext.displayName = "MenuPortalContext";
+function useMenuPortalContext() {
+    const value = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](MenuPortalContext);
+    if (value === undefined) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: <Menu.Portal> is missing.' : "TURBOPACK unreachable");
+    }
+    return value;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/portal/MenuPortal.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuPortal",
+    ()=>MenuPortal
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingPortal$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingPortal.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$portal$2f$MenuPortalContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/portal/MenuPortalContext.mjs [app-ssr] (ecmascript)");
+/**
+ * A portal element that moves the popup to a different part of the DOM.
+ * By default, the portal element is appended to `<body>`.
+ * Renders a `<div>` element.
+ *
+ * Documentation: [Base UI Menu](https://base-ui.com/react/components/menu)
+ */ var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+const MenuPortal = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuPortal(props, forwardedRef) {
+    const { keepMounted = false, ...portalProps } = props;
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const mounted = store.useState('mounted');
+    const shouldRender = mounted || keepMounted;
+    if (!shouldRender) {
+        return null;
+    }
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$portal$2f$MenuPortalContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuPortalContext"].Provider, {
+        value: keepMounted,
+        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingPortal$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingPortal"], {
+            ref: forwardedRef,
+            ...portalProps
+        })
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuPortal.displayName = "MenuPortal";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/popupTriggerMap.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+/**
+ * Data structure to keep track of popup trigger elements by their IDs.
+ * Uses both a set of Elements and a map of IDs to Elements for efficient lookups.
+ */ __turbopack_context__.s([
+    "PopupTriggerMap",
+    ()=>PopupTriggerMap
+]);
+class PopupTriggerMap {
+    constructor(){
+        this.elementsSet = new Set();
+        this.idMap = new Map();
+    }
+    /**
+   * Adds a trigger element with the given ID.
+   *
+   * Note: The provided element is assumed to not be registered under multiple IDs.
+   */ add(id, element) {
+        const existingElement = this.idMap.get(id);
+        if (existingElement === element) {
+            return;
+        }
+        if (existingElement !== undefined) {
+            // We assume that the same element won't be registered under multiple ids.
+            // This is safe considering how useTriggerRegistration is implemented.
+            this.elementsSet.delete(existingElement);
+        }
+        this.elementsSet.add(element);
+        this.idMap.set(id, element);
+        if ("TURBOPACK compile-time truthy", 1) {
+            if (this.elementsSet.size !== this.idMap.size) {
+                // TODO: fix mui/no-guarded-throw
+                // eslint-disable-next-line mui/no-guarded-throw
+                throw new Error('Base UI: A trigger element cannot be registered under multiple IDs in PopupTriggerMap.');
+            }
+        }
+    }
+    /**
+   * Removes the trigger element with the given ID.
+   */ delete(id) {
+        const element = this.idMap.get(id);
+        if (element) {
+            this.elementsSet.delete(element);
+            this.idMap.delete(id);
+        }
+    }
+    /**
+   * Whether the given element is registered as a trigger.
+   */ hasElement(element) {
+        return this.elementsSet.has(element);
+    }
+    /**
+   * Whether there is a registered trigger element matching the given predicate.
+   */ hasMatchingElement(predicate) {
+        for (const element of this.elementsSet){
+            if (predicate(element)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+   * Returns the trigger element associated with the given ID, or undefined if no such element exists.
+   */ getById(id) {
+        return this.idMap.get(id);
+    }
+    /**
+   * Returns an iterable of all registered trigger entries, where each entry is a tuple of [id, element].
+   */ entries() {
+        return this.idMap.entries();
+    }
+    /**
+   * Returns an iterable of all registered trigger elements.
+   */ elements() {
+        return this.elementsSet.values();
+    }
+    /**
+   * Returns the number of registered trigger elements.
+   */ get size() {
+        return this.idMap.size;
+    }
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingRootStore.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "FloatingRootStore",
+    ()=>FloatingRootStore
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/store/createSelector.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$ReactStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/store/ReactStore.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createEventEmitter$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/createEventEmitter.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/event.mjs [app-ssr] (ecmascript)");
+;
+;
+;
+const selectors = {
+    open: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.open),
+    transitionStatus: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.transitionStatus),
+    domReferenceElement: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.domReferenceElement),
+    referenceElement: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.positionReference ?? state.referenceElement),
+    floatingElement: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.floatingElement),
+    floatingId: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.floatingId)
+};
+class FloatingRootStore extends __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$ReactStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ReactStore"] {
+    constructor(options){
+        const { syncOnly, nested, onOpenChange, triggerElements, ...initialState } = options;
+        super({
+            ...initialState,
+            positionReference: initialState.referenceElement,
+            domReferenceElement: initialState.referenceElement
+        }, {
+            onOpenChange,
+            dataRef: {
+                current: {}
+            },
+            events: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createEventEmitter$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createEventEmitter"])(),
+            nested,
+            triggerElements
+        }, selectors);
+        this.syncOnly = syncOnly;
+    }
+    /**
+   * Syncs the event used by hover logic to distinguish hover-open from click-like interaction.
+   */ syncOpenEvent = (newOpen, event)=>{
+        if (!newOpen || !this.state.open || // Prevent a pending hover-open from overwriting a click-open event, while allowing
+        // click events to upgrade a hover-open.
+        event != null && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isClickLikeEvent"])(event)) {
+            this.context.dataRef.current.openEvent = newOpen ? event : undefined;
+        }
+    };
+    /**
+   * Runs the root-owned side effects for an open state change.
+   */ dispatchOpenChange = (newOpen, eventDetails)=>{
+        this.syncOpenEvent(newOpen, eventDetails.event);
+        const details = {
+            open: newOpen,
+            reason: eventDetails.reason,
+            nativeEvent: eventDetails.event,
+            nested: this.context.nested,
+            triggerElement: eventDetails.trigger
+        };
+        this.context.events.emit('openchange', details);
+    };
+    /**
+   * Emits the `openchange` event through the internal event emitter and calls the `onOpenChange` handler with the provided arguments.
+   *
+   * @param newOpen The new open state.
+   * @param eventDetails Details about the event that triggered the open state change.
+   */ setOpen = (newOpen, eventDetails)=>{
+        if (this.syncOnly) {
+            this.context.onOpenChange?.(newOpen, eventDetails);
+            return;
+        }
+        this.dispatchOpenChange(newOpen, eventDetails);
+        this.context.onOpenChange?.(newOpen, eventDetails);
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useFloatingRootContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useFloatingRootContext",
+    ()=>useFloatingRootContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useRefWithInit.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupTriggerMap$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/popupTriggerMap.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingRootStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingRootStore.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+function useFloatingRootContext(options) {
+    const { open = false, onOpenChange, elements = {} } = options;
+    const floatingId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useId"])();
+    const nested = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingParentNodeId"])() != null;
+    if ("TURBOPACK compile-time truthy", 1) {
+        const optionDomReference = elements.reference;
+        if (optionDomReference && !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(optionDomReference)) {
+            console.error('Cannot pass a virtual element to the `elements.reference` option,', 'as it must be a real DOM element. Use `context.setPositionReference()`', 'instead.');
+        }
+    }
+    const store = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRefWithInit"])(()=>new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingRootStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingRootStore"]({
+            open,
+            transitionStatus: undefined,
+            onOpenChange,
+            referenceElement: elements.reference ?? null,
+            floatingElement: elements.floating ?? null,
+            triggerElements: new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupTriggerMap$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["PopupTriggerMap"](),
+            floatingId,
+            syncOnly: false,
+            nested
+        })).current;
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        const valuesToSync = {
+            open,
+            floatingId
+        };
+        // Only sync elements that are defined to avoid overwriting existing ones
+        if (elements.reference !== undefined) {
+            valuesToSync.referenceElement = elements.reference;
+            valuesToSync.domReferenceElement = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(elements.reference) ? elements.reference : null;
+        }
+        if (elements.floating !== undefined) {
+            valuesToSync.floatingElement = elements.floating;
+        }
+        store.update(valuesToSync);
+    }, [
+        open,
+        floatingId,
+        elements.reference,
+        elements.floating,
+        store
+    ]);
+    store.context.onOpenChange = onOpenChange;
+    store.context.nested = nested;
+    return store;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useFloating.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useFloating",
+    ()=>useFloating
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$react$2d$dom$2f$dist$2f$floating$2d$ui$2e$react$2d$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/react-dom/dist/floating-ui.react-dom.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useFloatingRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useFloatingRootContext.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+function useFloating(options = {}) {
+    const { nodeId, externalTree } = options;
+    const internalStore = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useFloatingRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingRootContext"])(options);
+    const store = options.rootContext || internalStore;
+    const referenceElement = store.useState('referenceElement');
+    const floatingElement = store.useState('floatingElement');
+    const domReferenceElement = store.useState('domReferenceElement');
+    const open = store.useState('open');
+    const floatingId = store.useState('floatingId');
+    const [positionReference, setPositionReferenceRaw] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
+    const [localDomReference, setLocalDomReference] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](undefined);
+    const [localFloatingElement, setLocalFloatingElement] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](undefined);
+    const domReferenceRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const tree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingTree"])(externalTree);
+    const storeElements = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            reference: referenceElement,
+            floating: floatingElement,
+            domReference: domReferenceElement
+        }), [
+        referenceElement,
+        floatingElement,
+        domReferenceElement
+    ]);
+    const position = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$react$2d$dom$2f$dist$2f$floating$2d$ui$2e$react$2d$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["useFloating"])({
+        ...options,
+        elements: {
+            ...storeElements,
+            ...positionReference && {
+                reference: positionReference
+            }
+        }
+    });
+    const localDomReferenceElement = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(localDomReference) ? localDomReference : null;
+    const syncedFloatingElement = localFloatingElement === undefined ? store.state.floatingElement : localFloatingElement;
+    store.useSyncedValue('referenceElement', localDomReference ?? null);
+    store.useSyncedValue('domReferenceElement', localDomReference === undefined ? domReferenceElement : localDomReferenceElement);
+    store.useSyncedValue('floatingElement', syncedFloatingElement);
+    const setPositionReference = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((node)=>{
+        const computedPositionReference = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(node) ? {
+            getBoundingClientRect: ()=>node.getBoundingClientRect(),
+            getClientRects: ()=>node.getClientRects(),
+            contextElement: node
+        } : node;
+        // Store the positionReference in state if the DOM reference is specified externally via the
+        // `elements.reference` option. This ensures that it won't be overridden on future renders.
+        setPositionReferenceRaw(computedPositionReference);
+        position.refs.setReference(computedPositionReference);
+    }, [
+        position.refs
+    ]);
+    const setReference = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((node)=>{
+        if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(node) || node === null) {
+            domReferenceRef.current = node;
+            setLocalDomReference(node);
+        }
+        // Backwards-compatibility for passing a virtual element to `reference`
+        // after it has set the DOM reference.
+        if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(position.refs.reference.current) || position.refs.reference.current === null || // Don't allow setting virtual elements using the old technique back to
+        // `null` to support `positionReference` + an unstable `reference`
+        // callback ref.
+        node !== null && !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(node)) {
+            position.refs.setReference(node);
+        }
+    }, [
+        position.refs,
+        setLocalDomReference
+    ]);
+    const setFloating = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((node)=>{
+        setLocalFloatingElement(node);
+        position.refs.setFloating(node);
+    }, [
+        position.refs
+    ]);
+    const refs = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            ...position.refs,
+            setReference,
+            setFloating,
+            setPositionReference,
+            domReference: domReferenceRef
+        }), [
+        position.refs,
+        setReference,
+        setFloating,
+        setPositionReference
+    ]);
+    const elements = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            ...position.elements,
+            domReference: domReferenceElement
+        }), [
+        position.elements,
+        domReferenceElement
+    ]);
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            ...position,
+            dataRef: store.context.dataRef,
+            open,
+            onOpenChange: store.setOpen,
+            events: store.context.events,
+            floatingId,
+            refs,
+            elements,
+            nodeId,
+            rootStore: store
+        }), [
+        position,
+        refs,
+        elements,
+        nodeId,
+        store,
+        open,
+        floatingId
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (domReferenceElement) {
+            domReferenceRef.current = domReferenceElement;
+        }
+    }, [
+        domReferenceElement
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        store.context.dataRef.current.floatingContext = context;
+        const node = tree?.nodesRef.current.find((n)=>n.id === nodeId);
+        if (node) {
+            node.context = context;
+        }
+    });
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            ...position,
+            context,
+            refs,
+            elements,
+            rootStore: store
+        }), [
+        position,
+        refs,
+        elements,
+        context,
+        store
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/direction-context/DirectionContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "DirectionContext",
+    ()=>DirectionContext,
+    "useDirection",
+    ()=>useDirection
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+const DirectionContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) DirectionContext.displayName = "DirectionContext";
+function useDirection() {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](DirectionContext);
+    return context?.direction ?? 'ltr';
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/middleware/arrow.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "arrow",
+    ()=>arrow,
+    "baseArrow",
+    ()=>baseArrow
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.mjs [app-ssr] (ecmascript)");
+;
+const baseArrow = (options)=>({
+        name: 'arrow',
+        options,
+        async fn (state) {
+            const { x, y, placement, rects, platform, elements, middlewareData } = state;
+            // Since `element` is required, we don't Partial<> the type.
+            const { element, padding = 0, offsetParent = 'real' } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["evaluate"])(options, state) || {};
+            if (element == null) {
+                return {};
+            }
+            const paddingObject = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getPaddingObject"])(padding);
+            const coords = {
+                x,
+                y
+            };
+            const axis = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getAlignmentAxis"])(placement);
+            const length = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getAxisLength"])(axis);
+            const arrowDimensions = await platform.getDimensions(element);
+            const isYAxis = axis === 'y';
+            const minProp = isYAxis ? 'top' : 'left';
+            const maxProp = isYAxis ? 'bottom' : 'right';
+            const clientProp = isYAxis ? 'clientHeight' : 'clientWidth';
+            const endDiff = rects.reference[length] + rects.reference[axis] - coords[axis] - rects.floating[length];
+            const startDiff = coords[axis] - rects.reference[axis];
+            const arrowOffsetParent = offsetParent === 'real' ? await platform.getOffsetParent?.(element) : elements.floating;
+            let clientSize = elements.floating[clientProp] || rects.floating[length];
+            // DOM platform can return `window` as the `offsetParent`.
+            if (!clientSize || !await platform.isElement?.(arrowOffsetParent)) {
+                clientSize = elements.floating[clientProp] || rects.floating[length];
+            }
+            const centerToReference = endDiff / 2 - startDiff / 2;
+            // If the padding is large enough that it causes the arrow to no longer be
+            // centered, modify the padding so that it is centered.
+            const largestPossiblePadding = clientSize / 2 - arrowDimensions[length] / 2 - 1;
+            const minPadding = Math.min(paddingObject[minProp], largestPossiblePadding);
+            const maxPadding = Math.min(paddingObject[maxProp], largestPossiblePadding);
+            // Make sure the arrow doesn't overflow the floating element if the center
+            // point is outside the floating element's bounds.
+            const min = minPadding;
+            const max = clientSize - arrowDimensions[length] - maxPadding;
+            const center = clientSize / 2 - arrowDimensions[length] / 2 + centerToReference;
+            const offset = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["clamp"])(min, center, max);
+            // If the reference is small enough that the arrow's padding causes it to
+            // to point to nothing for an aligned placement, adjust the offset of the
+            // floating element itself. To ensure `shift()` continues to take action,
+            // a single reset is performed when this is true.
+            const shouldAddOffset = !middlewareData.arrow && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getAlignment"])(placement) != null && center !== offset && rects.reference[length] / 2 - (center < min ? minPadding : maxPadding) - arrowDimensions[length] / 2 < 0;
+            // eslint-disable-next-line no-nested-ternary
+            const alignmentOffset = shouldAddOffset ? center < min ? center - min : center - max : 0;
+            return {
+                [axis]: coords[axis] + alignmentOffset,
+                data: {
+                    [axis]: offset,
+                    centerOffset: center - offset - alignmentOffset,
+                    ...shouldAddOffset && {
+                        alignmentOffset
+                    }
+                },
+                reset: shouldAddOffset
+            };
+        }
+    });
+const arrow = (options, deps)=>({
+        ...baseArrow(options),
+        options: [
+            options,
+            deps
+        ]
+    });
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/hideMiddleware.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "hide",
+    ()=>hide
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$react$2d$dom$2f$dist$2f$floating$2d$ui$2e$react$2d$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/react-dom/dist/floating-ui.react-dom.mjs [app-ssr] (ecmascript) <locals>");
+;
+const nativeHideFn = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$react$2d$dom$2f$dist$2f$floating$2d$ui$2e$react$2d$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["hide"])().fn;
+const hide = {
+    name: 'hide',
+    async fn (state) {
+        const { width, height, x, y } = state.rects.reference;
+        const anchorHidden = width === 0 && height === 0 && x === 0 && y === 0;
+        const nativeHideResult = await nativeHideFn(state);
+        return {
+            data: {
+                referenceHidden: nativeHideResult.data?.referenceHidden || anchorHidden
+            }
+        };
+    }
+};
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/adaptiveOriginMiddleware.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "DEFAULT_SIDES",
+    ()=>DEFAULT_SIDES,
+    "adaptiveOrigin",
+    ()=>adaptiveOrigin
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__getWindow__as__ownerWindow$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript) <export getWindow as ownerWindow>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.mjs [app-ssr] (ecmascript)");
+;
+;
+const DEFAULT_SIDES = {
+    sideX: 'left',
+    sideY: 'top'
+};
+const adaptiveOrigin = {
+    name: 'adaptiveOrigin',
+    async fn (state) {
+        const { x: rawX, y: rawY, rects: { floating: floatRect }, elements: { floating }, platform, strategy, placement } = state;
+        const win = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__getWindow__as__ownerWindow$3e$__["ownerWindow"])(floating);
+        const styles = win.getComputedStyle(floating);
+        const hasTransition = styles.transitionDuration !== '0s' && styles.transitionDuration !== '';
+        if (!hasTransition) {
+            return {
+                x: rawX,
+                y: rawY,
+                data: DEFAULT_SIDES
+            };
+        }
+        const offsetParent = await platform.getOffsetParent?.(floating);
+        let offsetDimensions = {
+            width: 0,
+            height: 0
+        };
+        // For fixed strategy, prefer visualViewport if available
+        if (strategy === 'fixed' && win?.visualViewport) {
+            offsetDimensions = {
+                width: win.visualViewport.width,
+                height: win.visualViewport.height
+            };
+        } else if (offsetParent === win) {
+            const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floating);
+            offsetDimensions = {
+                width: doc.documentElement.clientWidth,
+                height: doc.documentElement.clientHeight
+            };
+        } else if (await platform.isElement?.(offsetParent)) {
+            offsetDimensions = await platform.getDimensions(offsetParent);
+        }
+        const currentSide = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getSide"])(placement);
+        let x = rawX;
+        let y = rawY;
+        if (currentSide === 'left') {
+            x = offsetDimensions.width - (rawX + floatRect.width);
+        }
+        if (currentSide === 'top') {
+            y = offsetDimensions.height - (rawY + floatRect.height);
+        }
+        const sideX = currentSide === 'left' ? 'right' : DEFAULT_SIDES.sideX;
+        const sideY = currentSide === 'top' ? 'bottom' : DEFAULT_SIDES.sideY;
+        return {
+            x,
+            y,
+            data: {
+                sideX,
+                sideY
+            }
+        };
+    }
+};
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/useAnchorPositioning.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useAnchorPositioning",
+    ()=>useAnchorPositioning
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__getWindow__as__ownerWindow$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript) <export getWindow as ownerWindow>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useValueAsRef.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$dom$2f$dist$2f$floating$2d$ui$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/dom/dist/floating-ui.dom.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$react$2d$dom$2f$dist$2f$floating$2d$ui$2e$react$2d$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/react-dom/dist/floating-ui.react-dom.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useFloating$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useFloating.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$direction$2d$context$2f$DirectionContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/direction-context/DirectionContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$middleware$2f$arrow$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/middleware/arrow.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$hideMiddleware$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/hideMiddleware.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$adaptiveOriginMiddleware$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/adaptiveOriginMiddleware.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+function getLogicalSide(sideParam, renderedSide, isRtl) {
+    const isLogicalSideParam = sideParam === 'inline-start' || sideParam === 'inline-end';
+    const logicalRight = isRtl ? 'inline-start' : 'inline-end';
+    const logicalLeft = isRtl ? 'inline-end' : 'inline-start';
+    return ({
+        top: 'top',
+        right: isLogicalSideParam ? logicalRight : 'right',
+        bottom: 'bottom',
+        left: isLogicalSideParam ? logicalLeft : 'left'
+    })[renderedSide];
+}
+function getOffsetData(state, sideParam, isRtl) {
+    const { rects, placement } = state;
+    const data = {
+        side: getLogicalSide(sideParam, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getSide"])(placement), isRtl),
+        align: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getAlignment"])(placement) || 'center',
+        anchor: {
+            width: rects.reference.width,
+            height: rects.reference.height
+        },
+        positioner: {
+            width: rects.floating.width,
+            height: rects.floating.height
+        }
+    };
+    return data;
+}
+function useAnchorPositioning(params) {
+    const { // Public parameters
+    anchor, positionMethod = 'absolute', side: sideParam = 'bottom', sideOffset = 0, align = 'center', alignOffset = 0, collisionBoundary, collisionPadding: collisionPaddingParam = 5, sticky = false, arrowPadding = 5, disableAnchorTracking = false, inline: inlineMiddleware, // Private parameters
+    keepMounted = false, floatingRootContext, mounted, collisionAvoidance, shiftCrossAxis = false, nodeId, adaptiveOrigin, lazyFlip = false, externalTree } = params;
+    const [mountSide, setMountSide] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
+    if (!mounted && mountSide !== null) {
+        setMountSide(null);
+    }
+    const collisionAvoidanceSide = collisionAvoidance.side || 'flip';
+    const collisionAvoidanceAlign = collisionAvoidance.align || 'flip';
+    const collisionAvoidanceFallbackAxisSide = collisionAvoidance.fallbackAxisSide || 'end';
+    const anchorFn = typeof anchor === 'function' ? anchor : undefined;
+    const anchorFnCallback = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(anchorFn);
+    const anchorDep = anchorFn ? anchorFnCallback : anchor;
+    const anchorValueRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(anchor);
+    const mountedRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(mounted);
+    const direction = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$direction$2d$context$2f$DirectionContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useDirection"])();
+    const isRtl = direction === 'rtl';
+    const side = mountSide || ({
+        top: 'top',
+        right: 'right',
+        bottom: 'bottom',
+        left: 'left',
+        'inline-end': isRtl ? 'left' : 'right',
+        'inline-start': isRtl ? 'right' : 'left'
+    })[sideParam];
+    const placement = align === 'center' ? side : `${side}-${align}`;
+    let collisionPadding = collisionPaddingParam;
+    // Create a bias to the preferred side.
+    // On iOS, when the mobile software keyboard opens, the input is exactly centered
+    // in the viewport, but this can cause it to flip to the top undesirably.
+    const bias = 1;
+    const biasTop = sideParam === 'bottom' ? bias : 0;
+    const biasBottom = sideParam === 'top' ? bias : 0;
+    const biasLeft = sideParam === 'right' ? bias : 0;
+    const biasRight = sideParam === 'left' ? bias : 0;
+    if (typeof collisionPadding === 'number') {
+        collisionPadding = {
+            top: collisionPadding + biasTop,
+            right: collisionPadding + biasRight,
+            bottom: collisionPadding + biasBottom,
+            left: collisionPadding + biasLeft
+        };
+    } else if (collisionPadding) {
+        collisionPadding = {
+            top: (collisionPadding.top || 0) + biasTop,
+            right: (collisionPadding.right || 0) + biasRight,
+            bottom: (collisionPadding.bottom || 0) + biasBottom,
+            left: (collisionPadding.left || 0) + biasLeft
+        };
+    }
+    const commonCollisionProps = {
+        boundary: collisionBoundary === 'clipping-ancestors' ? 'clippingAncestors' : collisionBoundary,
+        padding: collisionPadding
+    };
+    // Using a ref assumes that the arrow element is always present in the DOM for the lifetime of the
+    // popup. If this assumption ends up being false, we can switch to state to manage the arrow's
+    // presence.
+    const arrowRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    // Keep these reactive if they're not functions
+    const sideOffsetRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(sideOffset);
+    const alignOffsetRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(alignOffset);
+    const sideOffsetDep = typeof sideOffset !== 'function' ? sideOffset : 0;
+    const alignOffsetDep = typeof alignOffset !== 'function' ? alignOffset : 0;
+    const middleware = [];
+    if (inlineMiddleware) {
+        middleware.push(inlineMiddleware);
+    }
+    middleware.push((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$react$2d$dom$2f$dist$2f$floating$2d$ui$2e$react$2d$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["offset"])((state)=>{
+        const data = getOffsetData(state, sideParam, isRtl);
+        const sideAxis = typeof sideOffsetRef.current === 'function' ? sideOffsetRef.current(data) : sideOffsetRef.current;
+        const alignAxis = typeof alignOffsetRef.current === 'function' ? alignOffsetRef.current(data) : alignOffsetRef.current;
+        return {
+            mainAxis: sideAxis,
+            crossAxis: alignAxis,
+            alignmentAxis: alignAxis
+        };
+    }, [
+        sideOffsetDep,
+        alignOffsetDep,
+        isRtl,
+        sideParam
+    ]));
+    const shiftDisabled = collisionAvoidanceAlign === 'none' && collisionAvoidanceSide !== 'shift';
+    const crossAxisShiftEnabled = !shiftDisabled && (sticky || shiftCrossAxis || collisionAvoidanceSide === 'shift');
+    const flipMiddleware = collisionAvoidanceSide === 'none' ? null : (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$react$2d$dom$2f$dist$2f$floating$2d$ui$2e$react$2d$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["flip"])({
+        ...commonCollisionProps,
+        // Ensure the popup flips if it's been limited by its --available-height and it resizes.
+        // Since the size() padding is smaller than the flip() padding, flip() will take precedence.
+        padding: {
+            top: collisionPadding.top + bias,
+            right: collisionPadding.right + bias,
+            bottom: collisionPadding.bottom + bias,
+            left: collisionPadding.left + bias
+        },
+        mainAxis: !shiftCrossAxis && collisionAvoidanceSide === 'flip',
+        crossAxis: collisionAvoidanceAlign === 'flip' ? 'alignment' : false,
+        fallbackAxisSideDirection: collisionAvoidanceFallbackAxisSide
+    });
+    const shiftMiddleware = shiftDisabled ? null : (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$react$2d$dom$2f$dist$2f$floating$2d$ui$2e$react$2d$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["shift"])((data)=>{
+        const html = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(data.elements.floating).documentElement;
+        return {
+            ...commonCollisionProps,
+            // Use the Layout Viewport to avoid shifting around when pinch-zooming
+            // for context menus.
+            rootBoundary: shiftCrossAxis ? {
+                x: 0,
+                y: 0,
+                width: html.clientWidth,
+                height: html.clientHeight
+            } : undefined,
+            mainAxis: collisionAvoidanceAlign !== 'none',
+            crossAxis: crossAxisShiftEnabled,
+            limiter: sticky || shiftCrossAxis ? undefined : (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$react$2d$dom$2f$dist$2f$floating$2d$ui$2e$react$2d$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["limitShift"])((limitData)=>{
+                if (!arrowRef.current) {
+                    return {};
+                }
+                const { width, height } = arrowRef.current.getBoundingClientRect();
+                const sideAxis = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getSideAxis"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getSide"])(limitData.placement));
+                const arrowSize = sideAxis === 'y' ? width : height;
+                const offsetAmount = sideAxis === 'y' ? collisionPadding.left + collisionPadding.right : collisionPadding.top + collisionPadding.bottom;
+                return {
+                    offset: arrowSize / 2 + offsetAmount / 2
+                };
+            })
+        };
+    }, [
+        commonCollisionProps,
+        sticky,
+        shiftCrossAxis,
+        collisionPadding,
+        collisionAvoidanceAlign
+    ]);
+    // https://floating-ui.com/docs/flip#combining-with-shift
+    if (collisionAvoidanceSide === 'shift' || collisionAvoidanceAlign === 'shift' || align === 'center') {
+        middleware.push(shiftMiddleware, flipMiddleware);
+    } else {
+        middleware.push(flipMiddleware, shiftMiddleware);
+    }
+    middleware.push((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$react$2d$dom$2f$dist$2f$floating$2d$ui$2e$react$2d$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["size"])({
+        ...commonCollisionProps,
+        apply ({ elements: { floating }, availableWidth, availableHeight, rects }) {
+            if (!mountedRef.current) {
+                return;
+            }
+            const floatingStyle = floating.style;
+            floatingStyle.setProperty('--available-width', `${availableWidth}px`);
+            floatingStyle.setProperty('--available-height', `${availableHeight}px`);
+            // Snap anchor dimensions to device pixels to ensure the popup's visual width matches the anchor's one.
+            const dpr = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__getWindow__as__ownerWindow$3e$__["ownerWindow"])(floating).devicePixelRatio || 1;
+            const { x, y, width, height } = rects.reference;
+            const anchorWidth = (Math.round((x + width) * dpr) - Math.round(x * dpr)) / dpr;
+            const anchorHeight = (Math.round((y + height) * dpr) - Math.round(y * dpr)) / dpr;
+            floatingStyle.setProperty('--anchor-width', `${anchorWidth}px`);
+            floatingStyle.setProperty('--anchor-height', `${anchorHeight}px`);
+        }
+    }), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$middleware$2f$arrow$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["arrow"])((state)=>({
+            // `transform-origin` calculations rely on an element existing. If the arrow hasn't been set,
+            // we'll create a fake element.
+            element: arrowRef.current || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(state.elements.floating).createElement('div'),
+            padding: arrowPadding,
+            offsetParent: 'floating'
+        }), [
+        arrowPadding
+    ]), {
+        name: 'transformOrigin',
+        fn (state) {
+            const { elements, middlewareData, placement: renderedPlacement, rects, y } = state;
+            const currentRenderedSide = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getSide"])(renderedPlacement);
+            const currentRenderedAxis = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getSideAxis"])(currentRenderedSide);
+            const arrowEl = arrowRef.current;
+            const arrowX = middlewareData.arrow?.x || 0;
+            const arrowY = middlewareData.arrow?.y || 0;
+            const arrowWidth = arrowEl?.clientWidth || 0;
+            const arrowHeight = arrowEl?.clientHeight || 0;
+            const transformX = arrowX + arrowWidth / 2;
+            const transformY = arrowY + arrowHeight / 2;
+            const shiftY = Math.abs(middlewareData.shift?.y || 0);
+            const halfAnchorHeight = rects.reference.height / 2;
+            const sideOffsetValue = typeof sideOffset === 'function' ? sideOffset(getOffsetData(state, sideParam, isRtl)) : sideOffset;
+            const isOverlappingAnchor = shiftY > sideOffsetValue;
+            const adjacentTransformOrigin = {
+                top: `${transformX}px calc(100% + ${sideOffsetValue}px)`,
+                bottom: `${transformX}px ${-sideOffsetValue}px`,
+                left: `calc(100% + ${sideOffsetValue}px) ${transformY}px`,
+                right: `${-sideOffsetValue}px ${transformY}px`
+            }[currentRenderedSide];
+            const overlapTransformOrigin = `${transformX}px ${rects.reference.y + halfAnchorHeight - y}px`;
+            elements.floating.style.setProperty('--transform-origin', crossAxisShiftEnabled && currentRenderedAxis === 'y' && isOverlappingAnchor ? overlapTransformOrigin : adjacentTransformOrigin);
+            return {};
+        }
+    }, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$hideMiddleware$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["hide"], adaptiveOrigin);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        // Ensure positioning doesn't run initially for `keepMounted` elements that
+        // aren't initially open.
+        if (!mounted && floatingRootContext) {
+            floatingRootContext.update({
+                referenceElement: null,
+                floatingElement: null,
+                domReferenceElement: null,
+                positionReference: null
+            });
+        }
+    }, [
+        mounted,
+        floatingRootContext
+    ]);
+    const autoUpdateOptions = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            elementResize: !disableAnchorTracking && typeof ResizeObserver !== 'undefined',
+            layoutShift: !disableAnchorTracking && typeof IntersectionObserver !== 'undefined'
+        }), [
+        disableAnchorTracking
+    ]);
+    const { refs, elements, x, y, middlewareData, update, placement: renderedPlacement, context, isPositioned, floatingStyles: originalFloatingStyles } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useFloating$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloating"])({
+        rootContext: floatingRootContext,
+        open: keepMounted ? mounted : undefined,
+        placement,
+        middleware,
+        strategy: positionMethod,
+        whileElementsMounted: keepMounted ? undefined : (...args)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$dom$2f$dist$2f$floating$2d$ui$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["autoUpdate"])(...args, autoUpdateOptions),
+        nodeId,
+        externalTree
+    });
+    const { sideX, sideY } = middlewareData.adaptiveOrigin || __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$adaptiveOriginMiddleware$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DEFAULT_SIDES"];
+    // Default to `fixed` when not positioned to prevent `autoFocus` scroll jumps.
+    // This ensures the popup is inside the viewport initially before it gets positioned.
+    const resolvedPosition = isPositioned ? positionMethod : 'fixed';
+    const floatingStyles = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        const base = adaptiveOrigin ? {
+            position: resolvedPosition,
+            [sideX]: x,
+            [sideY]: y
+        } : {
+            position: resolvedPosition,
+            ...originalFloatingStyles
+        };
+        if (!isPositioned) {
+            base.opacity = 0;
+        }
+        return base;
+    }, [
+        adaptiveOrigin,
+        resolvedPosition,
+        sideX,
+        x,
+        sideY,
+        y,
+        originalFloatingStyles,
+        isPositioned
+    ]);
+    const registeredPositionReferenceRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!mounted) {
+            return;
+        }
+        const anchorValue = anchorValueRef.current;
+        const resolvedAnchor = typeof anchorValue === 'function' ? anchorValue() : anchorValue;
+        const unwrappedElement = (isRef(resolvedAnchor) ? resolvedAnchor.current : resolvedAnchor) || null;
+        const finalAnchor = unwrappedElement || null;
+        if (finalAnchor !== registeredPositionReferenceRef.current) {
+            refs.setPositionReference(finalAnchor);
+            registeredPositionReferenceRef.current = finalAnchor;
+        }
+    }, [
+        mounted,
+        refs,
+        anchorDep,
+        anchorValueRef
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!mounted) {
+            return;
+        }
+        const anchorValue = anchorValueRef.current;
+        // Refs from parent components are set after useLayoutEffect runs and are available in useEffect.
+        // Therefore, if the anchor is a ref, we need to update the position reference in useEffect.
+        if (typeof anchorValue === 'function') {
+            return;
+        }
+        if (isRef(anchorValue) && anchorValue.current !== registeredPositionReferenceRef.current) {
+            refs.setPositionReference(anchorValue.current);
+            registeredPositionReferenceRef.current = anchorValue.current;
+        }
+    }, [
+        mounted,
+        refs,
+        anchorDep,
+        anchorValueRef
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (keepMounted && mounted && elements.reference && elements.floating) {
+            return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$dom$2f$dist$2f$floating$2d$ui$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["autoUpdate"])(elements.reference, elements.floating, update, autoUpdateOptions);
+        }
+        return undefined;
+    }, [
+        keepMounted,
+        mounted,
+        elements,
+        update,
+        autoUpdateOptions
+    ]);
+    const renderedSide = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getSide"])(renderedPlacement);
+    const logicalRenderedSide = getLogicalSide(sideParam, renderedSide, isRtl);
+    const renderedAlign = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getAlignment"])(renderedPlacement) || 'center';
+    const anchorHidden = Boolean(middlewareData.hide?.referenceHidden);
+    // Locks the flip (makes it "sticky") so it doesn't prefer a given placement
+    // and flips back lazily, not eagerly. Ideal for filtered lists that change
+    // the size of the popup dynamically to avoid unwanted flipping when typing.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (lazyFlip && mounted && isPositioned) {
+            setMountSide(renderedSide);
+        }
+    }, [
+        lazyFlip,
+        mounted,
+        isPositioned,
+        renderedSide
+    ]);
+    const arrowStyles = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            position: 'absolute',
+            top: middlewareData.arrow?.y,
+            left: middlewareData.arrow?.x
+        }), [
+        middlewareData.arrow
+    ]);
+    const arrowUncentered = middlewareData.arrow?.centerOffset !== 0;
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            positionerStyles: floatingStyles,
+            arrowStyles,
+            arrowRef,
+            arrowUncentered,
+            side: logicalRenderedSide,
+            align: renderedAlign,
+            physicalSide: renderedSide,
+            anchorHidden,
+            refs,
+            context,
+            isPositioned,
+            update
+        }), [
+        floatingStyles,
+        arrowStyles,
+        arrowRef,
+        arrowUncentered,
+        logicalRenderedSide,
+        renderedAlign,
+        renderedSide,
+        anchorHidden,
+        refs,
+        context,
+        isPositioned,
+        update
+    ]);
+}
+function isRef(param) {
+    return param != null && 'current' in param;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/CompositeList.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "CompositeList",
+    ()=>CompositeList
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useRefWithInit.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$CompositeListContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/CompositeListContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+/* eslint-disable no-bitwise */ 'use client';
+;
+;
+;
+;
+;
+;
+function CompositeList(props) {
+    const { children, elementsRef, labelsRef, onMapChange: onMapChangeProp } = props;
+    const onMapChange = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(onMapChangeProp);
+    const nextIndexRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](0);
+    const listeners = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRefWithInit"])(createListeners).current;
+    // We use a stable `map` to avoid O(n^2) re-allocation costs for large lists.
+    // `mapTick` is our re-render trigger mechanism. We also need to update the
+    // elements and label refs, but there's a lot of async work going on and sometimes
+    // the effect that handles `onMapChange` gets called after those refs have been
+    // filled, and we don't want to lose those values by setting their lengths to `0`.
+    // We also need to have them at the proper length because floating-ui uses that
+    // information for list navigation.
+    const map = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRefWithInit"])(createMap).current;
+    // `mapTick` uses a counter rather than objects for low precision-loss risk and better memory efficiency
+    const [mapTick, setMapTick] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](0);
+    const lastTickRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](mapTick);
+    const register = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((node, metadata)=>{
+        map.set(node, metadata ?? null);
+        lastTickRef.current += 1;
+        setMapTick(lastTickRef.current);
+    });
+    const unregister = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((node)=>{
+        map.delete(node);
+        lastTickRef.current += 1;
+        setMapTick(lastTickRef.current);
+    });
+    const sortedMap = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        // `mapTick` is the `useMemo` trigger as `map` is stable.
+        disableEslintWarning(mapTick);
+        const newMap = new Map();
+        // Filter out disconnected elements before sorting to avoid inconsistent
+        // compareDocumentPosition results when elements are detached from the DOM.
+        const sortedNodes = Array.from(map.keys()).filter((node)=>node.isConnected).sort(sortByDocumentPosition);
+        sortedNodes.forEach((node, index)=>{
+            const metadata = map.get(node) ?? {};
+            newMap.set(node, {
+                ...metadata,
+                index
+            });
+        });
+        return newMap;
+    }, [
+        map,
+        mapTick
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (typeof MutationObserver !== 'function' || sortedMap.size === 0) {
+            return undefined;
+        }
+        const mutationObserver = new MutationObserver((entries)=>{
+            const diff = new Set();
+            const updateDiff = (node)=>diff.has(node) ? diff.delete(node) : diff.add(node);
+            entries.forEach((entry)=>{
+                entry.removedNodes.forEach(updateDiff);
+                entry.addedNodes.forEach(updateDiff);
+            });
+            if (diff.size === 0) {
+                lastTickRef.current += 1;
+                setMapTick(lastTickRef.current);
+            }
+        });
+        sortedMap.forEach((_, node)=>{
+            if (node.parentElement) {
+                mutationObserver.observe(node.parentElement, {
+                    childList: true
+                });
+            }
+        });
+        return ()=>{
+            mutationObserver.disconnect();
+        };
+    }, [
+        sortedMap
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        const shouldUpdateLengths = lastTickRef.current === mapTick;
+        if (shouldUpdateLengths) {
+            if (elementsRef.current.length !== sortedMap.size) {
+                elementsRef.current.length = sortedMap.size;
+            }
+            if (labelsRef && labelsRef.current.length !== sortedMap.size) {
+                labelsRef.current.length = sortedMap.size;
+            }
+            nextIndexRef.current = sortedMap.size;
+        }
+        onMapChange(sortedMap);
+    }, [
+        onMapChange,
+        sortedMap,
+        elementsRef,
+        labelsRef,
+        mapTick
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        return ()=>{
+            elementsRef.current = [];
+        };
+    }, [
+        elementsRef
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        return ()=>{
+            if (labelsRef) {
+                labelsRef.current = [];
+            }
+        };
+    }, [
+        labelsRef
+    ]);
+    const subscribeMapChange = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((fn)=>{
+        listeners.add(fn);
+        return ()=>{
+            listeners.delete(fn);
+        };
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        listeners.forEach((l)=>l(sortedMap));
+    }, [
+        listeners,
+        sortedMap
+    ]);
+    const contextValue = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            register,
+            unregister,
+            subscribeMapChange,
+            elementsRef,
+            labelsRef,
+            nextIndexRef
+        }), [
+        register,
+        unregister,
+        subscribeMapChange,
+        elementsRef,
+        labelsRef,
+        nextIndexRef
+    ]);
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$CompositeListContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CompositeListContext"].Provider, {
+        value: contextValue,
+        children: children
+    });
+}
+function createMap() {
+    return new Map();
+}
+function createListeners() {
+    return new Set();
+}
+function sortByDocumentPosition(a, b) {
+    const position = a.compareDocumentPosition(b);
+    if (position & Node.DOCUMENT_POSITION_FOLLOWING || position & Node.DOCUMENT_POSITION_CONTAINED_BY) {
+        return -1;
+    }
+    if (position & Node.DOCUMENT_POSITION_PRECEDING || position & Node.DOCUMENT_POSITION_CONTAINS) {
+        return 1;
+    }
+    return 0;
+}
+function disableEslintWarning(_) {}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/InternalBackdrop.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "InternalBackdrop",
+    ()=>InternalBackdrop
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+/**
+ * @internal
+ */ var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+;
+;
+const InternalBackdrop = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function InternalBackdrop(props, ref) {
+    const { cutout, ...otherProps } = props;
+    let clipPath;
+    if (cutout) {
+        const rect = cutout.getBoundingClientRect();
+        clipPath = `polygon(0% 0%,100% 0%,100% 100%,0% 100%,0% 0%,${rect.left}px ${rect.top}px,${rect.left}px ${rect.bottom}px,${rect.right}px ${rect.bottom}px,${rect.right}px ${rect.top}px,${rect.left}px ${rect.top}px)`;
+    }
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])("div", {
+        ref: ref,
+        role: "presentation",
+        "data-base-ui-inert": "",
+        ...otherProps,
+        style: {
+            position: 'fixed',
+            inset: 0,
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            clipPath
+        }
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) InternalBackdrop.displayName = "InternalBackdrop";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/usePositioner.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "usePositioner",
+    ()=>usePositioner
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popupStateMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$getDisabledMountTransitionStyles$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/getDisabledMountTransitionStyles.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+function usePositioner(componentProps, state, { styles, transitionStatus, props, refs, hidden, inert = false }) {
+    const style = {
+        ...styles
+    };
+    if (inert) {
+        style.pointerEvents = 'none';
+    }
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        state,
+        ref: refs,
+        props: [
+            {
+                role: 'presentation',
+                hidden,
+                style
+            },
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$getDisabledMountTransitionStyles$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getDisabledMountTransitionStyles"])(transitionStatus),
+            props
+        ],
+        stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["popupStateMapping"]
+    });
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/useAnchoredPopupScrollLock.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useAnchoredPopupScrollLock",
+    ()=>useAnchoredPopupScrollLock
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useScrollLock$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useScrollLock.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+// Touch-opened popups normally avoid scroll locking so users can still swipe outside to dismiss.
+// This hook re-enables scroll lock only when the popup is effectively full-width.
+// Treat popups with up to 20px of total horizontal gutter as full-width so common ~10px side
+// padding still locks scroll, since that leaves too little outside space for a reliable swipe.
+const VIEWPORT_WIDTH_TOLERANCE_PX = 20;
+function useAnchoredPopupScrollLock(enabled, touchOpen, positionerElement, referenceElement) {
+    const [touchOpenShouldLockScroll, setTouchOpenShouldLockScroll] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](false);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!enabled || !touchOpen || positionerElement == null) {
+            setTouchOpenShouldLockScroll(false);
+            return;
+        }
+        const viewportWidth = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(positionerElement).documentElement.clientWidth;
+        const popupWidth = positionerElement.offsetWidth;
+        setTouchOpenShouldLockScroll(viewportWidth > 0 && popupWidth > 0 && popupWidth >= viewportWidth - VIEWPORT_WIDTH_TOLERANCE_PX);
+    }, [
+        enabled,
+        touchOpen,
+        positionerElement
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useScrollLock$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useScrollLock"])(enabled && (!touchOpen || touchOpenShouldLockScroll), referenceElement);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositioner.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuPositioner",
+    ()=>MenuPositioner
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$inertValue$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/inertValue.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositionerContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$useAnchorPositioning$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/useAnchorPositioning.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$CompositeList$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/CompositeList.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$InternalBackdrop$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/InternalBackdrop.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$portal$2f$MenuPortalContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/portal/MenuPortalContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/constants.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$context$2d$menu$2f$root$2f$ContextMenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/context-menu/root/ContextMenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$adaptiveOriginMiddleware$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/adaptiveOriginMiddleware.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useAnimationsFinished$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useAnimationsFinished.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$usePositioner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/usePositioner.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$useAnchoredPopupScrollLock$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/useAnchoredPopupScrollLock.mjs [app-ssr] (ecmascript)");
+/**
+ * Positions the menu popup against the trigger.
+ * Renders a `<div>` element.
+ *
+ * Documentation: [Base UI Menu](https://base-ui.com/react/components/menu)
+ */ var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const MenuPositioner = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuPositioner(componentProps, forwardedRef) {
+    const { anchor: anchorProp, positionMethod: positionMethodProp = 'absolute', className, render, side, align: alignProp, sideOffset: sideOffsetProp = 0, alignOffset: alignOffsetProp = 0, collisionBoundary = 'clipping-ancestors', collisionPadding = 5, arrowPadding = 5, sticky = false, disableAnchorTracking = false, collisionAvoidance: collisionAvoidanceProp = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DROPDOWN_COLLISION_AVOIDANCE"], style, ...elementProps } = componentProps;
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const keepMounted = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$portal$2f$MenuPortalContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuPortalContext"])();
+    const contextMenuContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$context$2d$menu$2f$root$2f$ContextMenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContextMenuRootContext"])(true);
+    const parent = store.useState('parent');
+    const floatingRootContext = store.useState('floatingRootContext');
+    const floatingTreeRoot = store.useState('floatingTreeRoot');
+    const mounted = store.useState('mounted');
+    const open = store.useState('open');
+    const modal = store.useState('modal');
+    const openMethod = store.useState('openMethod');
+    const triggerElement = store.useState('activeTriggerElement');
+    const transitionStatus = store.useState('transitionStatus');
+    const positionerElement = store.useState('positionerElement');
+    const instantType = store.useState('instantType');
+    const hasViewport = store.useState('hasViewport');
+    const lastOpenChangeReason = store.useState('lastOpenChangeReason');
+    const floatingNodeId = store.useState('floatingNodeId');
+    const floatingParentNodeId = store.useState('floatingParentNodeId');
+    const domReference = floatingRootContext.useState('domReferenceElement');
+    const previousTriggerRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const runOnceAnimationsFinish = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useAnimationsFinished$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationsFinished"])(positionerElement, false, false);
+    let anchor = anchorProp;
+    let sideOffset = sideOffsetProp;
+    let alignOffset = alignOffsetProp;
+    let align = alignProp;
+    let collisionAvoidance = collisionAvoidanceProp;
+    if (parent.type === 'context-menu') {
+        anchor = anchorProp ?? parent.context?.anchor;
+        align = align ?? 'start';
+        if (!side && align !== 'center') {
+            alignOffset = componentProps.alignOffset ?? 2;
+            sideOffset = componentProps.sideOffset ?? -5;
+        }
+    }
+    let computedSide = side;
+    let computedAlign = align;
+    if (parent.type === 'menu') {
+        computedSide = computedSide ?? 'inline-end';
+        computedAlign = computedAlign ?? 'start';
+        collisionAvoidance = componentProps.collisionAvoidance ?? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["POPUP_COLLISION_AVOIDANCE"];
+    } else if (parent.type === 'menubar') {
+        computedSide = computedSide ?? (parent.context.orientation === 'vertical' ? 'inline-end' : 'bottom');
+        computedAlign = computedAlign ?? 'start';
+    }
+    const contextMenu = parent.type === 'context-menu';
+    const positioner = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$useAnchorPositioning$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnchorPositioning"])({
+        anchor,
+        floatingRootContext,
+        positionMethod: contextMenuContext ? 'fixed' : positionMethodProp,
+        mounted,
+        side: computedSide,
+        sideOffset,
+        align: computedAlign,
+        alignOffset,
+        arrowPadding: contextMenu ? 0 : arrowPadding,
+        collisionBoundary,
+        collisionPadding,
+        sticky,
+        nodeId: floatingNodeId,
+        keepMounted,
+        disableAnchorTracking,
+        collisionAvoidance,
+        shiftCrossAxis: contextMenu && !('side' in collisionAvoidance && collisionAvoidance.side === 'flip'),
+        externalTree: floatingTreeRoot,
+        adaptiveOrigin: hasViewport ? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$adaptiveOriginMiddleware$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["adaptiveOrigin"] : undefined
+    });
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        function onMenuOpenChange(details) {
+            if (details.open) {
+                if (details.parentNodeId === floatingNodeId) {
+                    store.set('hoverEnabled', false);
+                }
+                if (details.nodeId !== floatingNodeId && details.parentNodeId === store.select('floatingParentNodeId')) {
+                    store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].siblingOpen));
+                }
+            }
+        }
+        floatingTreeRoot.events.on('menuopenchange', onMenuOpenChange);
+        return ()=>{
+            floatingTreeRoot.events.off('menuopenchange', onMenuOpenChange);
+        };
+    }, [
+        store,
+        floatingTreeRoot.events,
+        floatingNodeId
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (store.select('floatingParentNodeId') == null) {
+            return undefined;
+        }
+        function onParentClose(details) {
+            if (details.open || details.nodeId !== store.select('floatingParentNodeId')) {
+                return;
+            }
+            const reason = details.reason ?? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].siblingOpen;
+            store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(reason));
+        }
+        floatingTreeRoot.events.on('menuopenchange', onParentClose);
+        return ()=>{
+            floatingTreeRoot.events.off('menuopenchange', onParentClose);
+        };
+    }, [
+        floatingTreeRoot.events,
+        store
+    ]);
+    const closeTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    // Clear pending close timeout when the menu closes.
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!open) {
+            closeTimeout.clear();
+        }
+    }, [
+        open,
+        closeTimeout
+    ]);
+    // Close unrelated child submenus when hovering a different item in the parent menu.
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        function onItemHover(event) {
+            // If an item within our parent menu is hovered, and this menu's trigger is not that item,
+            // close this submenu. This ensures hovering a different item in the parent closes other branches.
+            if (!open || event.nodeId !== store.select('floatingParentNodeId')) {
+                return;
+            }
+            if (event.target && triggerElement && triggerElement !== event.target) {
+                const delay = store.select('closeDelay');
+                if (delay > 0) {
+                    if (!closeTimeout.isStarted()) {
+                        closeTimeout.start(delay, ()=>{
+                            store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].siblingOpen));
+                        });
+                    }
+                } else {
+                    store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].siblingOpen));
+                }
+            } else {
+                // User re-hovered the submenu trigger, cancel pending close.
+                closeTimeout.clear();
+            }
+        }
+        floatingTreeRoot.events.on('itemhover', onItemHover);
+        return ()=>{
+            floatingTreeRoot.events.off('itemhover', onItemHover);
+        };
+    }, [
+        floatingTreeRoot.events,
+        open,
+        triggerElement,
+        store,
+        closeTimeout
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        const eventDetails = {
+            open,
+            nodeId: floatingNodeId,
+            parentNodeId: floatingParentNodeId,
+            reason: store.select('lastOpenChangeReason')
+        };
+        floatingTreeRoot.events.emit('menuopenchange', eventDetails);
+    }, [
+        floatingTreeRoot.events,
+        open,
+        store,
+        floatingNodeId,
+        floatingParentNodeId
+    ]);
+    // Keep positioner transition behavior aligned with Popover when switching detached triggers.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        const currentTrigger = domReference;
+        const previousTrigger = previousTriggerRef.current;
+        if (currentTrigger) {
+            previousTriggerRef.current = currentTrigger;
+        }
+        if (previousTrigger && currentTrigger && currentTrigger !== previousTrigger) {
+            store.set('instantType', undefined);
+            const abortController = new AbortController();
+            runOnceAnimationsFinish(()=>{
+                store.set('instantType', 'trigger-change');
+            }, abortController.signal);
+            return ()=>{
+                abortController.abort();
+            };
+        }
+        return undefined;
+    }, [
+        domReference,
+        runOnceAnimationsFinish,
+        store
+    ]);
+    const state = {
+        open,
+        side: positioner.side,
+        align: positioner.align,
+        anchorHidden: positioner.anchorHidden,
+        nested: parent.type === 'menu',
+        instant: instantType
+    };
+    const menubarModal = parent.type === 'menubar' && parent.context.modal;
+    const popupModal = modal && lastOpenChangeReason !== __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover;
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$useAnchoredPopupScrollLock$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnchoredPopupScrollLock"])(open && (menubarModal || popupModal), openMethod === 'touch', positionerElement, triggerElement);
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$usePositioner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["usePositioner"])(componentProps, state, {
+        styles: positioner.positionerStyles,
+        transitionStatus,
+        props: elementProps,
+        refs: [
+            forwardedRef,
+            store.useStateSetter('positionerElement')
+        ],
+        hidden: !mounted,
+        inert: !open
+    });
+    const shouldRenderBackdrop = mounted && parent.type !== 'menu' && (parent.type !== 'menubar' && modal && lastOpenChangeReason !== __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover || parent.type === 'menubar' && parent.context.modal);
+    // cuts a hole in the backdrop to allow pointer interaction with the menubar or dropdown menu trigger element
+    let backdropCutout = null;
+    if (parent.type === 'menubar') {
+        backdropCutout = parent.context.contentElement;
+    } else if (parent.type === undefined) {
+        backdropCutout = triggerElement;
+    }
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxs"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuPositionerContext"].Provider, {
+        value: positioner,
+        children: [
+            shouldRenderBackdrop && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$InternalBackdrop$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["InternalBackdrop"], {
+                ref: parent.type === 'context-menu' || parent.type === 'nested-context-menu' ? parent.context.internalBackdropRef : null,
+                inert: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$inertValue$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["inertValue"])(!open),
+                cutout: backdropCutout
+            }),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingNode"], {
+                id: floatingNodeId,
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$CompositeList$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CompositeList"], {
+                    elementsRef: store.context.itemDomElements,
+                    labelsRef: store.context.itemLabels,
+                    children: element
+                })
+            })
+        ]
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuPositioner.displayName = "MenuPositioner";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-group/MenuRadioGroupContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuRadioGroupContext",
+    ()=>MenuRadioGroupContext,
+    "useMenuRadioGroupContext",
+    ()=>useMenuRadioGroupContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const MenuRadioGroupContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) MenuRadioGroupContext.displayName = "MenuRadioGroupContext";
+function useMenuRadioGroupContext() {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](MenuRadioGroupContext);
+    if (context === undefined) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: MenuRadioGroupContext is missing. MenuRadioGroup parts must be placed within <Menu.RadioGroup>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-group/MenuRadioGroup.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuRadioGroup",
+    ()=>MenuRadioGroup
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useControlled$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useControlled.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$group$2f$MenuRadioGroupContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-group/MenuRadioGroupContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$group$2f$MenuGroupContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/group/MenuGroupContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+const MenuRadioGroup = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["memo"](/*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuRadioGroup(componentProps, forwardedRef) {
+    const { render, className, value: valueProp, defaultValue, onValueChange: onValueChangeProp, disabled = false, style, 'aria-labelledby': ariaLabelledByProp, ...elementProps } = componentProps;
+    const [labelId, setLabelId] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](undefined);
+    const [value, setValueUnwrapped] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useControlled$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useControlled"])({
+        controlled: valueProp,
+        default: defaultValue,
+        name: 'MenuRadioGroup'
+    });
+    const setValue = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((newValue, eventDetails)=>{
+        onValueChangeProp?.(newValue, eventDetails);
+        if (eventDetails.isCanceled) {
+            return;
+        }
+        setValueUnwrapped(newValue);
+    });
+    const state = {
+        disabled
+    };
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        state,
+        ref: forwardedRef,
+        props: {
+            role: 'group',
+            'aria-labelledby': ariaLabelledByProp ?? labelId,
+            'aria-disabled': disabled || undefined,
+            ...elementProps
+        }
+    });
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            value,
+            setValue,
+            disabled
+        }), [
+        value,
+        setValue,
+        disabled
+    ]);
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$group$2f$MenuGroupContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuGroupContext"].Provider, {
+        value: setLabelId,
+        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$group$2f$MenuRadioGroupContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuRadioGroupContext"].Provider, {
+            value: context,
+            children: element
+        })
+    });
+}));
+if ("TURBOPACK compile-time truthy", 1) MenuRadioGroup.displayName = "MenuRadioGroup";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-item/MenuRadioItemContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuRadioItemContext",
+    ()=>MenuRadioItemContext,
+    "useMenuRadioItemContext",
+    ()=>useMenuRadioItemContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const MenuRadioItemContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) MenuRadioItemContext.displayName = "MenuRadioItemContext";
+function useMenuRadioItemContext() {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](MenuRadioItemContext);
+    if (context === undefined) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: MenuRadioItemContext is missing. MenuRadioItem parts must be placed within <Menu.RadioItem>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-item/MenuRadioItem.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuRadioItem",
+    ()=>MenuRadioItem
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useBaseUiId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$group$2f$MenuRadioGroupContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-group/MenuRadioGroupContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$item$2f$MenuRadioItemContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-item/MenuRadioItemContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$utils$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/utils/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/useCompositeListItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/item/useMenuItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositionerContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+/**
+ * A menu item that works like a radio button in a given group.
+ * Renders a `<div>` element.
+ *
+ * Documentation: [Base UI Menu](https://base-ui.com/react/components/menu)
+ */ var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const MenuRadioItem = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuRadioItem(componentProps, forwardedRef) {
+    const { render, className, id: idProp, label, nativeButton = false, disabled: disabledProp = false, closeOnClick = false, value, style, ...elementProps } = componentProps;
+    const listItem = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeListItem"])({
+        label
+    });
+    const menuPositionerContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuPositionerContext"])(true);
+    const id = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useBaseUiId"])(idProp);
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const highlighted = store.useState('isActive', listItem.index);
+    const itemProps = store.useState('itemProps');
+    const { value: selectedValue, setValue: setSelectedValue, disabled: groupDisabled } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$group$2f$MenuRadioGroupContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRadioGroupContext"])();
+    const disabled = groupDisabled || disabledProp;
+    const checked = selectedValue === value;
+    const { getItemProps, itemRef } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuItem"])({
+        closeOnClick,
+        disabled,
+        highlighted,
+        id,
+        store,
+        nativeButton,
+        nodeId: menuPositionerContext?.context.nodeId,
+        itemMetadata: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["REGULAR_ITEM"]
+    });
+    const state = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            disabled,
+            highlighted,
+            checked
+        }), [
+        disabled,
+        highlighted,
+        checked
+    ]);
+    function handleClick(event) {
+        const details = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].itemPress, event.nativeEvent, undefined, {
+            preventUnmountOnClose () {}
+        });
+        setSelectedValue(value, details);
+    }
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        state,
+        stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$utils$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["itemMapping"],
+        props: [
+            itemProps,
+            {
+                role: 'menuitemradio',
+                'aria-checked': checked,
+                onClick: handleClick
+            },
+            elementProps,
+            getItemProps
+        ],
+        ref: [
+            itemRef,
+            forwardedRef,
+            listItem.ref
+        ]
+    });
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$item$2f$MenuRadioItemContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuRadioItemContext"].Provider, {
+        value: state,
+        children: element
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuRadioItem.displayName = "MenuRadioItem";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-item-indicator/MenuRadioItemIndicator.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuRadioItemIndicator",
+    ()=>MenuRadioItemIndicator
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$item$2f$MenuRadioItemContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-item/MenuRadioItemContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$utils$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/utils/stateAttributesMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useTransitionStatus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useTransitionStatus.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useOpenChangeComplete$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useOpenChangeComplete.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+const MenuRadioItemIndicator = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuRadioItemIndicator(componentProps, forwardedRef) {
+    const { render, className, style, keepMounted = false, ...elementProps } = componentProps;
+    const item = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$item$2f$MenuRadioItemContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRadioItemContext"])();
+    const indicatorRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const { transitionStatus, setMounted } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useTransitionStatus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTransitionStatus"])(item.checked);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useOpenChangeComplete$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useOpenChangeComplete"])({
+        open: item.checked,
+        ref: indicatorRef,
+        onComplete () {
+            if (!item.checked) {
+                setMounted(false);
+            }
+        }
+    });
+    const state = {
+        checked: item.checked,
+        disabled: item.disabled,
+        highlighted: item.highlighted,
+        transitionStatus
+    };
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('span', componentProps, {
+        state,
+        stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$utils$2f$stateAttributesMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["itemMapping"],
+        ref: [
+            forwardedRef,
+            indicatorRef
+        ],
+        props: {
+            'aria-hidden': true,
+            ...elementProps
+        },
+        enabled: keepMounted || item.checked
+    });
+    return element;
+});
+if ("TURBOPACK compile-time truthy", 1) MenuRadioItemIndicator.displayName = "MenuRadioItemIndicator";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useDismiss.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "normalizeProp",
+    ()=>normalizeProp,
+    "useDismiss",
+    ()=>useDismiss
+]);
+/* eslint-disable no-underscore-dangle */ var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/addEventListener.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/mergeCleanups.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/platform/parts.mjs [app-ssr] (ecmascript) <export * as platform>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createAttribute$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/createAttribute.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/event.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/nodes.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+function alwaysFalse() {
+    return false;
+}
+function normalizeProp(normalizable) {
+    return {
+        escapeKey: typeof normalizable === 'boolean' ? normalizable : normalizable?.escapeKey ?? false,
+        outsidePress: typeof normalizable === 'boolean' ? normalizable : normalizable?.outsidePress ?? true
+    };
+}
+function useDismiss(context, props = {}) {
+    const { enabled = true, escapeKey = true, outsidePress: outsidePressProp = true, outsidePressEvent = 'sloppy', referencePress = alwaysFalse, bubbles, externalTree } = props;
+    const store = 'rootStore' in context ? context.rootStore : context;
+    const open = store.useState('open');
+    const floatingElement = store.useState('floatingElement');
+    const { dataRef } = store.context;
+    const tree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingTree"])(externalTree);
+    const outsidePressFn = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(typeof outsidePressProp === 'function' ? outsidePressProp : ()=>false);
+    const outsidePress = typeof outsidePressProp === 'function' ? outsidePressFn : outsidePressProp;
+    const outsidePressEnabled = outsidePress !== false;
+    const getOutsidePressEventProp = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>outsidePressEvent);
+    const { escapeKey: escapeKeyBubbles, outsidePress: outsidePressBubbles } = normalizeProp(bubbles);
+    const pressStartedInsideRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    const pressStartPreventedRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    // Ignore only the very next outside click after dragging from inside to outside.
+    const suppressNextOutsideClickRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    const isComposingRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    const currentPointerTypeRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"]('');
+    const touchStateRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const cancelDismissOnEndTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const clearInsideReactTreeTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const clearInsideReactTree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        clearInsideReactTreeTimeout.clear();
+        dataRef.current.insideReactTree = false;
+    });
+    const hasBlockingChild = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((bubbleKey)=>{
+        const nodeId = dataRef.current.floatingContext?.nodeId;
+        const children = tree ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeChildren"])(tree.nodesRef.current, nodeId) : [];
+        return children.some((child)=>child.context?.open && !child.context.dataRef.current[bubbleKey]);
+    });
+    const isEventWithinOwnElements = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((event)=>{
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isEventTargetWithin"])(event, store.select('floatingElement')) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isEventTargetWithin"])(event, store.select('domReferenceElement'));
+    });
+    const closeOnReferencePress = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((event)=>{
+        if (!referencePress()) {
+            return;
+        }
+        store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerPress, event.nativeEvent));
+    });
+    const closeOnEscapeKeyDown = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((event)=>{
+        if (!open || !enabled || !escapeKey || event.key !== 'Escape') {
+            return;
+        }
+        // Wait until IME is settled. Pressing `Escape` while composing should
+        // close the compose menu, but not the floating element.
+        if (isComposingRef.current) {
+            return;
+        }
+        if (!escapeKeyBubbles && hasBlockingChild('__escapeKeyBubbles')) {
+            return;
+        }
+        const native = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isReactEvent"])(event) ? event.nativeEvent : event;
+        const eventDetails = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].escapeKey, native);
+        store.setOpen(false, eventDetails);
+        if (!eventDetails.isCanceled) {
+            event.preventDefault();
+        }
+        if (!escapeKeyBubbles && !eventDetails.isPropagationAllowed) {
+            event.stopPropagation();
+        }
+    });
+    const markInsideReactTree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        dataRef.current.insideReactTree = true;
+        clearInsideReactTreeTimeout.start(0, clearInsideReactTree);
+    });
+    const markPressStartedInsideReactTree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((event)=>{
+        if (!open || !enabled || event.button !== 0) {
+            return;
+        }
+        const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event.nativeEvent);
+        // Only treat presses that start within the floating DOM subtree as inside.
+        // This avoids suppressing parent dismissal when interacting with nested portals.
+        if (!(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(store.select('floatingElement'), target)) {
+            return;
+        }
+        if (!pressStartedInsideRef.current) {
+            pressStartedInsideRef.current = true;
+            pressStartPreventedRef.current = false;
+        }
+    });
+    const markInsidePressStartPrevented = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((event)=>{
+        if (!open || !enabled) {
+            return;
+        }
+        if (!(event.defaultPrevented || event.nativeEvent.defaultPrevented)) {
+            return;
+        }
+        if (pressStartedInsideRef.current) {
+            pressStartPreventedRef.current = true;
+        }
+    });
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!open || !enabled) {
+            return undefined;
+        }
+        dataRef.current.__escapeKeyBubbles = escapeKeyBubbles;
+        dataRef.current.__outsidePressBubbles = outsidePressBubbles;
+        const compositionTimeout = new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Timeout"]();
+        const preventedPressSuppressionTimeout = new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Timeout"]();
+        function handleCompositionStart() {
+            compositionTimeout.clear();
+            isComposingRef.current = true;
+        }
+        function handleCompositionEnd() {
+            // Safari fires `compositionend` before `keydown`, so we need to wait
+            // until the next tick to set `isComposing` to `false`.
+            // https://bugs.webkit.org/show_bug.cgi?id=165004
+            compositionTimeout.start(// 0ms or 1ms don't work in Safari. 5ms appears to consistently work.
+            // Only apply to WebKit for the test to remain 0ms.
+            __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].engine.webkit ? 5 : 0, ()=>{
+                isComposingRef.current = false;
+            });
+        }
+        function suppressImmediateOutsideClickAfterPreventedStart() {
+            suppressNextOutsideClickRef.current = true;
+            // Firefox can emit the synthetic outside click in a later task after
+            // pointer lock exit, so microtask clearing is too early here.
+            preventedPressSuppressionTimeout.start(0, ()=>{
+                suppressNextOutsideClickRef.current = false;
+            });
+        }
+        function resetPressStartState() {
+            pressStartedInsideRef.current = false;
+            pressStartPreventedRef.current = false;
+        }
+        function getOutsidePressEvent() {
+            const type = currentPointerTypeRef.current;
+            const computedType = type === 'pen' || !type ? 'mouse' : type;
+            const outsidePressEventValue = getOutsidePressEventProp();
+            const resolved = typeof outsidePressEventValue === 'function' ? outsidePressEventValue() : outsidePressEventValue;
+            if (typeof resolved === 'string') {
+                return resolved;
+            }
+            return resolved[computedType];
+        }
+        function shouldIgnoreEvent(event) {
+            const computedOutsidePressEvent = getOutsidePressEvent();
+            return computedOutsidePressEvent === 'intentional' && event.type !== 'click' || computedOutsidePressEvent === 'sloppy' && event.type === 'click';
+        }
+        function isEventWithinFloatingTree(event) {
+            const nodeId = dataRef.current.floatingContext?.nodeId;
+            const targetIsInsideChildren = tree && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeChildren"])(tree.nodesRef.current, nodeId).some((node)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isEventTargetWithin"])(event, node.context?.elements.floating));
+            return isEventWithinOwnElements(event) || targetIsInsideChildren;
+        }
+        function closeOnPressOutside(event) {
+            if (shouldIgnoreEvent(event)) {
+                // A new press began outside the floating element and its trigger. Clear any
+                // leftover drag-out suppression so this press's eventual click can dismiss.
+                if (event.type !== 'click' && !isEventWithinOwnElements(event)) {
+                    preventedPressSuppressionTimeout.clear();
+                    suppressNextOutsideClickRef.current = false;
+                }
+                clearInsideReactTree();
+                return;
+            }
+            if (dataRef.current.insideReactTree) {
+                clearInsideReactTree();
+                return;
+            }
+            const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event);
+            const inertSelector = `[${(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createAttribute$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createAttribute"])('inert')}]`;
+            const targetRoot = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(target) ? target.getRootNode() : null;
+            const markers = Array.from(((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isShadowRoot"])(targetRoot) ? targetRoot : (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(store.select('floatingElement'))).querySelectorAll(inertSelector));
+            const triggers = store.context.triggerElements;
+            // If another trigger is clicked, don't close the floating element.
+            if (target && (triggers.hasElement(target) || triggers.hasMatchingElement((trigger)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(trigger, target)))) {
+                return;
+            }
+            let targetRootAncestor = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(target) ? target : null;
+            while(targetRootAncestor && !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isLastTraversableNode"])(targetRootAncestor)){
+                const nextParent = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getParentNode"])(targetRootAncestor);
+                if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isLastTraversableNode"])(nextParent) || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(nextParent)) {
+                    break;
+                }
+                targetRootAncestor = nextParent;
+            }
+            // Check if the click occurred on a third-party element injected after the
+            // floating element rendered.
+            if (markers.length && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(target) && !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isRootElement"])(target) && // Clicked on a direct ancestor (e.g. FloatingOverlay).
+            !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(target, store.select('floatingElement')) && // If the target root element contains none of the markers, then the
+            // element was injected after the floating element rendered.
+            markers.every((marker)=>!(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(targetRootAncestor, marker))) {
+                return;
+            }
+            // Check if the click occurred on the scrollbar
+            // Skip for touch events: scrollbars don't receive touch events on most platforms
+            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(target) && !('touches' in event)) {
+                const lastTraversableNode = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isLastTraversableNode"])(target);
+                const style = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getComputedStyle"])(target);
+                const scrollRe = /auto|scroll/;
+                const isScrollableX = lastTraversableNode || scrollRe.test(style.overflowX);
+                const isScrollableY = lastTraversableNode || scrollRe.test(style.overflowY);
+                const canScrollX = isScrollableX && target.clientWidth > 0 && target.scrollWidth > target.clientWidth;
+                const canScrollY = isScrollableY && target.clientHeight > 0 && target.scrollHeight > target.clientHeight;
+                const isRTL = style.direction === 'rtl';
+                // Check click position relative to scrollbar.
+                // In some browsers it is possible to change the <body> (or window)
+                // scrollbar to the left side, but is very rare and is difficult to
+                // check for. Plus, for modal dialogs with backdrops, it is more
+                // important that the backdrop is checked but not so much the window.
+                const pressedVerticalScrollbar = canScrollY && (isRTL ? event.offsetX <= target.offsetWidth - target.clientWidth : event.offsetX > target.clientWidth);
+                const pressedHorizontalScrollbar = canScrollX && event.offsetY > target.clientHeight;
+                if (pressedVerticalScrollbar || pressedHorizontalScrollbar) {
+                    return;
+                }
+            }
+            if (isEventWithinFloatingTree(event)) {
+                return;
+            }
+            // In intentional mode, a press that starts inside and ends outside gets
+            // one suppressed outside click. Run this after inside-target checks so
+            // inside clicks don't consume the one-shot suppression.
+            if (getOutsidePressEvent() === 'intentional' && suppressNextOutsideClickRef.current) {
+                preventedPressSuppressionTimeout.clear();
+                suppressNextOutsideClickRef.current = false;
+                return;
+            }
+            if (typeof outsidePress === 'function' && !outsidePress(event)) {
+                return;
+            }
+            if (hasBlockingChild('__outsidePressBubbles')) {
+                return;
+            }
+            store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].outsidePress, event));
+            clearInsideReactTree();
+        }
+        function handlePointerDown(event) {
+            if (getOutsidePressEvent() !== 'sloppy' || event.pointerType === 'touch' || !store.select('open') || !enabled || isEventWithinOwnElements(event)) {
+                return;
+            }
+            closeOnPressOutside(event);
+        }
+        function handleTouchStart(event) {
+            if (getOutsidePressEvent() !== 'sloppy' || !store.select('open') || !enabled || isEventWithinOwnElements(event)) {
+                return;
+            }
+            const touch = event.touches[0];
+            if (touch) {
+                touchStateRef.current = {
+                    startTime: Date.now(),
+                    startX: touch.clientX,
+                    startY: touch.clientY,
+                    dismissOnTouchEnd: false,
+                    dismissOnMouseDown: true
+                };
+                cancelDismissOnEndTimeout.start(1000, ()=>{
+                    if (touchStateRef.current) {
+                        touchStateRef.current.dismissOnTouchEnd = false;
+                        touchStateRef.current.dismissOnMouseDown = false;
+                    }
+                });
+            }
+        }
+        function addTargetEventListenerOnce(event, listener) {
+            const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event);
+            if (!target) {
+                return;
+            }
+            const unsubscribe = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(target, event.type, ()=>{
+                listener(event);
+                unsubscribe();
+            });
+        }
+        function handleTouchStartCapture(event) {
+            currentPointerTypeRef.current = 'touch';
+            addTargetEventListenerOnce(event, handleTouchStart);
+        }
+        function closeOnPressOutsideCapture(event) {
+            cancelDismissOnEndTimeout.clear();
+            if (event.type === 'pointerdown') {
+                currentPointerTypeRef.current = event.pointerType;
+            }
+            if (event.type === 'mousedown' && touchStateRef.current && !touchStateRef.current.dismissOnMouseDown) {
+                return;
+            }
+            addTargetEventListenerOnce(event, (targetEvent)=>{
+                if (targetEvent.type === 'pointerdown') {
+                    handlePointerDown(targetEvent);
+                } else {
+                    closeOnPressOutside(targetEvent);
+                }
+            });
+        }
+        function handlePressEndCapture(event) {
+            if (!pressStartedInsideRef.current) {
+                return;
+            }
+            const pressStartedInsideDefaultPrevented = pressStartPreventedRef.current;
+            resetPressStartState();
+            if (getOutsidePressEvent() !== 'intentional') {
+                return;
+            }
+            if (event.type === 'pointercancel') {
+                if (pressStartedInsideDefaultPrevented) {
+                    suppressImmediateOutsideClickAfterPreventedStart();
+                }
+                return;
+            }
+            if (isEventWithinFloatingTree(event)) {
+                return;
+            }
+            // If pointerdown was prevented, no click may be generated for that
+            // interaction. However, Firefox may still emit an immediate click after
+            // pointerup (e.g. NumberField scrub with pointer lock), so suppress for
+            // one tick to absorb that synthetic click only.
+            if (pressStartedInsideDefaultPrevented) {
+                suppressImmediateOutsideClickAfterPreventedStart();
+                return;
+            }
+            // Avoid suppressing when outsidePress explicitly ignores this target.
+            if (typeof outsidePress === 'function' && !outsidePress(event)) {
+                return;
+            }
+            preventedPressSuppressionTimeout.clear();
+            suppressNextOutsideClickRef.current = true;
+            clearInsideReactTree();
+        }
+        function handleTouchMove(event) {
+            if (getOutsidePressEvent() !== 'sloppy' || !touchStateRef.current || isEventWithinOwnElements(event)) {
+                return;
+            }
+            const touch = event.touches[0];
+            if (!touch) {
+                return;
+            }
+            const deltaX = Math.abs(touch.clientX - touchStateRef.current.startX);
+            const deltaY = Math.abs(touch.clientY - touchStateRef.current.startY);
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            if (distance > 5) {
+                touchStateRef.current.dismissOnTouchEnd = true;
+            }
+            if (distance > 10) {
+                closeOnPressOutside(event);
+                cancelDismissOnEndTimeout.clear();
+                touchStateRef.current = null;
+            }
+        }
+        function handleTouchMoveCapture(event) {
+            addTargetEventListenerOnce(event, handleTouchMove);
+        }
+        function handleTouchEnd(event) {
+            if (getOutsidePressEvent() !== 'sloppy' || !touchStateRef.current || isEventWithinOwnElements(event)) {
+                return;
+            }
+            if (touchStateRef.current.dismissOnTouchEnd) {
+                closeOnPressOutside(event);
+            }
+            cancelDismissOnEndTimeout.clear();
+            touchStateRef.current = null;
+        }
+        function handleTouchEndCapture(event) {
+            addTargetEventListenerOnce(event, handleTouchEnd);
+        }
+        const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floatingElement);
+        const unsubscribe = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeCleanups"])(escapeKey && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeCleanups"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'keydown', closeOnEscapeKeyDown), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'compositionstart', handleCompositionStart), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'compositionend', handleCompositionEnd)), outsidePressEnabled && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeCleanups"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'click', closeOnPressOutsideCapture, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'pointerdown', closeOnPressOutsideCapture, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'pointerup', handlePressEndCapture, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'pointercancel', handlePressEndCapture, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'mousedown', closeOnPressOutsideCapture, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'mouseup', handlePressEndCapture, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'touchstart', handleTouchStartCapture, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'touchmove', handleTouchMoveCapture, true), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(doc, 'touchend', handleTouchEndCapture, true)));
+        return ()=>{
+            unsubscribe();
+            compositionTimeout.clear();
+            preventedPressSuppressionTimeout.clear();
+            resetPressStartState();
+            suppressNextOutsideClickRef.current = false;
+        };
+    }, [
+        dataRef,
+        floatingElement,
+        escapeKey,
+        outsidePressEnabled,
+        outsidePress,
+        open,
+        enabled,
+        escapeKeyBubbles,
+        outsidePressBubbles,
+        closeOnEscapeKeyDown,
+        clearInsideReactTree,
+        getOutsidePressEventProp,
+        hasBlockingChild,
+        isEventWithinOwnElements,
+        tree,
+        store,
+        cancelDismissOnEndTimeout
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](clearInsideReactTree, [
+        outsidePress,
+        clearInsideReactTree
+    ]);
+    const reference = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            onKeyDown: closeOnEscapeKeyDown,
+            onPointerDown: closeOnReferencePress,
+            onClick: closeOnReferencePress
+        }), [
+        closeOnEscapeKeyDown,
+        closeOnReferencePress
+    ]);
+    const floating = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            onKeyDown: closeOnEscapeKeyDown,
+            // `onMouseDown` may be blocked if `event.preventDefault()` is called in
+            // `onPointerDown`, such as with <NumberField.ScrubArea>.
+            // See https://github.com/mui/base-ui/pull/3379
+            onPointerDown: markInsidePressStartPrevented,
+            onMouseDown: markInsidePressStartPrevented,
+            onClickCapture: markInsideReactTree,
+            onMouseDownCapture (event) {
+                markInsideReactTree();
+                markPressStartedInsideReactTree(event);
+            },
+            onPointerDownCapture (event) {
+                markInsideReactTree();
+                markPressStartedInsideReactTree(event);
+            },
+            onMouseUpCapture: markInsideReactTree,
+            onTouchEndCapture: markInsideReactTree,
+            onTouchMoveCapture: markInsideReactTree
+        }), [
+        closeOnEscapeKeyDown,
+        markInsideReactTree,
+        markPressStartedInsideReactTree,
+        markInsidePressStartPrevented
+    ]);
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>enabled ? {
+            reference,
+            floating,
+            trigger: reference
+        } : {}, [
+        enabled,
+        reference,
+        floating
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useListNavigation.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "ESCAPE",
+    ()=>ESCAPE,
+    "useListNavigation",
+    ()=>useListNavigation
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useAnimationFrame.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useValueAsRef.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/composite.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/constants.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$enqueueFocus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/enqueueFocus.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/event.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const ESCAPE = 'Escape';
+function doSwitch(orientation, vertical, horizontal) {
+    switch(orientation){
+        case 'vertical':
+            return vertical;
+        case 'horizontal':
+            return horizontal;
+        default:
+            return vertical || horizontal;
+    }
+}
+function isMainOrientationKey(key, orientation) {
+    const vertical = key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_UP"] || key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_DOWN"];
+    const horizontal = key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_LEFT"] || key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_RIGHT"];
+    return doSwitch(orientation, vertical, horizontal);
+}
+function isMainOrientationToEndKey(key, orientation, rtl) {
+    const vertical = key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_DOWN"];
+    const horizontal = rtl ? key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_LEFT"] : key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_RIGHT"];
+    return doSwitch(orientation, vertical, horizontal) || key === 'Enter' || key === ' ' || key === '';
+}
+function isCrossOrientationOpenKey(key, orientation, rtl) {
+    const vertical = rtl ? key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_LEFT"] : key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_RIGHT"];
+    const horizontal = key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_DOWN"];
+    return doSwitch(orientation, vertical, horizontal);
+}
+function isCrossOrientationCloseKey(key, orientation, rtl, grid) {
+    const vertical = rtl ? key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_RIGHT"] : key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_LEFT"];
+    const horizontal = key === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ARROW_UP"];
+    if (orientation === 'both' || orientation === 'horizontal' && grid) {
+        return key === ESCAPE;
+    }
+    return doSwitch(orientation, vertical, horizontal);
+}
+function useListNavigation(context, props) {
+    const { listRef, activeIndex, onNavigate: onNavigateProp = ()=>{}, enabled = true, selectedIndex = null, allowEscape = false, loopFocus = false, nested = false, rtl = false, virtual = false, focusItemOnOpen = 'auto', focusItemOnHover = true, openOnArrowKeyDown = true, disabledIndices = undefined, orientation = 'vertical', parentOrientation, id, resetOnPointerLeave = true, externalTree, grid: navigateGrid } = props;
+    const isGrid = navigateGrid != null;
+    if ("TURBOPACK compile-time truthy", 1) {
+        if (allowEscape) {
+            if (!loopFocus) {
+                console.warn('`useListNavigation` looping must be enabled to allow escaping.');
+            }
+            if (!virtual) {
+                console.warn('`useListNavigation` must be virtual to allow escaping.');
+            }
+        }
+        if (orientation === 'vertical' && isGrid) {
+            console.warn('In grid list navigation mode, the `orientation` should', 'be either "horizontal" or "both".');
+        }
+    }
+    const store = 'rootStore' in context ? context.rootStore : context;
+    const open = store.useState('open');
+    const floatingElement = store.useState('floatingElement');
+    const domReferenceElement = store.useState('domReferenceElement');
+    const dataRef = store.context.dataRef;
+    const floatingFocusElement = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["getFloatingFocusElement"])(floatingElement);
+    const typeableComboboxReference = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isTypeableCombobox"])(domReferenceElement);
+    const floatingFocusElementRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(floatingFocusElement);
+    const parentId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingParentNodeId"])();
+    const tree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingTree"])(externalTree);
+    const focusItemOnOpenRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](focusItemOnOpen);
+    const indexRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](selectedIndex ?? -1);
+    const keyRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const isPointerModalityRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](true);
+    const onNavigate = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((event)=>{
+        onNavigateProp(indexRef.current === -1 ? null : indexRef.current, event);
+    });
+    const previousMountedRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](!!floatingElement);
+    const previousOpenRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](open);
+    const forceSyncFocusRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    const forceScrollIntoViewRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    const cancelQueuedFocusRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const disabledIndicesRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(disabledIndices);
+    const latestOpenRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(open);
+    const selectedIndexRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(selectedIndex);
+    const resetOnPointerLeaveRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(resetOnPointerLeave);
+    const focusFrame = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationFrame"])();
+    const waitForListPopulatedFrame = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationFrame"])();
+    const focusItem = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        function runFocus(item) {
+            if (virtual) {
+                tree?.events.emit('virtualfocus', item);
+            } else {
+                cancelQueuedFocusRef.current = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$enqueueFocus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["enqueueFocus"])(item, {
+                    sync: forceSyncFocusRef.current,
+                    preventScroll: true
+                });
+            }
+        }
+        const initialItem = listRef.current[indexRef.current];
+        const forceScrollIntoView = forceScrollIntoViewRef.current;
+        if (initialItem) {
+            runFocus(initialItem);
+        }
+        const scheduler = forceSyncFocusRef.current ? (callback)=>callback() : (callback)=>focusFrame.request(callback);
+        scheduler(()=>{
+            const waitedItem = listRef.current[indexRef.current] || initialItem;
+            if (!waitedItem) {
+                return;
+            }
+            if (!initialItem) {
+                runFocus(waitedItem);
+            }
+            const shouldScrollIntoView = // eslint-disable-next-line @typescript-eslint/no-use-before-define
+            item && (forceScrollIntoView || !isPointerModalityRef.current);
+            if (shouldScrollIntoView) {
+                // JSDOM doesn't support `.scrollIntoView()` but it's widely supported
+                // by all browsers.
+                waitedItem.scrollIntoView?.({
+                    block: 'nearest',
+                    inline: 'nearest'
+                });
+            }
+        });
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        dataRef.current.orientation = orientation;
+    }, [
+        dataRef,
+        orientation
+    ]);
+    // Sync `selectedIndex` to be the `activeIndex` upon opening the floating
+    // element. Also, reset `activeIndex` upon closing the floating element.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!enabled) {
+            return;
+        }
+        if (open && floatingElement) {
+            indexRef.current = selectedIndex ?? -1;
+            if (focusItemOnOpenRef.current && selectedIndex != null) {
+                // Regardless of the pointer modality, we want to ensure the selected
+                // item comes into view when the floating element is opened.
+                forceScrollIntoViewRef.current = true;
+                onNavigate();
+            }
+        } else if (previousMountedRef.current) {
+            // Reset the active index when the list is no longer open and mounted (closing or
+            // unmounting). `onNavigate` is a stable callback that always forwards to the latest
+            // `onNavigate` prop.
+            indexRef.current = -1;
+            onNavigate();
+        }
+    }, [
+        enabled,
+        open,
+        floatingElement,
+        selectedIndex,
+        onNavigate
+    ]);
+    // Sync `activeIndex` to be the focused item while the floating element is
+    // open.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!enabled) {
+            return;
+        }
+        if (!open) {
+            forceSyncFocusRef.current = false;
+            return;
+        }
+        if (!floatingElement) {
+            return;
+        }
+        if (activeIndex == null) {
+            forceSyncFocusRef.current = false;
+            if (selectedIndexRef.current != null) {
+                return;
+            }
+            // Reset while the floating element was open (e.g. the list changed).
+            if (previousMountedRef.current) {
+                indexRef.current = -1;
+                focusItem();
+            }
+            // Initial sync.
+            if ((!previousOpenRef.current || !previousMountedRef.current) && focusItemOnOpenRef.current && (keyRef.current != null || focusItemOnOpenRef.current === true && keyRef.current == null)) {
+                let runs = 0;
+                const waitForListPopulated = ()=>{
+                    if (listRef.current[0] == null) {
+                        // Avoid letting the browser paint if possible on the first try,
+                        // otherwise use rAF. Don't try more than twice, since something
+                        // is wrong otherwise.
+                        if (runs < 2) {
+                            const scheduler = runs ? (callback)=>waitForListPopulatedFrame.request(callback) : queueMicrotask;
+                            scheduler(waitForListPopulated);
+                        }
+                        runs += 1;
+                    } else {
+                        // Initially focus the first non-disabled item. `disabledIndices` is deliberately
+                        // omitted here so attribute-disabled items (`disabled`/`aria-disabled`) are skipped
+                        // on open even when the consumer passes an empty `disabledIndices` array. Passing it
+                        // would regress that behavior (see mui/base-ui#2604).
+                        indexRef.current = keyRef.current == null || isMainOrientationToEndKey(keyRef.current, orientation, rtl) || nested ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getMinListIndex"])(listRef) : (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getMaxListIndex"])(listRef);
+                        keyRef.current = null;
+                        onNavigate();
+                    }
+                };
+                waitForListPopulated();
+            }
+        } else if (!(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isIndexOutOfListBounds"])(listRef.current, activeIndex)) {
+            indexRef.current = activeIndex;
+            focusItem();
+            forceScrollIntoViewRef.current = false;
+        }
+    }, [
+        enabled,
+        open,
+        floatingElement,
+        activeIndex,
+        selectedIndexRef,
+        nested,
+        listRef,
+        orientation,
+        rtl,
+        onNavigate,
+        focusItem,
+        waitForListPopulatedFrame
+    ]);
+    // Ensure the parent floating element has focus when a nested child closes
+    // to allow arrow key navigation to work after the pointer leaves the child.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!enabled || floatingElement || !tree || virtual || !previousMountedRef.current) {
+            return;
+        }
+        const nodes = tree.nodesRef.current;
+        const parent = nodes.find((node)=>node.id === parentId)?.context?.elements.floating;
+        // `floatingElement` is null here (see the guard above), so resolve the owner document from an
+        // in-DOM element for realm-safety (shadow DOM/iframes): the reference element, falling back to
+        // the parent floating element when the reference is virtual (`domReferenceElement` is null).
+        const activeEl = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(domReferenceElement ?? parent ?? null));
+        const treeContainsActiveEl = nodes.some((node)=>node.context && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(node.context.elements.floating, activeEl));
+        if (parent && !treeContainsActiveEl && isPointerModalityRef.current) {
+            parent.focus({
+                preventScroll: true
+            });
+        }
+    }, [
+        enabled,
+        floatingElement,
+        domReferenceElement,
+        tree,
+        parentId,
+        virtual
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        previousOpenRef.current = open;
+        previousMountedRef.current = !!floatingElement;
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open) {
+            keyRef.current = null;
+            focusItemOnOpenRef.current = focusItemOnOpen;
+        }
+    }, [
+        open,
+        focusItemOnOpen
+    ]);
+    const hasActiveIndex = activeIndex != null;
+    const syncCurrentTarget = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((event)=>{
+        if (!latestOpenRef.current) {
+            return;
+        }
+        const index = listRef.current.indexOf(event.currentTarget);
+        if (index !== -1 && (indexRef.current !== index || activeIndex !== index)) {
+            indexRef.current = index;
+            onNavigate(event);
+        }
+    });
+    const getParentOrientation = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        return parentOrientation ?? tree?.nodesRef.current.find((node)=>node.id === parentId)?.context?.dataRef?.current.orientation;
+    });
+    const getMinEnabledIndex = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getMinListIndex"])(listRef, disabledIndicesRef.current);
+    });
+    const commonOnKeyDown = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((event)=>{
+        isPointerModalityRef.current = false;
+        forceSyncFocusRef.current = true;
+        // When composing a character, Chrome fires ArrowDown twice. Firefox/Safari
+        // don't appear to suffer from this. `event.isComposing` is avoided due to
+        // Safari not supporting it properly (although it's not needed in the first
+        // place for Safari, just avoiding any possible issues).
+        if (event.which === 229) {
+            return;
+        }
+        // If the floating element is animating out, ignore navigation. Otherwise,
+        // the `activeIndex` gets set to 0 despite not being open so the next time
+        // the user ArrowDowns, the first item won't be focused.
+        if (!latestOpenRef.current && event.currentTarget === floatingFocusElementRef.current) {
+            return;
+        }
+        if (nested && isCrossOrientationCloseKey(event.key, orientation, rtl, isGrid)) {
+            // If the nested list's close key is also the parent navigation key,
+            // let the parent navigate. Otherwise, stop propagating the event.
+            if (!isMainOrientationKey(event.key, getParentOrientation())) {
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+            }
+            store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].listNavigation, event.nativeEvent));
+            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(domReferenceElement)) {
+                if (virtual) {
+                    tree?.events.emit('virtualfocus', domReferenceElement);
+                } else {
+                    domReferenceElement.focus();
+                }
+            }
+            return;
+        }
+        const currentIndex = indexRef.current;
+        const minIndex = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getMinListIndex"])(listRef, disabledIndices);
+        const maxIndex = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getMaxListIndex"])(listRef, disabledIndices);
+        if (!typeableComboboxReference) {
+            if (event.key === 'Home') {
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+                indexRef.current = minIndex;
+                onNavigate(event);
+            }
+            if (event.key === 'End') {
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+                indexRef.current = maxIndex;
+                onNavigate(event);
+            }
+        }
+        // Grid navigation is injected by grid-capable consumers so non-grid
+        // consumers (menu, select) tree-shake the grid helpers out.
+        if (navigateGrid != null) {
+            const index = navigateGrid(event, indexRef.current, listRef, orientation, loopFocus, rtl, disabledIndices, minIndex, maxIndex);
+            if (index != null) {
+                indexRef.current = index;
+                onNavigate(event);
+            }
+            if (orientation === 'both') {
+                return;
+            }
+        }
+        if (isMainOrientationKey(event.key, orientation)) {
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+            // Reset the index if no item is focused.
+            if (open && !virtual && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])(event.currentTarget.ownerDocument) === event.currentTarget) {
+                indexRef.current = isMainOrientationToEndKey(event.key, orientation, rtl) ? minIndex : maxIndex;
+                onNavigate(event);
+                return;
+            }
+            if (isMainOrientationToEndKey(event.key, orientation, rtl)) {
+                if (loopFocus) {
+                    if (currentIndex >= maxIndex) {
+                        if (allowEscape && currentIndex !== listRef.current.length) {
+                            indexRef.current = -1;
+                        } else {
+                            // Give time for virtualizers to update the listRef.
+                            forceSyncFocusRef.current = false;
+                            indexRef.current = minIndex;
+                        }
+                    } else {
+                        indexRef.current = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["findNonDisabledListIndex"])(listRef.current, {
+                            startingIndex: currentIndex,
+                            disabledIndices
+                        });
+                    }
+                } else {
+                    indexRef.current = Math.min(maxIndex, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["findNonDisabledListIndex"])(listRef.current, {
+                        startingIndex: currentIndex,
+                        disabledIndices
+                    }));
+                }
+            } else if (loopFocus) {
+                if (currentIndex <= minIndex) {
+                    if (allowEscape && currentIndex !== -1) {
+                        indexRef.current = listRef.current.length;
+                    } else {
+                        // Give time for virtualizers to update the listRef.
+                        forceSyncFocusRef.current = false;
+                        indexRef.current = maxIndex;
+                    }
+                } else {
+                    indexRef.current = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["findNonDisabledListIndex"])(listRef.current, {
+                        startingIndex: currentIndex,
+                        decrement: true,
+                        disabledIndices
+                    });
+                }
+            } else {
+                indexRef.current = Math.max(minIndex, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["findNonDisabledListIndex"])(listRef.current, {
+                    startingIndex: currentIndex,
+                    decrement: true,
+                    disabledIndices
+                }));
+            }
+            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isIndexOutOfListBounds"])(listRef.current, indexRef.current)) {
+                indexRef.current = -1;
+            }
+            onNavigate(event);
+        }
+    });
+    const item = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        const itemProps = {
+            onFocus (event) {
+                forceSyncFocusRef.current = true;
+                syncCurrentTarget(event);
+            },
+            onClick: ({ currentTarget })=>currentTarget.focus({
+                    preventScroll: true
+                }),
+            // Safari
+            onMouseMove (event) {
+                forceSyncFocusRef.current = true;
+                forceScrollIntoViewRef.current = false;
+                if (focusItemOnHover) {
+                    syncCurrentTarget(event);
+                }
+            },
+            onPointerLeave (event) {
+                if (!latestOpenRef.current || !isPointerModalityRef.current || event.pointerType === 'touch') {
+                    return;
+                }
+                forceSyncFocusRef.current = true;
+                const relatedTarget = event.relatedTarget;
+                if (!focusItemOnHover || listRef.current.includes(relatedTarget)) {
+                    return;
+                }
+                if (!resetOnPointerLeaveRef.current) {
+                    return;
+                }
+                cancelQueuedFocusRef.current?.();
+                cancelQueuedFocusRef.current = null;
+                indexRef.current = -1;
+                onNavigate(event);
+                if (!virtual) {
+                    const floatingFocusEl = floatingFocusElementRef.current;
+                    const activeEl = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(floatingFocusEl));
+                    if (floatingFocusEl && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floatingFocusEl, activeEl)) {
+                        floatingFocusEl.focus({
+                            preventScroll: true
+                        });
+                    }
+                }
+            }
+        };
+        return itemProps;
+    }, [
+        syncCurrentTarget,
+        latestOpenRef,
+        floatingFocusElementRef,
+        focusItemOnHover,
+        listRef,
+        onNavigate,
+        resetOnPointerLeaveRef,
+        virtual
+    ]);
+    const ariaActiveDescendantProp = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        return virtual && open && hasActiveIndex && {
+            'aria-activedescendant': `${id}-${activeIndex}`
+        };
+    }, [
+        virtual,
+        open,
+        hasActiveIndex,
+        id,
+        activeIndex
+    ]);
+    const floating = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        return {
+            'aria-orientation': orientation === 'both' ? undefined : orientation,
+            ...!typeableComboboxReference ? ariaActiveDescendantProp : {},
+            onKeyDown (event) {
+                // Close submenu on Shift+Tab
+                if (event.key === 'Tab' && event.shiftKey && open && !virtual) {
+                    // If the event originated from within a nested element (e.g., a Dialog opened from
+                    // within the menu), don't close the menu. The nested element has its own focus
+                    // management and should handle the Tab key.
+                    const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event.nativeEvent);
+                    if (target && !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floatingFocusElementRef.current, target)) {
+                        return;
+                    }
+                    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+                    store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].focusOut, event.nativeEvent));
+                    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(domReferenceElement)) {
+                        domReferenceElement.focus();
+                    }
+                    return;
+                }
+                commonOnKeyDown(event);
+            },
+            onPointerMove () {
+                isPointerModalityRef.current = true;
+            }
+        };
+    }, [
+        ariaActiveDescendantProp,
+        commonOnKeyDown,
+        floatingFocusElementRef,
+        orientation,
+        typeableComboboxReference,
+        store,
+        open,
+        virtual,
+        domReferenceElement
+    ]);
+    const trigger = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        function openOnNavigationKeyDown(event) {
+            store.setOpen(true, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].listNavigation, event.nativeEvent, event.currentTarget));
+        }
+        function checkVirtualMouse(event) {
+            if (focusItemOnOpen === 'auto' && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isVirtualClick"])(event.nativeEvent)) {
+                focusItemOnOpenRef.current = !virtual;
+            }
+        }
+        function checkVirtualPointer(event) {
+            // `pointerdown` fires first, reset the state then perform the checks.
+            focusItemOnOpenRef.current = focusItemOnOpen;
+            if (focusItemOnOpen === 'auto' && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isVirtualPointerEvent"])(event.nativeEvent)) {
+                focusItemOnOpenRef.current = true;
+            }
+        }
+        return {
+            onKeyDown (event) {
+                // non-reactive open state (to prevent re-creation of the handler)
+                const currentOpen = store.select('open');
+                isPointerModalityRef.current = false;
+                const isArrowKey = event.key.startsWith('Arrow');
+                const isParentCrossOpenKey = isCrossOrientationOpenKey(event.key, getParentOrientation(), rtl);
+                const isMainKey = isMainOrientationKey(event.key, orientation);
+                const isNavigationKey = (nested ? isParentCrossOpenKey : isMainKey) || event.key === 'Enter' || event.key.trim() === '';
+                if (virtual && currentOpen) {
+                    return commonOnKeyDown(event);
+                }
+                // If a floating element should not open on arrow key down, avoid
+                // setting `activeIndex` while it's closed.
+                if (!currentOpen && !openOnArrowKeyDown && isArrowKey) {
+                    return undefined;
+                }
+                if (isNavigationKey) {
+                    const isParentMainKey = isMainOrientationKey(event.key, getParentOrientation());
+                    keyRef.current = nested && isParentMainKey ? null : event.key;
+                }
+                if (nested) {
+                    if (isParentCrossOpenKey) {
+                        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+                        if (currentOpen) {
+                            indexRef.current = getMinEnabledIndex();
+                            onNavigate(event);
+                        } else {
+                            openOnNavigationKeyDown(event);
+                        }
+                    }
+                    return undefined;
+                }
+                if (isMainKey) {
+                    if (selectedIndexRef.current != null) {
+                        indexRef.current = selectedIndexRef.current;
+                    }
+                    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+                    if (!currentOpen && openOnArrowKeyDown) {
+                        openOnNavigationKeyDown(event);
+                    } else {
+                        commonOnKeyDown(event);
+                    }
+                    if (currentOpen) {
+                        onNavigate(event);
+                    }
+                }
+                return undefined;
+            },
+            onFocus (event) {
+                if (store.select('open') && !virtual) {
+                    indexRef.current = -1;
+                    onNavigate(event);
+                }
+            },
+            onPointerDown: checkVirtualPointer,
+            onPointerEnter: checkVirtualPointer,
+            onMouseDown: checkVirtualMouse,
+            onClick: checkVirtualMouse
+        };
+    }, [
+        commonOnKeyDown,
+        focusItemOnOpen,
+        getMinEnabledIndex,
+        nested,
+        onNavigate,
+        store,
+        openOnArrowKeyDown,
+        orientation,
+        getParentOrientation,
+        rtl,
+        selectedIndexRef,
+        virtual
+    ]);
+    const reference = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        return {
+            ...ariaActiveDescendantProp,
+            ...trigger
+        };
+    }, [
+        ariaActiveDescendantProp,
+        trigger
+    ]);
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>enabled ? {
+            reference,
+            floating,
+            item,
+            trigger
+        } : {}, [
+        enabled,
+        reference,
+        floating,
+        trigger,
+        item
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useTypeahead.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useTypeahead",
+    ()=>useTypeahead
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/composite.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/event.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+function useTypeahead(context, props) {
+    const { listRef, elementsRef, activeIndex, onMatch: onMatchProp, disabledIndices, onTyping, enabled = true, resetMs = 750, selectedIndex = null } = props;
+    const store = 'rootStore' in context ? context.rootStore : context;
+    const open = store.useState('open');
+    const timeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const stringRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"]('');
+    const prevIndexRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](selectedIndex ?? activeIndex ?? -1);
+    const matchIndexRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const onKeyDown = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((event)=>{
+        function isVisible(index) {
+            const element = elementsRef?.current[index];
+            return !element || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElementVisible"])(element);
+        }
+        function isItemAvailable(index) {
+            if (!isVisible(index)) {
+                return false;
+            }
+            // Visibility is handled above; pass an empty element list so `isListIndexDisabled`
+            // resolves only the explicit `disabledIndices` (array/predicate) and skips its own
+            // visibility/attribute fallbacks. Consumers that don't opt in keep matching every
+            // visible item.
+            return disabledIndices == null || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$composite$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isListIndexDisabled"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_ARRAY"], index, disabledIndices);
+        }
+        function getMatchingIndex(list, string, startIndex = 0) {
+            if (list.length === 0) {
+                return -1;
+            }
+            const normalizedStartIndex = (startIndex % list.length + list.length) % list.length;
+            const lowerString = string.toLowerCase();
+            for(let offset = 0; offset < list.length; offset += 1){
+                const index = (normalizedStartIndex + offset) % list.length;
+                const text = list[index];
+                if (!text?.toLowerCase().startsWith(lowerString) || !isItemAvailable(index)) {
+                    continue;
+                }
+                return index;
+            }
+            return -1;
+        }
+        const listContent = listRef.current;
+        if (stringRef.current.length > 0 && event.key === ' ') {
+            // Space should continue the in-progress typeahead session.
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+            onTyping?.(true);
+        }
+        if (stringRef.current.length > 0 && stringRef.current[0] !== ' ') {
+            if (getMatchingIndex(listContent, stringRef.current) === -1 && event.key !== ' ') {
+                onTyping?.(false);
+            }
+        }
+        if (listContent == null || // Character key.
+        event.key.length !== 1 || // Modifier key.
+        event.ctrlKey || event.metaKey || event.altKey) {
+            return;
+        }
+        if (open && event.key !== ' ') {
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["stopEvent"])(event);
+            onTyping?.(true);
+        }
+        // Capture whether this is a new typing session before mutating the string.
+        const isNewSession = stringRef.current === '';
+        if (isNewSession) {
+            prevIndexRef.current = selectedIndex ?? activeIndex ?? -1;
+        }
+        // Bail out if the list contains a word like "llama" or "aaron". TODO:
+        // allow it in this case, too. Unavailable items are skipped while matching, so
+        // they must be ignored here as well — otherwise a hidden or disabled double-letter
+        // label would block rapid cycling through the available items.
+        const allowRapidSuccessionOfFirstLetter = listContent.every((text, index)=>text && isItemAvailable(index) ? text[0]?.toLowerCase() !== text[1]?.toLowerCase() : true);
+        // Allows the user to cycle through items that start with the same letter
+        // in rapid succession.
+        if (allowRapidSuccessionOfFirstLetter && stringRef.current === event.key) {
+            stringRef.current = '';
+            prevIndexRef.current = matchIndexRef.current;
+        }
+        stringRef.current += event.key;
+        timeout.start(resetMs, ()=>{
+            stringRef.current = '';
+            prevIndexRef.current = matchIndexRef.current;
+            onTyping?.(false);
+        });
+        // Compute the starting index for this search.
+        // If this is a new typing session (string is empty), base it on the current
+        // selection/active item; otherwise continue from the last matched index.
+        const prevIndex = isNewSession ? selectedIndex ?? activeIndex ?? -1 : prevIndexRef.current;
+        const startIndex = (prevIndex ?? 0) + 1;
+        const index = getMatchingIndex(listContent, stringRef.current, startIndex);
+        if (index !== -1) {
+            onMatchProp?.(index);
+            matchIndexRef.current = index;
+        } else if (event.key !== ' ') {
+            stringRef.current = '';
+            onTyping?.(false);
+        }
+    });
+    const onBlur = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((event)=>{
+        const next = event.relatedTarget;
+        const currentDomReferenceElement = store.select('domReferenceElement');
+        const currentFloatingElement = store.select('floatingElement');
+        const withinComposite = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(currentDomReferenceElement, next) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(currentFloatingElement, next);
+        // Keep the session if focus moves within the composite (reference <-> floating).
+        if (withinComposite) {
+            return;
+        }
+        // End the current typing session when focus leaves the composite entirely.
+        timeout.clear();
+        stringRef.current = '';
+        prevIndexRef.current = matchIndexRef.current;
+        onTyping?.(false);
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open && selectedIndex !== null) {
+            return;
+        }
+        timeout.clear();
+        matchIndexRef.current = null;
+        if (stringRef.current !== '') {
+            stringRef.current = '';
+        }
+    }, [
+        open,
+        selectedIndex,
+        timeout
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        // Sync arrow key navigation but not typeahead navigation.
+        if (open && stringRef.current === '') {
+            prevIndexRef.current = selectedIndex ?? activeIndex ?? -1;
+        }
+    }, [
+        open,
+        selectedIndex,
+        activeIndex
+    ]);
+    const sharedProps = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            onKeyDown,
+            onBlur
+        }), [
+        onKeyDown,
+        onBlur
+    ]);
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>enabled ? {
+            reference: sharedProps,
+            floating: sharedProps
+        } : {}, [
+        enabled,
+        sharedProps
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useSyncedFloatingRootContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useSyncedFloatingRootContext",
+    ()=>useSyncedFloatingRootContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingRootStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingRootStore.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+function useSyncedFloatingRootContext(options) {
+    const { popupStore, treatPopupAsFloatingElement = false, floatingRootContext: floatingRootContextProp, floatingId, nested, onOpenChange } = options;
+    const open = popupStore.useState('open');
+    const referenceElement = popupStore.useState('activeTriggerElement');
+    const floatingElement = popupStore.useState(treatPopupAsFloatingElement ? 'popupElement' : 'positionerElement');
+    const triggerElements = popupStore.context.triggerElements;
+    const handleOpenChange = onOpenChange;
+    const internalStoreRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    if (floatingRootContextProp === undefined && internalStoreRef.current === null) {
+        internalStoreRef.current = new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingRootStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingRootStore"]({
+            open,
+            transitionStatus: undefined,
+            referenceElement,
+            floatingElement,
+            triggerElements,
+            onOpenChange: handleOpenChange,
+            floatingId,
+            syncOnly: true,
+            nested
+        });
+    }
+    const store = floatingRootContextProp ?? internalStoreRef.current;
+    popupStore.useSyncedValue('floatingId', floatingId);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        const valuesToSync = {
+            open,
+            floatingId,
+            referenceElement,
+            floatingElement
+        };
+        if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(referenceElement)) {
+            valuesToSync.domReferenceElement = referenceElement;
+        }
+        if (store.state.positionReference === store.state.referenceElement) {
+            valuesToSync.positionReference = referenceElement;
+        }
+        store.update(valuesToSync);
+    }, [
+        open,
+        floatingId,
+        referenceElement,
+        floatingElement,
+        store
+    ]);
+    // Keep non-reactive context values fresh for interactions that call `store.setOpen`.
+    store.context.onOpenChange = handleOpenChange;
+    store.context.nested = nested;
+    return store;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menubar/MenubarContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenubarContext",
+    ()=>MenubarContext,
+    "useMenubarContext",
+    ()=>useMenubarContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const MenubarContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](null);
+if ("TURBOPACK compile-time truthy", 1) MenubarContext.displayName = "MenubarContext";
+function useMenubarContext(optional) {
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](MenubarContext);
+    if (context === null && !optional) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: MenubarContext is missing. Menubar parts must be placed within <Menubar>.' : "TURBOPACK unreachable");
+    }
+    return context;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/useValueChanged.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useValueChanged",
+    ()=>useValueChanged
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+function useValueChanged(value, onChange) {
+    const valueRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](value);
+    const onChangeCallback = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(onChange);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (valueRef.current === value) {
+            return;
+        }
+        onChangeCallback(valueRef.current);
+    }, [
+        value,
+        onChangeCallback
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        valueRef.current = value;
+    }, [
+        value
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/useOpenInteractionType.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useOpenInteractionType",
+    ()=>useOpenInteractionType,
+    "useOpenMethodTriggerProps",
+    ()=>useOpenMethodTriggerProps
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useEnhancedClickHandler$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useEnhancedClickHandler.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/platform/parts.mjs [app-ssr] (ecmascript) <export * as platform>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useValueChanged$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useValueChanged.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+function useOpenMethodTriggerProps(open, setOpenMethod) {
+    const handleTriggerClick = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((_, interactionType)=>{
+        const isOpen = typeof open === 'function' ? open() : open;
+        if (!isOpen) {
+            setOpenMethod(interactionType || (// On iOS Safari, the hitslop around touch targets means tapping outside an element's
+            // bounds does not fire `pointerdown` but does fire `mousedown`. The `interactionType`
+            // will be "" in that case.
+            __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].os.ios ? 'touch' : ''));
+        }
+    });
+    const { onClick, onPointerDown } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useEnhancedClickHandler$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEnhancedClickHandler"])(handleTriggerClick);
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            onClick,
+            onPointerDown
+        }), [
+        onClick,
+        onPointerDown
+    ]);
+}
+function useOpenInteractionType(open) {
+    const [openMethod, setOpenMethod] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
+    const triggerProps = useOpenMethodTriggerProps(open, setOpenMethod);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useValueChanged$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueChanged"])(open, (previousOpen)=>{
+        if (previousOpen && !open) {
+            setOpenMethod(null);
+        }
+    });
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            openMethod,
+            triggerProps
+        }), [
+        openMethod,
+        triggerProps
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/getEmptyRootContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "getEmptyRootContext",
+    ()=>getEmptyRootContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupTriggerMap$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/popupTriggerMap.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingRootStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingRootStore.mjs [app-ssr] (ecmascript)");
+;
+;
+function getEmptyRootContext() {
+    return new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingRootStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingRootStore"]({
+        open: false,
+        transitionStatus: undefined,
+        floatingElement: null,
+        referenceElement: null,
+        triggerElements: new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupTriggerMap$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["PopupTriggerMap"](),
+        floatingId: undefined,
+        syncOnly: false,
+        nested: false,
+        onOpenChange: undefined
+    });
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/store.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "createInitialPopupStoreState",
+    ()=>createInitialPopupStoreState,
+    "createPopupFloatingRootContext",
+    ()=>createPopupFloatingRootContext,
+    "popupStoreSelectors",
+    ()=>popupStoreSelectors
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/store/createSelector.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingRootStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingRootStore.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$getEmptyRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/getEmptyRootContext.mjs [app-ssr] (ecmascript)");
+;
+;
+;
+;
+function createInitialPopupStoreState() {
+    return {
+        open: false,
+        openProp: undefined,
+        mounted: false,
+        transitionStatus: undefined,
+        floatingRootContext: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$getEmptyRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getEmptyRootContext"])(),
+        floatingId: undefined,
+        triggerCount: 0,
+        preventUnmountingOnClose: false,
+        payload: undefined,
+        activeTriggerId: null,
+        activeTriggerElement: null,
+        triggerIdProp: undefined,
+        popupElement: null,
+        positionerElement: null,
+        activeTriggerProps: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"],
+        inactiveTriggerProps: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"],
+        popupProps: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"]
+    };
+}
+function createPopupFloatingRootContext(triggerElements, floatingId, nested = false) {
+    return new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingRootStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingRootStore"]({
+        open: false,
+        transitionStatus: undefined,
+        floatingElement: null,
+        referenceElement: null,
+        triggerElements,
+        floatingId,
+        syncOnly: true,
+        nested,
+        onOpenChange: undefined
+    });
+}
+const activeTriggerIdSelector = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.triggerIdProp ?? state.activeTriggerId);
+const openSelector = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.openProp ?? state.open);
+const popupIdSelector = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>{
+    const popupId = state.popupElement?.id ?? state.floatingId;
+    return popupId || undefined;
+});
+function triggerOwnsOpenPopup(state, triggerId) {
+    return triggerId !== undefined && openSelector(state) && activeTriggerIdSelector(state) === triggerId;
+}
+function triggerOwnsOpenPopupOrIsOnlyTrigger(state, triggerId) {
+    if (triggerOwnsOpenPopup(state, triggerId)) {
+        return true;
+    }
+    return triggerId !== undefined && openSelector(state) && activeTriggerIdSelector(state) == null && state.triggerCount === 1;
+}
+const popupStoreSelectors = {
+    open: openSelector,
+    mounted: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.mounted),
+    transitionStatus: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.transitionStatus),
+    floatingRootContext: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.floatingRootContext),
+    triggerCount: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.triggerCount),
+    preventUnmountingOnClose: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.preventUnmountingOnClose),
+    payload: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.payload),
+    activeTriggerId: activeTriggerIdSelector,
+    activeTriggerElement: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.mounted ? state.activeTriggerElement : null),
+    popupId: popupIdSelector,
+    /**
+   * Whether the trigger with the given ID was used to open the popup.
+   */ isTriggerActive: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state, triggerId)=>triggerId !== undefined && activeTriggerIdSelector(state) === triggerId),
+    /**
+   * Whether the popup is open and was activated by a trigger with the given ID.
+   */ isOpenedByTrigger: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state, triggerId)=>triggerOwnsOpenPopup(state, triggerId)),
+    /**
+   * Whether the popup is mounted and was activated by a trigger with the given ID.
+   */ isMountedByTrigger: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state, triggerId)=>triggerId !== undefined && activeTriggerIdSelector(state) === triggerId && state.mounted),
+    triggerProps: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state, isActive)=>isActive ? state.activeTriggerProps : state.inactiveTriggerProps),
+    /**
+   * Popup id for the trigger that currently owns the open popup.
+   */ triggerPopupId: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state, triggerId)=>triggerOwnsOpenPopupOrIsOnlyTrigger(state, triggerId) ? popupIdSelector(state) : undefined),
+    popupProps: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.popupProps),
+    popupElement: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.popupElement),
+    positionerElement: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.positionerElement)
+};
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/store/MenuStore.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuStore",
+    ()=>MenuStore
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/store/createSelector.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$ReactStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/store/ReactStore.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useRefWithInit.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTreeStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTreeStore.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$store$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/store.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupTriggerMap$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/popupTriggerMap.mjs [app-ssr] (ecmascript)");
+;
+;
+;
+;
+;
+;
+const selectors = {
+    ...__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$store$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["popupStoreSelectors"],
+    disabled: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.parent.type === 'menubar' ? state.parent.context.disabled || state.disabled : state.disabled),
+    modal: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>(state.parent.type === undefined || state.parent.type === 'context-menu') && (state.modal ?? true)),
+    openMethod: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.openMethod),
+    allowMouseEnter: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.allowMouseEnter),
+    highlightItemOnHover: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.highlightItemOnHover),
+    stickIfOpen: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.stickIfOpen),
+    parent: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.parent),
+    rootId: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>{
+        if (state.parent.type === 'menu') {
+            return state.parent.store.select('rootId');
+        }
+        return state.parent.type !== undefined ? state.parent.context.rootId : state.rootId;
+    }),
+    activeIndex: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.activeIndex),
+    isActive: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state, itemIndex)=>state.activeIndex === itemIndex),
+    hoverEnabled: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.hoverEnabled),
+    instantType: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.instantType),
+    lastOpenChangeReason: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.openChangeReason),
+    floatingTreeRoot: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>{
+        if (state.parent.type === 'menu') {
+            return state.parent.store.select('floatingTreeRoot');
+        }
+        return state.floatingTreeRoot;
+    }),
+    floatingNodeId: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.floatingNodeId),
+    floatingParentNodeId: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.floatingParentNodeId),
+    itemProps: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.itemProps),
+    closeDelay: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.closeDelay),
+    hasViewport: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>state.hasViewport),
+    keyboardEventRelay: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$createSelector$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createSelector"])((state)=>{
+        if (state.keyboardEventRelay) {
+            return state.keyboardEventRelay;
+        }
+        if (state.parent.type === 'menu') {
+            return state.parent.store.select('keyboardEventRelay');
+        }
+        return undefined;
+    })
+};
+class MenuStore extends __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$store$2f$ReactStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ReactStore"] {
+    constructor(initialState){
+        super({
+            ...createInitialState(),
+            ...initialState
+        }, {
+            positionerRef: /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createRef"](),
+            popupRef: /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createRef"](),
+            typingRef: {
+                current: false
+            },
+            itemDomElements: {
+                current: []
+            },
+            itemLabels: {
+                current: []
+            },
+            allowMouseUpTriggerRef: {
+                current: false
+            },
+            triggerFocusTargetRef: /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createRef"](),
+            beforeContentFocusGuardRef: /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createRef"](),
+            onOpenChangeComplete: undefined,
+            triggerElements: new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupTriggerMap$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["PopupTriggerMap"]()
+        }, selectors);
+        // Set up propagation of state from parent menu if applicable.
+        this.unsubscribeParentListener = this.observe('parent', (parent)=>{
+            this.unsubscribeParentListener?.();
+            if (parent.type === 'menu') {
+                let rootId = parent.store.select('rootId');
+                let floatingTreeRoot = parent.store.select('floatingTreeRoot');
+                let keyboardEventRelay = parent.store.select('keyboardEventRelay');
+                this.unsubscribeParentListener = parent.store.subscribe(()=>{
+                    const nextRootId = parent.store.select('rootId');
+                    const nextFloatingTreeRoot = parent.store.select('floatingTreeRoot');
+                    const nextKeyboardEventRelay = parent.store.select('keyboardEventRelay');
+                    if (rootId === nextRootId && floatingTreeRoot === nextFloatingTreeRoot && keyboardEventRelay === nextKeyboardEventRelay) {
+                        return;
+                    }
+                    rootId = nextRootId;
+                    floatingTreeRoot = nextFloatingTreeRoot;
+                    keyboardEventRelay = nextKeyboardEventRelay;
+                    this.notifyAll();
+                });
+                this.context.allowMouseUpTriggerRef = parent.store.context.allowMouseUpTriggerRef;
+                return;
+            }
+            if (parent.type !== undefined) {
+                this.context.allowMouseUpTriggerRef = parent.context.allowMouseUpTriggerRef;
+            }
+            this.unsubscribeParentListener = null;
+        });
+    }
+    setOpen(open, eventDetails) {
+        this.state.floatingRootContext.context.events.emit('setOpen', {
+            open,
+            eventDetails
+        });
+    }
+    static useStore(externalStore, initialState) {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const internalStore = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useRefWithInit$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRefWithInit"])(()=>{
+            return new MenuStore(initialState);
+        }).current;
+        return externalStore ?? internalStore;
+    }
+    unsubscribeParentListener = null;
+}
+function createInitialState() {
+    return {
+        ...(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$store$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createInitialPopupStoreState"])(),
+        disabled: false,
+        modal: true,
+        openMethod: null,
+        allowMouseEnter: false,
+        highlightItemOnHover: true,
+        stickIfOpen: true,
+        parent: {
+            type: undefined
+        },
+        rootId: undefined,
+        activeIndex: null,
+        hoverEnabled: true,
+        instantType: undefined,
+        openChangeReason: null,
+        floatingTreeRoot: new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTreeStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingTreeStore"](),
+        floatingNodeId: undefined,
+        floatingParentNodeId: null,
+        itemProps: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"],
+        keyboardEventRelay: undefined,
+        closeDelay: 0,
+        hasViewport: false
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/popupStoreUtils.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "FOCUSABLE_POPUP_PROPS",
+    ()=>FOCUSABLE_POPUP_PROPS,
+    "applyPopupOpenChange",
+    ()=>applyPopupOpenChange,
+    "attachPreventUnmountOnClose",
+    ()=>attachPreventUnmountOnClose,
+    "createDefaultInitialFocus",
+    ()=>createDefaultInitialFocus,
+    "setPopupOpenState",
+    ()=>setPopupOpenState,
+    "useImplicitActiveTrigger",
+    ()=>useImplicitActiveTrigger,
+    "useInitialOpenSync",
+    ()=>useInitialOpenSync,
+    "useOpenStateTransitions",
+    ()=>useOpenStateTransitions,
+    "usePopupInteractionProps",
+    ()=>usePopupInteractionProps,
+    "usePopupRootSync",
+    ()=>usePopupRootSync,
+    "usePopupStore",
+    ()=>usePopupStore,
+    "useTriggerDataForwarding",
+    ()=>useTriggerDataForwarding,
+    "useTriggerRegistration",
+    ()=>useTriggerRegistration
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-dom.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useOnFirstRender$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useOnFirstRender.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/constants.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useSyncedFloatingRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useSyncedFloatingRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useTransitionStatus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useTransitionStatus.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useOpenChangeComplete$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useOpenChangeComplete.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const FOCUSABLE_POPUP_PROPS = {
+    tabIndex: -1,
+    [__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FOCUSABLE_ATTRIBUTE"]]: ''
+};
+function createDefaultInitialFocus(popupRef) {
+    return (interactionType)=>interactionType === 'touch' ? popupRef.current : true;
+}
+function usePopupStore(externalStore, createStore, treatPopupAsFloatingElement = false) {
+    const floatingId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useId"])();
+    const nested = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingParentNodeId"])() != null;
+    const internalStoreRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    if (externalStore === undefined && internalStoreRef.current === null) {
+        internalStoreRef.current = createStore(floatingId, nested);
+    }
+    const store = externalStore ?? internalStoreRef.current;
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useSyncedFloatingRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useSyncedFloatingRootContext"])({
+        popupStore: store,
+        treatPopupAsFloatingElement,
+        floatingRootContext: store.state.floatingRootContext,
+        floatingId,
+        nested,
+        onOpenChange: store.setOpen
+    });
+    return {
+        store,
+        internalStore: internalStoreRef.current
+    };
+}
+function useTriggerRegistration(id, store) {
+    // Keep track of the currently registered element to unregister it on unmount or id change.
+    const registeredElementIdRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const registeredElementRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((element)=>{
+        if (id === undefined) {
+            return;
+        }
+        let shouldSyncTriggerCount = false;
+        if (registeredElementIdRef.current !== null) {
+            const registeredId = registeredElementIdRef.current;
+            const registeredElement = registeredElementRef.current;
+            const currentElement = store.context.triggerElements.getById(registeredId);
+            if (registeredElement && currentElement === registeredElement) {
+                store.context.triggerElements.delete(registeredId);
+                shouldSyncTriggerCount = true;
+            }
+            registeredElementIdRef.current = null;
+            registeredElementRef.current = null;
+        }
+        if (element !== null) {
+            registeredElementIdRef.current = id;
+            registeredElementRef.current = element;
+            store.context.triggerElements.add(id, element);
+            shouldSyncTriggerCount = true;
+        }
+        if (shouldSyncTriggerCount) {
+            const triggerCount = store.context.triggerElements.size;
+            if (store.select('open') && store.state.triggerCount !== triggerCount) {
+                store.set('triggerCount', triggerCount);
+            }
+        }
+    }, [
+        store,
+        id
+    ]);
+}
+function setPopupOpenState(state, open, trigger, preventUnmountOnClose = false) {
+    if (open) {
+        // Opening starts a new close cycle, so clear any previous request to keep the popup mounted.
+        state.preventUnmountingOnClose = false;
+    } else if (preventUnmountOnClose) {
+        state.preventUnmountingOnClose = true;
+    }
+    const triggerId = trigger?.id ?? null;
+    // If a popup is closing, the `trigger` may be undefined.
+    // We want to keep the previous value so that exit animations are played and focus is returned correctly.
+    if (triggerId || open) {
+        state.activeTriggerId = triggerId;
+        state.activeTriggerElement = trigger ?? null;
+    }
+}
+function attachPreventUnmountOnClose(eventDetails) {
+    let preventUnmountOnClose = false;
+    eventDetails.preventUnmountOnClose = ()=>{
+        preventUnmountOnClose = true;
+    };
+    return ()=>preventUnmountOnClose;
+}
+function applyPopupOpenChange(store, nextOpen, eventDetails, options = {}) {
+    const reason = eventDetails.reason;
+    const isHover = reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover;
+    const isFocusOpen = nextOpen && reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerFocus;
+    const isDismissClose = !nextOpen && (reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerPress || reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].escapeKey);
+    const shouldPreventUnmountOnClose = attachPreventUnmountOnClose(eventDetails);
+    store.context.onOpenChange?.(nextOpen, eventDetails);
+    if (eventDetails.isCanceled) {
+        return;
+    }
+    options.onBeforeDispatch?.();
+    store.state.floatingRootContext.dispatchOpenChange(nextOpen, eventDetails);
+    const changeState = ()=>{
+        // Spread `extraState` first so `open` always reflects `nextOpen`, keeping it in
+        // sync with the value already passed to `dispatchOpenChange`/`setPopupOpenState`.
+        const updatedState = {
+            ...options.extraState,
+            open: nextOpen
+        };
+        if (isFocusOpen) {
+            updatedState.instantType = 'focus';
+        } else if (isDismissClose) {
+            updatedState.instantType = 'dismiss';
+        } else if (isHover) {
+            updatedState.instantType = undefined;
+        }
+        setPopupOpenState(updatedState, nextOpen, eventDetails.trigger, shouldPreventUnmountOnClose());
+        store.update(updatedState);
+    };
+    if (isHover) {
+        // Flush synchronously for hover so `node.getAnimations()` sees the new state.
+        __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["flushSync"](changeState);
+    } else {
+        changeState();
+    }
+}
+function useInitialOpenSync(store, openProp, defaultOpen, defaultTriggerId) {
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useOnFirstRender$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useOnFirstRender"])(()=>{
+        if (openProp === undefined && store.state.open === false && defaultOpen) {
+            // Avoid notifying detached trigger subscribers while the Root is rendering.
+            store.state = {
+                ...store.state,
+                open: true,
+                activeTriggerId: defaultTriggerId,
+                preventUnmountingOnClose: false
+            };
+        }
+    });
+}
+function useTriggerDataForwarding(triggerId, triggerElementRef, store, stateUpdates) {
+    const isMountedByThisTrigger = store.useState('isMountedByTrigger', triggerId);
+    const baseRegisterTrigger = useTriggerRegistration(triggerId, store);
+    const registerTrigger = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((element)=>{
+        baseRegisterTrigger(element);
+        if (!element) {
+            return;
+        }
+        const open = store.select('open');
+        const activeTriggerId = store.select('activeTriggerId');
+        if (activeTriggerId === triggerId) {
+            store.update({
+                activeTriggerElement: element,
+                ...open ? stateUpdates : null
+            });
+            return;
+        }
+        if (activeTriggerId == null && open) {
+            // If a popup is already open, a detached trigger can mount before any active trigger
+            // has been established. Claim the first registered trigger so trigger-owned focus
+            // management and ARIA relationships work.
+            store.update({
+                activeTriggerId: triggerId,
+                activeTriggerElement: element,
+                ...stateUpdates
+            });
+        }
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (isMountedByThisTrigger) {
+            store.update({
+                activeTriggerElement: triggerElementRef.current,
+                ...stateUpdates
+            });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        isMountedByThisTrigger,
+        store,
+        triggerElementRef,
+        ...Object.values(stateUpdates)
+    ]);
+    return {
+        registerTrigger,
+        isMountedByThisTrigger
+    };
+}
+function useImplicitActiveTrigger(store, options = {}) {
+    const { closeOnActiveTriggerUnmount = false } = options;
+    const open = store.useState('open');
+    const reactiveTriggerCount = store.useState('triggerCount');
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open) {
+            if (store.state.triggerCount !== 0) {
+                store.set('triggerCount', 0);
+            }
+            return;
+        }
+        const triggerCount = store.context.triggerElements.size;
+        const stateUpdates = {};
+        if (store.state.triggerCount !== triggerCount) {
+            stateUpdates.triggerCount = triggerCount;
+        }
+        const activeTriggerId = store.select('activeTriggerId');
+        let lostActiveTriggerId = null;
+        if (activeTriggerId) {
+            const activeTriggerElement = store.context.triggerElements.getById(activeTriggerId);
+            if (!activeTriggerElement) {
+                lostActiveTriggerId = activeTriggerId;
+            } else if (activeTriggerElement !== store.state.activeTriggerElement) {
+                stateUpdates.activeTriggerElement = activeTriggerElement;
+            }
+        }
+        if (!lostActiveTriggerId && !activeTriggerId && triggerCount === 1) {
+            const iteratorResult = store.context.triggerElements.entries().next();
+            if (!iteratorResult.done) {
+                const [implicitTriggerId, implicitTriggerElement] = iteratorResult.value;
+                stateUpdates.activeTriggerId = implicitTriggerId;
+                stateUpdates.activeTriggerElement = implicitTriggerElement;
+            }
+        }
+        if (stateUpdates.triggerCount !== undefined || stateUpdates.activeTriggerId !== undefined || stateUpdates.activeTriggerElement !== undefined) {
+            store.update(stateUpdates);
+        }
+        if (lostActiveTriggerId) {
+            if (closeOnActiveTriggerUnmount) {
+                // Defer so a same-tick replacement trigger with the same id can register first.
+                queueMicrotask(()=>{
+                    if (store.select('open') && store.select('activeTriggerId') === lostActiveTriggerId && !store.context.triggerElements.getById(lostActiveTriggerId)) {
+                        const eventDetails = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].none);
+                        store.setOpen(false, eventDetails);
+                        // If closing is canceled, keep the previous active trigger ownership for the
+                        // still-open popup instead of claiming another trigger implicitly.
+                        if (!eventDetails.isCanceled) {
+                            store.update({
+                                activeTriggerId: null,
+                                activeTriggerElement: null
+                            });
+                        }
+                    }
+                });
+            }
+        }
+    }, [
+        open,
+        store,
+        reactiveTriggerCount,
+        closeOnActiveTriggerUnmount
+    ]);
+}
+function useOpenStateTransitions(open, store, onUnmount) {
+    const { mounted, setMounted, transitionStatus } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useTransitionStatus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTransitionStatus"])(open);
+    const preventUnmountingOnClose = store.useState('preventUnmountingOnClose');
+    // Opening starts a new close cycle. Clear during render so the close-completion hook below
+    // reads the synchronized value on the same pass.
+    const syncedPreventUnmountingOnClose = open ? false : preventUnmountingOnClose;
+    store.useSyncedValues({
+        mounted,
+        transitionStatus,
+        preventUnmountingOnClose: syncedPreventUnmountingOnClose
+    });
+    const forceUnmount = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        setMounted(false);
+        store.update({
+            activeTriggerId: null,
+            activeTriggerElement: null,
+            mounted: false,
+            preventUnmountingOnClose: false
+        });
+        onUnmount?.();
+        store.context.onOpenChangeComplete?.(false);
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useOpenChangeComplete$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useOpenChangeComplete"])({
+        enabled: mounted && !open && !syncedPreventUnmountingOnClose,
+        open,
+        ref: store.context.popupRef,
+        onComplete () {
+            if (!open) {
+                forceUnmount();
+            }
+        }
+    });
+    return {
+        forceUnmount,
+        transitionStatus
+    };
+}
+function usePopupInteractionProps(store, statePart) {
+    store.useSyncedValues(statePart);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>()=>{
+            store.update({
+                activeTriggerProps: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"],
+                inactiveTriggerProps: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"],
+                popupProps: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"]
+            });
+        }, [
+        store
+    ]);
+}
+function usePopupRootSync(store, open) {
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open && store.state.openMethod !== null) {
+            store.set('openMethod', null);
+        }
+    }, [
+        open,
+        store
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>()=>{
+            if (store.state.openMethod !== null) {
+                store.set('openMethod', null);
+            }
+        }, [
+        store
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/submenu-root/MenuSubmenuRootContext.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuSubmenuRootContext",
+    ()=>MenuSubmenuRootContext,
+    "useMenuSubmenuRootContext",
+    ()=>useMenuSubmenuRootContext
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+'use client';
+;
+const MenuSubmenuRootContext = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"](undefined);
+if ("TURBOPACK compile-time truthy", 1) MenuSubmenuRootContext.displayName = "MenuSubmenuRootContext";
+function useMenuSubmenuRootContext() {
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"](MenuSubmenuRootContext);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRoot.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuRoot",
+    ()=>MenuRoot
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$fastHooks$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/fastHooks.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useDismiss$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useDismiss.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useListNavigation$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useListNavigation.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useTypeahead$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useTypeahead.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useSyncedFloatingRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useSyncedFloatingRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menubar$2f$MenubarContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menubar/MenubarContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/constants.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$direction$2d$context$2f$DirectionContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/direction-context/DirectionContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$useOpenInteractionType$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/useOpenInteractionType.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$context$2d$menu$2f$root$2f$ContextMenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/context-menu/root/ContextMenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/merge-props/mergeProps.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$store$2f$MenuStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/store/MenuStore.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/popupStoreUtils.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$submenu$2d$root$2f$MenuSubmenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/submenu-root/MenuSubmenuRootContext.mjs [app-ssr] (ecmascript)");
+/**
+ * Groups all parts of the menu.
+ * Doesn't render its own HTML element.
+ *
+ * Documentation: [Base UI Menu](https://base-ui.com/react/components/menu)
+ */ var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const MenuRoot = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$fastHooks$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["fastComponent"])(function MenuRoot(props) {
+    const { children, open: openProp, onOpenChange, onOpenChangeComplete, defaultOpen = false, disabled: disabledProp = false, modal: modalProp, loopFocus = true, orientation = 'vertical', actionsRef, closeParentOnEsc = false, handle, triggerId: triggerIdProp, defaultTriggerId: defaultTriggerIdProp = null, highlightItemOnHover = true } = props;
+    const contextMenuContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$context$2d$menu$2f$root$2f$ContextMenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContextMenuRootContext"])(true);
+    const parentMenuRootContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])(true);
+    const menubarContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menubar$2f$MenubarContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenubarContext"])(true);
+    const isSubmenu = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$submenu$2d$root$2f$MenuSubmenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuSubmenuRootContext"])();
+    const parentFromContext = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        if (isSubmenu && parentMenuRootContext) {
+            return {
+                type: 'menu',
+                store: parentMenuRootContext.store
+            };
+        }
+        if (menubarContext) {
+            return {
+                type: 'menubar',
+                context: menubarContext
+            };
+        }
+        // Ensure this is not a Menu nested inside ContextMenu.Trigger.
+        // ContextMenu parentContext is always undefined as ContextMenu.Root is instantiated with
+        // <MenuRootContext.Provider value={undefined}>
+        if (contextMenuContext && !parentMenuRootContext) {
+            return {
+                type: 'context-menu',
+                context: contextMenuContext
+            };
+        }
+        return {
+            type: undefined
+        };
+    }, [
+        contextMenuContext,
+        parentMenuRootContext,
+        menubarContext,
+        isSubmenu
+    ]);
+    const store = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$store$2f$MenuStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuStore"].useStore(handle?.store, {
+        open: defaultOpen,
+        openProp,
+        activeTriggerId: defaultTriggerIdProp,
+        triggerIdProp,
+        parent: parentFromContext
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useInitialOpenSync"])(store, openProp, defaultOpen, defaultTriggerIdProp);
+    store.useControlledProp('openProp', openProp);
+    store.useControlledProp('triggerIdProp', triggerIdProp);
+    store.useContextCallback('onOpenChangeComplete', onOpenChangeComplete);
+    const rootId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useId"])();
+    const floatingId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useId"])();
+    const floatingTreeRoot = store.useState('floatingTreeRoot');
+    const floatingNodeIdFromContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingNodeId"])(floatingTreeRoot);
+    const floatingParentNodeIdFromContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingParentNodeId"])();
+    const open = store.useState('open');
+    const activeTriggerElement = store.useState('activeTriggerElement');
+    const positionerElement = store.useState('positionerElement');
+    const hoverEnabled = store.useState('hoverEnabled');
+    const disabled = store.useState('disabled');
+    const lastOpenChangeReason = store.useState('lastOpenChangeReason');
+    const parent = store.useState('parent');
+    const activeIndex = store.useState('activeIndex');
+    const payload = store.useState('payload');
+    const floatingParentNodeId = store.useState('floatingParentNodeId');
+    const openEventRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const allowOutsidePressDismissalRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](parent.type !== 'context-menu');
+    const allowOutsidePressDismissalTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const allowTouchToCloseRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](true);
+    const allowTouchToCloseTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const nested = floatingParentNodeId != null;
+    if ("TURBOPACK compile-time truthy", 1) {
+        if (parent.type !== undefined && modalProp !== undefined) {
+            console.warn('Base UI: The `modal` prop is not supported on nested menus. It will be ignored.');
+        }
+    }
+    const { openMethod, triggerProps: interactionTypeProps } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$useOpenInteractionType$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useOpenInteractionType"])(open);
+    store.useSyncedValues({
+        disabled: disabledProp,
+        highlightItemOnHover,
+        modal: parent.type === undefined ? modalProp : undefined,
+        openMethod,
+        rootId
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useImplicitActiveTrigger"])(store);
+    const { forceUnmount } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useOpenStateTransitions"])(open, store, ()=>{
+        store.update({
+            allowMouseEnter: false,
+            stickIfOpen: true
+        });
+    });
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (contextMenuContext && !parentMenuRootContext) {
+            // This is a context menu root.
+            // It doesn't support detached triggers yet, so we have to sync the parent context manually.
+            store.update({
+                parent: {
+                    type: 'context-menu',
+                    context: contextMenuContext
+                },
+                floatingNodeId: floatingNodeIdFromContext,
+                floatingParentNodeId: floatingParentNodeIdFromContext
+            });
+        } else if (parentMenuRootContext) {
+            store.update({
+                floatingNodeId: floatingNodeIdFromContext,
+                floatingParentNodeId: floatingParentNodeIdFromContext
+            });
+        }
+    }, [
+        contextMenuContext,
+        parentMenuRootContext,
+        floatingNodeIdFromContext,
+        floatingParentNodeIdFromContext,
+        store
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!open) {
+            openEventRef.current = null;
+        }
+        if (parent.type !== 'context-menu') {
+            return;
+        }
+        if (!open) {
+            allowOutsidePressDismissalTimeout.clear();
+            allowOutsidePressDismissalRef.current = false;
+            return;
+        }
+        // With `mousedown` outside press events and long press touch input, there
+        // needs to be a grace period after opening to ensure the dismissal event
+        // doesn't fire immediately after open.
+        allowOutsidePressDismissalTimeout.start(500, ()=>{
+            allowOutsidePressDismissalRef.current = true;
+        });
+    }, [
+        allowOutsidePressDismissalTimeout,
+        open,
+        parent.type
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open && !hoverEnabled) {
+            store.set('hoverEnabled', true);
+        }
+    }, [
+        open,
+        hoverEnabled,
+        store
+    ]);
+    const setOpen = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((nextOpen, eventDetails)=>{
+        const reason = eventDetails.reason;
+        if (open === nextOpen && eventDetails.trigger === activeTriggerElement && lastOpenChangeReason === reason) {
+            return;
+        }
+        const shouldPreventUnmountOnClose = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["attachPreventUnmountOnClose"])(eventDetails);
+        // Do not immediately reset the activeTriggerId to allow
+        // exit animations to play and focus to be returned correctly.
+        if (!nextOpen && eventDetails.trigger == null) {
+            eventDetails.trigger = activeTriggerElement ?? undefined;
+        }
+        onOpenChange?.(nextOpen, eventDetails);
+        if (eventDetails.isCanceled) {
+            return;
+        }
+        store.state.floatingRootContext.dispatchOpenChange(nextOpen, eventDetails);
+        const nativeEvent = eventDetails.event;
+        if (nextOpen === false && nativeEvent?.type === 'click' && nativeEvent.pointerType === 'touch' && !allowTouchToCloseRef.current) {
+            return;
+        }
+        // Prevent the menu from closing on mobile devices that have a delayed click event.
+        // In some cases the menu, when tapped, will fire the focus event first and then the click event.
+        // Without this guard, the menu will close immediately after opening.
+        if (nextOpen && reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerFocus) {
+            allowTouchToCloseRef.current = false;
+            allowTouchToCloseTimeout.start(300, ()=>{
+                allowTouchToCloseRef.current = true;
+            });
+        } else {
+            allowTouchToCloseRef.current = true;
+            allowTouchToCloseTimeout.clear();
+        }
+        const isKeyboardClick = (reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerPress || reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].itemPress) && nativeEvent.detail === 0 && nativeEvent?.isTrusted;
+        const isDismissClose = !nextOpen && (reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].escapeKey || reason == null);
+        const updatedState = {
+            open: nextOpen,
+            openChangeReason: reason
+        };
+        openEventRef.current = eventDetails.event ?? null;
+        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["setPopupOpenState"])(updatedState, nextOpen, eventDetails.trigger, shouldPreventUnmountOnClose());
+        store.update(updatedState);
+        if (parent.type === 'menubar' && (reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerFocus || reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].focusOut || reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover || reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].listNavigation || reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].siblingOpen)) {
+            store.set('instantType', 'group');
+        } else if (isKeyboardClick || isDismissClose) {
+            store.set('instantType', isKeyboardClick ? 'click' : 'dismiss');
+        } else {
+            store.set('instantType', undefined);
+        }
+    });
+    const floatingRootContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useSyncedFloatingRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useSyncedFloatingRootContext"])({
+        popupStore: store,
+        floatingId,
+        nested: floatingParentNodeIdFromContext != null,
+        onOpenChange: setOpen
+    });
+    const floatingEvents = floatingRootContext.context.events;
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        const handleSetOpenEvent = ({ open: nextOpen, eventDetails })=>setOpen(nextOpen, eventDetails);
+        floatingEvents.on('setOpen', handleSetOpenEvent);
+        return ()=>{
+            floatingEvents?.off('setOpen', handleSetOpenEvent);
+        };
+    }, [
+        floatingEvents,
+        setOpen
+    ]);
+    const handleImperativeClose = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"](()=>{
+        store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].imperativeAction));
+    }, [
+        store
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useImperativeHandle"](actionsRef, ()=>({
+            unmount: forceUnmount,
+            close: handleImperativeClose
+        }), [
+        forceUnmount,
+        handleImperativeClose
+    ]);
+    let ctx;
+    if (parent.type === 'context-menu') {
+        ctx = parent.context;
+    }
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useImperativeHandle"](ctx?.positionerRef, ()=>positionerElement, [
+        positionerElement
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useImperativeHandle"](ctx?.actionsRef, ()=>({
+            setOpen
+        }), [
+        setOpen
+    ]);
+    const dismiss = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useDismiss$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useDismiss"])(floatingRootContext, {
+        enabled: !disabled,
+        bubbles: {
+            escapeKey: closeParentOnEsc && parent.type === 'menu'
+        },
+        outsidePress () {
+            if (parent.type !== 'context-menu' || openEventRef.current?.type === 'contextmenu') {
+                return true;
+            }
+            return allowOutsidePressDismissalRef.current;
+        },
+        externalTree: nested ? floatingTreeRoot : undefined
+    });
+    const direction = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$direction$2d$context$2f$DirectionContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useDirection"])();
+    const setActiveIndex = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((index)=>{
+        if (store.select('activeIndex') === index) {
+            return;
+        }
+        store.set('activeIndex', index);
+    }, [
+        store
+    ]);
+    const listNavigation = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useListNavigation$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useListNavigation"])(floatingRootContext, {
+        enabled: !disabled,
+        listRef: store.context.itemDomElements,
+        activeIndex,
+        nested: parent.type !== undefined,
+        loopFocus,
+        orientation,
+        parentOrientation: parent.type === 'menubar' ? parent.context.orientation : undefined,
+        rtl: direction === 'rtl',
+        disabledIndices: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_ARRAY"],
+        onNavigate: setActiveIndex,
+        openOnArrowKeyDown: parent.type !== 'context-menu',
+        externalTree: nested ? floatingTreeRoot : undefined,
+        focusItemOnHover: highlightItemOnHover
+    });
+    const onTyping = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((nextTyping)=>{
+        store.context.typingRef.current = nextTyping;
+    }, [
+        store
+    ]);
+    const typeahead = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useTypeahead$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTypeahead"])(floatingRootContext, {
+        enabled: !disabled,
+        listRef: store.context.itemLabels,
+        elementsRef: store.context.itemDomElements,
+        activeIndex,
+        resetMs: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TYPEAHEAD_RESET_MS"],
+        onMatch: (index)=>{
+            if (open && index !== activeIndex) {
+                store.set('activeIndex', index);
+            }
+        },
+        onTyping
+    });
+    const activeTriggerProps = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        const mergedProps = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeProps"])(typeahead.reference, listNavigation.reference, dismiss.reference, {
+            onMouseMove () {
+                store.set('allowMouseEnter', true);
+            }
+        }, interactionTypeProps);
+        mergedProps['aria-haspopup'] = 'menu';
+        mergedProps['aria-expanded'] = open;
+        return mergedProps;
+    }, [
+        store,
+        typeahead.reference,
+        listNavigation.reference,
+        dismiss.reference,
+        interactionTypeProps,
+        open
+    ]);
+    const inactiveTriggerProps = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        const mergedProps = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeProps"])(listNavigation.trigger, dismiss.trigger, interactionTypeProps);
+        mergedProps['aria-haspopup'] = 'menu';
+        mergedProps['aria-expanded'] = false;
+        return mergedProps;
+    }, [
+        listNavigation.trigger,
+        dismiss.trigger,
+        interactionTypeProps
+    ]);
+    const popupProps = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeProps"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FOCUSABLE_POPUP_PROPS"], {
+            id: floatingId,
+            role: 'menu',
+            'aria-labelledby': activeTriggerElement?.id,
+            onMouseMove () {
+                store.set('allowMouseEnter', true);
+                if (parent.type === 'menu') {
+                    store.set('hoverEnabled', false);
+                }
+            },
+            onClick () {
+                if (store.select('hoverEnabled')) {
+                    store.set('hoverEnabled', false);
+                }
+            },
+            onKeyDown (event) {
+                // The Menubar's CompositeRoot captures keyboard events via
+                // event delegation. This works well when Menu.Root is nested inside Menubar,
+                // but with detached triggers we need to manually forward the event to the CompositeRoot.
+                const relay = store.select('keyboardEventRelay');
+                if (relay && !event.isPropagationStopped()) {
+                    relay(event);
+                }
+            }
+        }, typeahead.floating, listNavigation.floating, dismiss.floating), [
+        activeTriggerElement,
+        floatingId,
+        parent.type,
+        store,
+        typeahead.floating,
+        listNavigation.floating,
+        dismiss.floating
+    ]);
+    const itemProps = listNavigation.item ?? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["usePopupInteractionProps"])(store, {
+        floatingRootContext,
+        activeTriggerProps,
+        inactiveTriggerProps,
+        popupProps,
+        itemProps
+    });
+    const context = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            store,
+            parent: parentFromContext
+        }), [
+        store,
+        parentFromContext
+    ]);
+    const content = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuRootContext"].Provider, {
+        value: context,
+        children: typeof children === 'function' ? children({
+            payload
+        }) : children
+    });
+    if (parent.type === undefined || parent.type === 'context-menu') {
+        // set up a FloatingTree to provide the context to nested menus
+        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingTree"], {
+            externalTree: floatingTreeRoot,
+            children: content
+        });
+    }
+    return content;
+});
+if ("TURBOPACK compile-time truthy", 1) MenuRoot.displayName = "MenuRoot";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/submenu-root/MenuSubmenuRoot.mjs [app-ssr] (ecmascript) <locals>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuSubmenuRoot",
+    ()=>MenuSubmenuRoot
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRoot$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRoot.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$submenu$2d$root$2f$MenuSubmenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/submenu-root/MenuSubmenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+function MenuSubmenuRoot(props) {
+    const parentMenu = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])().store;
+    const contextValue = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            parentMenu
+        }), [
+        parentMenu
+    ]);
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$submenu$2d$root$2f$MenuSubmenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuSubmenuRootContext"].Provider, {
+        value: contextValue,
+        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRoot$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuRoot"], {
+            ...props
+        })
+    });
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/safePolygon.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "safePolygon",
+    ()=>safePolygon
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/nodes.mjs [app-ssr] (ecmascript)");
+;
+;
+;
+;
+/* eslint-disable no-nested-ternary */ const CURSOR_SPEED_THRESHOLD = 0.1;
+const CURSOR_SPEED_THRESHOLD_SQUARED = CURSOR_SPEED_THRESHOLD * CURSOR_SPEED_THRESHOLD;
+const POLYGON_BUFFER = 0.5;
+function hasIntersectingEdge(pointX, pointY, xi, yi, xj, yj) {
+    return yi >= pointY !== yj >= pointY && pointX <= (xj - xi) * (pointY - yi) / (yj - yi) + xi;
+}
+function isPointInQuadrilateral(pointX, pointY, x1, y1, x2, y2, x3, y3, x4, y4) {
+    let isInsideValue = false;
+    if (hasIntersectingEdge(pointX, pointY, x1, y1, x2, y2)) {
+        isInsideValue = !isInsideValue;
+    }
+    if (hasIntersectingEdge(pointX, pointY, x2, y2, x3, y3)) {
+        isInsideValue = !isInsideValue;
+    }
+    if (hasIntersectingEdge(pointX, pointY, x3, y3, x4, y4)) {
+        isInsideValue = !isInsideValue;
+    }
+    if (hasIntersectingEdge(pointX, pointY, x4, y4, x1, y1)) {
+        isInsideValue = !isInsideValue;
+    }
+    return isInsideValue;
+}
+function isInsideRect(pointX, pointY, rect) {
+    return pointX >= rect.x && pointX <= rect.x + rect.width && pointY >= rect.y && pointY <= rect.y + rect.height;
+}
+function isInsideAxisAlignedRect(pointX, pointY, x1, y1, x2, y2) {
+    const minX = Math.min(x1, x2);
+    const maxX = Math.max(x1, x2);
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    return pointX >= minX && pointX <= maxX && pointY >= minY && pointY <= maxY;
+}
+function safePolygon(options = {}) {
+    const { blockPointerEvents = false } = options;
+    const timeout = new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Timeout"]();
+    const fn = ({ x, y, placement, elements, onClose, nodeId, tree })=>{
+        const side = placement?.split('-')[0];
+        let hasLanded = false;
+        let lastX = null;
+        let lastY = null;
+        let lastCursorTime = typeof performance !== 'undefined' ? performance.now() : 0;
+        function isCursorMovingSlowly(nextX, nextY) {
+            const currentTime = performance.now();
+            const elapsedTime = currentTime - lastCursorTime;
+            if (lastX === null || lastY === null || elapsedTime === 0) {
+                lastX = nextX;
+                lastY = nextY;
+                lastCursorTime = currentTime;
+                return false;
+            }
+            const deltaX = nextX - lastX;
+            const deltaY = nextY - lastY;
+            const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+            const thresholdSquared = elapsedTime * elapsedTime * CURSOR_SPEED_THRESHOLD_SQUARED;
+            lastX = nextX;
+            lastY = nextY;
+            lastCursorTime = currentTime;
+            return distanceSquared < thresholdSquared;
+        }
+        function close() {
+            timeout.clear();
+            onClose();
+        }
+        return function onMouseMove(event) {
+            timeout.clear();
+            const domReference = elements.domReference;
+            const floating = elements.floating;
+            if (!domReference || !floating || side == null || x == null || y == null) {
+                return undefined;
+            }
+            const { clientX, clientY } = event;
+            const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event);
+            const isLeave = event.type === 'mouseleave';
+            const isOverFloatingEl = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floating, target);
+            const isOverReferenceEl = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(domReference, target);
+            if (isOverFloatingEl) {
+                hasLanded = true;
+                if (!isLeave) {
+                    return undefined;
+                }
+            }
+            if (isOverReferenceEl) {
+                hasLanded = false;
+                if (!isLeave) {
+                    hasLanded = true;
+                    return undefined;
+                }
+            }
+            // Prevent overlapping floating element from being stuck in an open-close
+            // loop: https://github.com/floating-ui/floating-ui/issues/1910
+            if (isLeave && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(event.relatedTarget) && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(floating, event.relatedTarget)) {
+                return undefined;
+            }
+            function hasOpenChildNode() {
+                return Boolean(tree && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$nodes$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNodeChildren"])(tree.nodesRef.current, nodeId).length > 0);
+            }
+            function closeIfNoOpenChild() {
+                if (!hasOpenChildNode()) {
+                    close();
+                }
+            }
+            // If any nested child is open, abort.
+            if (hasOpenChildNode()) {
+                return undefined;
+            }
+            const refRect = domReference.getBoundingClientRect();
+            const rect = floating.getBoundingClientRect();
+            const cursorLeaveFromRight = x > rect.right - rect.width / 2;
+            const cursorLeaveFromBottom = y > rect.bottom - rect.height / 2;
+            const isFloatingWider = rect.width > refRect.width;
+            const isFloatingTaller = rect.height > refRect.height;
+            const left = (isFloatingWider ? refRect : rect).left;
+            const right = (isFloatingWider ? refRect : rect).right;
+            const top = (isFloatingTaller ? refRect : rect).top;
+            const bottom = (isFloatingTaller ? refRect : rect).bottom;
+            // If the pointer is leaving from the opposite side, the "buffer" logic
+            // creates a point where the floating element remains open, but should be
+            // ignored.
+            // A constant of 1 handles floating point rounding errors.
+            if (side === 'top' && y >= refRect.bottom - 1 || side === 'bottom' && y <= refRect.top + 1 || side === 'left' && x >= refRect.right - 1 || side === 'right' && x <= refRect.left + 1) {
+                closeIfNoOpenChild();
+                return undefined;
+            }
+            // Ignore when the cursor is within the rectangular trough between the
+            // two elements. Since the triangle is created from the cursor point,
+            // which can start beyond the ref element's edge, traversing back and
+            // forth from the ref to the floating element can cause it to close. This
+            // ensures it always remains open in that case.
+            let isInsideTroughRect = false;
+            switch(side){
+                case 'top':
+                    isInsideTroughRect = isInsideAxisAlignedRect(clientX, clientY, left, refRect.top + 1, right, rect.bottom - 1);
+                    break;
+                case 'bottom':
+                    isInsideTroughRect = isInsideAxisAlignedRect(clientX, clientY, left, rect.top + 1, right, refRect.bottom - 1);
+                    break;
+                case 'left':
+                    isInsideTroughRect = isInsideAxisAlignedRect(clientX, clientY, rect.right - 1, bottom, refRect.left + 1, top);
+                    break;
+                case 'right':
+                    isInsideTroughRect = isInsideAxisAlignedRect(clientX, clientY, refRect.right - 1, bottom, rect.left + 1, top);
+                    break;
+                default:
+            }
+            if (isInsideTroughRect) {
+                return undefined;
+            }
+            if (hasLanded && !isInsideRect(clientX, clientY, refRect)) {
+                closeIfNoOpenChild();
+                return undefined;
+            }
+            if (!isLeave && isCursorMovingSlowly(clientX, clientY)) {
+                closeIfNoOpenChild();
+                return undefined;
+            }
+            let isInsidePolygon = false;
+            switch(side){
+                case 'top':
+                    {
+                        const cursorXOffset = isFloatingWider ? POLYGON_BUFFER / 2 : POLYGON_BUFFER * 4;
+                        const cursorPointOneX = isFloatingWider ? x + cursorXOffset : cursorLeaveFromRight ? x + cursorXOffset : x - cursorXOffset;
+                        const cursorPointTwoX = isFloatingWider ? x - cursorXOffset : cursorLeaveFromRight ? x + cursorXOffset : x - cursorXOffset;
+                        const cursorPointY = y + POLYGON_BUFFER + 1;
+                        const commonYLeft = cursorLeaveFromRight ? rect.bottom - POLYGON_BUFFER : isFloatingWider ? rect.bottom - POLYGON_BUFFER : rect.top;
+                        const commonYRight = cursorLeaveFromRight ? isFloatingWider ? rect.bottom - POLYGON_BUFFER : rect.top : rect.bottom - POLYGON_BUFFER;
+                        isInsidePolygon = isPointInQuadrilateral(clientX, clientY, cursorPointOneX, cursorPointY, cursorPointTwoX, cursorPointY, rect.left, commonYLeft, rect.right, commonYRight);
+                        break;
+                    }
+                case 'bottom':
+                    {
+                        const cursorXOffset = isFloatingWider ? POLYGON_BUFFER / 2 : POLYGON_BUFFER * 4;
+                        const cursorPointOneX = isFloatingWider ? x + cursorXOffset : cursorLeaveFromRight ? x + cursorXOffset : x - cursorXOffset;
+                        const cursorPointTwoX = isFloatingWider ? x - cursorXOffset : cursorLeaveFromRight ? x + cursorXOffset : x - cursorXOffset;
+                        const cursorPointY = y - POLYGON_BUFFER;
+                        const commonYLeft = cursorLeaveFromRight ? rect.top + POLYGON_BUFFER : isFloatingWider ? rect.top + POLYGON_BUFFER : rect.bottom;
+                        const commonYRight = cursorLeaveFromRight ? isFloatingWider ? rect.top + POLYGON_BUFFER : rect.bottom : rect.top + POLYGON_BUFFER;
+                        isInsidePolygon = isPointInQuadrilateral(clientX, clientY, cursorPointOneX, cursorPointY, cursorPointTwoX, cursorPointY, rect.left, commonYLeft, rect.right, commonYRight);
+                        break;
+                    }
+                case 'left':
+                    {
+                        const cursorYOffset = isFloatingTaller ? POLYGON_BUFFER / 2 : POLYGON_BUFFER * 4;
+                        const cursorPointOneY = isFloatingTaller ? y + cursorYOffset : cursorLeaveFromBottom ? y + cursorYOffset : y - cursorYOffset;
+                        const cursorPointTwoY = isFloatingTaller ? y - cursorYOffset : cursorLeaveFromBottom ? y + cursorYOffset : y - cursorYOffset;
+                        const cursorPointX = x + POLYGON_BUFFER + 1;
+                        const commonXTop = cursorLeaveFromBottom ? rect.right - POLYGON_BUFFER : isFloatingTaller ? rect.right - POLYGON_BUFFER : rect.left;
+                        const commonXBottom = cursorLeaveFromBottom ? isFloatingTaller ? rect.right - POLYGON_BUFFER : rect.left : rect.right - POLYGON_BUFFER;
+                        isInsidePolygon = isPointInQuadrilateral(clientX, clientY, commonXTop, rect.top, commonXBottom, rect.bottom, cursorPointX, cursorPointOneY, cursorPointX, cursorPointTwoY);
+                        break;
+                    }
+                case 'right':
+                    {
+                        const cursorYOffset = isFloatingTaller ? POLYGON_BUFFER / 2 : POLYGON_BUFFER * 4;
+                        const cursorPointOneY = isFloatingTaller ? y + cursorYOffset : cursorLeaveFromBottom ? y + cursorYOffset : y - cursorYOffset;
+                        const cursorPointTwoY = isFloatingTaller ? y - cursorYOffset : cursorLeaveFromBottom ? y + cursorYOffset : y - cursorYOffset;
+                        const cursorPointX = x - POLYGON_BUFFER;
+                        const commonXTop = cursorLeaveFromBottom ? rect.left + POLYGON_BUFFER : isFloatingTaller ? rect.left + POLYGON_BUFFER : rect.right;
+                        const commonXBottom = cursorLeaveFromBottom ? isFloatingTaller ? rect.left + POLYGON_BUFFER : rect.right : rect.left + POLYGON_BUFFER;
+                        isInsidePolygon = isPointInQuadrilateral(clientX, clientY, cursorPointX, cursorPointOneY, cursorPointX, cursorPointTwoY, commonXTop, rect.top, commonXBottom, rect.bottom);
+                        break;
+                    }
+                default:
+            }
+            if (!isInsidePolygon) {
+                closeIfNoOpenChild();
+            } else if (!hasLanded) {
+                timeout.start(40, closeIfNoOpenChild);
+            }
+            return undefined;
+        };
+    };
+    // eslint-disable-next-line no-underscore-dangle
+    fn.__options = {
+        ...options,
+        blockPointerEvents
+    };
+    return fn;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useClick.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useClick",
+    ()=>useClick
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useAnimationFrame.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/event.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+function useClick(context, props = {}) {
+    const { enabled = true, event: eventOption = 'click', toggle = true, ignoreMouse = false, stickIfOpen = true, touchOpenDelay = 0, reason = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerPress } = props;
+    const store = 'rootStore' in context ? context.rootStore : context;
+    const dataRef = store.context.dataRef;
+    const pointerTypeRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](undefined);
+    const frame = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationFrame"])();
+    const touchOpenTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const reference = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        function setOpenWithTouchDelay(nextOpen, nativeEvent, target, pointerType) {
+            const details = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(reason, nativeEvent, target);
+            if (nextOpen && pointerType === 'touch' && touchOpenDelay > 0) {
+                touchOpenTimeout.start(touchOpenDelay, ()=>{
+                    store.setOpen(true, details);
+                });
+            } else {
+                store.setOpen(nextOpen, details);
+            }
+        }
+        function getNextOpen(open, currentTarget, isClickLikeOpenEvent) {
+            const openEvent = dataRef.current.openEvent;
+            const hasClickedOnInactiveTrigger = store.select('domReferenceElement') !== currentTarget;
+            if (open && hasClickedOnInactiveTrigger) {
+                // Moving between triggers should always open the newly active one.
+                return true;
+            }
+            if (!open) {
+                // A closed popup should open on the next press.
+                return true;
+            }
+            if (!toggle) {
+                // Non-toggle mode never closes on a repeated trigger press.
+                return true;
+            }
+            if (openEvent && stickIfOpen) {
+                // Preserve hover/focus-opened popups until the matching click-like event closes them.
+                return !isClickLikeOpenEvent(openEvent.type);
+            }
+            // Otherwise, a repeated click toggles the popup closed.
+            return false;
+        }
+        return {
+            onPointerDown (event) {
+                pointerTypeRef.current = event.pointerType;
+            },
+            onMouseDown (event) {
+                const pointerType = pointerTypeRef.current;
+                const nativeEvent = event.nativeEvent;
+                const open = store.select('open');
+                // Ignore all buttons except for the "main" button.
+                // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
+                if (event.button !== 0 || eventOption === 'click' || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isMouseLikePointerType"])(pointerType, true) && ignoreMouse) {
+                    return;
+                }
+                const nextOpen = getNextOpen(open, event.currentTarget, (openEventType)=>openEventType === 'click' || openEventType === 'mousedown');
+                // Animations sometimes won't run on a typeable element if using a rAF.
+                // Focus is always set on these elements. For touch, we may delay opening.
+                const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(nativeEvent);
+                if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isTypeableElement"])(target)) {
+                    setOpenWithTouchDelay(nextOpen, nativeEvent, target, pointerType);
+                    return;
+                }
+                // Capture the currentTarget before the rAF.
+                // as React sets it to null after the event handler completes.
+                const eventCurrentTarget = event.currentTarget;
+                // Wait until focus is set on the element. This is an alternative to
+                // `event.preventDefault()` to avoid :focus-visible from appearing when using a pointer.
+                frame.request(()=>{
+                    setOpenWithTouchDelay(nextOpen, nativeEvent, eventCurrentTarget, pointerType);
+                });
+            },
+            onClick (event) {
+                if (eventOption === 'mousedown-only') {
+                    return;
+                }
+                const pointerType = pointerTypeRef.current;
+                if (eventOption === 'mousedown' && pointerType) {
+                    pointerTypeRef.current = undefined;
+                    return;
+                }
+                if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isMouseLikePointerType"])(pointerType, true) && ignoreMouse) {
+                    return;
+                }
+                const open = store.select('open');
+                const nextOpen = getNextOpen(open, event.currentTarget, (openEventType)=>openEventType === 'click' || openEventType === 'mousedown' || openEventType === 'keydown' || openEventType === 'keyup');
+                setOpenWithTouchDelay(nextOpen, event.nativeEvent, event.currentTarget, pointerType);
+            },
+            onKeyDown () {
+                pointerTypeRef.current = undefined;
+            }
+        };
+    }, [
+        dataRef,
+        eventOption,
+        ignoreMouse,
+        reason,
+        store,
+        stickIfOpen,
+        toggle,
+        frame,
+        touchOpenTimeout,
+        touchOpenDelay
+    ]);
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>enabled ? {
+            reference
+        } : __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"], [
+        enabled,
+        reference
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useFocus.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useFocus",
+    ()=>useFocus
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/addEventListener.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/platform/parts.mjs [app-ssr] (ecmascript) <export * as platform>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/mergeCleanups.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createAttribute$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/createAttribute.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const isMacSafari = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].os.mac && __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].engine.webkit;
+function useFocus(context, props = {}) {
+    const { enabled = true, delay } = props;
+    const store = 'rootStore' in context ? context.rootStore : context;
+    const { events, dataRef } = store.context;
+    const blockFocusRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    // Track which reference should be blocked from re-opening after Escape/press dismissal.
+    const blockedReferenceRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const keyboardModalityRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](true);
+    const timeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        const domReference = store.select('domReferenceElement');
+        if (!enabled) {
+            return undefined;
+        }
+        const win = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getWindow"])(domReference);
+        // If the reference was focused and the user left the tab/window, and the
+        // floating element was not open, the focus should be blocked when they
+        // return to the tab/window.
+        function onBlur() {
+            const currentDomReference = store.select('domReferenceElement');
+            if (!store.select('open') && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(currentDomReference) && currentDomReference === (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(currentDomReference))) {
+                blockFocusRef.current = true;
+            }
+        }
+        function onKeyDown() {
+            keyboardModalityRef.current = true;
+        }
+        function onPointerDown() {
+            keyboardModalityRef.current = false;
+        }
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeCleanups"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(win, 'blur', onBlur), isMacSafari && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(win, 'keydown', onKeyDown, true), isMacSafari && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(win, 'pointerdown', onPointerDown, true));
+    }, [
+        store,
+        enabled
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!enabled) {
+            return undefined;
+        }
+        function onOpenChangeLocal(details) {
+            if (details.reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerPress || details.reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].escapeKey) {
+                const referenceElement = store.select('domReferenceElement');
+                if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(referenceElement)) {
+                    blockedReferenceRef.current = referenceElement;
+                    blockFocusRef.current = true;
+                }
+            }
+        }
+        events.on('openchange', onOpenChangeLocal);
+        return ()=>{
+            events.off('openchange', onOpenChangeLocal);
+        };
+    }, [
+        events,
+        enabled,
+        store
+    ]);
+    const reference = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        function resetBlockedFocus() {
+            blockFocusRef.current = false;
+            blockedReferenceRef.current = null;
+        }
+        return {
+            onMouseLeave () {
+                resetBlockedFocus();
+            },
+            onFocus (event) {
+                const focusTarget = event.currentTarget;
+                if (blockFocusRef.current) {
+                    if (blockedReferenceRef.current === focusTarget) {
+                        return;
+                    }
+                    resetBlockedFocus();
+                }
+                const target = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event.nativeEvent);
+                if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(target)) {
+                    // Safari fails to match `:focus-visible` if focus was initially
+                    // outside the document.
+                    if (isMacSafari && !event.relatedTarget) {
+                        if (!keyboardModalityRef.current && !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isTypeableElement"])(target)) {
+                            return;
+                        }
+                    } else if (!(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["matchesFocusVisible"])(target)) {
+                        return;
+                    }
+                }
+                const movedFromOtherEnabledTrigger = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isTargetInsideEnabledTrigger"])(event.relatedTarget, store.context.triggerElements);
+                const { nativeEvent, currentTarget } = event;
+                const delayValue = typeof delay === 'function' ? delay() : delay;
+                if (store.select('open') && movedFromOtherEnabledTrigger || delayValue === 0 || delayValue === undefined) {
+                    store.setOpen(true, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerFocus, nativeEvent, currentTarget));
+                    return;
+                }
+                timeout.start(delayValue, ()=>{
+                    if (blockFocusRef.current) {
+                        return;
+                    }
+                    store.setOpen(true, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerFocus, nativeEvent, currentTarget));
+                });
+            },
+            onBlur (event) {
+                resetBlockedFocus();
+                const relatedTarget = event.relatedTarget;
+                const nativeEvent = event.nativeEvent;
+                // Hit the non-modal focus management portal guard. Focus will be
+                // moved into the floating element immediately after.
+                const movedToFocusGuard = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(relatedTarget) && relatedTarget.hasAttribute((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$createAttribute$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createAttribute"])('focus-guard')) && relatedTarget.getAttribute('data-type') === 'outside';
+                // Wait for the window blur listener to fire.
+                timeout.start(0, ()=>{
+                    const domReference = store.select('domReferenceElement');
+                    const activeEl = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["activeElement"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(domReference));
+                    // Focus left the page, keep it open.
+                    if (!relatedTarget && activeEl === domReference) {
+                        return;
+                    }
+                    // When focusing the reference element (e.g. regular click), then
+                    // clicking into the floating element, prevent it from hiding.
+                    // Note: it must be focusable, e.g. `tabindex="-1"`.
+                    // We can not rely on relatedTarget to point to the correct element
+                    // as it will only point to the shadow host of the newly focused element
+                    // and not the element that actually has received focus if it is located
+                    // inside a shadow root.
+                    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(dataRef.current.floatingContext?.refs.floating.current, activeEl) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(domReference, activeEl) || movedToFocusGuard) {
+                        return;
+                    }
+                    // If the next focused element is one of the triggers, do not close
+                    // the floating element. The focus handler of that trigger will
+                    // handle the open state.
+                    const nextFocusedElement = relatedTarget ?? activeEl;
+                    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isTargetInsideEnabledTrigger"])(nextFocusedElement, store.context.triggerElements)) {
+                        return;
+                    }
+                    store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerFocus, nativeEvent));
+                });
+            }
+        };
+    }, [
+        dataRef,
+        delay,
+        store,
+        timeout
+    ]);
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>enabled ? {
+            reference,
+            trigger: reference
+        } : {}, [
+        enabled,
+        reference
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverReferenceInteraction.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useHoverReferenceInteraction",
+    ()=>useHoverReferenceInteraction
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-dom.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/addEventListener.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/mergeCleanups.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useValueAsRef.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/event.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverInteractionSharedState$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverInteractionSharedState.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverShared$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverShared.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__$3c$export__isTargetInsideEnabledTrigger__as__isInsideEnabledTrigger$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/element.mjs [app-ssr] (ecmascript) <locals> <export isTargetInsideEnabledTrigger as isInsideEnabledTrigger>");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const EMPTY_REF = {
+    current: null
+};
+function useHoverReferenceInteraction(context, props = {}) {
+    const { enabled = true, delay = 0, handleClose = null, mouseOnly = false, restMs = 0, move = true, triggerElementRef = EMPTY_REF, externalTree, isActiveTrigger = true, getHandleCloseContext, isClosing, shouldOpen: shouldOpenProp } = props;
+    const store = 'rootStore' in context ? context.rootStore : context;
+    const { dataRef, events } = store.context;
+    const tree = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingTree"])(externalTree);
+    const instance = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverInteractionSharedState$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["useHoverInteractionSharedState"])(store);
+    const isHoverCloseActiveRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    const handleCloseRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(handleClose);
+    const delayRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(delay);
+    const restMsRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(restMs);
+    const enabledRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(enabled);
+    const shouldOpenRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(shouldOpenProp);
+    const isClosingRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useValueAsRef$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useValueAsRef"])(isClosing);
+    const isClickLikeOpenEvent = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverShared$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["isClickLikeOpenEvent"])(dataRef.current.openEvent?.type, instance.interactedInside);
+    });
+    const checkShouldOpen = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        return shouldOpenRef.current?.() !== false;
+    });
+    const isOverInactiveTrigger = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((currentDomReference, currentTarget, target)=>{
+        const allTriggers = store.context.triggerElements;
+        // Fast path for normal usage where handlers are attached directly to triggers.
+        if (allTriggers.hasElement(currentTarget)) {
+            return !currentDomReference || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(currentDomReference, currentTarget);
+        }
+        // Fallback for delegated/wrapper usage where currentTarget may be outside the trigger map.
+        if (!(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(target)) {
+            return false;
+        }
+        const targetElement = target;
+        return allTriggers.hasMatchingElement((trigger)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(trigger, targetElement)) && (!currentDomReference || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(currentDomReference, targetElement));
+    });
+    const cleanupMouseMoveHandler = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        if (!instance.handler) {
+            return;
+        }
+        const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(store.select('domReferenceElement'));
+        doc.removeEventListener('mousemove', instance.handler);
+        instance.handler = undefined;
+    });
+    const clearPointerEvents = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverInteractionSharedState$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["clearSafePolygonPointerEventsMutation"])(instance);
+    });
+    if (isActiveTrigger) {
+        // eslint-disable-next-line no-underscore-dangle
+        instance.handleCloseOptions = handleCloseRef.current?.__options;
+    }
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>cleanupMouseMoveHandler, [
+        cleanupMouseMoveHandler
+    ]);
+    // When closing before opening, clear the delay timeouts to cancel it
+    // from showing.
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!enabled) {
+            return undefined;
+        }
+        function onOpenChangeLocal(details) {
+            if (!details.open) {
+                isHoverCloseActiveRef.current = details.reason === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover;
+                cleanupMouseMoveHandler();
+                instance.openChangeTimeout.clear();
+                instance.restTimeout.clear();
+                instance.blockMouseMove = true;
+                instance.restTimeoutPending = false;
+            } else {
+                isHoverCloseActiveRef.current = false;
+            }
+        }
+        events.on('openchange', onOpenChangeLocal);
+        return ()=>{
+            events.off('openchange', onOpenChangeLocal);
+        };
+    }, [
+        enabled,
+        events,
+        instance,
+        cleanupMouseMoveHandler
+    ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!enabled) {
+            return undefined;
+        }
+        function closeWithDelay(event, runElseBranch = true) {
+            const closeDelay = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverShared$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["getDelay"])(delayRef.current, 'close', instance.pointerType);
+            if (closeDelay) {
+                instance.openChangeTimeout.start(closeDelay, ()=>{
+                    store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover, event));
+                    tree?.events.emit('floating.closed', event);
+                });
+            } else if (runElseBranch) {
+                instance.openChangeTimeout.clear();
+                store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover, event));
+                tree?.events.emit('floating.closed', event);
+            }
+        }
+        const trigger = triggerElementRef.current ?? (isActiveTrigger ? store.select('domReferenceElement') : null);
+        if (!(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(trigger)) {
+            return undefined;
+        }
+        function onMouseEnter(event) {
+            instance.openChangeTimeout.clear();
+            instance.blockMouseMove = false;
+            if (mouseOnly && !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isMouseLikePointerType"])(instance.pointerType)) {
+                return;
+            }
+            // Only rest delay is set; there's no fallback delay.
+            // This will be handled by `onMouseMove`.
+            const restMsValue = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverShared$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["getRestMs"])(restMsRef.current);
+            const openDelay = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverShared$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["getDelay"])(delayRef.current, 'open', instance.pointerType);
+            const eventTarget = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTarget"])(event);
+            const currentTarget = event.currentTarget ?? null;
+            const currentDomReference = store.select('domReferenceElement');
+            let triggerNode = currentTarget;
+            // Wrapper/delegated mode: resolve the actual trigger from the event target.
+            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(eventTarget) && !store.context.triggerElements.hasElement(eventTarget)) {
+                for (const triggerElement of store.context.triggerElements.elements()){
+                    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(triggerElement, eventTarget)) {
+                        triggerNode = triggerElement;
+                        break;
+                    }
+                }
+            }
+            // Wrapper/delegated mode fallback: if the wrapper contains the active trigger,
+            // treat this as re-entering that active trigger.
+            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(currentTarget) && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(currentDomReference) && !store.context.triggerElements.hasElement(currentTarget) && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(currentTarget, currentDomReference)) {
+                triggerNode = currentDomReference;
+            }
+            const isOverInactive = triggerNode == null ? false : isOverInactiveTrigger(currentDomReference, triggerNode, eventTarget);
+            const isOpen = store.select('open');
+            const isInClosingTransition = isClosingRef.current?.() ?? store.select('transitionStatus') === 'ending';
+            const isHoverCloseTransition = !isOpen && isInClosingTransition && isHoverCloseActiveRef.current;
+            const isReenteringSameTriggerDuringCloseTransition = !isOverInactive && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(triggerNode) && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElement"])(currentDomReference) && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(currentDomReference, triggerNode) && isHoverCloseTransition;
+            const isRestOnlyDelay = restMsValue > 0 && !openDelay;
+            const shouldOpenImmediately = isOverInactive && (isOpen || isHoverCloseTransition) || isReenteringSameTriggerDuringCloseTransition;
+            const shouldOpen = !isOpen || isOverInactive;
+            // Open immediately when moving between triggers while open, or during
+            // a hover-driven close transition (including same-trigger re-entry).
+            if (shouldOpenImmediately) {
+                if (checkShouldOpen()) {
+                    store.setOpen(true, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover, event, triggerNode));
+                }
+                return;
+            }
+            if (isRestOnlyDelay) {
+                return;
+            }
+            if (openDelay) {
+                instance.openChangeTimeout.start(openDelay, ()=>{
+                    if (shouldOpen && checkShouldOpen()) {
+                        store.setOpen(true, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover, event, triggerNode));
+                    }
+                });
+            } else if (shouldOpen) {
+                if (checkShouldOpen()) {
+                    store.setOpen(true, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover, event, triggerNode));
+                }
+            }
+        }
+        function onMouseLeave(event) {
+            if (isClickLikeOpenEvent()) {
+                clearPointerEvents();
+                return;
+            }
+            cleanupMouseMoveHandler();
+            const domReferenceElement = store.select('domReferenceElement');
+            const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(domReferenceElement);
+            instance.restTimeout.clear();
+            instance.restTimeoutPending = false;
+            const handleCloseContextBase = dataRef.current.floatingContext ?? getHandleCloseContext?.();
+            if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$element$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__$3c$export__isTargetInsideEnabledTrigger__as__isInsideEnabledTrigger$3e$__["isInsideEnabledTrigger"])(event.relatedTarget, store.context.triggerElements)) {
+                return;
+            }
+            if (handleCloseRef.current && handleCloseContextBase) {
+                if (!store.select('open')) {
+                    instance.openChangeTimeout.clear();
+                }
+                const currentTrigger = triggerElementRef.current;
+                instance.handler = handleCloseRef.current({
+                    ...handleCloseContextBase,
+                    tree,
+                    x: event.clientX,
+                    y: event.clientY,
+                    onClose () {
+                        clearPointerEvents();
+                        cleanupMouseMoveHandler();
+                        if (enabledRef.current && !isClickLikeOpenEvent() && currentTrigger === store.select('domReferenceElement')) {
+                            closeWithDelay(event, true);
+                        }
+                    }
+                });
+                doc.addEventListener('mousemove', instance.handler);
+                instance.handler(event);
+                return;
+            }
+            const shouldClose = instance.pointerType === 'touch' ? !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(store.select('floatingElement'), event.relatedTarget) : true;
+            if (shouldClose) {
+                closeWithDelay(event);
+            }
+        }
+        if (move) {
+            return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeCleanups"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(trigger, 'mousemove', onMouseEnter, {
+                once: true
+            }), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(trigger, 'mouseenter', onMouseEnter), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(trigger, 'mouseleave', onMouseLeave));
+        }
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$mergeCleanups$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeCleanups"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(trigger, 'mouseenter', onMouseEnter), (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$addEventListener$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["addEventListener"])(trigger, 'mouseleave', onMouseLeave));
+    }, [
+        cleanupMouseMoveHandler,
+        clearPointerEvents,
+        dataRef,
+        delayRef,
+        store,
+        enabled,
+        handleCloseRef,
+        instance,
+        isActiveTrigger,
+        isOverInactiveTrigger,
+        isClickLikeOpenEvent,
+        mouseOnly,
+        move,
+        restMsRef,
+        triggerElementRef,
+        tree,
+        enabledRef,
+        getHandleCloseContext,
+        isClosingRef,
+        checkShouldOpen
+    ]);
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        if (!enabled) {
+            return undefined;
+        }
+        function setPointerRef(event) {
+            instance.pointerType = event.pointerType;
+        }
+        return {
+            onPointerDown: setPointerRef,
+            onPointerEnter: setPointerRef,
+            onMouseMove (event) {
+                const { nativeEvent } = event;
+                const trigger = event.currentTarget;
+                const currentDomReference = store.select('domReferenceElement');
+                const currentOpen = store.select('open');
+                const isOverInactive = isOverInactiveTrigger(currentDomReference, trigger, event.target);
+                if (mouseOnly && !(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$event$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isMouseLikePointerType"])(instance.pointerType)) {
+                    return;
+                }
+                if (currentOpen && isOverInactive && instance.handleCloseOptions?.blockPointerEvents) {
+                    const floatingElement = store.select('floatingElement');
+                    if (floatingElement) {
+                        const scopeElement = instance.handleCloseOptions?.getScope?.() ?? trigger.ownerDocument.body;
+                        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverInteractionSharedState$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["applySafePolygonPointerEventsMutation"])(instance, {
+                            scopeElement,
+                            referenceElement: trigger,
+                            floatingElement
+                        });
+                    }
+                }
+                const restMsValue = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverShared$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["getRestMs"])(restMsRef.current);
+                if (currentOpen && !isOverInactive || restMsValue === 0) {
+                    return;
+                }
+                if (!isOverInactive && instance.restTimeoutPending && event.movementX ** 2 + event.movementY ** 2 < 2) {
+                    return;
+                }
+                instance.restTimeout.clear();
+                function handleMouseMove() {
+                    instance.restTimeoutPending = false;
+                    // A delayed hover open should not override a click-like open that happened
+                    // while the hover delay was pending.
+                    if (isClickLikeOpenEvent()) {
+                        return;
+                    }
+                    const latestOpen = store.select('open');
+                    if (!instance.blockMouseMove && (!latestOpen || isOverInactive) && checkShouldOpen()) {
+                        store.setOpen(true, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover, nativeEvent, trigger));
+                    }
+                }
+                if (instance.pointerType === 'touch') {
+                    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["flushSync"](()=>{
+                        handleMouseMove();
+                    });
+                } else if (isOverInactive && currentOpen) {
+                    handleMouseMove();
+                } else {
+                    instance.restTimeoutPending = true;
+                    instance.restTimeout.start(restMsValue, handleMouseMove);
+                }
+            }
+        };
+    }, [
+        enabled,
+        instance,
+        isClickLikeOpenEvent,
+        isOverInactiveTrigger,
+        mouseOnly,
+        store,
+        restMsRef,
+        checkShouldOpen
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/getPseudoElementBounds.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "getPseudoElementBounds",
+    ()=>getPseudoElementBounds
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__getWindow__as__ownerWindow$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript) <export getWindow as ownerWindow>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/platform/parts.mjs [app-ssr] (ecmascript) <export * as platform>");
+;
+;
+function getPseudoElementBounds(element) {
+    const elementRect = element.getBoundingClientRect();
+    const win = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__getWindow__as__ownerWindow$3e$__["ownerWindow"])(element);
+    // Avoid "Not implemented: window.getComputedStyle(elt, pseudoElt)" in jsdom.
+    if (__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$platform$2f$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__platform$3e$__["platform"].env.jsdom) {
+        return elementRect;
+    }
+    const beforeStyles = win.getComputedStyle(element, '::before');
+    const afterStyles = win.getComputedStyle(element, '::after');
+    const hasPseudoElements = beforeStyles.content !== 'none' || afterStyles.content !== 'none';
+    if (!hasPseudoElements) {
+        return elementRect;
+    }
+    // Get dimensions of pseudo-elements
+    const beforeWidth = parseFloat(beforeStyles.width) || 0;
+    const beforeHeight = parseFloat(beforeStyles.height) || 0;
+    const afterWidth = parseFloat(afterStyles.width) || 0;
+    const afterHeight = parseFloat(afterStyles.height) || 0;
+    // Calculate max dimensions including pseudo-elements
+    const totalWidth = Math.max(elementRect.width, beforeWidth, afterWidth);
+    const totalHeight = Math.max(elementRect.height, beforeHeight, afterHeight);
+    // Calculate the differences to extend the bounds
+    const widthDiff = totalWidth - elementRect.width;
+    const heightDiff = totalHeight - elementRect.height;
+    return {
+        left: elementRect.left - widthDiff / 2,
+        right: elementRect.right + widthDiff / 2,
+        top: elementRect.top - heightDiff / 2,
+        bottom: elementRect.bottom + heightDiff / 2
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/item/useCompositeItem.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useCompositeItem",
+    ()=>useCompositeItem
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useMergedRefs.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$root$2f$CompositeRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/root/CompositeRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/useCompositeListItem.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+function useCompositeItem(params = {}) {
+    const { highlightItemOnHover, highlightedIndex, onHighlightedIndexChange } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$root$2f$CompositeRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeRootContext"])();
+    const { ref, index } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeListItem"])(params);
+    const isHighlighted = highlightedIndex === index;
+    const itemRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const mergedRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useMergedRefs$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMergedRefs"])(ref, itemRef);
+    const compositeProps = {
+        tabIndex: isHighlighted ? 0 : -1,
+        onFocus () {
+            onHighlightedIndexChange(index);
+        },
+        onMouseMove () {
+            const item = itemRef.current;
+            if (!highlightItemOnHover || !item) {
+                return;
+            }
+            const disabled = item.hasAttribute('disabled') || item.ariaDisabled === 'true';
+            if (!isHighlighted && !disabled) {
+                item.focus();
+            }
+        }
+    };
+    return {
+        compositeProps,
+        compositeRef: mergedRef,
+        index
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/item/CompositeItem.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "CompositeItem",
+    ()=>CompositeItem
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$item$2f$useCompositeItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/item/useCompositeItem.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+function CompositeItem(componentProps) {
+    const { render, className, style, state = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"], props = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_ARRAY"], refs = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_ARRAY"], metadata, stateAttributesMapping, tag = 'div', ...elementProps } = componentProps;
+    const { compositeProps, compositeRef } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$item$2f$useCompositeItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeItem"])({
+        metadata
+    });
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])(tag, componentProps, {
+        state,
+        ref: [
+            ...refs,
+            compositeRef
+        ],
+        props: [
+            compositeProps,
+            ...props,
+            elementProps
+        ],
+        stateAttributesMapping
+    });
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/utils/findRootOwnerId.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "findRootOwnerId",
+    ()=>findRootOwnerId
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+;
+function findRootOwnerId(node) {
+    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(node) && node.hasAttribute('data-rootownerid')) {
+        return node.getAttribute('data-rootownerid') ?? undefined;
+    }
+    if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isLastTraversableNode"])(node)) {
+        return undefined;
+    }
+    return findRootOwnerId((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getParentNode"])(node));
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/useTriggerFocusGuards.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useTriggerFocusGuards",
+    ()=>useTriggerFocusGuards
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-dom.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/utils/tabbable.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+'use client';
+;
+;
+;
+;
+;
+function useTriggerFocusGuards(store, triggerElementRef) {
+    const preFocusGuardRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    function handlePreFocusGuardFocus(event) {
+        __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["flushSync"](()=>{
+            store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].focusOut, event.nativeEvent, event.currentTarget));
+        });
+        const previousTabbable = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTabbableBeforeElement"])(preFocusGuardRef.current);
+        previousTabbable?.focus();
+    }
+    function handleFocusTargetFocus(event) {
+        const positionerElement = store.select('positionerElement');
+        if (positionerElement && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isOutsideEvent"])(event, positionerElement)) {
+            store.context.beforeContentFocusGuardRef.current?.focus();
+        } else {
+            __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["flushSync"](()=>{
+                store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].focusOut, event.nativeEvent, event.currentTarget));
+            });
+            let nextTabbable = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getTabbableAfterElement"])(store.context.triggerFocusTargetRef.current || triggerElementRef.current);
+            while(nextTabbable !== null && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(positionerElement, nextTabbable)){
+                const prevTabbable = nextTabbable;
+                nextTabbable = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$utils$2f$tabbable$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getNextTabbable"])(nextTabbable);
+                if (nextTabbable === prevTabbable) {
+                    break;
+                }
+            }
+            nextTabbable?.focus();
+        }
+    }
+    return {
+        preFocusGuardRef,
+        handlePreFocusGuardFocus,
+        handleFocusTargetFocus
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/useMixedToggleClickHandler.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useMixedToggleClickHandler",
+    ()=>useMixedToggleClickHandler
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+function useMixedToggleClickHandler(params) {
+    const { enabled = true, mouseDownAction, open } = params;
+    const ignoreClickRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        if (!enabled) {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+        }
+        return {
+            onMouseDown: (event)=>{
+                if (mouseDownAction === 'open' && !open || mouseDownAction === 'close' && open) {
+                    ignoreClickRef.current = true;
+                    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(event.currentTarget).addEventListener('click', ()=>{
+                        ignoreClickRef.current = false;
+                    }, {
+                        once: true
+                    });
+                }
+            },
+            onClick: (event)=>{
+                if (ignoreClickRef.current) {
+                    ignoreClickRef.current = false;
+                    event.preventBaseUIHandler();
+                }
+            }
+        };
+    }, [
+        enabled,
+        mouseDownAction,
+        open
+    ]);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/trigger/MenuTrigger.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuTrigger",
+    ()=>MenuTrigger
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useTimeout.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$fastHooks$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/fastHooks.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$safePolygon$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/safePolygon.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useClick$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useClick.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTree.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useFocus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useFocus.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverReferenceInteraction$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverReferenceInteraction.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTreeStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/components/FloatingTreeStore.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/shadowDom.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popupStateMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$use$2d$button$2f$useButton$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/use-button/useButton.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$getPseudoElementBounds$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/getPseudoElementBounds.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$item$2f$CompositeItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/item/CompositeItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$root$2f$CompositeRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/root/CompositeRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$utils$2f$findRootOwnerId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/utils/findRootOwnerId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/popupStoreUtils.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$useTriggerFocusGuards$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/useTriggerFocusGuards.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useBaseUiId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/reason-parts.mjs [app-ssr] (ecmascript) <export * as REASONS>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$useMixedToggleClickHandler$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/useMixedToggleClickHandler.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$context$2d$menu$2f$root$2f$ContextMenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/context-menu/root/ContextMenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menubar$2f$MenubarContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menubar/MenubarContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/constants.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$FocusGuard$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/FocusGuard.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/merge-props/mergeProps.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const BOUNDARY_OFFSET = 2;
+const MenuTrigger = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$fastHooks$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["fastComponentRef"])(function MenuTrigger(componentProps, forwardedRef) {
+    const { render, className, style, disabled: disabledProp = false, nativeButton = true, id: idProp, openOnHover: openOnHoverProp, delay = 100, closeDelay = 0, handle, payload, ...elementProps } = componentProps;
+    const rootContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])(true);
+    const store = handle?.store ?? rootContext?.store;
+    if (!store) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: <Menu.Trigger> must be either used within a <Menu.Root> component or provided with a handle.' : "TURBOPACK unreachable");
+    }
+    const thisTriggerId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useBaseUiId"])(idProp);
+    const isTriggerActive = store.useState('isTriggerActive', thisTriggerId);
+    const floatingRootContext = store.useState('floatingRootContext');
+    const isOpenedByThisTrigger = store.useState('isOpenedByTrigger', thisTriggerId);
+    const popupId = store.useState('triggerPopupId', thisTriggerId);
+    const triggerElementRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const parent = useMenuParent();
+    const compositeRootContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$root$2f$CompositeRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeRootContext"])(true);
+    const floatingTreeRootFromContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingTree"])();
+    const floatingTreeRoot = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        return floatingTreeRootFromContext ?? new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTreeStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FloatingTreeStore"]();
+    }, [
+        floatingTreeRootFromContext
+    ]);
+    const floatingNodeId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingNodeId"])(floatingTreeRoot);
+    const floatingParentNodeId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$components$2f$FloatingTree$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFloatingParentNodeId"])();
+    const { registerTrigger, isMountedByThisTrigger } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTriggerDataForwarding"])(thisTriggerId, triggerElementRef, store, {
+        payload,
+        closeDelay,
+        parent,
+        floatingTreeRoot,
+        floatingNodeId,
+        floatingParentNodeId,
+        keyboardEventRelay: compositeRootContext?.relayKeyboardEvent
+    });
+    const isInMenubar = parent.type === 'menubar';
+    const rootDisabled = store.useState('disabled');
+    const disabled = disabledProp || rootDisabled || isInMenubar && parent.context.disabled;
+    const { getButtonProps, buttonRef } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$use$2d$button$2f$useButton$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useButton"])({
+        disabled,
+        native: nativeButton
+    });
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (!isOpenedByThisTrigger && parent.type === undefined) {
+            store.context.allowMouseUpTriggerRef.current = false;
+        }
+    }, [
+        store,
+        isOpenedByThisTrigger,
+        parent.type
+    ]);
+    const triggerRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const allowMouseUpTriggerTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const handleDocumentMouseUp = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((mouseEvent)=>{
+        if (!triggerRef.current) {
+            return;
+        }
+        allowMouseUpTriggerTimeout.clear();
+        store.context.allowMouseUpTriggerRef.current = false;
+        const mouseUpTarget = mouseEvent.target;
+        if ((0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(triggerRef.current, mouseUpTarget) || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$shadowDom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["contains"])(store.select('positionerElement'), mouseUpTarget) || mouseUpTarget === triggerRef.current) {
+            return;
+        }
+        if (mouseUpTarget != null && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$utils$2f$findRootOwnerId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["findRootOwnerId"])(mouseUpTarget) === store.select('rootId')) {
+            return;
+        }
+        const bounds = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$getPseudoElementBounds$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getPseudoElementBounds"])(triggerRef.current);
+        if (mouseEvent.clientX >= bounds.left - BOUNDARY_OFFSET && mouseEvent.clientX <= bounds.right + BOUNDARY_OFFSET && mouseEvent.clientY >= bounds.top - BOUNDARY_OFFSET && mouseEvent.clientY <= bounds.bottom + BOUNDARY_OFFSET) {
+            return;
+        }
+        floatingTreeRoot.events.emit('close', {
+            domEvent: mouseEvent,
+            reason: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].cancelOpen
+        });
+    });
+    __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"](()=>{
+        if (isOpenedByThisTrigger && store.select('lastOpenChangeReason') === __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$reason$2d$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$2a$__as__REASONS$3e$__["REASONS"].triggerHover) {
+            const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(triggerRef.current);
+            doc.addEventListener('mouseup', handleDocumentMouseUp, {
+                once: true
+            });
+        }
+    }, [
+        isOpenedByThisTrigger,
+        handleDocumentMouseUp,
+        store
+    ]);
+    const parentMenubarHasSubmenuOpen = isInMenubar && parent.context.hasSubmenuOpen;
+    const openOnHover = openOnHoverProp ?? parentMenubarHasSubmenuOpen;
+    const hoverProps = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverReferenceInteraction$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useHoverReferenceInteraction"])(floatingRootContext, {
+        enabled: openOnHover && !disabled && parent.type !== 'context-menu' && (!isInMenubar || parentMenubarHasSubmenuOpen && !isMountedByThisTrigger),
+        handleClose: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$safePolygon$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["safePolygon"])({
+            blockPointerEvents: !isInMenubar
+        }),
+        mouseOnly: true,
+        move: false,
+        restMs: parent.type === undefined ? delay : undefined,
+        delay: {
+            close: closeDelay
+        },
+        triggerElementRef,
+        externalTree: floatingTreeRoot,
+        isActiveTrigger: isTriggerActive,
+        isClosing: ()=>store.select('transitionStatus') === 'ending'
+    });
+    // Whether to ignore clicks to open the menu.
+    // `lastOpenChangeReason` doesn't need to be reactive here, as we need to run this
+    // only when `isOpenedByThisTrigger` changes.
+    const stickIfOpen = useStickIfOpen(isOpenedByThisTrigger, store.select('lastOpenChangeReason'));
+    const click = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useClick$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useClick"])(floatingRootContext, {
+        enabled: !disabled && parent.type !== 'context-menu',
+        event: isOpenedByThisTrigger && isInMenubar ? 'click' : 'mousedown',
+        toggle: true,
+        ignoreMouse: false,
+        stickIfOpen: parent.type === undefined ? stickIfOpen : false
+    });
+    const focus = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useFocus$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFocus"])(floatingRootContext, {
+        enabled: !disabled && parentMenubarHasSubmenuOpen
+    });
+    const mixedToggleHandlers = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$useMixedToggleClickHandler$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMixedToggleClickHandler"])({
+        open: isOpenedByThisTrigger,
+        enabled: isInMenubar,
+        mouseDownAction: 'open'
+    });
+    const localInteractionProps = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$merge$2d$props$2f$mergeProps$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["mergeProps"])(focus.reference, click.reference), [
+        focus.reference,
+        click.reference
+    ]);
+    const rootTriggerProps = store.useState('triggerProps', isMountedByThisTrigger);
+    const { preFocusGuardRef, handlePreFocusGuardFocus, handleFocusTargetFocus } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$useTriggerFocusGuards$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTriggerFocusGuards"])(store, triggerElementRef);
+    const state = {
+        disabled,
+        open: isOpenedByThisTrigger
+    };
+    const ref = [
+        triggerRef,
+        forwardedRef,
+        buttonRef,
+        registerTrigger,
+        triggerElementRef
+    ];
+    const props = [
+        localInteractionProps,
+        hoverProps ?? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"],
+        rootTriggerProps,
+        {
+            'aria-haspopup': 'menu',
+            'aria-controls': popupId,
+            id: thisTriggerId,
+            onMouseDown: (event)=>{
+                if (store.select('open')) {
+                    return;
+                }
+                // mousedown -> mouseup on menu item should not trigger it within 200ms.
+                allowMouseUpTriggerTimeout.start(200, ()=>{
+                    store.context.allowMouseUpTriggerRef.current = true;
+                });
+                const doc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(event.currentTarget);
+                doc.addEventListener('mouseup', handleDocumentMouseUp, {
+                    once: true
+                });
+            }
+        },
+        isInMenubar ? {
+            role: 'menuitem'
+        } : {},
+        mixedToggleHandlers,
+        elementProps,
+        getButtonProps
+    ];
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('button', componentProps, {
+        enabled: !isInMenubar,
+        stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["pressableTriggerOpenStateMapping"],
+        state,
+        ref,
+        props
+    });
+    if (isInMenubar) {
+        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$item$2f$CompositeItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CompositeItem"], {
+            tag: "button",
+            render: render,
+            className: className,
+            style: style,
+            state: state,
+            refs: ref,
+            props: props,
+            stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["pressableTriggerOpenStateMapping"]
+        });
+    }
+    // A fragment with key is required to ensure that the `element` is mounted to the same DOM node
+    // regardless of whether the focus guards are rendered or not.
+    if (isOpenedByThisTrigger) {
+        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxs"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
+            children: [
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$FocusGuard$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FocusGuard"], {
+                    ref: preFocusGuardRef,
+                    onFocus: handlePreFocusGuardFocus
+                }, `${thisTriggerId}-pre-focus-guard`),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
+                    children: element
+                }, thisTriggerId),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$FocusGuard$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FocusGuard"], {
+                    ref: store.context.triggerFocusTargetRef,
+                    onFocus: handleFocusTargetFocus
+                }, `${thisTriggerId}-post-focus-guard`)
+            ]
+        });
+    }
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
+        children: element
+    }, thisTriggerId);
+});
+if ("TURBOPACK compile-time truthy", 1) MenuTrigger.displayName = "MenuTrigger";
+/**
+ * Determines whether to ignore clicks after a hover-open.
+ */ function useStickIfOpen(open, openReason) {
+    const stickIfOpenTimeout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useTimeout$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTimeout"])();
+    const [stickIfOpen, setStickIfOpen] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](false);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (open && openReason === 'trigger-hover') {
+            // Only allow "patient" clicks to close the menu if it's open.
+            // If they clicked within 500ms of the menu opening, keep it open.
+            setStickIfOpen(true);
+            stickIfOpenTimeout.start(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$constants$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["PATIENT_CLICK_THRESHOLD"], ()=>{
+                setStickIfOpen(false);
+            });
+        } else if (!open) {
+            stickIfOpenTimeout.clear();
+            setStickIfOpen(false);
+        }
+    }, [
+        open,
+        openReason,
+        stickIfOpenTimeout
+    ]);
+    return stickIfOpen;
+}
+function useMenuParent() {
+    const contextMenuContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$context$2d$menu$2f$root$2f$ContextMenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContextMenuRootContext"])(true);
+    const parentContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])(true);
+    const menubarContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menubar$2f$MenubarContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenubarContext"])(true);
+    const parent = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        if (menubarContext) {
+            return {
+                type: 'menubar',
+                context: menubarContext
+            };
+        }
+        // Ensure this is not a Menu nested inside ContextMenu.Trigger.
+        // ContextMenu parentContext is always undefined as ContextMenu.Root is instantiated with
+        // <MenuRootContext.Provider value={undefined}>
+        if (contextMenuContext && !parentContext) {
+            return {
+                type: 'context-menu',
+                context: contextMenuContext
+            };
+        }
+        return {
+            type: undefined
+        };
+    }, [
+        contextMenuContext,
+        parentContext,
+        menubarContext
+    ]);
+    return parent;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/getCssDimensions.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "getCssDimensions",
+    ()=>getCssDimensions
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs [app-ssr] (ecmascript)");
+;
+;
+function getCssDimensions(element) {
+    const css = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getComputedStyle"])(element);
+    // In testing environments, the `width` and `height` properties are empty
+    // strings for SVG elements, returning NaN. Fallback to `0` in this case.
+    let width = parseFloat(css.width) || 0;
+    let height = parseFloat(css.height) || 0;
+    const hasOffset = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$dom$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isHTMLElement"])(element);
+    const offsetWidth = hasOffset ? element.offsetWidth : width;
+    const offsetHeight = hasOffset ? element.offsetHeight : height;
+    const shouldFallback = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["round"])(width) !== offsetWidth || (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$floating$2d$ui$2f$utils$2f$dist$2f$floating$2d$ui$2e$utils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["round"])(height) !== offsetHeight;
+    if (shouldFallback) {
+        width = offsetWidth;
+        height = offsetHeight;
+    }
+    return {
+        width,
+        height
+    };
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/usePopupAutoResize.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "usePopupAutoResize",
+    ()=>usePopupAutoResize
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useAnimationFrame.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useAnimationsFinished$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useAnimationsFinished.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$getCssDimensions$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/getCssDimensions.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+function usePopupAutoResize(parameters) {
+    const { popupElement, positionerElement, content, mounted, onMeasureLayout: onMeasureLayoutParam, onMeasureLayoutComplete: onMeasureLayoutCompleteParam, side, direction } = parameters;
+    const runOnceAnimationsFinish = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useAnimationsFinished$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationsFinished"])(popupElement, true, false);
+    const animationFrame = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationFrame"])();
+    const committedDimensionsRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const isInitialRenderRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](true);
+    const restoreAnchoringStylesRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["NOOP"]);
+    const onMeasureLayout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(onMeasureLayoutParam);
+    const onMeasureLayoutComplete = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(onMeasureLayoutCompleteParam);
+    const anchoringStyles = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>{
+        // Ensure popup size transitions correctly when anchored to `bottom` (side=top) or `right` (side=left).
+        let isOriginSide = side === 'top';
+        let isPhysicalLeft = side === 'left';
+        if (direction === 'rtl') {
+            isOriginSide = isOriginSide || side === 'inline-end';
+            isPhysicalLeft = isPhysicalLeft || side === 'inline-end';
+        } else {
+            isOriginSide = isOriginSide || side === 'inline-start';
+            isPhysicalLeft = isPhysicalLeft || side === 'inline-start';
+        }
+        return isOriginSide ? {
+            position: 'absolute',
+            [side === 'top' ? 'bottom' : 'top']: '0',
+            [isPhysicalLeft ? 'right' : 'left']: '0'
+        } : __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+    }, [
+        side,
+        direction
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        // Reset the state when the popup is closed.
+        if (!mounted) {
+            restoreAnchoringStylesRef.current = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["NOOP"];
+            isInitialRenderRef.current = true;
+            committedDimensionsRef.current = null;
+            return undefined;
+        }
+        if (!popupElement || !positionerElement) {
+            return undefined;
+        }
+        restoreAnchoringStylesRef.current = applyElementStyles(popupElement, anchoringStyles);
+        // Measure the rendered size to enable transitions:
+        setPopupCssSize(popupElement, 'auto');
+        const restorePopupPosition = overrideElementStyle(popupElement, 'position', 'static');
+        const restorePopupTransform = overrideElementStyle(popupElement, 'transform', 'none');
+        const restorePopupScale = overrideElementStyle(popupElement, 'scale', '1');
+        const restorePositionerAvailableSize = applyElementStyles(positionerElement, {
+            '--available-width': 'max-content',
+            '--available-height': 'max-content'
+        });
+        function restoreMeasurementOverrides() {
+            restorePopupPosition();
+            restorePopupTransform();
+            restorePositionerAvailableSize();
+        }
+        function restoreMeasurementOverridesIncludingScale() {
+            restoreMeasurementOverrides();
+            restorePopupScale();
+        }
+        onMeasureLayout?.();
+        // Initial render (for each time the popup opens).
+        if (isInitialRenderRef.current || committedDimensionsRef.current === null) {
+            setPositionerCssSize(positionerElement, 'max-content');
+            const dimensions = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$getCssDimensions$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getCssDimensions"])(popupElement);
+            committedDimensionsRef.current = dimensions;
+            setPositionerCssSize(positionerElement, dimensions);
+            restoreMeasurementOverridesIncludingScale();
+            onMeasureLayoutComplete?.(null, dimensions);
+            isInitialRenderRef.current = false;
+            return ()=>{
+                restoreAnchoringStylesRef.current();
+                restoreAnchoringStylesRef.current = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["NOOP"];
+            };
+        }
+        // Subsequent renders while open (when `content` changes).
+        setPositionerCssSize(positionerElement, 'max-content');
+        const previousDimensions = committedDimensionsRef.current;
+        const newDimensions = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$getCssDimensions$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getCssDimensions"])(popupElement);
+        // Commit immediately so future content changes have a stable previous size.
+        committedDimensionsRef.current = newDimensions;
+        setPopupCssSize(popupElement, previousDimensions);
+        restoreMeasurementOverridesIncludingScale();
+        onMeasureLayoutComplete?.(previousDimensions, newDimensions);
+        setPositionerCssSize(positionerElement, newDimensions);
+        const abortController = new AbortController();
+        animationFrame.request(()=>{
+            setPopupCssSize(popupElement, newDimensions);
+            runOnceAnimationsFinish(()=>{
+                popupElement.style.setProperty('--popup-width', 'auto');
+                popupElement.style.setProperty('--popup-height', 'auto');
+            }, abortController.signal);
+        });
+        return ()=>{
+            abortController.abort();
+            animationFrame.cancel();
+            restoreAnchoringStylesRef.current();
+            restoreAnchoringStylesRef.current = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["NOOP"];
+        };
+    }, [
+        content,
+        popupElement,
+        positionerElement,
+        runOnceAnimationsFinish,
+        animationFrame,
+        mounted,
+        onMeasureLayout,
+        onMeasureLayoutComplete,
+        anchoringStyles
+    ]);
+}
+function overrideElementStyle(element, property, value) {
+    const originalValue = element.style.getPropertyValue(property);
+    element.style.setProperty(property, value);
+    return ()=>{
+        element.style.setProperty(property, originalValue);
+    };
+}
+function applyElementStyles(element, styles) {
+    const restorers = [];
+    for (const [key, value] of Object.entries(styles)){
+        restorers.push(overrideElementStyle(element, key, value));
+    }
+    return restorers.length ? ()=>{
+        restorers.forEach((restore)=>restore());
+    } : __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["NOOP"];
+}
+function setPopupCssSize(popupElement, size) {
+    const width = size === 'auto' ? 'auto' : `${size.width}px`;
+    const height = size === 'auto' ? 'auto' : `${size.height}px`;
+    popupElement.style.setProperty('--popup-width', width);
+    popupElement.style.setProperty('--popup-height', height);
+}
+function setPositionerCssSize(positionerElement, size) {
+    const width = size === 'max-content' ? 'max-content' : `${size.width}px`;
+    const height = size === 'max-content' ? 'max-content' : `${size.height}px`;
+    positionerElement.style.setProperty('--positioner-width', width);
+    positionerElement.style.setProperty('--positioner-height', height);
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/utils/usePopupViewport.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "usePopupViewport",
+    ()=>usePopupViewport
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-dom.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$inertValue$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/inertValue.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useAnimationFrame.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$usePreviousValue$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/usePreviousValue.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useStableCallback.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/owner.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useAnimationsFinished$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useAnimationsFinished.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$usePopupAutoResize$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/usePopupAutoResize.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$direction$2d$context$2f$DirectionContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/direction-context/DirectionContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-runtime.js [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+function usePopupViewport(parameters) {
+    const { store, side, cssVars, children } = parameters;
+    const direction = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$direction$2d$context$2f$DirectionContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useDirection"])();
+    const activeTrigger = store.useState('activeTriggerElement');
+    const activeTriggerId = store.useState('activeTriggerId');
+    const open = store.useState('open');
+    const payload = store.useState('payload');
+    const mounted = store.useState('mounted');
+    const popupElement = store.useState('popupElement');
+    const positionerElement = store.useState('positionerElement');
+    const previousActiveTrigger = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$usePreviousValue$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["usePreviousValue"])(open ? activeTrigger : null);
+    // Remount current content on trigger changes (and once more when payload lags) to avoid DOM reuse flashes.
+    // The key bumps immediately on trigger switches, then again if the payload arrives on a later render.
+    const currentContentKey = usePopupContentKey(activeTriggerId, payload);
+    const capturedNodeRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const [previousContentNode, setPreviousContentNode] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
+    const [newTriggerOffset, setNewTriggerOffset] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
+    const currentContainerRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const previousContainerRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const onAnimationsFinished = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useAnimationsFinished$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationsFinished"])(currentContainerRef, true, false);
+    const cleanupFrame = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useAnimationFrame$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAnimationFrame"])();
+    const [previousContentDimensions, setPreviousContentDimensions] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
+    const [showStartingStyleAttribute, setShowStartingStyleAttribute] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](false);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        store.set('hasViewport', true);
+        return ()=>{
+            store.set('hasViewport', false);
+        };
+    }, [
+        store
+    ]);
+    const handleMeasureLayout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])(()=>{
+        currentContainerRef.current?.style.setProperty('animation', 'none');
+        currentContainerRef.current?.style.setProperty('transition', 'none');
+        previousContainerRef.current?.style.setProperty('display', 'none');
+    });
+    const handleMeasureLayoutComplete = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useStableCallback$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useStableCallback"])((previousDimensions)=>{
+        currentContainerRef.current?.style.removeProperty('animation');
+        currentContainerRef.current?.style.removeProperty('transition');
+        previousContainerRef.current?.style.removeProperty('display');
+        if (previousDimensions) {
+            setPreviousContentDimensions(previousDimensions);
+        }
+    });
+    const lastHandledTriggerRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        if (!open || !mounted) {
+            lastHandledTriggerRef.current = null;
+        }
+    }, [
+        open,
+        mounted
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        // When a trigger changes, set the captured children HTML to state,
+        // so we can render both new and old content.
+        if (activeTrigger && previousActiveTrigger && activeTrigger !== previousActiveTrigger && lastHandledTriggerRef.current !== activeTrigger && capturedNodeRef.current) {
+            setPreviousContentNode(capturedNodeRef.current);
+            setShowStartingStyleAttribute(true);
+            // Calculate the relative position between the previous and new trigger,
+            // so we can pass it to the style hook for animation purposes.
+            const offset = calculateRelativePosition(previousActiveTrigger, activeTrigger);
+            setNewTriggerOffset(offset);
+            cleanupFrame.request(()=>{
+                __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$dom$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["flushSync"](()=>{
+                    setShowStartingStyleAttribute(false);
+                });
+                onAnimationsFinished(()=>{
+                    setPreviousContentNode(null);
+                    setPreviousContentDimensions(null);
+                    capturedNodeRef.current = null;
+                });
+            });
+            lastHandledTriggerRef.current = activeTrigger;
+        }
+    }, [
+        activeTrigger,
+        previousActiveTrigger,
+        previousContentNode,
+        onAnimationsFinished,
+        cleanupFrame
+    ]);
+    // Capture a clone of the current content DOM subtree when not transitioning.
+    // We can't store previous React nodes as they may be stateful; instead we capture DOM clones for visual continuity.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        // When a transition is in progress, we store the next content in capturedNodeRef.
+        // This handles the case where the trigger changes multiple times before the transition finishes.
+        // We want to always capture the latest content for the previous snapshot.
+        // So clicking quickly on T1, T2, T3 will result in the following sequence:
+        // 1. T1 -> T2: previousContent = T1, currentContent = T2
+        // 2. T2 -> T3: previousContent = T2, currentContent = T3
+        const source = currentContainerRef.current;
+        if (!source) {
+            return;
+        }
+        const wrapper = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$owner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["ownerDocument"])(source).createElement('div');
+        for (const child of Array.from(source.childNodes)){
+            wrapper.appendChild(child.cloneNode(true));
+        }
+        capturedNodeRef.current = wrapper;
+    });
+    const isTransitioning = previousContentNode != null;
+    let childrenToRender;
+    if (!isTransitioning) {
+        childrenToRender = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])("div", {
+            "data-current": true,
+            ref: currentContainerRef,
+            children: children
+        }, currentContentKey);
+    } else {
+        childrenToRender = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxs"])(__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
+            children: [
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])("div", {
+                    "data-previous": true,
+                    inert: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$inertValue$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["inertValue"])(true),
+                    ref: previousContainerRef,
+                    style: {
+                        ...previousContentDimensions ? {
+                            [cssVars.popupWidth]: `${previousContentDimensions.width}px`,
+                            [cssVars.popupHeight]: `${previousContentDimensions.height}px`
+                        } : null,
+                        position: 'absolute'
+                    },
+                    "data-ending-style": showStartingStyleAttribute ? undefined : ''
+                }, "previous"),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsx"])("div", {
+                    "data-current": true,
+                    ref: currentContainerRef,
+                    "data-starting-style": showStartingStyleAttribute ? '' : undefined,
+                    children: children
+                }, currentContentKey)
+            ]
+        });
+    }
+    // When previousContentNode is present, imperatively populate the previous container with the cloned children.
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        const container = previousContainerRef.current;
+        if (!container || !previousContentNode) {
+            return;
+        }
+        container.replaceChildren(...Array.from(previousContentNode.childNodes));
+    }, [
+        previousContentNode
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$usePopupAutoResize$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["usePopupAutoResize"])({
+        popupElement,
+        positionerElement,
+        mounted,
+        content: payload,
+        onMeasureLayout: handleMeasureLayout,
+        onMeasureLayoutComplete: handleMeasureLayoutComplete,
+        side,
+        direction
+    });
+    const state = {
+        activationDirection: getActivationDirection(newTriggerOffset),
+        transitioning: isTransitioning
+    };
+    return {
+        children: childrenToRender,
+        state
+    };
+}
+/**
+ * Returns a string describing the provided offset.
+ * It describes both the horizontal and vertical offset, separated by a space.
+ *
+ * @param offset
+ */ function getActivationDirection(offset) {
+    if (!offset) {
+        return undefined;
+    }
+    return `${getValueWithTolerance(offset.horizontal, 5, 'right', 'left')} ${getValueWithTolerance(offset.vertical, 5, 'down', 'up')}`;
+}
+/**
+ * Returns a label describing the value (positive/negative) treating values
+ * within tolerance as zero.
+ *
+ * @param value Value to check
+ * @param tolerance Tolerance to treat the value as zero.
+ * @param positiveLabel
+ * @param negativeLabel
+ * @returns If 0 < abs(value) < tolerance, returns an empty string. Otherwise returns positiveLabel or negativeLabel.
+ */ function getValueWithTolerance(value, tolerance, positiveLabel, negativeLabel) {
+    if (value > tolerance) {
+        return positiveLabel;
+    }
+    if (value < -tolerance) {
+        return negativeLabel;
+    }
+    return '';
+}
+/**
+ * Calculates the relative position between centers of two elements.
+ */ function calculateRelativePosition(from, to) {
+    const fromRect = from.getBoundingClientRect();
+    const toRect = to.getBoundingClientRect();
+    const fromCenter = {
+        x: fromRect.left + fromRect.width / 2,
+        y: fromRect.top + fromRect.height / 2
+    };
+    const toCenter = {
+        x: toRect.left + toRect.width / 2,
+        y: toRect.top + toRect.height / 2
+    };
+    return {
+        horizontal: toCenter.x - fromCenter.x,
+        vertical: toCenter.y - fromCenter.y
+    };
+}
+/**
+ * Returns a key that forces remounting content when triggers change or a payload is updated.
+ */ function usePopupContentKey(activeTriggerId, payload) {
+    const [contentKey, setContentKey] = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](0);
+    const previousActiveTriggerIdRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](activeTriggerId);
+    const previousPayloadRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](payload);
+    const pendingPayloadUpdateRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](false);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+        // Compare against the last committed values to decide whether we need a new DOM subtree.
+        const previousActiveTriggerId = previousActiveTriggerIdRef.current;
+        const previousPayload = previousPayloadRef.current;
+        const triggerIdChanged = activeTriggerId !== previousActiveTriggerId;
+        const payloadChanged = payload !== previousPayload;
+        if (triggerIdChanged) {
+            // Remount immediately on trigger change; remember if payload hasn't caught up yet.
+            setContentKey((value)=>value + 1);
+            pendingPayloadUpdateRef.current = !payloadChanged;
+        } else if (pendingPayloadUpdateRef.current && payloadChanged) {
+            // Payload arrived a render later, so remount once more to avoid reusing the old <img>.
+            setContentKey((value)=>value + 1);
+            pendingPayloadUpdateRef.current = false;
+        }
+        // Persist current values for the next render's comparison.
+        previousActiveTriggerIdRef.current = activeTriggerId;
+        previousPayloadRef.current = payload;
+    }, [
+        activeTriggerId,
+        payload
+    ]);
+    return `${activeTriggerId ?? 'current'}-${contentKey}`;
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/viewport/MenuViewportCssVars.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuViewportCssVars",
+    ()=>MenuViewportCssVars
+]);
+let MenuViewportCssVars = /*#__PURE__*/ function(MenuViewportCssVars) {
+    /**
+   * The width of the parent popup.
+   * This variable is placed on the 'previous' container and stores the width of the popup when the previous content was rendered.
+   * It can be used to freeze the dimensions of the popup when animating between different content.
+   */ MenuViewportCssVars["popupWidth"] = "--popup-width";
+    /**
+   * The height of the parent popup.
+   * This variable is placed on the 'previous' container and stores the height of the popup when the previous content was rendered.
+   * It can be used to freeze the dimensions of the popup when animating between different content.
+   */ MenuViewportCssVars["popupHeight"] = "--popup-height";
+    return MenuViewportCssVars;
+}({});
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/viewport/MenuViewport.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuViewport",
+    ()=>MenuViewport
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositionerContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$usePopupViewport$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/usePopupViewport.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$viewport$2f$MenuViewportCssVars$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/viewport/MenuViewportCssVars.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+const stateAttributesMapping = {
+    activationDirection: (value)=>value ? {
+            'data-activation-direction': value
+        } : null
+};
+const MenuViewport = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuViewport(componentProps, forwardedRef) {
+    const { render, className, style, children, ...elementProps } = componentProps;
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const { side } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuPositionerContext"])();
+    const instantType = store.useState('instantType');
+    const { children: childrenToRender, state: viewportState } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$usePopupViewport$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["usePopupViewport"])({
+        store,
+        side,
+        cssVars: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$viewport$2f$MenuViewportCssVars$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuViewportCssVars"],
+        children
+    });
+    const state = {
+        activationDirection: viewportState.activationDirection,
+        transitioning: viewportState.transitioning,
+        instant: instantType
+    };
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        state,
+        ref: forwardedRef,
+        props: [
+            elementProps,
+            {
+                children: childrenToRender
+            }
+        ],
+        stateAttributesMapping
+    });
+});
+if ("TURBOPACK compile-time truthy", 1) MenuViewport.displayName = "MenuViewport";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/separator/Separator.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "Separator",
+    ()=>Separator
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+const Separator = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function SeparatorComponent(componentProps, forwardedRef) {
+    const { className, render, orientation = 'horizontal', style, ...elementProps } = componentProps;
+    const state = {
+        orientation
+    };
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        state,
+        ref: forwardedRef,
+        props: [
+            {
+                role: 'separator',
+                'aria-orientation': orientation
+            },
+            elementProps
+        ]
+    });
+    return element;
+});
+if ("TURBOPACK compile-time truthy", 1) Separator.displayName = "Separator";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/submenu-trigger/MenuSubmenuTrigger.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuSubmenuTrigger",
+    ()=>MenuSubmenuTrigger
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$isElementDisabled$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/isElementDisabled.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$warn$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/warn.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$safeReact$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/safeReact.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/utils/empty.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$safePolygon$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/safePolygon.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useClick$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useClick.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverReferenceInteraction$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/floating-ui-react/hooks/useHoverReferenceInteraction.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRootContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useBaseUiId.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popupStateMapping.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/composite/list/useCompositeListItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/item/useMenuItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/useRenderElement.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositionerContext.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/utils/popups/popupStoreUtils.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$submenu$2d$root$2f$MenuSubmenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/submenu-root/MenuSubmenuRootContext.mjs [app-ssr] (ecmascript)");
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const MenuSubmenuTrigger = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["forwardRef"](function MenuSubmenuTrigger(componentProps, forwardedRef) {
+    const { render, className, style, label, id: idProp, nativeButton = false, openOnHover = true, delay = 100, closeDelay = 0, disabled: disabledProp = false, ...elementProps } = componentProps;
+    const listItem = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$composite$2f$list$2f$useCompositeListItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCompositeListItem"])({
+        label
+    });
+    const menuPositionerContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositionerContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuPositionerContext"])();
+    const { store } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuRootContext"])();
+    const thisTriggerId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useBaseUiId$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useBaseUiId"])(idProp);
+    const open = store.useState('open');
+    const floatingRootContext = store.useState('floatingRootContext');
+    const floatingTreeRoot = store.useState('floatingTreeRoot');
+    const popupId = store.useState('triggerPopupId', thisTriggerId);
+    const baseRegisterTrigger = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popups$2f$popupStoreUtils$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTriggerRegistration"])(thisTriggerId, store);
+    const registerTrigger = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((element)=>{
+        const cleanup = baseRegisterTrigger(element);
+        if (element !== null && store.select('open') && store.select('activeTriggerId') == null) {
+            store.update({
+                activeTriggerId: thisTriggerId,
+                activeTriggerElement: element,
+                closeDelay
+            });
+        }
+        return cleanup;
+    }, [
+        baseRegisterTrigger,
+        closeDelay,
+        store,
+        thisTriggerId
+    ]);
+    const triggerElementRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"](null);
+    const handleTriggerElementRef = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"]((el)=>{
+        triggerElementRef.current = el;
+        store.set('activeTriggerElement', el);
+    }, [
+        store
+    ]);
+    const submenuRootContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$submenu$2d$root$2f$MenuSubmenuRootContext$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuSubmenuRootContext"])();
+    if (!submenuRootContext?.parentMenu) {
+        throw new Error(("TURBOPACK compile-time truthy", 1) ? 'Base UI: <Menu.SubmenuTrigger> must be placed in <Menu.SubmenuRoot>.' : "TURBOPACK unreachable");
+    }
+    store.useSyncedValue('closeDelay', closeDelay);
+    const parentMenuStore = submenuRootContext.parentMenu;
+    const rootDisabled = store.useState('disabled');
+    const parentDisabled = parentMenuStore.useState('disabled');
+    const disabled = disabledProp || rootDisabled || parentDisabled;
+    if ("TURBOPACK compile-time truthy", 1) {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$useIsoLayoutEffect$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useIsoLayoutEffect"])(()=>{
+            const element = triggerElementRef.current;
+            if (element && (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$isElementDisabled$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["isElementDisabled"])(element) && !disabled) {
+                const ownerStackMessage = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$safeReact$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SafeReact"].captureOwnerStack?.() || '';
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$warn$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["warn"])(`A disabled element was detected on <Menu.SubmenuTrigger>. To properly disable the trigger, use the \`disabled\` prop on the component instead of setting it on the rendered element.${ownerStackMessage}`);
+            }
+        });
+    }
+    const itemProps = parentMenuStore.useState('itemProps');
+    const highlighted = parentMenuStore.useState('isActive', listItem.index);
+    const itemMetadata = __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"](()=>({
+            type: 'submenu-trigger',
+            setActive () {
+                if (parentMenuStore.select('highlightItemOnHover')) {
+                    parentMenuStore.set('activeIndex', listItem.index);
+                }
+            }
+        }), [
+        parentMenuStore,
+        listItem.index
+    ]);
+    const { getItemProps, itemRef } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$useMenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMenuItem"])({
+        closeOnClick: false,
+        disabled,
+        highlighted,
+        id: thisTriggerId,
+        store,
+        typingRef: parentMenuStore.context.typingRef,
+        nativeButton,
+        itemMetadata,
+        nodeId: menuPositionerContext?.context.nodeId
+    });
+    const hoverEnabled = store.useState('hoverEnabled');
+    const hoverProps = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useHoverReferenceInteraction$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useHoverReferenceInteraction"])(floatingRootContext, {
+        enabled: hoverEnabled && openOnHover && !disabled,
+        handleClose: (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$safePolygon$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["safePolygon"])({
+            blockPointerEvents: true
+        }),
+        mouseOnly: true,
+        move: true,
+        restMs: delay,
+        delay: {
+            open: delay,
+            close: closeDelay
+        },
+        shouldOpen: delay > 0 ? ()=>parentMenuStore.select('allowMouseEnter') : undefined,
+        triggerElementRef,
+        externalTree: floatingTreeRoot,
+        isClosing: ()=>store.select('transitionStatus') === 'ending'
+    });
+    const click = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$floating$2d$ui$2d$react$2f$hooks$2f$useClick$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useClick"])(floatingRootContext, {
+        enabled: !disabled,
+        event: 'mousedown',
+        toggle: !openOnHover,
+        ignoreMouse: openOnHover,
+        stickIfOpen: false
+    });
+    const localInteractionProps = click.reference ?? __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$utils$2f$empty$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EMPTY_OBJECT"];
+    const rootTriggerProps = store.useState('triggerProps', true);
+    delete rootTriggerProps.id;
+    const state = {
+        disabled,
+        highlighted,
+        open
+    };
+    const element = (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$useRenderElement$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRenderElement"])('div', componentProps, {
+        state,
+        stateAttributesMapping: __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$utils$2f$popupStateMapping$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["triggerOpenStateMapping"],
+        props: [
+            localInteractionProps,
+            hoverProps,
+            rootTriggerProps,
+            itemProps,
+            {
+                'aria-controls': popupId,
+                tabIndex: open || highlighted ? 0 : -1,
+                onBlur () {
+                    if (highlighted) {
+                        parentMenuStore.set('activeIndex', null);
+                    }
+                }
+            },
+            elementProps,
+            getItemProps
+        ],
+        ref: [
+            forwardedRef,
+            listItem.ref,
+            itemRef,
+            registerTrigger,
+            handleTriggerElementRef
+        ]
+    });
+    return element;
+});
+if ("TURBOPACK compile-time truthy", 1) MenuSubmenuTrigger.displayName = "MenuSubmenuTrigger";
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/store/MenuHandle.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "MenuHandle",
+    ()=>MenuHandle,
+    "createMenuHandle",
+    ()=>createMenuHandle
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/internals/createBaseUIEventDetails.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$store$2f$MenuStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/store/MenuStore.mjs [app-ssr] (ecmascript)");
+;
+;
+;
+class MenuHandle {
+    /**
+   * Internal store holding the menu's state.
+   * @internal
+   */ constructor(){
+        this.store = new __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$store$2f$MenuStore$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuStore"]();
+    }
+    /**
+   * Opens the menu and associates it with the trigger with the given id.
+   * The trigger must be a Menu.Trigger component with this handle passed as a prop.
+   *
+   * @param triggerId ID of the trigger to associate with the menu.
+   */ open(triggerId) {
+        const triggerElement = triggerId ? this.store.context.triggerElements.getById(triggerId) : undefined;
+        if (triggerId && !triggerElement) {
+            throw new Error(("TURBOPACK compile-time truthy", 1) ? `Base UI: MenuHandle.open: No trigger found with id "${triggerId}".` : "TURBOPACK unreachable");
+        }
+        this.store.setOpen(true, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])('imperative-action', undefined, triggerElement));
+    }
+    /**
+   * Closes the menu.
+   */ close() {
+        this.store.setOpen(false, (0, __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$internals$2f$createBaseUIEventDetails$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createChangeEventDetails"])('imperative-action', undefined, undefined));
+    }
+    /**
+   * Indicates whether the menu is currently open.
+   */ get isOpen() {
+        return this.store.select('open');
+    }
+}
+function createMenuHandle() {
+    return new MenuHandle();
+}
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/index.parts.mjs [app-ssr] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "Arrow",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$arrow$2f$MenuArrow$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuArrow"],
+    "Backdrop",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$backdrop$2f$MenuBackdrop$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuBackdrop"],
+    "CheckboxItem",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2f$MenuCheckboxItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuCheckboxItem"],
+    "CheckboxItemIndicator",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2d$indicator$2f$MenuCheckboxItemIndicator$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuCheckboxItemIndicator"],
+    "Group",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$group$2f$MenuGroup$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuGroup"],
+    "GroupLabel",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$group$2d$label$2f$MenuGroupLabel$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuGroupLabel"],
+    "Handle",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$store$2f$MenuHandle$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuHandle"],
+    "Item",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$MenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuItem"],
+    "LinkItem",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$link$2d$item$2f$MenuLinkItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuLinkItem"],
+    "Popup",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$popup$2f$MenuPopup$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuPopup"],
+    "Portal",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$portal$2f$MenuPortal$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuPortal"],
+    "Positioner",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositioner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuPositioner"],
+    "RadioGroup",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$group$2f$MenuRadioGroup$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuRadioGroup"],
+    "RadioItem",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$item$2f$MenuRadioItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuRadioItem"],
+    "RadioItemIndicator",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$item$2d$indicator$2f$MenuRadioItemIndicator$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuRadioItemIndicator"],
+    "Root",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRoot$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuRoot"],
+    "Separator",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$separator$2f$Separator$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Separator"],
+    "SubmenuRoot",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$submenu$2d$root$2f$MenuSubmenuRoot$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["MenuSubmenuRoot"],
+    "SubmenuTrigger",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$submenu$2d$trigger$2f$MenuSubmenuTrigger$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuSubmenuTrigger"],
+    "Trigger",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$trigger$2f$MenuTrigger$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuTrigger"],
+    "Viewport",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$viewport$2f$MenuViewport$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MenuViewport"],
+    "createHandle",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$store$2f$MenuHandle$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createMenuHandle"]
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$index$2e$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/index.parts.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$arrow$2f$MenuArrow$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/arrow/MenuArrow.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$backdrop$2f$MenuBackdrop$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/backdrop/MenuBackdrop.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2f$MenuCheckboxItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/checkbox-item/MenuCheckboxItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$checkbox$2d$item$2d$indicator$2f$MenuCheckboxItemIndicator$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/checkbox-item-indicator/MenuCheckboxItemIndicator.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$group$2f$MenuGroup$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/group/MenuGroup.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$group$2d$label$2f$MenuGroupLabel$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/group-label/MenuGroupLabel.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$item$2f$MenuItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/item/MenuItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$link$2d$item$2f$MenuLinkItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/link-item/MenuLinkItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$popup$2f$MenuPopup$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/popup/MenuPopup.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$portal$2f$MenuPortal$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/portal/MenuPortal.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$positioner$2f$MenuPositioner$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/positioner/MenuPositioner.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$group$2f$MenuRadioGroup$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-group/MenuRadioGroup.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$item$2f$MenuRadioItem$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-item/MenuRadioItem.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$radio$2d$item$2d$indicator$2f$MenuRadioItemIndicator$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/radio-item-indicator/MenuRadioItemIndicator.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$root$2f$MenuRoot$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/root/MenuRoot.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$submenu$2d$root$2f$MenuSubmenuRoot$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/submenu-root/MenuSubmenuRoot.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$trigger$2f$MenuTrigger$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/trigger/MenuTrigger.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$viewport$2f$MenuViewport$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/viewport/MenuViewport.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$separator$2f$Separator$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/separator/Separator.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$submenu$2d$trigger$2f$MenuSubmenuTrigger$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/submenu-trigger/MenuSubmenuTrigger.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$store$2f$MenuHandle$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/store/MenuHandle.mjs [app-ssr] (ecmascript)");
+}),
+"[project]/supabase/migrations/node_modules/@base-ui/react/menu/index.parts.mjs [app-ssr] (ecmascript) <export * as Menu>", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "Menu",
+    ()=>__TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$index$2e$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$supabase$2f$migrations$2f$node_modules$2f40$base$2d$ui$2f$react$2f$menu$2f$index$2e$parts$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/supabase/migrations/node_modules/@base-ui/react/menu/index.parts.mjs [app-ssr] (ecmascript)");
+}),
+];
+
+//# sourceMappingURL=1uwy_%40base-ui_react_00es5-8._.js.map

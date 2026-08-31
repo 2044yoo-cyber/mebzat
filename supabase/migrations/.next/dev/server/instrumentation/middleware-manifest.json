@@ -1,0 +1,12 @@
+{
+  "sorted_middleware": [],
+  "middleware": {},
+  "instrumentation": {
+    "files": [
+      "server/edge/chunks/supabase_migrations_0hk-n3m._.js",
+      "server/edge/chunks/1u1p_next_dist_esm_build_templates_edge-wrapper_0ztwws-.js"
+    ],
+    "name": "instrumentation"
+  },
+  "functions": {}
+}
