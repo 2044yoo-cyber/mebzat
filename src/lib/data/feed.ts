@@ -238,9 +238,23 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
       error.code === UNDEFINED_TABLE ||
       /could not find the function|schema cache/i.test(error.message);
 
-    console.error(
-      `[medosha:feed] feed_page failed (${error.code ?? "no code"}): ${error.message}`,
-    );
+    // A transport failure and a database failure look the same in the log
+    // otherwise, and they have nothing in common. supabase-js reports a
+    // request that never completed as "TypeError: fetch failed" with no code;
+    // anything the database actually answered carries a PostgREST code.
+    const transport = !error.code && /fetch failed|ENOTFOUND|ECONNREFUSED|timeout/i.test(error.message);
+
+    if (transport) {
+      console.error(
+        `[medosha:feed] feed_page could not reach Supabase: ${error.message}. ` +
+          `This is the network, not the query — the database was never asked. ` +
+          `Run: node scripts/supabase_doctor.mjs`,
+      );
+    } else {
+      console.error(
+        `[medosha:feed] feed_page failed (${error.code ?? "no code"}): ${error.message}`,
+      );
+    }
 
     return { posts: [], cursor: null, available: !missing };
   }
