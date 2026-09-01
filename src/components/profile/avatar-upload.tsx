@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { moderateQuarantinedImage } from "@/app/moderation/upload-actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { createClient } from "@/lib/supabase/client";
 
@@ -44,10 +45,14 @@ export function AvatarUpload({
     setUploading(true);
     const supabase = createClient();
     const ext = file.name.split(".").pop();
+
+    // Into quarantine, not into `avatars`. The bucket is private and its RLS
+    // policy scopes each folder to auth.uid(), so between this line and a
+    // verdict the file is not fetchable by anyone — including by URL.
     const path = `${userId}/avatar-${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
-      .from("avatars")
+      .from("moderation-quarantine")
       .upload(path, file, { upsert: true });
 
     if (uploadError) {
@@ -56,13 +61,25 @@ export function AvatarUpload({
       return;
     }
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("avatars").getPublicUrl(path);
+    const verdict = await moderateQuarantinedImage({
+      quarantinePath: path,
+      contentType: "profile_avatar",
+      publicBucket: "avatars",
+    });
+
+    // The profile is only written on `safe`, and only with the URL the server
+    // produced. On review or blocked the existing avatar stays exactly as it
+    // was — a rejected upload must not clear the picture somebody already had.
+    if (verdict.status !== "safe" || !verdict.publicUrl) {
+      setUploading(false);
+      if (verdict.status === "blocked") toast.error(verdict.message);
+      else toast.info(verdict.message);
+      return;
+    }
 
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({ avatar_url: publicUrl })
+      .update({ avatar_url: verdict.publicUrl })
       .eq("id", userId);
 
     setUploading(false);
@@ -72,7 +89,8 @@ export function AvatarUpload({
       return;
     }
 
-    setPreview(publicUrl);
+    setPreview(verdict.publicUrl);
+    toast.success(verdict.message);
     router.refresh();
   }
 
