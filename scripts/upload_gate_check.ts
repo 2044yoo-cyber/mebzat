@@ -37,6 +37,7 @@ const PUBLIC_BUCKETS = [
 const INTEGRATED = [
   "src/components/profile/avatar-upload.tsx",
   "src/components/profile/cover-upload.tsx",
+  "src/components/products/product-images-input.tsx",
 ];
 
 for (const file of INTEGRATED) {
@@ -118,7 +119,6 @@ check(
 /* -------------------------------------------------------------------------- */
 
 const REMAINING = [
-  "src/components/products/product-images-input.tsx",
   "src/components/projects/project-images-input.tsx",
   "src/components/companies/single-image-input.tsx",
   "src/components/property/property-form.tsx",

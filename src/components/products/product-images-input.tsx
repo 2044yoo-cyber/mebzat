@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { ImagePlus, Loader2, Star, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { moderateQuarantinedImage } from "@/app/moderation/upload-actions";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,10 @@ export function ProductImagesInput({
     setUploading(true);
     const supabase = createClient();
     const uploaded: string[] = [];
+    // Counted rather than announced one by one: a batch of twelve where three
+    // are held would otherwise stack three toasts on top of a phone screen.
+    let held = 0;
+    let refused = 0;
 
     for (const file of files) {
       if (file.size > MAX_SIZE) {
@@ -42,22 +47,48 @@ export function ProductImagesInput({
         continue;
       }
       const ext = file.name.split(".").pop();
+      // Quarantine is private and folder-scoped to auth.uid(), so nothing in
+      // this batch is fetchable by URL before it has been checked.
       const path = `${userId}/${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage
-        .from("product-images")
+        .from("moderation-quarantine")
         .upload(path, file);
       if (error) {
         toast.error(error.message);
         continue;
       }
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("product-images").getPublicUrl(path);
-      uploaded.push(publicUrl);
+
+      const verdict = await moderateQuarantinedImage({
+        quarantinePath: path,
+        contentType: "product_image",
+        publicBucket: "product-images",
+      });
+
+      // One refusal must not cost the rest of the batch — the existing
+      // per-file `continue` already had the right shape for this.
+      if (verdict.status !== "safe" || !verdict.publicUrl) {
+        if (verdict.status === "blocked") refused += 1;
+        else held += 1;
+        continue;
+      }
+      uploaded.push(verdict.publicUrl);
     }
 
     setUrls((prev) => [...prev, ...uploaded]);
     setUploading(false);
+
+    if (refused > 0) {
+      toast.error(
+        refused === 1
+          ? "One image cannot be published because it violates Medosha's content guidelines."
+          : `${refused} images cannot be published because they violate Medosha's content guidelines.`,
+      );
+    }
+    if (held > 0) {
+      toast.info(
+        held === 1 ? "One image is under review." : `${held} images are under review.`,
+      );
+    }
   }
 
   function remove(url: string) {
