@@ -34,7 +34,10 @@ const PUBLIC_BUCKETS = [
 
 /** Components already routed through quarantine. Each one added here is one
  * fewer place an unchecked image can reach the public web. */
-const INTEGRATED = ["src/components/profile/avatar-upload.tsx"];
+const INTEGRATED = [
+  "src/components/profile/avatar-upload.tsx",
+  "src/components/profile/cover-upload.tsx",
+];
 
 for (const file of INTEGRATED) {
   if (!existsSync(file)) {
@@ -115,7 +118,6 @@ check(
 /* -------------------------------------------------------------------------- */
 
 const REMAINING = [
-  "src/components/profile/cover-upload.tsx",
   "src/components/products/product-images-input.tsx",
   "src/components/projects/project-images-input.tsx",
   "src/components/companies/single-image-input.tsx",

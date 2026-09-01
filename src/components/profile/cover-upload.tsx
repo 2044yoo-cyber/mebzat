@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { moderateQuarantinedImage } from "@/app/moderation/upload-actions";
 import { createClient } from "@/lib/supabase/client";
 
 const MAX_SIZE = 8 * 1024 * 1024;
@@ -36,8 +37,10 @@ export function CoverUpload({
     const ext = file.name.split(".").pop();
     const path = `${userId}/cover-${Date.now()}.${ext}`;
 
+    // Quarantine first. The bucket is private and folder-scoped to auth.uid(),
+    // so the file is not fetchable by URL between here and a verdict.
     const { error: uploadError } = await supabase.storage
-      .from("covers")
+      .from("moderation-quarantine")
       .upload(path, file, { upsert: true });
 
     if (uploadError) {
@@ -46,13 +49,24 @@ export function CoverUpload({
       return;
     }
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("covers").getPublicUrl(path);
+    const verdict = await moderateQuarantinedImage({
+      quarantinePath: path,
+      contentType: "profile_cover",
+      publicBucket: "covers",
+    });
+
+    // Only `safe` writes the profile, and only with the URL the server built.
+    // A refused upload leaves the existing cover exactly where it was.
+    if (verdict.status !== "safe" || !verdict.publicUrl) {
+      setUploading(false);
+      if (verdict.status === "blocked") toast.error(verdict.message);
+      else toast.info(verdict.message);
+      return;
+    }
 
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({ cover_url: publicUrl })
+      .update({ cover_url: verdict.publicUrl })
       .eq("id", userId);
 
     setUploading(false);
@@ -62,7 +76,8 @@ export function CoverUpload({
       return;
     }
 
-    setPreview(publicUrl);
+    setPreview(verdict.publicUrl);
+    toast.success(verdict.message);
     router.refresh();
   }
 
