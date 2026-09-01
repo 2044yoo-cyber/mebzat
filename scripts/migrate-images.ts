@@ -111,7 +111,7 @@ async function migrateProjects(admin: Admin) {
   type Row = { id: string; title: string | null; building_type: string | null; style: string | null; cover_image_url: string | null };
   const rows = await selectAll<Row>(admin, "projects", "id, title, building_type, style, cover_image_url");
   const localFor = (r: Row) =>
-    projectImages(r.title ?? "", r.building_type ?? "other", r.style ?? "", r.id)[0] ?? PROJECT_PLACEHOLDER;
+    projectImages(r.title ?? "", r.building_type ?? "other", r.style ?? "", r.id, 1)[0] ?? PROJECT_PLACEHOLDER;
 
   for (const row of rows) {
     if (isExternal(row.cover_image_url)) {
@@ -143,7 +143,7 @@ async function migrateProducts(admin: Admin) {
 
   const rows = await selectAll<Row>(admin, "products", "id, title, category_id, cover_image_url");
   const localFor = (r: Row) =>
-    productImages(r.title ?? "", catSlug.get(r.category_id ?? "") ?? "", r.id)[0] ?? PRODUCT_PLACEHOLDER;
+    productImages(r.title ?? "", catSlug.get(r.category_id ?? "") ?? "", r.id, 1)[0] ?? PRODUCT_PLACEHOLDER;
 
   for (const row of rows) {
     if (isExternal(row.cover_image_url)) {

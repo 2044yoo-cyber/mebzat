@@ -138,9 +138,22 @@ const splitCols = (sig) => {
     .map((m) => ({ name: m[1].replace(/"/g, ""), type: m[2] }));
 };
 
+// `returns setof <table>` is a row set, not a scalar. Falling through to the
+// scalar map turned it into string[], which is why material_price_lookup's
+// caller was told it was mapping over strings.
+const relationRow = (name) => {
+  const rel = tables.get(name);
+  if (!rel) return null;
+  return `{ ${rel.cols
+    .map((c) => `${quote(c.col)}: ${tsType(c.typname, c.typtype, c.elem, c.elem_kind)}${c.nullable ? " | null" : ""}`)
+    .join("; ")} }`;
+};
+
 const RET_TS = (r) => {
   let s = r.replace(/^SETOF\s+/i, "");
   const setof = /^SETOF\s+/i.test(r);
+  const rel = relationRow(s.replace(/^public\./, ""));
+  if (rel) return setof ? `${rel}[]` : rel;
   if (/^TABLE\(/i.test(s)) {
     const c = splitCols(s);
     if (!c.length) return "Record<string, unknown>[]";
@@ -279,6 +292,10 @@ const RELATION_ALIAS = {
 };
 // Row shapes of table-returning functions.
 const FUNCTION_ROW = {
+  // A nearby_places table exists, but callers use this name for the result of
+  // places_near_property(), which carries distance_km and omits the columns
+  // the table has. The function wins: it is what getNearbyPlaces returns.
+  NearbyPlace: "places_near_property",
   PropertyLocation: "property_location",
   SearchResult: "global_search",
   MapProperty: "properties_in_viewport",
@@ -311,8 +328,14 @@ out.push(``);
 // application actually imports (Job, Property, Payment, ...). Update variants
 // only where a caller asks for one.
 const EXPLICIT_UPDATE = new Set(["profiles"]);
+const claimed = new Set([
+  ...Object.keys(ENUM_ALIAS),
+  ...Object.keys(RELATION_ALIAS),
+  ...Object.keys(FUNCTION_ROW),
+]);
 for (const [pas, [where, rel]] of [...relByPascal].sort()) {
   if (pas !== pascal(singular(rel))) continue;
+  if (claimed.has(pas)) continue;
   out.push(`export type ${pas} = Database["public"]["${where}"][${JSON.stringify(rel)}]["Row"];`);
   if (EXPLICIT_UPDATE.has(rel))
     out.push(`export type ${pas}Update = Database["public"]["${where}"][${JSON.stringify(rel)}]["Update"];`);

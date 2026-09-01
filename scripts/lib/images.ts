@@ -209,3 +209,21 @@ export function architectureCover(key: string): string {
   const prompt = `modern construction architecture cityscape, ${COMPANY_STYLE}`;
   return buildUrl(prompt, hash(`${key}|usercover`), 1200, 400);
 }
+
+// --- Local assets --------------------------------------------------------
+// These are files on disk (public/images/...), not provider URLs. They exist
+// so migrate-images.ts can put a record back on a first-party image when the
+// keyword mapping has nothing to offer.
+
+export const COMPANY_PLACEHOLDER = "/images/placeholders/company.svg";
+export const PRODUCT_PLACEHOLDER = "/images/placeholders/product.svg";
+export const PROJECT_PLACEHOLDER = "/images/placeholders/project.svg";
+
+const AVATAR_COUNT = 12;
+
+/** One of the twelve local avatars, chosen deterministically from the key so
+ * the same person keeps the same face across reseeds and reruns. */
+export function avatarImage(key: string): string {
+  const n = (hash(`${key}|avatar`) % AVATAR_COUNT) + 1;
+  return `/images/avatars/avatar-${String(n).padStart(2, "0")}.svg`;
+}

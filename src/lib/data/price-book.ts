@@ -55,7 +55,9 @@ function toReference(row: PriceRow): ReferencePrice {
     priceEtb: Number(row.price_etb),
     vatStatus: row.vat_status,
     status: row.data_status,
-    verified: row.verified,
+    // Nullable in the column, never optional in the record: an unset flag
+    // means the figure has not been verified.
+    verified: row.verified ?? false,
     supplier: row.supplier,
     source: row.source,
     priceDate: row.price_date,

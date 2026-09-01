@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { settlePayment } from "@/lib/billing/fulfilment";
 import { paymentService } from "@/lib/billing/payments/service";
 import { createServiceClient } from "@/lib/supabase/service";
+import { asJson } from "@/lib/billing/payments/provider";
 
 /**
  * Where the provider tells us what happened.
@@ -99,7 +100,7 @@ export async function POST(
     provider: provider.name,
     event_reference: parsed.eventReference,
     event_type: parsed.eventType,
-    payload: parsed.payload,
+    payload: asJson(parsed.payload),
   });
 
   if (alreadySeen) {

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { asJson } from "./payments/provider";
 import { paymentService } from "./payments/service";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -82,7 +83,7 @@ export async function settlePayment(
       .update({
         status: "failed",
         failure_reason: "The provider reported the transaction as unsuccessful.",
-        provider_payload: verified.raw,
+        provider_payload: asJson(verified.raw),
         provider_transaction_id: verified.providerTransactionId,
         updated_at: stamp,
       })
@@ -134,7 +135,7 @@ export async function settlePayment(
       .update({
         status: "failed",
         failure_reason: `REVIEW: ${problems.join("; ")}`,
-        provider_payload: verified.raw,
+        provider_payload: asJson(verified.raw),
         updated_at: stamp,
       })
       .eq("id", payment.id);
@@ -150,7 +151,7 @@ export async function settlePayment(
     .update({
       status: "succeeded",
       provider_transaction_id: verified.providerTransactionId,
-      provider_payload: verified.raw,
+      provider_payload: asJson(verified.raw),
       updated_at: stamp,
     })
     .eq("id", payment.id);

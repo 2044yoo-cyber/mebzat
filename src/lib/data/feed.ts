@@ -220,7 +220,9 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
     // The first page fixes the clock; every page after it reuses that value
     // so the age term cannot move a post across a page boundary mid-scroll.
     p_now: cursor?.now ?? new Date().toISOString(),
-    p_after_score: cursor?.score ?? null,
+    // The cursor carries the score as a string so it survives the query
+    // string unchanged; p_after_score is numeric.
+    p_after_score: cursor ? Number(cursor.score) : null,
     p_after_id: cursor?.id ?? null,
     p_kinds: kinds && kinds.length > 0 ? kinds : null,
     p_topics: topics && topics.length > 0 ? topics : null,

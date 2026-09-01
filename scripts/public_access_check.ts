@@ -105,16 +105,32 @@ const MUST_BE_PRIVATE = [
   "/(dashboard)/profile",
   "/(dashboard)/profile/edit",
   "/(dashboard)/messages",
+  "/(dashboard)/messages/[id]",
   "/(dashboard)/settings",
+  "/(dashboard)/billing",
+  "/(dashboard)/billing/return",
+  "/(dashboard)/dashboard/services",
+  "/(dashboard)/dashboard/services/new",
+  "/(dashboard)/dashboard/services/[id]/edit",
+  "/(dashboard)/dashboard/services/[id]/analytics",
+  "/(dashboard)/projects/[id]/agenda",
+  "/(dashboard)/admin/diagnostics",
 ];
 
+// Known limit, stated rather than glossed: this reads the gate's text, not
+// its reachability. Deleting or commenting one is caught; making it
+// unreachable (`if (false) redirect(...)`) is not, because the call is still
+// written. Catching that needs the type checker or a running request, not a
+// regex — so do not read a pass here as proof the gate fires.
 for (const target of MUST_BE_PRIVATE) {
   const file = files.find((f) => route(f) === target && f.endsWith("page.tsx"));
   if (!file) continue;
   const source = code(readFileSync(file, "utf8"));
   check(
     `${target} still requires an account`,
-    /redirect\(["'`]\/login/.test(source) || /requireViewer\(/.test(source),
+    /redirect\(["'`]\/login/.test(source) ||
+      /requireViewer\(/.test(source) ||
+      (/isAdmin\(/.test(source) && /notFound\(\)/.test(source)),
     "this page shows one person's own data and lost its only gate",
   );
 }

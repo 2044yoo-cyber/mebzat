@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { Json } from "@/types/database.types";
+
 /**
  * What a payment provider has to be able to do, and nothing more.
  *
@@ -164,4 +166,17 @@ export class PaymentProviderError extends Error {
     super(message);
     this.name = "PaymentProviderError";
   }
+}
+
+/**
+ * A provider payload is parsed JSON, so a jsonb column can hold it — but the
+ * contract types it `unknown` because nothing outside the provider is allowed
+ * to read it for meaning. Round-tripping rather than asserting: it is the
+ * difference between claiming the value is storable and making it so, and it
+ * drops the undefined values and Dates that would otherwise be mangled on the
+ * way into the column.
+ */
+export function asJson(value: unknown): Json {
+  if (value === undefined) return null;
+  return JSON.parse(JSON.stringify(value)) as Json;
 }

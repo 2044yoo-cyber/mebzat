@@ -7407,7 +7407,7 @@ export interface Database {
           target_unit?: string | null;
           max_rows?: number | null;
         };
-        Returns: string[];
+        Returns: { id: string; category: string; subcategory: string | null; material: string; specification: string | null; unit: string; brand: string | null; city_region: string; price_etb: number; currency: string; vat_status: PriceVatStatus; supplier: string | null; supplier_id: string | null; source: string | null; price_date: string; data_status: PriceDataStatus; verified: boolean | null; verified_by: string | null; verified_at: string | null; superseded_by: string | null; notes: string | null; created_by: string | null; created_at: string; updated_at: string }[];
       };
       my_agendas: {
         Args: Record<PropertyKey, never>;
@@ -8019,7 +8019,6 @@ export type ModerationAppeal = Database["public"]["Tables"]["moderation_appeals"
 export type ModerationAudit = Database["public"]["Tables"]["moderation_audit"]["Row"];
 export type ModerationItem = Database["public"]["Tables"]["moderation_items"]["Row"];
 export type ModerationReport = Database["public"]["Tables"]["moderation_reports"]["Row"];
-export type NearbyPlace = Database["public"]["Tables"]["nearby_places"]["Row"];
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 export type Payment = Database["public"]["Tables"]["payments"]["Row"];
 export type PaymentEvent = Database["public"]["Tables"]["payment_events"]["Row"];
@@ -8073,6 +8072,16 @@ export type TravelLandmark = Database["public"]["Tables"]["travel_landmarks"]["R
 export type UserBadge = Database["public"]["Tables"]["user_badges"]["Row"];
 export type UserStrike = Database["public"]["Tables"]["user_strikes"]["Row"];
 
+/** Row of public.places_near_property(). */
+export type NearbyPlace = {
+  id: string;
+  name: string;
+  kind: PlaceKind;
+  latitude: number;
+  longitude: number;
+  rating: number;
+  distance_km: number;
+};
 /** Row of public.property_location(). */
 export type PropertyLocation = {
   latitude: number;
