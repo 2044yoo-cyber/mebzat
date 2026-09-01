@@ -68,16 +68,44 @@ if (url.protocol !== "https:") bad(`expected https:, got ${url.protocol}`);
 
 /* 4 ------------------------------------------------------- DNS resolution */
 
+let addrs = [];
 try {
-  const { address } = await lookup(url.hostname);
-  ok(`DNS resolves ${url.hostname} -> ${address}`);
+  addrs = await lookup(url.hostname, { all: true });
+  ok(`DNS resolves ${url.hostname}`);
+  for (const a of addrs) info(`IPv${a.family}: ${a.address}`);
 } catch (e) {
   bad(`DNS cannot resolve ${url.hostname} (${e.code})`);
   info(`the project ref in the URL may be wrong, or this machine has no DNS`);
   process.exit(1);
 }
 
+/* 4b --------------------------------- does the key belong to this project? */
+
+// The anon key is a JWT and its payload is public — it ships to every browser.
+// Only the ref, role and expiry are read here; the signature is never touched
+// and nothing is printed that is not already visible in the page source.
+try {
+  const claims = JSON.parse(Buffer.from(env[ANON_KEY].split(".")[1], "base64url").toString());
+  const urlRef = url.hostname.split(".")[0];
+  if (claims.ref && claims.ref !== urlRef) {
+    bad(`key belongs to project "${claims.ref}" but the URL points at "${urlRef}"`);
+    info(`the app is talking to a different project than the key authorises`);
+  } else if (claims.ref) {
+    ok(`key and URL agree on project ref "${claims.ref}"`);
+  }
+  if (claims.role) info(`key role: ${claims.role}`);
+  if (claims.exp) {
+    const when = new Date(claims.exp * 1000);
+    if (when < new Date()) bad(`key EXPIRED on ${when.toISOString().slice(0, 10)}`);
+    else ok(`key valid until ${when.toISOString().slice(0, 10)}`);
+  }
+} catch {
+  info(`anon key is not a readable JWT — skipping the project-match check`);
+}
+
 /* 5 --------------------------------------------------- the API answers */
+
+let lastCause = null;
 
 async function probe(label, path, headers = {}) {
   const target = new URL(path, url).toString();
@@ -89,6 +117,7 @@ async function probe(label, path, headers = {}) {
   } catch (e) {
     const reason = e.cause?.code ?? e.cause?.message ?? e.name;
     bad(`${label} -> ${e.message} [${reason}] (${Date.now() - started}ms)`);
+    lastCause = reason;
     return null;
   }
 }
@@ -96,11 +125,51 @@ async function probe(label, path, headers = {}) {
 const health = await probe("auth health", "/auth/v1/health");
 await probe("rest root", "/rest/v1/", { apikey: env[ANON_KEY] });
 
+// The browser reaching Supabase while Node cannot is a real and common split
+// on Windows: Node picks an address family and does not fall back the way a
+// browser does, and antivirus and proxies filter node.exe separately.
+let v4 = null;
+if (health === null && addrs.some((a) => a.family === 6)) {
+  const { Agent, fetch: undiciFetch } = await import("undici").catch(() => ({}));
+  if (undiciFetch) {
+    try {
+      const res = await undiciFetch(new URL("/auth/v1/health", url).toString(), {
+        dispatcher: new Agent({ connect: { family: 4 } }),
+        signal: AbortSignal.timeout(15000),
+      });
+      v4 = res.status;
+      ok(`auth health over forced IPv4 -> HTTP ${res.status}`);
+    } catch (e) {
+      bad(`auth health over forced IPv4 -> ${e.message} [${e.cause?.code ?? e.name}]`);
+    }
+  }
+}
+
 /* 6 ------------------------------------------------------------- verdict */
 
 console.log("");
-if (health === null) {
-  console.log("VERDICT: the host resolves but never answers.");
+const TLS = /CERT|SELF_SIGNED|UNABLE_TO_VERIFY|DEPTH_ZERO|ERR_TLS/i;
+if (health === null && TLS.test(String(lastCause))) {
+  console.log(`VERDICT: TLS interception. Node rejected the certificate (${lastCause}).`);
+  console.log("  Antivirus or a corporate proxy is re-signing HTTPS with its own");
+  console.log("  root CA. Windows trusts it, so your browser works — which is why");
+  console.log("  the dashboard shows successful auth requests. Node keeps its own");
+  console.log("  CA list and has never heard of it, so the dev server cannot connect.");
+  console.log("  Fix, without weakening anything:");
+  console.log("    Node 22+:  setx NODE_OPTIONS \"--use-system-ca\"");
+  console.log("    or:        setx NODE_EXTRA_CA_CERTS \"C:\\path\\to\\proxy-root.crt\"");
+  console.log("  Then open a NEW terminal and restart the dev server.");
+  console.log("  Do NOT set NODE_TLS_REJECT_UNAUTHORIZED=0 — that disables");
+  console.log("  certificate checking for every request the server makes.");
+} else if (health === null && v4 !== null) {
+  console.log("VERDICT: IPv6 is broken on this machine; IPv4 works.");
+  console.log("  Node picked the IPv6 address and did not fall back, which is why");
+  console.log("  the browser reaches Supabase and the dev server does not.");
+  console.log("  Fix without touching the database or the app:");
+  console.log("    setx NODE_OPTIONS \"--dns-result-order=ipv4first\"");
+  console.log("  then open a NEW terminal and restart the dev server.");
+} else if (health === null) {
+  console.log(`VERDICT: the host resolves but never answers (${lastCause ?? "no cause reported"}).`);
   console.log("  The most common cause is a PAUSED Supabase project — the free tier");
   console.log("  pauses after inactivity and the API stops responding while the");
   console.log("  database and all its data stay intact. Open the project in the");
