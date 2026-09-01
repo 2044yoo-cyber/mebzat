@@ -4,24 +4,74 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
+import { SupabaseConfigError, createClient } from "@/lib/supabase/client";
 
 export function GoogleButton({ next = "/dashboard" }: { next?: string }) {
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Start Google sign-in.
+   *
+   * The `finally` is the fix for the reported bug, and it is worth being
+   * explicit about why. `createClient()` throws when Supabase is unconfigured,
+   * and the throw happened after `setLoading(true)` with nothing to catch it —
+   * so `setLoading(false)` never ran and the button stayed `disabled` for the
+   * life of the page. Clicking it greyed it out and killed it. The cause was a
+   * missing environment variable; the symptom was a dead button on a page that
+   * otherwise looked fine.
+   *
+   * On the success path this deliberately stays loading: the browser is being
+   * navigated to Google, and clearing the state would flash the button back to
+   * life for the instant before the page goes away.
+   */
   async function handleClick() {
+    if (loading) return;
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
-    });
 
-    if (error) {
-      toast.error(error.message);
-      setLoading(false);
+    let leaving = false;
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        },
+      });
+
+      if (error) {
+        // Supabase answered and refused. Almost always means Google is not
+        // enabled for this project, which is a dashboard setting rather than
+        // anything in the code.
+        toast.error(
+          error.message ||
+            "Google sign-in is unavailable. Try email or phone instead.",
+        );
+        console.error("[auth] Google OAuth refused:", error.message);
+        return;
+      }
+
+      leaving = true;
+    } catch (caught) {
+      if (caught instanceof SupabaseConfigError) {
+        // Named variables, no values. The anon key and URL are public by
+        // design, and a developer staring at a dead button needs to know which
+        // one is absent rather than being told "something went wrong".
+        console.error(`[auth] ${caught.message}`);
+        toast.error(
+          process.env.NODE_ENV === "development"
+            ? caught.message
+            : "Sign-in is unavailable right now. Please try again shortly.",
+        );
+        return;
+      }
+
+      console.error("[auth] Google sign-in failed:", caught);
+      toast.error("Could not start Google sign-in. Please try again.");
+    } finally {
+      // Never leave the button stuck. The one exception is a successful
+      // redirect, where the page is about to be replaced anyway.
+      if (!leaving) setLoading(false);
     }
   }
 
