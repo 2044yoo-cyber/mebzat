@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { JoinPromptProvider } from "@/components/auth/join-prompt";
 import { Toaster } from "@/components/ui/sonner";
 
 import "./globals.css";
@@ -43,7 +44,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          {/* Mounted once, at the root, so any Like or Save button anywhere
+              below can raise the join prompt without state being threaded
+              through the tree. It renders nothing until something asks. */}
+          <JoinPromptProvider>{children}</JoinPromptProvider>
           <Toaster />
         </ThemeProvider>
       </body>

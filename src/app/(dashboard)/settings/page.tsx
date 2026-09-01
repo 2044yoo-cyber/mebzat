@@ -4,10 +4,15 @@ import { Pencil, Settings } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { requireViewer } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Settings" };
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  // Account settings belong to somebody. Gate it here: the layout used to
+  // do this for the whole folder and no longer does.
+  await requireViewer("/settings");
+
   return (
     <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed p-16 text-center">
       <div className="flex size-14 items-center justify-center rounded-2xl bg-brand/10">

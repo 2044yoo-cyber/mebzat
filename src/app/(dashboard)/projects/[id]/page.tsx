@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import {
   Banknote,
   BedDouble,
@@ -58,13 +58,17 @@ export default async function ProjectDetailPage(props: {
 }) {
   const { id } = await props.params;
   const supabase = await createClient();
+
+  // Public. A project showcase is something somebody shares — a link in a
+  // message, a post, a search result — and requiring an account to open it
+  // turns every share into a dead end. The session is read only to decide
+  // whether to offer the owner their edit controls.
+  //
+  // Row-level security still decides what `select` returns, so a private
+  // project stays invisible whoever asks. This governs the page, not the data.
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
 
   const { data: project } = await supabase
     .from("projects")
@@ -76,7 +80,7 @@ export default async function ProjectDetailPage(props: {
     notFound();
   }
 
-  const isOwner = project.owner_id === user.id;
+  const isOwner = Boolean(user) && project.owner_id === user!.id;
 
   const [{ data: images }, { data: owner }] = await Promise.all([
     supabase

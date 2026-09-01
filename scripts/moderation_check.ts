@@ -1,7 +1,7 @@
 /**
  * Content safety, checked where it can be checked without a network.
  *
- *   npx tsx scripts/moderation-check.ts
+ *   npx tsx scripts/moderation_check.ts
  *
  * The properties below are the ones whose failure is silent. A moderation
  * system that fails open still renders an upload form, still shows "Checking
