@@ -20,6 +20,7 @@ import { buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuLinkItem,
@@ -161,16 +162,21 @@ export function UserNav({
         <ChevronDown className="hidden size-4 text-muted-foreground sm:inline" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="flex flex-col gap-0.5 py-2">
-          <span className="truncate text-sm font-medium text-foreground">
-            {name}
-          </span>
-          {profile.email && (
-            <span className="truncate text-xs font-normal text-muted-foreground">
-              {profile.email}
+        {/* GroupLabel reads MenuGroupContext, so Base UI throws
+            "MenuGroupContext is missing" when it is rendered as a direct child
+            of Content. The Group is the label's owner, not decoration. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col gap-0.5 py-2">
+            <span className="truncate text-sm font-medium text-foreground">
+              {name}
             </span>
-          )}
-        </DropdownMenuLabel>
+            {profile.email && (
+              <span className="truncate text-xs font-normal text-muted-foreground">
+                {profile.email}
+              </span>
+            )}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {MENU_LINKS.map(({ href, label, icon: Icon }) => (
           <DropdownMenuLinkItem key={href} render={<Link href={href} />}>
