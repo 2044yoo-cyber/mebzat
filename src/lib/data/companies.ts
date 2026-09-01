@@ -67,3 +67,22 @@ export async function getCompanyBySlug(slug: string) {
     .maybeSingle();
   return data;
 }
+
+export type OwnedCompany = { id: string; name: string; slug: string };
+
+/** Companies this person owns, for the "post as" picker on a job form.
+ * owner_id is null until a claim is verified, so an unclaimed company never
+ * appears here even if the person imported it. Returns [] rather than
+ * throwing: not owning a company is the normal case, and the form is
+ * expected to render without the picker. */
+export async function getMyCompanies(userId: string): Promise<OwnedCompany[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("companies")
+    .select("id, name, slug")
+    .eq("owner_id", userId)
+    .order("name");
+
+  if (error) return [];
+  return (data ?? []) as OwnedCompany[];
+}

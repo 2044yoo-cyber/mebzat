@@ -25,7 +25,7 @@ const service = readFileSync("src/lib/moderation/service.ts", "utf8");
 const types = readFileSync("src/lib/moderation/types.ts", "utf8");
 const video = readFileSync("src/lib/moderation/video.ts", "utf8");
 const strikes = readFileSync("src/lib/moderation/strikes.ts", "utf8");
-const sql = readFileSync("supabase/migrations/0007_moderation.sql", "utf8");
+const sql = readFileSync("supabase/migrations/0052_moderation.sql", "utf8");
 
 /** Comments stripped, so a check never matches the prose explaining itself. */
 const code = (source: string) =>
