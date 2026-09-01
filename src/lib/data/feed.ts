@@ -245,10 +245,14 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
     const transport = !error.code && /fetch failed|ENOTFOUND|ECONNREFUSED|timeout/i.test(error.message);
 
     if (transport) {
+      // supabase-js puts the real reason in details, not message: message is
+      // always the generic "TypeError: fetch failed" while details carries the
+      // "Caused by: ... (ENOTFOUND | ECONNREFUSED | CERT_* | ETIMEDOUT)" line
+      // that actually identifies the failure. Logging only message is what
+      // made this take so long to pin down.
       console.error(
-        `[medosha:feed] feed_page could not reach Supabase: ${error.message}. ` +
-          `This is the network, not the query — the database was never asked. ` +
-          `Run: node scripts/supabase_doctor.mjs`,
+        `[medosha:feed] feed_page could not reach Supabase: ${error.message}\n` +
+          `${error.details || "(no cause reported)"}`,
       );
     } else {
       console.error(
