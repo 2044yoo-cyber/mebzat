@@ -6,7 +6,6 @@ import { ArrowUp, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import { STARTER_BRIEFS } from "../../services/starters";
 
 /**
  * The conversation.
@@ -62,15 +61,6 @@ export function DesignChat({
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3">
-        {messages.length === 0 ? (
-          <Welcome
-            onPick={(brief) => {
-              setDraft(brief);
-              inputRef.current?.focus();
-            }}
-          />
-        ) : null}
-
         {messages.map((message) => (
           <div
             key={message.id}
@@ -154,39 +144,6 @@ export function DesignChat({
               <ArrowUp className="size-4" aria-hidden />
             )}
           </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Welcome({ onPick }: { onPick: (brief: string) => void }) {
-  return (
-    <div className="space-y-4 py-2">
-      <div>
-        <h2 className="text-base font-semibold">Describe it. Berchuma draws it.</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Say what you want built and in what space. You get a drawing, a parts
-          list and a price from live supplier rates — then change any of it, by
-          asking or by hand.
-        </p>
-      </div>
-
-      <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Start from one of these
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {STARTER_BRIEFS.map((starter) => (
-            <button
-              key={starter.label}
-              type="button"
-              onClick={() => onPick(starter.brief)}
-              className="rounded-full border px-3 py-1.5 text-xs hover:bg-muted"
-            >
-              {starter.label}
-            </button>
-          ))}
         </div>
       </div>
     </div>
