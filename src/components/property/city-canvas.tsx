@@ -5,6 +5,8 @@ import * as maplibregl from "maplibre-gl";
 import type { Map as MapLibreMap, Marker } from "maplibre-gl";
 import { Box, Layers, Loader2, Locate, Minus, Plus, WifiOff } from "lucide-react";
 
+import { useRouter } from "next/navigation";
+
 import { describeError, trackRequest } from "@/lib/map/diagnostics";
 import { MapEngine, type EngineState } from "@/lib/map/engine";
 import {
@@ -12,6 +14,8 @@ import {
   createClusterElement,
   createMarkerElement,
   MARKER_COLOURS,
+  groupByBuilding,
+  createBuildingElement,
 } from "@/lib/map/markers";
 import type { AiHighlight } from "@/lib/map/ai-highlight";
 import { loadSession, saveSession } from "@/lib/map/session";
@@ -77,6 +81,7 @@ export function CityCanvas({
   onSelect: (property: MapProperty | null) => void;
   onResults?: (properties: MapProperty[]) => void;
 }) {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const engineRef = useRef<MapEngine | null>(null);
@@ -390,9 +395,14 @@ export function CityCanvas({
     if (!map || !ready) return;
 
     const markers = markersRef.current;
-    const { clusters, singles } = clusterProperties(properties, zoom);
+    // Buildings come out first and at every zoom: their units share one
+    // coordinate exactly, so no amount of zooming would ever separate them and
+    // the spatial grid below cannot help.
+    const { buildings, rest } = groupByBuilding(properties);
+    const { clusters, singles } = clusterProperties(rest, zoom);
 
     const wanted = new Set<string>();
+    for (const building of buildings) wanted.add(`building:${building.id}`);
     for (const cluster of clusters) wanted.add(`cluster:${cluster.id}`);
     for (const property of singles) wanted.add(property.id);
 
@@ -401,6 +411,34 @@ export function CityCanvas({
         marker.remove();
         markers.delete(id);
       }
+    }
+
+    for (const building of buildings) {
+      const id = `building:${building.id}`;
+      const signature = `${building.units.length}`;
+      const already = markers.get(id);
+      if (already) {
+        if (already.getElement().dataset.units === signature) continue;
+        already.remove();
+        markers.delete(id);
+      }
+
+      const element = createBuildingElement(
+        building.name,
+        building.units.length,
+        () => {
+          // The code, not the uuid — the building page is addressed by it.
+          if (building.code) router.push(`/building/${building.code}`);
+        },
+      );
+      element.dataset.units = signature;
+
+      markers.set(
+        id,
+        new maplibregl.Marker({ element, anchor: "center" })
+          .setLngLat([building.longitude, building.latitude])
+          .addTo(map),
+      );
     }
 
     for (const cluster of clusters) {
@@ -469,7 +507,7 @@ export function CityCanvas({
         // A pin with impossible coordinates must not take the map with it.
       }
     }
-  }, [bands, properties, ready, selectedId, matchState, zoom]);
+  }, [bands, properties, ready, selectedId, matchState, zoom, router]);
 
   // Frame what the assistant found.
   //

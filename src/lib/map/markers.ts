@@ -148,6 +148,79 @@ export function createMarkerElement(
  * Size grows with count but is capped: past a few hundred the difference stops
  * being informative and the bubble just gets in the way.
  */
+/**
+ * The marker for a whole building.
+ *
+ * Deliberately not a price pin. A tower holding a 2.8M studio and a 9M
+ * penthouse has no single price worth printing, and picking one would
+ * misdescribe every other unit in it. It shows what it is and how much of it
+ * is available, and the price question is answered on the building page where
+ * there is room for a range.
+ */
+export function createBuildingElement(
+  name: string | null,
+  units: number,
+  onClick: () => void,
+): HTMLElement {
+  const wrapper = document.createElement("button");
+  wrapper.type = "button";
+  wrapper.className = "medosha-building-marker";
+  wrapper.setAttribute(
+    "aria-label",
+    `${name ?? "Building"}, ${units} units available`,
+  );
+
+  wrapper.style.cssText = [
+    "display:flex",
+    "align-items:center",
+    "gap:6px",
+    "padding:5px 10px 5px 6px",
+    "border-radius:999px",
+    "border:1.5px solid rgba(0,0,0,0.12)",
+    "background:#fff",
+    "box-shadow:0 2px 8px rgba(0,0,0,0.18)",
+    "cursor:pointer",
+    "font:600 12px/1 system-ui,sans-serif",
+    "color:#111",
+    "white-space:nowrap",
+    "max-width:190px",
+  ].join(";");
+
+  // A tower glyph, drawn rather than an emoji: an emoji renders differently on
+  // every platform and this sits next to price pins that are all one style.
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("width", "18");
+  icon.setAttribute("height", "18");
+  icon.setAttribute("fill", "none");
+  icon.setAttribute("stroke", "currentColor");
+  icon.setAttribute("stroke-width", "1.8");
+  icon.setAttribute("stroke-linejoin", "round");
+  icon.innerHTML =
+    '<path d="M7 21V5h10v16" /><path d="M4 21h16" />' +
+    '<path d="M10 9h1M13 9h1M10 13h1M13 13h1M10 17h1M13 17h1" stroke-linecap="round" />';
+  icon.style.flexShrink = "0";
+  wrapper.appendChild(icon);
+
+  const label = document.createElement("span");
+  label.style.cssText = "overflow:hidden;text-overflow:ellipsis";
+  label.textContent = name ?? "Building";
+  wrapper.appendChild(label);
+
+  const count = document.createElement("span");
+  count.style.cssText =
+    "flex-shrink:0;padding:1px 6px;border-radius:999px;background:#111;color:#fff;font-size:11px";
+  count.textContent = String(units);
+  wrapper.appendChild(count);
+
+  wrapper.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onClick();
+  });
+
+  return wrapper;
+}
+
 export function createClusterElement(
   count: number,
   onClick: () => void,
@@ -213,6 +286,81 @@ export function createClusterElement(
 
   wrapper.append(button);
   return wrapper;
+}
+
+
+export type BuildingGroup = {
+  /** The building's uuid, used as the marker key. */
+  id: string;
+  code: string | null;
+  name: string | null;
+  latitude: number;
+  longitude: number;
+  units: MapProperty[];
+  available: number;
+};
+
+/**
+ * Units in the same building become one marker; everything else is left alone.
+ *
+ * This runs before the spatial clustering and independently of zoom, because
+ * the problem it solves is not crowding. Thirty apartments in one tower share
+ * one coordinate exactly: no amount of zooming separates them, so a
+ * zoom-sensitive grid cannot help. Only the top pin would be clickable and the
+ * other twenty-nine would be unreachable at any scale.
+ *
+ * A building with a single listed unit is deliberately not grouped — a marker
+ * saying "1 unit" is a worse pin than the unit's own, and hides its price.
+ */
+export function groupByBuilding(properties: MapProperty[]): {
+  buildings: BuildingGroup[];
+  rest: MapProperty[];
+} {
+  const byBuilding = new Map<string, MapProperty[]>();
+  const rest: MapProperty[] = [];
+
+  for (const property of properties) {
+    const id = property.building_id;
+    if (!id) {
+      rest.push(property);
+      continue;
+    }
+    const bucket = byBuilding.get(id);
+    if (bucket) bucket.push(property);
+    else byBuilding.set(id, [property]);
+  }
+
+  const buildings: BuildingGroup[] = [];
+
+  for (const [id, units] of byBuilding) {
+    if (units.length < 2) {
+      rest.push(...units);
+      continue;
+    }
+
+    // Averaged rather than taken from the first unit: they should share a
+    // coordinate, but a building whose units were pinned individually before
+    // being linked would otherwise put its marker on whichever one happened to
+    // sort first.
+    const latitude =
+      units.reduce((total, unit) => total + unit.latitude, 0) / units.length;
+    const longitude =
+      units.reduce((total, unit) => total + unit.longitude, 0) / units.length;
+
+    buildings.push({
+      id,
+      code: units[0].building_code,
+      name: units[0].building_name,
+      latitude,
+      longitude,
+      units,
+      // Every row the viewport function returns is already status=available,
+      // so this is the count of what is listed rather than a second filter.
+      available: units.length,
+    });
+  }
+
+  return { buildings, rest };
 }
 
 export type Cluster = {
