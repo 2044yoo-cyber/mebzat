@@ -71,6 +71,9 @@ const COLUMNS = `
 export const FALLBACK_CITY: City = {
   id: "00000000-0000-0000-0000-000000000000",
   slug: "addis-ababa",
+  // Matches what 0053 seeds for the real row, so a building code generated
+  // against the fallback reads the same as one generated against the table.
+  code: "ADD",
   name: "Addis Ababa",
   country: "Ethiopia",
   latitude: 9.0192,

@@ -271,6 +271,12 @@ export type ClaimStatus =
   | "approved"
   | "rejected";
 
+export type ConstructionStatus =
+  | "planned"
+  | "under_construction"
+  | "completed"
+  | "renovating";
+
 export type ContactMethod =
   | "call"
   | "whatsapp"
@@ -1993,6 +1999,69 @@ export interface Database {
         };
         Relationships: [];
       };
+      buildings: {
+        Row: {
+          id: string;
+          code: string;
+          name: string;
+          building_type: PropertyType | null;
+          construction_status: ConstructionStatus;
+          floors: number | null;
+          city_id: string | null;
+          owner_id: string;
+          company_id: string | null;
+          address: string | null;
+          sub_city: string | null;
+          neighbourhood: string | null;
+          latitude: number;
+          longitude: number;
+          cover_image_url: string | null;
+          description: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          name: string;
+          building_type?: PropertyType | null;
+          construction_status?: ConstructionStatus;
+          floors?: number | null;
+          city_id?: string | null;
+          owner_id: string;
+          company_id?: string | null;
+          address?: string | null;
+          sub_city?: string | null;
+          neighbourhood?: string | null;
+          latitude: number;
+          longitude: number;
+          cover_image_url?: string | null;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          code?: string;
+          name?: string;
+          building_type?: PropertyType | null;
+          construction_status?: ConstructionStatus;
+          floors?: number | null;
+          city_id?: string | null;
+          owner_id?: string;
+          company_id?: string | null;
+          address?: string | null;
+          sub_city?: string | null;
+          neighbourhood?: string | null;
+          latitude?: number;
+          longitude?: number;
+          cover_image_url?: string | null;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       cities: {
         Row: {
           id: string;
@@ -2009,6 +2078,7 @@ export interface Database {
           active: boolean;
           position: number;
           created_at: string;
+          code: string | null;
         };
         Insert: {
           id?: string;
@@ -2025,6 +2095,7 @@ export interface Database {
           active?: boolean;
           position?: number;
           created_at?: string;
+          code?: string | null;
         };
         Update: {
           id?: string;
@@ -2041,6 +2112,7 @@ export interface Database {
           active?: boolean;
           position?: number;
           created_at?: string;
+          code?: string | null;
         };
         Relationships: [];
       };
@@ -5460,6 +5532,9 @@ export interface Database {
           location_accuracy: LocationAccuracy;
           location_source: string | null;
           is_sample: boolean;
+          building_id: string | null;
+          unit_number: string | null;
+          unit_code: string | null;
         };
         Insert: {
           id?: string;
@@ -5528,6 +5603,9 @@ export interface Database {
           location_accuracy?: LocationAccuracy;
           location_source?: string | null;
           is_sample?: boolean;
+          building_id?: string | null;
+          unit_number?: string | null;
+          unit_code?: string | null;
         };
         Update: {
           id?: string;
@@ -5596,6 +5674,9 @@ export interface Database {
           location_accuracy?: LocationAccuracy;
           location_source?: string | null;
           is_sample?: boolean;
+          building_id?: string | null;
+          unit_number?: string | null;
+          unit_code?: string | null;
         };
         Relationships: [];
       };
@@ -6813,6 +6894,12 @@ export interface Database {
         };
         Returns: { id: string; slug: string; name: string; city: string; logo_url: string; verified: boolean; rating: number; projects_completed: number; is_claimed: boolean }[];
       };
+      building_summary: {
+        Args: {
+          target: string;
+        };
+        Returns: { total_units: number; available_units: number; min_price: number; max_price: number; floors_with_units: number }[];
+      };
       can_see_exact_location: {
         Args: {
           target_property_id: string;
@@ -7413,6 +7500,12 @@ export interface Database {
         Args: Record<PropertyKey, never>;
         Returns: { project_id: string; title: string; role: AgendaRole; open_tasks: number; last_activity: string }[];
       };
+      next_building_code: {
+        Args: {
+          target_city: string;
+        };
+        Returns: string;
+      };
       offset_point: {
         Args: {
           lat: number;
@@ -7841,6 +7934,7 @@ export interface Database {
       budget_kind: BudgetKind;
       building_type: BuildingType;
       claim_status: ClaimStatus;
+      construction_status: ConstructionStatus;
       contact_method: ContactMethod;
       content_kind: ContentKind;
       contract_shape: ContractShape;
@@ -7960,6 +8054,7 @@ export type BillingProduct = Database["public"]["Tables"]["billing_products"]["R
 export type BriefAttachment = Database["public"]["Tables"]["brief_attachments"]["Row"];
 export type BriefBid = Database["public"]["Tables"]["brief_bids"]["Row"];
 export type BriefInvite = Database["public"]["Tables"]["brief_invites"]["Row"];
+export type Building = Database["public"]["Tables"]["buildings"]["Row"];
 export type City = Database["public"]["Tables"]["cities"]["Row"];
 export type CommentLike = Database["public"]["Tables"]["comment_likes"]["Row"];
 export type Company = Database["public"]["Tables"]["companies"]["Row"];
