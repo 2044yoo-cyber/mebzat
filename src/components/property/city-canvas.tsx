@@ -53,6 +53,7 @@ export type CanvasFilters = {
   minPrice?: number;
   maxPrice?: number;
   minBedrooms?: number;
+  floors?: number;
   minArea?: number;
 };
 
@@ -169,6 +170,7 @@ export function CityCanvas({
       params.set("minBedrooms", String(active.minBedrooms));
     }
     if (active.minArea !== undefined) params.set("minArea", String(active.minArea));
+    if (active.floors !== undefined) params.set("floors", String(active.floors));
 
     const url = `/api/properties/viewport?${params}`;
 

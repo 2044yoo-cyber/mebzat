@@ -56,6 +56,7 @@ export default async function CityPage(props: {
       maxPrice: Number(get("maxPrice")) || undefined,
       minBedrooms: Number(get("beds")) || undefined,
       minArea: Number(get("minArea")) || undefined,
+      floors: Number(get("floors")) || undefined,
     },
   );
 

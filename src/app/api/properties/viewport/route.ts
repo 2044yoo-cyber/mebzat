@@ -72,6 +72,7 @@ export async function GET(request: Request) {
         maxPrice: positiveNumber(searchParams.get("maxPrice")),
         minBedrooms: positiveNumber(searchParams.get("minBedrooms")),
         minArea: positiveNumber(searchParams.get("minArea")),
+        floors: positiveNumber(searchParams.get("floors")),
       },
     );
 

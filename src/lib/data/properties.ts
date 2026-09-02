@@ -50,6 +50,8 @@ export type PropertyFilters = {
   maxPrice?: number;
   minBedrooms?: number;
   minArea?: number;
+  /** Total storeys, exactly. G+N is floors = N + 1. */
+  floors?: number;
 };
 
 const COLUMNS = `
@@ -136,7 +138,19 @@ export async function getPropertiesInViewport(
   });
 
   if (error) return { properties: [], available: false };
-  return { properties: (data ?? []) as MapProperty[], available: true };
+
+  let rows = (data ?? []) as MapProperty[];
+
+  // properties_in_viewport has no storey argument, but it returns `floors`, so
+  // the filter is applied here rather than by changing a database function. It
+  // runs after max_results, so a storey filter narrows the page the viewport
+  // returned rather than reaching further into the city — acceptable while the
+  // cap is 300 and a viewport rarely holds that many.
+  if (filters.floors !== undefined) {
+    rows = rows.filter((property) => property.floors === filters.floors);
+  }
+
+  return { properties: rows, available: true };
 }
 
 export type PropertyListResult = {
@@ -190,6 +204,7 @@ export async function getProperties(options: {
     builder = builder.gte("bedrooms", filters.minBedrooms);
   }
   if (filters.minArea !== undefined) builder = builder.gte("area_m2", filters.minArea);
+  if (filters.floors !== undefined) builder = builder.eq("floors", filters.floors);
 
   const order = {
     newest: { column: "created_at", ascending: false },

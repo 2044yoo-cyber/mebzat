@@ -26,6 +26,7 @@ import { openPanel } from "@/lib/workspace/store";
 import { cn } from "@/lib/utils";
 import type { City, ListingKind, MapProperty } from "@/types/database.types";
 import type { CanvasFilters } from "@/components/property/city-canvas";
+import { StoreyFilter } from "@/components/property/storey-filter";
 
 /**
  * Medosha City.
@@ -75,6 +76,9 @@ export function CityExplorer({
   );
   const [band, setBand] = useState(Number(params.get("band")) || 0);
   const [beds, setBeds] = useState(Number(params.get("beds")) || 0);
+  const [floors, setFloors] = useState<number | null>(
+    Number(params.get("floors")) || null,
+  );
   const [areaBand, setAreaBand] = useState(Number(params.get("area")) || 0);
   const [showFilters, setShowFilters] = useState(false);
   const [layers, setLayers] = useState<string[]>(["properties"]);
@@ -118,11 +122,17 @@ export function CityExplorer({
       maxPrice: price.max,
       minBedrooms: beds || undefined,
       minArea: area.min,
+      floors: floors ?? undefined,
     };
-  }, [types, kind, band, beds, areaBand]);
+  }, [types, kind, band, beds, areaBand, floors]);
 
   const activeCount =
-    types.length + (kind ? 1 : 0) + (band ? 1 : 0) + (beds ? 1 : 0) + (areaBand ? 1 : 0);
+    types.length +
+    (kind ? 1 : 0) +
+    (band ? 1 : 0) +
+    (beds ? 1 : 0) +
+    (areaBand ? 1 : 0) +
+    (floors ? 1 : 0);
 
   // Stable identities, so the canvas never sees a changed callback and has no
   // reason to do anything but keep running.
@@ -145,13 +155,22 @@ export function CityExplorer({
   // be slower than the typing.
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return results;
-    return results.filter(
+    let rows = results;
+
+    // properties_in_viewport takes no storey argument, but it does return
+    // `floors` — so this filters what is already on screen instead of
+    // requiring a change to the database function.
+    if (floors !== null) {
+      rows = rows.filter((property) => property.floors === floors);
+    }
+
+    if (!term) return rows;
+    return rows.filter(
       (property) =>
         property.title.toLowerCase().includes(term) ||
         property.neighbourhood?.toLowerCase().includes(term),
     );
-  }, [results, query]);
+  }, [results, query, floors]);
 
   function toggleType(value: string) {
     setTypes((current) =>
@@ -175,6 +194,7 @@ export function CityExplorer({
     setBand(0);
     setBeds(0);
     setAreaBand(0);
+    setFloors(null);
     setQuery("");
   }
 
@@ -350,6 +370,8 @@ export function CityExplorer({
               ))}
             </FilterRow>
           </div>
+
+          <StoreyFilter value={floors} onChange={setFloors} />
         </div>
       )}
 
