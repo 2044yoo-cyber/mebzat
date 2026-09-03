@@ -5,8 +5,6 @@ import * as maplibregl from "maplibre-gl";
 import type { Map as MapLibreMap, Marker } from "maplibre-gl";
 import { Box, Layers, Loader2, Locate, Minus, Plus, WifiOff } from "lucide-react";
 
-import { useRouter } from "next/navigation";
-
 import { describeError, trackRequest } from "@/lib/map/diagnostics";
 import { MapEngine, type EngineState } from "@/lib/map/engine";
 import {
@@ -16,6 +14,7 @@ import {
   MARKER_COLOURS,
   groupByBuilding,
   createBuildingElement,
+  type BuildingGroup,
 } from "@/lib/map/markers";
 import type { AiHighlight } from "@/lib/map/ai-highlight";
 import { loadSession, saveSession } from "@/lib/map/session";
@@ -70,6 +69,7 @@ export function CityCanvas({
   panelOpen,
   onSelect,
   onResults,
+  onSelectBuilding,
 }: {
   city: City;
   initial: MapProperty[];
@@ -80,8 +80,9 @@ export function CityCanvas({
   panelOpen: boolean;
   onSelect: (property: MapProperty | null) => void;
   onResults?: (properties: MapProperty[]) => void;
+  /** A building marker was tapped. The list beside the map shows its units. */
+  onSelectBuilding?: (building: BuildingGroup | null) => void;
 }) {
-  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const engineRef = useRef<MapEngine | null>(null);
@@ -427,8 +428,9 @@ export function CityCanvas({
         building.name,
         building.units.length,
         () => {
-          // The code, not the uuid — the building page is addressed by it.
-          if (building.code) router.push(`/building/${building.code}`);
+          // The list beside the map, not a navigation. Somebody comparing
+          // towers should not lose the map to look inside one of them.
+          onSelectBuilding?.(building);
         },
       );
       element.dataset.units = signature;
@@ -507,7 +509,7 @@ export function CityCanvas({
         // A pin with impossible coordinates must not take the map with it.
       }
     }
-  }, [bands, properties, ready, selectedId, matchState, zoom, router]);
+  }, [bands, properties, ready, selectedId, matchState, zoom, onSelectBuilding]);
 
   // Frame what the assistant found.
   //

@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import type { City, ListingKind, MapProperty } from "@/types/database.types";
 import type { CanvasFilters } from "@/components/property/city-canvas";
 import { StoreyFilter } from "@/components/property/storey-filter";
+import type { BuildingGroup } from "@/lib/map/markers";
 
 /**
  * Medosha City.
@@ -81,6 +82,8 @@ export function CityExplorer({
   );
   const [areaBand, setAreaBand] = useState(Number(params.get("area")) || 0);
   const [showFilters, setShowFilters] = useState(false);
+  // Which building the list is showing the inside of, if any.
+  const [building, setBuilding] = useState<BuildingGroup | null>(null);
   const [layers, setLayers] = useState<string[]>(["properties"]);
   const [showLayers, setShowLayers] = useState(false);
 
@@ -164,13 +167,19 @@ export function CityExplorer({
       rows = rows.filter((property) => property.floors === floors);
     }
 
+    // A building marker was tapped: the list becomes that building's units.
+    // Applied before the text search so somebody can still search within it.
+    if (building) {
+      rows = rows.filter((property) => property.building_id === building.id);
+    }
+
     if (!term) return rows;
     return rows.filter(
       (property) =>
         property.title.toLowerCase().includes(term) ||
         property.neighbourhood?.toLowerCase().includes(term),
     );
-  }, [results, query, floors]);
+  }, [results, query, floors, building]);
 
   function toggleType(value: string) {
     setTypes((current) =>
@@ -195,6 +204,7 @@ export function CityExplorer({
     setBeds(0);
     setAreaBand(0);
     setFloors(null);
+    setBuilding(null);
     setQuery("");
   }
 
@@ -396,6 +406,7 @@ export function CityExplorer({
               panelOpen={panelOpen}
               onSelect={handleSelect}
               onResults={handleResults}
+            onSelectBuilding={setBuilding}
             />
           </MapBoundary>
         </div>
@@ -404,9 +415,41 @@ export function CityExplorer({
             is showing that property's detail beside this. */}
         {!panelOpen && (
           <aside className="min-h-0 overflow-y-auto border-t p-3 lg:border-t-0 lg:border-l">
+            {building && (
+              <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border bg-muted/40 p-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {building.name ?? "Building"}
+                  </p>
+                  {building.code && (
+                    <Link
+                      href={`/building/${building.code}`}
+                      className="font-mono text-[11px] text-brand hover:underline"
+                    >
+                      {building.code} →
+                    </Link>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBuilding(null)}
+                  className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Show all
+                </button>
+              </div>
+            )}
+
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-medium">
-                {visible.length} {visible.length === 1 ? "property" : "properties"}
+                {visible.length}{" "}
+                {building
+                  ? visible.length === 1
+                    ? "unit"
+                    : "units"
+                  : visible.length === 1
+                    ? "property"
+                    : "properties"}
                 {query && " matching"}
               </h2>
               <Link
