@@ -147,4 +147,63 @@ select '5. deleting the scenes took the hotspots' as step,
         where tour_id = 'bbbbbbbb-0000-0000-0000-000000000001') as scenes,
        (select count(*) from public.tour_hotspots) as orphaned_hotspots;
 
+-- ===================================================================
+-- 6. properties.has_360 has one answer, not two.
+--
+-- 0017 wrote this column from property_media and 0057 wrote it from tours.
+-- Neither knew about the other, so adding an ordinary photo to a listing with
+-- a published tour turned its 360° badge off — silently, on the map, with no
+-- error anywhere. 0059 gave both triggers the same question to ask.
+-- ===================================================================
+reset role;
+insert into auth.users (id, email) values
+  ('dddddddd-0000-0000-0000-000000000001', 'flag-owner@example.test'),
+  ('dddddddd-0000-0000-0000-000000000002', 'flag-stranger@example.test')
+on conflict (id) do nothing;
+
+insert into public.properties
+  (id, owner_id, title, slug, property_type, listing_kind, latitude, longitude)
+values ('eeeeeeee-0000-0000-0000-000000000001',
+        'dddddddd-0000-0000-0000-000000000001',
+        'Flag probe', 'flag-probe', 'apartment', 'sale', 9.0, 38.75);
+
+insert into public.tours (id, owner_id, title, property_id, visibility, published_at)
+values ('ffffffff-0000-0000-0000-000000000001',
+        'dddddddd-0000-0000-0000-000000000001',
+        'Probe tour', 'eeeeeeee-0000-0000-0000-000000000001', 'published', now());
+
+insert into public.property_media (property_id, kind, url)
+values ('eeeeeeee-0000-0000-0000-000000000001', 'photo', 'https://example.test/a.jpg');
+
+select '6. an unrelated photo did not wipe the flag' as step,
+       has_360 as should_be_true
+from public.properties where id = 'eeeeeeee-0000-0000-0000-000000000001';
+
+-- The other direction: a legacy panorama survives the tour being withdrawn.
+insert into public.property_media (property_id, kind, url)
+values ('eeeeeeee-0000-0000-0000-000000000001', 'panorama_360', 'https://example.test/p.jpg');
+update public.tours set visibility = 'draft'
+where id = 'ffffffff-0000-0000-0000-000000000001';
+
+select '6b. withdrawing the tour left the panorama media' as step,
+       has_360 as should_be_true
+from public.properties where id = 'eeeeeeee-0000-0000-0000-000000000001';
+
+delete from public.property_media
+where property_id = 'eeeeeeee-0000-0000-0000-000000000001' and kind = 'panorama_360';
+
+select '6c. with neither source, the flag is off' as step,
+       has_360 as should_be_false
+from public.properties where id = 'eeeeeeee-0000-0000-0000-000000000001';
+
+-- tours.property_id carries no ownership check, so anyone may aim a tour at
+-- any listing. Only the owner's own tour may light the badge.
+insert into public.tours (owner_id, title, property_id, visibility, published_at)
+values ('dddddddd-0000-0000-0000-000000000002', 'Hijack',
+        'eeeeeeee-0000-0000-0000-000000000001', 'published', now());
+
+select '6d. a stranger cannot light the badge' as step,
+       has_360 as should_be_false
+from public.properties where id = 'eeeeeeee-0000-0000-0000-000000000001';
+
 rollback;

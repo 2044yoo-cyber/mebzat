@@ -41,6 +41,7 @@ import {
   isPropertySaved,
 } from "@/lib/data/properties";
 import { createClient } from "@/lib/supabase/server";
+import { listToursFor } from "@/lib/tour/queries";
 import { cn, formatPrice } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -116,7 +117,8 @@ export default async function PropertyPage(props: {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [media, location, publicPlaces, travel, services, stats, saved] = await Promise.all([
+  const [media, location, publicPlaces, travel, services, stats, saved, tours] =
+    await Promise.all([
     getPropertyMedia(property.id),
     getPropertyLocation(property.id),
     getPublicNearbyPlaces(property.id, 2),
@@ -128,6 +130,7 @@ export default async function PropertyPage(props: {
       property.location_city,
     ),
     isPropertySaved(property.id, user?.id ?? null),
+    listToursFor({ propertyId: property.id, ownerId: property.owner_id }),
   ]);
 
   const land = isLandType(property.property_type);
@@ -222,11 +225,28 @@ export default async function PropertyPage(props: {
             <span className="absolute top-3 left-3 rounded-full bg-background/90 px-3 py-1 text-sm font-medium backdrop-blur">
               {LISTING_KIND[property.listing_kind]}
             </span>
-            {property.has_360 && (
-              <span className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1 text-sm font-medium backdrop-blur">
+            {/* The badge used to say a tour existed and give nobody a way to
+                open it. It is the link now — and when there is no tour, the
+                owner is the only person who can do anything about that, so
+                they are the only one who sees the other half. */}
+            {tours.length > 0 ? (
+              <Link
+                href={`/tour/${tours[0].id}`}
+                className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1 text-sm font-medium backdrop-blur transition-colors hover:bg-background"
+              >
                 <Rotate3d className="size-4" />
-                360° tour available
-              </span>
+                {tours.length > 1 ? `${tours.length} 360° tours` : "Walk through in 360°"}
+              </Link>
+            ) : (
+              user?.id === property.owner_id && (
+                <Link
+                  href={`/tours/new?property=${property.id}`}
+                  className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1 text-sm font-medium backdrop-blur transition-colors hover:bg-background"
+                >
+                  <Rotate3d className="size-4" />
+                  Add a 360° tour
+                </Link>
+              )
             )}
           </div>
 

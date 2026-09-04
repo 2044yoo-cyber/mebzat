@@ -192,9 +192,22 @@ export async function listMyTours(): Promise<TourSummary[]> {
   }));
 }
 
-/** Published tours attached to one property, building or project. */
+/**
+ * Published tours attached to one property, building or project.
+ *
+ * `ownerId` is not optional decoration on the property case. tours.property_id
+ * carries no ownership check — anyone may build a tour and point it at any
+ * listing — so without it a stranger's tour would be offered on somebody
+ * else's property page as though the seller had made it. The database applies
+ * the same rule to the has_360 flag; see migration 0059.
+ */
 export async function listToursFor(
-  target: { propertyId?: string; buildingId?: string; projectId?: string },
+  target: {
+    propertyId?: string;
+    buildingId?: string;
+    projectId?: string;
+    ownerId?: string;
+  },
 ): Promise<TourSummary[]> {
   const supabase = await createClient();
 
@@ -207,6 +220,8 @@ export async function listToursFor(
   else if (target.buildingId) query = query.eq("building_id", target.buildingId);
   else if (target.projectId) query = query.eq("project_id", target.projectId);
   else return [];
+
+  if (target.ownerId) query = query.eq("owner_id", target.ownerId);
 
   const { data } = await query.order("published_at", { ascending: false });
 
