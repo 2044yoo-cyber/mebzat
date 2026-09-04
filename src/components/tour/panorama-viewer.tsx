@@ -69,6 +69,7 @@ export function PanoramaViewer({
   initialZoom = 75,
   hotspots = [],
   onHotspot,
+  onAim,
   className,
 }: {
   src: string;
@@ -77,6 +78,14 @@ export function PanoramaViewer({
   initialZoom?: number;
   hotspots?: PanoramaHotspot[];
   onHotspot?: (id: string) => void;
+  /**
+   * Where the view is pointed, in degrees, reported when a turn or a zoom
+   * ends rather than while it is happening. The builder places a hotspot at
+   * whatever the viewer is facing, and a callback fired on every frame would
+   * re-render the form sixty times a second for a number nobody reads until
+   * they press the button.
+   */
+  onAim?: (aim: { yaw: number; pitch: number }) => void;
   className?: string;
 }) {
   const mount = useRef<HTMLDivElement>(null);
@@ -105,6 +114,13 @@ export function PanoramaViewer({
   useEffect(() => {
     current.current = hotspots;
   }, [hotspots]);
+
+  // Same reason: an inline arrow function as onAim would otherwise rebuild the
+  // WebGL scene on every render of the parent.
+  const reportAim = useRef(onAim);
+  useEffect(() => {
+    reportAim.current = onAim;
+  }, [onAim]);
 
   useEffect(() => {
     const node = mount.current;
@@ -211,16 +227,27 @@ export function PanoramaViewer({
       lastY = event.clientY;
     }
 
+    function announce() {
+      reportAim.current?.({
+        yaw: normaliseDegrees((yaw * 180) / Math.PI),
+        pitch: (pitch * 180) / Math.PI,
+      });
+    }
+
     function up(event: PointerEvent) {
       pointers.delete(event.pointerId);
       if (pointers.size < 2) pinchStart = 0;
-      if (pointers.size === 0) dragging = false;
+      if (pointers.size === 0) {
+        dragging = false;
+        announce();
+      }
     }
 
     function wheel(event: WheelEvent) {
       event.preventDefault();
       camera.fov = clampFov(camera.fov + event.deltaY * 0.05);
       camera.updateProjectionMatrix();
+      announce();
     }
 
     canvas.addEventListener("pointerdown", down);
@@ -260,6 +287,7 @@ export function PanoramaViewer({
       place();
     }
     render();
+    announce();
 
     return () => {
       disposed = true;
@@ -319,4 +347,13 @@ export function PanoramaViewer({
         ))}
     </div>
   );
+}
+
+/**
+ * A yaw of -370° and one of 350° are the same direction. Stored angles are
+ * kept in 0–360 so a hotspot's coordinates mean the same thing whether the
+ * person dragged clockwise or anticlockwise to reach them.
+ */
+function normaliseDegrees(value: number) {
+  return ((value % 360) + 360) % 360;
 }
