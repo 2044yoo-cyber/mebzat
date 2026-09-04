@@ -25,6 +25,15 @@ import {
   PITCH_LIMIT,
   projectHotspot,
 } from "../src/lib/tour/panorama-math.ts";
+import {
+  checkPanorama,
+  EQUIRECTANGULAR_RATIO,
+  MAX_PANORAMA_WIDTH,
+  MIN_PANORAMA_WIDTH,
+  PANORAMA_TYPES,
+  RATIO_TOLERANCE,
+  sceneName,
+} from "../src/lib/tour/panorama-image.ts";
 
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
@@ -242,6 +251,152 @@ for (const [yaw, pitch] of [
 check("looking at the horizon does not tilt the target", Math.abs(lookTarget(0, 0).y) < 1e-9);
 check("looking up puts the target above the horizon", lookTarget(0, 1).y > 0);
 check("looking down puts the target below the horizon", lookTarget(0, -1).y < 0);
+
+// ---------------------------------------------------------------------------
+// 7. What is allowed to become a panorama
+//
+// An ordinary photograph on a sphere does not error. It renders, smeared, and
+// looks like a bug in the viewer rather than the wrong file. The one thing
+// this check must never do is let a non-equirectangular image through.
+// ---------------------------------------------------------------------------
+
+// Real 360° cameras, and the sizes they write.
+for (const [w, h, label] of [
+  [5376, 2688, "Ricoh Theta"],
+  [4096, 2048, "a stitched panorama"],
+  [2048, 1024, "a small panorama"],
+  [1024, 512, "the smallest accepted"],
+  [11968, 5984, "Insta360 X3"],
+  [8192, 4096, "an 8K panorama"],
+] as const) {
+  check(`${label} (${w}×${h}) is accepted`, checkPanorama(w, h).ok);
+}
+
+// Ordinary photographs, screenshots and phone portraits. Every one of these
+// would render as a smear.
+for (const [w, h, label] of [
+  [4032, 3024, "a 4:3 phone photo"],
+  [1920, 1080, "a 16:9 screenshot"],
+  [1080, 1920, "a portrait photo"],
+  [1000, 1000, "a square crop"],
+  [3000, 1000, "a 3:1 letterbox"],
+  [2000, 1400, "a wide-ish photo"],
+] as const) {
+  check(`${label} (${w}×${h}) is refused`, !checkPanorama(w, h).ok);
+}
+
+check("a zero-sized image is refused", !checkPanorama(0, 0).ok);
+check("a negative size is refused", !checkPanorama(-4096, -2048).ok);
+check("a non-finite size is refused", !checkPanorama(Number.NaN, 2048).ok);
+
+// The tolerance exists for stitchers that round; it must not be wide enough
+// to swallow a real photograph. 2:1 ± 0.04 spans roughly 1.96 to 2.04.
+check("the tolerance is small enough to exclude 16:9", RATIO_TOLERANCE < 16 / 9 - 1);
+check("the tolerance admits a few pixels of rounding", checkPanorama(4097, 2048).ok);
+check("the ratio is two to one", EQUIRECTANGULAR_RATIO === 2);
+
+// Too small to look at.
+const tiny = checkPanorama(MIN_PANORAMA_WIDTH - 2, (MIN_PANORAMA_WIDTH - 2) / 2);
+check("a panorama under the minimum width is refused", !tiny.ok);
+check(
+  "and it is refused for its size, not its shape",
+  !tiny.ok && tiny.reason.includes("too small"),
+  tiny.ok ? "" : tiny.reason,
+);
+
+// Too large to display: shrunk rather than refused, because the file is
+// perfectly valid and the phone is the constraint.
+const huge = checkPanorama(11968, 5984);
+check("an oversized panorama is accepted", huge.ok);
+check(
+  "an oversized panorama is resized to the texture limit",
+  huge.ok && huge.resizeTo?.width === MAX_PANORAMA_WIDTH,
+  huge.ok ? JSON.stringify(huge.resizeTo) : "",
+);
+check(
+  "and the resize target is exactly two to one",
+  huge.ok && huge.resizeTo !== null && huge.resizeTo.width === huge.resizeTo.height * 2,
+);
+// An oversized panorama that is a few pixels off 2:1 comes out *exactly*
+// equirectangular, rather than carrying its rounding error into the stored
+// file. Scaling by the source ratio would keep the error, and the check that
+// used a perfectly 2:1 source could not tell the two apart.
+const skewed = checkPanorama(8200, 4090);
+check("an off-square oversized panorama is accepted", skewed.ok);
+check(
+  "and it is corrected to exactly 2:1, not scaled by its own ratio",
+  skewed.ok && skewed.resizeTo?.width === MAX_PANORAMA_WIDTH &&
+    skewed.resizeTo?.height === MAX_PANORAMA_WIDTH / 2,
+  skewed.ok ? JSON.stringify(skewed.resizeTo) : "",
+);
+
+check(
+  "a panorama at the limit is not resized",
+  checkPanorama(MAX_PANORAMA_WIDTH, MAX_PANORAMA_WIDTH / 2).ok &&
+    (checkPanorama(MAX_PANORAMA_WIDTH, MAX_PANORAMA_WIDTH / 2) as { resizeTo: unknown })
+      .resizeTo === null,
+);
+
+// The accepted types have to be ones the panoramas bucket will take. PNG is
+// deliberately absent: 4096 wide and lossless is past the size limit.
+check("jpeg is accepted", (PANORAMA_TYPES as readonly string[]).includes("image/jpeg"));
+check("webp is accepted", (PANORAMA_TYPES as readonly string[]).includes("image/webp"));
+check("png is not", !(PANORAMA_TYPES as readonly string[]).includes("image/png"));
+
+// The refusal has to say what to do, not just that it failed. A message that
+// only says "invalid image" sends somebody to support.
+const refusal = checkPanorama(4032, 3024);
+check(
+  "the refusal explains the shape a 360° photo has to be",
+  !refusal.ok && refusal.reason.includes("twice as wide"),
+  refusal.ok ? "" : refusal.reason,
+);
+check(
+  "the refusal quotes the size that was uploaded",
+  !refusal.ok && refusal.reason.includes("4032") && refusal.reason.includes("3024"),
+);
+
+// ---------------------------------------------------------------------------
+// 8. What a scene is called before anybody renames it
+//
+// A serial number as a scene title is worse than a placeholder, because it
+// looks deliberate. Nobody edits "R0010234", and it ships to the buyer.
+// ---------------------------------------------------------------------------
+
+for (const [file, expected] of [
+  ["living room.jpg", "Living room"],
+  ["master_bedroom.jpg", "Master bedroom"],
+  ["kitchen-and-dining.webp", "Kitchen and dining"],
+  ["Balcony.JPG", "Balcony"],
+  ["  rooftop  .jpg", "Rooftop"],
+  ["second floor landing.jpeg", "Second floor landing"],
+] as const) {
+  check(`"${file}" becomes "${expected}"`, sceneName(file, 0) === expected, sceneName(file, 0));
+}
+
+// Camera output, in the shapes the common 360° cameras write.
+for (const file of [
+  "R0010234.JPG",
+  "IMG_2201.jpg",
+  "DSC00042.jpg",
+  "GS__0198.jpg",
+  "20260904.jpg",
+  "0001.webp",
+  ".jpg",
+  "___.jpg",
+]) {
+  check(`"${file}" falls back to a numbered scene`, sceneName(file, 2) === "Scene 3", sceneName(file, 2));
+}
+
+check("the fallback is one-based", sceneName("IMG_0001.jpg", 0) === "Scene 1");
+
+// A real room name that happens to contain digits is not a serial number.
+check('"bedroom 2.jpg" keeps its name', sceneName("bedroom 2.jpg", 0) === "Bedroom 2");
+check('"unit 401.jpg" keeps its name', sceneName("unit 401.jpg", 0) === "Unit 401");
+// Short block-and-unit labels — "B2", "A 12" — are how buildings here are
+// signed. A serial number is a long run of digits; two is a door.
+check('"B2.jpg" keeps its name', sceneName("B2.jpg", 0) === "B2", sceneName("B2.jpg", 0));
+check('"A 12.jpg" keeps its name', sceneName("A 12.jpg", 0) === "A 12", sceneName("A 12.jpg", 0));
 
 // ---------------------------------------------------------------------------
 

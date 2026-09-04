@@ -298,7 +298,8 @@ export type ContentKind =
   | "post"
   | "comment"
   | "listing"
-  | "video";
+  | "video"
+  | "panorama";
 
 export type ContractShape =
   | "labour_only"
