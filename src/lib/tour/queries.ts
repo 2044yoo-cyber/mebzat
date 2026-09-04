@@ -1,5 +1,6 @@
 import "server-only";
 
+import { reportFailure } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import type { HotspotKind, TourVisibility } from "@/types/database.types";
 
@@ -64,13 +65,23 @@ export type Tour = {
   scenes: TourScene[];
 };
 
+/**
+ * The foreign key is named because there are two.
+ *
+ * tour_hotspots points at tour_scenes twice — once for the scene it sits in
+ * (scene_id) and once for the scene a door opens (target_scene_id) — and asked
+ * to embed one table in the other, PostgREST cannot guess which. It does not
+ * guess: it refuses the whole query. Unnamed, this select returned an error
+ * for every tour that has ever existed, and the pages built on it answered 404
+ * with nothing to say why.
+ */
 const SHAPE = `
   id, owner_id, title, description, visibility, thumbnail_url,
   property_id, building_id, project_id, view_count, published_at, updated_at,
   tour_scenes (
     id, title, panorama_url, quarantine_path, moderation_item_id, width, height,
     initial_yaw, initial_pitch, initial_zoom, position,
-    tour_hotspots (
+    tour_hotspots!tour_hotspots_scene_id_fkey (
       id, kind, yaw, pitch, title, description,
       target_scene_id, target_property_id, target_project_id, target_url
     )
@@ -115,7 +126,7 @@ type SceneRow = {
 export async function getTour(id: string): Promise<Tour | null> {
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("tours")
     .select(SHAPE)
     .eq("id", id)
@@ -124,6 +135,11 @@ export async function getTour(id: string): Promise<Tour | null> {
     .order("position", { referencedTable: "tour_scenes", ascending: true })
     .maybeSingle();
 
+  // A tour that is not readable and a query that is broken both arrive here as
+  // an empty result, and the caller renders the same 404 for either. Only one
+  // of them is anybody's fault, and the difference is in the error object —
+  // which this used to discard one line after receiving it.
+  if (error) reportFailure("getTour", error, "");
   if (!data) return null;
 
   const rows = (data.tour_scenes ?? []) as unknown as SceneRow[];
@@ -194,9 +210,15 @@ async function signedPreview(
   supabase: Awaited<ReturnType<typeof createClient>>,
   path: string,
 ): Promise<string | null> {
-  const { data } = await supabase.storage
+  const { data, error } = await supabase.storage
     .from("moderation-quarantine")
     .createSignedUrl(path, 60 * 60);
+
+  // A storage error is not a PostgrestError, so it does not go through
+  // reportFailure. It still has to be said out loud: a room the owner cannot
+  // preview is dropped from the tour, and silently is the wrong way to do that.
+  if (error) console.error("[tour] could not sign a pending panorama:", error.message);
+
   return data?.signedUrl ?? null;
 }
 
@@ -218,12 +240,14 @@ export async function listMyTours(): Promise<TourSummary[]> {
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("tours")
     .select("id, title, visibility, thumbnail_url, view_count, updated_at, tour_scenes(id)")
     .eq("owner_id", user.id)
     .neq("visibility", "archived")
     .order("updated_at", { ascending: false });
+
+  if (error) reportFailure("listMyTours", error, "");
 
   return (data ?? []).map((tour) => ({
     id: tour.id,
@@ -267,7 +291,9 @@ export async function listToursFor(
 
   if (target.ownerId) query = query.eq("owner_id", target.ownerId);
 
-  const { data } = await query.order("published_at", { ascending: false });
+  const { data, error } = await query.order("published_at", { ascending: false });
+
+  if (error) reportFailure("listToursFor", error, "");
 
   return (data ?? []).map((tour) => ({
     id: tour.id,

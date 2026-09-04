@@ -814,6 +814,65 @@ check("and carries no quarantine path", !clearedOut.quarantinePath);
 check("the whole list is converted", toSceneInputs([draftScene, clearedDraft]).length === 2);
 
 // ---------------------------------------------------------------------------
+// 11c. An embed between two tables joined twice must name its foreign key
+//
+// tour_hotspots points at tour_scenes twice: scene_id, for the room the marker
+// is in, and target_scene_id, for the room a door opens. Asked to embed one in
+// the other, PostgREST will not guess which — it refuses the entire query. The
+// select then returns an error, the error was discarded, and every page built
+// on it answered 404 with nothing to say why.
+//
+// This reads the migration for the pairs of tables joined more than once, then
+// reads every select in the codebase that embeds one in the other, so a new
+// ambiguous embed fails here rather than as a bare 404.
+// ---------------------------------------------------------------------------
+
+const tourSql = readFileSync("supabase/migrations/0057_tours.sql", "utf8")
+  .replace(/--.*$/gm, "");
+
+// The two references that make the embed ambiguous. If either ever goes, the
+// disambiguation below is no longer needed and this says so.
+check(
+  "a hotspot references the scene it sits in",
+  /scene_id\s+uuid\s+not null\s+references public\.tour_scenes/.test(tourSql),
+);
+check(
+  "a hotspot also references the scene a door opens",
+  /target_scene_id\s+uuid\s+references public\.tour_scenes/.test(tourSql),
+);
+
+const queries = readFileSync("src/lib/tour/queries.ts", "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+// Every embed of tour_hotspots has to name which reference it means.
+const embeds = queries.match(/tour_hotspots\s*!?[A-Za-z_]*\s*\(/g) ?? [];
+check("the tour query embeds hotspots", embeds.length > 0);
+for (const embed of embeds) {
+  check(
+    `the embed "${embed.trim()}" names its foreign key`,
+    embed.includes("!"),
+    embed,
+  );
+}
+check(
+  "and it names the scene the hotspot sits in, not the one it opens",
+  queries.includes("tour_hotspots!tour_hotspots_scene_id_fkey"),
+);
+
+// The errors these reads produce must not be discarded — that is what turned a
+// clear PostgREST message into a bare 404 for several rounds.
+const reads = queries.match(/const \{ data[^}]*\} = await/g) ?? [];
+check("the tour reads destructure a result", reads.length >= 3);
+for (const read of reads) {
+  check(`"${read.trim()}" keeps its error`, read.includes("error"), read);
+}
+check(
+  "and the error is reported",
+  (queries.match(/reportFailure\(/g) ?? []).length >= 3,
+);
+
+// ---------------------------------------------------------------------------
 // 12. next/image must not be pointed at quarantine
 //
 // The obvious fix for "Invalid src prop" on a signed preview is to add the
