@@ -13,6 +13,8 @@ import {
   statedSize,
 } from "../../services/opening-samples";
 import { buildOpening } from "../../services/openings";
+import { OpeningPreview } from "./opening-preview";
+import { SaveOpening } from "./save-opening-button";
 import { packLinear } from "../../services/linear-stock";
 import {
   glassTypes,
@@ -189,6 +191,17 @@ function OpeningBreakdownView({
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3">
+        {/* ---- The opening itself ---------------------------------------- */}
+        {/*
+          Above the controls rather than beside them: on a phone this column is
+          the whole screen, and a drawing under three sections of fields is a
+          drawing nobody scrolls to. Every field below feeds the same spec, so
+          the picture is never out of step with the numbers.
+        */}
+        <OpeningPreview spec={spec} />
+
+        <SaveOpening spec={spec} />
+
         {/* ---- Size ------------------------------------------------------ */}
         <section className="space-y-2 rounded-xl border p-3">
           <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
