@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Building2, MapPin } from "lucide-react";
+import { Building2, MapPin, Rotate3d } from "lucide-react";
 
 import { StoreyIcon } from "@/components/property/storey-icons";
 import {
@@ -9,6 +9,8 @@ import {
   getBuildingSummary,
   getBuildingUnits,
 } from "@/lib/data/buildings";
+import { createClient } from "@/lib/supabase/server";
+import { listToursFor } from "@/lib/tour/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -45,9 +47,17 @@ export default async function BuildingPage(props: {
   const building = await getBuildingByCode(code);
   if (!building) notFound();
 
-  const [summary, floors] = await Promise.all([
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [summary, floors, tours] = await Promise.all([
     getBuildingSummary(building.id),
     getBuildingUnits(building.id),
+    // Owner-matched for the same reason as on a property: tours.building_id
+    // carries no ownership check, so anyone may aim a tour at any building.
+    listToursFor({ buildingId: building.id, ownerId: building.owner_id }),
   ]);
 
   const storeys = building.floors ?? 0;
@@ -169,6 +179,41 @@ export default async function BuildingPage(props: {
             </section>
           ))}
         </div>
+      )}
+
+      {(tours.length > 0 || user?.id === building.owner_id) && (
+        <section className="mt-8">
+          <h2 className="mb-3 text-sm font-medium">360° tours</h2>
+
+          {tours.length === 0 ? (
+            <Link
+              href={`/tours/new?building=${building.id}`}
+              className="flex items-center gap-2 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-brand hover:text-foreground"
+            >
+              <Rotate3d className="size-4" />
+              Add a 360° tour of the lobby, a show unit or the roof
+            </Link>
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {tours.map((tour) => (
+                <li key={tour.id}>
+                  <Link
+                    href={`/tour/${tour.id}`}
+                    className="flex items-center gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/50"
+                  >
+                    <Rotate3d className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{tour.title}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {tour.sceneCount} {tour.sceneCount === 1 ? "scene" : "scenes"}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
       <footer className="mt-8 flex items-center gap-2 border-t pt-4 text-xs text-muted-foreground">

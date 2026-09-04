@@ -11,6 +11,7 @@ import {
   Layers,
   MapPin,
   Palette,
+  Rotate3d,
   User,
 } from "lucide-react";
 
@@ -19,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { BUILDING_TYPE_MAP } from "@/lib/constants/building-types";
 import { createClient } from "@/lib/supabase/server";
+import { listToursFor } from "@/lib/tour/queries";
 
 export async function generateMetadata(props: {
   params: Promise<{ id: string }>;
@@ -82,7 +84,7 @@ export default async function ProjectDetailPage(props: {
 
   const isOwner = Boolean(user) && project.owner_id === user!.id;
 
-  const [{ data: images }, { data: owner }] = await Promise.all([
+  const [{ data: images }, { data: owner }, tours] = await Promise.all([
     supabase
       .from("project_images")
       .select("id, url, caption")
@@ -93,6 +95,9 @@ export default async function ProjectDetailPage(props: {
       .select("username, full_name, company_name, avatar_url")
       .eq("id", project.owner_id)
       .single(),
+    // Owner-matched: tours.project_id carries no ownership check, so without
+    // this a stranger's tour would be shown here as though the owner made it.
+    listToursFor({ projectId: project.id, ownerId: project.owner_id }),
   ]);
 
   if (!isOwner) {
@@ -268,6 +273,41 @@ export default async function ProjectDetailPage(props: {
           </div>
         </aside>
       </div>
+
+      {(tours.length > 0 || isOwner) && (
+        <section className="mt-8">
+          <h2 className="mb-3 text-sm font-medium">360° tours</h2>
+
+          {tours.length === 0 ? (
+            <Link
+              href={`/tours/new?project=${project.id}`}
+              className="flex items-center gap-2 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-brand hover:text-foreground"
+            >
+              <Rotate3d className="size-4" />
+              Add a 360° tour — a finished room says more than a photograph of it
+            </Link>
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {tours.map((tour) => (
+                <li key={tour.id}>
+                  <Link
+                    href={`/tour/${tour.id}`}
+                    className="flex items-center gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/50"
+                  >
+                    <Rotate3d className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{tour.title}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {tour.sceneCount} {tour.sceneCount === 1 ? "scene" : "scenes"}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </div>
   );
 }
