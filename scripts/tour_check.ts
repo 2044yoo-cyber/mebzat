@@ -38,7 +38,11 @@ import {
   sceneName,
 } from "../src/lib/tour/panorama-image.ts";
 import type { ValidatableHotspot, ValidatableScene } from "../src/lib/tour/validate.ts";
-import { toSceneInputs, type DraftTourScene } from "../src/lib/tour/draft.ts";
+import {
+  resolveSceneTargets,
+  toSceneInputs,
+  type DraftTourScene,
+} from "../src/lib/tour/draft.ts";
 import {
   fromOurStorage,
   ownsQuarantinePath,
@@ -812,6 +816,132 @@ check("a cleared scene is not marked pending", !clearedOut.pending);
 check("and carries no quarantine path", !clearedOut.quarantinePath);
 
 check("the whole list is converted", toSceneInputs([draftScene, clearedDraft]).length === 2);
+
+// ---------------------------------------------------------------------------
+// 11e. A door that resolves to nothing never reaches the database
+//
+// hotspot_scene_has_target refuses a scene hotspot with no target, and what
+// comes back is a 23514 quoting a row of uuids: "new row for relation
+// tour_hotspots violates check constraint". Nobody can act on that. Worse, by
+// the time it arrives the scenes have already been written.
+// ---------------------------------------------------------------------------
+
+/** A hotspot as the builder holds one. */
+function door(title: string, targetSceneKey: string | null) {
+  return {
+    key: `h-${title}`,
+    kind: "scene" as const,
+    yaw: 90,
+    pitch: 0,
+    title,
+    description: null,
+    targetSceneKey,
+  };
+}
+
+function note(title: string) {
+  return {
+    key: `h-${title}`,
+    kind: "info" as const,
+    yaw: 0,
+    pitch: 0,
+    title,
+    description: null,
+    targetSceneKey: null,
+  };
+}
+
+const two = [
+  { key: "a", title: "Living room", hotspots: [door("To the kitchen", "b"), note("South facing")] },
+  { key: "b", title: "Kitchen", hotspots: [door("Back", "a")] },
+];
+const ids = new Map([
+  ["a", "11111111-0000-0000-0000-000000000001"],
+  ["b", "11111111-0000-0000-0000-000000000002"],
+]);
+const at = (i: number) => ["11111111-0000-0000-0000-000000000001", "11111111-0000-0000-0000-000000000002"][i];
+
+const good = resolveSceneTargets(two, ids, at);
+check("two rooms with doors between them resolve", good.ok, good.ok ? "" : good.reason);
+check("every hotspot is carried", good.ok && good.hotspots.length === 3);
+check(
+  "a door points at the uuid its room was given",
+  good.ok && good.hotspots[0].target_scene_id === "11111111-0000-0000-0000-000000000002",
+);
+check(
+  "and sits in the uuid of the room it is in",
+  good.ok && good.hotspots[0].scene_id === "11111111-0000-0000-0000-000000000001",
+);
+check("a note needs no target", good.ok && good.hotspots[1].target_scene_id === null);
+
+// The failure that produced the 23514.
+const brokenDoor = [
+  { key: "a", title: "Living room", hotspots: [door("To Shot panoramic bedroom", "gone")] },
+];
+const orphan = resolveSceneTargets(brokenDoor, ids, at);
+check("a door pointing at a missing room is refused", !orphan.ok);
+check(
+  "and the message names the door and the room it is in",
+  !orphan.ok &&
+    orphan.reason.includes("To Shot panoramic bedroom") &&
+    orphan.reason.includes("Living room"),
+  orphan.ok ? "" : orphan.reason,
+);
+check(
+  "and says what to do about it",
+  !orphan.ok && /remove it|Choose another room/.test(orphan.reason),
+  orphan.ok ? "" : orphan.reason,
+);
+// Two different mistakes, two different sentences: this door was given a room
+// that has since gone, the one below was never given one. Telling somebody
+// their door "has no room to open" when they can see a room selected in the
+// dropdown sends them looking in the wrong place.
+check(
+  "and says the room has gone, not that none was chosen",
+  !orphan.ok && orphan.reason.includes("no longer in this tour"),
+  orphan.ok ? "" : orphan.reason,
+);
+
+const noDestination = [{ key: "a", title: "Living room", hotspots: [door("Nowhere", null)] }];
+const empty = resolveSceneTargets(noDestination, ids, at);
+check("a door with no target at all is refused", !empty.ok);
+check(
+  "and says the door has no room to open",
+  !empty.ok && empty.reason.includes("no room to open"),
+  empty.ok ? "" : empty.reason,
+);
+
+// A scene whose insert returned no id must not silently write hotspots that
+// point at nothing.
+const noId = resolveSceneTargets(two, ids, () => undefined);
+check("a scene with no id back is refused", !noId.ok);
+check(
+  "and it is reported as a scene failure, not a door one",
+  !noId.ok && noId.reason.includes("scenes"),
+  noId.ok ? "" : noId.reason,
+);
+
+// A hotspot belongs to the room at its index, not to whatever the key map
+// says. The two agree in every normal save, which is exactly why a mix-up
+// here would go unnoticed: every marker would land in the wrong room and the
+// tour would still open.
+const disagreeing = new Map([
+  ["a", "22222222-0000-0000-0000-00000000000a"],
+  ["b", "11111111-0000-0000-0000-000000000002"],
+]);
+const byIndex = resolveSceneTargets(two, disagreeing, at);
+check(
+  "a hotspot sits in the room at its index, not the one its key maps to",
+  byIndex.ok && byIndex.hotspots[0].scene_id === at(0),
+  byIndex.ok ? byIndex.hotspots[0].scene_id : "",
+);
+
+check("a tour with no hotspots resolves to none",
+  (() => {
+    const r = resolveSceneTargets([{ key: "a", title: "Only room", hotspots: [] }], ids, at);
+    return r.ok && r.hotspots.length === 0;
+  })(),
+);
 
 // ---------------------------------------------------------------------------
 // 11c. An embed between two tables joined twice must name its foreign key

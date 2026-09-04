@@ -63,3 +63,97 @@ export function toSceneInputs(scenes: DraftTourScene[]): SceneInput[] {
     })),
   }));
 }
+
+/** One hotspot row, with its scene and target already resolved to uuids. */
+export type ResolvedHotspot = {
+  scene_id: string;
+  kind: HotspotInput["kind"];
+  yaw: number;
+  pitch: number;
+  title: string;
+  description: string | null;
+  target_scene_id: string | null;
+  target_property_id: string | null;
+  target_project_id: string | null;
+  target_url: string | null;
+};
+
+export type ResolveResult =
+  | { ok: true; hotspots: ResolvedHotspot[] }
+  | { ok: false; reason: string; detail: string };
+
+/**
+ * Turning each hotspot's scene *key* into the uuid that scene was just given.
+ *
+ * A door names its destination by the builder's local key, because it may
+ * point at a room being created in the same save. The keys are resolved here,
+ * after the scenes are written and before any hotspot is.
+ *
+ * The failure this exists to prevent is a door that resolves to nothing. The
+ * database refuses it — `hotspot_scene_has_target` — but by then the scenes
+ * have been written, and what reaches the person is a 23514 quoting a row.
+ * Resolving first turns that into a sentence naming the room, and means the
+ * broken row is never sent.
+ */
+export function resolveSceneTargets(
+  scenes: { key: string; title: string; hotspots?: DraftHotspot[] }[],
+  idForKey: Map<string, string>,
+  idAt: (index: number) => string | undefined,
+): ResolveResult {
+  const hotspots: ResolvedHotspot[] = [];
+
+  for (const [index, scene] of scenes.entries()) {
+    const sceneId = idAt(index);
+    if (!sceneId) {
+      return {
+        ok: false,
+        reason: "Could not save the scenes.",
+        detail: `no id came back for scene ${index} ("${scene.title}")`,
+      };
+    }
+
+    for (const hotspot of scene.hotspots ?? []) {
+      let target: string | null = null;
+
+      if (hotspot.targetSceneKey) {
+        target = idForKey.get(hotspot.targetSceneKey) ?? null;
+
+        if (hotspot.kind === "scene" && !target) {
+          return {
+            ok: false,
+            reason:
+              `The door "${hotspot.title}" in "${scene.title}" points at a room ` +
+              `that is no longer in this tour. Choose another room for it, or ` +
+              `remove it, and save again.`,
+            detail: `unresolved target key ${hotspot.targetSceneKey}`,
+          };
+        }
+      }
+
+      if (hotspot.kind === "scene" && !target) {
+        return {
+          ok: false,
+          reason:
+            `The door "${hotspot.title}" in "${scene.title}" has no room to ` +
+            `open. Choose one for it, or remove it, and save again.`,
+          detail: "scene hotspot with no target key",
+        };
+      }
+
+      hotspots.push({
+        scene_id: sceneId,
+        kind: hotspot.kind,
+        yaw: hotspot.yaw,
+        pitch: hotspot.pitch,
+        title: hotspot.title.trim(),
+        description: hotspot.description?.trim() || null,
+        target_scene_id: target,
+        target_property_id: hotspot.targetPropertyId ?? null,
+        target_project_id: hotspot.targetProjectId ?? null,
+        target_url: hotspot.targetUrl ?? null,
+      });
+    }
+  }
+
+  return { ok: true, hotspots };
+}

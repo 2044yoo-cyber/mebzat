@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { reportFailure } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
+import { resolveSceneTargets } from "@/lib/tour/draft";
 import { fromOurStorage, ownsQuarantinePath, validateTour } from "@/lib/tour/validate";
 import type { HotspotKind, TourVisibility } from "@/types/database.types";
 
@@ -174,16 +175,42 @@ export async function updateTour(id: string, input: TourInput): Promise<TourResu
     return { error: reportFailure("updateTour", error, "Could not save that tour.") };
   }
 
-  // Replaced wholesale. Scenes cascade to their hotspots, so this is one
-  // delete rather than a diff — and a diff of a set the user has been
+  // Replaced wholesale rather than diffed: a diff of a set the user has been
   // reordering and renaming is where the subtle bugs live.
-  const { error: cleared } = await supabase.from("tour_scenes").delete().eq("tour_id", id);
-  if (cleared) {
-    return { error: reportFailure("updateTour.clear", cleared, "Could not save that tour.") };
-  }
+  //
+  // The order matters, and it used to be wrong. Deleting first meant a failed
+  // write left the tour stripped of every room it had — the save reported an
+  // error and the work was already gone. The old rows are identified now,
+  // the new ones written, and only then are the old ones removed; if anything
+  // fails in between, the tour is put back exactly as it was.
+  const { data: previous } = await supabase
+    .from("tour_scenes")
+    .select("id")
+    .eq("tour_id", id);
+
+  const previousIds = (previous ?? []).map((scene) => scene.id);
 
   const wrote = await writeScenes(supabase, id, input.scenes);
   if (wrote) return { error: wrote };
+
+  if (previousIds.length > 0) {
+    const { error: cleared } = await supabase
+      .from("tour_scenes")
+      .delete()
+      .in("id", previousIds);
+
+    if (cleared) {
+      // The new rooms are in and the old ones are not gone, so the tour would
+      // show every room twice. Undo the half that just succeeded.
+      await supabase
+        .from("tour_scenes")
+        .delete()
+        .eq("tour_id", id)
+        .not("id", "in", `(${previousIds.join(",")})`);
+
+      return { error: reportFailure("updateTour.clear", cleared, "Could not save that tour.") };
+    }
+  }
 
   revalidatePath("/tours");
   revalidatePath(`/tour/${id}`);
@@ -244,25 +271,31 @@ async function writeScenes(
   }
 
   const idForKey = new Map<string, string>();
-  scenes.forEach((scene, index) => idForKey.set(scene.key, idAt.get(index)!));
+  scenes.forEach((scene, index) => {
+    const id = idAt.get(index);
+    if (id) idForKey.set(scene.key, id);
+  });
 
-  const hotspots = scenes.flatMap((scene, index) =>
-    (scene.hotspots ?? []).map((hotspot) => ({
-      scene_id: idAt.get(index)!,
-      kind: hotspot.kind,
-      yaw: hotspot.yaw,
-      pitch: hotspot.pitch,
-      title: hotspot.title.trim(),
-      description: hotspot.description?.trim() || null,
-      target_scene_id: hotspot.targetSceneKey
-        ? (idForKey.get(hotspot.targetSceneKey) ?? null)
-        : null,
-      target_property_id: hotspot.targetPropertyId ?? null,
-      target_project_id: hotspot.targetProjectId ?? null,
-      target_url: hotspot.targetUrl ?? null,
+  // Resolved before anything is written. A door that resolves to nothing is
+  // refused by the database — hotspot_scene_has_target — and what reaches the
+  // person is a 23514 quoting a row of uuids. This names the room instead, and
+  // the broken row is never sent.
+  const resolved = resolveSceneTargets(
+    scenes.map((scene) => ({
+      key: scene.key,
+      title: scene.title,
+      hotspots: (scene.hotspots ?? []).map((hotspot) => ({ ...hotspot, key: "" })),
     })),
+    idForKey,
+    (index) => idAt.get(index),
   );
 
+  if (!resolved.ok) {
+    console.error("writeScenes:", resolved.detail);
+    return resolved.reason;
+  }
+
+  const hotspots = resolved.hotspots;
   if (hotspots.length === 0) return null;
 
   const { error: hotspotError } = await supabase.from("tour_hotspots").insert(hotspots);
