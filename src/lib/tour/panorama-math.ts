@@ -81,3 +81,18 @@ export function projectHotspot(
     visible: scratch.z < 1,
   };
 }
+
+/**
+ * The same direction, expressed once.
+ *
+ * A yaw of -370° and one of 350° point at the same wall. Stored angles are
+ * kept in 0–360 so a hotspot's coordinates mean the same thing whether the
+ * person dragged clockwise or anticlockwise to reach it — and so two tours
+ * built the same way do not hold different numbers for the same door.
+ *
+ * The doubled modulo is not redundant: JavaScript's `%` keeps the sign of its
+ * left operand, so -370 % 360 is -10, not 350.
+ */
+export function normaliseDegrees(value: number) {
+  return ((value % 360) + 360) % 360;
+}

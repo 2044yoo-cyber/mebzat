@@ -8,6 +8,7 @@ import {
   clampPitch,
   dragSpeed,
   lookTarget,
+  normaliseDegrees,
   projectHotspot,
 } from "@/lib/tour/panorama-math";
 
@@ -347,13 +348,4 @@ export function PanoramaViewer({
         ))}
     </div>
   );
-}
-
-/**
- * A yaw of -370° and one of 350° are the same direction. Stored angles are
- * kept in 0–360 so a hotspot's coordinates mean the same thing whether the
- * person dragged clockwise or anticlockwise to reach them.
- */
-function normaliseDegrees(value: number) {
-  return ((value % 360) + 360) % 360;
 }

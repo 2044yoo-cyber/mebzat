@@ -22,6 +22,7 @@ import {
   lookTarget,
   MAX_FOV,
   MIN_FOV,
+  normaliseDegrees,
   PITCH_LIMIT,
   projectHotspot,
 } from "../src/lib/tour/panorama-math.ts";
@@ -258,6 +259,50 @@ for (const [yaw, pitch] of [
 check("looking at the horizon does not tilt the target", Math.abs(lookTarget(0, 0).y) < 1e-9);
 check("looking up puts the target above the horizon", lookTarget(0, 1).y > 0);
 check("looking down puts the target below the horizon", lookTarget(0, -1).y < 0);
+
+// ---------------------------------------------------------------------------
+// 6b. The same direction, expressed once
+//
+// JavaScript's % keeps the sign of its left operand, so -370 % 360 is -10.
+// A hotspot stored at -10° and one stored at 350° are on the same wall, and a
+// tour built by dragging anticlockwise must not hold different numbers from
+// one built by dragging the other way.
+// ---------------------------------------------------------------------------
+
+for (const [given, expected] of [
+  [0, 0],
+  [90, 90],
+  [359, 359],
+  [360, 0],
+  [370, 10],
+  [720, 0],
+  [-10, 350],
+  [-370, 350],
+  [-360, 0],
+  [-720, 0],
+  [1085, 5],
+  [-1085, 355],
+] as const) {
+  check(
+    `${given}° normalises to ${expected}°`,
+    normaliseDegrees(given) === expected,
+    String(normaliseDegrees(given)),
+  );
+}
+
+// Whatever comes in, what comes out is a bearing.
+for (const value of [0, 1, -1, 180, -180, 359.9, -359.9, 12345, -12345]) {
+  const out = normaliseDegrees(value);
+  check(`${value}° lands inside one turn`, out >= 0 && out < 360, String(out));
+}
+
+// Turning right round is a no-op, at any starting angle.
+for (const value of [0, 37, 180, 359, -45]) {
+  check(
+    `${value}° and ${value + 360}° are the same direction`,
+    normaliseDegrees(value) === normaliseDegrees(value + 360),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // 7. What is allowed to become a panorama
