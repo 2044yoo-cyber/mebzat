@@ -34,6 +34,13 @@ import {
   RATIO_TOLERANCE,
   sceneName,
 } from "../src/lib/tour/panorama-image.ts";
+import type { ValidatableHotspot, ValidatableScene } from "../src/lib/tour/validate.ts";
+import {
+  fromOurStorage,
+  MAX_HOTSPOTS_PER_SCENE,
+  MAX_SCENES,
+  validateTour,
+} from "../src/lib/tour/validate.ts";
 
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
@@ -397,6 +404,225 @@ check('"unit 401.jpg" keeps its name', sceneName("unit 401.jpg", 0) === "Unit 40
 // signed. A serial number is a long run of digits; two is a door.
 check('"B2.jpg" keeps its name', sceneName("B2.jpg", 0) === "B2", sceneName("B2.jpg", 0));
 check('"A 12.jpg" keeps its name', sceneName("A 12.jpg", 0) === "A 12", sceneName("A 12.jpg", 0));
+
+// ---------------------------------------------------------------------------
+// 9. A tour that is safe to write
+//
+// A validation gap does not throw. It writes a tour that looks fine until a
+// visitor clicks a door that opens nothing.
+// ---------------------------------------------------------------------------
+
+/** Hotspots are optional on a scene, but every tour built here has some, and
+ * the assertions below reach into them. */
+type CheckScene = ValidatableScene & { hotspots: ValidatableHotspot[] };
+
+/** The shape of a tour that should save without complaint. */
+function goodTour(): { title: string; scenes: CheckScene[] } {
+  return {
+    title: "Two bedroom in Bole",
+    scenes: [
+      {
+        key: "a",
+        title: "Living room",
+        panoramaUrl: "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/1.jpg",
+        hotspots: [
+          { kind: "scene", yaw: 90, pitch: 0, title: "To the kitchen", targetSceneKey: "b" },
+          { kind: "info", yaw: -30, pitch: 10, title: "South facing" },
+        ],
+      },
+      {
+        key: "b",
+        title: "Kitchen",
+        panoramaUrl: "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/2.jpg",
+        hotspots: [{ kind: "scene", yaw: -90, pitch: 0, title: "Back", targetSceneKey: "a" }],
+      },
+    ],
+  };
+}
+
+check("a complete tour is accepted", validateTour(goodTour()) === null, validateTour(goodTour()) ?? "");
+
+// The name.
+check("a tour with no name is refused", validateTour({ ...goodTour(), title: "" }) !== null);
+check("a tour named with spaces is refused", validateTour({ ...goodTour(), title: "   " }) !== null);
+check("a two-letter name is refused", validateTour({ ...goodTour(), title: "2b" }) !== null);
+check("a three-letter name is accepted", validateTour({ ...goodTour(), title: "G+4" }) === null);
+check(
+  "an absurdly long name is refused",
+  validateTour({ ...goodTour(), title: "x".repeat(201) }) !== null,
+);
+
+// The scenes.
+check("a tour with no scenes is refused", validateTour({ ...goodTour(), scenes: [] }) !== null);
+check(
+  "a tour past the scene limit is refused",
+  validateTour({
+    ...goodTour(),
+    scenes: Array.from({ length: MAX_SCENES + 1 }, (_, i) => ({
+      key: `k${i}`,
+      title: `Scene ${i}`,
+      panoramaUrl: "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/1.jpg",
+    })),
+  }) !== null,
+);
+check(
+  "a tour at the scene limit is accepted",
+  validateTour({
+    ...goodTour(),
+    scenes: Array.from({ length: MAX_SCENES }, (_, i) => ({
+      key: `k${i}`,
+      title: `Scene ${i}`,
+      panoramaUrl: "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/1.jpg",
+    })),
+  }) === null,
+);
+
+// Duplicate keys would make one scene's hotspots land on another, because the
+// key is what pairs a scene with the uuid it was given.
+// No scene hotspots here: with a door in play the duplicate would be refused
+// for pointing at a key that no longer resolves, and the duplicate check
+// itself would never be reached.
+const duplicated = goodTour();
+duplicated.scenes[1].key = "a";
+duplicated.scenes[0].hotspots = [{ kind: "info", yaw: 0, pitch: 0, title: "Note" }];
+duplicated.scenes[1].hotspots = [];
+check("two scenes sharing a key are refused", validateTour(duplicated) !== null);
+check(
+  "and it is refused for the duplicate, not for a broken door",
+  validateTour(duplicated)?.includes("same id") === true,
+  validateTour(duplicated) ?? "",
+);
+
+const unnamed = goodTour();
+unnamed.scenes[1].title = "  ";
+check("a scene with no name is refused", validateTour(unnamed) !== null);
+
+const photoless = goodTour();
+photoless.scenes[1].panoramaUrl = "";
+check("a scene with no photo is refused", validateTour(photoless) !== null);
+
+// The dead end: the failure this whole function exists to prevent.
+const dangling = goodTour();
+dangling.scenes[0].hotspots[0].targetSceneKey = "does-not-exist";
+check("a door pointing at a scene not in the tour is refused", validateTour(dangling) !== null);
+
+check(
+  "and it is refused for pointing at a missing scene",
+  validateTour(dangling)?.includes("not in this tour") === true,
+  validateTour(dangling) ?? "",
+);
+
+const targetless = goodTour();
+dangling.scenes[0].hotspots[0].targetSceneKey = "b";
+targetless.scenes[0].hotspots[0].targetSceneKey = null;
+check("a door pointing nowhere is refused", validateTour(targetless) !== null);
+// A different sentence from the one above, because they are different
+// mistakes: one door was never given a destination, the other lost it.
+check(
+  "and it says the door has no scene to open",
+  validateTour(targetless)?.includes("no scene to open") === true,
+  validateTour(targetless) ?? "",
+);
+
+// An info hotspot has nothing to point at, and must not be held to the rule.
+const info = goodTour();
+info.scenes[0].hotspots = [{ kind: "info", yaw: 0, pitch: 0, title: "Balcony" }];
+check("an info hotspot needs no target", validateTour(info) === null);
+
+const unlabelled = goodTour();
+unlabelled.scenes[0].hotspots[1].title = "";
+check("a hotspot with no label is refused", validateTour(unlabelled) !== null);
+
+const nowhere = goodTour();
+nowhere.scenes[0].hotspots[1].yaw = Number.NaN;
+check("a hotspot with no position is refused", validateTour(nowhere) !== null);
+
+const crowded = goodTour();
+crowded.scenes[0].hotspots = Array.from({ length: MAX_HOTSPOTS_PER_SCENE + 1 }, () => ({
+  kind: "info",
+  yaw: 0,
+  pitch: 0,
+  title: "Note",
+}));
+check("a scene past the hotspot limit is refused", validateTour(crowded) !== null);
+
+// ---------------------------------------------------------------------------
+// 10. Where a panorama is allowed to come from
+//
+// The browser sends a URL, not a file — a server action cannot receive a Blob.
+// So an unchecked URL would let a tour embed an image from anywhere, bypassing
+// the moderation the upload path exists to enforce, and point Medosha's viewer
+// at a stranger's server.
+// ---------------------------------------------------------------------------
+
+const OURS = "https://abc123.supabase.co";
+const ok = (url: string) => fromOurStorage(url, OURS);
+
+check(
+  "a published panorama is accepted",
+  ok("https://abc123.supabase.co/storage/v1/object/public/panoramas/user/a.jpg"),
+);
+
+// Another host entirely.
+check("a foreign host is refused", !ok("https://evil.example/panoramas/a.jpg"));
+check(
+  "a foreign host imitating the path is refused",
+  !ok("https://evil.example/storage/v1/object/public/panoramas/a.jpg"),
+);
+check(
+  "a subdomain of ours is refused",
+  !ok("https://abc123.supabase.co.evil.example/storage/v1/object/public/panoramas/a.jpg"),
+);
+check(
+  "the same host over http is refused",
+  !ok("http://abc123.supabase.co/storage/v1/object/public/panoramas/a.jpg"),
+);
+
+// Our host, wrong bucket. Quarantine is the one that matters: those files are
+// the ones that have *not* been checked yet.
+check(
+  "a file still in quarantine is refused",
+  !ok("https://abc123.supabase.co/storage/v1/object/public/moderation-quarantine/u/a.jpg"),
+);
+check(
+  "another public bucket is refused",
+  !ok("https://abc123.supabase.co/storage/v1/object/public/avatars/u/a.jpg"),
+);
+check(
+  "a bucket whose name merely starts the same is refused",
+  !ok("https://abc123.supabase.co/storage/v1/object/public/panoramas-staging/u/a.jpg"),
+);
+// An uploader picks the object name inside their own quarantine folder, so
+// they can name a file after the panoramas path. Matching the path anywhere
+// in the URL rather than at its start would publish an unchecked image.
+check(
+  "a quarantine file named after the panoramas path is refused",
+  !ok(
+    "https://abc123.supabase.co/storage/v1/object/public/moderation-quarantine/" +
+      "user/storage/v1/object/public/panoramas/x.jpg",
+  ),
+);
+
+check(
+  "the private object route is refused",
+  !ok("https://abc123.supabase.co/storage/v1/object/panoramas/u/a.jpg"),
+);
+
+// Nonsense.
+check("an empty url is refused", !ok(""));
+check("a relative path is refused", !ok("/storage/v1/object/public/panoramas/a.jpg"));
+check("a javascript url is refused", !ok("javascript:alert(1)"));
+check(
+  "a data url is refused",
+  !ok("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA=="),
+);
+check(
+  "no configured supabase url refuses everything",
+  !fromOurStorage(
+    "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/a.jpg",
+    undefined,
+  ),
+);
 
 // ---------------------------------------------------------------------------
 
