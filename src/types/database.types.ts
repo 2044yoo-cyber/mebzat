@@ -299,7 +299,8 @@ export type ContentKind =
   | "comment"
   | "listing"
   | "video"
-  | "panorama";
+  | "panorama"
+  | "floor_plan";
 
 export type ContractShape =
   | "labour_only"
@@ -3358,6 +3359,63 @@ export interface Database {
           user_id?: string;
           seen_count?: number;
           last_seen_at?: string;
+        };
+        Relationships: [];
+      };
+      floor_plans: {
+        Row: {
+          id: string;
+          owner_id: string;
+          title: string;
+          file_url: string | null;
+          quarantine_path: string | null;
+          moderation_item_id: string | null;
+          media_type: string;
+          width: number | null;
+          height: number | null;
+          property_id: string | null;
+          building_id: string | null;
+          project_id: string | null;
+          floor_number: number | null;
+          tour_id: string | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          title: string;
+          file_url?: string | null;
+          quarantine_path?: string | null;
+          moderation_item_id?: string | null;
+          media_type?: string;
+          width?: number | null;
+          height?: number | null;
+          property_id?: string | null;
+          building_id?: string | null;
+          project_id?: string | null;
+          floor_number?: number | null;
+          tour_id?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          title?: string;
+          file_url?: string | null;
+          quarantine_path?: string | null;
+          moderation_item_id?: string | null;
+          media_type?: string;
+          width?: number | null;
+          height?: number | null;
+          property_id?: string | null;
+          building_id?: string | null;
+          project_id?: string | null;
+          floor_number?: number | null;
+          tour_id?: string | null;
+          position?: number;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -8301,6 +8359,7 @@ export type FeedPost = Database["public"]["Tables"]["feed_posts"]["Row"];
 export type FeedReport = Database["public"]["Tables"]["feed_reports"]["Row"];
 export type FeedSave = Database["public"]["Tables"]["feed_saves"]["Row"];
 export type FeedView = Database["public"]["Tables"]["feed_views"]["Row"];
+export type FloorPlan = Database["public"]["Tables"]["floor_plans"]["Row"];
 export type Follow = Database["public"]["Tables"]["follows"]["Row"];
 export type FurniturePrice = Database["public"]["Views"]["furniture_prices"]["Row"];
 export type Hashtag = Database["public"]["Tables"]["hashtags"]["Row"];

@@ -16,6 +16,14 @@
 -- their ids back, and then writes the hotspots — that shape is required, not
 -- incidental.
 
+-- One thing about this file that is easy to get wrong: `set local
+-- request.jwt.claim.sub` is transaction-scoped and is NOT cleared by
+-- `reset role`. A signed-out probe that only switches role therefore still
+-- runs as whoever was signed in a moment earlier, and reports that anonymous
+-- visitors can see things they cannot. Every anon block below clears the claim
+-- as well as the role. This was found when a floor-plan check said a visitor
+-- could see two plans and there was only one they were allowed.
+
 begin;
 
 -- Two real users, so the policies have something to distinguish.
@@ -106,6 +114,7 @@ select '3. a stranger sees the published tour' as step,
 
 reset role;
 set role anon;
+set local request.jwt.claim.sub = '';
 set local request.jwt.claims = '{"role":"anon"}';
 select '3b. a signed-out visitor sees it' as step,
        (select count(*) from public.tours
@@ -274,6 +283,7 @@ select '7b. a visitor sees only the cleared room' as step, count(*) as should_be
 from public.tour_scenes where tour_id = '99999999-1111-0000-0000-000000000001';
 
 reset role; set role anon;
+set local request.jwt.claim.sub = '';
 select '7c. signed out, only the cleared room' as step, count(*) as should_be_1
 from public.tour_scenes where tour_id = '99999999-1111-0000-0000-000000000001';
 
@@ -294,6 +304,65 @@ do $$ begin
   raise notice '7e. A SCENE WITH NO IMAGE WAS ACCEPTED — constraint failed';
 exception when check_violation then
   raise notice '7e. a scene with neither a URL nor a path is refused';
+end $$;
+
+-- ===================================================================
+-- 8. Floor plans.
+--
+-- Same rule as a room: cleared is public, in review is the owner's alone.
+-- ===================================================================
+reset role;
+insert into public.floor_plans (id, owner_id, title, file_url, media_type, tour_id)
+values ('cccc1111-0000-0000-0000-000000000001',
+        'aaaaaaaa-0000-0000-0000-000000000001',
+        'Apartment 402', 'https://example.test/402.png', 'image',
+        'bbbbbbbb-0000-0000-0000-000000000001');
+
+insert into public.floor_plans (id, owner_id, title, quarantine_path, media_type)
+values ('cccc1111-0000-0000-0000-000000000002',
+        'aaaaaaaa-0000-0000-0000-000000000001',
+        'Fourth floor', 'aaaaaaaa-0000-0000-0000-000000000001/f4.pdf', 'pdf');
+
+set role authenticated;
+set local request.jwt.claim.sub = 'aaaaaaaa-0000-0000-0000-000000000001';
+select '8. the owner sees both plans' as step, count(*) as should_be_2 from public.floor_plans;
+
+reset role; set role anon;
+set local request.jwt.claim.sub = '';
+select '8b. a visitor sees only the cleared plan' as step, count(*) as should_be_1
+from public.floor_plans;
+
+-- A stranger cannot edit or delete somebody else's plan.
+reset role; set role authenticated;
+set local request.jwt.claim.sub = 'aaaaaaaa-0000-0000-0000-000000000002';
+update public.floor_plans set title = 'Stolen'
+where id = 'cccc1111-0000-0000-0000-000000000001';
+delete from public.floor_plans where id = 'cccc1111-0000-0000-0000-000000000001';
+
+reset role;
+select '8c. after a stranger tried to edit and delete' as step, title
+from public.floor_plans where id = 'cccc1111-0000-0000-0000-000000000001';
+
+-- Deleting the tour leaves the plan: it is a document about the property, not
+-- part of the tour.
+delete from public.tours where id = 'bbbbbbbb-0000-0000-0000-000000000001';
+select '8d. deleting the tour left the plan' as step, count(*) as should_be_1
+from public.floor_plans where id = 'cccc1111-0000-0000-0000-000000000001';
+
+do $$ begin
+  insert into public.floor_plans (owner_id, title)
+  values ('aaaaaaaa-0000-0000-0000-000000000001', 'Nothing');
+  raise notice '8e. A PLAN WITH NO FILE WAS ACCEPTED — constraint failed';
+exception when check_violation then
+  raise notice '8e. a plan with neither a URL nor a path is refused';
+end $$;
+
+do $$ begin
+  insert into public.floor_plans (owner_id, title, file_url, media_type)
+  values ('aaaaaaaa-0000-0000-0000-000000000001', 'Odd', 'https://x/a', 'dwg');
+  raise notice '8f. AN UNKNOWN MEDIA TYPE WAS ACCEPTED — constraint failed';
+exception when check_violation then
+  raise notice '8f. an unknown media type is refused';
 end $$;
 
 rollback;

@@ -40,6 +40,7 @@ export const CONTENT_KINDS = [
   "listing",
   "video",
   "panorama",
+  "floor_plan",
 ] as const;
 export type ContentKind = (typeof CONTENT_KINDS)[number];
 

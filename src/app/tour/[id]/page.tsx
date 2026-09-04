@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, Eye } from "lucide-react";
 
-import { TourPlayer } from "@/components/tour/tour-player";
+import { PropertyVisualisation } from "@/components/tour/visualisation";
+import { listFloorPlans } from "@/lib/tour/floor-plans";
 import { getTour } from "@/lib/tour/queries";
 
 /**
@@ -44,6 +45,8 @@ export default async function TourPage(props: { params: Promise<{ id: string }> 
   const tour = await getTour(id);
   if (!tour) notFound();
 
+  const plans = await listFloorPlans({ tourId: tour.id });
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:py-6">
       <div className="mb-4 flex items-center gap-3">
@@ -63,12 +66,37 @@ export default async function TourPage(props: { params: Promise<{ id: string }> 
         </div>
       </div>
 
-      {/* Tall on a phone, wider on a desktop. A 360° view needs height more
-          than a photograph does — a letterbox of a room is most of a wall. */}
-      <TourPlayer
+      {/* The tour, the plan, the photographs and the model are four ways of
+          answering the same question, so they are one screen rather than four
+          pages. The player inside is tall: a 360° view needs height more than
+          a photograph does, and a letterbox of a room is mostly wall. */}
+      <PropertyVisualisation
+        title={tour.title}
         scenes={tour.scenes}
-        className="h-[70vh] min-h-[380px] w-full overflow-hidden rounded-2xl border sm:h-[65vh]"
+        plans={plans}
+        photoHref={tour.propertyId ? `/property/${tour.propertyId}` : null}
       />
+
+      {tour.scenes.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-2 text-sm font-medium">Rooms</h2>
+          <ul className="flex flex-wrap gap-2">
+            {tour.scenes.map((scene) => (
+              <li
+                key={scene.id}
+                className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm"
+              >
+                {scene.title}
+                {scene.pending && (
+                  <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                    in review
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {tour.description && (
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">

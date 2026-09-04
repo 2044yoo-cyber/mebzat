@@ -37,6 +37,8 @@ const SIGNATURES: { mime: string; bytes: number[]; offset?: number }[] = [
   { mime: "image/jpeg", bytes: [0xff, 0xd8, 0xff] },
   { mime: "image/png", bytes: [0x89, 0x50, 0x4e, 0x47] },
   { mime: "image/webp", bytes: [0x57, 0x45, 0x42, 0x50], offset: 8 },
+  // "%PDF-". Floor plans arrive as PDFs more often than as images.
+  { mime: "application/pdf", bytes: [0x25, 0x50, 0x44, 0x46, 0x2d] },
 ];
 
 function sniff(buffer: Uint8Array): string | null {
@@ -97,7 +99,14 @@ export async function moderateQuarantinedImage(input: {
     };
   }
 
-  const dataUrl = `data:${actual};base64,${Buffer.from(bytes).toString("base64")}`;
+  // A PDF is not an image and must not be handed to an image classifier as
+  // one: the provider would either error or answer about nothing. With no
+  // image to check, moderate() has nothing to go on and returns `review`,
+  // which is the right answer — a person looks at it. Fail closed, not open.
+  const checkable = actual.startsWith("image/");
+  const dataUrl = checkable
+    ? `data:${actual};base64,${Buffer.from(bytes).toString("base64")}`
+    : undefined;
 
   const outcome = await moderate({
     client: supabase,

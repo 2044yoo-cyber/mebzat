@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Eye, Loader2, MapPin, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { FloorPlanInput, type DraftPlan } from "@/components/tour/floor-plan-input";
 import { PanoramaInput, type DraftScene } from "@/components/tour/panorama-input";
 import { PanoramaViewer } from "@/components/tour/panorama-viewer";
 import {
@@ -13,6 +14,7 @@ import {
   setTourVisibility,
   type HotspotInput,
 } from "@/app/tours/actions";
+import { addFloorPlan } from "@/app/tours/floor-plan-actions";
 import { toSceneInputs, type DraftTourScene } from "@/lib/tour/draft";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +41,7 @@ export function TourBuilder({
   initialTitle = "",
   initialDescription = "",
   initialScenes = [],
+  initialPlans = [],
   propertyId,
   buildingId,
   projectId,
@@ -49,6 +52,8 @@ export function TourBuilder({
   initialTitle?: string;
   initialDescription?: string;
   initialScenes?: BuilderScene[];
+  /** Plans already saved. Only newly added ones are written on save. */
+  initialPlans?: DraftPlan[];
   propertyId?: string | null;
   buildingId?: string | null;
   projectId?: string | null;
@@ -58,6 +63,7 @@ export function TourBuilder({
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [scenes, setScenes] = useState<BuilderScene[]>(initialScenes);
+  const [plans, setPlans] = useState<DraftPlan[]>(initialPlans);
   const [editing, setEditing] = useState<string | null>(initialScenes[0]?.key ?? null);
   const [saving, setSaving] = useState(false);
 
@@ -142,6 +148,30 @@ export function TourBuilder({
       return;
     }
 
+    // Plans are written after the tour, because a plan hangs off the tour and
+    // a new tour has no id until now. Only the ones added in this session: the
+    // rest are already rows.
+    const fresh = plans.filter((plan) => !initialPlans.some((one) => one.key === plan.key));
+    for (const [index, plan] of fresh.entries()) {
+      const written = await addFloorPlan({
+        title: plan.title,
+        fileUrl: plan.pending ? null : plan.url,
+        quarantinePath: plan.pending ? plan.quarantinePath : null,
+        moderationItemId: plan.moderationItemId,
+        mediaType: plan.mediaType,
+        width: plan.width,
+        height: plan.height,
+        tourId: result.id,
+        propertyId,
+        buildingId,
+        projectId,
+        position: initialPlans.length + index,
+      });
+
+      // One plan failing must not lose the tour, which is already saved.
+      if (written.error) toast.error(`${plan.title}: ${written.error}`);
+    }
+
     if (thenPublish) {
       const published = await setTourVisibility(result.id, "published");
       if (published.error) {
@@ -192,6 +222,15 @@ export function TourBuilder({
       <section className="space-y-3">
         <h2 className="text-sm font-medium">Rooms</h2>
         <PanoramaInput userId={userId} scenes={scenes} onChange={addScenes} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium">Floor plans</h2>
+        <p className="text-xs text-muted-foreground">
+          A plan of the flat, a floor of the building, or the whole project. A PDF
+          keeps its pages.
+        </p>
+        <FloorPlanInput userId={userId} plans={plans} onChange={setPlans} />
       </section>
 
       {scenes.length > 0 && (

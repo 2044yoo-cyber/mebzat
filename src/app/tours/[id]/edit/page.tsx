@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { TourBuilder } from "@/components/tour/tour-builder";
+import { listFloorPlans } from "@/lib/tour/floor-plans";
 import { getTour } from "@/lib/tour/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,6 +23,8 @@ export default async function EditTourPage(props: { params: Promise<{ id: string
   // anybody can read but only its owner may edit.
   if (!tour || tour.ownerId !== user.id) notFound();
 
+  const plans = await listFloorPlans({ tourId: tour.id });
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
       <h1 className="mb-1 text-xl font-semibold">Edit tour</h1>
@@ -37,6 +40,19 @@ export default async function EditTourPage(props: { params: Promise<{ id: string
         propertyId={tour.propertyId}
         buildingId={tour.buildingId}
         projectId={tour.projectId}
+        initialPlans={plans.map((plan) => ({
+          // The plan's own id doubles as the builder's local key, which is how
+          // it knows this one is already a row and must not be written again.
+          key: plan.id,
+          title: plan.title,
+          url: plan.url,
+          mediaType: plan.mediaType,
+          width: plan.width,
+          height: plan.height,
+          pending: plan.pending,
+          quarantinePath: plan.quarantinePath ?? undefined,
+          moderationItemId: plan.moderationItemId ?? undefined,
+        }))}
         initialScenes={tour.scenes.map((scene) => ({
           // The scene's own uuid doubles as the builder's local key, so a door
           // that pointed at it before the edit still resolves afterwards.

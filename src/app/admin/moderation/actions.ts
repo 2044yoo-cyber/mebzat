@@ -105,6 +105,18 @@ async function publishItemFile(
   );
   if (!publicUrl) return false;
 
+  if (item.content_type === "floor_plan") {
+    const { error } = await supabase
+      .from("floor_plans")
+      .update({ file_url: publicUrl, quarantine_path: null })
+      .eq("moderation_item_id", item.id);
+
+    if (error) {
+      console.error("[moderation] published the file but could not update the plan:", error);
+      return false;
+    }
+  }
+
   if (item.content_type === "panorama") {
     const { error } = await supabase
       .from("tour_scenes")
@@ -138,6 +150,7 @@ async function publishItemFile(
 /** Where each kind of upload lives once it has been cleared. */
 const PUBLIC_BUCKETS: Record<string, string | undefined> = {
   panorama: "panoramas",
+  floor_plan: "floor-plans",
   product_image: "product-images",
   profile_avatar: "avatars",
   profile_cover: "covers",

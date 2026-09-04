@@ -11,9 +11,10 @@ import {
   Car,
   ClipboardList,
   Layers,
-  Maximize,
   MapPin,
+  Maximize,
   Rotate3d,
+  Ruler,
   Sofa,
   Sparkles,
 } from "lucide-react";
@@ -41,6 +42,7 @@ import {
   isPropertySaved,
 } from "@/lib/data/properties";
 import { createClient } from "@/lib/supabase/server";
+import { listFloorPlans } from "@/lib/tour/floor-plans";
 import { listToursFor } from "@/lib/tour/queries";
 import { cn, formatPrice } from "@/lib/utils";
 
@@ -117,7 +119,7 @@ export default async function PropertyPage(props: {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [media, location, publicPlaces, travel, services, stats, saved, tours] =
+  const [media, location, publicPlaces, travel, services, stats, saved, tours, plans] =
     await Promise.all([
     getPropertyMedia(property.id),
     getPropertyLocation(property.id),
@@ -131,6 +133,7 @@ export default async function PropertyPage(props: {
     ),
     isPropertySaved(property.id, user?.id ?? null),
     listToursFor({ propertyId: property.id, ownerId: property.owner_id }),
+    listFloorPlans({ propertyId: property.id }),
   ]);
 
   const land = isLandType(property.property_type);
@@ -225,6 +228,22 @@ export default async function PropertyPage(props: {
             <span className="absolute top-3 left-3 rounded-full bg-background/90 px-3 py-1 text-sm font-medium backdrop-blur">
               {LISTING_KIND[property.listing_kind]}
             </span>
+            {/* A plan is a different question from a tour — "what is the
+                layout" rather than "what does it look like" — so it gets its
+                own way in rather than being folded into the 360° badge. */}
+            {plans.length > 0 && (
+              <Link
+                href={
+                  plans[0].tourId
+                    ? `/tour/${plans[0].tourId}`
+                    : `/property/${property.id}/plan`
+                }
+                className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1 text-sm font-medium backdrop-blur transition-colors hover:bg-background"
+              >
+                <Ruler className="size-4" />
+                Floor plan
+              </Link>
+            )}
             {/* The badge used to say a tour existed and give nobody a way to
                 open it. It is the link now — and when there is no tour, the
                 owner is the only person who can do anything about that, so

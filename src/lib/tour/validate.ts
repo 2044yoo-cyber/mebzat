@@ -125,3 +125,24 @@ export function ownsQuarantinePath(path: string, userId: string): boolean {
   if (path.startsWith("/") || path.split("/").includes("..")) return false;
   return path.split("/")[0] === userId;
 }
+
+/**
+ * Whether a floor plan URL is one this application published.
+ *
+ * The same boundary as a panorama's, against a different bucket. A plan is the
+ * one piece of 360° content that is routinely a PDF, and a PDF from an
+ * arbitrary origin embedded in an <object> is a worse thing to accept than a
+ * stray image: it is a document the browser will execute a viewer for.
+ */
+export function fromOurPlans(url: string, supabaseUrl: string | undefined): boolean {
+  if (!supabaseUrl) return false;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.origin === new URL(supabaseUrl).origin &&
+      parsed.pathname.startsWith("/storage/v1/object/public/floor-plans/")
+    );
+  } catch {
+    return false;
+  }
+}

@@ -44,6 +44,7 @@ import {
   type DraftTourScene,
 } from "../src/lib/tour/draft.ts";
 import {
+  fromOurPlans,
   fromOurStorage,
   ownsQuarantinePath,
   MAX_HOTSPOTS_PER_SCENE,
@@ -1036,6 +1037,122 @@ check(
   "a viewer with no size says so rather than going black",
   /clientWidth === 0 \|\| clientHeight === 0/.test(viewer) &&
     /console\.error\(\s*\n?\s*"\[panorama\] the viewer has no size/.test(viewer),
+);
+
+// ---------------------------------------------------------------------------
+// 11f. Where a floor plan is allowed to come from
+//
+// The same boundary as a panorama's, against a different bucket — and it
+// matters more, because a plan is routinely a PDF and a PDF from an arbitrary
+// origin embedded in an <object> is a document the browser runs a viewer for.
+// ---------------------------------------------------------------------------
+
+const plan = (url: string) => fromOurPlans(url, OURS);
+
+check(
+  "a published plan is accepted",
+  plan("https://abc123.supabase.co/storage/v1/object/public/floor-plans/u/402.pdf"),
+);
+check("a foreign host is refused", !plan("https://evil.example/floor-plans/402.pdf"));
+check(
+  "a foreign host imitating the path is refused",
+  !plan("https://evil.example/storage/v1/object/public/floor-plans/402.pdf"),
+);
+check(
+  "a subdomain of ours is refused",
+  !plan("https://abc123.supabase.co.evil.example/storage/v1/object/public/floor-plans/a.pdf"),
+);
+check(
+  "a file still in quarantine is refused",
+  !plan("https://abc123.supabase.co/storage/v1/object/public/moderation-quarantine/u/a.pdf"),
+);
+check(
+  "the panoramas bucket is not the plans bucket",
+  !plan("https://abc123.supabase.co/storage/v1/object/public/panoramas/u/a.jpg"),
+);
+check(
+  "a bucket whose name merely starts the same is refused",
+  !plan("https://abc123.supabase.co/storage/v1/object/public/floor-plans-old/u/a.pdf"),
+);
+check(
+  "a quarantine file named after the plans path is refused",
+  !plan(
+    "https://abc123.supabase.co/storage/v1/object/public/moderation-quarantine/" +
+      "user/storage/v1/object/public/floor-plans/a.pdf",
+  ),
+);
+check("a javascript url is refused", !plan("javascript:alert(1)"));
+check("an empty url is refused", !plan(""));
+check(
+  "no configured supabase url refuses everything",
+  !fromOurPlans(
+    "https://abc123.supabase.co/storage/v1/object/public/floor-plans/u/a.pdf",
+    undefined,
+  ),
+);
+
+// A plan and a panorama must not be interchangeable: each names its own bucket.
+check(
+  "a panorama url is not a plan url",
+  !plan("https://abc123.supabase.co/storage/v1/object/public/panoramas/u/a.jpg") &&
+    ok("https://abc123.supabase.co/storage/v1/object/public/panoramas/u/a.jpg"),
+);
+check(
+  "a plan url is not a panorama url",
+  !ok("https://abc123.supabase.co/storage/v1/object/public/floor-plans/u/a.pdf") &&
+    plan("https://abc123.supabase.co/storage/v1/object/public/floor-plans/u/a.pdf"),
+);
+
+// ---------------------------------------------------------------------------
+// 11g. A PDF is not an image
+//
+// Floor plans arrive as PDFs more often than as pictures, so quarantine has to
+// accept one and the sniffer has to recognise one. What must never happen is a
+// PDF being handed to an image classifier as though it were a picture: the
+// provider answers about nothing, and "nothing found" would read as safe.
+// ---------------------------------------------------------------------------
+
+const uploads = readFileSync("src/app/moderation/upload-actions.ts", "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+check(
+  "the sniffer knows the PDF signature",
+  /mime: "application\/pdf", bytes: \[0x25, 0x50, 0x44, 0x46, 0x2d\]/.test(uploads),
+);
+check(
+  "only an image is sent to the classifier",
+  /const checkable = actual\.startsWith\("image\/"\)/.test(uploads) &&
+    /image: dataUrl/.test(uploads) &&
+    /checkable\s*\?/.test(uploads),
+);
+check(
+  "and the file type is still sniffed rather than believed",
+  /const actual = sniff\(\s*bytes\s*\)/.test(uploads) && /if\s*\(\s*!actual\s*\)/.test(uploads),
+);
+
+const planMigration = readFileSync("supabase/migrations/0061_floor_plans.sql", "utf8")
+  .replace(/--.*$/gm, "");
+
+check(
+  "quarantine is widened to accept a PDF",
+  /application\/pdf/.test(planMigration) && /moderation-quarantine/.test(planMigration),
+);
+check(
+  "the plans bucket exists and takes a PDF",
+  /'floor-plans'/.test(planMigration) && /array\['image\/jpeg', 'image\/png', 'image\/webp', 'application\/pdf'\]/.test(planMigration),
+);
+check(
+  "the plans table is granted to the roles that must read it",
+  /grant select on public\.floor_plans to anon, authenticated;/.test(planMigration),
+);
+check(
+  "and written only by the signed-in",
+  /grant insert, update, delete on public\.floor_plans to authenticated;/.test(planMigration),
+);
+check(
+  "a plan in review is not readable by a visitor",
+  /using \(file_url is not null or owner_id = auth\.uid\(\)\)/.test(planMigration),
 );
 
 // ---------------------------------------------------------------------------
