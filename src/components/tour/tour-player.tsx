@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Info, X } from "lucide-react";
 
 import { PanoramaViewer, type PanoramaHotspot } from "@/components/tour/panorama-viewer";
+import { SceneThumbnail } from "@/components/tour/scene-thumbnail";
 import type { TourScene } from "@/lib/tour/queries";
 import { cn } from "@/lib/utils";
 
@@ -168,12 +168,10 @@ export function TourPlayer({
                     i === index ? "border-white" : "border-transparent hover:border-white/50",
                   )}
                 >
-                  <Image
+                  <SceneThumbnail
                     src={other.panoramaUrl}
-                    alt=""
-                    fill
+                    pending={other.pending}
                     sizes="96px"
-                    className="object-cover"
                   />
                   <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1.5 py-0.5 text-left text-[11px] text-white">
                     {other.title}

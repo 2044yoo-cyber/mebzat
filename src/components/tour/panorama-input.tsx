@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRef, useState } from "react";
 import { GripVertical, Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +8,7 @@ import {
   moderateQuarantinedImage,
   signQuarantinePreview,
 } from "@/app/moderation/upload-actions";
+import { SceneThumbnail } from "@/components/tour/scene-thumbnail";
 import { createClient } from "@/lib/supabase/client";
 import {
   checkPanorama,
@@ -220,12 +220,10 @@ export function PanoramaInput({
           </span>
 
           <div className="relative h-14 w-28 shrink-0 overflow-hidden rounded-lg bg-muted">
-            <Image
+            <SceneThumbnail
               src={scene.panoramaUrl}
-              alt=""
-              fill
+              pending={scene.pending}
               sizes="112px"
-              className="object-cover"
             />
           </div>
 

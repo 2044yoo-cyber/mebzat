@@ -13,6 +13,8 @@
  * front of you, and a pitch of exactly straight up flips the whole horizon.
  */
 
+import { readFileSync } from "node:fs";
+
 import * as THREE from "three";
 
 import {
@@ -723,6 +725,52 @@ check("a scene in review with no path is refused", validateTour(pendingNoPath) !
 check(
   "a signed quarantine link is not a published panorama",
   !ok("https://abc123.supabase.co/storage/v1/object/sign/moderation-quarantine/u/a.jpg"),
+);
+
+// ---------------------------------------------------------------------------
+// 12. next/image must not be pointed at quarantine
+//
+// The obvious fix for "Invalid src prop" on a signed preview is to add the
+// /object/sign/ path to remotePatterns. It is the wrong fix: Next's optimiser
+// caches by URL and serves the result from /_next/image with no auth, so the
+// optimised copy of an unreviewed panorama would outlive the signature that
+// was protecting it and be fetchable by anyone. A pending room uses a plain
+// <img> instead. This is here so that reasoning survives the next person who
+// meets that error message.
+// ---------------------------------------------------------------------------
+
+const nextConfig = readFileSync("next.config.ts", "utf8");
+
+check(
+  "next/image allows the public storage path",
+  nextConfig.includes("/storage/v1/object/public/**"),
+);
+check(
+  "next/image is not allowed to fetch signed storage URLs",
+  !nextConfig.includes("/object/sign"),
+);
+check(
+  "next/image is not allowed to fetch quarantine",
+  !nextConfig.includes("moderation-quarantine"),
+);
+
+// Comments are stripped first: the explanation above mentions <img>, and a
+// check that matched its own prose would pass whatever the code did.
+const thumbnail = readFileSync("src/components/tour/scene-thumbnail.tsx", "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+check(
+  "a pending room is rendered with a plain img",
+  /<img\s/.test(thumbnail),
+);
+check(
+  "a cleared room still goes through next/image",
+  /<Image\s/.test(thumbnail),
+);
+check(
+  "and the two are chosen by the pending flag",
+  /if\s*\(\s*pending\s*\)/.test(thumbnail),
 );
 
 // ---------------------------------------------------------------------------
