@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Eye, Plus, Rotate3d } from "lucide-react";
+import { Eye, Globe, Link2, Lock, Plus, Rotate3d } from "lucide-react";
 
+import { SceneThumbnail } from "@/components/tour/scene-thumbnail";
 import { listMyTours } from "@/lib/tour/queries";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "My 360° tours" };
 
-const VISIBILITY: Record<string, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "bg-muted text-muted-foreground" },
-  published: { label: "Published", className: "bg-brand text-brand-foreground" },
-  unlisted: { label: "Link only", className: "bg-muted text-muted-foreground" },
-  private: { label: "Private", className: "bg-muted text-muted-foreground" },
-  archived: { label: "Archived", className: "bg-muted text-muted-foreground" },
+const VISIBILITY: Record<
+  string,
+  { label: string; className: string; icon: typeof Globe }
+> = {
+  draft: { label: "Draft", className: "bg-muted text-muted-foreground", icon: Lock },
+  published: { label: "Public", className: "bg-brand text-brand-foreground", icon: Globe },
+  unlisted: { label: "Link only", className: "bg-muted text-muted-foreground", icon: Link2 },
+  private: { label: "Private", className: "bg-muted text-muted-foreground", icon: Lock },
+  archived: { label: "Archived", className: "bg-muted text-muted-foreground", icon: Lock },
 };
 
 export default async function ToursPage() {
@@ -28,7 +31,7 @@ export default async function ToursPage() {
   const tours = await listMyTours();
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6">
+    <div className="mx-auto w-full max-w-2xl px-4 py-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">My 360° tours</h1>
@@ -60,47 +63,82 @@ export default async function ToursPage() {
           </Link>
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="space-y-5">
           {tours.map((tour) => {
             const badge = VISIBILITY[tour.visibility] ?? VISIBILITY.draft;
+            const Icon = badge.icon;
             return (
-              <li key={tour.id}>
-                <Link
-                  href={`/tours/${tour.id}/edit`}
-                  className="group flex gap-3 rounded-2xl border p-3 transition-colors hover:bg-muted/50"
-                >
-                  <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-xl bg-muted">
-                    {tour.thumbnailUrl && (
-                      <Image
+              <li key={tour.id} className="overflow-hidden rounded-2xl border bg-card">
+                {/* The picture first and large. A tour is a thing you look at,
+                    and a list of names with grey squares beside them gives no
+                    reason to open any of them. */}
+                <Link href={`/tours/${tour.id}/edit`} className="group block">
+                  <div className="relative aspect-[16/9] w-full bg-muted">
+                    {tour.thumbnailUrl ? (
+                      <SceneThumbnail
                         src={tour.thumbnailUrl}
-                        alt=""
-                        fill
-                        sizes="128px"
-                        className="object-cover"
+                        pending={tour.thumbnailPending}
+                        sizes="(max-width: 672px) 100vw, 640px"
                       />
+                    ) : (
+                      <span className="grid size-full place-items-center text-muted-foreground">
+                        <Rotate3d className="size-8" />
+                      </span>
                     )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{tour.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {tour.sceneCount} {tour.sceneCount === 1 ? "scene" : "scenes"}
-                      {tour.viewCount > 0 && (
-                        <>
-                          {" · "}
-                          <Eye className="inline size-3" /> {tour.viewCount}
-                        </>
-                      )}
-                    </p>
+
+                    <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur">
+                      <Rotate3d className="size-3.5" />
+                      360°
+                    </span>
+
                     <span
                       className={cn(
-                        "mt-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium",
+                        "absolute right-3 top-3 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur",
                         badge.className,
                       )}
                     >
+                      <Icon className="size-3.5" />
                       {badge.label}
                     </span>
+
+                    {tour.thumbnailPending && (
+                      <span className="absolute bottom-3 left-3 rounded-full bg-amber-500/90 px-2.5 py-1 text-[11px] font-medium text-black">
+                        In review
+                      </span>
+                    )}
                   </div>
                 </Link>
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 p-4">
+                  <Link
+                    href={`/tours/${tour.id}/edit`}
+                    className="min-w-0 flex-1 truncate text-base font-medium hover:underline"
+                  >
+                    {tour.title}
+                  </Link>
+
+                  <span className="text-sm text-muted-foreground">
+                    {tour.sceneCount} {tour.sceneCount === 1 ? "room" : "rooms"}
+                  </span>
+
+                  {tour.viewCount > 0 && (
+                    <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Eye className="size-3.5" />
+                      {tour.viewCount}
+                    </span>
+                  )}
+
+                  {tour.sharedToFeed && tour.visibility === "published" && (
+                    <span className="text-xs text-muted-foreground">In the feed</span>
+                  )}
+
+                  <Link
+                    href={`/tour/${tour.id}`}
+                    className="rounded-full border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+                  >
+                    Open
+                  </Link>
+                </div>
               </li>
             );
           })}

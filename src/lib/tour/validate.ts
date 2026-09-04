@@ -146,3 +146,23 @@ export function fromOurPlans(url: string, supabaseUrl: string | undefined): bool
     return false;
   }
 }
+
+/**
+ * Whether a tour should have a post in the feed.
+ *
+ * Two questions that are easy to run together, and the answer to the first
+ * overrides the second entirely:
+ *
+ *   visibility     who may open the tour — published, or link-only
+ *   shareToFeed    whether it also turns up in other people's feeds
+ *
+ * A link-only tour is never posted however the second is set. That is what
+ * link-only means, and getting it wrong would put a tour somebody meant to
+ * send to one buyer in front of everybody.
+ */
+export function belongsInTheFeed(
+  visibility: string,
+  shareToFeed: boolean | null | undefined,
+): boolean {
+  return visibility === "published" && shareToFeed === true;
+}

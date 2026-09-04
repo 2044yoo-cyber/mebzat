@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { reportFailure } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSceneTargets } from "@/lib/tour/draft";
+import { syncTourToFeed } from "@/app/tours/feed-actions";
 import { fromOurStorage, ownsQuarantinePath, validateTour } from "@/lib/tour/validate";
 import type { HotspotKind, TourVisibility } from "@/types/database.types";
 
@@ -67,6 +68,12 @@ export type TourInput = {
   buildingId?: string | null;
   projectId?: string | null;
   companyId?: string | null;
+  /**
+   * Whether a published tour also appears in other people's feeds. Separate
+   * from visibility, and never true for a link-only tour: an author listing
+   * forty flats does not want forty posts.
+   */
+  shareToFeed?: boolean;
   scenes: SceneInput[];
 };
 
@@ -125,6 +132,7 @@ export async function createTour(input: TourInput): Promise<TourResult> {
       // The first *cleared* scene is the tour's face. A pending one would put
       // an expiring signed URL on every card that shows this tour.
       thumbnail_url: input.scenes.find((scene) => !scene.pending)?.panoramaUrl ?? null,
+      share_to_feed: input.shareToFeed ?? false,
       visibility: "draft",
     })
     .select("id")
@@ -167,6 +175,7 @@ export async function updateTour(id: string, input: TourInput): Promise<TourResu
       building_id: input.buildingId ?? null,
       project_id: input.projectId ?? null,
       thumbnail_url: input.scenes.find((scene) => !scene.pending)?.panoramaUrl ?? null,
+      share_to_feed: input.shareToFeed ?? false,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
@@ -211,6 +220,8 @@ export async function updateTour(id: string, input: TourInput): Promise<TourResu
       return { error: reportFailure("updateTour.clear", cleared, "Could not save that tour.") };
     }
   }
+
+  await syncTourToFeed(id);
 
   revalidatePath("/tours");
   revalidatePath(`/tour/${id}`);
@@ -362,6 +373,10 @@ export async function setTourVisibility(
   if (error) {
     return { error: reportFailure("setTourVisibility", error, "Could not change that.") };
   }
+
+  // The post follows the tour. Withdrawing a shared tour has to take it out of
+  // other people's feeds, or the link in it leads somewhere they cannot open.
+  await syncTourToFeed(id);
 
   revalidatePath("/tours");
   revalidatePath(`/tour/${id}`);

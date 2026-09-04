@@ -3,7 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, Eye } from "lucide-react";
 
+import { TourSocial } from "@/components/tour/tour-social";
 import { PropertyVisualisation } from "@/components/tour/visualisation";
+import { getFeedPost } from "@/lib/data/feed";
+import { tourFeedPostId } from "@/app/tours/feed-actions";
+import { createClient } from "@/lib/supabase/server";
 import { listFloorPlans } from "@/lib/tour/floor-plans";
 import { getTour } from "@/lib/tour/queries";
 
@@ -46,6 +50,24 @@ export default async function TourPage(props: { params: Promise<{ id: string }> 
   if (!tour) notFound();
 
   const plans = await listFloorPlans({ tourId: tour.id });
+
+  // A tour shared to the feed has a post, and the post is where its likes and
+  // comments already live. A tour that was never shared simply has none.
+  const postId = await tourFeedPostId(tour.id);
+  const post = postId ? await getFeedPost(postId) : null;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: profile } = user
+    ? await supabase
+        .from("profiles")
+        .select("full_name, username, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle()
+    : { data: null };
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:py-6">
@@ -96,6 +118,21 @@ export default async function TourPage(props: { params: Promise<{ id: string }> 
             ))}
           </ul>
         </section>
+      )}
+
+      {post && (
+        <TourSocial
+          post={post}
+          signedIn={Boolean(user)}
+          viewer={
+            profile
+              ? {
+                  name: profile.full_name ?? profile.username ?? "You",
+                  avatarUrl: profile.avatar_url,
+                }
+              : null
+          }
+        />
       )}
 
       {tour.description && (

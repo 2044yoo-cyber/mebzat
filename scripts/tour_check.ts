@@ -48,6 +48,7 @@ import {
   type DraftTourScene,
 } from "../src/lib/tour/draft.ts";
 import {
+  belongsInTheFeed,
   fromOurPlans,
   fromOurStorage,
   ownsQuarantinePath,
@@ -1335,6 +1336,52 @@ for (const [file, label] of [
     source.includes(`if (error && !isMissingRelation(error)) reportFailure("${label}"`),
   );
 }
+
+// ---------------------------------------------------------------------------
+// 11i. Whether a tour belongs in other people's feeds
+//
+// Two questions that are easy to run together, and the first overrides the
+// second entirely. Getting this wrong puts a tour somebody meant to send to
+// one buyer in front of everybody, which is not a bug you get to fix after the
+// fact.
+// ---------------------------------------------------------------------------
+
+check("a public tour the author shared is posted", belongsInTheFeed("published", true));
+check("a public tour they did not share is not", !belongsInTheFeed("published", false));
+
+// The one that matters.
+check("a link-only tour is never posted, even if shared is set", !belongsInTheFeed("unlisted", true));
+check("nor when it is not", !belongsInTheFeed("unlisted", false));
+
+for (const visibility of ["draft", "private", "archived"]) {
+  check(`a ${visibility} tour is never posted`, !belongsInTheFeed(visibility, true));
+}
+
+// An unset flag is not a yes. A tour saved before this existed has null here.
+check("a null share flag is not a yes", !belongsInTheFeed("published", null));
+check("an undefined share flag is not a yes", !belongsInTheFeed("published", undefined));
+
+// And the action has to ask this rather than reimplementing it.
+const feedActions = readFileSync("src/app/tours/feed-actions.ts", "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+check(
+  "the sync asks the shared rule",
+  /belongsInTheFeed\(tour\.visibility, tour\.share_to_feed\)/.test(feedActions),
+);
+check(
+  "and finds the post by the tour it points at",
+  /\.eq\("entity_type", "tour"\)/.test(feedActions) &&
+    /\.eq\("entity_id", tour\.id\)/.test(feedActions),
+);
+check(
+  "unsharing hides the post rather than deleting it",
+  /status: "hidden"/.test(feedActions) && !/\.from\("feed_posts"\)\s*\.delete\(\)/.test(feedActions),
+);
+check(
+  "and no second table is invented for likes or comments",
+  !/tour_likes|tour_comments/.test(feedActions),
+);
 
 // ---------------------------------------------------------------------------
 // 12. next/image must not be pointed at quarantine

@@ -61,6 +61,8 @@ export type Tour = {
   buildingId: string | null;
   projectId: string | null;
   viewCount: number;
+  /** Whether a published tour also appears in the feed. */
+  sharedToFeed: boolean;
   publishedAt: string | null;
   updatedAt: string;
   scenes: TourScene[];
@@ -78,7 +80,7 @@ export type Tour = {
  */
 const SHAPE = `
   id, owner_id, title, description, visibility, thumbnail_url,
-  property_id, building_id, project_id, view_count, published_at, updated_at,
+  property_id, building_id, project_id, view_count, share_to_feed, published_at, updated_at,
   tour_scenes (
     id, title, panorama_url, quarantine_path, moderation_item_id, width, height,
     initial_yaw, initial_pitch, initial_zoom, position,
@@ -172,6 +174,7 @@ export async function getTour(id: string): Promise<Tour | null> {
     buildingId: data.building_id,
     projectId: data.project_id,
     viewCount: data.view_count,
+    sharedToFeed: data.share_to_feed ?? false,
     publishedAt: data.published_at,
     updatedAt: data.updated_at,
     scenes: scenes
@@ -230,9 +233,13 @@ export type TourSummary = {
   title: string;
   visibility: TourVisibility;
   thumbnailUrl: string | null;
+  /** True when the preview is a signed quarantine link rather than a public
+   * file, so a card knows not to hand it to next/image. */
+  thumbnailPending: boolean;
   sceneCount: number;
   viewCount: number;
   updatedAt: string;
+  sharedToFeed: boolean;
 };
 
 /** The signed-in person's own tours, drafts included. */
@@ -245,7 +252,7 @@ export async function listMyTours(): Promise<TourSummary[]> {
 
   const { data, error } = await supabase
     .from("tours")
-    .select("id, title, visibility, thumbnail_url, view_count, updated_at, tour_scenes(id)")
+    .select("id, title, visibility, thumbnail_url, view_count, updated_at, share_to_feed, tour_scenes(id, panorama_url, quarantine_path, position)")
     .eq("owner_id", user.id)
     .neq("visibility", "archived")
     .order("updated_at", { ascending: false });
@@ -254,15 +261,43 @@ export async function listMyTours(): Promise<TourSummary[]> {
   // everything else. See isMissingRelation.
   if (error && !isMissingRelation(error)) reportFailure("listMyTours", error, "");
 
-  return (data ?? []).map((tour) => ({
-    id: tour.id,
-    title: tour.title,
-    visibility: tour.visibility,
-    thumbnailUrl: tour.thumbnail_url,
-    sceneCount: tour.tour_scenes?.length ?? 0,
-    viewCount: tour.view_count,
-    updatedAt: tour.updated_at,
-  }));
+  return Promise.all(
+    (data ?? []).map(async (tour) => {
+      const scenes = (tour.tour_scenes ?? []) as unknown as {
+        id: string;
+        panorama_url: string | null;
+        quarantine_path: string | null;
+        position: number;
+      }[];
+
+      // A tour whose every room is still in review has no public thumbnail,
+      // and the card was a blank grey rectangle — which reads as broken rather
+      // than as waiting. Its owner is the only person who sees this list, and
+      // they may see their own file.
+      let thumbnailUrl = tour.thumbnail_url;
+      let thumbnailPending = false;
+
+      if (!thumbnailUrl) {
+        const first = [...scenes].sort((a, b) => a.position - b.position)[0];
+        if (first?.quarantine_path) {
+          thumbnailUrl = await signedPreview(supabase, first.quarantine_path);
+          thumbnailPending = thumbnailUrl !== null;
+        }
+      }
+
+      return {
+        id: tour.id,
+        title: tour.title,
+        visibility: tour.visibility,
+        thumbnailUrl,
+        thumbnailPending,
+        sceneCount: scenes.length,
+        viewCount: tour.view_count,
+        updatedAt: tour.updated_at,
+        sharedToFeed: tour.share_to_feed ?? false,
+      };
+    }),
+  );
 }
 
 /**
@@ -307,8 +342,10 @@ export async function listToursFor(
     title: tour.title,
     visibility: tour.visibility,
     thumbnailUrl: tour.thumbnail_url,
+    thumbnailPending: false,
     sceneCount: tour.tour_scenes?.length ?? 0,
     viewCount: tour.view_count,
     updatedAt: tour.updated_at,
+    sharedToFeed: false,
   }));
 }

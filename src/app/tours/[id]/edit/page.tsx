@@ -40,6 +40,8 @@ export default async function EditTourPage(props: { params: Promise<{ id: string
         propertyId={tour.propertyId}
         buildingId={tour.buildingId}
         projectId={tour.projectId}
+        initialShareToFeed={tour.sharedToFeed}
+        initialVisibility={tour.visibility === "unlisted" ? "unlisted" : "published"}
         initialPlans={plans.map((plan) => ({
           // The plan's own id doubles as the builder's local key, which is how
           // it knows this one is already a row and must not be written again.

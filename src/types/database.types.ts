@@ -392,7 +392,8 @@ export type FeedKind =
   | "question"
   | "discussion"
   | "learning"
-  | "success_story";
+  | "success_story"
+  | "tour_360";
 
 export type FeedMediaKind =
   | "image"
@@ -6741,6 +6742,7 @@ export interface Database {
           created_at: string;
           updated_at: string;
           published_at: string | null;
+          share_to_feed: boolean;
         };
         Insert: {
           id?: string;
@@ -6757,6 +6759,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           published_at?: string | null;
+          share_to_feed?: boolean;
         };
         Update: {
           id?: string;
@@ -6773,6 +6776,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           published_at?: string | null;
+          share_to_feed?: boolean;
         };
         Relationships: [];
       };

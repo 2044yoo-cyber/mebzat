@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Eye, Loader2, MapPin, Plus, X } from "lucide-react";
+import { Eye, Globe, Link2, Loader2, MapPin, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { FloorPlanInput, type DraftPlan } from "@/components/tour/floor-plan-input";
@@ -42,6 +42,8 @@ export function TourBuilder({
   initialDescription = "",
   initialScenes = [],
   initialPlans = [],
+  initialShareToFeed = false,
+  initialVisibility = "published",
   propertyId,
   buildingId,
   projectId,
@@ -54,6 +56,9 @@ export function TourBuilder({
   initialScenes?: BuilderScene[];
   /** Plans already saved. Only newly added ones are written on save. */
   initialPlans?: DraftPlan[];
+  initialShareToFeed?: boolean;
+  /** What "publish" will mean for this tour: public, or link-only. */
+  initialVisibility?: "published" | "unlisted";
   propertyId?: string | null;
   buildingId?: string | null;
   projectId?: string | null;
@@ -66,6 +71,8 @@ export function TourBuilder({
   const [plans, setPlans] = useState<DraftPlan[]>(initialPlans);
   const [editing, setEditing] = useState<string | null>(initialScenes[0]?.key ?? null);
   const [saving, setSaving] = useState(false);
+  const [shareToFeed, setShareToFeed] = useState(initialShareToFeed);
+  const [reach, setReach] = useState<"published" | "unlisted">(initialVisibility);
 
   // Where the preview is currently pointed. A hotspot is dropped here.
   const [aim, setAim] = useState({ yaw: 0, pitch: 0 });
@@ -137,6 +144,7 @@ export function TourBuilder({
       propertyId,
       buildingId,
       projectId,
+      shareToFeed: reach === "published" && shareToFeed,
       scenes: toSceneInputs(scenes),
     };
 
@@ -173,7 +181,7 @@ export function TourBuilder({
     }
 
     if (thenPublish) {
-      const published = await setTourVisibility(result.id, "published");
+      const published = await setTourVisibility(result.id, reach);
       if (published.error) {
         setSaving(false);
         // The tour is saved either way — say so, rather than letting it look
@@ -384,6 +392,68 @@ export function TourBuilder({
         </section>
       )}
 
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium">Who can see it</h2>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setReach("published")}
+            aria-pressed={reach === "published"}
+            className={cn(
+              "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
+              reach === "published" ? "border-brand bg-brand/5" : "hover:bg-muted/60",
+            )}
+          >
+            <Globe className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <span>
+              <span className="block text-sm font-medium">Public</span>
+              <span className="block text-xs text-muted-foreground">
+                Anyone can find and open it
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setReach("unlisted")}
+            aria-pressed={reach === "unlisted"}
+            className={cn(
+              "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
+              reach === "unlisted" ? "border-brand bg-brand/5" : "hover:bg-muted/60",
+            )}
+          >
+            <Link2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <span>
+              <span className="block text-sm font-medium">Link only</span>
+              <span className="block text-xs text-muted-foreground">
+                Only people you send the link to
+              </span>
+            </span>
+          </button>
+        </div>
+
+        {/* Only meaningful for a public tour, so it is not offered otherwise
+            rather than being offered and quietly ignored. */}
+        {reach === "published" && (
+          <label className="flex items-start gap-3 rounded-xl border p-3">
+            <input
+              type="checkbox"
+              checked={shareToFeed}
+              onChange={(event) => setShareToFeed(event.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-[var(--brand)]"
+            />
+            <span>
+              <span className="block text-sm font-medium">Post it to the feed</span>
+              <span className="block text-xs text-muted-foreground">
+                It appears in other people&apos;s feeds, where it can be liked,
+                commented on and saved. You can turn this off later.
+              </span>
+            </span>
+          </label>
+        )}
+      </section>
+
       <div className="sticky bottom-0 -mx-4 flex flex-wrap gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur">
         <button
           type="button"
@@ -392,7 +462,7 @@ export function TourBuilder({
           className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-medium text-brand-foreground transition-opacity disabled:opacity-50"
         >
           {saving ? <Loader2 className="size-4 animate-spin" /> : <Eye className="size-4" />}
-          Publish tour
+          {reach === "unlisted" ? "Publish as a link" : "Publish tour"}
         </button>
         <button
           type="button"
