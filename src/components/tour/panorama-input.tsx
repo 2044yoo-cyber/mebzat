@@ -10,11 +10,14 @@ import {
 } from "@/app/moderation/upload-actions";
 import { SceneThumbnail } from "@/components/tour/scene-thumbnail";
 import { createClient } from "@/lib/supabase/client";
+import type { PanoramaReading } from "@/lib/tour/panorama-image";
 import {
-  checkPanorama,
   MAX_PANORAMA_WIDTH,
+  PANORAMA_KIND_LABEL,
   PANORAMA_TYPES,
+  readPanorama,
   sceneName,
+  type PanoramaKind,
 } from "@/lib/tour/panorama-image";
 
 /**
@@ -50,6 +53,10 @@ export type DraftScene = {
   quarantinePath?: string;
   /** The moderation record, so approval knows which scene to publish into. */
   moderationItemId?: string;
+  /** What the proportions say this is. Shown beside the room, not enforced. */
+  kind?: PanoramaKind;
+  /** "1.78:1", as read off the file. */
+  ratioLabel?: string;
 };
 
 /** The `panoramas` bucket's limit. */
@@ -68,6 +75,16 @@ export function PanoramaInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [dragging, setDragging] = useState<number | null>(null);
+
+  // An image whose proportions are closer to a photograph than a panorama is
+  // put to the person rather than refused. Held here with the promise that the
+  // upload loop is waiting on, so the answer resumes it.
+  const [asking, setAsking] = useState<{
+    name: string;
+    note: string;
+    label: string;
+    decide: (useIt: boolean) => void;
+  } | null>(null);
 
   async function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -100,6 +117,21 @@ export function PanoramaInput({
       if ("reason" in prepared) {
         toast.error(prepared.reason);
         continue;
+      }
+
+      if (prepared.reading.needsConfirmation) {
+        const useIt = await new Promise<boolean>((resolve) =>
+          setAsking({
+            name: file.name,
+            note: prepared.reading.note ?? "",
+            label: prepared.reading.label,
+            decide: (answer) => {
+              setAsking(null);
+              resolve(answer);
+            },
+          }),
+        );
+        if (!useIt) continue;
       }
 
       const extension = prepared.blob.type === "image/webp" ? "webp" : "jpg";
@@ -138,6 +170,8 @@ export function PanoramaInput({
           panoramaUrl: verdict.publicUrl,
           width: prepared.width,
           height: prepared.height,
+          kind: prepared.reading.kind,
+          ratioLabel: prepared.reading.label,
         });
         continue;
       }
@@ -146,6 +180,10 @@ export function PanoramaInput({
       // on building it — the alternative was an empty list and a toast, which
       // looks exactly like a failed upload. The file stays private; this is a
       // signed link only its uploader can open.
+      if (prepared.reading.note && prepared.reading.kind === "wide") {
+        toast.info(prepared.reading.note);
+      }
+
       held += 1;
       const preview = await signQuarantinePreview(path);
       if (!preview) {
@@ -162,6 +200,8 @@ export function PanoramaInput({
         pending: true,
         quarantinePath: path,
         moderationItemId: verdict.itemId,
+        kind: prepared.reading.kind,
+        ratioLabel: prepared.reading.label,
       });
     }
 
@@ -226,6 +266,19 @@ export function PanoramaInput({
               sizes="112px"
             />
           </div>
+
+          {scene.ratioLabel && (
+            <span
+              className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground"
+              title={
+                scene.kind
+                  ? `${PANORAMA_KIND_LABEL[scene.kind]} — a full 360° photo is 2:1`
+                  : undefined
+              }
+            >
+              {scene.ratioLabel}
+            </span>
+          )}
 
           {scene.pending && (
             <span
@@ -296,6 +349,34 @@ export function PanoramaInput({
         </span>
       </button>
 
+      {asking && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-2xl border bg-background p-5 shadow-lg">
+            <p className="text-sm font-medium">{asking.name}</p>
+            <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+              Panorama ratio: {asking.label} · Recommended for full 360°: 2.00:1
+            </p>
+            <p className="mt-3 text-sm text-muted-foreground">{asking.note}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => asking.decide(true)}
+                className="flex-1 rounded-xl bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground"
+              >
+                Use anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => asking.decide(false)}
+                className="rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
+              >
+                Choose another
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <input
         ref={inputRef}
         type="file"
@@ -318,7 +399,10 @@ export function PanoramaInput({
  */
 async function prepare(
   file: File,
-): Promise<{ blob: Blob; width: number; height: number } | { reason: string }> {
+): Promise<
+  | { blob: Blob; width: number; height: number; reading: PanoramaReading }
+  | { reason: string }
+> {
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
@@ -327,14 +411,16 @@ async function prepare(
   }
 
   try {
-    const verdict = checkPanorama(bitmap.width, bitmap.height);
-    if (!verdict.ok) return { reason: verdict.reason };
+    const reading = readPanorama(bitmap.width, bitmap.height);
+    // Only the two hard refusals reach here: unreadable, or too small to look
+    // at. Proportions are reported, never refused.
+    if (reading.refusal) return { reason: reading.refusal };
 
-    if (!verdict.resizeTo) {
-      return { blob: file, width: bitmap.width, height: bitmap.height };
+    if (!reading.resizeTo) {
+      return { blob: file, width: bitmap.width, height: bitmap.height, reading };
     }
 
-    const { width, height } = verdict.resizeTo;
+    const { width, height } = reading.resizeTo;
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
@@ -356,7 +442,7 @@ async function prepare(
       };
     }
 
-    return { blob, width, height };
+    return { blob, width, height, reading };
   } finally {
     bitmap.close();
   }

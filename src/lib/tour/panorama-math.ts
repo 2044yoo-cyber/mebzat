@@ -96,3 +96,49 @@ export function projectHotspot(
 export function normaliseDegrees(value: number) {
   return ((value % 360) + 360) % 360;
 }
+
+/**
+ * How much of the sphere an image of these proportions actually covers.
+ *
+ * A true equirectangular panorama is 2:1 because 360° across and 180° down is
+ * exactly two to one. Wrap a 1.78:1 image over that same full sphere and every
+ * vertical line in the room is stretched — the picture fills the view, nothing
+ * errors, and the flat looks subtly wrong in a way nobody can name.
+ *
+ * The honest mapping keeps degrees-per-pixel equal on both axes, which fixes
+ * the extents from the ratio alone:
+ *
+ *   wider than 2:1  — the full turn, less of the floor and ceiling
+ *   narrower        — the full height, and short of a complete turn
+ *
+ * A 4368×2448 image is 1.78:1, so it is 321° round rather than 360°. The
+ * missing 39° is a gap the viewer can turn into. That is the truth about the
+ * photograph; stretching it to hide the gap is not.
+ */
+export function sphereExtents(
+  width: number | null | undefined,
+  height: number | null | undefined,
+) {
+  const full = { haov: Math.PI * 2, vaov: Math.PI };
+
+  // Scenes saved before dimensions were recorded, and anything nonsensical:
+  // assume the standard sphere, which is what they were shown as before.
+  if (
+    !width ||
+    !height ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return full;
+  }
+
+  const ratio = width / height;
+
+  if (ratio >= 2) {
+    return { haov: Math.PI * 2, vaov: (Math.PI * 2) / ratio };
+  }
+
+  return { haov: Math.PI * ratio, vaov: Math.PI };
+}

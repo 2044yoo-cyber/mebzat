@@ -26,15 +26,17 @@ import {
   MIN_FOV,
   normaliseDegrees,
   PITCH_LIMIT,
+  sphereExtents,
   projectHotspot,
 } from "../src/lib/tour/panorama-math.ts";
 import {
-  checkPanorama,
   EQUIRECTANGULAR_RATIO,
   MAX_PANORAMA_WIDTH,
+  MIN_PANORAMA_RATIO,
   MIN_PANORAMA_WIDTH,
   PANORAMA_TYPES,
   RATIO_TOLERANCE,
+  readPanorama,
   sceneName,
 } from "../src/lib/tour/panorama-image.ts";
 import type { ValidatableHotspot, ValidatableScene } from "../src/lib/tour/validate.ts";
@@ -314,108 +316,202 @@ for (const value of [0, 37, 180, 359, -45]) {
 }
 
 // ---------------------------------------------------------------------------
-// 7. What is allowed to become a panorama
+// 7. What kind of panorama this is
 //
-// An ordinary photograph on a sphere does not error. It renders, smeared, and
-// looks like a bug in the viewer rather than the wrong file. The one thing
-// this check must never do is let a non-equirectangular image through.
+// This used to refuse anything that was not 2:1 within a hair, and threw out
+// real panoramas — 4368×2448 among them — telling the person their camera was
+// wrong. Two questions had been run together: "is this a full equirectangular
+// sphere" and "can this be used at all". Only the first depends on 2:1.
 // ---------------------------------------------------------------------------
 
-// Real 360° cameras, and the sizes they write.
+// True equirectangular, from the cameras that write it.
 for (const [w, h, label] of [
   [5376, 2688, "Ricoh Theta"],
   [4096, 2048, "a stitched panorama"],
   [2048, 1024, "a small panorama"],
   [1024, 512, "the smallest accepted"],
   [11968, 5984, "Insta360 X3"],
-  [8192, 4096, "an 8K panorama"],
 ] as const) {
-  check(`${label} (${w}×${h}) is accepted`, checkPanorama(w, h).ok);
+  const reading = readPanorama(w, h);
+  check(`${label} (${w}×${h}) is accepted`, reading.refusal === null);
+  check(`${label} is called equirectangular`, reading.kind === "equirectangular", reading.kind);
+  check(`${label} needs no confirming`, !reading.needsConfirmation);
 }
 
-// Ordinary photographs, screenshots and phone portraits. Every one of these
-// would render as a smear.
+// The image this was all about.
+const theirs = readPanorama(4368, 2448);
+check("4368×2448 is accepted", theirs.refusal === null, theirs.refusal ?? "");
+check("4368×2448 is called a wide panorama", theirs.kind === "wide", theirs.kind);
+check("its ratio is reported as 1.78:1", theirs.label === "1.78:1", theirs.label);
+check("it is not held up for confirmation", !theirs.needsConfirmation);
+check(
+  "and the note says what that means rather than refusing",
+  theirs.note !== null && theirs.note.includes("1.78:1") && !/must|cannot|has to be/.test(theirs.note),
+  theirs.note ?? "",
+);
+
+// Other wide-but-not-2:1 shapes, all usable.
+for (const [w, h] of [
+  [3000, 1800],
+  [4000, 2000 + 300],
+  [6000, 2000],
+  [8000, 2000],
+] as const) {
+  const reading = readPanorama(w, h);
+  check(`${w}×${h} is accepted`, reading.refusal === null, reading.refusal ?? "");
+  check(`${w}×${h} is not held up`, !reading.needsConfirmation);
+}
+
+// A 16:9 screenshot is 1.778 and their panorama is 1.784 — the same shape.
+// Ratio alone cannot separate them, which is the whole reason this warns
+// instead of refusing. Both are accepted as wide panoramas.
+const screenshot = readPanorama(1920, 1080);
+check("a 16:9 image is accepted", screenshot.refusal === null);
+check("a 16:9 image is a wide panorama", screenshot.kind === "wide", screenshot.kind);
+check(
+  "because it is the same shape as a real 1.78:1 panorama",
+  Math.abs(1920 / 1080 - 4368 / 2448) < 0.01,
+);
+
+// Close to an ordinary photograph: asked about, still never refused.
 for (const [w, h, label] of [
   [4032, 3024, "a 4:3 phone photo"],
-  [1920, 1080, "a 16:9 screenshot"],
-  [1080, 1920, "a portrait photo"],
-  [1000, 1000, "a square crop"],
-  [3000, 1000, "a 3:1 letterbox"],
   [2000, 1400, "a wide-ish photo"],
+  [1080, 1920, "a portrait photo"],
+  [1600, 1600, "a square crop"],
 ] as const) {
-  check(`${label} (${w}×${h}) is refused`, !checkPanorama(w, h).ok);
+  const reading = readPanorama(w, h);
+  check(`${label} (${w}×${h}) is not refused`, reading.refusal === null);
+  check(`${label} is asked about`, reading.needsConfirmation);
+  check(`${label} is marked as needing verification`, reading.kind === "uncertain");
+  check(
+    `${label} is told it may not be a full panorama`,
+    reading.note !== null && reading.note.includes("may not"),
+    reading.note ?? "",
+  );
+  check(
+    `${label} is offered anyway`,
+    reading.note !== null && reading.note.includes("use it anyway"),
+    reading.note ?? "",
+  );
 }
 
-check("a zero-sized image is refused", !checkPanorama(0, 0).ok);
-check("a negative size is refused", !checkPanorama(-4096, -2048).ok);
-check("a non-finite size is refused", !checkPanorama(Number.NaN, 2048).ok);
+// The threshold between "wide panorama" and "ask first".
+check("the panorama ratio floor is 1.5", MIN_PANORAMA_RATIO === 1.5);
+check("just above the floor is a wide panorama", readPanorama(3040, 2000).kind === "wide");
+check("just below the floor is asked about", readPanorama(2960, 2000).needsConfirmation);
+check("the ratio two to one is still the standard", EQUIRECTANGULAR_RATIO === 2);
+check("the equirectangular tolerance stays tight", RATIO_TOLERANCE < 0.1);
 
-// The tolerance exists for stitchers that round; it must not be wide enough
-// to swallow a real photograph. 2:1 ± 0.04 spans roughly 1.96 to 2.04.
-check("the tolerance is small enough to exclude 16:9", RATIO_TOLERANCE < 16 / 9 - 1);
-check("the tolerance admits a few pixels of rounding", checkPanorama(4097, 2048).ok);
-check("the ratio is two to one", EQUIRECTANGULAR_RATIO === 2);
+// The two hard refusals, which are about the file and not its shape.
+check("a zero-sized image is refused", readPanorama(0, 0).refusal !== null);
+check("a negative size is refused", readPanorama(-4096, -2048).refusal !== null);
+check("a non-finite size is refused", readPanorama(Number.NaN, 2048).refusal !== null);
 
-// Too small to look at.
-const tiny = checkPanorama(MIN_PANORAMA_WIDTH - 2, (MIN_PANORAMA_WIDTH - 2) / 2);
-check("a panorama under the minimum width is refused", !tiny.ok);
+const tiny = readPanorama(MIN_PANORAMA_WIDTH - 2, (MIN_PANORAMA_WIDTH - 2) / 2);
+check("a panorama under the minimum width is refused", tiny.refusal !== null);
 check(
   "and it is refused for its size, not its shape",
-  !tiny.ok && tiny.reason.includes("too small"),
-  tiny.ok ? "" : tiny.reason,
+  tiny.refusal !== null && tiny.refusal.includes("too small"),
+  tiny.refusal ?? "",
 );
 
-// Too large to display: shrunk rather than refused, because the file is
-// perfectly valid and the phone is the constraint.
-const huge = checkPanorama(11968, 5984);
-check("an oversized panorama is accepted", huge.ok);
-check(
-  "an oversized panorama is resized to the texture limit",
-  huge.ok && huge.resizeTo?.width === MAX_PANORAMA_WIDTH,
-  huge.ok ? JSON.stringify(huge.resizeTo) : "",
-);
-check(
-  "and the resize target is exactly two to one",
-  huge.ok && huge.resizeTo !== null && huge.resizeTo.width === huge.resizeTo.height * 2,
-);
-// An oversized panorama that is a few pixels off 2:1 comes out *exactly*
-// equirectangular, rather than carrying its rounding error into the stored
-// file. Scaling by the source ratio would keep the error, and the check that
-// used a perfectly 2:1 source could not tell the two apart.
-const skewed = checkPanorama(8200, 4090);
-check("an off-square oversized panorama is accepted", skewed.ok);
-check(
-  "and it is corrected to exactly 2:1, not scaled by its own ratio",
-  skewed.ok && skewed.resizeTo?.width === MAX_PANORAMA_WIDTH &&
-    skewed.resizeTo?.height === MAX_PANORAMA_WIDTH / 2,
-  skewed.ok ? JSON.stringify(skewed.resizeTo) : "",
-);
+// Shrinking keeps the picture's own proportions. Forcing 2:1 here is what
+// would stretch the room.
+const huge = readPanorama(11968, 5984);
+check("an oversized panorama is resized", huge.resizeTo?.width === MAX_PANORAMA_WIDTH);
+check("and stays 2:1 when it started 2:1", huge.resizeTo?.height === MAX_PANORAMA_WIDTH / 2);
 
+const hugeWide = readPanorama(8736, 4896);
+check("an oversized 1.78:1 keeps its ratio", hugeWide.resizeTo?.width === MAX_PANORAMA_WIDTH);
 check(
-  "a panorama at the limit is not resized",
-  checkPanorama(MAX_PANORAMA_WIDTH, MAX_PANORAMA_WIDTH / 2).ok &&
-    (checkPanorama(MAX_PANORAMA_WIDTH, MAX_PANORAMA_WIDTH / 2) as { resizeTo: unknown })
-      .resizeTo === null,
+  "and is not squared up to 2:1",
+  hugeWide.resizeTo !== null &&
+    Math.abs(hugeWide.resizeTo.width / hugeWide.resizeTo.height - 8736 / 4896) < 0.01,
+  JSON.stringify(hugeWide.resizeTo),
 );
+check("a panorama at the limit is not resized", readPanorama(4096, 2048).resizeTo === null);
 
-// The accepted types have to be ones the panoramas bucket will take. PNG is
-// deliberately absent: 4096 wide and lossless is past the size limit.
 check("jpeg is accepted", (PANORAMA_TYPES as readonly string[]).includes("image/jpeg"));
 check("webp is accepted", (PANORAMA_TYPES as readonly string[]).includes("image/webp"));
 check("png is not", !(PANORAMA_TYPES as readonly string[]).includes("image/png"));
 
-// The refusal has to say what to do, not just that it failed. A message that
-// only says "invalid image" sends somebody to support.
-const refusal = checkPanorama(4032, 3024);
+// ---------------------------------------------------------------------------
+// 7b. How much of the sphere the picture covers
+//
+// Wrap a 1.78:1 image over a full 360×180 sphere and every vertical line in
+// the room is stretched. Nothing errors; the flat just looks subtly wrong.
+// ---------------------------------------------------------------------------
+
+const DEG = 180 / Math.PI;
+
+const square = sphereExtents(4096, 2048);
+check("a 2:1 panorama covers the whole turn", Math.abs(square.haov * DEG - 360) < 0.01);
+check("and the whole height", Math.abs(square.vaov * DEG - 180) < 0.01);
+
+const theirExtents = sphereExtents(4368, 2448);
 check(
-  "the refusal explains the shape a 360° photo has to be",
-  !refusal.ok && refusal.reason.includes("twice as wide"),
-  refusal.ok ? "" : refusal.reason,
+  "a 1.78:1 panorama covers 321 degrees, not 360",
+  Math.abs(theirExtents.haov * DEG - 321.2) < 0.5,
+  (theirExtents.haov * DEG).toFixed(1),
 );
+check("and still the full height", Math.abs(theirExtents.vaov * DEG - 180) < 0.01);
+
+const veryWide = sphereExtents(6000, 2000);
+check("a 3:1 panorama covers the whole turn", Math.abs(veryWide.haov * DEG - 360) < 0.01);
 check(
-  "the refusal quotes the size that was uploaded",
-  !refusal.ok && refusal.reason.includes("4032") && refusal.reason.includes("3024"),
+  "and 120 degrees of height",
+  Math.abs(veryWide.vaov * DEG - 120) < 0.01,
+  (veryWide.vaov * DEG).toFixed(1),
 );
+
+// The one property that matters: degrees per pixel is the same on both axes,
+// which is what "not stretched" means.
+for (const [w, h] of [
+  [4096, 2048],
+  [4368, 2448],
+  [6000, 2000],
+  [8000, 2000],
+  [3000, 1800],
+] as const) {
+  const { haov, vaov } = sphereExtents(w, h);
+  check(
+    `${w}×${h} is mapped without stretching`,
+    Math.abs(haov / w - vaov / h) < 1e-9,
+    `${(haov / w).toExponential(3)} vs ${(vaov / h).toExponential(3)}`,
+  );
+}
+
+// Never more sphere than exists.
+for (const [w, h] of [
+  [4096, 2048],
+  [4368, 2448],
+  [2000, 1900],
+  [10000, 1000],
+] as const) {
+  const { haov, vaov } = sphereExtents(w, h);
+  check(`${w}×${h} does not exceed a full turn`, haov <= Math.PI * 2 + 1e-9);
+  check(`${w}×${h} does not exceed the poles`, vaov <= Math.PI + 1e-9);
+}
+
+// A scene saved before dimensions were recorded is shown as it always was.
+// A negative dimension passes every falsy check and would otherwise produce a
+// sphere with a negative angular extent — geometry that renders as nothing.
+for (const [w, h] of [
+  [null, null],
+  [undefined, undefined],
+  [0, 0],
+  [4096, 0],
+  [-4096, 2048],
+  [4096, -2048],
+  [Number.NaN, 2048],
+] as const) {
+  const extents = sphereExtents(w, h);
+  check(
+    `unknown dimensions (${w}×${h}) fall back to the full sphere`,
+    Math.abs(extents.haov - Math.PI * 2) < 1e-9 && Math.abs(extents.vaov - Math.PI) < 1e-9,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // 8. What a scene is called before anybody renames it

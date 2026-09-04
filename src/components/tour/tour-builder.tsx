@@ -266,6 +266,8 @@ export function TourBuilder({
               <PanoramaViewer
                 key={scene.key}
                 src={scene.panoramaUrl}
+                width={scene.width}
+                height={scene.height}
                 initialYaw={scene.initialYaw}
                 initialPitch={scene.initialPitch}
                 initialZoom={scene.initialZoom}

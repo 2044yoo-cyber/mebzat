@@ -103,6 +103,11 @@ export function TourPlayer({
         // A tour of thirty rooms that kept them all would exhaust a phone.
         key={scene.id}
         src={scene.panoramaUrl}
+        // Its own proportions, so a panorama short of 2:1 is mapped to the
+        // part of the sphere it actually covers instead of stretched over all
+        // of it.
+        width={scene.width}
+        height={scene.height}
         initialYaw={scene.initialYaw}
         initialPitch={scene.initialPitch}
         initialZoom={scene.initialZoom}

@@ -10,6 +10,7 @@ import {
   lookTarget,
   normaliseDegrees,
   projectHotspot,
+  sphereExtents,
 } from "@/lib/tour/panorama-math";
 
 /**
@@ -68,12 +69,23 @@ export function PanoramaViewer({
   initialYaw = 0,
   initialPitch = 0,
   initialZoom = 75,
+  width,
+  height,
   hotspots = [],
   onHotspot,
   onAim,
   className,
 }: {
   src: string;
+  /**
+   * The panorama's own pixel dimensions, used to decide how much of the sphere
+   * it covers. Without them a non-2:1 image is stretched over the full sphere;
+   * with them it keeps its proportions and leaves a gap where it has no
+   * picture. Absent on scenes saved before this was recorded, which fall back
+   * to the full sphere they were already being shown as.
+   */
+  width?: number | null;
+  height?: number | null;
   initialYaw?: number;
   initialPitch?: number;
   initialZoom?: number;
@@ -135,9 +147,24 @@ export function PanoramaViewer({
     node.appendChild(renderer.domElement);
     renderer.domElement.style.cssText = "width:100%;height:100%;display:block;touch-action:none";
 
-    // Scale -1 on x turns the sphere inside out, which is cheaper than
-    // rendering back faces and keeps the texture the right way round.
-    const geometry = new THREE.SphereGeometry(500, 60, 40);
+    // Only as much of the sphere as the image actually covers. Centred on both
+    // axes, so a panorama short of a full turn opens facing the middle of what
+    // it does have rather than at the edge of the gap.
+    const { haov, vaov } = sphereExtents(width, height);
+    const geometry = new THREE.SphereGeometry(
+      500,
+      60,
+      40,
+      -haov / 2,
+      haov,
+      (Math.PI - vaov) / 2,
+      vaov,
+    );
+
+    // Scale -1 on x turns it inside out, which is cheaper than rendering back
+    // faces and keeps the texture the right way round. Centring the phi range
+    // above is what makes this safe for a partial sphere: mirroring a centred
+    // range leaves it centred.
     geometry.scale(-1, 1, 1);
 
     const loader = new THREE.TextureLoader();
@@ -325,7 +352,7 @@ export function PanoramaViewer({
       renderer.dispose();
       node.removeChild(canvas);
     };
-  }, [src, initialYaw, initialPitch, initialZoom, supported]);
+  }, [src, initialYaw, initialPitch, initialZoom, width, height, supported]);
 
   const broken = failed || !supported;
 
