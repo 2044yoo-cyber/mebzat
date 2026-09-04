@@ -421,6 +421,15 @@ export type Furnishing =
   | "semi_furnished"
   | "furnished";
 
+export type HotspotKind =
+  | "scene"
+  | "info"
+  | "image"
+  | "video"
+  | "property"
+  | "project"
+  | "link";
+
 export type InterviewStatus =
   | "proposed"
   | "confirmed"
@@ -821,6 +830,13 @@ export type TeamRole =
   | "estimator"
   | "accountant"
   | "marketing";
+
+export type TourVisibility =
+  | "draft"
+  | "published"
+  | "unlisted"
+  | "private"
+  | "archived";
 
 export type VerificationStatus =
   | "unverified"
@@ -6542,6 +6558,159 @@ export interface Database {
         };
         Relationships: [];
       };
+      tour_hotspots: {
+        Row: {
+          id: string;
+          scene_id: string;
+          kind: HotspotKind;
+          yaw: number;
+          pitch: number;
+          title: string;
+          description: string | null;
+          target_scene_id: string | null;
+          target_property_id: string | null;
+          target_project_id: string | null;
+          target_url: string | null;
+          image_url: string | null;
+          video_url: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          scene_id: string;
+          kind?: HotspotKind;
+          yaw: number;
+          pitch: number;
+          title: string;
+          description?: string | null;
+          target_scene_id?: string | null;
+          target_property_id?: string | null;
+          target_project_id?: string | null;
+          target_url?: string | null;
+          image_url?: string | null;
+          video_url?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          scene_id?: string;
+          kind?: HotspotKind;
+          yaw?: number;
+          pitch?: number;
+          title?: string;
+          description?: string | null;
+          target_scene_id?: string | null;
+          target_property_id?: string | null;
+          target_project_id?: string | null;
+          target_url?: string | null;
+          image_url?: string | null;
+          video_url?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      tour_scenes: {
+        Row: {
+          id: string;
+          tour_id: string;
+          title: string;
+          panorama_url: string;
+          thumbnail_url: string | null;
+          blur_data_url: string | null;
+          width: number | null;
+          height: number | null;
+          initial_yaw: number;
+          initial_pitch: number;
+          initial_zoom: number;
+          position: number;
+          media_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tour_id: string;
+          title: string;
+          panorama_url: string;
+          thumbnail_url?: string | null;
+          blur_data_url?: string | null;
+          width?: number | null;
+          height?: number | null;
+          initial_yaw?: number;
+          initial_pitch?: number;
+          initial_zoom?: number;
+          position?: number;
+          media_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tour_id?: string;
+          title?: string;
+          panorama_url?: string;
+          thumbnail_url?: string | null;
+          blur_data_url?: string | null;
+          width?: number | null;
+          height?: number | null;
+          initial_yaw?: number;
+          initial_pitch?: number;
+          initial_zoom?: number;
+          position?: number;
+          media_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      tours: {
+        Row: {
+          id: string;
+          owner_id: string;
+          company_id: string | null;
+          title: string;
+          description: string | null;
+          visibility: TourVisibility;
+          thumbnail_url: string | null;
+          property_id: string | null;
+          building_id: string | null;
+          project_id: string | null;
+          view_count: number;
+          created_at: string;
+          updated_at: string;
+          published_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          company_id?: string | null;
+          title: string;
+          description?: string | null;
+          visibility?: TourVisibility;
+          thumbnail_url?: string | null;
+          property_id?: string | null;
+          building_id?: string | null;
+          project_id?: string | null;
+          view_count?: number;
+          created_at?: string;
+          updated_at?: string;
+          published_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          company_id?: string | null;
+          title?: string;
+          description?: string | null;
+          visibility?: TourVisibility;
+          thumbnail_url?: string | null;
+          property_id?: string | null;
+          building_id?: string | null;
+          project_id?: string | null;
+          view_count?: number;
+          created_at?: string;
+          updated_at?: string;
+          published_at?: string | null;
+        };
+        Relationships: [];
+      };
       travel_landmarks: {
         Row: {
           id: string;
@@ -7882,6 +8051,12 @@ export interface Database {
         };
         Returns: boolean;
       };
+      tour_is_readable: {
+        Args: {
+          t: string;
+        };
+        Returns: boolean;
+      };
       unread_message_count: {
         Args: Record<PropertyKey, never>;
         Returns: number;
@@ -7978,6 +8153,7 @@ export interface Database {
       feed_topic: FeedTopic;
       follow_target: FollowTarget;
       furnishing: Furnishing;
+      hotspot_kind: HotspotKind;
       interview_status: InterviewStatus;
       invest_doc_kind: InvestDocKind;
       invest_media_kind: InvestMediaKind;
@@ -8027,6 +8203,7 @@ export interface Database {
       stock_status: StockStatus;
       strike_level: StrikeLevel;
       team_role: TeamRole;
+      tour_visibility: TourVisibility;
       verification_status: VerificationStatus;
       work_mode: WorkMode;
       work_status: WorkStatus;
@@ -8188,6 +8365,9 @@ export type SocialPublishLog = Database["public"]["Tables"]["social_publish_log"
 export type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];
 export type SupplierPrice = Database["public"]["Views"]["supplier_prices"]["Row"];
 export type TemplateGrant = Database["public"]["Tables"]["template_grants"]["Row"];
+export type Tour = Database["public"]["Tables"]["tours"]["Row"];
+export type TourHotspot = Database["public"]["Tables"]["tour_hotspots"]["Row"];
+export type TourScene = Database["public"]["Tables"]["tour_scenes"]["Row"];
 export type TravelLandmark = Database["public"]["Tables"]["travel_landmarks"]["Row"];
 export type UserBadge = Database["public"]["Tables"]["user_badges"]["Row"];
 export type UserStrike = Database["public"]["Tables"]["user_strikes"]["Row"];
