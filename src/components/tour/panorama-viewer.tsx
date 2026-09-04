@@ -179,9 +179,27 @@ export function PanoramaViewer({
 
     const canvas = renderer.domElement;
 
+    let warnedAboutSize = false;
+
     function resize() {
       const { clientWidth, clientHeight } = node!;
-      if (clientWidth === 0 || clientHeight === 0) return;
+      if (clientWidth === 0 || clientHeight === 0) {
+        // A container with no height renders a black rectangle and reports
+        // nothing — the texture loads, the loop runs, and there is simply
+        // nowhere to draw. Said out loud once, because the cause is never
+        // guessable from the symptom.
+        if (!warnedAboutSize) {
+          warnedAboutSize = true;
+          console.error(
+            "[panorama] the viewer has no size (" +
+              `${clientWidth}x${clientHeight}). Give it a height — a class ` +
+              "like size-full or h-[60vh]. Note that the root sets " +
+              "position:relative inline, so an `absolute inset-0` class on it " +
+              "will not take effect.",
+          );
+        }
+        return;
+      }
       camera.aspect = clientWidth / clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(clientWidth, clientHeight, false);

@@ -873,6 +873,42 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+// 11d. The viewer has to be given a height
+//
+// PanoramaViewer sets position:relative as an inline style, and an inline
+// style beats a class. So `absolute inset-0` on it does nothing: the element
+// stays relative, takes no height from its absolutely-positioned contents, and
+// renders as a black rectangle. The texture loads, the loop runs, no error is
+// raised anywhere — there is simply nowhere to draw.
+// ---------------------------------------------------------------------------
+
+const player = readFileSync("src/components/tour/tour-player.tsx", "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+// Scoped to the PanoramaViewer element, not the whole file: the player is full
+// of absolutely-positioned overlays, and every one of them is fine.
+const viewerTag = player.match(/<PanoramaViewer[\s\S]*?\/>/)?.[0] ?? "";
+check("the player renders the viewer", viewerTag.length > 0);
+check(
+  "and gives it a sizing class",
+  /className="[^"]*(size-full|h-full|h-\[)/.test(viewerTag),
+  viewerTag.match(/className="[^"]*"/)?.[0] ?? "no className",
+);
+check(
+  "and does not position it absolutely",
+  !/className="[^"]*absolute/.test(viewerTag),
+  viewerTag.match(/className="[^"]*"/)?.[0] ?? "",
+);
+
+const viewer = readFileSync("src/components/tour/panorama-viewer.tsx", "utf8");
+check(
+  "a viewer with no size says so rather than going black",
+  /clientWidth === 0 \|\| clientHeight === 0/.test(viewer) &&
+    /console\.error\(\s*\n?\s*"\[panorama\] the viewer has no size/.test(viewer),
+);
+
+// ---------------------------------------------------------------------------
 // 12. next/image must not be pointed at quarantine
 //
 // The obvious fix for "Invalid src prop" on a signed preview is to add the

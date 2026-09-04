@@ -108,7 +108,11 @@ export function TourPlayer({
         initialZoom={scene.initialZoom}
         hotspots={hotspots}
         onHotspot={activate}
-        className="absolute inset-0"
+        // Not "absolute inset-0". The viewer sets position:relative as an
+        // inline style, which beats a class, so an absolutely-positioned class
+        // here left it relative with no height at all — zero-sized, the
+        // renderer never sized, and a black rectangle with no error.
+        className="size-full"
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 bg-gradient-to-b from-black/60 to-transparent p-4">
