@@ -35,7 +35,16 @@ import { cn } from "@/lib/utils";
 /** Cards kept mounted on either side of the visible range. */
 const WINDOW = 8;
 /** Assumed height of an unmounted card, until one has been measured. */
-const ASSUMED_CARD_HEIGHT = 520;
+/**
+ * Only used for a card that has never been on screen.
+ *
+ * Deliberately generous. Guessing too tall leaves a gap that closes when the
+ * card mounts and measures itself; guessing too short shortens the document,
+ * and the browser answers that by clamping the scroll offset — which is the
+ * reader being thrown up the page. The two errors are not symmetrical, so this
+ * errs in the direction that cannot move anybody.
+ */
+const ASSUMED_CARD_HEIGHT = 720;
 
 export function Feed({
   initial,
@@ -221,6 +230,39 @@ function VirtualList({
   const heights = useRef(new Map<string, number>());
   const container = useRef<HTMLDivElement>(null);
 
+  /**
+   * Heights, kept current while a card is mounted.
+   *
+   * The ref callback alone measured the card at the moment it attached, which
+   * is before its images have loaded. On a phone a feed card is mostly image,
+   * so the recorded height came out hundreds of pixels short — and the spacer
+   * left behind when the card unmounted was short by the same amount. The
+   * document shortened, the browser clamped the scroll, and the reader was
+   * thrown up the page. Enough cards collapsing at once sent it to the top.
+   *
+   * This writes to a ref and never sets state, so it cannot itself re-render
+   * anything or feed the IntersectionObserver that drives the window.
+   */
+  const sizes = useRef<ResizeObserver | null>(null);
+
+  // Built on first use rather than during render. A ref must not be touched
+  // while rendering — the same rule the ref callback below was already written
+  // to respect — and a ref callback is not render, so this is where it belongs.
+  const sizeObserver = useCallback(() => {
+    if (sizes.current) return sizes.current;
+    if (typeof ResizeObserver === "undefined") return null;
+    sizes.current = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const id = (entry.target as HTMLElement).dataset.postId;
+        const height = entry.contentRect.height;
+        if (id && height > 0) heights.current.set(id, height);
+      }
+    });
+    return sizes.current;
+  }, []);
+
+  useEffect(() => () => sizes.current?.disconnect(), []);
+
   useEffect(() => {
     const node = container.current;
     if (!node || typeof IntersectionObserver === "undefined") return;
@@ -275,13 +317,19 @@ function VirtualList({
             // map during render would mean reading a ref during render, which
             // is both a lint error and a real bug — the value written after
             // the last commit would not be the value this render sees.
+            data-post-id={post.id}
             ref={(node) => {
               if (!node) return;
               if (mounted) {
+                // Seed it immediately so an unmount in the same frame still
+                // has a number, then let the observer correct it as the
+                // images arrive.
                 const height = node.getBoundingClientRect().height;
                 if (height > 0) heights.current.set(post.id, height);
+                sizeObserver()?.observe(node);
                 node.style.minHeight = "";
               } else {
+                sizes.current?.unobserve(node);
                 // Hold the space the card occupied so unmounting it does not
                 // move the scrollbar under the reader's thumb.
                 node.style.minHeight = `${
