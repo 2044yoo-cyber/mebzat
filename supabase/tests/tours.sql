@@ -172,6 +172,13 @@ values ('ffffffff-0000-0000-0000-000000000001',
         'dddddddd-0000-0000-0000-000000000001',
         'Probe tour', 'eeeeeeee-0000-0000-0000-000000000001', 'published', now());
 
+-- A cleared room. Since 0060 a tour whose every scene is still in review has
+-- nothing to show a visitor and must not light the badge, so a tour with no
+-- scenes at all does not either.
+insert into public.tour_scenes (tour_id, title, panorama_url, position)
+values ('ffffffff-0000-0000-0000-000000000001', 'Living room',
+        'https://example.test/probe.jpg', 0);
+
 insert into public.property_media (property_id, kind, url)
 values ('eeeeeeee-0000-0000-0000-000000000001', 'photo', 'https://example.test/a.jpg');
 
@@ -198,12 +205,95 @@ from public.properties where id = 'eeeeeeee-0000-0000-0000-000000000001';
 
 -- tours.property_id carries no ownership check, so anyone may aim a tour at
 -- any listing. Only the owner's own tour may light the badge.
-insert into public.tours (owner_id, title, property_id, visibility, published_at)
-values ('dddddddd-0000-0000-0000-000000000002', 'Hijack',
-        'eeeeeeee-0000-0000-0000-000000000001', 'published', now());
+-- Given a cleared room of its own, so this fails on ownership alone rather
+-- than on having nothing to show.
+with hijack as (
+  insert into public.tours (owner_id, title, property_id, visibility, published_at)
+  values ('dddddddd-0000-0000-0000-000000000002', 'Hijack',
+          'eeeeeeee-0000-0000-0000-000000000001', 'published', now())
+  returning id
+)
+insert into public.tour_scenes (tour_id, title, panorama_url, position)
+select id, 'Room', 'https://example.test/hijack.jpg', 0 from hijack;
 
 select '6d. a stranger cannot light the badge' as step,
        has_360 as should_be_false
 from public.properties where id = 'eeeeeeee-0000-0000-0000-000000000001';
+
+-- A published tour whose only room is still in review has nothing to show.
+-- Sending somebody to an empty tour is worse than not offering one.
+update public.tour_scenes
+set panorama_url = null, quarantine_path = 'dddddddd-0000-0000-0000-000000000001/x.jpg'
+where tour_id = 'ffffffff-0000-0000-0000-000000000001';
+
+update public.tours set visibility = 'published', published_at = now()
+where id = 'ffffffff-0000-0000-0000-000000000001';
+
+select '6e. a tour with every room in review does not light it' as step,
+       has_360 as should_be_false
+from public.properties where id = 'eeeeeeee-0000-0000-0000-000000000001';
+
+update public.tour_scenes
+set panorama_url = 'https://example.test/probe.jpg', quarantine_path = null
+where tour_id = 'ffffffff-0000-0000-0000-000000000001';
+
+select '6f. clearing that room lights it' as step,
+       has_360 as should_be_true
+from public.properties where id = 'eeeeeeee-0000-0000-0000-000000000001';
+
+-- ===================================================================
+-- 7. A room waiting on review.
+--
+-- It belongs to the tour from the moment it is uploaded — the person carries
+-- on building — but the file is still in quarantine, which is private. The
+-- owner sees the room; nobody else does; approving it is what makes it appear.
+-- ===================================================================
+reset role;
+insert into public.tours (id, owner_id, title, visibility, published_at)
+values ('99999999-1111-0000-0000-000000000001',
+        'aaaaaaaa-0000-0000-0000-000000000001',
+        'Half reviewed', 'published', now());
+
+insert into public.tour_scenes (tour_id, title, panorama_url, position)
+values ('99999999-1111-0000-0000-000000000001', 'Living room',
+        'https://example.test/live.jpg', 0);
+
+insert into public.tour_scenes (id, tour_id, title, quarantine_path, position)
+values ('99999999-2222-0000-0000-000000000001',
+        '99999999-1111-0000-0000-000000000001', 'Kitchen',
+        'aaaaaaaa-0000-0000-0000-000000000001/k.jpg', 1);
+
+set role authenticated;
+set local request.jwt.claim.sub = 'aaaaaaaa-0000-0000-0000-000000000001';
+select '7. the owner sees both rooms' as step, count(*) as should_be_2
+from public.tour_scenes where tour_id = '99999999-1111-0000-0000-000000000001';
+
+reset role; set role authenticated;
+set local request.jwt.claim.sub = 'aaaaaaaa-0000-0000-0000-000000000002';
+select '7b. a visitor sees only the cleared room' as step, count(*) as should_be_1
+from public.tour_scenes where tour_id = '99999999-1111-0000-0000-000000000001';
+
+reset role; set role anon;
+select '7c. signed out, only the cleared room' as step, count(*) as should_be_1
+from public.tour_scenes where tour_id = '99999999-1111-0000-0000-000000000001';
+
+-- Approval fills in the URL, which is what makes the room public.
+reset role;
+update public.tour_scenes
+set panorama_url = 'https://example.test/kitchen.jpg', quarantine_path = null
+where id = '99999999-2222-0000-0000-000000000001';
+
+set role anon;
+select '7d. once approved, the visitor sees both' as step, count(*) as should_be_2
+from public.tour_scenes where tour_id = '99999999-1111-0000-0000-000000000001';
+
+reset role;
+do $$ begin
+  insert into public.tour_scenes (tour_id, title, position)
+  values ('99999999-1111-0000-0000-000000000001', 'Neither', 2);
+  raise notice '7e. A SCENE WITH NO IMAGE WAS ACCEPTED — constraint failed';
+exception when check_violation then
+  raise notice '7e. a scene with neither a URL nor a path is refused';
+end $$;
 
 rollback;

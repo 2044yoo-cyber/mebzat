@@ -112,9 +112,19 @@ export function TourPlayer({
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 bg-gradient-to-b from-black/60 to-transparent p-4">
-        <p className="rounded-full bg-black/45 px-3 py-1.5 text-sm font-medium text-white backdrop-blur">
-          {scene.title}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="rounded-full bg-black/45 px-3 py-1.5 text-sm font-medium text-white backdrop-blur">
+            {scene.title}
+          </p>
+          {/* Only ever reaches the owner: the row policy hides a pending scene
+              from everyone else, so nobody is told a room exists that they
+              cannot see. */}
+          {scene.pending && (
+            <p className="rounded-full bg-amber-500/85 px-3 py-1.5 text-xs font-medium text-black backdrop-blur">
+              In review — only you can see this room
+            </p>
+          )}
+        </div>
         {scenes.length > 1 && (
           <p className="rounded-full bg-black/45 px-3 py-1.5 text-xs text-white/80 backdrop-blur">
             {index + 1} of {scenes.length}

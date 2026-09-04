@@ -29,7 +29,16 @@ export type TourHotspot = {
 export type TourScene = {
   id: string;
   title: string;
+  /** A published URL, or — for the owner, while a scene waits on review — a
+   * signed link into quarantine that expires within the hour. */
   panoramaUrl: string;
+  /** True while the panorama is waiting to be reviewed. Only ever true for
+   * the owner: the row policy hides such a scene from everyone else. */
+  pending: boolean;
+  /** Set while pending, so an edit can save the scene back without having to
+   * re-upload the file. */
+  quarantinePath: string | null;
+  moderationItemId: string | null;
   width: number | null;
   height: number | null;
   initialYaw: number;
@@ -59,7 +68,7 @@ const SHAPE = `
   id, owner_id, title, description, visibility, thumbnail_url,
   property_id, building_id, project_id, view_count, published_at, updated_at,
   tour_scenes (
-    id, title, panorama_url, width, height,
+    id, title, panorama_url, quarantine_path, moderation_item_id, width, height,
     initial_yaw, initial_pitch, initial_zoom, position,
     tour_hotspots (
       id, kind, yaw, pitch, title, description,
@@ -80,7 +89,9 @@ const SHAPE = `
 type SceneRow = {
   id: string;
   title: string;
-  panorama_url: string;
+  panorama_url: string | null;
+  quarantine_path: string | null;
+  moderation_item_id: string | null;
   width: number | null;
   height: number | null;
   initial_yaw: number;
@@ -115,7 +126,21 @@ export async function getTour(id: string): Promise<Tour | null> {
 
   if (!data) return null;
 
-  const scenes = (data.tour_scenes ?? []) as unknown as SceneRow[];
+  const rows = (data.tour_scenes ?? []) as unknown as SceneRow[];
+
+  // A scene still in quarantine has no address anyone can fetch. The policy
+  // has already established that only the owner can see the row at all, so a
+  // signed link is created for whoever got one back — one round trip per
+  // pending scene, and there are rarely any.
+  const scenes = await Promise.all(
+    rows.map(async (scene) => ({
+      scene,
+      preview:
+        scene.panorama_url === null && scene.quarantine_path
+          ? await signedPreview(supabase, scene.quarantine_path)
+          : null,
+    })),
+  );
 
   return {
     id: data.id,
@@ -130,10 +155,17 @@ export async function getTour(id: string): Promise<Tour | null> {
     viewCount: data.view_count,
     publishedAt: data.published_at,
     updatedAt: data.updated_at,
-    scenes: scenes.map((scene) => ({
+    scenes: scenes
+      // A pending scene the owner cannot preview has nothing to render. Better
+      // absent than a broken image in the middle of a tour.
+      .filter(({ scene, preview }) => scene.panorama_url !== null || preview !== null)
+      .map(({ scene, preview }) => ({
       id: scene.id,
       title: scene.title,
-      panoramaUrl: scene.panorama_url,
+      panoramaUrl: scene.panorama_url ?? preview!,
+      pending: scene.panorama_url === null,
+      quarantinePath: scene.quarantine_path,
+      moderationItemId: scene.moderation_item_id,
       width: scene.width,
       height: scene.height,
       initialYaw: scene.initial_yaw,
@@ -154,6 +186,18 @@ export async function getTour(id: string): Promise<Tour | null> {
       })),
     })),
   };
+}
+
+/** A one-hour link into the private quarantine bucket. Returns null rather
+ * than throwing: a scene that cannot be previewed is dropped, not fatal. */
+async function signedPreview(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  path: string,
+): Promise<string | null> {
+  const { data } = await supabase.storage
+    .from("moderation-quarantine")
+    .createSignedUrl(path, 60 * 60);
+  return data?.signedUrl ?? null;
 }
 
 export type TourSummary = {

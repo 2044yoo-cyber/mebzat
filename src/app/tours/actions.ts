@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { reportFailure } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
-import { fromOurStorage, validateTour } from "@/lib/tour/validate";
+import { fromOurStorage, ownsQuarantinePath, validateTour } from "@/lib/tour/validate";
 import type { HotspotKind, TourVisibility } from "@/types/database.types";
 
 /**
@@ -33,6 +33,10 @@ export type SceneInput = {
   key: string;
   title: string;
   panoramaUrl: string;
+  /** Waiting on review — the image is still in quarantine. */
+  pending?: boolean;
+  quarantinePath?: string;
+  moderationItemId?: string;
   width?: number | null;
   height?: number | null;
   initialYaw?: number;
@@ -74,17 +78,38 @@ async function requireUser(returnTo: string) {
   return { supabase, user };
 }
 
+/**
+ * Every scene's image is one this application is holding.
+ *
+ * A cleared scene must point into the `panoramas` bucket; a scene still in
+ * review must point at a quarantine path inside the caller's own folder.
+ * Neither is taken on trust: the browser sends both, and an unchecked URL
+ * would let a tour embed an image from anywhere, while an unchecked path
+ * would let a caller adopt a stranger's unreviewed file.
+ */
+function checkSceneImages(scenes: SceneInput[], userId: string): string | null {
+  for (const scene of scenes) {
+    if (scene.pending) {
+      if (!scene.quarantinePath || !ownsQuarantinePath(scene.quarantinePath, userId)) {
+        return "A scene's photo could not be verified.";
+      }
+      continue;
+    }
+    if (!fromOurStorage(scene.panoramaUrl, process.env.NEXT_PUBLIC_SUPABASE_URL)) {
+      return "A scene's photo was not uploaded through Medosha.";
+    }
+  }
+  return null;
+}
+
 export async function createTour(input: TourInput): Promise<TourResult> {
   const { supabase, user } = await requireUser("/tours/new");
 
   const invalid = validateTour(input);
   if (invalid) return { error: invalid };
 
-  for (const scene of input.scenes) {
-    if (!fromOurStorage(scene.panoramaUrl, process.env.NEXT_PUBLIC_SUPABASE_URL)) {
-      return { error: "A scene's photo was not uploaded through Medosha." };
-    }
-  }
+  const misplaced = checkSceneImages(input.scenes, user.id);
+  if (misplaced) return { error: misplaced };
 
   const { data: tour, error } = await supabase
     .from("tours")
@@ -96,8 +121,9 @@ export async function createTour(input: TourInput): Promise<TourResult> {
       property_id: input.propertyId ?? null,
       building_id: input.buildingId ?? null,
       project_id: input.projectId ?? null,
-      // The first scene is the tour's face until somebody picks another.
-      thumbnail_url: input.scenes[0].panoramaUrl,
+      // The first *cleared* scene is the tour's face. A pending one would put
+      // an expiring signed URL on every card that shows this tour.
+      thumbnail_url: input.scenes.find((scene) => !scene.pending)?.panoramaUrl ?? null,
       visibility: "draft",
     })
     .select("id")
@@ -125,11 +151,8 @@ export async function updateTour(id: string, input: TourInput): Promise<TourResu
   const invalid = validateTour(input);
   if (invalid) return { error: invalid };
 
-  for (const scene of input.scenes) {
-    if (!fromOurStorage(scene.panoramaUrl, process.env.NEXT_PUBLIC_SUPABASE_URL)) {
-      return { error: "A scene's photo was not uploaded through Medosha." };
-    }
-  }
+  const misplaced = checkSceneImages(input.scenes, user.id);
+  if (misplaced) return { error: misplaced };
 
   const owned = await ownedByCaller(supabase, id, user.id);
   if (!owned) return { error: "That tour could not be found." };
@@ -142,7 +165,7 @@ export async function updateTour(id: string, input: TourInput): Promise<TourResu
       property_id: input.propertyId ?? null,
       building_id: input.buildingId ?? null,
       project_id: input.projectId ?? null,
-      thumbnail_url: input.scenes[0].panoramaUrl,
+      thumbnail_url: input.scenes.find((scene) => !scene.pending)?.panoramaUrl ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
@@ -192,7 +215,12 @@ async function writeScenes(
       scenes.map((scene, position) => ({
         tour_id: tourId,
         title: scene.title.trim(),
-        panorama_url: scene.panoramaUrl,
+        // A pending scene stores no URL at all. The signed link it was
+        // previewed through expires within the hour, so writing it would leave
+        // a scene pointing at a dead address once it cleared review.
+        panorama_url: scene.pending ? null : scene.panoramaUrl,
+        quarantine_path: scene.pending ? (scene.quarantinePath ?? null) : null,
+        moderation_item_id: scene.pending ? (scene.moderationItemId ?? null) : null,
         width: scene.width ?? null,
         height: scene.height ?? null,
         initial_yaw: scene.initialYaw ?? 0,

@@ -6615,7 +6615,7 @@ export interface Database {
           id: string;
           tour_id: string;
           title: string;
-          panorama_url: string;
+          panorama_url: string | null;
           thumbnail_url: string | null;
           blur_data_url: string | null;
           width: number | null;
@@ -6626,12 +6626,14 @@ export interface Database {
           position: number;
           media_id: string | null;
           created_at: string;
+          quarantine_path: string | null;
+          moderation_item_id: string | null;
         };
         Insert: {
           id?: string;
           tour_id: string;
           title: string;
-          panorama_url: string;
+          panorama_url?: string | null;
           thumbnail_url?: string | null;
           blur_data_url?: string | null;
           width?: number | null;
@@ -6642,12 +6644,14 @@ export interface Database {
           position?: number;
           media_id?: string | null;
           created_at?: string;
+          quarantine_path?: string | null;
+          moderation_item_id?: string | null;
         };
         Update: {
           id?: string;
           tour_id?: string;
           title?: string;
-          panorama_url?: string;
+          panorama_url?: string | null;
           thumbnail_url?: string | null;
           blur_data_url?: string | null;
           width?: number | null;
@@ -6658,6 +6662,8 @@ export interface Database {
           position?: number;
           media_id?: string | null;
           created_at?: string;
+          quarantine_path?: string | null;
+          moderation_item_id?: string | null;
         };
         Relationships: [];
       };

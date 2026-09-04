@@ -29,6 +29,9 @@ export type ValidatableScene = {
   key: string;
   title: string;
   panoramaUrl: string;
+  /** Waiting on review: the image is in quarantine, not the public bucket. */
+  pending?: boolean;
+  quarantinePath?: string;
   hotspots?: ValidatableHotspot[];
 };
 
@@ -52,7 +55,12 @@ export function validateTour(input: ValidatableTour): string | null {
   if (keys.size !== input.scenes.length) return "Two scenes have the same id.";
 
   for (const scene of input.scenes) {
-    if (!scene.panoramaUrl) return "A scene is missing its photo.";
+    // A scene waiting on review has no public URL yet — it has a quarantine
+    // path instead, and the signed link it is previewed through expires. Both
+    // are a photo; neither being present is not.
+    if (scene.pending ? !scene.quarantinePath : !scene.panoramaUrl) {
+      return "A scene is missing its photo.";
+    }
     if (!scene.title.trim()) return "Every scene needs a name.";
 
     const hotspots = scene.hotspots ?? [];
@@ -99,4 +107,21 @@ export function fromOurStorage(url: string, supabaseUrl: string | undefined): bo
   } catch {
     return false;
   }
+}
+
+/**
+ * Whether a quarantine path belongs to the person saving the tour.
+ *
+ * A pending scene stores a path rather than a URL, and the browser supplies
+ * it. Unchecked, a caller could name somebody else's quarantine folder and
+ * have their unreviewed file published into a tour when it cleared. The
+ * bucket's own policy scopes writes to `auth.uid()`, so the first segment of
+ * any legitimate path is the uploader's id.
+ */
+export function ownsQuarantinePath(path: string, userId: string): boolean {
+  if (!path || !userId) return false;
+  // A leading slash, or "..", would make the first segment something other
+  // than the folder the file is actually in.
+  if (path.startsWith("/") || path.split("/").includes("..")) return false;
+  return path.split("/")[0] === userId;
 }

@@ -5,7 +5,10 @@ import { useRef, useState } from "react";
 import { GripVertical, Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { moderateQuarantinedImage } from "@/app/moderation/upload-actions";
+import {
+  moderateQuarantinedImage,
+  signQuarantinePreview,
+} from "@/app/moderation/upload-actions";
 import { createClient } from "@/lib/supabase/client";
 import {
   checkPanorama,
@@ -32,9 +35,21 @@ export type DraftScene = {
   /** Local only, until the tour is saved. */
   key: string;
   title: string;
+  /**
+   * Where the image is. Either a published URL in the `panoramas` bucket, or —
+   * while it waits on review — a signed link into quarantine that only its
+   * uploader can open. `pending` says which, because a signed URL expires and
+   * must never be stored as if it were permanent.
+   */
   panoramaUrl: string;
   width: number;
   height: number;
+  /** Set while the panorama is waiting to be reviewed. */
+  pending?: boolean;
+  /** The quarantine path, kept so the saved scene can point at the file. */
+  quarantinePath?: string;
+  /** The moderation record, so approval knows which scene to publish into. */
+  moderationItemId?: string;
 };
 
 /** The `panoramas` bucket's limit. */
@@ -107,20 +122,46 @@ export function PanoramaInput({
         publicBucket: "panoramas",
       });
 
-      if (verdict.status !== "safe" || !verdict.publicUrl) {
-        if (verdict.status === "blocked") refused += 1;
-        else held += 1;
+      if (verdict.status === "blocked") {
+        refused += 1;
+        continue;
+      }
+
+      // A first guess at the name from the file, which is usually "living
+      // room.jpg" and occasionally "R0010234.JPG". Either way it is editable.
+      const title = sceneName(file.name, scenes.length + added.length);
+
+      if (verdict.status === "safe" && verdict.publicUrl) {
+        added.push({
+          key: crypto.randomUUID(),
+          title,
+          panoramaUrl: verdict.publicUrl,
+          width: prepared.width,
+          height: prepared.height,
+        });
+        continue;
+      }
+
+      // Waiting on review. The room stays in the tour and the person carries
+      // on building it — the alternative was an empty list and a toast, which
+      // looks exactly like a failed upload. The file stays private; this is a
+      // signed link only its uploader can open.
+      held += 1;
+      const preview = await signQuarantinePreview(path);
+      if (!preview) {
+        toast.error(`${file.name} was uploaded but cannot be shown yet.`);
         continue;
       }
 
       added.push({
         key: crypto.randomUUID(),
-        // A first guess from the file name, which is usually "living room.jpg"
-        // and occasionally "R0010234.JPG". Either way it is editable.
-        title: sceneName(file.name, scenes.length + added.length),
-        panoramaUrl: verdict.publicUrl,
+        title,
+        panoramaUrl: preview,
         width: prepared.width,
         height: prepared.height,
+        pending: true,
+        quarantinePath: path,
+        moderationItemId: verdict.itemId,
       });
     }
 
@@ -136,7 +177,9 @@ export function PanoramaInput({
     }
     if (held > 0) {
       toast.info(
-        held === 1 ? "One panorama is under review." : `${held} panoramas are under review.`,
+        held === 1
+          ? "One panorama is being reviewed. It is in your tour — visitors will see it once it is cleared."
+          : `${held} panoramas are being reviewed. They are in your tour — visitors will see them once they are cleared.`,
       );
     }
   }
@@ -185,6 +228,15 @@ export function PanoramaInput({
               className="object-cover"
             />
           </div>
+
+          {scene.pending && (
+            <span
+              className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400"
+              title="Only you can see this room until it has been reviewed"
+            >
+              In review
+            </span>
+          )}
 
           <label className="min-w-0 flex-1">
             <span className="sr-only">Name of scene {index + 1}</span>

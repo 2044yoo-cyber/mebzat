@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { isAdmin } from "@/lib/auth/admin";
-import { audit } from "@/lib/moderation/service";
+import { audit, publishApproved } from "@/lib/moderation/service";
 import { strikeFor } from "@/lib/moderation/strikes";
 import type { ModerationCategory } from "@/lib/moderation/types";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +37,7 @@ export async function approveItem(itemId: string): Promise<ModResult> {
 
   const { data: item } = await ctx.supabase
     .from("moderation_items")
-    .select("id, category")
+    .select("id, category, content_type, quarantine_path")
     .eq("id", itemId)
     .maybeSingle();
 
@@ -63,9 +63,85 @@ export async function approveItem(itemId: string): Promise<ModResult> {
   if (error) return { ok: false, message: "Could not approve that." };
 
   await audit(ctx.supabase, itemId, ctx.user.id, "safe", { via: "queue" });
+
+  // Approving used to set the status and stop, while the message said
+  // "Approved and published". The file stayed in quarantine, which is private,
+  // so an approved image was as invisible as a rejected one. Publishing is the
+  // half that makes the decision mean anything.
+  const published = await publishItemFile(ctx.supabase, item);
+
   revalidatePath("/admin/moderation");
-  return { ok: true, message: "Approved and published." };
+  return {
+    ok: true,
+    message: published
+      ? "Approved and published."
+      : "Approved. The file could not be published — check the logs.",
+  };
 }
+
+/**
+ * Move an approved file out of quarantine, and point whatever was waiting on
+ * it at the published copy.
+ *
+ * A 360° scene is the case that needs the second half. Its row was written
+ * before the verdict, holding a quarantine path instead of a URL, and the row
+ * policy keeps it hidden from everyone but its owner until that URL exists.
+ * Filling it in is what makes the room appear for visitors.
+ */
+async function publishItemFile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  item: { id: string; content_type: string; quarantine_path: string | null } | null,
+): Promise<boolean> {
+  if (!item?.quarantine_path) return true;
+
+  const bucket = PUBLIC_BUCKETS[item.content_type];
+  if (!bucket) return true;
+
+  const publicUrl = await publishApproved(
+    supabase,
+    item.id,
+    item.quarantine_path,
+    bucket,
+  );
+  if (!publicUrl) return false;
+
+  if (item.content_type === "panorama") {
+    const { error } = await supabase
+      .from("tour_scenes")
+      .update({ panorama_url: publicUrl, quarantine_path: null })
+      .eq("moderation_item_id", item.id);
+
+    if (error) {
+      console.error("[moderation] published the file but could not update the scene:", error);
+      return false;
+    }
+
+    // A tour whose first room was pending has no thumbnail yet.
+    const { data: scene } = await supabase
+      .from("tour_scenes")
+      .select("tour_id")
+      .eq("moderation_item_id", item.id)
+      .maybeSingle();
+
+    if (scene) {
+      await supabase
+        .from("tours")
+        .update({ thumbnail_url: publicUrl })
+        .eq("id", scene.tour_id)
+        .is("thumbnail_url", null);
+    }
+  }
+
+  return true;
+}
+
+/** Where each kind of upload lives once it has been cleared. */
+const PUBLIC_BUCKETS: Record<string, string | undefined> = {
+  panorama: "panoramas",
+  product_image: "product-images",
+  profile_avatar: "avatars",
+  profile_cover: "covers",
+};
 
 /** Take it out of public view and record a strike against the author. */
 export async function removeItem(

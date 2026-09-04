@@ -38,6 +38,7 @@ import {
 import type { ValidatableHotspot, ValidatableScene } from "../src/lib/tour/validate.ts";
 import {
   fromOurStorage,
+  ownsQuarantinePath,
   MAX_HOTSPOTS_PER_SCENE,
   MAX_SCENES,
   validateTour,
@@ -667,6 +668,61 @@ check(
     "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/a.jpg",
     undefined,
   ),
+);
+
+// ---------------------------------------------------------------------------
+// 11. A scene that is still being reviewed
+//
+// It stays in the tour — the person carries on building — but its image is in
+// quarantine, which is private, and the path comes from the browser. Adopting
+// a path outside the caller's own folder would let somebody attach a
+// stranger's unreviewed file to their tour and have it published when it
+// cleared.
+// ---------------------------------------------------------------------------
+
+const ME = "11111111-2222-3333-4444-555555555555";
+const THEM = "99999999-8888-7777-6666-555555555555";
+
+check("my own folder is mine", ownsQuarantinePath(`${ME}/a.jpg`, ME));
+check("a nested path in my folder is mine", ownsQuarantinePath(`${ME}/deep/a.jpg`, ME));
+check("somebody else's folder is not", !ownsQuarantinePath(`${THEM}/a.jpg`, ME));
+check("a bare filename is not", !ownsQuarantinePath("a.jpg", ME));
+check("an empty path is not", !ownsQuarantinePath("", ME));
+check("a leading slash is not", !ownsQuarantinePath(`/${ME}/a.jpg`, ME));
+check("a path climbing out is not", !ownsQuarantinePath(`${ME}/../${THEM}/a.jpg`, ME));
+check("my id appearing later does not count", !ownsQuarantinePath(`${THEM}/${ME}/a.jpg`, ME));
+check("no user id matches nothing", !ownsQuarantinePath(`${ME}/a.jpg`, ""));
+// Both empty is the one pair that compares equal without the guard, and it is
+// reachable: a signed-out caller and a scene whose path never got written.
+check("an empty path and no user id is not a match", !ownsQuarantinePath("", ""));
+
+// A pending scene is validated on its path, a cleared one on its URL.
+const pendingTour = goodTour();
+pendingTour.scenes[1] = {
+  key: "b",
+  title: "Kitchen",
+  panoramaUrl: "https://abc123.supabase.co/storage/v1/object/sign/moderation-quarantine/x",
+  pending: true,
+  quarantinePath: `${ME}/k.jpg`,
+  hotspots: [],
+};
+check("a tour with a scene in review is accepted", validateTour(pendingTour) === null,
+  validateTour(pendingTour) ?? "");
+
+const pendingNoPath = goodTour();
+pendingNoPath.scenes[1] = {
+  key: "b",
+  title: "Kitchen",
+  panoramaUrl: "https://abc123.supabase.co/storage/v1/object/sign/moderation-quarantine/x",
+  pending: true,
+  hotspots: [],
+};
+check("a scene in review with no path is refused", validateTour(pendingNoPath) !== null);
+
+// A signed quarantine link must never pass as a published panorama.
+check(
+  "a signed quarantine link is not a published panorama",
+  !ok("https://abc123.supabase.co/storage/v1/object/sign/moderation-quarantine/u/a.jpg"),
 );
 
 // ---------------------------------------------------------------------------

@@ -140,3 +140,35 @@ export async function moderateQuarantinedImage(input: {
     message: uploadMessage("safe"),
   };
 }
+
+/**
+ * A short-lived link to a file still in quarantine, for the person who put it
+ * there.
+ *
+ * Something waiting on review has to be visible to its author — they cannot
+ * finish a tour around a room they cannot see, and an upload that vanishes is
+ * indistinguishable from one that failed. But it must be visible to *only*
+ * them, so this signs a URL rather than publishing the file, and refuses any
+ * path outside the caller's own folder. The quarantine bucket is private; a
+ * signed URL is the only way in, and it expires.
+ */
+export async function signQuarantinePreview(
+  quarantinePath: string,
+): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  // The same ownership check the publish path makes, for the same reason: the
+  // path comes from the browser and naming somebody else's folder must not
+  // hand back a link to their file.
+  if (quarantinePath.split("/")[0] !== user.id) return null;
+
+  const { data } = await supabase.storage
+    .from("moderation-quarantine")
+    .createSignedUrl(quarantinePath, 60 * 60);
+
+  return data?.signedUrl ?? null;
+}
