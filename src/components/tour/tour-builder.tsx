@@ -12,8 +12,8 @@ import {
   updateTour,
   setTourVisibility,
   type HotspotInput,
-  type SceneInput,
 } from "@/app/tours/actions";
+import { toSceneInputs, type DraftTourScene } from "@/lib/tour/draft";
 import { cn } from "@/lib/utils";
 
 /**
@@ -30,12 +30,8 @@ import { cn } from "@/lib/utils";
 
 type DraftHotspot = HotspotInput & { key: string };
 
-type BuilderScene = DraftScene & {
-  initialYaw: number;
-  initialPitch: number;
-  initialZoom: number;
-  hotspots: DraftHotspot[];
-};
+/** The same shape src/lib/tour/draft.ts converts, so the two cannot drift. */
+type BuilderScene = DraftScene & DraftTourScene;
 
 export function TourBuilder({
   userId,
@@ -127,29 +123,6 @@ export function TourBuilder({
     updateScene(scene.key, { hotspots: scene.hotspots.filter((h) => h.key !== key) });
   }
 
-  function payload(): SceneInput[] {
-    return scenes.map((s) => ({
-      key: s.key,
-      title: s.title,
-      panoramaUrl: s.panoramaUrl,
-      width: s.width,
-      height: s.height,
-      initialYaw: s.initialYaw,
-      initialPitch: s.initialPitch,
-      initialZoom: s.initialZoom,
-      // Listed rather than spread: `key` is local to the builder and must not
-      // reach the action, which keys scenes by its own.
-      hotspots: s.hotspots.map((hotspot) => ({
-        kind: hotspot.kind,
-        yaw: hotspot.yaw,
-        pitch: hotspot.pitch,
-        title: hotspot.title,
-        description: hotspot.description,
-        targetSceneKey: hotspot.targetSceneKey,
-      })),
-    }));
-  }
-
   async function save(thenPublish: boolean) {
     setSaving(true);
     const input = {
@@ -158,7 +131,7 @@ export function TourBuilder({
       propertyId,
       buildingId,
       projectId,
-      scenes: payload(),
+      scenes: toSceneInputs(scenes),
     };
 
     const result = tourId ? await updateTour(tourId, input) : await createTour(input);

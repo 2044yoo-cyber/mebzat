@@ -38,6 +38,7 @@ import {
   sceneName,
 } from "../src/lib/tour/panorama-image.ts";
 import type { ValidatableHotspot, ValidatableScene } from "../src/lib/tour/validate.ts";
+import { toSceneInputs, type DraftTourScene } from "../src/lib/tour/draft.ts";
 import {
   fromOurStorage,
   ownsQuarantinePath,
@@ -726,6 +727,91 @@ check(
   "a signed quarantine link is not a published panorama",
   !ok("https://abc123.supabase.co/storage/v1/object/sign/moderation-quarantine/u/a.jpg"),
 );
+
+// ---------------------------------------------------------------------------
+// 11b. Everything the builder holds reaches the server
+//
+// This conversion is a hand-written field list that has to stay in step with
+// two other types, and it has already fallen behind once: `pending`,
+// `quarantinePath` and `moderationItemId` were added to the types and not to
+// the copy, so a room waiting on review arrived looking like an attempt to
+// smuggle in a foreign image and the save was refused. The check counts the
+// fields rather than naming a few, so the next one that is added and forgotten
+// fails here.
+// ---------------------------------------------------------------------------
+
+const draftScene: DraftTourScene = {
+  key: "a",
+  title: "Living room",
+  panoramaUrl: "https://abc123.supabase.co/storage/v1/object/sign/x",
+  width: 4096,
+  height: 2048,
+  pending: true,
+  quarantinePath: `${ME}/a.jpg`,
+  moderationItemId: "cafe0000-0000-0000-0000-000000000001",
+  initialYaw: 90,
+  initialPitch: -10,
+  initialZoom: 60,
+  hotspots: [
+    {
+      key: "local-only",
+      kind: "scene",
+      yaw: 45,
+      pitch: 5,
+      title: "To the kitchen",
+      description: null,
+      targetSceneKey: "b",
+    },
+  ],
+};
+
+const [converted] = toSceneInputs([draftScene]);
+
+// Every field the builder holds, except the ones deliberately left behind.
+const carried = Object.keys(draftScene).filter((field) => field !== "hotspots");
+for (const field of carried) {
+  check(
+    `the builder's "${field}" reaches the server`,
+    converted[field as keyof typeof converted] ===
+      draftScene[field as keyof DraftTourScene],
+    `${String(converted[field as keyof typeof converted])} vs ${String(
+      draftScene[field as keyof DraftTourScene],
+    )}`,
+  );
+}
+
+check("the scene's hotspots come across", converted.hotspots?.length === 1);
+check(
+  "a hotspot's local key does not",
+  converted.hotspots !== undefined && !("key" in converted.hotspots[0]),
+  JSON.stringify(converted.hotspots?.[0]),
+);
+check(
+  "a hotspot's target survives",
+  converted.hotspots?.[0].targetSceneKey === "b",
+);
+check(
+  "a hotspot's angles survive",
+  converted.hotspots?.[0].yaw === 45 && converted.hotspots?.[0].pitch === 5,
+);
+
+// A cleared scene carries no pending state at all.
+const clearedDraft: DraftTourScene = {
+  key: "c",
+  title: "Kitchen",
+  panoramaUrl: "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/1.jpg",
+  width: 4096,
+  height: 2048,
+  initialYaw: 0,
+  initialPitch: 0,
+  initialZoom: 75,
+  hotspots: [],
+};
+const [clearedOut] = toSceneInputs([clearedDraft]);
+check("a cleared scene is not marked pending", !clearedOut.pending);
+check("and carries no quarantine path", !clearedOut.quarantinePath);
+
+check("the whole list is converted", toSceneInputs([draftScene, clearedDraft]).length === 2);
 
 // ---------------------------------------------------------------------------
 // 12. next/image must not be pointed at quarantine
