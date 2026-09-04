@@ -3,10 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
-  ArrowLeft,
-  ArrowRight,
   Building2,
-  Check,
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -56,15 +53,6 @@ import type {
  * part a seller has to look up, think about and get right — which is where
  * most of them stopped. Photos are the part already in their hand.
  */
-const STEPS = [
-  { id: "photos", label: "Photos" },
-  { id: "basics", label: "Basics" },
-  { id: "price", label: "Price" },
-  { id: "details", label: "Details" },
-  { id: "location", label: "Location" },
-  { id: "review", label: "Review" },
-] as const;
-
 /** Addis Ababa city centre — where the picker opens before anything is set. */
 const DEFAULT_POSITION = { lat: 9.0192, lon: 38.7525 };
 
@@ -99,7 +87,6 @@ export function PropertyForm() {
   const [woreda, setWoreda] = useState("");
   const [condominium, setCondominium] = useState("");
   const [photos, setPhotos] = useState<ListingPhoto[]>([]);
-  const [step, setStep] = useState(0);
   const [sellerKind, setSellerKind] = useState<SellerKind | "">("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactPhoneAlt, setContactPhoneAlt] = useState("");
@@ -269,46 +256,20 @@ export function PropertyForm() {
     });
   }
 
-  const canLeavePhotos = photos.length > 0;
-  const canLeaveBasics = title.trim().length >= 4 && sellerKind !== "";
-  const stepReady = [canLeavePhotos, canLeaveBasics, true, true, true, true];
+  // The wizard enforced these by refusing to advance. On one page nothing
+  // refuses to advance, so they become the condition on the button — dropping
+  // them would have quietly made a listing publishable with no photo and no
+  // seller, which is a validation change dressed up as a layout change.
+  const missing: string[] = [];
+  if (photos.length === 0) missing.push("a photo");
+  if (title.trim().length < 4) missing.push("a title");
+  if (sellerKind === "") missing.push("who is listing it");
+  const ready = missing.length === 0;
 
   return (
     <form onSubmit={submit} className="space-y-8">
-      {/* ---- Where you are ------------------------------------------ */}
-      <ol className="flex flex-wrap gap-x-1 gap-y-2 text-xs">
-        {STEPS.map((entry, index) => (
-          <li key={entry.id} className="flex items-center gap-1">
-            <button
-              type="button"
-              // Steps behind you are always reachable; ahead only once the
-              // current one is answered. A stepper that lets you skip the
-              // photos is the flow this replaced.
-              onClick={() => setStep(index)}
-              disabled={index > step && !stepReady.slice(0, index).every(Boolean)}
-              className={cn(
-                "rounded-full px-2.5 py-1 transition-colors disabled:opacity-40",
-                index === step
-                  ? "bg-brand font-medium text-brand-foreground"
-                  : index < step
-                    ? "text-brand hover:bg-brand/10"
-                    : "text-muted-foreground",
-              )}
-            >
-              {index < step && <Check className="mr-1 inline size-3" />}
-              {entry.label}
-            </button>
-            {index < STEPS.length - 1 && (
-              <span aria-hidden className="text-muted-foreground">
-                ›
-              </span>
-            )}
-          </li>
-        ))}
-      </ol>
-
       {/* ---- 1. Photos ---------------------------------------------- */}
-      {step === 0 && (
+      {(
         <Section title="Start with the photos">
           <p className="-mt-1 mb-3 text-sm text-muted-foreground">
             The part you already have. Everything else is easier once the
@@ -318,12 +279,11 @@ export function PropertyForm() {
           <PhotoUploader
             photos={photos}
             onChange={setPhotos}
-            onContinue={() => setStep(1)}
           />
         </Section>
       )}
 
-      {step === 1 && (
+      {(
         <>
       <Section title="What are you listing?">
         <div className="flex flex-wrap gap-1.5">
@@ -559,7 +519,7 @@ export function PropertyForm() {
         </>
       )}
 
-      {step === 2 && (
+      {(
       <Section title="Price">
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label={`Price (ETB)`} htmlFor="p-price">
@@ -604,7 +564,7 @@ export function PropertyForm() {
 
       )}
 
-      {step === 3 && (
+      {(
         <>
       <Section title="Details">
         <div className="grid gap-3 sm:grid-cols-3">
@@ -727,7 +687,7 @@ export function PropertyForm() {
         </>
       )}
 
-      {step === 4 && (
+      {(
       <Section title="Location">
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="City" htmlFor="p-city">
@@ -827,7 +787,7 @@ export function PropertyForm() {
 
       )}
 
-      {step === 5 && (
+      {(
         <Section title="Check it over">
           <div className="space-y-3">
             {photos[0] && (
@@ -896,39 +856,13 @@ export function PropertyForm() {
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        {step > 0 && (
-          <Button
-            type="button"
-            size="lg"
-            variant="outline"
-            onClick={() => setStep(step - 1)}
-          >
-            <ArrowLeft className="size-4" />
-            Back
-          </Button>
-        )}
-
-        {step < STEPS.length - 1 ? (
-          <Button
-            type="button"
-            size="lg"
-            disabled={!stepReady[step]}
-            onClick={() => setStep(step + 1)}
-          >
-            {STEPS[step + 1]?.label ?? "Next"}
-            <ArrowRight className="size-4" />
-          </Button>
-        ) : (
-          <Button
-            type="submit"
-            size="lg"
-            disabled={pending || title.trim().length < 4}
-          >
-            <Building2 className="size-4" />
-            {pending ? "Publishing…" : "Publish listing"}
-          </Button>
-        )}
+      {/* One button, at the bottom, where somebody who has filled the page in
+          expects to find it. */}
+      <div className="flex flex-wrap items-center gap-3 border-t pt-6">
+        <Button type="submit" size="lg" disabled={pending || !ready}>
+          <Building2 className="size-4" />
+          {pending ? "Publishing…" : "Publish listing"}
+        </Button>
 
         <Button
           type="button"
@@ -938,13 +872,16 @@ export function PropertyForm() {
         >
           Cancel
         </Button>
+
+        {/* Named, not implied. A greyed-out button that does not say what it
+            wants is a dead end somebody stares at. */}
+        {!ready && (
+          <p className="text-sm text-muted-foreground">
+            Still needs {missing.join(", ")}.
+          </p>
+        )}
       </div>
 
-      {!stepReady[step] && step === 1 && (
-        <p className="text-sm text-muted-foreground">
-          A title and who you are, then you can carry on.
-        </p>
-      )}
     </form>
   );
 }
