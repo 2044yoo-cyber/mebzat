@@ -105,6 +105,12 @@ export function reportFailure(
     code: failure.code,
     details: failure.details,
     hint: failure.hint,
+    // Some clients return an error with none of those set, which printed as
+    // `{}` and said nothing at all. The original is kept so there is always
+    // something to read.
+    ...(failure.message || failure.code || failure.details || failure.hint
+      ? {}
+      : { raw: error }),
   });
 
   if (process.env.NODE_ENV === "production") {

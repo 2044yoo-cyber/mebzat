@@ -15,6 +15,8 @@
 
 import { readFileSync } from "node:fs";
 
+import { isMissingRelation } from "../src/lib/supabase/missing-relation.ts";
+
 import * as THREE from "three";
 
 import {
@@ -1250,6 +1252,89 @@ check(
   "a plan in review is not readable by a visitor",
   /using \(file_url is not null or owner_id = auth\.uid\(\)\)/.test(planMigration),
 );
+
+// ---------------------------------------------------------------------------
+// 11h. An unapplied migration is not a bug worth shouting about
+//
+// A feature behind a new table has to render as absent on a deployment that
+// has not run its migration. The existing convention does that by discarding
+// every error, which is the habit that cost several rounds of debugging a 404
+// whose cause was sitting in the error object. Both, then: silent for a table
+// that is not there yet, loud for everything else.
+// ---------------------------------------------------------------------------
+
+const err = (fields: Partial<{ message: string; code: string; details: string; hint: string }>) =>
+  ({
+    message: fields.message ?? "",
+    code: fields.code ?? "",
+    details: fields.details ?? "",
+    hint: fields.hint ?? "",
+    name: "PostgrestError",
+  }) as unknown as Parameters<typeof isMissingRelation>[0];
+
+check("no error is not a missing table", !isMissingRelation(null));
+check("42P01 is a missing table", isMissingRelation(err({ code: "42P01" })));
+check("PGRST205 is a missing table", isMissingRelation(err({ code: "PGRST205" })));
+check(
+  "so is the message PostgREST sends",
+  isMissingRelation(
+    err({ message: "Could not find the table 'public.floor_plans' in the schema cache" }),
+  ),
+);
+check(
+  "and the one Postgres sends",
+  isMissingRelation(err({ message: 'relation "public.floor_plans" does not exist' })),
+);
+
+// Everything that is a real fault must still be reported. These are the ones
+// this feature actually hit.
+check(
+  "an ambiguous embed is not a missing table",
+  !isMissingRelation(
+    err({
+      code: "PGRST201",
+      message:
+        "Could not embed because more than one relationship was found for " +
+        "'tour_scenes' and 'tour_hotspots'",
+    }),
+  ),
+);
+check(
+  "a check constraint is not a missing table",
+  !isMissingRelation(
+    err({
+      code: "23514",
+      message: 'new row for relation "tour_hotspots" violates check constraint',
+    }),
+  ),
+);
+check(
+  "a permission denial is not a missing table",
+  !isMissingRelation(
+    err({ code: "42501", message: "permission denied for table floor_plans" }),
+  ),
+);
+check(
+  "a missing column is not a missing table",
+  !isMissingRelation(err({ code: "42703", message: 'column "quarantine_path" of relation' })),
+);
+check("an empty error is not assumed to be a missing table", !isMissingRelation(err({})));
+
+// The reads have to use it rather than going back to discarding everything.
+for (const [file, label] of [
+  ["src/lib/tour/floor-plans.ts", "listFloorPlans"],
+  ["src/lib/tour/queries.ts", "getTour"],
+  ["src/lib/tour/queries.ts", "listMyTours"],
+  ["src/lib/tour/queries.ts", "listToursFor"],
+] as const) {
+  const source = readFileSync(file, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  check(
+    `${label} reports a real failure and not an absent table`,
+    source.includes(`if (error && !isMissingRelation(error)) reportFailure("${label}"`),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // 12. next/image must not be pointed at quarantine

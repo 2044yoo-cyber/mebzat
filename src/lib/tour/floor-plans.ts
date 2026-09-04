@@ -1,6 +1,7 @@
 import "server-only";
 
 import { reportFailure } from "@/lib/supabase/errors";
+import { isMissingRelation } from "@/lib/supabase/missing-relation";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -72,7 +73,9 @@ export async function listFloorPlans(target: PlanTarget): Promise<FloorPlan[]> {
 
   const { data, error } = await query.order("position", { ascending: true });
 
-  if (error) reportFailure("listFloorPlans", error, "");
+  // Silent when the migration has simply not been applied yet; loud for
+  // everything else. See isMissingRelation.
+  if (error && !isMissingRelation(error)) reportFailure("listFloorPlans", error, "");
   if (!data) return [];
 
   const rows = data as unknown as PlanRow[];

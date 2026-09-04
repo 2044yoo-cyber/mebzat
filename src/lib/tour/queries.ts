@@ -1,6 +1,7 @@
 import "server-only";
 
 import { reportFailure } from "@/lib/supabase/errors";
+import { isMissingRelation } from "@/lib/supabase/missing-relation";
 import { createClient } from "@/lib/supabase/server";
 import type { HotspotKind, TourVisibility } from "@/types/database.types";
 
@@ -139,7 +140,9 @@ export async function getTour(id: string): Promise<Tour | null> {
   // an empty result, and the caller renders the same 404 for either. Only one
   // of them is anybody's fault, and the difference is in the error object —
   // which this used to discard one line after receiving it.
-  if (error) reportFailure("getTour", error, "");
+  // Silent when the migration has simply not been applied yet; loud for
+  // everything else. See isMissingRelation.
+  if (error && !isMissingRelation(error)) reportFailure("getTour", error, "");
   if (!data) return null;
 
   const rows = (data.tour_scenes ?? []) as unknown as SceneRow[];
@@ -247,7 +250,9 @@ export async function listMyTours(): Promise<TourSummary[]> {
     .neq("visibility", "archived")
     .order("updated_at", { ascending: false });
 
-  if (error) reportFailure("listMyTours", error, "");
+  // Silent when the migration has simply not been applied yet; loud for
+  // everything else. See isMissingRelation.
+  if (error && !isMissingRelation(error)) reportFailure("listMyTours", error, "");
 
   return (data ?? []).map((tour) => ({
     id: tour.id,
@@ -293,7 +298,9 @@ export async function listToursFor(
 
   const { data, error } = await query.order("published_at", { ascending: false });
 
-  if (error) reportFailure("listToursFor", error, "");
+  // Silent when the migration has simply not been applied yet; loud for
+  // everything else. See isMissingRelation.
+  if (error && !isMissingRelation(error)) reportFailure("listToursFor", error, "");
 
   return (data ?? []).map((tour) => ({
     id: tour.id,
