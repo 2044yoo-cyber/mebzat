@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import {
   AREA_BANDS,
   BEDROOM_OPTIONS,
+  CONSTRUCTION_STATUS,
   LISTING_KIND,
   PRICE_BANDS,
   PROPERTY_TYPE,
@@ -26,6 +27,7 @@ import { openPanel } from "@/lib/workspace/store";
 import { cn } from "@/lib/utils";
 import type { City, ListingKind, MapProperty } from "@/types/database.types";
 import type { CanvasFilters } from "@/components/property/city-canvas";
+import { MapFilterBar, type QuickFilter } from "@/components/property/map-filter-bar";
 import { StoreyFilter } from "@/components/property/storey-filter";
 import type { BuildingGroup } from "@/lib/map/markers";
 
@@ -84,6 +86,8 @@ export function CityExplorer({
   const [showFilters, setShowFilters] = useState(false);
   // Which building the list is showing the inside of, if any.
   const [building, setBuilding] = useState<BuildingGroup | null>(null);
+  const [construction, setConstruction] = useState<string[]>([]);
+  const [quick, setQuick] = useState("all");
   const [layers, setLayers] = useState<string[]>(["properties"]);
   const [showLayers, setShowLayers] = useState(false);
 
@@ -126,8 +130,11 @@ export function CityExplorer({
       minBedrooms: beds || undefined,
       minArea: area.min,
       floors: floors ?? undefined,
+      construction: construction.length
+        ? (construction as CanvasFilters["construction"])
+        : undefined,
     };
-  }, [types, kind, band, beds, areaBand, floors]);
+  }, [types, kind, band, beds, areaBand, floors, construction]);
 
   const activeCount =
     types.length +
@@ -135,7 +142,8 @@ export function CityExplorer({
     (band ? 1 : 0) +
     (beds ? 1 : 0) +
     (areaBand ? 1 : 0) +
-    (floors ? 1 : 0);
+    (floors ? 1 : 0) +
+    (construction.length > 0 ? 1 : 0);
 
   // Stable identities, so the canvas never sees a changed callback and has no
   // reason to do anything but keep running.
@@ -181,6 +189,31 @@ export function CityExplorer({
     );
   }, [results, query, floors, building]);
 
+
+  function applyQuick(id: string, filter: QuickFilter) {
+    setQuick(id);
+    setBuilding(null);
+
+    if (filter.kind === "all") {
+      setKind(null);
+      setTypes([]);
+      return;
+    }
+    if (filter.kind === "listing") {
+      setKind(filter.value);
+      setTypes([]);
+      return;
+    }
+    if (filter.kind === "type") {
+      setTypes([filter.value]);
+      return;
+    }
+    // "Buildings" is not a property type — it is whether the listing belongs
+    // to one, which the grouping already answers. Clearing the type chips is
+    // enough; the map draws a building marker wherever units share a building.
+    setTypes([]);
+  }
+
   function toggleType(value: string) {
     setTypes((current) =>
       current.includes(value)
@@ -204,6 +237,8 @@ export function CityExplorer({
     setBeds(0);
     setAreaBand(0);
     setFloors(null);
+    setConstruction([]);
+    setQuick("all");
     setBuilding(null);
     setQuery("");
   }
@@ -330,6 +365,10 @@ export function CityExplorer({
         </Link>
       </div>
 
+      <div className="border-b px-4 py-2">
+        <MapFilterBar active={quick} onSelect={applyQuick} />
+      </div>
+
       {showFilters && (
         <div className="space-y-4 border-b bg-muted/30 px-4 py-4">
           <div className="flex flex-wrap gap-4">
@@ -380,6 +419,26 @@ export function CityExplorer({
               ))}
             </FilterRow>
           </div>
+
+          <FilterRow label="Construction">
+            {Object.entries(CONSTRUCTION_STATUS).map(([value, entry]) => (
+              <Chip
+                key={value}
+                active={construction.includes(value)}
+                // Several at once: "not finished yet" is three of these, and
+                // making it exclusive would mean three separate searches.
+                onClick={() =>
+                  setConstruction((current) =>
+                    current.includes(value)
+                      ? current.filter((item) => item !== value)
+                      : [...current, value],
+                  )
+                }
+              >
+                {entry.label}
+              </Chip>
+            ))}
+          </FilterRow>
 
           <StoreyFilter value={floors} onChange={setFloors} />
         </div>

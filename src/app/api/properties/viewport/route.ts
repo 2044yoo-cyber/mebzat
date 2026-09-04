@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { getPropertiesInViewport } from "@/lib/data/properties";
-import { isListingKind, isPropertyType } from "@/lib/constants/properties";
+import {
+  isConstructionStatus,
+  isListingKind,
+  isPropertyType,
+} from "@/lib/constants/properties";
 import type { ListingKind, PropertyType } from "@/types/database.types";
 
 /**
@@ -73,6 +77,12 @@ export async function GET(request: Request) {
         minBedrooms: positiveNumber(searchParams.get("minBedrooms")),
         minArea: positiveNumber(searchParams.get("minArea")),
         floors: positiveNumber(searchParams.get("floors")),
+        // Validated here rather than widened in the query: an unknown status
+        // reaching the database returns nothing, which on a map is
+        // indistinguishable from an empty city.
+        construction:
+          searchParams.get("construction")?.split(",").filter(isConstructionStatus) ||
+          undefined,
       },
     );
 

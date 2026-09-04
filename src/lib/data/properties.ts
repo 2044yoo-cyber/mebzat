@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import type {
+  ConstructionStatus,
   City,
   ListingKind,
   MapProperty,
@@ -52,6 +53,8 @@ export type PropertyFilters = {
   minArea?: number;
   /** Total storeys, exactly. G+N is floors = N + 1. */
   floors?: number;
+  /** Build state. Several may be selected — "not finished yet" is three of them. */
+  construction?: ConstructionStatus[];
 };
 
 const COLUMNS = `
@@ -153,6 +156,17 @@ export async function getPropertiesInViewport(
     rows = rows.filter((property) => property.floors === filters.floors);
   }
 
+  // Same treatment as floors, and for the same reason: the function returns
+  // the column but takes no argument for it.
+  if (filters.construction?.length) {
+    const wanted = new Set(filters.construction);
+    rows = rows.filter(
+      (property) =>
+        property.construction_status !== null &&
+        wanted.has(property.construction_status),
+    );
+  }
+
   return { properties: rows, available: true };
 }
 
@@ -208,6 +222,9 @@ export async function getProperties(options: {
   }
   if (filters.minArea !== undefined) builder = builder.gte("area_m2", filters.minArea);
   if (filters.floors !== undefined) builder = builder.eq("floors", filters.floors);
+  if (filters.construction?.length) {
+    builder = builder.in("construction_status", filters.construction);
+  }
 
   const order = {
     newest: { column: "created_at", ascending: false },

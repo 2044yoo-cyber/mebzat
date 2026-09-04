@@ -5,6 +5,7 @@ import type {
   PropertyMediaKind,
   PropertyStatus,
   PropertyType,
+  ConstructionStatus,
 } from "@/types/database.types";
 
 /** Labels and options for the property module. Safe to import on the client. */
@@ -197,4 +198,28 @@ export function shortPrice(
     return `${currency} ${Math.round(amount / 1_000)}K${suffix}`;
   }
   return `${currency} ${amount}${suffix}`;
+}
+
+/**
+ * Build state, in the order a building passes through it.
+ *
+ * The words are the ones used on site rather than the ones a developer's
+ * schedule uses: somebody standing in front of a block asks whether it is a
+ * shell, whether it is plastered, whether they can move in.
+ */
+export const CONSTRUCTION_STATUS: Record<string, { label: string }> = {
+  unfinished: { label: "Unfinished" },
+  under_construction: { label: "Under construction" },
+  structure_complete: { label: "Structure complete" },
+  finishing: { label: "Finishing" },
+  completed: { label: "Finished" },
+  furnished: { label: "Furnished" },
+};
+
+export const CONSTRUCTION_STATUSES = Object.keys(CONSTRUCTION_STATUS);
+
+export function isConstructionStatus(
+  value: unknown,
+): value is ConstructionStatus {
+  return typeof value === "string" && value in CONSTRUCTION_STATUS;
 }

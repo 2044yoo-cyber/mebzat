@@ -7662,7 +7662,7 @@ export interface Database {
           min_area?: number | null;
           max_results?: number | null;
         };
-        Returns: { id: string; title: string; property_type: PropertyType; listing_kind: ListingKind; price: number; currency: string; price_period: string; bedrooms: number; bathrooms: number; area_m2: number; latitude: number; longitude: number; cover_image_url: string; neighbourhood: string; has_360: boolean; building_height_m: number; floors: number; privacy_radius_m: number; location_visibility: LocationVisibility; location_verified: boolean; seller_kind: SellerKind; listing_verified: boolean; is_premium: boolean; is_sample: boolean; location_accuracy: LocationAccuracy; agent_name: string; building_id: string; building_code: string; building_name: string }[];
+        Returns: { id: string; title: string; property_type: PropertyType; listing_kind: ListingKind; price: number; currency: string; price_period: string; bedrooms: number; bathrooms: number; area_m2: number; latitude: number; longitude: number; cover_image_url: string; neighbourhood: string; has_360: boolean; building_height_m: number; floors: number; privacy_radius_m: number; location_visibility: LocationVisibility; location_verified: boolean; seller_kind: SellerKind; listing_verified: boolean; is_premium: boolean; is_sample: boolean; location_accuracy: LocationAccuracy; agent_name: string; building_id: string; building_code: string; building_name: string; construction_status: ConstructionStatus; completion_percent: number }[];
       };
       property_location: {
         Args: {
@@ -8257,6 +8257,8 @@ export type MapProperty = {
   building_id: string;
   building_code: string;
   building_name: string;
+  construction_status: ConstructionStatus;
+  completion_percent: number;
 };
 /** Row of public.match_professionals(). */
 export type ProfessionalMatch = {
