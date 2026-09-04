@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PanelRight } from "lucide-react";
 
 import { AiLauncher } from "@/components/ai/ai-launcher";
@@ -67,6 +67,22 @@ export function AppShell({
   // opposite defaults — open beside a wide workspace, shut over a narrow one.
   const desktop = useMediaQuery("(min-width: 1024px)");
   const panelOpen = desktop ? !shell.panelCollapsed : shell.panelMobile;
+
+  /**
+   * The mobile panel does not follow you off the page that opened it.
+   *
+   * openPanel() sets panelMobile, the store persists to localStorage, and
+   * nothing was clearing it — so tapping one property on the map left a
+   * full-height sheet over every page afterwards, across reloads, until
+   * somebody happened to press the topbar toggle.
+   *
+   * Only panelMobile is reset. closePanel() would also set panelCollapsed and
+   * so would fold the desktop panel away on every navigation, which is a
+   * different product decision and not this bug.
+   */
+  useEffect(() => {
+    update({ panelMobile: false });
+  }, [pathname]);
 
   const bare =
     searchParams?.get("_pane") === "1" ||
@@ -199,9 +215,16 @@ export function AppShell({
           <div
             style={{ width: shell.panelWidth }}
             className={cn(
-              "shrink-0 border-l print:hidden",
+              // bg-background on the wrapper, not only on ContextPanel inside
+              // it. Without it a panel with little to show was a transparent
+              // sheet over 90% of the screen — present to touch, invisible to
+              // look at, which is why this took so long to find.
+              "shrink-0 border-l bg-background print:hidden",
               // Below lg it floats over the workspace rather than squeezing it.
-              "fixed inset-y-0 right-0 z-50 max-w-[90vw] shadow-2xl",
+              // z-40, not z-50: BottomNav is also fixed at z-50, and with equal
+              // z-index the winner was decided by which rendered later in the
+              // file. Navigation worked and nothing else did, by accident.
+              "fixed inset-y-0 right-0 z-40 max-w-[90vw] shadow-2xl",
               "lg:static lg:z-auto lg:max-w-none lg:shadow-none",
             )}
           >
