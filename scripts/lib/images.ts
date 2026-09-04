@@ -227,3 +227,41 @@ export function avatarImage(key: string): string {
   const n = (hash(`${key}|avatar`) % AVATAR_COUNT) + 1;
   return `/images/avatars/avatar-${String(n).padStart(2, "0")}.svg`;
 }
+
+// --- Buildings -----------------------------------------------------------
+
+/** What each kind of building should actually look like. A villa and a hotel
+ * rendered from the same prompt come back as the same photograph, which is
+ * worse than no photograph: it teaches the reader that the images mean
+ * nothing. */
+const BUILDING_PHRASE: Record<string, string> = {
+  house: "single storey family house, corrugated roof, compound wall",
+  villa: "modern two storey villa, garden, gated compound",
+  apartment: "mid rise residential apartment block, balconies",
+  commercial: "commercial retail building, shopfronts at street level",
+  office: "glass office tower, corporate entrance",
+  hotel: "hotel exterior, canopy entrance, signage",
+  mixed_use: "mixed use tower, retail podium with residential above",
+  warehouse: "industrial warehouse, loading bay",
+  shop: "small retail shop frontage",
+  land: "vacant urban plot, boundary wall",
+};
+
+/**
+ * A cover for one building, matched to its type and stable for its key.
+ *
+ * Height is folded into the prompt because a G+1 and a G+16 described only as
+ * "apartment block" come back looking the same, and the storey count is the
+ * first thing anyone reads off the card.
+ */
+export function buildingCover(
+  buildingType: string,
+  floors: number,
+  key: string,
+): string {
+  const base = BUILDING_PHRASE[buildingType] ?? BUILDING_PHRASE.apartment;
+  const scale =
+    floors >= 13 ? "high rise, many floors" : floors >= 6 ? "six to ten floors" : "low rise";
+  const prompt = `${base}, ${scale}, Addis Ababa Ethiopia, daylight, street view, architectural photograph`;
+  return buildUrl(prompt, hash(`${key}|building`), 1200, 800);
+}

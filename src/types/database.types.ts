@@ -272,9 +272,13 @@ export type ClaimStatus =
   | "rejected";
 
 export type ConstructionStatus =
+  | "unfinished"
   | "planned"
   | "under_construction"
+  | "structure_complete"
+  | "finishing"
   | "completed"
+  | "furnished"
   | "renovating";
 
 export type ContactMethod =
@@ -2019,6 +2023,9 @@ export interface Database {
           description: string | null;
           created_at: string;
           updated_at: string;
+          is_sample: boolean;
+          total_units: number | null;
+          completion_percent: number | null;
         };
         Insert: {
           id?: string;
@@ -2039,6 +2046,9 @@ export interface Database {
           description?: string | null;
           created_at?: string;
           updated_at?: string;
+          is_sample?: boolean;
+          total_units?: number | null;
+          completion_percent?: number | null;
         };
         Update: {
           id?: string;
@@ -2059,6 +2069,9 @@ export interface Database {
           description?: string | null;
           created_at?: string;
           updated_at?: string;
+          is_sample?: boolean;
+          total_units?: number | null;
+          completion_percent?: number | null;
         };
         Relationships: [];
       };
@@ -5535,6 +5548,8 @@ export interface Database {
           building_id: string | null;
           unit_number: string | null;
           unit_code: string | null;
+          construction_status: ConstructionStatus | null;
+          completion_percent: number | null;
         };
         Insert: {
           id?: string;
@@ -5606,6 +5621,8 @@ export interface Database {
           building_id?: string | null;
           unit_number?: string | null;
           unit_code?: string | null;
+          construction_status?: ConstructionStatus | null;
+          completion_percent?: number | null;
         };
         Update: {
           id?: string;
@@ -5677,6 +5694,8 @@ export interface Database {
           building_id?: string | null;
           unit_number?: string | null;
           unit_code?: string | null;
+          construction_status?: ConstructionStatus | null;
+          completion_percent?: number | null;
         };
         Relationships: [];
       };
@@ -6893,6 +6912,12 @@ export interface Database {
           p_limit?: number | null;
         };
         Returns: { id: string; slug: string; name: string; city: string; logo_url: string; verified: boolean; rating: number; projects_completed: number; is_claimed: boolean }[];
+      };
+      building_availability: {
+        Args: {
+          target: string;
+        };
+        Returns: { total_units: number; available_units: number; for_sale: number; for_rent: number; from_price: number }[];
       };
       building_summary: {
         Args: {
