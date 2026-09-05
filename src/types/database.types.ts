@@ -5283,6 +5283,8 @@ export interface Database {
           plan: AccountPlan;
           is_demo: boolean;
           is_moderator: boolean;
+          restricted_until: string | null;
+          restriction_reason: string | null;
         };
         Insert: {
           id: string;
@@ -5319,6 +5321,8 @@ export interface Database {
           plan?: AccountPlan;
           is_demo?: boolean;
           is_moderator?: boolean;
+          restricted_until?: string | null;
+          restriction_reason?: string | null;
         };
         Update: {
           id?: string;
@@ -5355,6 +5359,8 @@ export interface Database {
           plan?: AccountPlan;
           is_demo?: boolean;
           is_moderator?: boolean;
+          restricted_until?: string | null;
+          restriction_reason?: string | null;
         };
         Relationships: [];
       };
@@ -7035,6 +7041,12 @@ export interface Database {
       };
     };
     Functions: {
+      account_is_restricted: {
+        Args: {
+          target: string;
+        };
+        Returns: boolean;
+      };
       agenda_can_view_finance: {
         Args: {
           target_project: string;
@@ -8035,6 +8047,14 @@ export interface Database {
           max_results?: number | null;
         };
         Returns: { id: string; name: string; slug: string; logo_url: string; category: string; distance_m: number; verified: boolean }[];
+      };
+      set_account_restriction: {
+        Args: {
+          target: string;
+          until: string;
+          reason?: string | null;
+        };
+        Returns: undefined;
       };
       set_limit: {
         Args: {

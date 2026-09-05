@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { accountRestriction, restrictionMessage } from "@/lib/auth/restriction";
 import { reportFailure } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import { fromOurPlans, ownsQuarantinePath } from "@/lib/tour/validate";
@@ -45,6 +46,9 @@ export async function addFloorPlan(input: FloorPlanInput): Promise<PlanResult> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?redirect=%2Ftours");
+
+  const restriction = await accountRestriction(user.id);
+  if (restriction.restricted) return { error: restrictionMessage(restriction) };
 
   const title = input.title.trim();
   if (!title) return { error: "Give the plan a name." };

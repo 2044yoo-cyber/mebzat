@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { accountRestriction, restrictionMessage } from "@/lib/auth/restriction";
 import { reportFailure } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSceneTargets } from "@/lib/tour/draft";
@@ -113,6 +114,12 @@ function checkSceneImages(scenes: SceneInput[], userId: string): string | null {
 export async function createTour(input: TourInput): Promise<TourResult> {
   const { supabase, user } = await requireUser("/tours/new");
 
+  // A restricted account may read and appeal; it may not publish. Checked
+  // here rather than only on the page, because a server action is a public
+  // endpoint and the button not being rendered is not the gate.
+  const restriction = await accountRestriction(user.id);
+  if (restriction.restricted) return { error: restrictionMessage(restriction) };
+
   const invalid = validateTour(input);
   if (invalid) return { error: invalid };
 
@@ -156,6 +163,9 @@ export async function createTour(input: TourInput): Promise<TourResult> {
 
 export async function updateTour(id: string, input: TourInput): Promise<TourResult> {
   const { supabase, user } = await requireUser(`/tours/${id}/edit`);
+
+  const restriction = await accountRestriction(user.id);
+  if (restriction.restricted) return { error: restrictionMessage(restriction) };
 
   const invalid = validateTour(input);
   if (invalid) return { error: invalid };
