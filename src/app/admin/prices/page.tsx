@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 
 import { VerificationQueue } from "@/components/pricing/verification-queue";
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { pendingVerification } from "@/lib/data/price-book";
-import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Price verification" };
 export const dynamic = "force-dynamic";
@@ -22,20 +22,10 @@ export const dynamic = "force-dynamic";
  * back to; a 404 tells them nothing.
  */
 export default async function AdminPricesPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) notFound();
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!profile?.is_admin) notFound();
+  // The prices area specifically, not administrators in general. Somebody
+  // brought in to clear the report queue has no business promoting a figure
+  // to Medosha's own word.
+  if (!(await canAdmin("prices"))) notFound();
 
   const pending = await pendingVerification(50);
 

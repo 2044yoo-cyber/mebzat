@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isAdmin } from "@/lib/auth/admin";
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -24,7 +24,7 @@ export type Person = {
 };
 
 export async function listPeople(search = ""): Promise<Person[] | null> {
-  if (!(await isAdmin())) return null;
+  if (!(await canAdmin("users"))) return null;
 
   const supabase = await createClient();
 

@@ -1,15 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  Activity,
   Building2,
   Flag,
+  HardHat,
   LayoutDashboard,
+  Package,
+  Rotate3d,
   Ruler,
   Tags,
+  UserCog,
   Users,
 } from "lucide-react";
 
-import { isAdmin } from "@/lib/auth/admin";
+import { adminIdentity } from "@/lib/auth/admin-areas";
+import type { AdminArea } from "@/types/database.types";
 
 /**
  * The control room.
@@ -27,13 +33,24 @@ import { isAdmin } from "@/lib/auth/admin";
  * behind this layout is not the gate.
  */
 
-const SECTIONS = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
-  { href: "/admin/users", label: "People", icon: Users },
-  { href: "/admin/properties", label: "Properties", icon: Building2 },
-  { href: "/admin/moderation", label: "Moderation", icon: Flag },
-  { href: "/admin/content", label: "Content", icon: Tags },
-  { href: "/admin/prices", label: "Prices", icon: Ruler },
+/** Every section, and the area it needs. `null` is the overview, which any
+ * administrator may see. */
+const SECTIONS: {
+  href: string;
+  label: string;
+  icon: typeof Users;
+  area: AdminArea | null;
+}[] = [
+  { href: "/admin", label: "Overview", icon: LayoutDashboard, area: null },
+  { href: "/admin/users", label: "People", icon: Users, area: "users" },
+  { href: "/admin/properties", label: "Properties", icon: Building2, area: "properties" },
+  { href: "/admin/products", label: "Products", icon: Package, area: "products" },
+  { href: "/admin/projects", label: "Projects", icon: HardHat, area: "projects" },
+  { href: "/admin/tours", label: "3D & 360°", icon: Rotate3d, area: "tours" },
+  { href: "/admin/moderation", label: "Moderation", icon: Flag, area: "moderation" },
+  { href: "/admin/content", label: "Content", icon: Tags, area: "content" },
+  { href: "/admin/prices", label: "Prices", icon: Ruler, area: "prices" },
+  { href: "/admin/diagnostics", label: "Diagnostics", icon: Activity, area: "security" },
 ];
 
 export default async function AdminLayout({
@@ -41,7 +58,15 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  if (!(await isAdmin())) notFound();
+  const identity = await adminIdentity();
+  if (!identity.isAdmin) notFound();
+
+  // Only what this person can actually open. A menu entry that 404s is a menu
+  // entry that reads like a fault — and hiding it is presentation, not
+  // security: every page and every action checks for itself.
+  const sections = SECTIONS.filter(
+    (section) => section.area === null || identity.isOwner || identity.areas.includes(section.area),
+  );
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6">
@@ -49,11 +74,12 @@ export default async function AdminLayout({
         <h1 className="text-xl font-semibold">Medosha control room</h1>
         <p className="text-sm text-muted-foreground">
           The live platform. Everything here acts on the real records.
+          {identity.isOwner ? " You are the main administrator." : ""}
         </p>
       </header>
 
       <nav className="mb-6 flex flex-wrap gap-1 border-b pb-2">
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <Link
             key={section.href}
             href={section.href}
@@ -63,6 +89,15 @@ export default async function AdminLayout({
             {section.label}
           </Link>
         ))}
+        {identity.isOwner && (
+          <Link
+            href="/admin/team"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <UserCog className="size-4" />
+            Team
+          </Link>
+        )}
       </nav>
 
       {children}

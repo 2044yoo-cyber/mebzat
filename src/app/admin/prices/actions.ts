@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -30,13 +31,7 @@ async function requireAdmin() {
 
   if (!user) return { ok: false as const, error: "Sign in first." };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!profile?.is_admin) {
+  if (!(await canAdmin("prices"))) {
     return { ok: false as const, error: "Administrators only." };
   }
 

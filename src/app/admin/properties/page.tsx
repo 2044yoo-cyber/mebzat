@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
 import { Building2 } from "lucide-react";
 
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { PropertyRow } from "@/components/admin/property-row";
 import { listPropertiesForAdmin } from "@/lib/admin/properties";
 import type { PropertyStatus } from "@/types/database.types";
@@ -24,6 +26,10 @@ const FILTERS: { id: PropertyStatus | "all"; label: string }[] = [
 export default async function AdminPropertiesPage(props: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  // The layout hides the menu entry; this is the gate. A page that trusts
+  // the menu is a page anyone can open by typing the address.
+  if (!(await canAdmin("properties"))) notFound();
+
   const { status } = await props.searchParams;
   const filter = FILTERS.find((one) => one.id === status)?.id;
 

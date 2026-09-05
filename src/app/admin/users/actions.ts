@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { isAdmin } from "@/lib/auth/admin";
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { reportFailure } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,7 +32,7 @@ export async function restrictAccount(
   reason: string,
   days = DEFAULT_DAYS,
 ): Promise<AdminResult> {
-  if (!(await isAdmin())) return DENIED;
+  if (!(await canAdmin("users"))) return DENIED;
 
   const trimmed = reason.trim();
   if (!trimmed) {
@@ -59,7 +59,7 @@ export async function restrictAccount(
 }
 
 export async function reinstateAccount(userId: string): Promise<AdminResult> {
-  if (!(await isAdmin())) return DENIED;
+  if (!(await canAdmin("users"))) return DENIED;
 
   const supabase = await createClient();
   // Null lifts it. The generated signature types `until` as a string because

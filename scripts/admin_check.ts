@@ -93,15 +93,31 @@ function guardedHelpers(source: string): string[] {
 
     // The same three spellings the callers are held to, so a helper and its
     // caller cannot be judged by different rules.
-    const guards =
-      /isAdmin\(\)/.test(body) ||
-      /await operator\(\)/.test(body) ||
-      (/select\("is_admin"\)/.test(body) && /!\w+\?\.is_admin/.test(body));
-
-    if (guards) names.push(match[1]);
+    if (isGuarded(body)) names.push(match[1]);
   }
 
   return names;
+}
+
+/**
+ * Whether this body confirms the caller before it does anything.
+ *
+ * Four spellings, one property. `canAdmin("area")` is the per-area check that
+ * replaced the blunt boolean; `adminIdentity()` is what the owner-only paths
+ * read; `operator()` is the moderation queue's wrapper; `isAdmin()` remains
+ * for anything that legitimately means "any administrator".
+ *
+ * Deliberately not a check for the *right* area — that is asserted separately,
+ * against the menu, because a call to canAdmin("prices") inside the people
+ * page satisfies this one and is still wrong.
+ */
+function isGuarded(body: string): boolean {
+  return (
+    /canAdmin\(/.test(body) ||
+    /adminIdentity\(\)/.test(body) ||
+    /isAdmin\(\)/.test(body) ||
+    /await operator\(\)/.test(body)
+  );
 }
 
 /** Comments stripped: an explanation must not satisfy its own assertion. */
@@ -109,6 +125,30 @@ function code(path: string): string {
   return readFileSync(path, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "");
+}
+
+/**
+ * The file that serves a menu href.
+ *
+ * Not `src/app${href}/page.tsx`: a route group directory — `(dashboard)` —
+ * is part of the path on disk and not part of the URL, and the diagnostics
+ * page lives in one. Guessing the path would report that page as missing and
+ * quietly stop checking which area it asks for.
+ */
+function pageFor(href: string): string | null {
+  const wanted = href === "/admin" ? "/admin" : href;
+  for (const path of walk("src/app")) {
+    if (!path.endsWith("page.tsx")) continue;
+    const route =
+      "/" +
+      path
+        .slice("src/app/".length, -"/page.tsx".length)
+        .split("/")
+        .filter((part) => !part.startsWith("("))
+        .join("/");
+    if (route === wanted) return path;
+  }
+  return null;
 }
 
 const adminFiles = walk("src/app/admin");
@@ -140,9 +180,7 @@ for (const path of actionFiles) {
   // unauthenticated write with a friendly name.
   for (const [name, body] of exportedBodies(source)) {
     const gated =
-      /isAdmin\(\)/.test(body) ||
-      /await operator\(\)/.test(body) ||
-      (/select\("is_admin"\)/.test(body) && /!\w+\?\.is_admin/.test(body)) ||
+      isGuarded(body) ||
       // A private helper in the same file may hold the check for its callers,
       // so a delegation counts — but only to a helper that actually has one.
       // Naming the helper explicitly would let this pass for a helper that
@@ -155,9 +193,13 @@ for (const path of actionFiles) {
   }
 }
 
+// Only the modules that actually reach the database. A module holding a type
+// and a URL has nothing to guard, and demanding a guard of it teaches people
+// to add one that does nothing.
 for (const path of adminLib) {
   const source = code(path);
-  check(`${path} refuses a non-admin`, /isAdmin\(\)/.test(source), path);
+  if (!/createClient\(\)/.test(source)) continue;
+  check(`${path} refuses a non-admin`, isGuarded(source), path);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,10 +244,18 @@ check("a missing table reads as unavailable, not as zero",
 // one.
 // ---------------------------------------------------------------------------
 
+// `admin_members` is the one table that is legitimately the control room's
+// own: it holds who may do what, which is not a copy of anything on the site
+// and has nowhere else to live. Every other `admin_*` table would be a second
+// copy of a record the public pages already read, so the rule stands for them.
+const OWN_TABLE = "admin_members";
+
 for (const path of [...adminLib, ...actionFiles]) {
   const source = code(path);
-  check(`${path} writes no admin-only table`,
-    !/from\("admin_[a-z_]+"\)/.test(source));
+  const tables = [...source.matchAll(/from\("(admin_[a-z_]+)"\)/g)].map((m) => m[1]);
+  check(`${path} keeps no admin-only copy of site content`,
+    tables.every((table) => table === OWN_TABLE),
+    tables.filter((table) => table !== OWN_TABLE).join(" "));
 }
 
 const properties = code("src/lib/admin/properties.ts");
@@ -242,7 +292,7 @@ check("reinstating passes null rather than a second function",
 // ---------------------------------------------------------------------------
 
 const layout = code("src/app/admin/layout.tsx");
-check("the admin layout checks isAdmin", /isAdmin\(\)/.test(layout));
+check("the admin layout checks who the caller is", isGuarded(layout));
 check("and a non-admin gets a 404 rather than a 403",
   /notFound\(\)/.test(layout) && !/403|forbidden/i.test(layout));
 
@@ -274,6 +324,149 @@ check("a deployment without the column is not restricted",
   /if \(error \|\| !data\?\.restricted_until\) return CLEAR;/.test(restriction));
 check("the message says when it ends",
   /until \? ` until \$\{until\}`/.test(restriction));
+
+// ---------------------------------------------------------------------------
+// 7. One main administrator, and what the others may touch
+//
+// The failure this prevents is quiet and total: a page gated on *an* area
+// rather than on *its* area. `canAdmin("prices")` at the top of the people
+// page reads as a permission check, satisfies every generic assertion above,
+// and lets the price verifier restrict accounts. So the area each page asks
+// for is compared against the area the menu says that page needs, and the menu
+// is read from the layout rather than restated here — two lists would drift.
+// ---------------------------------------------------------------------------
+
+const layoutSource = code("src/app/admin/layout.tsx");
+
+/** The menu, as the layout declares it: href and the area it needs. */
+const menu = [...layoutSource.matchAll(
+  /\{\s*href:\s*"([^"]+)",[^}]*?area:\s*(?:"(\w+)"|null)\s*,?\s*\}/g,
+)].map((match) => ({ href: match[1], area: match[2] ?? null }));
+
+check("the layout declares a menu", menu.length >= 8, String(menu.length));
+check("the overview needs no particular area",
+  menu.some((entry) => entry.href === "/admin" && entry.area === null));
+
+for (const entry of menu) {
+  if (entry.area === null) continue;
+
+  const pagePath = pageFor(entry.href);
+  check(`${entry.href} exists`, pagePath !== null, entry.href);
+  if (!pagePath) continue;
+  const page = code(pagePath);
+
+  // Call syntax, not the bare word: an import line, a type or a comment
+  // mentioning the area would otherwise satisfy this while the call is wrong.
+  check(`${entry.href} asks for its own area, not just for some area`,
+    new RegExp(`canAdmin\\("${entry.area}"\\)`).test(page),
+    entry.area);
+
+  // And the actions behind it, where the writes actually happen.
+  const actionPath = pagePath.replace(/page\.tsx$/, "actions.ts");
+  const actions = actionFiles.includes(actionPath) ? code(actionPath) : "";
+  if (actions) {
+    check(`${entry.href} actions ask for the same area`,
+      new RegExp(`canAdmin\\(([A-Z_]+\\[kind\\]|"${entry.area}")\\)`).test(actions),
+      entry.area);
+  }
+}
+
+check("the menu is filtered by what the person holds",
+  /identity\.areas\.includes\(/.test(layoutSource));
+check("and the owner is not filtered out of their own platform",
+  /identity\.isOwner/.test(layoutSource));
+
+// The team page is the one that hands out access, so it is the owner's alone
+// — in the page, in the library behind it, and in every action.
+// Per function. `searchForTeam` holding the owner check is not `listTeam`
+// holding it, and a file-level assertion cannot tell the two apart — which is
+// exactly how this passed on a listTeam that had been loosened to any
+// administrator.
+const teamLib = code("src/lib/admin/team.ts");
+const teamReaders = exportedBodies(teamLib);
+check("the team library exports its readers", teamReaders.size >= 2, String(teamReaders.size));
+for (const [name, body] of teamReaders) {
+  check(`team: ${name} is the owner's alone`,
+    /identity\.isOwner/.test(body) && /return null;/.test(body), name);
+}
+
+const teamActions = code("src/app/admin/team/actions.ts");
+for (const [name, body] of exportedBodies(teamActions)) {
+  check(`team: ${name} is the owner's alone`, /identity\.isOwner/.test(body), name);
+}
+
+check("granting goes through set_admin_member",
+  /rpc\("set_admin_member"/.test(teamActions));
+check("removing goes through remove_admin_member",
+  /rpc\("remove_admin_member"/.test(teamActions));
+check("and profiles.is_admin is never written from here",
+  !/from\("profiles"\)[\s\S]{0,200}\.update\(/.test(teamActions));
+check("an administrator with no areas is refused rather than stored",
+  /chosen\.length === 0/.test(teamActions));
+
+// Anything the browser sends that is not an area is dropped before it reaches
+// the database. Membership, not a length check: a list of eleven strings that
+// happen to be the wrong eleven would pass a count.
+check("only real areas are passed on",
+  /new Set<string>\(ADMIN_AREAS\)/.test(teamActions) && /allowed\.has\(one\)/.test(teamActions));
+
+// ---------------------------------------------------------------------------
+// 8. The areas in the code are the areas in the database
+//
+// The enum is what PostgreSQL will accept. A list in TypeScript that has
+// drifted from it produces a checkbox that saves and then fails, or an area
+// that exists in the database and can never be granted.
+// ---------------------------------------------------------------------------
+
+const areasModule = code("src/lib/auth/admin-areas.ts");
+const areaNames = code("src/lib/auth/admin-areas-shape.ts");
+const declared = [...(areaNames.match(/export const ADMIN_AREAS = \[([\s\S]*?)\] as const;/) ?? ["", ""])[1]
+  .matchAll(/"(\w+)"/g)].map((match) => match[1]);
+
+const migration = readFileSync("supabase/migrations/0064_admin_team.sql", "utf8");
+const enumBody = (migration.match(/create type public\.admin_area as enum \(([\s\S]*?)\);/) ?? ["", ""])[1];
+const inDatabase = [...enumBody.matchAll(/'(\w+)'/g)].map((match) => match[1]);
+
+check("the migration declares the areas", inDatabase.length >= 8, String(inDatabase.length));
+check("every area in the database can be granted",
+  inDatabase.every((area) => declared.includes(area)),
+  inDatabase.filter((area) => !declared.includes(area)).join(" "));
+check("and no area is offered that the database would refuse",
+  declared.every((area) => inDatabase.includes(area)),
+  declared.filter((area) => !inDatabase.includes(area)).join(" "));
+
+// Every area needs a name and a sentence, or the tick box is a word nobody can
+// act on. Asserted per area rather than by counting entries.
+const labels = (areaNames.match(/AREA_LABEL[\s\S]*?\n\};/) ?? [""])[0];
+for (const area of declared) {
+  check(`${area} has a label`, new RegExp(`\\b${area}: "`).test(labels), area);
+}
+const hints = (areaNames.match(/AREA_HINT[\s\S]*?\n\};/) ?? [""])[0];
+for (const area of declared) {
+  check(`${area} says what it lets somebody do`, new RegExp(`\\b${area}: "`).test(hints), area);
+}
+
+// The ticks offer exactly the stored areas — no twelfth pseudo-permission.
+const boxes = code("src/components/admin/area-checkboxes.tsx");
+check("the ticks come from the one list", /ADMIN_AREAS\.map\(/.test(boxes));
+check("“everything” sets the ticks rather than storing a word",
+  /\[\.\.\.ADMIN_AREAS\]/.test(boxes) && !/"everything"|'everything'/.test(boxes));
+
+// ---------------------------------------------------------------------------
+// 9. A deployment without the migration is not an administrator
+//
+// my_admin_areas does not exist until 0064 is applied. An rpc that errors
+// returns null data, and treating null as "no restrictions" would open the
+// control room to everybody on exactly the deployments that have not yet run
+// the migration.
+// ---------------------------------------------------------------------------
+
+check("a missing grant table means no areas, not all of them",
+  /\(areas \?\? \[\]\)/.test(areasModule));
+check("and owner is only true when the database says true",
+  /owner === true/.test(areasModule));
+check("the owner holds every area without a stored copy",
+  /identity\.isOwner \|\| identity\.areas\.includes\(area\)/.test(areasModule));
 
 // ---------------------------------------------------------------------------
 

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { isAdmin } from "@/lib/auth/admin";
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { reportFailure } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import type { PropertyStatus } from "@/types/database.types";
@@ -32,7 +32,7 @@ async function setStatus(
   status: PropertyStatus,
   message: string,
 ): Promise<PropertyResult> {
-  if (!(await isAdmin())) return DENIED;
+  if (!(await canAdmin("properties"))) return DENIED;
 
   const supabase = await createClient();
   const { error } = await supabase

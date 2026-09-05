@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 
 import { AdminControls } from "@/components/social/admin-controls";
-import { isAdmin } from "@/lib/auth/admin";
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { hasCredentials } from "@/lib/social/settings";
 import { SOCIAL_PLATFORMS } from "@/lib/social/platforms";
 import { createClient } from "@/lib/supabase/server";
@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
  * anything by editing the HTML.
  */
 export default async function AdminContentPage() {
-  if (!(await isAdmin())) notFound();
+  if (!(await canAdmin("content"))) notFound();
 
   const supabase = await createClient();
 

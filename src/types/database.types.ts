@@ -28,6 +28,19 @@ export type AccountType =
   | "university"
   | "student";
 
+export type AdminArea =
+  | "users"
+  | "properties"
+  | "products"
+  | "projects"
+  | "tours"
+  | "moderation"
+  | "content"
+  | "prices"
+  | "analytics"
+  | "security"
+  | "settings";
+
 export type AgendaConfidentiality =
   | "members"
   | "finance"
@@ -861,6 +874,33 @@ export type WorkStatus =
 export interface Database {
   public: {
     Tables: {
+      admin_members: {
+        Row: {
+          user_id: string;
+          is_owner: boolean;
+          areas: AdminArea[];
+          granted_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          is_owner?: boolean;
+          areas?: AdminArea[];
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          is_owner?: boolean;
+          areas?: AdminArea[];
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       agenda_attachments: {
         Row: {
           id: string;
@@ -7047,6 +7087,12 @@ export interface Database {
         };
         Returns: boolean;
       };
+      admin_can: {
+        Args: {
+          area: AdminArea;
+        };
+        Returns: boolean;
+      };
       agenda_can_view_finance: {
         Args: {
           target_project: string;
@@ -7669,6 +7715,14 @@ export interface Database {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
+      is_admin_member: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      is_admin_owner: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
       is_conversation_participant: {
         Args: {
           conversation_id: string;
@@ -7770,6 +7824,10 @@ export interface Database {
           max_rows?: number | null;
         };
         Returns: { id: string; category: string; subcategory: string | null; material: string; specification: string | null; unit: string; brand: string | null; city_region: string; price_etb: number; currency: string; vat_status: PriceVatStatus; supplier: string | null; supplier_id: string | null; source: string | null; price_date: string; data_status: PriceDataStatus; verified: boolean | null; verified_by: string | null; verified_at: string | null; superseded_by: string | null; notes: string | null; created_by: string | null; created_at: string; updated_at: string }[];
+      };
+      my_admin_areas: {
+        Args: Record<PropertyKey, never>;
+        Returns: AdminArea[];
       };
       my_agendas: {
         Args: Record<PropertyKey, never>;
@@ -7978,6 +8036,12 @@ export interface Database {
         };
         Returns: undefined;
       };
+      remove_admin_member: {
+        Args: {
+          target: string;
+        };
+        Returns: undefined;
+      };
       remove_seed_content: {
         Args: {
           p_batch: string;
@@ -8053,6 +8117,13 @@ export interface Database {
           target: string;
           until: string;
           reason?: string | null;
+        };
+        Returns: undefined;
+      };
+      set_admin_member: {
+        Args: {
+          target: string;
+          areas: AdminArea[];
         };
         Returns: undefined;
       };
@@ -8199,6 +8270,7 @@ export interface Database {
     Enums: {
       account_plan: AccountPlan;
       account_type: AccountType;
+      admin_area: AdminArea;
       agenda_confidentiality: AgendaConfidentiality;
       agenda_decision_status: AgendaDecisionStatus;
       agenda_event_kind: AgendaEventKind;
@@ -8325,6 +8397,7 @@ export type MaterialPriceRow = Database["public"]["Tables"]["material_prices"]["
 export type ServicePortfolioItem = Database["public"]["Tables"]["service_portfolio"]["Row"];
 export type SocialPublishLogEntry = Database["public"]["Tables"]["social_publish_log"]["Row"];
 
+export type AdminMember = Database["public"]["Tables"]["admin_members"]["Row"];
 export type AgendaAttachment = Database["public"]["Tables"]["agenda_attachments"]["Row"];
 export type AgendaAudit = Database["public"]["Tables"]["agenda_audit"]["Row"];
 export type AgendaDailyLog = Database["public"]["Tables"]["agenda_daily_logs"]["Row"];

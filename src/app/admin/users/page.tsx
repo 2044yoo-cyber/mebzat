@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
 import { Users } from "lucide-react";
 
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { PersonRow } from "@/components/admin/person-row";
 import { listPeople } from "@/lib/admin/people";
 
@@ -17,6 +19,10 @@ export const dynamic = "force-dynamic";
 export default async function AdminPeoplePage(props: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  // The layout hides the menu entry; this is the gate. A page that trusts
+  // the menu is a page anyone can open by typing the address.
+  if (!(await canAdmin("users"))) notFound();
+
   const { q } = await props.searchParams;
   const people = await listPeople(q ?? "");
   if (!people) notFound();

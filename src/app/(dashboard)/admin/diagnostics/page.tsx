@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Activity } from "lucide-react";
 
 import { Diagnostics } from "@/components/admin/diagnostics";
-import { isAdmin } from "@/lib/auth/admin";
+import { canAdmin } from "@/lib/auth/admin-areas";
 
 export const metadata: Metadata = { title: "Provider diagnostics" };
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  * confirm its own existence to someone who may not have it.
  */
 export default async function DiagnosticsPage() {
-  if (!(await isAdmin())) notFound();
+  if (!(await canAdmin("security"))) notFound();
 
   return (
     <div className="space-y-6">

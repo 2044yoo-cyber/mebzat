@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isAdmin } from "@/lib/auth/admin";
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { createClient } from "@/lib/supabase/server";
 import type { PropertyStatus } from "@/types/database.types";
 
@@ -27,7 +27,7 @@ export type AdminProperty = {
 export async function listPropertiesForAdmin(
   status?: PropertyStatus,
 ): Promise<AdminProperty[] | null> {
-  if (!(await isAdmin())) return null;
+  if (!(await canAdmin("properties"))) return null;
 
   const supabase = await createClient();
 

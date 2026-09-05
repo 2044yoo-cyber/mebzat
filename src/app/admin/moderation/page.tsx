@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, Flag, ShieldAlert } from "lucide-react";
 
 import { QueueRow } from "@/components/moderation/queue-row";
-import { isAdmin } from "@/lib/auth/admin";
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Moderation" };
@@ -35,7 +35,7 @@ const TABS: { id: Tab; label: string; icon: typeof Flag }[] = [
 export default async function ModerationQueuePage(props: {
   searchParams: Promise<{ tab?: string }>;
 }) {
-  if (!(await isAdmin())) notFound();
+  if (!(await canAdmin("moderation"))) notFound();
 
   const { tab: raw } = await props.searchParams;
   const tab: Tab = (["review", "reported", "blocked", "appeals"] as const).includes(

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isAdmin } from "@/lib/auth/admin";
+import { adminIdentity } from "@/lib/auth/admin-areas";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -62,7 +62,8 @@ async function countOf(
 }
 
 export async function getOverview(): Promise<Overview | null> {
-  if (!(await isAdmin())) return null;
+  // Any administrator may see the overview: it is counts, not control.
+  if (!(await adminIdentity()).isAdmin) return null;
 
   const supabase = await createClient();
 

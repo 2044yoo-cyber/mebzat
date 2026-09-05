@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { isAdmin } from "@/lib/auth/admin";
+import { canAdmin } from "@/lib/auth/admin-areas";
 import { audit, publishApproved } from "@/lib/moderation/service";
 import { strikeFor } from "@/lib/moderation/strikes";
 import type { ModerationCategory } from "@/lib/moderation/types";
@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * Moderator actions.
  *
- * Every one of these re-checks isAdmin() rather than trusting that the page
+ * Every one of these re-checks the moderation area rather than trusting the page
  * rendered. A server action is a public endpoint with a URL; the fact that the
  * only button pointing at it lives behind a gate is not the gate.
  */
@@ -21,7 +21,7 @@ export type ModResult = { ok: boolean; message: string };
 const DENIED: ModResult = { ok: false, message: "Not permitted." };
 
 async function operator() {
-  if (!(await isAdmin())) return null;
+  if (!(await canAdmin("moderation"))) return null;
   const supabase = await createClient();
   const {
     data: { user },
