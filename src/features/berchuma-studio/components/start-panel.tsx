@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Monitor,
   PanelsTopLeft,
+  Ruler,
   Shapes,
   Sparkles,
 } from "lucide-react";
@@ -19,8 +20,10 @@ import { cn } from "@/lib/utils";
 
 import { ImageToDesign } from "./image-to-design";
 import { OpeningPanel } from "./openings/opening-panel";
+import { PlanEditor } from "./plan/plan-editor";
+import { runsFromRoom } from "../services/room-geometry";
 import { startingDesign } from "../services/starting-designs";
-import type { DesignKind, DesignSpec } from "../types/spec";
+import { validateSpec, type DesignKind, type DesignSpec } from "../types/spec";
 
 /**
  * Where a design starts.
@@ -64,7 +67,7 @@ export function StartPanel({
 }) {
   const [kind, setKind] = useState<DesignKind | null>(null);
   const [width, setWidth] = useState(3600);
-  const [route, setRoute] = useState<"design" | "photo" | "opening">("design");
+  const [route, setRoute] = useState<"design" | "photo" | "opening" | "plan">("design");
 
   const chosen = CATEGORIES.find((entry) => entry.kind === kind);
 
@@ -74,10 +77,10 @@ export function StartPanel({
         "mx-auto flex h-full w-full max-w-2xl flex-col gap-5 p-4",
         // A cut list is taller than the panel and scrolls inside itself.
         // Centring it vertically pushes its heading off the top.
-        route === "opening" ? "min-h-0" : "justify-center",
+        route === "opening" || route === "plan" ? "min-h-0" : "justify-center",
       )}
     >
-      {route === "opening" ? null : (
+      {route === "opening" || route === "plan" ? null : (
         <div className="text-center">
           <h1 className="text-xl font-semibold">What are you making?</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -87,15 +90,17 @@ export function StartPanel({
         </div>
       )}
 
-      {/* Three ways in. The first two produce a design — starting from a
+      {/* Four ways in. The first two produce a design — starting from a
           photograph is not a separate feature with its own dead end. The third
           produces an opening instead: a window is not a cabinet, it is cut from
           bars rather than sheets, and pretending otherwise is how the frame
-          engine ended up with no way in at all. */}
+          engine ended up with no way in at all. The fourth starts from the room
+          rather than the furniture, which is the order somebody with a floor
+          plan in their hand already has it in. */}
       <div
         role="tablist"
         aria-label="How to start"
-        className="mx-auto grid w-full max-w-md grid-cols-3 gap-1 rounded-lg bg-muted p-1"
+        className="mx-auto grid w-full max-w-2xl grid-cols-2 gap-1 rounded-lg bg-muted p-1 sm:grid-cols-4"
       >
         <button
           type="button"
@@ -136,9 +141,50 @@ export function StartPanel({
           <PanelsTopLeft className="size-3.5" aria-hidden />
           Window or door
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={route === "plan"}
+          onClick={() => setRoute("plan")}
+          className={cn(
+            "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium",
+            route === "plan" ? "bg-background shadow-sm" : "text-muted-foreground",
+          )}
+        >
+          <Ruler className="size-3.5" aria-hidden />
+          From a floor plan
+        </button>
       </div>
 
-      {route === "opening" ? (
+      {route === "plan" ? (
+        <div className="min-h-0 flex-1">
+          <PlanEditor
+            onDone={(room) => {
+              // The room's chosen walls become the runs, and from there the
+              // design is an ordinary Berchuma design: the layout solver
+              // places the cabinets, buildParts costs them, and the cut list
+              // and price follow. Nothing downstream knows a plan was drawn.
+              const runs = runsFromRoom(room, { depth: 600, height: 2400 });
+              const base = startingDesign("kitchen", {
+                width: runs[0]?.length ?? 3600,
+              });
+
+              // Re-validated, because the runs came from a drawing rather than
+              // from the generator: validateSpec is what repairs a cabinet the
+              // new wall lengths no longer fit, and it is the same check every
+              // other route here goes through.
+              onStart(
+                validateSpec({
+                  ...base,
+                  room,
+                  runs: runs.length > 0 ? runs : base.runs,
+                  layout: runs.length >= 3 ? "u_shaped" : runs.length === 2 ? "l_shaped" : "straight",
+                }).spec,
+              );
+            }}
+          />
+        </div>
+      ) : route === "opening" ? (
         <OpeningPanel />
       ) : route === "photo" ? (
         <ImageToDesign compact onDesign={(spec) => onStart(spec)} />

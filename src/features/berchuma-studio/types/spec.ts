@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { openingClashes, openingFaults } from "../services/room-geometry";
+import { roomSchema } from "./room";
+
 import {
   cornerKinds,
   furnitureTypes,
@@ -421,6 +424,22 @@ export const designSpecSchema = z.object({
     { id: "run-1", label: "Wall A", length: 2400, depth: 600, height: 2400 },
   ]),
 
+  /**
+   * The room, when the design was drawn in one.
+   *
+   * Optional, and deliberately not a version bump: an optional field parses
+   * every stored v3 spec unchanged, where `z.literal(4)` would reject all of
+   * them and make this depend on an upgrade path working perfectly the first
+   * time. A design with no room is a design that behaves exactly as it did
+   * before the plan editor existed.
+   *
+   * `runs` stays authoritative for the cabinets. When a room is present its
+   * chosen walls *derive* the runs — see services/room-geometry — so the
+   * layout solver, buildParts, the cut list and the price are all reached
+   * through the path that already exists rather than a second one.
+   */
+  room: roomSchema.optional(),
+
   /** How the runs meet. Ignored for a straight layout. */
   cornerKind: z.enum(cornerKinds).default("l_corner"),
   units: z.literal("mm"),
@@ -582,6 +601,28 @@ export function validateSpec(input: DesignSpec): ValidationResult {
       ...issues.flatMap((issue) => (issue.correction ? [issue.correction] : [])),
     ]),
   ];
+
+  // Cabinets standing where a door or a window is.
+  //
+  // Reported here rather than in a panel of its own, because this is the list
+  // the workspace already shows and a warning in a second place is a warning
+  // somebody has to know to look for. A door is an error — nothing can stand
+  // in a doorway. A tall unit across a window is a warning: a base unit under
+  // one is completely normal, and a joiner who wants one should not have to
+  // argue with the software.
+  if (spec.room) {
+    for (const clash of openingClashes(spec.room, spec.cabinets)) {
+      issues.push({
+        severity: clash.severity,
+        path: `cabinets.${clash.cabinetId}`,
+        message: clash.message,
+      });
+    }
+
+    for (const fault of openingFaults(spec.room)) {
+      issues.push({ severity: "warning", path: "room.openings", message: fault });
+    }
+  }
 
   return { spec, issues };
 }
