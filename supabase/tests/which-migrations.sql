@@ -130,49 +130,107 @@ begin
   -- anybody can check. This row said "50 expected after 0044" and reported 357
   -- on a healthy database — 0044's fifty sales, 0047's hundred rentals, and
   -- however many units scripts/seed_buildings.ts has put inside its buildings.
-  -- A figure that reads as wrong when nothing is wrong is worse than no figure:
-  -- it sends somebody looking for a fault, or teaches them to ignore the row.
+  --
+  -- The first attempt at breaking it up was worse than the total: the parts
+  -- came to 362 against a total of 357, because scripts/demo_building.ts moves
+  -- five existing demo listings into "Sunrise Apartments (demo)" rather than
+  -- inventing new ones, so those five were counted as demo listings and again
+  -- as units in a building. Parts that do not add up send somebody hunting for
+  -- a fault that is not there — exactly what the row was rewritten to stop.
+  --
+  -- So the groups below are disjoint, and the total row checks them.
   if to_regclass('public.properties') is not null then
-    if to_regclass('public.seed_content') is not null then
-      execute $q$select count(*) from public.seed_content
-               where entity = 'properties' and batch = 'property-demo-2026-08'$q$ into found;
+    declare
+      registered boolean := to_regclass('public.seed_content') is not null;
+      grouped boolean := exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'properties'
+          and column_name = 'building_id');
+      sale bigint := 0;
+      rent bigint := 0;
+      units bigint := 0;
+      loose bigint := 0;
+      moved bigint := 0;
+      total bigint := 0;
+    begin
+      execute 'select count(*) from public.properties where is_sample' into total;
+
+      if registered then
+        execute $q$select count(*) from public.properties p
+                 where p.is_sample and exists (
+                   select 1 from public.seed_content s
+                   where s.entity = 'properties' and s.entity_id = p.id
+                     and s.batch = 'property-demo-2026-08')$q$ into sale;
+        execute $q$select count(*) from public.properties p
+                 where p.is_sample and exists (
+                   select 1 from public.seed_content s
+                   where s.entity = 'properties' and s.entity_id = p.id
+                     and s.batch = 'rental-demo-2026-08')$q$ into rent;
+
+        insert into which_migrations_report values (
+          100, 'seed data', 'demo properties for sale', sale::text, '50 after 0044');
+        insert into which_migrations_report values (
+          101, 'seed data', 'demo properties to rent', rent::text, '100 after 0047');
+      end if;
+
+      -- Units seed_buildings.ts created. Registered demo listings are excluded
+      -- because demo_building.ts moves some of them into a building, and a row
+      -- counted in two groups is what made the parts overshoot the total.
+      if grouped then
+        execute $q$select count(*) from public.properties p
+                 where p.is_sample and p.building_id is not null $q$
+                 || case when registered then $q$and not exists (
+                      select 1 from public.seed_content s
+                      where s.entity = 'properties' and s.entity_id = p.id)$q$
+                    else '' end
+          into units;
+
+        insert into which_migrations_report values (
+          102, 'seed data', 'demo units in buildings', units::text,
+          'however many seed_buildings.ts made');
+
+        if registered then
+          execute $q$select count(*) from public.properties p
+                   where p.is_sample and p.building_id is not null and exists (
+                     select 1 from public.seed_content s
+                     where s.entity = 'properties' and s.entity_id = p.id)$q$
+            into moved;
+
+          insert into which_migrations_report values (
+            103, 'seed data', 'of those, demo listings moved indoors', moved::text,
+            'demo_building.ts puts existing listings in a building, counted above');
+        end if;
+      end if;
+
+      -- Counted, not inferred. `total - sale - rent - units` would make the
+      -- check below an identity that holds however wrong the groups are: an
+      -- overlap would quietly come out as a negative remainder and the sum
+      -- would still balance. Asking the table what is left over is what lets
+      -- the groups overshoot and be caught.
+      execute 'select count(*) from public.properties p where p.is_sample'
+              || case when grouped then ' and p.building_id is null' else '' end
+              || case when registered then $q$ and not exists (
+                   select 1 from public.seed_content s
+                   where s.entity = 'properties' and s.entity_id = p.id)$q$
+                 else '' end
+        into loose;
+
       insert into which_migrations_report values (
-        100, 'seed data', 'demo properties for sale', found::text, '50 after 0044');
+        104, 'seed data', 'other sample rows', loose::text,
+        'not from a migration or a building — seeded by hand');
 
-      execute $q$select count(*) from public.seed_content
-               where entity = 'properties' and batch = 'rental-demo-2026-08'$q$ into found;
       insert into which_migrations_report values (
-        101, 'seed data', 'demo properties to rent', found::text, '100 after 0047');
-    end if;
+        105, 'seed data', 'sample properties, all told', total::text,
+        case
+          when sale + rent + units + loose = total
+            then 'the groups above, which do not overlap'
+          else '** the groups above do not add up to this'
+        end);
 
-    -- Units inside demo buildings. Not a migration's doing — seed_buildings.ts
-    -- writes them — so any number here is fine, including none.
-    if exists (
-      select 1 from information_schema.columns
-      where table_schema = 'public' and table_name = 'properties'
-        and column_name = 'building_id'
-    ) then
-      execute 'select count(*) from public.properties where is_sample and building_id is not null'
-        into found;
+      execute 'select count(*) from public.properties where not is_sample' into total;
       insert into which_migrations_report values (
-        102, 'seed data', 'demo units in buildings', found::text,
-        'however many seed_buildings.ts made');
-    end if;
-
-    execute 'select count(*) from public.properties where is_sample' into found;
-    insert into which_migrations_report values (
-      103, 'seed data', 'sample properties, all told', found::text,
-      'the three above, plus anything seeded by hand');
-
-    execute 'select count(*) from public.properties where not is_sample' into found;
-    insert into which_migrations_report values (
-      104, 'seed data', 'real listings', found::text, 'posted by actual sellers');
-  end if;
-
-  if to_regclass('public.material_prices') is not null then
-    execute 'select count(*) from public.material_prices' into found;
-    insert into which_migrations_report values (
-      101, 'seed data', 'material prices', found::text, '455 expected after 0042');
+        106, 'seed data', 'real listings', total::text, 'posted by actual sellers');
+    end;
   end if;
 
   -- ------------------------------------------------------- the control room
