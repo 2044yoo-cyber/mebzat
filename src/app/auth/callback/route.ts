@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/server";
  *
  * `next` arrives in the query string, which means it arrives from whoever wrote
  * the link. Interpolating it into a redirect unchecked is an open redirect: a
- * value of `//evil.example` produces `https://medosha.com//evil.example`, which
+ * value of `//evil.example` produces `https://medosha.net//evil.example`, which
  * browsers read as protocol-relative and follow off-site — landing somebody on
  * a stranger's page moments after signing in, still trusting the flow they
  * started. That is a convincing way to phish a member.

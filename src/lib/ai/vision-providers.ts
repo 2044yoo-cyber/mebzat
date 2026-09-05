@@ -1,4 +1,5 @@
 import "server-only";
+import { siteUrl } from "@/lib/site";
 
 /**
  * Vision providers, as their own list.
@@ -146,7 +147,7 @@ const PROVIDERS: VisionProvider[] = [
     apiKey: () => process.env.OPENROUTER_API_KEY ?? null,
     headers: (key) => ({
       authorization: `Bearer ${key ?? ""}`,
-      "http-referer": process.env.NEXT_PUBLIC_SITE_URL ?? "https://medosha.com",
+      "http-referer": siteUrl(),
       "x-title": "Medosha",
     }),
     envModel: process.env.OPENROUTER_VISION_MODEL,

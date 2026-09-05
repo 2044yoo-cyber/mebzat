@@ -130,7 +130,7 @@ async function main(): Promise<void> {
     reference,
     amount: 1,
     currency: "ETB",
-    email: process.env.CHAPA_TEST_EMAIL ?? "doctor@medosha.com",
+    email: process.env.CHAPA_TEST_EMAIL ?? "doctor@medosha.net",
     firstName,
     lastName,
     phone: null,

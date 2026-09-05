@@ -406,7 +406,7 @@ const body = initializeBody({
   phone: null,
   title: "Medosha Studio Professional Plan",
   description: "A".repeat(400),
-  returnUrl: "https://medosha.com/billing/return?ref=medosha-abc-0001",
+  returnUrl: "https://medosha.net/billing/return?ref=medosha-abc-0001",
   callbackUrl: null,
 });
 
@@ -579,7 +579,7 @@ for (const local of [
 }
 
 for (const public_ of [
-  "https://medosha.com",
+  "https://medosha.net",
   "https://medosha.vercel.app",
   "https://a1b2c3.ngrok-free.app",
 ]) {

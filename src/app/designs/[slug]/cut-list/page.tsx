@@ -1,6 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+import { siteUrl } from "@/lib/site";
+
+/**
+ * The bare host, for a line that is printed and taken to a workshop.
+ *
+ * Derived from NEXT_PUBLIC_SITE_URL rather than written out, because this line
+ * ends up on paper: a hardcoded domain on a cut list outlives the deployment
+ * that produced it, and somebody types it in a year later and lands nowhere.
+ */
+function host(): string {
+  return siteUrl().replace(/^https?:\/\//, "");
+}
 import { ArrowLeft, FileSpreadsheet } from "lucide-react";
 
 import { BoardSheets } from "@/features/berchuma-studio/components/manufacturing/sheet-diagram";
@@ -94,7 +107,7 @@ export default async function CutListPage({
         </p>
         <p className="text-xs text-muted-foreground">
           Cut list produced {new Date().toLocaleDateString("en-GB")} for{" "}
-          {design.owner.name} · medosha.com/designs/{design.slug}
+          {design.owner.name} · {host()}/designs/{design.slug}
         </p>
       </header>
 
