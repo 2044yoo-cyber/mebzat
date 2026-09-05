@@ -125,10 +125,48 @@ begin
   --
   -- Data rather than schema, so asked separately: a migration can have run and
   -- still have inserted nothing if it was edited or interrupted.
+  --
+  -- Broken down rather than totalled, because the total is not a number
+  -- anybody can check. This row said "50 expected after 0044" and reported 357
+  -- on a healthy database — 0044's fifty sales, 0047's hundred rentals, and
+  -- however many units scripts/seed_buildings.ts has put inside its buildings.
+  -- A figure that reads as wrong when nothing is wrong is worse than no figure:
+  -- it sends somebody looking for a fault, or teaches them to ignore the row.
   if to_regclass('public.properties') is not null then
+    if to_regclass('public.seed_content') is not null then
+      execute $q$select count(*) from public.seed_content
+               where entity = 'properties' and batch = 'property-demo-2026-08'$q$ into found;
+      insert into which_migrations_report values (
+        100, 'seed data', 'demo properties for sale', found::text, '50 after 0044');
+
+      execute $q$select count(*) from public.seed_content
+               where entity = 'properties' and batch = 'rental-demo-2026-08'$q$ into found;
+      insert into which_migrations_report values (
+        101, 'seed data', 'demo properties to rent', found::text, '100 after 0047');
+    end if;
+
+    -- Units inside demo buildings. Not a migration's doing — seed_buildings.ts
+    -- writes them — so any number here is fine, including none.
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'properties'
+        and column_name = 'building_id'
+    ) then
+      execute 'select count(*) from public.properties where is_sample and building_id is not null'
+        into found;
+      insert into which_migrations_report values (
+        102, 'seed data', 'demo units in buildings', found::text,
+        'however many seed_buildings.ts made');
+    end if;
+
     execute 'select count(*) from public.properties where is_sample' into found;
     insert into which_migrations_report values (
-      100, 'seed data', 'demo properties', found::text, '50 expected after 0044');
+      103, 'seed data', 'sample properties, all told', found::text,
+      'the three above, plus anything seeded by hand');
+
+    execute 'select count(*) from public.properties where not is_sample' into found;
+    insert into which_migrations_report values (
+      104, 'seed data', 'real listings', found::text, 'posted by actual sellers');
   end if;
 
   if to_regclass('public.material_prices') is not null then
@@ -147,6 +185,14 @@ begin
     insert into which_migrations_report values (
       200, 'administrators', '(none yet)', '** MISSING',
       'apply 0064 — until then nobody can open /admin/team');
+  elsif not exists (select 1 from public.admin_members) then
+    -- Not damage, and not 0064 failing. Nothing in any migration sets
+    -- profiles.is_admin, so a Medosha that has never had an administrator has
+    -- nobody for 0064's carry to carry, and set_admin_member cannot appoint
+    -- the first because it refuses anybody who is not already the owner.
+    insert into which_migrations_report values (
+      200, 'administrators', 'nobody yet', '** NOT APPOINTED',
+      'expected on a database that has never had one — run supabase/tools/main-administrator.sql');
   else
     for row in
       execute $q$
@@ -168,10 +214,12 @@ begin
         case when row.is_owner then 'everything' else row.areas end
       );
     end loop;
+  end if;
 
-    -- The two lists that must agree. A trigger keeps profiles.is_admin in step
-    -- with membership, so a difference here means something wrote the flag
-    -- directly and the two have drifted.
+  -- The two lists that must agree, counted outside the branch above. Putting
+  -- this inside the "there are administrators" arm is how the summary line
+  -- vanished from the one report that most needed it: the empty database.
+  if to_regclass('public.admin_members') is not null then
     declare
       members bigint;
       flagged bigint;
@@ -184,6 +232,8 @@ begin
       insert into which_migrations_report values (
         300, 'summary', 'administrators',
         case
+          when members = 0 and flagged = 0
+            then '** nobody is an administrator yet — appoint one'
           when owners <> 1 then '** there must be exactly one main administrator'
           when members <> flagged then '** the flag and the team have drifted apart'
           else 'in step'

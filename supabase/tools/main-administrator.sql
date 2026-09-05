@@ -1,7 +1,18 @@
--- Putting the main administrator on the right account.
+-- Appointing the main administrator, or moving it.
 --
---   Edit the handle on the line marked CHANGE THIS, then paste the whole file
---   into the Supabase SQL editor and run it.
+--   Edit the line marked CHANGE THIS to your handle or the email address you
+--   sign in with, then paste the whole file into the Supabase SQL editor and
+--   run it.
+--
+-- ## The first one
+--
+-- On a database that has never had an administrator this is the only way in.
+-- Nothing in any migration sets profiles.is_admin — 0021 adds the column
+-- defaulting to false and a trigger refuses to let a session change it — so a
+-- fresh Medosha has nobody, 0064's carry has nobody to carry, and the control
+-- room is shut to everyone. set_admin_member cannot open it either: it refuses
+-- anybody who is not already the owner. Somebody with database access has to
+-- appoint the first one, and this is that.
 --
 -- Migration 0064 carried every existing administrator across and made the
 -- longest-standing of them the owner, because somebody had to be and the first
@@ -28,22 +39,42 @@
 
 do $$
 declare
-  -- CHANGE THIS to the handle of the account that should be in charge.
-  wanted_username text := 'your-handle-here';
+  -- CHANGE THIS to the handle, or the email address, of the account that
+  -- should be in charge.
+  wanted text := 'your-handle-or-email-here';
 
   target uuid;
   previous uuid;
 begin
-  select id into target from public.profiles where username = wanted_username;
+  -- Handle first, then the sign-in address. A profile created before usernames
+  -- were asked for has none, and that account is exactly the one likely to be
+  -- the first administrator — so looking only at profiles.username would fail
+  -- on the commonest case this file exists for.
+  select id into target from public.profiles where username = wanted;
 
   if target is null then
-    raise exception 'no account with the handle %. Check profiles.username.', wanted_username;
+    select u.id into target from auth.users u
+    where lower(u.email) = lower(wanted);
+  end if;
+
+  if target is null then
+    raise exception
+      'no account with the handle or email %. Check profiles.username and auth.users.email.',
+      wanted;
+  end if;
+
+  -- An auth user with no profile row cannot hold a permission: admin_members
+  -- references auth.users, but every screen reads the profile.
+  if not exists (select 1 from public.profiles where id = target) then
+    raise exception
+      'the account % has no profile row. Sign in on the site once, then run this again.',
+      wanted;
   end if;
 
   select user_id into previous from public.admin_members where is_owner;
 
   if previous = target then
-    raise notice 'Already the main administrator: %', wanted_username;
+    raise notice 'Already the main administrator: %', wanted;
     return;
   end if;
 
@@ -60,9 +91,9 @@ begin
   update public.admin_members set is_owner = true, updated_at = now() where user_id = target;
 
   if previous is null then
-    raise notice 'Main administrator is now %', wanted_username;
+    raise notice 'Main administrator is now %', wanted;
   else
-    raise notice 'Main administrator moved to %. The previous one keeps every area.', wanted_username;
+    raise notice 'Main administrator moved to %. The previous one keeps every area.', wanted;
   end if;
 end $$;
 
