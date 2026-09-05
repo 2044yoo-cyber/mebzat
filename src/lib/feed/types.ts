@@ -81,6 +81,14 @@ export type FeedPost = {
   viewerSaved: boolean;
   viewerFollows: boolean;
 
+  /**
+   * Whether this reader has met this post before. Everything unseen outranks
+   * everything seen, so a card marked true is one the feed has come back to
+   * after running out of new material — worth saying on the card rather than
+   * leaving somebody to wonder why it is here twice.
+   */
+  seen: boolean;
+
   /** The ranking score. Carried back as the pagination cursor. */
   score: string;
 };
@@ -104,6 +112,12 @@ export type FeedCursor = {
   /** The clock the first page was ranked against, threaded through the rest
    *  so age decay does not shift under the reader mid-scroll. */
   now: string;
+  /**
+   * The tie-breaker seed, threaded through for the same reason as the clock.
+   * A fresh seed on page two would reshuffle the whole ranking underneath the
+   * cursor, which reads as posts repeating and posts going missing at once.
+   */
+  seed: number;
 };
 
 export type FeedComment = {

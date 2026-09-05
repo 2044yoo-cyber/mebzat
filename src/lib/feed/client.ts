@@ -66,8 +66,54 @@ export const feedApi = {
   view: (postIds: string[]) => post({ action: "view", postIds }),
 };
 
+/**
+ * What this browser has already been shown, for a reader who is not signed in.
+ *
+ * sessionStorage rather than localStorage: it is a reading session's memory,
+ * not a profile. Closing the tab forgets it, which is the right lifetime for
+ * something the reader never agreed to and cannot see or clear from the page.
+ *
+ * Every read and write is wrapped, because a private window, a browser set to
+ * block site data, and an embedded webview all throw here rather than
+ * returning nothing — and a feed that crashes because it could not remember
+ * what it showed is worse than one that repeats itself.
+ */
+const SEEN_KEY = "medosha.feed.seen";
+const SEEN_LIMIT = 400;
+
+export function rememberSeen(ids: string[]): void {
+  if (typeof sessionStorage === "undefined" || ids.length === 0) return;
+  try {
+    const kept = new Set(recallSeen());
+    for (const id of ids) kept.add(id);
+    // Oldest first out. A session that reads for an hour should not be pinned
+    // to whatever it happened to see in the first minute.
+    const list = [...kept].slice(-SEEN_LIMIT);
+    sessionStorage.setItem(SEEN_KEY, JSON.stringify(list));
+  } catch {
+    // Storage is full, or blocked. The feed still works, it just repeats more.
+  }
+}
+
+export function recallSeen(): string[] {
+  if (typeof sessionStorage === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(SEEN_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((one): one is string => typeof one === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export type FeedRequest = {
   cursor?: FeedCursor | null;
+  /** Ids this session has been shown. Sent only when signed out — the server
+   *  ignores it otherwise, and a signed-in reader's history is the database's. */
+  seenIds?: string[] | null;
   filter?: string;
   authorKey?: string | null;
   savedOnly?: boolean;
@@ -84,6 +130,7 @@ export async function fetchFeedPage(request: FeedRequest): Promise<FeedPage> {
     params.set("score", request.cursor.score);
     params.set("after", request.cursor.id);
     params.set("now", request.cursor.now);
+    params.set("seed", String(request.cursor.seed));
   }
   if (request.filter && request.filter !== "for-you") {
     params.set("filter", request.filter);
@@ -94,9 +141,17 @@ export async function fetchFeedPage(request: FeedRequest): Promise<FeedPage> {
   if (request.search) params.set("q", request.search);
   if (request.limit) params.set("limit", String(request.limit));
 
-  const response = await fetch(`/api/feed?${params.toString()}`, {
-    signal: request.signal,
-  });
+  // POST only when there is a list to send: four hundred uuids do not fit in
+  // a URL. Everything else stays a plain GET.
+  const seen = request.seenIds ?? [];
+  const response = seen.length > 0
+    ? await fetch(`/api/feed?${params.toString()}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ seen }),
+        signal: request.signal,
+      })
+    : await fetch(`/api/feed?${params.toString()}`, { signal: request.signal });
 
   if (!response.ok) {
     return { posts: [], cursor: null, available: true };

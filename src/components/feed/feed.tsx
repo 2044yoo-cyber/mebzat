@@ -5,7 +5,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 
 import { FeedCard } from "@/components/feed/feed-card";
 import { FeedSkeleton } from "@/components/feed/feed-skeleton";
-import { fetchFeedPage, feedApi } from "@/lib/feed/client";
+import { fetchFeedPage, feedApi, recallSeen, rememberSeen } from "@/lib/feed/client";
 import { FEED_FILTERS } from "@/lib/feed/constants";
 import type { FeedPage, FeedPost } from "@/lib/feed/types";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,8 @@ import { cn } from "@/lib/utils";
 
 /** Cards kept mounted on either side of the visible range. */
 const WINDOW = 8;
+/** How long half a card must stay on screen before it counts as read. */
+const DWELL_MS = 1000;
 /** Assumed height of an unmounted card, until one has been measured. */
 /**
  * Only used for a card that has never been on screen.
@@ -89,6 +91,9 @@ export function Feed({
       savedOnly,
       followingOnly,
       authorKey,
+      // Signed out, the browser is the only memory there is. Signed in the
+      // server ignores this and reads feed_views, which is the real history.
+      seenIds: signedIn ? null : recallSeen(),
     });
 
     setPosts((current) => {
@@ -102,7 +107,49 @@ export function Feed({
 
     setLoading(false);
     inFlight.current = false;
-  }, [cursor, exhausted, filter, savedOnly, followingOnly, authorKey]);
+  }, [cursor, exhausted, filter, savedOnly, followingOnly, authorKey, signedIn]);
+
+  /**
+   * The first page, again, for a signed-out reader who has been here already.
+   *
+   * The server renders page one before the browser has said anything, so it
+   * cannot exclude what this session has already read — a refresh would hand
+   * back cards the reader has just scrolled past. This runs once on mount, and
+   * only when there is something in the session memory to act on, so a first
+   * visit pays nothing and does not flicker.
+   */
+  const swapped = useRef(false);
+  useEffect(() => {
+    if (signedIn || swapped.current) return;
+    swapped.current = true;
+
+    const seenIds = recallSeen();
+    if (seenIds.length === 0) return;
+
+    let live = true;
+    const abort = new AbortController();
+
+    void fetchFeedPage({
+      filter,
+      savedOnly,
+      followingOnly,
+      authorKey,
+      seenIds,
+      signal: abort.signal,
+    }).then((page) => {
+      if (!live || page.posts.length === 0) return;
+      setPosts(page.posts);
+      setCursor(page.cursor);
+      setExhausted(page.cursor === null);
+    });
+
+    return () => {
+      live = false;
+      abort.abort();
+    };
+    // Mount only: re-running this on a filter change would fight changeFilter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Infinite scroll. `rootMargin` starts the request a screen and a half
   // early, which is roughly how far a fast thumb travels while a request is
@@ -133,6 +180,7 @@ export function Feed({
       savedOnly,
       followingOnly,
       authorKey,
+      seenIds: signedIn ? null : recallSeen(),
     });
 
     setPosts(page.posts);
@@ -361,12 +409,20 @@ function VirtualList({
 /**
  * What the reader actually saw.
  *
- * A card counts as seen once half of it has been on screen. Ids are collected
- * and flushed in batches — one request per twelve cards rather than one per
- * card — and the flush runs on an idle callback so it never competes with the
- * scroll.
+ * A card counts as seen once half of it has been on screen *and stayed there
+ * for a second*. The dwell is the point: a thumb flicking through forty cards
+ * crosses every one of them for a few milliseconds, and counting those as read
+ * would bury the whole feed on the strength of a scroll nobody was reading.
+ * A second is short enough that anyone who paused on a card has met it and
+ * long enough that a flick has not.
  *
- * Signed out there is nothing to record against, so the whole thing is inert.
+ * Ids are collected and flushed in batches — one request per screenful rather
+ * than one per card — and the flush runs on an idle callback so the ranking
+ * signal never competes with the scroll for the main thread.
+ *
+ * Signed out there is nobody to record against, so the ids go to
+ * sessionStorage instead and ride along with the next request. Same rule, same
+ * dwell; a shorter memory.
  */
 function ImpressionTracker({
   posts,
@@ -379,9 +435,13 @@ function ImpressionTracker({
   const sent = useRef(new Set<string>());
 
   useEffect(() => {
-    if (!signedIn || typeof IntersectionObserver === "undefined") return;
+    if (typeof IntersectionObserver === "undefined") return;
 
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // One pending timer per card that is currently half on screen. Cleared the
+    // moment it leaves, so a card scrolled past does not count itself a second
+    // later from off screen.
+    const dwelling = new Map<string, ReturnType<typeof setTimeout>>();
 
     const flush = () => {
       timer = null;
@@ -389,7 +449,10 @@ function ImpressionTracker({
       pending.current.clear();
       if (batch.length === 0) return;
 
-      const send = () => void feedApi.view(batch);
+      const send = () => {
+        if (signedIn) void feedApi.view(batch);
+        else rememberSeen(batch);
+      };
       if (typeof requestIdleCallback === "function") {
         requestIdleCallback(send, { timeout: 2000 });
       } else {
@@ -397,19 +460,31 @@ function ImpressionTracker({
       }
     };
 
+    const count = (id: string) => {
+      dwelling.delete(id);
+      if (sent.current.has(id)) return;
+      sent.current.add(id);
+      pending.current.add(id);
+      if (timer === null) timer = setTimeout(flush, 1500);
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
           const id = (entry.target as HTMLElement).dataset.feedPost;
           if (!id || sent.current.has(id)) continue;
-          sent.current.add(id);
-          pending.current.add(id);
-          observer.unobserve(entry.target);
-        }
 
-        if (pending.current.size > 0 && timer === null) {
-          timer = setTimeout(flush, 1500);
+          if (entry.isIntersecting) {
+            if (!dwelling.has(id)) {
+              dwelling.set(id, setTimeout(() => count(id), DWELL_MS));
+            }
+          } else {
+            const pendingDwell = dwelling.get(id);
+            if (pendingDwell !== undefined) {
+              clearTimeout(pendingDwell);
+              dwelling.delete(id);
+            }
+          }
         }
       },
       { threshold: 0.5 },
@@ -421,6 +496,7 @@ function ImpressionTracker({
 
     return () => {
       observer.disconnect();
+      for (const pendingDwell of dwelling.values()) clearTimeout(pendingDwell);
       if (timer !== null) clearTimeout(timer);
       flush();
     };

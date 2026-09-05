@@ -3388,18 +3388,21 @@ export interface Database {
           user_id: string;
           seen_count: number;
           last_seen_at: string;
+          first_seen_at: string;
         };
         Insert: {
           post_id: string;
           user_id: string;
           seen_count?: number;
           last_seen_at?: string;
+          first_seen_at?: string;
         };
         Update: {
           post_id?: string;
           user_id?: string;
           seen_count?: number;
           last_seen_at?: string;
+          first_seen_at?: string;
         };
         Relationships: [];
       };
@@ -7395,8 +7398,11 @@ export interface Database {
           p_saved_only?: boolean | null;
           p_following_only?: boolean | null;
           p_search?: string | null;
+          p_seen_ids?: string[] | null;
+          p_seed?: number | null;
+          p_cooldown_hours?: number | null;
         };
-        Returns: { id: string; kind: FeedKind; topic: FeedTopic; title: string; body: string; author_id: string; author_key: string; author_name: string; author_username: string; author_role: string; author_avatar_url: string; author_location: string; author_verified: boolean; company_id: string; link_href: string; link_label: string; entity_type: string; entity_id: string; price_amount: number; price_currency: string; price_unit: string; price_change: number; city: string; region: string; tags: string[]; like_count: number; comment_count: number; save_count: number; share_count: number; view_count: number; download_count: number; is_demo: boolean; published_at: string; media: Json; files: Json; viewer_liked: boolean; viewer_saved: boolean; viewer_follows: boolean; score: number }[];
+        Returns: { id: string; kind: FeedKind; topic: FeedTopic; title: string; body: string; author_id: string; author_key: string; author_name: string; author_username: string; author_role: string; author_avatar_url: string; author_location: string; author_verified: boolean; company_id: string; link_href: string; link_label: string; entity_type: string; entity_id: string; price_amount: number; price_currency: string; price_unit: string; price_change: number; city: string; region: string; tags: string[]; like_count: number; comment_count: number; save_count: number; share_count: number; view_count: number; download_count: number; is_demo: boolean; published_at: string; media: Json; files: Json; viewer_liked: boolean; viewer_saved: boolean; viewer_follows: boolean; seen: boolean; score: number }[];
       };
       feed_record_download: {
         Args: {

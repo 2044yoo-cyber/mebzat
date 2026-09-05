@@ -76,6 +76,7 @@ type FeedPageRow = {
   viewer_liked: boolean;
   viewer_saved: boolean;
   viewer_follows: boolean;
+  seen: boolean;
   score: string | number;
 };
 
@@ -186,6 +187,7 @@ function normalize(row: FeedPageRow): FeedPost | null {
     viewerLiked: row.viewer_liked,
     viewerSaved: row.viewer_saved,
     viewerFollows: row.viewer_follows,
+    seen: row.seen === true,
     score: String(row.score),
   };
 }
@@ -199,7 +201,38 @@ export type FeedQuery = {
   savedOnly?: boolean;
   followingOnly?: boolean;
   search?: string | null;
+  /**
+   * Ids this browser has already been shown. Only used for a reader who is not
+   * signed in: there is nobody to record a sighting against, so the session
+   * carries its own short memory instead. Ignored for a signed-in reader,
+   * whose real history is in feed_views and is not something a request should
+   * be able to rewrite.
+   */
+  seenIds?: string[] | null;
 };
+
+/** The most ids a session may claim to have seen. Beyond this the array stops
+ *  being a memory and starts being a way to make the database sort a list
+ *  somebody else chose. */
+const SEEN_LIMIT = 400;
+
+/**
+ * The tie-breaker seed for one reading session.
+ *
+ * Signed in it is derived from the reader, so their ranking is stable from one
+ * visit to the next and the variety comes from the seen tier instead. Signed
+ * out there is no seen tier, so it is random per request — which is the whole
+ * of what makes a refresh a different mix rather than the same twelve cards
+ * for ever.
+ */
+function seedFor(userId: string | null): number {
+  if (!userId) return Math.floor(Math.random() * 1_000_000);
+  let hash = 0;
+  for (let index = 0; index < userId.length; index += 1) {
+    hash = (hash * 31 + userId.charCodeAt(index)) % 1_000_000;
+  }
+  return hash;
+}
 
 export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
   const {
@@ -211,9 +244,17 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
     savedOnly = false,
     followingOnly = false,
     search = null,
+    seenIds = null,
   } = query;
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // The seed is fixed by the first page and carried by the cursor, so the
+  // ranking cannot reshuffle underneath a reader who is halfway down it.
+  const seed = cursor?.seed ?? seedFor(user?.id ?? null);
 
   const { data, error } = await supabase.rpc("feed_page", {
     p_limit: limit,
@@ -230,6 +271,9 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
     p_saved_only: savedOnly,
     p_following_only: followingOnly,
     p_search: search && search.trim().length > 1 ? search.trim() : null,
+    // Only honoured for a signed-out reader; feed_page ignores it otherwise.
+    p_seen_ids: user ? null : (seenIds ?? []).slice(0, SEEN_LIMIT),
+    p_seed: seed,
   });
 
   if (error) {
@@ -281,6 +325,7 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
           score: String(last.score),
           id: last.id,
           now: cursor?.now ?? new Date().toISOString(),
+          seed,
         }
       : null,
     available: true,
@@ -348,6 +393,10 @@ export async function getFeedPost(id: string): Promise<FeedPost | null> {
 
   return normalize({
     ...(row as unknown as FeedPageRow),
+    // The permalink is not ranked, so there is no seen tier to report. Said
+    // here rather than left to the spread, which would quietly supply
+    // undefined for a field the type says is a boolean.
+    seen: false,
     media: mediaRows
       .map((entry) => entry as Record<string, unknown>)
       .sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0))
