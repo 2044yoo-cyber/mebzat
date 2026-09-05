@@ -22,9 +22,12 @@ import {
   openingClashes,
   openingFaults,
   doorClearance,
+  roomTransform,
   roomWalls,
   runsFromRoom,
   signedArea,
+  toDesignSpace,
+  wallPieces,
 } from "../src/features/berchuma-studio/services/room-geometry.ts";
 import {
   rectangularRoom,
@@ -276,6 +279,153 @@ check("a door in the middle of a wall is not",
   doorClearance({ ...RECT, openings: [{ id: "d", kind: "door", wallId: "c1", offset: 1600, width: 900, height: 2100, sill: 0, swing: "none", label: "" }] }).length === 0);
 
 check("wall labels run A, B, C", wallLabel(0) === "Wall A" && wallLabel(2) === "Wall C");
+
+// ---------------------------------------------------------------------------
+// 5b. Lining the room up with the cabinets
+//
+// The layout solver puts the first run at the origin travelling along +x. The
+// room is wherever somebody drew it. If the transform between them is wrong
+// the walls render beautifully, half a metre from the cabinets that are
+// supposed to stand against them, and it looks like a design decision.
+// ---------------------------------------------------------------------------
+
+const alignmentCases: [string, Room][] = [
+  ["a rectangle, first wall", { ...RECT, runWalls: ["c1"] }],
+  ["a rectangle, second wall", { ...RECT, runWalls: ["c2"] }],
+  ["a rectangle, third wall", { ...RECT, runWalls: ["c3"] }],
+  ["a rectangle, fourth wall", { ...RECT, runWalls: ["c4"] }],
+  ["an L-shaped room", { ...L_SHAPED, runWalls: ["c3"] }],
+  ["a rectangle drawn backwards", { ...reversed(RECT), runWalls: ["c3"] }],
+];
+
+for (const [label, room] of alignmentCases) {
+  const wall = roomWalls(room).find((one) => one.id === room.runWalls[0])!;
+
+  const start = toDesignSpace(room, wall.start);
+  const end = toDesignSpace(room, wall.end);
+
+  check(`${label}: the run wall starts at the origin`,
+    Math.abs(start.x) < 1e-6 && Math.abs(start.y) < 1e-6,
+    `${start.x.toFixed(2)}, ${start.y.toFixed(2)}`);
+  check(`${label}: and runs along +x`,
+    Math.abs(end.x - wall.length) < 1e-6 && Math.abs(end.y) < 1e-6,
+    `${end.x.toFixed(2)}, ${end.y.toFixed(2)} for a ${wall.length.toFixed(0)} wall`);
+
+  // Every other corner has to keep its distance from the run wall's start —
+  // a transform that rotates and moves must not also stretch the room.
+  for (const corner of room.corners) {
+    const before = Math.hypot(corner.x - wall.start.x, corner.y - wall.start.y);
+    const after = (({ x, y }) => Math.hypot(x, y))(toDesignSpace(room, corner));
+    check(`${label}: the room is not stretched at ${corner.id}`,
+      Math.abs(before - after) < 1e-6, `${before.toFixed(2)} vs ${after.toFixed(2)}`);
+  }
+}
+
+check("a room with no chosen wall has no transform",
+  roomTransform(RECT) === null);
+check("and its points are left where they are",
+  toDesignSpace(RECT, { x: 123, y: 456 }).x === 123);
+
+// ---------------------------------------------------------------------------
+// 5c. Walls with the holes left out of them
+//
+// A wall in 3D is boxes with the openings drawn round rather than subtracted
+// from it. A wall drawn over its own window still looks like a wall, and
+// nothing anywhere reports it — so the arithmetic is asserted instead.
+// ---------------------------------------------------------------------------
+
+const plainRoom: Room = { ...RECT, runWalls: ["c1"] };
+check("a room with no openings is one piece per wall",
+  wallPieces(plainRoom).length === 4, String(wallPieces(plainRoom).length));
+
+for (const piece of wallPieces(plainRoom)) {
+  check(`${piece.id} is full height`, piece.height === plainRoom.ceilingHeight);
+  check(`${piece.id} has a positive length`, piece.length > 0);
+}
+
+// A door: two pieces on that wall, and nothing across the doorway.
+const withDoor: Room = {
+  ...plainRoom,
+  openings: [
+    { id: "d1", kind: "door", wallId: "c1", offset: 1000, width: 900, height: 2100, sill: 0, swing: "in-right", label: "" },
+  ],
+};
+const doorPieces = wallPieces(withDoor).filter((piece) => piece.id.startsWith("c1"));
+check("a wall with a door becomes two pieces beside it",
+  doorPieces.filter((p) => p.height === withDoor.ceilingHeight).length === 2,
+  String(doorPieces.length));
+check("the full-height pieces add up to the wall minus the door",
+  Math.abs(
+    doorPieces
+      .filter((p) => p.height === withDoor.ceilingHeight)
+      .reduce((total, p) => total + p.length, 0) - (4200 - 900),
+  ) < 1);
+
+// A window: the stretches either side, the sill wall under it, the head over.
+const withWindow: Room = {
+  ...plainRoom,
+  openings: [
+    { id: "w1", kind: "window", wallId: "c1", offset: 1000, width: 1200, height: 1200, sill: 900, swing: "none", label: "" },
+  ],
+};
+const windowPieces = wallPieces(withWindow).filter((piece) => piece.id.startsWith("c1"));
+check("a wall with a window becomes four pieces",
+  windowPieces.length === 4, String(windowPieces.length));
+check("one is the sill wall under the glass",
+  windowPieces.some((piece) => piece.id.includes("under") && piece.height === 900));
+check("and one is the head above it",
+  windowPieces.some(
+    (piece) => piece.id.includes("over") && Math.abs(piece.height - (2700 - 2100)) < 1,
+  ));
+check("nothing full height is drawn across the glass",
+  windowPieces.filter((p) => p.height === withWindow.ceilingHeight).length === 2);
+
+// A door reaching the ceiling has no head piece to draw.
+const fullHeightDoor: Room = {
+  ...plainRoom,
+  ceilingHeight: 2100,
+  openings: [
+    { id: "d1", kind: "door", wallId: "c1", offset: 1000, width: 900, height: 2100, sill: 0, swing: "none", label: "" },
+  ],
+};
+check("a door to the ceiling leaves no head above it",
+  !wallPieces(fullHeightDoor).some((piece) => piece.id.includes("over")));
+
+// An opening hard against the corner leaves nothing before it.
+const atTheCorner: Room = {
+  ...plainRoom,
+  openings: [
+    { id: "d1", kind: "door", wallId: "c1", offset: 0, width: 900, height: 2100, sill: 0, swing: "none", label: "" },
+  ],
+};
+check("an opening at the corner leaves no sliver before it",
+  !wallPieces(atTheCorner).some((piece) => piece.id.includes("before")));
+
+// Two openings in one wall: three full-height stretches between and beside.
+const twoHoles: Room = {
+  ...plainRoom,
+  openings: [
+    { id: "d1", kind: "door", wallId: "c1", offset: 500, width: 900, height: 2100, sill: 0, swing: "none", label: "" },
+    { id: "w1", kind: "window", wallId: "c1", offset: 2500, width: 1000, height: 1200, sill: 900, swing: "none", label: "" },
+  ],
+};
+const twoPieces = wallPieces(twoHoles).filter((piece) => piece.id.startsWith("c1"));
+check("two openings in a wall are both left out",
+  twoPieces.filter((piece) => piece.height === twoHoles.ceilingHeight).length === 3,
+  String(twoPieces.filter((piece) => piece.height === twoHoles.ceilingHeight).length));
+
+check("every piece has a real size",
+  wallPieces(twoHoles).every((piece) => piece.length > 0 && piece.height > 0));
+
+// An opening belongs to one wall. Applying it to all of them punches the same
+// hole in four walls, and every assertion above still passes because they all
+// look only at the wall the opening is actually on.
+for (const wallId of ["c2", "c3", "c4"]) {
+  const untouched = wallPieces(withDoor).filter((piece) => piece.id.startsWith(wallId));
+  check(`a door on Wall A leaves ${wallId} whole`,
+    untouched.length === 1 && untouched[0].height === withDoor.ceilingHeight,
+    `${untouched.length} pieces`);
+}
 
 // ---------------------------------------------------------------------------
 // 6. A design that has never seen a room still parses

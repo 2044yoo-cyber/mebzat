@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Canvas, useStore, useThree } from "@react-three/fiber";
+
+import { RoomShell } from "./room-shell";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as THREE from "three";
 
@@ -89,6 +91,16 @@ export default function Model({
       onPointerMissed={onSelectCabinet ? () => onSelectCabinet(null) : undefined}
     >
       <Lighting height={height * MM} reach={reach} />
+
+      {/* The room, when the design was drawn in one. Placed with the same
+          offset as the cabinets, so the walls land where the units stand
+          against them — see toDesignSpace, which is what makes that true. */}
+      {spec.room ? (
+        <RoomShell
+          room={spec.room}
+          offset={[-(width * MM) / 2, 0, (depth * MM) / 2]}
+        />
+      ) : null}
 
       <group
         // Centred left to right and front to back, standing on y = 0.

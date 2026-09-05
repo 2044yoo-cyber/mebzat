@@ -279,3 +279,139 @@ export function openingFaults(room: Room): string[] {
 
   return faults;
 }
+
+/**
+ * Where the room sits relative to the design.
+ *
+ * The layout solver puts the first run at the origin, travelling along +x.
+ * The room is drawn wherever somebody happened to draw it. To show both in one
+ * scene, one of them has to move — and it has to be the room, because moving
+ * the design would mean re-solving every cabinet position and the whole point
+ * of deriving runs is that it does not.
+ *
+ * So this returns the rotation and translation that carry the first chosen
+ * wall's start corner onto the origin with the wall running along +x. Applied
+ * to the room, the walls land exactly where the cabinets already are.
+ *
+ * Returning null rather than an identity transform when no wall is chosen: a
+ * room with no runs has no relationship to the design at all, and pretending
+ * it is aligned would put it somewhere arbitrary and look deliberate.
+ */
+export function roomTransform(
+  room: Room,
+): { angle: number; origin: { x: number; y: number } } | null {
+  const walls = roomWalls(room);
+  const firstId = room.runWalls[0];
+  const wall = walls.find((one) => one.id === firstId);
+  if (!wall) return null;
+
+  // The wall's own bearing on the plan — not the rotation to apply. The
+  // transform rotates by *minus* this to bring the wall onto +x, and a scene
+  // that wants to turn the room the same way rotates by minus it too.
+  //
+  // Storing the bearing rather than the rotation is deliberate: the first
+  // version stored the negation and then used rotation formulas that assumed
+  // the bearing, which came out right for the two horizontal walls of a
+  // rectangle and backwards for the two vertical ones. Half a room correct is
+  // exactly the kind of wrong nobody notices.
+  const angle = Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x);
+
+  return { angle, origin: { x: wall.start.x, y: wall.start.y } };
+}
+
+/**
+ * A room point in the design's own coordinates.
+ *
+ * Millimetres in, millimetres out. `x` runs along the first wall and `y` away
+ * from it into the room, which is what the design calls depth.
+ */
+export function toDesignSpace(
+  room: Room,
+  point: { x: number; y: number },
+): { x: number; y: number } {
+  const transform = roomTransform(room);
+  if (!transform) return point;
+
+  const dx = point.x - transform.origin.x;
+  const dy = point.y - transform.origin.y;
+  const cos = Math.cos(transform.angle);
+  const sin = Math.sin(transform.angle);
+
+  // Rotating by minus the wall's bearing, which carries it onto +x.
+  return {
+    x: dx * cos + dy * sin,
+    y: -dx * sin + dy * cos,
+  };
+}
+
+export type WallPiece = {
+  id: string;
+  /** Centre in design space, millimetres. */
+  centre: { x: number; y: number };
+  centreY: number;
+  length: number;
+  height: number;
+  rotation: number;
+};
+
+/**
+ * A wall, minus its holes, as boxes.
+ *
+ * Out here rather than in the component that draws it, because the arithmetic
+ * of leaving a gap is the part that can be quietly wrong — a wall drawn over
+ * its own window looks like a wall, and nothing reports it.
+ *
+ * A wall with a window becomes three pieces — below the sill, above the head,
+ * and the full-height stretches either side. A wall with a door becomes two.
+ * Sorting the openings along the wall first is what lets this be a single walk
+ * from one end to the other.
+ */
+export function wallPieces(room: Room): WallPiece[] {
+  const pieces: WallPiece[] = [];
+
+  for (const wall of roomWalls(room)) {
+    const start = toDesignSpace(room, wall.start);
+    const end = toDesignSpace(room, wall.end);
+    const rotation = -Math.atan2(-(end.y - start.y), end.x - start.x);
+
+    /** A stretch of full-height wall, from `from` to `to` along it. */
+    const solid = (id: string, from: number, to: number, bottom: number, top: number) => {
+      const length = to - from;
+      if (length <= 1 || top - bottom <= 1) return;
+      const middle = (from + to) / 2;
+      const along = middle / wall.length;
+      pieces.push({
+        id,
+        centre: {
+          x: start.x + (end.x - start.x) * along,
+          y: start.y + (end.y - start.y) * along,
+        },
+        centreY: (bottom + top) / 2,
+        length,
+        height: top - bottom,
+        rotation,
+      });
+    };
+
+    let cursor = 0;
+    for (const opening of openingsOn(room, wall.id)) {
+      solid(`${wall.id}-before-${opening.id}`, cursor, opening.offset, 0, room.ceilingHeight);
+
+      // Under a window, and over anything that does not reach the ceiling.
+      if (opening.sill > 0) {
+        solid(`${wall.id}-under-${opening.id}`, opening.offset, opening.offset + opening.width, 0, opening.sill);
+      }
+      const head = opening.sill + opening.height;
+      if (head < room.ceilingHeight) {
+        solid(`${wall.id}-over-${opening.id}`, opening.offset, opening.offset + opening.width, head, room.ceilingHeight);
+      }
+
+      cursor = Math.max(cursor, opening.offset + opening.width);
+    }
+
+    solid(`${wall.id}-end`, cursor, wall.length, 0, room.ceilingHeight);
+  }
+
+  return pieces;
+}
+
