@@ -167,6 +167,7 @@ function sign(body: string): string {
   const secret =
     process.env.OAUTH_STATE_SECRET ??
     process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SECRET_KEY ??
     "";
   return createHmac("sha256", secret).update(body).digest("hex");
 }
