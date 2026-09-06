@@ -301,6 +301,90 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+// Full screen actually means full screen
+//
+// The failure worth guarding is the one named in the brief: a mode that makes
+// the map card a bit larger and calls it full screen. `fixed inset-0` is the
+// difference — the map leaves the page's grid entirely rather than growing
+// inside it — and a check on the class is a check on that.
+// ---------------------------------------------------------------------------
+
+const explorer = code("src/components/property/city-explorer.tsx");
+
+check(
+  "full screen leaves the page layout rather than growing inside it",
+  /fixed inset-0 z-\[60\] h-\[100dvh\]/.test(explorer),
+);
+check(
+  "it sits above the bottom navigation, which is fixed at z-50",
+  /z-\[60\]/.test(explorer) && !/z-\[4\d\]/.test(explorer),
+);
+check(
+  "and clears the home indicator",
+  /pb-\[env\(safe-area-inset-bottom\)\]/.test(explorer),
+);
+check(
+  "the results column steps aside so the map gets the width",
+  /panelOpen \|\| fullscreen/.test(explorer) && /!panelOpen && !fullscreen/.test(explorer),
+);
+check(
+  "and the frame around the map goes",
+  /fullscreen \? "p-0" : "p-3"/.test(explorer),
+);
+
+// The rails are borrowed, not taken. Entering collapses them; exiting puts
+// back whatever they were, so a reader who used the mode once does not find
+// their navigation folded away tomorrow.
+check(
+  "the rails' previous state is remembered",
+  /restoreRails\.current = \{/.test(explorer) &&
+    /nav: shell\.navCollapsed/.test(explorer) &&
+    /panel: shell\.panelCollapsed/.test(explorer),
+);
+check(
+  "entering collapses them",
+  /update\(\{ navCollapsed: true, panelCollapsed: true, panelMobile: false \}\)/.test(explorer),
+);
+check(
+  "and leaving restores exactly what they were",
+  /update\(\{ navCollapsed: previous\.nav, panelCollapsed: previous\.panel \}\)/.test(explorer),
+);
+check(
+  "the mode itself is not persisted",
+  !/update\(\{[^}]*fullscreen/.test(explorer),
+);
+
+// The map instance is reused. Rebuilding it would drop the markers, the
+// clusters, the layers and the reader's position in one go.
+const canvasSource = code("src/components/property/city-canvas.tsx");
+check(
+  "the map resizes rather than remounting",
+  /new ResizeObserver\(\(\) => map\.resize\(\)\)/.test(canvasSource),
+);
+check(
+  "and full screen does not key or remount the canvas",
+  !/<CityCanvas[^>]*key=/.test(explorer),
+);
+
+// Reachable without a mouse, and leavable the way every full-screen surface
+// on the web is leavable.
+check("escape leaves", /event\.key === "Escape"/.test(explorer) && /exitFullscreen\(\)/.test(explorer));
+check(
+  "the listener is removed on exit",
+  /removeEventListener\("keydown", onKey\)/.test(explorer),
+);
+check(
+  "both directions are labelled",
+  /aria-label=\{fullscreen \? "Exit full screen map" : "Enter full screen map"\}/.test(explorer),
+);
+check("and the state is announced", /aria-pressed=\{fullscreen\}/.test(explorer));
+
+// Everything that was on the control row is still on it.
+for (const control of ["Search properties", "Layers", "Filters"]) {
+  check(`${control} survives full screen`, explorer.includes(control));
+}
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);

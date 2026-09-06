@@ -3,9 +3,18 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Building2, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Building2,
+  Maximize2,
+  Minimize2,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  X,
+} from "lucide-react";
 
+import { getSnapshot, update } from "@/lib/workspace/store";
 import { MapBoundary } from "@/components/property/map-boundary";
 import { MapDiagnostics } from "@/components/property/map-diagnostics";
 import { PropertyCard, toCardData } from "@/components/property/property-card";
@@ -90,6 +99,23 @@ export function CityExplorer({
   const [quick, setQuick] = useState("all");
   const [layers, setLayers] = useState<string[]>(["properties"]);
   const [showLayers, setShowLayers] = useState(false);
+
+  /**
+   * Full screen: a mode of this page, not a second page.
+   *
+   * The map instance is never touched. The container it lives in becomes
+   * `fixed inset-0` and the ResizeObserver already watching that container
+   * calls map.resize() on the next frame — so the map grows into the space
+   * with its centre, zoom, markers, clusters and layers all still loaded. No
+   * remount, no refetch, no markers rebuilt.
+   *
+   * Local state rather than the shell store, and deliberately: entering full
+   * screen collapses the rails, and a reader who did that once should not find
+   * their navigation permanently folded away tomorrow. What the rails were is
+   * remembered here and put back on the way out.
+   */
+  const [fullscreen, setFullscreen] = useState(false);
+  const restoreRails = useRef<{ nav: boolean; panel: boolean } | null>(null);
 
   const [results, setResults] = useState<MapProperty[]>(initialProperties);
 
@@ -243,10 +269,55 @@ export function CityExplorer({
     setQuery("");
   }
 
+  const enterFullscreen = useCallback(() => {
+    const shell = getSnapshot();
+    restoreRails.current = {
+      nav: shell.navCollapsed,
+      panel: shell.panelCollapsed,
+    };
+    update({ navCollapsed: true, panelCollapsed: true, panelMobile: false });
+    setFullscreen(true);
+  }, []);
+
+  const exitFullscreen = useCallback(() => {
+    const previous = restoreRails.current;
+    if (previous) {
+      update({ navCollapsed: previous.nav, panelCollapsed: previous.panel });
+      restoreRails.current = null;
+    }
+    setFullscreen(false);
+  }, []);
+
+  // Escape leaves, which is what every full-screen surface on the web does and
+  // therefore what a reader will try first.
+  useEffect(() => {
+    if (!fullscreen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") exitFullscreen();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [fullscreen, exitFullscreen]);
+
   const panelOpen = selected !== null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div
+      className={cn(
+        "flex min-h-0 flex-col",
+        fullscreen
+          ? // Above the bottom navigation, which is fixed at z-50, and above
+            // the context panel at z-40. An opaque layer over the bar is the
+            // simplest honest way to keep it off the map: nothing is unmounted,
+            // so exiting puts it straight back.
+            //
+            // The safe-area inset goes on the bottom of this box rather than
+            // the map, so the zoom and layer controls sit above a home
+            // indicator instead of under it.
+            "fixed inset-0 z-[60] h-[100dvh] bg-background pb-[env(safe-area-inset-bottom)]"
+          : "h-full",
+      )}
+    >
       <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
         <select
           value={city.slug}
@@ -351,6 +422,30 @@ export function CityExplorer({
           )}
         </div>
 
+        {/* Beside Layers, in the row the other map controls already live in,
+            rather than floating over the map where it would have to fight the
+            zoom buttons and the price key for a corner. `ml-auto` puts it at
+            the end of the row on a wide screen and lets it wrap on a narrow
+            one, so nothing is ever pushed off the edge. */}
+        <Button
+          type="button"
+          variant={fullscreen ? "secondary" : "outline"}
+          size="sm"
+          onClick={fullscreen ? exitFullscreen : enterFullscreen}
+          aria-label={fullscreen ? "Exit full screen map" : "Enter full screen map"}
+          aria-pressed={fullscreen}
+          className="ml-auto gap-1.5"
+        >
+          {fullscreen ? (
+            <Minimize2 className="size-4" aria-hidden />
+          ) : (
+            <Maximize2 className="size-4" aria-hidden />
+          )}
+          <span className="hidden sm:inline">
+            {fullscreen ? "Exit full screen" : "Full screen"}
+          </span>
+        </Button>
+
         {activeCount > 0 && (
           <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
             <X className="size-4" /> Clear
@@ -448,13 +543,17 @@ export function CityExplorer({
         className={cn(
           "grid min-h-0 flex-1",
           // The results list gives way when a property is open: its detail is
-          // already in the shell's panel, and the map deserves the room.
-          panelOpen
+          // already in the shell's panel, and the map deserves the room. In
+          // full screen it gives way always — the point of the mode is to see
+          // the city, not a column of cards beside it.
+          panelOpen || fullscreen
             ? "lg:grid-cols-[minmax(0,1fr)]"
             : "lg:grid-cols-[minmax(0,1fr)_340px]",
         )}
       >
-        <div className="min-h-64 p-3">
+        {/* No padding in full screen: a 12px frame around a map somebody asked
+            to be full screen is 12px of city they asked to see. */}
+        <div className={cn("min-h-64", fullscreen ? "p-0" : "p-3")}>
           <MapBoundary>
             <CityCanvas
               city={city}
@@ -472,7 +571,7 @@ export function CityExplorer({
 
         {/* Hidden while a property is open, because the shell's context panel
             is showing that property's detail beside this. */}
-        {!panelOpen && (
+        {!panelOpen && !fullscreen && (
           <aside className="min-h-0 overflow-y-auto border-t p-3 lg:border-t-0 lg:border-l">
             {building && (
               <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border bg-muted/40 p-2.5">
