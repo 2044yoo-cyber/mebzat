@@ -30,7 +30,8 @@
 -- What a card is. The UI picks a layout from this: a property card shows
 -- price and location, a before/after card shows a slider, a document card
 -- shows a download button.
-create type public.feed_kind as enum (
+do $$ begin
+  create type public.feed_kind as enum (
   'property',            -- a listing for sale or rent
   'material',            -- a marketplace product
   'furniture',
@@ -55,11 +56,41 @@ create type public.feed_kind as enum (
   'learning',            -- a course or a lesson
   'success_story'
 );
+exception when duplicate_object then null; end $$;
+
+-- Top up a type that already existed with a shorter list. `add value if
+-- not exists` is the only safe direction: values are never removed, because
+-- a row somewhere may be using one.
+alter type public.feed_kind add value if not exists 'property';
+alter type public.feed_kind add value if not exists 'material';
+alter type public.feed_kind add value if not exists 'furniture';
+alter type public.feed_kind add value if not exists 'equipment';
+alter type public.feed_kind add value if not exists 'progress';
+alter type public.feed_kind add value if not exists 'architecture';
+alter type public.feed_kind add value if not exists 'interior';
+alter type public.feed_kind add value if not exists 'ai_design';
+alter type public.feed_kind add value if not exists 'before_after';
+alter type public.feed_kind add value if not exists 'floor_plan';
+alter type public.feed_kind add value if not exists 'boq_template';
+alter type public.feed_kind add value if not exists 'cost_tip';
+alter type public.feed_kind add value if not exists 'price_update';
+alter type public.feed_kind add value if not exists 'video';
+alter type public.feed_kind add value if not exists 'tutorial';
+alter type public.feed_kind add value if not exists 'document';
+alter type public.feed_kind add value if not exists 'announcement';
+alter type public.feed_kind add value if not exists 'professional';
+alter type public.feed_kind add value if not exists 'investment';
+alter type public.feed_kind add value if not exists 'question';
+alter type public.feed_kind add value if not exists 'discussion';
+alter type public.feed_kind add value if not exists 'learning';
+alter type public.feed_kind add value if not exists 'success_story';
+
 
 -- The coarse grouping the recommender works in. Kinds are too fine to learn
 -- from: liking three cement posts should surface steel prices, not only
 -- cement.
-create type public.feed_topic as enum (
+do $$ begin
+  create type public.feed_topic as enum (
   'property',
   'materials',
   'design',
@@ -69,12 +100,46 @@ create type public.feed_topic as enum (
   'learning',
   'community'
 );
+exception when duplicate_object then null; end $$;
 
-create type public.feed_status as enum ('published', 'hidden', 'removed');
+-- Top up a type that already existed with a shorter list. `add value if
+-- not exists` is the only safe direction: values are never removed, because
+-- a row somewhere may be using one.
+alter type public.feed_topic add value if not exists 'property';
+alter type public.feed_topic add value if not exists 'materials';
+alter type public.feed_topic add value if not exists 'design';
+alter type public.feed_topic add value if not exists 'construction';
+alter type public.feed_topic add value if not exists 'equipment';
+alter type public.feed_topic add value if not exists 'finance';
+alter type public.feed_topic add value if not exists 'learning';
+alter type public.feed_topic add value if not exists 'community';
 
-create type public.feed_media_kind as enum ('image', 'video');
 
-create type public.feed_file_kind as enum (
+do $$ begin
+  create type public.feed_status as enum ('published', 'hidden', 'removed');
+exception when duplicate_object then null; end $$;
+
+-- Top up a type that already existed with a shorter list. `add value if
+-- not exists` is the only safe direction: values are never removed, because
+-- a row somewhere may be using one.
+alter type public.feed_status add value if not exists 'published';
+alter type public.feed_status add value if not exists 'hidden';
+alter type public.feed_status add value if not exists 'removed';
+
+
+do $$ begin
+  create type public.feed_media_kind as enum ('image', 'video');
+exception when duplicate_object then null; end $$;
+
+-- Top up a type that already existed with a shorter list. `add value if
+-- not exists` is the only safe direction: values are never removed, because
+-- a row somewhere may be using one.
+alter type public.feed_media_kind add value if not exists 'image';
+alter type public.feed_media_kind add value if not exists 'video';
+
+
+do $$ begin
+  create type public.feed_file_kind as enum (
   'pdf',
   'dwg',
   'revit',
@@ -84,12 +149,26 @@ create type public.feed_file_kind as enum (
   'image',
   'archive'
 );
+exception when duplicate_object then null; end $$;
+
+-- Top up a type that already existed with a shorter list. `add value if
+-- not exists` is the only safe direction: values are never removed, because
+-- a row somewhere may be using one.
+alter type public.feed_file_kind add value if not exists 'pdf';
+alter type public.feed_file_kind add value if not exists 'dwg';
+alter type public.feed_file_kind add value if not exists 'revit';
+alter type public.feed_file_kind add value if not exists 'sketchup';
+alter type public.feed_file_kind add value if not exists 'excel';
+alter type public.feed_file_kind add value if not exists 'word';
+alter type public.feed_file_kind add value if not exists 'image';
+alter type public.feed_file_kind add value if not exists 'archive';
+
 
 -- ---------------------------------------------------------------------------
 -- feed_posts
 -- ---------------------------------------------------------------------------
 
-create table public.feed_posts (
+create table if not exists public.feed_posts (
   id uuid primary key default gen_random_uuid(),
 
   kind public.feed_kind not null,
@@ -169,31 +248,32 @@ comment on column public.feed_posts.author_key is
 comment on column public.feed_posts.is_demo is
   'Seeded demonstration content. Labelled in the UI and removable with one delete.';
 
-create index feed_posts_rank_idx
+create index if not exists feed_posts_rank_idx
   on public.feed_posts (published_at desc)
   where status = 'published';
-create index feed_posts_kind_idx
+create index if not exists feed_posts_kind_idx
   on public.feed_posts (kind, published_at desc)
   where status = 'published';
-create index feed_posts_topic_idx
+create index if not exists feed_posts_topic_idx
   on public.feed_posts (topic, published_at desc)
   where status = 'published';
-create index feed_posts_author_idx
+create index if not exists feed_posts_author_idx
   on public.feed_posts (author_key, published_at desc);
-create index feed_posts_engagement_idx
+create index if not exists feed_posts_engagement_idx
   on public.feed_posts (like_count desc, published_at desc)
   where status = 'published';
-create index feed_posts_tags_idx on public.feed_posts using gin (tags);
-create index feed_posts_city_idx on public.feed_posts (city)
+create index if not exists feed_posts_tags_idx on public.feed_posts using gin (tags);
+create index if not exists feed_posts_city_idx on public.feed_posts (city)
   where city is not null;
 -- Tags are deliberately left out of this expression: array_to_string is
 -- STABLE, not IMMUTABLE, so including it makes the index illegal. Tag search
 -- goes through feed_posts_tags_idx instead, and feed_page's search predicate
 -- matches this expression exactly so it can actually use the index.
-create index feed_posts_search_idx
+create index if not exists feed_posts_search_idx
   on public.feed_posts
   using gin (to_tsvector('simple', title || ' ' || coalesce(body, '')));
 
+drop trigger if exists feed_posts_set_updated_at on public.feed_posts;
 create trigger feed_posts_set_updated_at
   before update on public.feed_posts
   for each row
@@ -205,7 +285,7 @@ create trigger feed_posts_set_updated_at
 -- uses it.
 -- ---------------------------------------------------------------------------
 
-create table public.feed_media (
+create table if not exists public.feed_media (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.feed_posts (id) on delete cascade,
   kind public.feed_media_kind not null default 'image',
@@ -221,7 +301,7 @@ create table public.feed_media (
   position smallint not null default 0
 );
 
-create index feed_media_post_idx on public.feed_media (post_id, position);
+create index if not exists feed_media_post_idx on public.feed_media (post_id, position);
 
 -- ---------------------------------------------------------------------------
 -- feed_files
@@ -229,7 +309,7 @@ create index feed_media_post_idx on public.feed_media (post_id, position);
 -- spreadsheets, standards PDFs.
 -- ---------------------------------------------------------------------------
 
-create table public.feed_files (
+create table if not exists public.feed_files (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.feed_posts (id) on delete cascade,
   file_kind public.feed_file_kind not null,
@@ -240,34 +320,34 @@ create table public.feed_files (
   position smallint not null default 0
 );
 
-create index feed_files_post_idx on public.feed_files (post_id, position);
+create index if not exists feed_files_post_idx on public.feed_files (post_id, position);
 
 -- ---------------------------------------------------------------------------
 -- Interactions
 -- ---------------------------------------------------------------------------
 
-create table public.feed_likes (
+create table if not exists public.feed_likes (
   post_id uuid not null references public.feed_posts (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,
   created_at timestamptz not null default now(),
   primary key (post_id, user_id)
 );
 
-create index feed_likes_user_idx on public.feed_likes (user_id, created_at desc);
+create index if not exists feed_likes_user_idx on public.feed_likes (user_id, created_at desc);
 
-create table public.feed_saves (
+create table if not exists public.feed_saves (
   post_id uuid not null references public.feed_posts (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,
   created_at timestamptz not null default now(),
   primary key (post_id, user_id)
 );
 
-create index feed_saves_user_idx on public.feed_saves (user_id, created_at desc);
+create index if not exists feed_saves_user_idx on public.feed_saves (user_id, created_at desc);
 
 -- Threaded properly, not one level: a reply to a reply is how an answer to a
 -- technical question actually reads. Depth is capped so the client never has
 -- to render an arbitrarily deep tree on a phone.
-create table public.feed_comments (
+create table if not exists public.feed_comments (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.feed_posts (id) on delete cascade,
   parent_id uuid references public.feed_comments (id) on delete cascade,
@@ -288,16 +368,17 @@ create table public.feed_comments (
   )
 );
 
-create index feed_comments_post_idx on public.feed_comments (post_id, created_at);
-create index feed_comments_parent_idx on public.feed_comments (parent_id)
+create index if not exists feed_comments_post_idx on public.feed_comments (post_id, created_at);
+create index if not exists feed_comments_parent_idx on public.feed_comments (parent_id)
   where parent_id is not null;
 
+drop trigger if exists feed_comments_set_updated_at on public.feed_comments;
 create trigger feed_comments_set_updated_at
   before update on public.feed_comments
   for each row
   execute function public.set_updated_at();
 
-create table public.feed_comment_likes (
+create table if not exists public.feed_comment_likes (
   comment_id uuid not null references public.feed_comments (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -306,16 +387,16 @@ create table public.feed_comment_likes (
 
 -- Following an author. Keyed on author_key rather than a profile id so a
 -- seeded author and a member work the same way.
-create table public.feed_follows (
+create table if not exists public.feed_follows (
   follower_id uuid not null references public.profiles (id) on delete cascade,
   author_key text not null,
   created_at timestamptz not null default now(),
   primary key (follower_id, author_key)
 );
 
-create index feed_follows_author_idx on public.feed_follows (author_key);
+create index if not exists feed_follows_author_idx on public.feed_follows (author_key);
 
-create table public.feed_reports (
+create table if not exists public.feed_reports (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.feed_posts (id) on delete cascade,
   reporter_id uuid not null references public.profiles (id) on delete cascade,
@@ -326,13 +407,13 @@ create table public.feed_reports (
   unique (post_id, reporter_id)
 );
 
-create index feed_reports_open_idx on public.feed_reports (created_at desc)
+create index if not exists feed_reports_open_idx on public.feed_reports (created_at desc)
   where resolved_at is null;
 
 -- What a reader has already been shown. Two jobs: keep the feed from
 -- repeating itself on the next visit, and give the recommender something to
 -- learn from that does not require a click.
-create table public.feed_views (
+create table if not exists public.feed_views (
   post_id uuid not null references public.feed_posts (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,
   seen_count integer not null default 1,
@@ -340,11 +421,11 @@ create table public.feed_views (
   primary key (post_id, user_id)
 );
 
-create index feed_views_user_idx on public.feed_views (user_id, last_seen_at desc);
+create index if not exists feed_views_user_idx on public.feed_views (user_id, last_seen_at desc);
 
 -- Posts a reader has told us not to show. "Not interested" has to mean
 -- something or it is a placebo button.
-create table public.feed_hidden (
+create table if not exists public.feed_hidden (
   post_id uuid not null references public.feed_posts (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -373,6 +454,7 @@ begin
 end;
 $$;
 
+drop trigger if exists feed_likes_count on public.feed_likes;
 create trigger feed_likes_count
   after insert or delete on public.feed_likes
   for each row execute function public.feed_bump_likes();
@@ -393,6 +475,7 @@ begin
 end;
 $$;
 
+drop trigger if exists feed_saves_count on public.feed_saves;
 create trigger feed_saves_count
   after insert or delete on public.feed_saves
   for each row execute function public.feed_bump_saves();
@@ -413,6 +496,7 @@ begin
 end;
 $$;
 
+drop trigger if exists feed_comments_count on public.feed_comments;
 create trigger feed_comments_count
   after insert or delete on public.feed_comments
   for each row execute function public.feed_bump_comments();
@@ -433,6 +517,7 @@ begin
 end;
 $$;
 
+drop trigger if exists feed_comment_likes_count on public.feed_comment_likes;
 create trigger feed_comment_likes_count
   after insert or delete on public.feed_comment_likes
   for each row execute function public.feed_bump_comment_likes();
@@ -458,6 +543,7 @@ begin
 end;
 $$;
 
+drop trigger if exists feed_comments_depth on public.feed_comments;
 create trigger feed_comments_depth
   before insert on public.feed_comments
   for each row execute function public.feed_comment_depth();
@@ -483,22 +569,27 @@ alter table public.feed_reports enable row level security;
 alter table public.feed_views enable row level security;
 alter table public.feed_hidden enable row level security;
 
+drop policy if exists feed_posts_read on public.feed_posts;
 create policy feed_posts_read on public.feed_posts
   for select using (status = 'published' or author_id = auth.uid());
 
+drop policy if exists feed_posts_write on public.feed_posts;
 create policy feed_posts_write on public.feed_posts
   for insert to authenticated
   with check (author_id = auth.uid());
 
+drop policy if exists feed_posts_update on public.feed_posts;
 create policy feed_posts_update on public.feed_posts
   for update to authenticated
   using (author_id = auth.uid())
   with check (author_id = auth.uid());
 
+drop policy if exists feed_posts_delete on public.feed_posts;
 create policy feed_posts_delete on public.feed_posts
   for delete to authenticated
   using (author_id = auth.uid());
 
+drop policy if exists feed_media_read on public.feed_media;
 create policy feed_media_read on public.feed_media
   for select using (
     exists (
@@ -507,6 +598,7 @@ create policy feed_media_read on public.feed_media
     )
   );
 
+drop policy if exists feed_media_write on public.feed_media;
 create policy feed_media_write on public.feed_media
   for all to authenticated
   using (
@@ -516,6 +608,7 @@ create policy feed_media_write on public.feed_media
     exists (select 1 from public.feed_posts p where p.id = post_id and p.author_id = auth.uid())
   );
 
+drop policy if exists feed_files_read on public.feed_files;
 create policy feed_files_read on public.feed_files
   for select using (
     exists (
@@ -524,6 +617,7 @@ create policy feed_files_read on public.feed_files
     )
   );
 
+drop policy if exists feed_files_write on public.feed_files;
 create policy feed_files_write on public.feed_files
   for all to authenticated
   using (
@@ -535,34 +629,41 @@ create policy feed_files_write on public.feed_files
 
 -- Like counts are public; who liked is not something the feed needs to show,
 -- but a reader must be able to see their own rows to know what they liked.
+drop policy if exists feed_likes_own on public.feed_likes;
 create policy feed_likes_own on public.feed_likes
   for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
+drop policy if exists feed_saves_own on public.feed_saves;
 create policy feed_saves_own on public.feed_saves
   for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
+drop policy if exists feed_comments_read on public.feed_comments;
 create policy feed_comments_read on public.feed_comments
   for select using (
     exists (select 1 from public.feed_posts p where p.id = post_id and p.status = 'published')
   );
 
+drop policy if exists feed_comments_write on public.feed_comments;
 create policy feed_comments_write on public.feed_comments
   for insert to authenticated
   with check (author_id = auth.uid());
 
+drop policy if exists feed_comments_update on public.feed_comments;
 create policy feed_comments_update on public.feed_comments
   for update to authenticated
   using (author_id = auth.uid())
   with check (author_id = auth.uid());
 
+drop policy if exists feed_comments_delete on public.feed_comments;
 create policy feed_comments_delete on public.feed_comments
   for delete to authenticated
   using (author_id = auth.uid());
 
+drop policy if exists feed_comment_likes_own on public.feed_comment_likes;
 create policy feed_comment_likes_own on public.feed_comment_likes
   for all to authenticated
   using (user_id = auth.uid())
@@ -570,22 +671,28 @@ create policy feed_comment_likes_own on public.feed_comment_likes
 
 -- Follower counts are public, so the select side is open; only the owner may
 -- add or remove a follow.
+drop policy if exists feed_follows_read on public.feed_follows;
 create policy feed_follows_read on public.feed_follows for select using (true);
+drop policy if exists feed_follows_write on public.feed_follows;
 create policy feed_follows_write on public.feed_follows
   for insert to authenticated with check (follower_id = auth.uid());
+drop policy if exists feed_follows_delete on public.feed_follows;
 create policy feed_follows_delete on public.feed_follows
   for delete to authenticated using (follower_id = auth.uid());
 
+drop policy if exists feed_reports_own on public.feed_reports;
 create policy feed_reports_own on public.feed_reports
   for all to authenticated
   using (reporter_id = auth.uid())
   with check (reporter_id = auth.uid());
 
+drop policy if exists feed_views_own on public.feed_views;
 create policy feed_views_own on public.feed_views
   for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
+drop policy if exists feed_hidden_own on public.feed_hidden;
 create policy feed_hidden_own on public.feed_hidden
   for all to authenticated
   using (user_id = auth.uid())

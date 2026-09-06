@@ -57,6 +57,7 @@ export function Feed({
   followingOnly = false,
   authorKey = null,
   showFilters = true,
+  showDiagnostics = false,
 }: {
   initial: FeedPage;
   signedIn: boolean;
@@ -66,6 +67,17 @@ export function Feed({
   followingOnly?: boolean;
   authorKey?: string | null;
   showFilters?: boolean;
+  /**
+   * Whether to name the missing migration when the feed tables are absent.
+   *
+   * Off by default, and passed only for an administrator. A visitor who meets
+   * a half-installed deployment learns nothing useful from "apply migrations
+   * 0026 and 0027" — it is an instruction they cannot follow, about a system
+   * they did not know existed, and it reads as the site being broken by
+   * someone careless. They get "nothing here yet"; the operator gets the
+   * migration number.
+   */
+  showDiagnostics?: boolean;
 }) {
   const [filter, setFilter] = useState(initialFilter);
   const [posts, setPosts] = useState<FeedPost[]>(initial.posts);
@@ -215,6 +227,7 @@ export function Feed({
           available={initial.available}
           savedOnly={savedOnly}
           followingOnly={followingOnly}
+          showDiagnostics={showDiagnostics}
         />
       ) : (
         <>
@@ -548,21 +561,24 @@ function Empty({
   available,
   savedOnly,
   followingOnly,
+  showDiagnostics = false,
 }: {
   available: boolean;
   savedOnly: boolean;
   followingOnly: boolean;
+  showDiagnostics?: boolean;
 }) {
   if (!available) {
     return (
       <div className="rounded-2xl border border-dashed border-border p-8 text-center">
         <RefreshCw className="mx-auto size-6 text-muted-foreground" />
         <p className="mt-3 text-sm font-medium text-foreground">
-          The feed is not set up yet
+          {showDiagnostics ? "The feed is not set up yet" : "Nothing here yet"}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Apply migrations 0026 and 0027 in the Supabase SQL editor, then
-          reload this page.
+          {showDiagnostics
+            ? "The feed tables are missing on this database. Apply migration 0026 in the Supabase SQL editor — it is safe to re-run — then reload."
+            : "Check back shortly."}
         </p>
       </div>
     );

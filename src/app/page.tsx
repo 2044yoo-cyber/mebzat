@@ -8,6 +8,7 @@ import {
   getFeedPage,
   getSuggestedAuthors,
 } from "@/lib/data/feed";
+import { isAdmin } from "@/lib/auth/admin";
 import { getNavProfile } from "@/lib/nav-profile";
 
 /**
@@ -35,10 +36,13 @@ import { getNavProfile } from "@/lib/nav-profile";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [profile, page, authors] = await Promise.all([
+  const [profile, page, authors, operator] = await Promise.all([
     getNavProfile(),
     getFeedPage({ limit: 12 }),
     getSuggestedAuthors(8),
+    // Only an administrator is told which migration is missing. Everybody else
+    // gets an empty feed, which is what an empty feed looks like.
+    isAdmin(),
   ]);
 
   const signedIn = Boolean(profile);
@@ -69,7 +73,12 @@ export default async function Home() {
           <SuggestedAuthors authors={authors.slice(0, 6)} signedIn={signedIn} />
         </div>
 
-        <Feed initial={page} signedIn={signedIn} viewer={viewer} />
+        <Feed
+          initial={page}
+          signedIn={signedIn}
+          viewer={viewer}
+          showDiagnostics={operator}
+        />
 
         {/* The rail carried these and it is gone. They live under the feed
             instead, because it was the only place in the whole application
