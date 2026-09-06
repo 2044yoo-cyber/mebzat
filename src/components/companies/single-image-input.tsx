@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { moderateQuarantinedImage } from "@/app/moderation/upload-actions";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -44,17 +45,37 @@ export function SingleImageInput({
     const supabase = createClient();
     const ext = file.name.split(".").pop();
     const path = `${userId}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage.from(bucket).upload(path, file);
+    // Quarantine first. A company logo is as public as anything on the site
+    // the moment it has a URL, so it is checked before it gets one.
+    const { error } = await supabase.storage
+      .from("moderation-quarantine")
+      .upload(path, file);
     if (error) {
       toast.error(error.message);
       setUploading(false);
       return;
     }
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from(bucket).getPublicUrl(path);
-    setUrl(publicUrl);
+
+    const verdict = await moderateQuarantinedImage({
+      quarantinePath: path,
+      contentType: "company",
+      publicBucket: bucket,
+    });
+
     setUploading(false);
+
+    if (verdict.status === "blocked") {
+      toast.error(
+        "This image cannot be published because it violates Medosha's content guidelines.",
+      );
+      return;
+    }
+    if (verdict.status !== "safe" || !verdict.publicUrl) {
+      toast.info("This image is under review and will appear once it is checked.");
+      return;
+    }
+
+    setUrl(verdict.publicUrl);
   }
 
   return (

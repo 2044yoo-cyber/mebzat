@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { AiField } from "@/components/ai/writing/ai-field";
 import { createProperty } from "@/app/property/actions";
 import { LocationPicker } from "@/components/property/location-picker";
+import { moderateQuarantinedImage } from "@/app/moderation/upload-actions";
 import { createClient } from "@/lib/supabase/client";
 import {
   PhotoUploader,
@@ -129,10 +130,10 @@ export function PropertyForm() {
    * form still filled in.
    */
   async function uploadPhotos(): Promise<
-    | { ok: true; paths: string[]; media: NonNullable<Parameters<typeof createProperty>[0]["photos"]> }
+    | { ok: true; paths: string[]; media: NonNullable<Parameters<typeof createProperty>[0]["photos"]>; held: number }
     | { ok: false; message: string }
   > {
-    if (photos.length === 0) return { ok: true, paths: [], media: [] };
+    if (photos.length === 0) return { ok: true, paths: [], media: [], held: 0 };
 
     const supabase = createClient();
     const {
@@ -147,12 +148,19 @@ export function PropertyForm() {
     const paths: string[] = [];
     const media: NonNullable<Parameters<typeof createProperty>[0]["photos"]> = [];
 
+    // Every photo lands in the private quarantine bucket first and is only
+    // copied into property-images once it comes back safe. Uploading straight
+    // to a public bucket publishes the file the instant it arrives — the row
+    // may still be a draft, but the object is fetchable by URL, and that is
+    // the whole of what "published" means to anybody who has the link.
+    let held = 0;
+
     for (const [index, photo] of photos.entries()) {
       const extension = photo.blob.type === "image/png" ? "png" : photo.blob.type === "image/jpeg" ? "jpg" : "webp";
       const path = `${user.id}/${draft}/${index}.${extension}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("property-images")
+        .from("moderation-quarantine")
         .upload(path, photo.blob, { contentType: photo.blob.type, upsert: true });
 
       if (uploadError) {
@@ -168,10 +176,35 @@ export function PropertyForm() {
         };
       }
 
+      const verdict = await moderateQuarantinedImage({
+        quarantinePath: path,
+        contentType: "listing",
+        publicBucket: "property-images",
+      });
+
+      if (verdict.status === "blocked") {
+        if (paths.length > 0) {
+          await supabase.storage.from("property-images").remove(paths);
+        }
+        return {
+          ok: false,
+          message: `${photo.name} cannot be published because it violates Medosha's content guidelines.`,
+        };
+      }
+
+      // Held for review: the listing goes ahead without this photo rather
+      // than failing outright. A seller who waited through six uploads should
+      // not lose the whole form because one picture needs a second look.
+      if (verdict.status !== "safe" || !verdict.publicUrl) {
+        held += 1;
+        continue;
+      }
+
+      // publishApproved keeps the filename when it copies out of quarantine,
+      // so the path recorded here is the one in property-images too — which is
+      // what the rollback above removes.
       paths.push(path);
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("property-images").getPublicUrl(path);
+      const publicUrl = verdict.publicUrl;
 
       media.push({
         url: publicUrl,
@@ -182,7 +215,7 @@ export function PropertyForm() {
       });
     }
 
-    return { ok: true, paths, media };
+    return { ok: true, paths, media, held };
   }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -194,6 +227,17 @@ export function PropertyForm() {
       if (!uploaded.ok) {
         setError(uploaded.message);
         return;
+      }
+
+      // Said before the listing is created, not after: a seller who uploaded
+      // six photos and sees four should be told why while they are still
+      // looking at the form.
+      if (uploaded.held > 0) {
+        toast.info(
+          uploaded.held === 1
+            ? "One photo is under review and will appear once it is checked."
+            : `${uploaded.held} photos are under review and will appear once they are checked.`,
+        );
       }
 
       const result = await createProperty({

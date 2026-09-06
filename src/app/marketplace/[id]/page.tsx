@@ -22,6 +22,7 @@ import { withFavorites } from "@/lib/data/products";
 import { createClient } from "@/lib/supabase/server";
 import { cn, formatPrice } from "@/lib/utils";
 import type { ProductCardData } from "@/components/products/product-card";
+import { ReportDialog } from "@/components/moderation/report-dialog";
 
 type Supplier = {
   id: string;
@@ -188,6 +189,16 @@ export default async function ProductDetailPage(props: {
           </>
         )}
       </nav>
+
+      {/* Reporting sits beside the breadcrumb rather than at the foot of the
+          page: somebody who has decided to report a listing should not have to
+          scroll past the thing they are reporting to find the button. Hidden
+          from the owner, who has their own controls. */}
+      {!isOwner && (
+        <div className="mb-4 flex justify-end">
+          <ReportDialog contentType="product" contentId={id} ownerId={ownerId} variant="row" />
+        </div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-2">
         <ProductGallery images={galleryImages} alt={String(product.title)} />

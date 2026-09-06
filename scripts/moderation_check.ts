@@ -322,6 +322,103 @@ check(
 );
 
 /* -------------------------------------------------------------------------- */
+/* Nothing public reaches a public bucket unchecked                            */
+/*                                                                             */
+/* The failure this catches is silent and total: an upload that writes straight */
+/* to a public bucket is published the instant it lands, whatever the row       */
+/* around it says. The file has a URL, and a URL is the whole of what published */
+/* means to anybody who has it. Four of these were open — property listings,    */
+/* project images, company logos and the ones below — while the moderation      */
+/* system they bypassed sat complete beside them.                               */
+/* -------------------------------------------------------------------------- */
+
+import { readdirSync as readDir, statSync as statOf } from "node:fs";
+import { join as joinPath } from "node:path";
+
+/** Buckets that anybody can read without a signed URL. */
+const PUBLIC_BUCKETS = [
+  "property-images",
+  "project-images",
+  "product-images",
+  "company-logos",
+  "company-covers",
+  "avatars",
+  "covers",
+  "panoramas",
+  "floor-plans",
+];
+
+function walkAll(dir: string): string[] {
+  return readDir(dir).flatMap((entry) => {
+    const full = joinPath(dir, entry);
+    return statOf(full).isDirectory() ? walkAll(full) : [full];
+  });
+}
+
+const sources = walkAll("src").filter(
+  (path) => path.endsWith(".ts") || path.endsWith(".tsx"),
+);
+
+for (const path of sources) {
+  const source = readFileSync(path, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  // An upload call naming a public bucket directly. The moderation service is
+  // allowed to do this — publishApproved is the one thing that may, and it
+  // only runs after a safe verdict.
+  const uploads = [...source.matchAll(/\.from\("([a-z-]+)"\)\s*\n?\s*\.upload\(/g)];
+  if (uploads.length === 0) continue;
+  if (path.endsWith("lib/moderation/service.ts")) continue;
+
+  for (const match of uploads) {
+    const bucket = match[1];
+    if (!PUBLIC_BUCKETS.includes(bucket)) continue;
+    check(
+      `${path} does not upload straight into the public bucket ${bucket}`,
+      false,
+      bucket,
+    );
+  }
+}
+
+// And the components that were opened up must actually call the service.
+for (const path of [
+  "src/components/property/property-form.tsx",
+  "src/components/projects/project-images-input.tsx",
+  "src/components/companies/single-image-input.tsx",
+  "src/components/products/product-images-input.tsx",
+]) {
+  const source = readFileSync(path, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  check(
+    `${path} quarantines before it publishes`,
+    /\.from\("moderation-quarantine"\)\s*\n?\s*\.upload\(/.test(source),
+  );
+  check(
+    `${path} asks for a verdict`,
+    /moderateQuarantinedImage\(/.test(source),
+  );
+  check(
+    `${path} publishes only the url the verdict returned`,
+    /verdict\.publicUrl/.test(source),
+  );
+}
+
+// Reporting has to be reachable. The dialog existed, fully built, mounted
+// nowhere — which is the same as not existing to the person trying to use it.
+for (const path of [
+  "src/app/property/[id]/page.tsx",
+  "src/app/marketplace/[id]/page.tsx",
+]) {
+  const source = readFileSync(path, "utf8");
+  // The trailing character class matters: /<ReportDialog/ alone also matches
+  // <ReportDialogAnything, so renaming the component away would have passed.
+  check(`${path} offers a way to report`, /<ReportDialog[\s/>]/.test(source));
+}
+
+/* -------------------------------------------------------------------------- */
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} failed:\n`);

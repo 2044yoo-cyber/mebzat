@@ -45,6 +45,7 @@ import { createClient } from "@/lib/supabase/server";
 import { listFloorPlans } from "@/lib/tour/floor-plans";
 import { listToursFor } from "@/lib/tour/queries";
 import { cn, formatPrice } from "@/lib/utils";
+import { ReportDialog } from "@/components/moderation/report-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -213,6 +214,20 @@ export default async function PropertyPage(props: {
         <ArrowLeft className="size-4" />
         Back to the map
       </Link>
+
+      {/* On the same row as "Back to the map" so it costs no vertical space on
+          a phone, and reachable without scrolling past the listing being
+          reported. Hidden from the owner, who has their own controls below. */}
+      {user?.id !== property.owner_id && (
+        <span className="float-right">
+          <ReportDialog
+            contentType="listing"
+            contentId={property.id}
+            ownerId={property.owner_id}
+            variant="row"
+          />
+        </span>
+      )}
 
       <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
