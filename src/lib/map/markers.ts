@@ -157,6 +157,74 @@ export function createMarkerElement(
  * is available, and the price question is answered on the building page where
  * there is room for a range.
  */
+/** Orange, and the same orange as the layer's swatch in the Layers menu. */
+export const DEVELOPMENT_COLOUR = "#ea580c";
+
+/**
+ * A development pin.
+ *
+ * Deliberately a different shape from a listing pin, not only a different
+ * colour: a filled tower glyph on a solid orange field against the listing's
+ * white price pill. Somebody who cannot tell orange from green still sees two
+ * unlike things, which is the whole of the accessibility requirement and is
+ * also just clearer at a glance on a busy map.
+ *
+ * The name is on the pin and nothing else is. Units and price belong on the
+ * card that opens when it is tapped — a map with three lines of text per
+ * marker is a map you cannot read at the zoom where it matters.
+ */
+export function createDevelopmentElement(
+  name: string | null,
+  onClick: () => void,
+): HTMLElement {
+  const wrapper = document.createElement("button");
+  wrapper.type = "button";
+  wrapper.className = "medosha-development-marker";
+  wrapper.setAttribute("aria-label", `${name ?? "Development"}, new project`);
+
+  wrapper.style.cssText = [
+    "display:flex",
+    "align-items:center",
+    "gap:5px",
+    "padding:5px 10px 5px 7px",
+    "border-radius:999px",
+    "border:1.5px solid rgba(255,255,255,0.9)",
+    `background:${DEVELOPMENT_COLOUR}`,
+    "box-shadow:0 2px 8px rgba(0,0,0,0.25)",
+    "cursor:pointer",
+    "font:600 12px/1 system-ui,sans-serif",
+    "color:#fff",
+    "white-space:nowrap",
+    "max-width:180px",
+  ].join(";");
+
+  // Drawn rather than an emoji, for the same reason as the building glyph: an
+  // emoji renders differently on every platform and is a different size on
+  // each, which on a pin means the layout moves.
+  const glyph = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  glyph.setAttribute("viewBox", "0 0 24 24");
+  glyph.setAttribute("width", "13");
+  glyph.setAttribute("height", "13");
+  glyph.setAttribute("fill", "currentColor");
+  glyph.setAttribute("aria-hidden", "true");
+  glyph.style.flexShrink = "0";
+  glyph.innerHTML =
+    '<path d="M3 21V7l7-4v5l7-3v16H3zm2-2h4v-3H5v3zm0-5h4v-3H5v3zm0-5h4V6L5 8v1zm6 10h6v-3h-6v3zm0-5h6v-3h-6v3zm0-5h6V7l-6 2.6V9z"/>';
+  wrapper.appendChild(glyph);
+
+  const label = document.createElement("span");
+  label.textContent = name ?? "New project";
+  label.style.cssText = "overflow:hidden;text-overflow:ellipsis";
+  wrapper.appendChild(label);
+
+  wrapper.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onClick();
+  });
+
+  return wrapper;
+}
+
 export function createBuildingElement(
   name: string | null,
   units: number,
@@ -288,6 +356,36 @@ export function createClusterElement(
   return wrapper;
 }
 
+
+/**
+ * A development, as the map draws it.
+ *
+ * Distinct from BuildingGroup, which is a cluster of *listed units* that
+ * happen to share a coordinate. This comes from the buildings table itself, so
+ * a tower with nothing on the market yet is still on the map — which is the
+ * whole category "New Projects" describes.
+ */
+export type MapDevelopment = {
+  id: string;
+  code: string | null;
+  name: string | null;
+  buildingType: string | null;
+  constructionStatus: string;
+  floors: number | null;
+  totalUnits: number | null;
+  completionPercent: number | null;
+  latitude: number;
+  longitude: number;
+  subCity: string | null;
+  neighbourhood: string | null;
+  address: string | null;
+  coverImageUrl: string | null;
+  developer: string | null;
+  /** Units on the market right now. Zero is ordinary for a new development. */
+  unitCount: number;
+  /** Cheapest available unit, or null when nothing is listed yet. */
+  priceFrom: number | null;
+};
 
 export type BuildingGroup = {
   /** The building's uuid, used as the marker key. */
@@ -447,7 +545,7 @@ export const MAP_LAYERS: {
   { id: "properties", label: "Properties", colour: "#16a34a", ready: true },
   { id: "schools", label: "Schools", colour: "#3b82f6", ready: true },
   { id: "hospitals", label: "Hospitals", colour: "#ef4444", ready: true },
-  { id: "projects", label: "Construction projects", colour: "#ea580c", ready: false },
+  { id: "projects", label: "New projects", colour: "#ea580c", ready: true },
   { id: "companies", label: "Companies", colour: "#9333ea", ready: false },
   { id: "professionals", label: "Professionals", colour: "#0891b2", ready: false },
   { id: "suppliers", label: "Material suppliers", colour: "#d4a017", ready: false },

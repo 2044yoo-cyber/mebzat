@@ -7218,6 +7218,17 @@ export interface Database {
         };
         Returns: { total_units: number; available_units: number; for_sale: number; for_rent: number; from_price: number }[];
       };
+      buildings_in_viewport: {
+        Args: {
+          south: number;
+          west: number;
+          north: number;
+          east: number;
+          statuses?: ConstructionStatus[] | null;
+          max_results?: number | null;
+        };
+        Returns: { id: string; code: string; name: string; building_type: PropertyType; construction_status: ConstructionStatus; floors: number; total_units: number; completion_percent: number; latitude: number; longitude: number; address: string; sub_city: string; neighbourhood: string; cover_image_url: string; company_id: string; company_name: string; unit_count: number; price_from: number }[];
+      };
       building_summary: {
         Args: {
           target: string;

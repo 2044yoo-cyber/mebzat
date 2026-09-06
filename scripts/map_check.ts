@@ -37,6 +37,52 @@ function walkAll(dir: string): string[] {
   });
 }
 
+/**
+ * The body of one named function, brace-matched.
+ *
+ * Per function, not per file. createBuildingElement and
+ * createDevelopmentElement both draw an SVG glyph, so a file-wide search finds
+ * one whichever of them still has it — and the check then reports on the wrong
+ * marker while looking exactly like it is watching the right one.
+ */
+function bodyOf(source: string, name: string): string {
+  const pattern = new RegExp(`(?:export\\s+)?(?:async\\s+)?function\\s+${name}\\b`);
+  const match = pattern.exec(source);
+  if (!match) return "";
+
+  // Paren depth, not "the character before the brace". A TypeScript signature
+  // ends `): HTMLElement {`, so the character before the body's brace is the
+  // return type — and a rule that looks for `)` walks straight past the body
+  // into the first callback inside it, which is what it did here.
+  let index = match.index + match[0].length;
+  let depth = 0;
+  let opened = false;
+  while (index < source.length) {
+    const char = source[index];
+    if (char === "(") {
+      depth += 1;
+      opened = true;
+    } else if (char === ")") {
+      depth -= 1;
+    } else if (char === "{" && opened && depth === 0) {
+      break;
+    }
+    index += 1;
+  }
+  if (index >= source.length) return "";
+
+  let braceDepth = 1;
+
+  const start = index + 1;
+  index += 1;
+  while (index < source.length && braceDepth > 0) {
+    if (source[index] === "{") braceDepth += 1;
+    else if (source[index] === "}") braceDepth -= 1;
+    index += 1;
+  }
+  return source.slice(start, index);
+}
+
 /** Comments stripped: an explanation must not satisfy its own assertion. */
 function code(path: string): string {
   return readFileSync(path, "utf8")
@@ -383,6 +429,95 @@ check("and the state is announced", /aria-pressed=\{fullscreen\}/.test(explorer)
 for (const control of ["Search properties", "Layers", "Filters"]) {
   check(`${control} survives full screen`, explorer.includes(control));
 }
+
+// ---------------------------------------------------------------------------
+// New projects are real developments, not listings wearing a colour
+//
+// The map already had building pins, derived from listings: two or more units
+// sharing a coordinate become one marker. A development with nothing listed
+// yet has no units to group, so it never appeared — and that is exactly the
+// category "New Projects" names. These come from the buildings table instead.
+// ---------------------------------------------------------------------------
+
+const markers = code("src/lib/map/markers.ts");
+const buildings = code("src/lib/data/buildings.ts");
+const devCard = code("src/components/property/development-card.tsx");
+const route = code("src/app/api/buildings/viewport/route.ts");
+
+check("the layer is switched on", /id: "projects"[^}]*ready: true/.test(markers));
+check(
+  "and is not the listing-derived grouping under a new name",
+  /export type MapDevelopment/.test(markers) && /export type BuildingGroup/.test(markers),
+);
+check(
+  "the pins come from the buildings table, not from properties",
+  /rpc\("buildings_in_viewport"/.test(buildings),
+);
+check(
+  "counted in the database rather than the browser",
+  !/from\("properties"\)[\s\S]{0,200}building_id/.test(buildings),
+);
+
+// Icon and colour, so the category survives colour blindness.
+check("the pin has its own shape, not only its own colour", /createDevelopmentElement/.test(markers));
+
+// Scoped to this function's own body. createBuildingElement draws an SVG glyph
+// too, so a file-wide search for one passes with the development's glyph
+// deleted — which is the check reporting on the wrong marker.
+const developmentBody = bodyOf(markers, "createDevelopmentElement");
+check("createDevelopmentElement is findable", developmentBody.length > 0);
+check(
+  "with a glyph of its own",
+  /createElementNS\("http:\/\/www\.w3\.org\/2000\/svg", "svg"\)/.test(developmentBody),
+);
+check("and a labelled purpose for a screen reader", /new project`/.test(developmentBody));
+check(
+  "the colour is the one the Layers menu already shows",
+  /DEVELOPMENT_COLOUR = "#ea580c"/.test(markers) &&
+    /id: "projects", label: "New projects", colour: "#ea580c"/.test(markers),
+);
+
+// A tap opens a card. It does not navigate: comparing four towers should not
+// cost four page loads and four presses of back.
+check("tapping a pin opens a card", /setOpenDevelopment\(development\)/.test(canvas));
+check("rather than navigating", !/router\.push[\s\S]{0,60}development/.test(canvas));
+// The link itself, not the words. "View project" also appears in the file's
+// own explanation of why the card does not navigate on tap, and a check that
+// matches prose is a check that passes with the button deleted.
+check(
+  "the card offers the way through",
+  /<Link\s+href=\{`\/building\/[\s\S]{0,600}?View project/.test(devCard),
+);
+check(
+  "it works on a phone and a desktop from one component",
+  /inset-x-2 bottom-2 sm:/.test(devCard),
+);
+check("and can be dismissed", /aria-label="Close"/.test(devCard));
+
+// Fields the database has no answer for are left out, not filled with a dash.
+check(
+  "facts are pushed only when present",
+  /if \(development\.totalUnits\) \{/.test(devCard) &&
+    /development\.priceFrom !== null/.test(devCard),
+);
+
+// The layer switch is honoured in both directions.
+check("the pins follow the switch off", /if \(developmentsOn\) return;[\s\S]{0,200}marker\.remove\(\)/.test(canvas));
+check(
+  "and so does the card, by arithmetic rather than an effect",
+  /\{developmentsOn && openDevelopment && \(/.test(canvas),
+);
+check(
+  "developments have their own marker map, so a pan does not rebuild the property pins",
+  /developmentMarkers = useRef\(new Map</.test(canvas),
+);
+
+// The route refuses a half-formed box rather than scanning the table.
+check(
+  "a bad bounding box returns nothing rather than everything",
+  /south === null \|\| north === null \|\| west === null \|\| east === null/.test(route),
+);
+check("and it never 5xxs at the map", !/status: 5\d\d/.test(route));
 
 // ---------------------------------------------------------------------------
 

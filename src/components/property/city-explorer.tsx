@@ -562,6 +562,7 @@ export function CityExplorer({
               selectedId={selected?.id ?? null}
               highlight={aiHighlight}
               panelOpen={panelOpen}
+              layers={layers}
               onSelect={handleSelect}
               onResults={handleResults}
             onSelectBuilding={setBuilding}

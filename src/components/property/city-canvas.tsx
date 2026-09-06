@@ -14,11 +14,14 @@ import {
   MARKER_COLOURS,
   groupByBuilding,
   createBuildingElement,
+  createDevelopmentElement,
   type BuildingGroup,
+  type MapDevelopment,
 } from "@/lib/map/markers";
 import type { AiHighlight } from "@/lib/map/ai-highlight";
 import { loadSession, saveSession } from "@/lib/map/session";
 import { BASE_STYLE } from "@/lib/map/style";
+import { DevelopmentCard } from "@/components/property/development-card";
 import { PriceLegend } from "@/components/property/price-legend";
 import {
   bandFor,
@@ -68,6 +71,7 @@ export function CityCanvas({
   selectedId,
   highlight,
   panelOpen,
+  layers,
   onSelect,
   onResults,
   onSelectBuilding,
@@ -79,6 +83,16 @@ export function CityCanvas({
   /** Listings Medosha AI just searched for, or null. */
   highlight?: AiHighlight | null;
   panelOpen: boolean;
+  /**
+   * Which optional layers are switched on. Only "projects" is read here; the
+   * rest are drawn elsewhere or not yet drawn at all.
+   *
+   * Passed rather than read from a store because the Layers menu lives in
+   * city-explorer and this component already takes its filters from there —
+   * two sources for one switch is how a layer ends up on in the menu and off
+   * on the map.
+   */
+  layers?: string[];
   onSelect: (property: MapProperty | null) => void;
   onResults?: (properties: MapProperty[]) => void;
   /** A building marker was tapped. The list beside the map shows its units. */
@@ -137,12 +151,14 @@ export function CityCanvas({
   // Everything the map reads imperatively lives in a ref, so none of it can
   // become an effect dependency and tear the map down.
   const filtersRef = useRef(filters);
+  const developmentsOnRef = useRef(false);
   const onSelectRef = useRef(onSelect);
   const onResultsRef = useRef(onResults);
   const selectedRef = useRef(selectedId);
   const panelRef = useRef(panelOpen);
   useEffect(() => {
     filtersRef.current = filters;
+    developmentsOnRef.current = (layers ?? []).includes("projects");
     onSelectRef.current = onSelect;
     onResultsRef.current = onResults;
     selectedRef.current = selectedId;
@@ -150,6 +166,75 @@ export function CityCanvas({
   });
 
   // ---- Properties: independent of the map's own health --------------------
+
+  const [developments, setDevelopments] = useState<MapDevelopment[]>([]);
+  const [openDevelopment, setOpenDevelopment] = useState<MapDevelopment | null>(null);
+  const developmentsOn = (layers ?? []).includes("projects");
+  const developmentsRequest = useRef<AbortController | null>(null);
+
+  /**
+   * Developments for the current viewport.
+   *
+   * Separate from the property fetch and separately abortable: the two answer
+   * different questions of different tables, one of them is behind a layer
+   * switch, and folding them into one request would mean a pan re-fetching
+   * buildings for a reader who has the layer off.
+   *
+   * Failure is silence. A missing layer is a smaller problem than a map that
+   * will not draw, and the route already answers a missing 0066 with an empty
+   * list rather than an error.
+   */
+  const fetchDevelopments = useCallback(async () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (!developmentsOnRef.current) {
+      setDevelopments([]);
+      return;
+    }
+
+    let params: URLSearchParams;
+    try {
+      const bounds = map.getBounds();
+      params = new URLSearchParams({
+        south: String(bounds.getSouth()),
+        west: String(bounds.getWest()),
+        north: String(bounds.getNorth()),
+        east: String(bounds.getEast()),
+      });
+    } catch {
+      return;
+    }
+
+    const active = filtersRef.current;
+    if (active.construction?.length) {
+      params.set("construction", active.construction.join(","));
+    }
+
+    developmentsRequest.current?.abort();
+    const controller = new AbortController();
+    developmentsRequest.current = controller;
+
+    try {
+      const response = await fetch(`/api/buildings/viewport?${params}`, {
+        signal: controller.signal,
+      });
+      if (!response.ok) return;
+      const data = (await response.json()) as { developments?: MapDevelopment[] };
+      setDevelopments(data.developments ?? []);
+    } catch {
+      // Aborted by the next pan, or offline. Neither is worth a console line
+      // on a map that is already showing its properties.
+    }
+  }, []);
+
+  // The switch changing is a reason to refetch, and the only one the pan and
+  // filter handlers do not already cover. fetchDevelopments is a useCallback
+  // with no dependencies, so its identity is stable and naming it here costs
+  // nothing — no ref, and nothing read during render.
+  useEffect(() => {
+    void fetchDevelopments();
+  }, [developmentsOn, fetchDevelopments]);
 
   const fetchViewport = useCallback(async () => {
     const map = mapRef.current;
@@ -274,6 +359,7 @@ export function CityCanvas({
       setReady(true);
       setZoom(map.getZoom());
       void fetchViewport();
+      void fetchDevelopments();
       // One serialised decision, so nothing races and blanks the map.
       void engineInstance.resolve();
     });
@@ -284,6 +370,7 @@ export function CityCanvas({
       moveTimer = setTimeout(() => {
         retryCountRef.current = 0;
         void fetchViewport();
+        void fetchDevelopments();
       }, MOVE_DEBOUNCE_MS);
 
       // Persist the camera so returning to the page lands where they left.
@@ -329,9 +416,10 @@ export function CityCanvas({
     const timer = setTimeout(() => {
       retryCountRef.current = 0;
       void fetchViewport();
+      void fetchDevelopments();
     }, 120);
     return () => clearTimeout(timer);
-  }, [filters, ready, fetchViewport]);
+  }, [filters, ready, fetchViewport, fetchDevelopments]);
 
   // Resize when the side panel opens or closes, so the canvas keeps the full
   // area rather than being letterboxed by a stale size.
@@ -513,6 +601,61 @@ export function CityCanvas({
     }
   }, [bands, properties, ready, selectedId, matchState, zoom, onSelectBuilding]);
 
+  // ---- Development pins ---------------------------------------------------
+  //
+  // Their own effect and their own marker map, so a pan that changes the
+  // developments does not tear down and rebuild every property pin — which is
+  // the difference between a map that redraws and a map that flickers.
+
+  const developmentMarkers = useRef(new Map<string, maplibregl.Marker>());
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+
+    const markers = developmentMarkers.current;
+    const wanted = new Set(developments.map((one) => one.id));
+
+    for (const [id, marker] of markers) {
+      if (!wanted.has(id)) {
+        marker.remove();
+        markers.delete(id);
+      }
+    }
+
+    for (const development of developments) {
+      if (markers.has(development.id)) continue;
+      if (
+        !Number.isFinite(development.latitude) ||
+        !Number.isFinite(development.longitude)
+      ) {
+        continue;
+      }
+
+      const element = createDevelopmentElement(development.name, () => {
+        setOpenDevelopment(development);
+      });
+
+      try {
+        markers.set(
+          development.id,
+          new maplibregl.Marker({ element, anchor: "bottom" })
+            .setLngLat([development.longitude, development.latitude])
+            .addTo(map),
+        );
+      } catch {
+        // A pin with impossible coordinates must not take the map with it.
+      }
+    }
+  }, [developments, ready]);
+
+  // The layer going off takes its pins with it.
+  useEffect(() => {
+    if (developmentsOn) return;
+    for (const marker of developmentMarkers.current.values()) marker.remove();
+    developmentMarkers.current.clear();
+  }, [developmentsOn]);
+
   // Frame what the assistant found.
   //
   // Highlighting a marker outside the viewport highlights nothing, and asking
@@ -678,6 +821,13 @@ export function CityCanvas({
       </div>
 
       <PriceLegend scale={bands.scale} kind={bands.kind} />
+
+      {developmentsOn && openDevelopment && (
+        <DevelopmentCard
+          development={openDevelopment}
+          onClose={() => setOpenDevelopment(null)}
+        />
+      )}
 
       {!ready && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-muted/40">

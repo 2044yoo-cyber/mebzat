@@ -1,7 +1,8 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { Building, PropertyType } from "@/types/database.types";
+import type { Building, ConstructionStatus, PropertyType } from "@/types/database.types";
+import type { MapDevelopment } from "@/lib/map/markers";
 
 /**
  * Buildings, and the units inside them.
@@ -150,4 +151,94 @@ export async function getBuildings(options: {
   const { data, error } = await query;
   if (error) return { buildings: [], available: false };
   return { buildings: data ?? [], available: true };
+}
+
+/**
+ * Developments inside a map viewport.
+ *
+ * Straight from the buildings table rather than from listings, so a tower
+ * under construction with nothing on the market is still returned. The unit
+ * count and the cheapest available unit are computed in the database — see
+ * 0066 for why counting them in the browser is the wrong shape of query at the
+ * zoom where a map has the most markers.
+ *
+ * Never throws. The map treats a failure as "no developments", which is the
+ * same thing it does for properties: a map with a missing layer is a smaller
+ * problem than a map that will not render.
+ */
+export async function getDevelopmentsInViewport(box: {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+  statuses?: string[] | null;
+  limit?: number;
+}): Promise<MapDevelopment[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc("buildings_in_viewport", {
+    south: box.south,
+    west: box.west,
+    north: box.north,
+    east: box.east,
+    statuses:
+      box.statuses && box.statuses.length > 0
+        ? (box.statuses as ConstructionStatus[])
+        : null,
+    max_results: box.limit ?? 200,
+  });
+
+  if (error) {
+    // 42883 is "function does not exist" — 0066 has not been applied on this
+    // deployment. Said once, quietly, rather than as an outage.
+    if (error.code === "42883") {
+      console.warn("[medosha:map] buildings_in_viewport is missing — apply 0066");
+    } else {
+      console.error(`[medosha:map] developments failed: ${error.message}`);
+    }
+    return [];
+  }
+
+  type Row = {
+    id: string;
+    code: string | null;
+    name: string | null;
+    building_type: string | null;
+    construction_status: string;
+    floors: number | null;
+    total_units: number | null;
+    completion_percent: number | null;
+    latitude: number;
+    longitude: number;
+    address: string | null;
+    sub_city: string | null;
+    neighbourhood: string | null;
+    cover_image_url: string | null;
+    company_id: string | null;
+    company_name: string | null;
+    unit_count: number | string | null;
+    price_from: number | string | null;
+  };
+
+  return ((data ?? []) as unknown as Row[]).map((row) => ({
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    buildingType: row.building_type,
+    constructionStatus: row.construction_status,
+    floors: row.floors,
+    totalUnits: row.total_units,
+    completionPercent: row.completion_percent,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    subCity: row.sub_city,
+    neighbourhood: row.neighbourhood,
+    address: row.address,
+    coverImageUrl: row.cover_image_url,
+    developer: row.company_name,
+    // bigint and numeric arrive as strings from PostgREST, which avoids float
+    // rounding and means Number() rather than a cast.
+    unitCount: Number(row.unit_count ?? 0),
+    priceFrom: row.price_from === null ? null : Number(row.price_from),
+  }));
 }
