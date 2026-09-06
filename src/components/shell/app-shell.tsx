@@ -191,7 +191,7 @@ export function AppShell({
             // the narrow shape it had when both panels were open. Pages that
             // want to reflow use `@…/ws:` variants and respond to the space
             // they actually have.
-            className="@container/ws min-w-0 flex-1 overflow-y-auto overscroll-contain pb-14 lg:pb-0 print:overflow-visible print:pb-0"
+            className="@container/ws min-w-0 flex-1 overflow-y-auto overscroll-contain pb-[var(--bottom-nav-h)] lg:pb-0 print:overflow-visible print:pb-0"
           >
             {children}
           </main>
@@ -280,7 +280,7 @@ export function AppShell({
             "--fab-right": panelOpen ? `${shell.panelWidth}px` : "0px",
           } as React.CSSProperties
         }
-        className="pointer-events-none fixed right-0 bottom-14 z-40 flex flex-col items-end gap-3 p-5 lg:right-[var(--fab-right)] lg:bottom-0 print:hidden"
+        className="pointer-events-none fixed right-0 bottom-[var(--bottom-nav-h)] z-40 flex flex-col items-end gap-3 p-5 lg:right-[var(--fab-right)] lg:bottom-0 print:hidden"
       >
         <AiLauncher />
         <QuickActions />

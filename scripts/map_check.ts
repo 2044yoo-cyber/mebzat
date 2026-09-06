@@ -192,6 +192,63 @@ check(
 check("and reports its state to a screen reader", /aria-pressed=\{navCollapsed\}/.test(topbar));
 
 // ---------------------------------------------------------------------------
+// The phone's bottom bar, and what has to clear it
+//
+// The bar is h-14 *plus* env(safe-area-inset-bottom). Clearing only the 56px
+// is invisibly correct on a device with no inset and hides the last ~34px of
+// the page on every iPhone since the X. Both consumers read one variable now,
+// so the two cannot drift apart.
+// ---------------------------------------------------------------------------
+
+const css = readFileSync("src/app/globals.css", "utf8");
+
+check(
+  "the bar's real height is defined once",
+  /--bottom-nav-h:\s*calc\(3\.5rem \+ env\(safe-area-inset-bottom\)\)/.test(css),
+);
+check(
+  "the scrolling workspace clears it",
+  /overflow-y-auto[^"]*pb-\[var\(--bottom-nav-h\)\] lg:pb-0/.test(shell),
+);
+check(
+  "and the floating buttons sit above it",
+  /fixed right-0 bottom-\[var\(--bottom-nav-h\)\]/.test(shell),
+);
+check(
+  "neither of them hardcodes 56px any more",
+  !/pb-14 lg:pb-0/.test(shell) && !/fixed right-0 bottom-14/.test(shell),
+);
+
+// ---------------------------------------------------------------------------
+// Studio's opening panel can be scrolled to its end
+//
+// It was `h-full ... justify-center` with no overflow rule. A flex column that
+// centres what it cannot contain spills it off both ends, so the last size
+// control and the start button were below the fold and the heading above it,
+// with no scrollbar either way. Padding would have moved unreachable content a
+// little further up and left it unreachable.
+// ---------------------------------------------------------------------------
+
+const start = code("src/features/berchuma-studio/components/start-panel.tsx");
+
+check(
+  "the opening panel scrolls",
+  /overflow-y-auto overscroll-contain/.test(start),
+);
+check(
+  "it centres by min-height rather than by cropping",
+  /flex min-h-full w-full flex-col/.test(start),
+);
+check(
+  "the scroll container is the outer element, not the centred column",
+  /h-full w-full max-w-2xl overflow-y-auto/.test(start),
+);
+check(
+  "and it no longer centres a column it cannot contain",
+  !/"mx-auto flex h-full w-full max-w-2xl flex-col gap-5 p-4"/.test(start),
+);
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);

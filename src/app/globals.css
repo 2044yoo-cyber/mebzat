@@ -51,6 +51,19 @@
 }
 
 :root {
+  /* How much of the screen the phone's bottom navigation actually takes.
+   *
+   * The bar is h-14 — 56px — *plus* the safe-area inset a phone with a home
+   * indicator reserves below it. Anything clearing it has to clear both, and
+   * two places were clearing only the 56px: the workspace's scroll padding and
+   * the floating action buttons. On a device with no inset that is invisibly
+   * correct, which is why it survived; on every iPhone since the X and most
+   * recent Androids it hid the last ~34px of the page behind the bar.
+   *
+   * Defined once here rather than written out twice, so a change to the bar's
+   * height cannot leave one consumer behind. */
+  --bottom-nav-h: calc(3.5rem + env(safe-area-inset-bottom));
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

@@ -72,14 +72,37 @@ export function StartPanel({
   const chosen = CATEGORIES.find((entry) => entry.kind === kind);
 
   return (
-    <div
-      className={cn(
-        "mx-auto flex h-full w-full max-w-2xl flex-col gap-5 p-4",
-        // A cut list is taller than the panel and scrolls inside itself.
-        // Centring it vertically pushes its heading off the top.
-        route === "opening" || route === "plan" ? "min-h-0" : "justify-center",
-      )}
-    >
+    /**
+     * Two elements, and the outer one is the only thing that scrolls.
+     *
+     * This used to be one `h-full ... justify-center` column with no overflow
+     * rule at all. On a desktop the seven categories and the size inputs fit,
+     * so it looked right. On a 390px phone they do not, and a flex column that
+     * centres what it cannot contain spills it off *both* ends — the last size
+     * control and the start button below the fold, the heading above it, and
+     * no scrollbar either way because nothing had been told it could scroll.
+     * The bottom navigation was sitting on top of the symptom rather than
+     * causing it; adding padding would have moved unreachable content a little
+     * further up and left it unreachable.
+     *
+     * `min-h-full` on the inner column is what keeps the centring honest: at
+     * least as tall as the viewport, so a short panel still centres, and taller
+     * than it when the content demands, so it grows downward and scrolls from
+     * the top instead of hiding its own beginning.
+     */
+    <div className="mx-auto h-full w-full max-w-2xl overflow-y-auto overscroll-contain">
+      <div
+        className={cn(
+          "flex min-h-full w-full flex-col gap-5 p-4",
+          // A cut list is taller than the panel and scrolls inside itself, so
+          // centring it vertically pushes its heading off the top. Only the
+          // centring is conditional now: `min-h-0` used to be the other half
+          // of this and would sit in the class list beside `min-h-full`, where
+          // which one wins is decided by stylesheet order rather than by the
+          // order they are written here.
+          route === "opening" || route === "plan" ? null : "justify-center",
+        )}
+      >
       {route === "opening" || route === "plan" ? null : (
         <div className="text-center">
           <h1 className="text-xl font-semibold">What are you making?</h1>
@@ -280,6 +303,7 @@ export function StartPanel({
         <MessageSquare className="size-4" aria-hidden />
         Or describe it in your own words
       </button>
+      </div>
     </div>
   );
 }
