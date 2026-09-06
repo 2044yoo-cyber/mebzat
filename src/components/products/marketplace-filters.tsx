@@ -143,12 +143,39 @@ export function MarketplaceFilters({
         </form>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      {/*
+        Two rows on a phone, and never more.
+
+        Twelve chips wrapped to five rows at 360px, which pushed the products
+        themselves off the screen — the category rail was taller than the thing
+        it filters. Shrinking the type does not fix it: measured at text-xs with
+        tight padding the chips still come to about 1140px against roughly 650px
+        of space in two rows, so "Construction Materials" alone would have to
+        lose half its width.
+
+        So the rows are capped and the overflow scrolls sideways, which is what
+        a chip rail does everywhere else on a phone. Nothing is hidden and
+        nothing is truncated; the type stays legible. From `sm` up there is room
+        to wrap and it wraps, exactly as before.
+
+        `grid-flow-col` fills top-then-bottom per column rather than left-to-
+        right across two rows. That is the right order here: a column is one
+        scroll position, so a category and the one under it arrive together.
+      */}
+      <div
+        className={cn(
+          "grid grid-flow-col grid-rows-2 justify-start gap-2 overflow-x-auto pb-1",
+          // The scrollbar is noise on a rail this short, and on a phone there
+          // is no scrollbar to hide anyway.
+          "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          "sm:flex sm:grid-flow-row sm:flex-wrap sm:overflow-visible sm:pb-0",
+        )}
+      >
         <button
           type="button"
           onClick={() => pushWith({ category: null })}
           className={cn(
-            "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+            "rounded-full border px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:px-3 sm:text-sm",
             !current.category
               ? "border-brand bg-brand text-brand-foreground"
               : "hover:border-brand hover:bg-brand/5",
@@ -166,13 +193,13 @@ export function MarketplaceFilters({
                 pushWith({ category: active ? null : category.slug })
               }
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:px-3 sm:text-sm",
                 active
                   ? "border-brand bg-brand text-brand-foreground"
                   : "hover:border-brand hover:bg-brand/5",
               )}
             >
-              <CategoryIcon slug={category.slug} className="size-3.5" />
+              <CategoryIcon slug={category.slug} className="size-3 sm:size-3.5" />
               {category.name}
             </button>
           );
@@ -186,7 +213,7 @@ export function MarketplaceFilters({
               setMaxPrice("");
               router.push(pathname);
             }}
-            className="inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1.5 text-xs whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground sm:px-3 sm:text-sm"
           >
             <X className="size-3.5" /> Clear
           </button>

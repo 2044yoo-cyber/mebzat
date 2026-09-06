@@ -548,6 +548,42 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+// The marketplace category rail is two rows, and never more
+//
+// Twelve chips wrapped to five rows at 360px and pushed the products off the
+// screen — a filter taller than the thing it filters. Shrinking the type alone
+// does not close the gap: at text-xs with tight padding the chips still come
+// to roughly 1150px against about 650px in two rows.
+//
+// So the row count is capped and the remainder scrolls. The trap this guards
+// is the tempting fix: `hidden sm:flex` on the rail, or slicing the list to
+// the first six, both of which make the screenshot look right by removing
+// categories a phone reader can no longer reach.
+// ---------------------------------------------------------------------------
+
+const rail = code("src/components/products/marketplace-filters.tsx");
+
+check("the rail is capped at two rows", /grid-flow-col grid-rows-2/.test(rail));
+check("and the rest scrolls rather than wrapping", /overflow-x-auto/.test(rail));
+check(
+  "it wraps normally from sm up, where there is room",
+  /sm:flex sm:grid-flow-row sm:flex-wrap sm:overflow-visible/.test(rail),
+);
+check(
+  "no category is dropped to make it fit",
+  /categories\.map\(/.test(rail) && !/categories\.slice\(/.test(rail),
+);
+check("and the rail is not simply hidden on a phone", !/"hidden sm:(flex|grid)/.test(rail));
+check(
+  "chips do not break mid-word inside a fixed row height",
+  (rail.match(/whitespace-nowrap/g) ?? []).length >= 3,
+);
+check(
+  "the type shrinks on a phone and returns from sm up",
+  /text-xs[^"]*sm:text-sm/.test(rail),
+);
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
