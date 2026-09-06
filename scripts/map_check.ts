@@ -11,7 +11,8 @@
  * present — and that the desktop rendering is untouched.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
@@ -27,6 +28,13 @@ function check(name: string, condition: boolean, detail = "") {
     return;
   }
   failures.push(`${name}${detail ? ` — ${detail}` : ""}`);
+}
+
+function walkAll(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const full = join(dir, entry);
+    return statSync(full).isDirectory() ? walkAll(full) : [full];
+  });
 }
 
 /** Comments stripped: an explanation must not satisfy its own assertion. */
@@ -246,6 +254,50 @@ check(
 check(
   "and it no longer centres a column it cannot contain",
   !/"mx-auto flex h-full w-full max-w-2xl flex-col gap-5 p-4"/.test(start),
+);
+
+// ---------------------------------------------------------------------------
+// No viewport units inside the workspace
+//
+// The shell is a fixed-height, internally-scrolling application: the workspace
+// is the viewport minus the topbar, minus the tab strip, minus the phone's
+// bottom bar. A `max-h-[60vh]` inside it is measuring a different thing from
+// the box it sits in, and when the two disagree the parent's overflow crops
+// what the child meant to scroll. That is how the Studio control sheet ended
+// up with its last few controls unreachable by any gesture.
+//
+// studio-workspace.tsx already carried the reasoning in a comment — "h-full,
+// not viewport arithmetic ... guess 36px wrong and the message box sits below
+// the fold" — and the sheet two files away did it anyway. Hence a check rather
+// than a note.
+// ---------------------------------------------------------------------------
+
+const studioFiles = walkAll("src/features/berchuma-studio/components").filter(
+  (path) => path.endsWith(".tsx"),
+);
+
+check("there are studio components to inspect", studioFiles.length > 5, String(studioFiles.length));
+
+for (const path of studioFiles) {
+  const source = code(path);
+  const offenders = [...source.matchAll(/(?:max-h|h|min-h)-\[\d+(?:d?vh)\]/g)].map(
+    (match) => match[0],
+  );
+  check(`${path} sizes itself against its box, not the viewport`, offenders.length === 0, offenders.join(" "));
+}
+
+const sheet = code("src/features/berchuma-studio/components/editor/design-editor.tsx");
+check(
+  "the control sheet is a flex column",
+  /flex max-h-\[70%\] flex-col overflow-hidden/.test(sheet),
+);
+check(
+  "its header does not shrink",
+  /flex shrink-0 items-center justify-between border-b/.test(sheet),
+);
+check(
+  "and the list takes the rest and scrolls",
+  /min-h-0 flex-1 overflow-y-auto overscroll-contain/.test(sheet),
 );
 
 // ---------------------------------------------------------------------------

@@ -196,8 +196,24 @@ export function DesignEditor({
             onClick={() => setPanelOpen(false)}
             className="flex-1 bg-black/40"
           />
-          <div className="max-h-[70%] overflow-hidden rounded-t-2xl border-t border-white/10 bg-background/80 backdrop-blur-xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+          {/*
+            A flex column, and no viewport units anywhere in it.
+
+            The scrolling half used to be `max-h-[60vh]` inside a sheet capped
+            at 70% of the editor. Those two measure different things: the sheet
+            is a share of the editor, which is the viewport *minus* the topbar,
+            the tab strip and the phone's bottom bar, while 60vh is a share of
+            the whole screen. On a short phone 60vh is taller than the space the
+            sheet actually has, so the parent's `overflow-hidden` cropped the
+            list instead of the child scrolling it — and the last few controls
+            could not be reached by any gesture.
+
+            `min-h-0 flex-1` asks for no number at all. The header takes what it
+            needs, the list takes the rest of whatever the sheet turned out to
+            be, and scrolls inside it.
+          */}
+          <div className="flex max-h-[70%] flex-col overflow-hidden rounded-t-2xl border-t border-white/10 bg-background/80 backdrop-blur-xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-2">
               <span className="text-xs font-medium uppercase tracking-wide">
                 Edit
               </span>
@@ -209,7 +225,7 @@ export function DesignEditor({
                 <X className="size-4" />
               </button>
             </div>
-            <div className="max-h-[60vh] overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <ControlPanel
                 spec={spec}
                 selectedId={selectedId}
