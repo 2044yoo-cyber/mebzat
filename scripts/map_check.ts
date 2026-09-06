@@ -91,99 +91,17 @@ function code(path: string): string {
     .replace(/^\s*\/\/.*$/gm, "");
 }
 
-const legend = code("src/components/property/price-legend.tsx");
-
-// ---------------------------------------------------------------------------
-// 1. Not hidden — folded
-// ---------------------------------------------------------------------------
-
-check("the legend still renders below sm", !/^\s*"hidden sm:/m.test(legend));
-check(
-  "there is a chip to open it, and only on a phone",
-  /sm:hidden/.test(legend) && /setOpen\(true\)/.test(legend),
-);
-check(
-  "the chip says what it opens rather than being a bare icon",
-  /kind === "rent" \? "Rent" : "Price"/.test(legend),
-);
-check(
-  "every band is rendered, not a shortened list",
-  /rows\.map\(/.test(legend) && !/rows\.slice\(/.test(legend),
-);
-check(
-  "the bars are shown once open, so the key works without colour",
-  /open \? "flex" : "hidden"/.test(legend),
-);
-
-// ---------------------------------------------------------------------------
-// 2. Desktop is unchanged
-// ---------------------------------------------------------------------------
-
-check(
-  "from sm up the panel is open with no tap needed",
-  /open \? "block" : "hidden sm:block"/.test(legend),
-);
-check("the desktop width is the width it was", /w-\[136px\] sm:w-\[168px\]/.test(legend));
-
-// ---------------------------------------------------------------------------
-// 3. It cannot overflow the screen
-//
-// A fixed pixel width on a 320px screen is how a panel ends up wider than the
-// device and takes the whole page into a horizontal scroll.
-// ---------------------------------------------------------------------------
-
-check(
-  "the panel is capped against the viewport, not only in pixels",
-  /max-w-\[calc\(100vw-/.test(legend),
-);
-
-// ---------------------------------------------------------------------------
-// 4. It can actually be tapped
-//
-// The legend used to carry `pointer-events-none`, which is correct for a label
-// and fatal for a button: the chip would render and do nothing.
-// ---------------------------------------------------------------------------
-
-check("nothing on the legend swallows its own taps", !/pointer-events-none/.test(legend));
-
-// ---------------------------------------------------------------------------
-// 5. Tapping the map closes it again
-// ---------------------------------------------------------------------------
-
-check(
-  "an outside press folds it away",
-  /addEventListener\("pointerdown"/.test(legend) && /!node\.contains\(/.test(legend),
-);
-check(
-  "on pointerdown rather than click, so a pan closes it as it starts",
-  !/addEventListener\("click", away/.test(legend),
-);
-check("escape closes it too", /event\.key === "Escape"/.test(legend));
-check(
-  "and the listener is removed when it folds",
-  /removeEventListener\("pointerdown"/.test(legend) &&
-    /removeEventListener\("keydown"/.test(legend),
-);
-check(
-  "the listener only exists while it is open",
-  /if \(!open\) return;/.test(legend),
-);
-
-// ---------------------------------------------------------------------------
-// 6. Reachable without a mouse
-// ---------------------------------------------------------------------------
-
-check("the chip is a button", /<button[\s\S]{0,200}setOpen\(true\)/.test(legend));
-check("it declares what it controls", /aria-controls=\{panelId\}/.test(legend));
-check("and whether it is open", /aria-expanded=/.test(legend));
-check("the close control is labelled", /aria-label="Close the price key"/.test(legend));
-
-// ---------------------------------------------------------------------------
-// 7. Still mounted on the map
-// ---------------------------------------------------------------------------
-
 const canvas = code("src/components/property/city-canvas.tsx");
-check("the map still renders the legend", /<PriceLegend[\s/>]/.test(canvas));
+
+// ---------------------------------------------------------------------------
+// The map keys are gone
+//
+// Both on-map keys were removed at the owner's request. The marker colours
+// stay; they simply no longer have a panel explaining them.
+// ---------------------------------------------------------------------------
+
+check("no price key is mounted", !/<PriceLegend[\s/>]/.test(canvas));
+check("no colour key is mounted", !/MARKER_COLOURS/.test(canvas));
 
 // ---------------------------------------------------------------------------
 // The shell: hidden has to mean gone, not invisible
@@ -642,7 +560,7 @@ if (failures.length > 0) {
 
 console.log(
   `\n${failures.length === 0 ? GREEN : RED}${passed} passed, ${failures.length} failed${RESET}` +
-    `\n${DIM}map: the key folds, it does not vanish${RESET}\n`,
+    `\n${DIM}map: mobile map, sidebars and keys${RESET}\n`,
 );
 
 process.exit(failures.length === 0 ? 0 : 1);

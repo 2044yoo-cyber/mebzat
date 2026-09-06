@@ -21,7 +21,6 @@ import {
   clusterProperties,
   createClusterElement,
   createMarkerElement,
-  MARKER_COLOURS,
   groupByBuilding,
   createBuildingElement,
   createDevelopmentElement,
@@ -32,7 +31,6 @@ import type { AiHighlight } from "@/lib/map/ai-highlight";
 import { loadSession, saveSession } from "@/lib/map/session";
 import { BASE_STYLE } from "@/lib/map/style";
 import { DevelopmentCard } from "@/components/property/development-card";
-import { PriceLegend } from "@/components/property/price-legend";
 import {
   bandFor,
   buildPriceScale,
@@ -842,22 +840,6 @@ export function CityCanvas({
           </span>
         )}
       </div>
-
-      {/* The legend is the key to the whole map, so it is always visible. */}
-      <div className="pointer-events-none absolute bottom-8 left-3 flex flex-wrap gap-x-3 gap-y-1 rounded-xl bg-background/90 px-3 py-2 text-xs shadow-sm backdrop-blur">
-        {Object.entries(MARKER_COLOURS).map(([key, colour]) => (
-          <span key={key} className="flex items-center gap-1.5">
-            <span
-              aria-hidden
-              className="size-2.5 rounded-full"
-              style={{ background: colour.base }}
-            />
-            {colour.label}
-          </span>
-        ))}
-      </div>
-
-      <PriceLegend scale={bands.scale} kind={bands.kind} />
 
       {developmentsOn && openDevelopment && (
         <DevelopmentCard
