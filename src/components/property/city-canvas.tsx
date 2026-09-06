@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { Map as MapLibreMap, Marker } from "maplibre-gl";
-import { Box, Layers, Loader2, Locate, Minus, Plus, WifiOff } from "lucide-react";
+import {
+  Box,
+  Layers,
+  Loader2,
+  Locate,
+  Maximize2,
+  Minimize2,
+  Minus,
+  Plus,
+  WifiOff,
+} from "lucide-react";
 
 import { describeError, trackRequest } from "@/lib/map/diagnostics";
 import { MapEngine, type EngineState } from "@/lib/map/engine";
@@ -72,6 +82,8 @@ export function CityCanvas({
   highlight,
   panelOpen,
   layers,
+  fullscreen,
+  onToggleFullscreen,
   onSelect,
   onResults,
   onSelectBuilding,
@@ -93,6 +105,17 @@ export function CityCanvas({
    * on the map.
    */
   layers?: string[];
+  /**
+   * Full screen, when the page offers it.
+   *
+   * The control belongs on the map rather than in the row of page controls
+   * above it. In that row it was the last item and `ml-auto` put it at the end
+   * of whichever line it wrapped onto — which on a phone was a line below the
+   * fold, so the one control that would have given the reader more map was the
+   * one they could not see.
+   */
+  fullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   onSelect: (property: MapProperty | null) => void;
   onResults?: (properties: MapProperty[]) => void;
   /** A building marker was tapped. The list beside the map shows its units. */
@@ -712,6 +735,20 @@ export function CityCanvas({
       <div ref={containerRef} className="size-full" />
 
       <div className="absolute top-3 right-3 flex flex-col gap-2">
+        {onToggleFullscreen && (
+          <MapButton
+            label={fullscreen ? "Exit full screen map" : "Enter full screen map"}
+            onClick={onToggleFullscreen}
+            active={fullscreen}
+            icon={
+              fullscreen ? (
+                <Minimize2 className="size-4" />
+              ) : (
+                <Maximize2 className="size-4" />
+              )
+            }
+          />
+        )}
         <MapButton label="Zoom in" onClick={() => mapRef.current?.zoomIn()} icon={<Plus className="size-4" />} />
         <MapButton label="Zoom out" onClick={() => mapRef.current?.zoomOut()} icon={<Minus className="size-4" />} />
 

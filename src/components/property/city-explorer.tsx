@@ -6,8 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Building2,
-  Maximize2,
-  Minimize2,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -305,6 +303,13 @@ export function CityExplorer({
     <div
       className={cn(
         "flex min-h-0 flex-col",
+        // Below lg the whole page scrolls, so the city selector, the search
+        // box, the sale/rent toggle and the quick chips move out of the way
+        // instead of holding a third of a phone screen for the whole visit.
+        // From lg up the shell keeps its fixed-height, internally-scrolling
+        // shape: there the controls cost nothing and a page that scrolls the
+        // map away would be worse.
+        !fullscreen && "overflow-y-auto lg:overflow-hidden",
         fullscreen
           ? // Above the bottom navigation, which is fixed at z-50, and above
             // the context panel at z-40. An opaque layer over the bar is the
@@ -422,30 +427,6 @@ export function CityExplorer({
           )}
         </div>
 
-        {/* Beside Layers, in the row the other map controls already live in,
-            rather than floating over the map where it would have to fight the
-            zoom buttons and the price key for a corner. `ml-auto` puts it at
-            the end of the row on a wide screen and lets it wrap on a narrow
-            one, so nothing is ever pushed off the edge. */}
-        <Button
-          type="button"
-          variant={fullscreen ? "secondary" : "outline"}
-          size="sm"
-          onClick={fullscreen ? exitFullscreen : enterFullscreen}
-          aria-label={fullscreen ? "Exit full screen map" : "Enter full screen map"}
-          aria-pressed={fullscreen}
-          className="ml-auto gap-1.5"
-        >
-          {fullscreen ? (
-            <Minimize2 className="size-4" aria-hidden />
-          ) : (
-            <Maximize2 className="size-4" aria-hidden />
-          )}
-          <span className="hidden sm:inline">
-            {fullscreen ? "Exit full screen" : "Full screen"}
-          </span>
-        </Button>
-
         {activeCount > 0 && (
           <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
             <X className="size-4" /> Clear
@@ -541,7 +522,14 @@ export function CityExplorer({
 
       <div
         className={cn(
-          "grid min-h-0 flex-1",
+          "grid min-h-0",
+          // A definite height below lg, because in a scrolling column `flex-1`
+          // resolves against content and a map has none of its own — it would
+          // collapse to nothing. 70svh rather than vh: the small viewport unit
+          // is the one that already accounts for the browser's own chrome, so
+          // the map does not grow taller than the space and push the listings
+          // it is meant to sit above off the screen.
+          fullscreen ? "flex-1" : "h-[70svh] lg:h-auto lg:flex-1",
           // The results list gives way when a property is open: its detail is
           // already in the shell's panel, and the map deserves the room. In
           // full screen it gives way always — the point of the mode is to see
@@ -563,6 +551,8 @@ export function CityExplorer({
               highlight={aiHighlight}
               panelOpen={panelOpen}
               layers={layers}
+              fullscreen={fullscreen}
+              onToggleFullscreen={fullscreen ? exitFullscreen : enterFullscreen}
               onSelect={handleSelect}
               onResults={handleResults}
             onSelectBuilding={setBuilding}

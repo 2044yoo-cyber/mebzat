@@ -369,6 +369,48 @@ check(
   "and clears the home indicator",
   /pb-\[env\(safe-area-inset-bottom\)\]/.test(explorer),
 );
+// The control belongs on the map, where map controls are and where it cannot
+// wrap out of sight. In the page's control row it was the last item with
+// `ml-auto`, so on a phone it landed at the end of a wrapped line below the
+// fold — the one control that would have given the reader more map was the one
+// they could not see.
+check(
+  "the full-screen control is on the map, not in the wrapping row",
+  /onToggleFullscreen/.test(canvas) && !/Full screen/.test(explorer),
+);
+check(
+  "it sits with the zoom and layer buttons",
+  /onToggleFullscreen && \(\s*<MapButton/.test(canvas),
+);
+check(
+  "and names both directions",
+  /label=\{fullscreen \? "Exit full screen map" : "Enter full screen map"\}/.test(canvas),
+);
+
+// Below lg the page scrolls, so the city selector, search, sale/rent toggle and
+// quick chips move out of the way instead of holding a third of a phone screen
+// for the whole visit.
+check(
+  "the top controls scroll away on a phone",
+  /"overflow-y-auto lg:overflow-hidden"/.test(explorer),
+);
+check(
+  "and the shell keeps its fixed-height shape from lg up",
+  /lg:overflow-hidden/.test(explorer),
+);
+check(
+  "the map keeps a definite height once the column scrolls",
+  /"h-\[70svh\] lg:h-auto lg:flex-1"/.test(explorer),
+);
+check(
+  "measured in svh, which already accounts for the browser's chrome",
+  !/h-\[\d+vh\]/.test(explorer),
+);
+check(
+  "full screen still fills, rather than taking the phone height",
+  /fullscreen \? "flex-1"/.test(explorer),
+);
+
 check(
   "the results column steps aside so the map gets the width",
   /panelOpen \|\| fullscreen/.test(explorer) && /!panelOpen && !fullscreen/.test(explorer),
@@ -419,11 +461,19 @@ check(
   "the listener is removed on exit",
   /removeEventListener\("keydown", onKey\)/.test(explorer),
 );
+// Asserted on MapButton, which is where the control now lives. It labels and
+// announces every button in the stack, so the full-screen toggle inherits both
+// rather than carrying its own copy — and a check pointed at the old location
+// would have gone on passing only because the string was still in a comment.
 check(
-  "both directions are labelled",
-  /aria-label=\{fullscreen \? "Exit full screen map" : "Enter full screen map"\}/.test(explorer),
+  "every map control is labelled",
+  /aria-label=\{label\}/.test(canvas) && /title=\{label\}/.test(canvas),
 );
-check("and the state is announced", /aria-pressed=\{fullscreen\}/.test(explorer));
+check("and announces whether it is on", /aria-pressed=\{active\}/.test(canvas));
+check(
+  "the full-screen control passes its state through",
+  /onClick=\{onToggleFullscreen\}\s*\n\s*active=\{fullscreen\}/.test(canvas),
+);
 
 // Everything that was on the control row is still on it.
 for (const control of ["Search properties", "Layers", "Filters"]) {
