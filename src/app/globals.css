@@ -64,6 +64,18 @@
    * height cannot leave one consumer behind. */
   --bottom-nav-h: calc(3.5rem + env(safe-area-inset-bottom));
 
+  /* How much room the floating actions take above the bar.
+   *
+   * The AI launcher and the + button stack in the bottom-right corner: two
+   * 44px targets, a 12px gap and 20px of padding. A scrolling column whose
+   * last control is a full-width button ends underneath them even when it has
+   * cleared the navigation bar itself — which is what the bar was getting
+   * blamed for.
+   *
+   * Named so a page that ends in a button can clear it without every page
+   * paying for the space. */
+  --floating-actions-h: 7.5rem;
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

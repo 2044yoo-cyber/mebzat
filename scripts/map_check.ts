@@ -520,6 +520,34 @@ check(
 check("and it never 5xxs at the map", !/status: 5\d\d/.test(route));
 
 // ---------------------------------------------------------------------------
+// A column that ends in a button has to clear what floats over it
+//
+// The workspace's box already stops above the navigation bar. The AI launcher
+// and the + button sit *inside* that box, in the bottom-right corner, and the
+// Studio's opening panel ends in a full-width "Start with a…" button — so the
+// last control was reachable by scrolling and not by tapping. That is a worse
+// failure than not reaching it at all: the reader can see it and is told, by
+// the absence of any response, that they have misunderstood something.
+// ---------------------------------------------------------------------------
+
+check(
+  "the floating actions' height is written down once",
+  /--floating-actions-h:\s*[\d.]+rem/.test(css),
+);
+check(
+  "the opening panel scrolls clear of them",
+  /pb-\[var\(--floating-actions-h\)\]/.test(start),
+);
+check(
+  "as scroll padding, so a panel that already fits does not move",
+  /"pb-\[var\(--floating-actions-h\)\] sm:pb-8"/.test(start),
+);
+check(
+  "and the two clearances are separate values",
+  /--bottom-nav-h:/.test(css) && /--floating-actions-h:/.test(css),
+);
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);

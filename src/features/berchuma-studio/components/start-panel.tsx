@@ -94,6 +94,17 @@ export function StartPanel({
       <div
         className={cn(
           "flex min-h-full w-full flex-col gap-5 p-4",
+          // Room at the end of the scroll for the two things that float over
+          // it. The panel's box already stops above the navigation bar, but
+          // the AI launcher and the + button sit *inside* that box in the
+          // bottom-right corner, and this column ends in a full-width "Start
+          // with a…" button — so the last control was reachable by scrolling
+          // and not by tapping, which is a worse failure than not reaching it
+          // at all.
+          //
+          // Scroll padding, not a margin: it is space to scroll into, so
+          // nothing moves for a reader whose panel already fits.
+          "pb-[var(--floating-actions-h)] sm:pb-8",
           // A cut list is taller than the panel and scrolls inside itself, so
           // centring it vertically pushes its heading off the top. Only the
           // centring is conditional now: `min-h-0` used to be the other half
