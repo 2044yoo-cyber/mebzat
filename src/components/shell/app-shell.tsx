@@ -59,7 +59,9 @@ export function AppShell({
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
   const shell = useShell();
-  const [mobileNav, setMobileNav] = useState(false);
+  // The route the navigation drawer was opened on, or null. See the note by
+  // the pathname effect below for why this is not a plain boolean.
+  const [navOpenedAt, setNavOpenedAt] = useState<string | null>(null);
 
   const live = useLiveCounts(counts, Boolean(profile));
 
@@ -79,10 +81,31 @@ export function AppShell({
    * Only panelMobile is reset. closePanel() would also set panelCollapsed and
    * so would fold the desktop panel away on every navigation, which is a
    * different product decision and not this bug.
+   *
+   * The left drawer had the same fault and not the same fix. Below lg the rail
+   * is a drawer over the page, and the only thing that closed it was the
+   * backdrop — so tapping "Marketplace" navigated underneath a sheet that
+   * stayed put, and the reader had to find the dark strip beside it to see
+   * where they had arrived. Navigation is the strongest possible signal that a
+   * navigation menu is finished with.
+   *
+   * It is local state rather than the store, so unlike the panel this one did
+   * at least clear on a reload. That made it look intermittent rather than
+   * broken, which is why it survived.
+   *
+   * Derived rather than cleared: `mobileNav` is now "the drawer was opened on
+   * the page we are still on". Navigating changes the pathname and the drawer
+   * is shut by arithmetic, with no effect and no second render. Clearing it in
+   * the effect above worked and React says not to — setState in an effect body
+   * is a cascading render, and the rule is right here: there is nothing to
+   * synchronise, only a value to compute.
    */
   useEffect(() => {
     update({ panelMobile: false });
   }, [pathname]);
+
+  /** Open only while the reader is still on the page they opened it from. */
+  const mobileNav = navOpenedAt !== null && navOpenedAt === pathname;
 
   const bare =
     searchParams?.get("_pane") === "1" ||
@@ -129,7 +152,7 @@ export function AppShell({
           <button
             type="button"
             aria-label="Close navigation"
-            onClick={() => setMobileNav(false)}
+            onClick={() => setNavOpenedAt(null)}
             className="absolute inset-0 cursor-default bg-black/50"
           />
           <div className="relative h-full w-[280px] border-r bg-sidebar">
@@ -145,7 +168,7 @@ export function AppShell({
           notifications={live.notifications}
           panelOpen={panelOpen}
           onTogglePanel={() => (panelOpen ? closePanel() : openPanel())}
-          onOpenMobileNav={() => setMobileNav(true)}
+          onOpenMobileNav={() => setNavOpenedAt(pathname)}
         />
         {/* Between the top bar and the tabs: the bar names what this platform
             contains, the tabs name what you have open in it. */}

@@ -132,6 +132,60 @@ const canvas = code("src/components/property/city-canvas.tsx");
 check("the map still renders the legend", /<PriceLegend[\s/>]/.test(canvas));
 
 // ---------------------------------------------------------------------------
+// The shell: hidden has to mean gone, not invisible
+//
+// `visibility: hidden` or `opacity-0` on a sidebar leaves its width in the
+// layout, so the workspace never gets the space back and the reader sees a
+// blank column where the menu used to be. Flex with `shrink-0` on the rail and
+// `flex-1 min-w-0` on the workspace is what makes the expansion real: change
+// the rail's width and the workspace takes the difference, with no media query
+// and no second layout to keep in step.
+// ---------------------------------------------------------------------------
+
+const shell = code("src/components/shell/app-shell.tsx");
+
+check(
+  "the workspace takes whatever the rail gives back",
+  /flex min-w-0 flex-1 flex-col/.test(shell),
+);
+check(
+  "the rail is sized by a real width, not a visibility toggle",
+  /style=\{\{ width: navWidth \}\}/.test(shell) &&
+    !/invisible|opacity-0/.test(shell),
+);
+check(
+  "collapsing narrows it rather than hiding it behind a class",
+  /shell\.navCollapsed \? 60 : shell\.navWidth/.test(shell),
+);
+check(
+  "the panel is sized the same way",
+  /style=\{\{ width: shell\.panelWidth \}\}/.test(shell),
+);
+check(
+  "both sides are independent state, not one flag",
+  /navCollapsed/.test(shell) && /panelCollapsed/.test(shell),
+);
+
+// Below lg the rail floats over the page rather than taking a column from it.
+check("on a phone the rail is a drawer", /fixed inset-0 z-60 lg:hidden/.test(shell));
+check("with a backdrop that closes it", /aria-label="Close navigation"/.test(shell));
+
+// Navigating closes it. This was the bug: only the backdrop closed the drawer,
+// so tapping a nav item navigated underneath a sheet that stayed put.
+check(
+  "and it is shut by navigating away",
+  /navOpenedAt !== null && navOpenedAt === pathname/.test(shell),
+);
+check(
+  "derived rather than cleared in an effect",
+  !/setNavOpenedAt\(null\);\s*\}, \[pathname\]/.test(shell),
+);
+
+const topbar = code("src/components/shell/topbar.tsx");
+check("the toggle says which way it goes", /Expand navigation.*Collapse navigation/s.test(topbar));
+check("and reports its state to a screen reader", /aria-pressed=\{navCollapsed\}/.test(topbar));
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
