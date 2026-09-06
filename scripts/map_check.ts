@@ -182,7 +182,13 @@ check(
 );
 
 const topbar = code("src/components/shell/topbar.tsx");
-check("the toggle says which way it goes", /Expand navigation.*Collapse navigation/s.test(topbar));
+// Both labels present, asserted separately. `/s` would have been the tidy way
+// to span the lines and this project targets ES2017, where the flag does not
+// exist — it type-errors rather than misbehaving, which is the good outcome.
+check(
+  "the toggle says which way it goes",
+  /Expand navigation/.test(topbar) && /Collapse navigation/.test(topbar),
+);
 check("and reports its state to a screen reader", /aria-pressed=\{navCollapsed\}/.test(topbar));
 
 // ---------------------------------------------------------------------------
