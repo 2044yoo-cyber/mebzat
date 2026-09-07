@@ -1072,7 +1072,7 @@ check(
 );
 
 const queries = readFileSync("src/lib/tour/queries.ts", "utf8")
-  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
   .replace(/^\s*\/\/.*$/gm, "");
 
 // Every embed of tour_hotspots has to name which reference it means.
@@ -1113,7 +1113,7 @@ check(
 // ---------------------------------------------------------------------------
 
 const player = readFileSync("src/components/tour/tour-player.tsx", "utf8")
-  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
   .replace(/^\s*\/\/.*$/gm, "");
 
 // Scoped to the PanoramaViewer element, not the whole file: the player is full
@@ -1212,7 +1212,7 @@ check(
 // ---------------------------------------------------------------------------
 
 const uploads = readFileSync("src/app/moderation/upload-actions.ts", "utf8")
-  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
   .replace(/^\s*\/\/.*$/gm, "");
 
 check(
@@ -1329,7 +1329,7 @@ for (const [file, label] of [
   ["src/lib/tour/queries.ts", "listToursFor"],
 ] as const) {
   const source = readFileSync(file, "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
     .replace(/^\s*\/\/.*$/gm, "");
   check(
     `${label} reports a real failure and not an absent table`,
@@ -1363,7 +1363,7 @@ check("an undefined share flag is not a yes", !belongsInTheFeed("published", und
 
 // And the action has to ask this rather than reimplementing it.
 const feedActions = readFileSync("src/app/tours/feed-actions.ts", "utf8")
-  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
   .replace(/^\s*\/\/.*$/gm, "");
 check(
   "the sync asks the shared rule",
@@ -1413,7 +1413,7 @@ check(
 // Comments are stripped first: the explanation above mentions <img>, and a
 // check that matched its own prose would pass whatever the code did.
 const thumbnail = readFileSync("src/components/tour/scene-thumbnail.tsx", "utf8")
-  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
   .replace(/^\s*\/\/.*$/gm, "");
 
 check(

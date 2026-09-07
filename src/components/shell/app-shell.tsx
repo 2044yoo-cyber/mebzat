@@ -119,12 +119,21 @@ export function AppShell({
   const navWidth = shell.navCollapsed ? 60 : shell.navWidth;
 
   return (
+    // `h-dvh`, not `h-screen`.
+    //
+    // `100vh` on a mobile browser is the viewport with the URL bar *hidden* —
+    // the largest it ever gets. A shell sized to that is taller than what is
+    // actually visible while the bar is showing, so its last rows sit below
+    // the fold with no way to scroll to them: the shell itself does not
+    // scroll, the column inside it does, and that column believed it had more
+    // room than the screen had. `100dvh` tracks the viewport as it changes.
+    //
     // Printing is the one time the workspace is not a fixed-height, internally
     // scrolling application. A cut list on paper has to be the whole document,
     // not the 900 pixels that happened to be in view, so `print:` unpicks the
     // shell: the panels go, the height cap goes, and the workspace becomes an
     // ordinary flowing page the browser can paginate.
-    <div className="flex h-screen overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
+    <div className="flex h-dvh overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
       {/* ---- Navigation ---------------------------------------------- */}
       <div
         style={{ width: navWidth }}
@@ -191,7 +200,24 @@ export function AppShell({
             // the narrow shape it had when both panels were open. Pages that
             // want to reflow use `@…/ws:` variants and respond to the space
             // they actually have.
-            className="@container/ws min-w-0 flex-1 overflow-y-auto overscroll-contain pb-[var(--bottom-nav-h)] lg:pb-0 print:overflow-visible print:pb-0"
+            // This is the element that actually scrolls for nearly every page in
+            // the application, so this is where the reservation belongs.
+            //
+            // It used to clear `--bottom-nav-h` alone, which is the bar and
+            // nothing else. The floating buttons sit *above* the bar and are
+            // rendered by this same shell, so a page whose last control was
+            // full-width ended underneath them — which is what "Save changes
+            // is covered" actually was.
+            //
+            // `scroll-pb-content-safe` is the same reservation again, for the
+            // scrolling the *browser* does rather than the reader: tapping an
+            // input near the foot of a form makes the browser scroll it into
+            // view, and without a scroll-padding it parks it flush against the
+            // bottom of the container — behind the bar, with the keyboard
+            // open. This is the passive half of the keyboard fix; there is
+            // deliberately no scrollIntoView on focus, because automatic
+            // scrolling that fires on every tap is its own problem.
+            className="@container/ws min-w-0 flex-1 overflow-y-auto overscroll-contain pb-content-safe scroll-pb-content-safe print:overflow-visible print:pb-0"
           >
             {children}
           </main>

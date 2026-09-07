@@ -19,7 +19,7 @@ export const metadata: Metadata = {
  */
 export default function CalculatorsPage() {
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 pb-[calc(var(--bottom-nav-h)+1.5rem)] sm:px-6 lg:pb-10">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold sm:text-3xl">Construction Calculators</h1>
         <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground sm:text-base">

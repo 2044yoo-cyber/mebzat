@@ -184,7 +184,7 @@ export function SketchWorkspace({
   };
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] min-h-0 flex-col">
+    <div className="flex h-[calc(100dvh-3.5rem-var(--content-bottom-gap))] min-h-0 flex-col">
       {/* ---- Header ------------------------------------------------------ */}
       <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-4">
         <div className="flex items-center gap-2">

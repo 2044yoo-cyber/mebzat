@@ -52,9 +52,22 @@ function near(actual: number, expected: number, tolerance = 1e-6): boolean {
 }
 
 /** Comments stripped, so an explanation cannot satisfy its own assertion. */
+/**
+ * NOTE ON STRIPPING BLOCK COMMENTS
+ *
+ * `/\*` is only treated as a comment opener when something that cannot be part
+ * of a token precedes it. Without that guard the `/\*` inside a string literal
+ * — `accept="image/\*"` is the common one — opens a comment that runs to the
+ * next real `*\/`, silently deleting everything between. In this repository
+ * that was 109 files and, in one case, 3,497 characters of real markup.
+ *
+ * Checks read the stripped text, so anything swallowed is code no assertion can
+ * see: the check passes because the thing it was looking for is not there to
+ * disagree with, which is worse than the check not existing.
+ */
 function code(path: string): string {
   return readFileSync(path, "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
     .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
     .replace(/^\s*\/\/.*$/gm, "");
 }
@@ -627,10 +640,21 @@ check("the mapping reverses", calculatorSlugForKind("wardrobe") === "wardrobe");
   check("wide tables scroll inside their own box", /overflow-x-auto/.test(results));
   check("the structural notice is printed when the flag is set", /structural &&/.test(results));
 
-  // Every calculator page clears the fixed bottom navigation.
+  // The calculator pages used to hand-write the bottom padding, and all three
+  // had it wrong: they cleared the navigation bar and not the floating buttons
+  // above it. The reservation now belongs to the shell's scroll container, so
+  // what is asserted here is the opposite of what it used to be — that no page
+  // has gone back to writing its own copy.
   for (const path of ["src/app/calculators/page.tsx", "src/app/calculators/[slug]/page.tsx", "src/app/calculators/saved/page.tsx"]) {
-    check(`${path} clears the bottom navigation bar`, /--bottom-nav-h/.test(code(path)));
+    check(
+      `${path} does not hand-write bottom padding`,
+      !/pb-\[(calc\()?var\(--bottom-nav-h\)/.test(code(path)),
+    );
   }
+  check(
+    "the shell reserves it for them",
+    /overflow-y-auto[^"]*pb-content-safe/.test(code("src/components/shell/app-shell.tsx")),
+  );
 }
 
 // ---------------------------------------------------------------------------

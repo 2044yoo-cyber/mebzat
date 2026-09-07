@@ -19,8 +19,21 @@ function check(name: string, ok: boolean, detail = "") {
   else failures.push(`${name}${detail ? ` — ${detail}` : ""}`);
 }
 
+/**
+ * NOTE ON STRIPPING BLOCK COMMENTS
+ *
+ * `/\*` is only treated as a comment opener when something that cannot be part
+ * of a token precedes it. Without that guard the `/\*` inside a string literal
+ * — `accept="image/\*"` is the common one — opens a comment that runs to the
+ * next real `*\/`, silently deleting everything between. In this repository
+ * that was 109 files and, in one case, 3,497 characters of real markup.
+ *
+ * Checks read the stripped text, so anything swallowed is code no assertion can
+ * see: the check passes because the thing it was looking for is not there to
+ * disagree with, which is worse than the check not existing.
+ */
 const code = (s: string) =>
-  s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  s.replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1").replace(/^\s*\/\/.*$/gm, "");
 
 /** Public buckets a browser must never upload into directly. */
 const PUBLIC_BUCKETS = [

@@ -43,7 +43,7 @@ export default async function ConversationPage({
     profile?.full_name ?? profile?.username ?? "Medosha member";
 
   return (
-    <div className="grid h-[calc(100vh-10rem)] min-h-0 overflow-hidden rounded-2xl border bg-card md:grid-cols-[22rem_1fr]">
+    <div className="grid h-[calc(100dvh-10rem)] min-h-0 overflow-hidden rounded-2xl border bg-card md:grid-cols-[22rem_1fr]">
       {/* Hidden on mobile: the thread takes the full screen there. */}
       <div className="hidden min-h-0 md:block md:border-r">
         <ConversationList conversations={conversations} activeId={id} />

@@ -95,7 +95,7 @@ check(
 // and matching that explanation fails the check on the sentence documenting why
 // it passes.
 const noteCode = note
-  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
   .replace(/^\s*\/\/.*$/gm, "");
 
 check(
@@ -193,7 +193,7 @@ check(
 );
 check(
   "the queue offers no delete",
-  !/delete/i.test(queue.replace(/\/\*[\s\S]*?\*\//g, "")),
+  !/delete/i.test(queue.replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")),
 );
 
 /* -------------------------------------------------------------------------- */

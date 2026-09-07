@@ -1386,7 +1386,7 @@ check(
   // deliberately absent from the response, and matching that comment would fail
   // the check on the sentence explaining why it passes.
   const routeCode = route
-    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
     .replace(/^\s*\/\/.*$/gm, "");
 
   // The prompt legitimately appears once — passed to Grok, which is the whole
@@ -1826,7 +1826,7 @@ check(
   // matching that explanation would fail the check on the sentence that
   // documents why it passes.
   const xaiCode = xai
-    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
     .replace(/^\s*\/\/.*$/gm, "");
 
   check(

@@ -27,8 +27,21 @@ const client = readFileSync("src/lib/supabase/client.ts", "utf8");
 const callback = readFileSync("src/app/auth/callback/route.ts", "utf8");
 
 /** Comments stripped, so no check matches the prose explaining itself. */
+/**
+ * NOTE ON STRIPPING BLOCK COMMENTS
+ *
+ * `/\*` is only treated as a comment opener when something that cannot be part
+ * of a token precedes it. Without that guard the `/\*` inside a string literal
+ * — `accept="image/\*"` is the common one — opens a comment that runs to the
+ * next real `*\/`, silently deleting everything between. In this repository
+ * that was 109 files and, in one case, 3,497 characters of real markup.
+ *
+ * Checks read the stripped text, so anything swallowed is code no assertion can
+ * see: the check passes because the thing it was looking for is not there to
+ * disagree with, which is worse than the check not existing.
+ */
 const code = (source: string) =>
-  source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  source.replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1").replace(/^\s*\/\/.*$/gm, "");
 
 /* -------------------------------------------------------------------------- */
 /* The button always recovers                                                 */

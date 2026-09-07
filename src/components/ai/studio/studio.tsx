@@ -98,7 +98,7 @@ export function AiStudio({
   const isChat = tool.kind === "chat";
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] min-h-0">
+    <div className="flex h-[calc(100dvh-3.5rem-var(--content-bottom-gap))] min-h-0">
       {/* ---- Tools ---------------------------------------------------- */}
       <div className="hidden w-56 shrink-0 border-r md:block">
         <ToolRail active={tool.id} onSelect={select} />

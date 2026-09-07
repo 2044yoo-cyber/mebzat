@@ -84,9 +84,22 @@ function bodyOf(source: string, name: string): string {
 }
 
 /** Comments stripped: an explanation must not satisfy its own assertion. */
+/**
+ * NOTE ON STRIPPING BLOCK COMMENTS
+ *
+ * `/\*` is only treated as a comment opener when something that cannot be part
+ * of a token precedes it. Without that guard the `/\*` inside a string literal
+ * — `accept="image/\*"` is the common one — opens a comment that runs to the
+ * next real `*\/`, silently deleting everything between. In this repository
+ * that was 109 files and, in one case, 3,497 characters of real markup.
+ *
+ * Checks read the stripped text, so anything swallowed is code no assertion can
+ * see: the check passes because the thing it was looking for is not there to
+ * disagree with, which is worse than the check not existing.
+ */
 function code(path: string): string {
   return readFileSync(path, "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
     .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
     .replace(/^\s*\/\/.*$/gm, "");
 }
@@ -178,9 +191,17 @@ check(
   "the bar's real height is defined once",
   /--bottom-nav-h:\s*calc\(3\.5rem \+ env\(safe-area-inset-bottom\)\)/.test(css),
 );
+// Asserted as a property, not a spelling. The reservation moved from a
+// hand-written `pb-[var(--bottom-nav-h)]` to the shared `pb-content-safe`,
+// which clears the floating buttons as well as the bar; a check pinned to the
+// old literal would have called that a regression.
 check(
-  "the scrolling workspace clears it",
-  /overflow-y-auto[^"]*pb-\[var\(--bottom-nav-h\)\] lg:pb-0/.test(shell),
+  "the scrolling workspace reserves room at its foot",
+  /overflow-y-auto[^"]*pb-content-safe/.test(shell),
+);
+check(
+  "and what it reserves covers the buttons above the bar, not just the bar",
+  /--content-bottom-gap:\s*calc\([^;]*--floating-actions-h/.test(css),
 );
 check(
   "and the floating buttons sit above it",
@@ -310,7 +331,7 @@ check(
 // for the whole visit.
 check(
   "the top controls scroll away on a phone",
-  /"overflow-y-auto lg:overflow-hidden"/.test(explorer),
+  /overflow-y-auto[^"]*lg:overflow-hidden/.test(explorer),
 );
 check(
   "and the shell keeps its fixed-height shape from lg up",

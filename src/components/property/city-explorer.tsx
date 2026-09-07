@@ -309,7 +309,9 @@ export function CityExplorer({
         // From lg up the shell keeps its fixed-height, internally-scrolling
         // shape: there the controls cost nothing and a page that scrolls the
         // map away would be worse.
-        !fullscreen && "overflow-y-auto lg:overflow-hidden",
+        // Its own scroller below lg, so the shell's reservation does not
+        // reach it and it has to make the same room itself.
+        !fullscreen && "overflow-y-auto pb-content-safe lg:overflow-hidden lg:pb-0",
         fullscreen
           ? // Above the bottom navigation, which is fixed at z-50, and above
             // the context panel at z-40. An opaque layer over the bar is the
@@ -563,7 +565,7 @@ export function CityExplorer({
         {/* Hidden while a property is open, because the shell's context panel
             is showing that property's detail beside this. */}
         {!panelOpen && !fullscreen && (
-          <aside className="min-h-0 overflow-y-auto border-t p-3 lg:border-t-0 lg:border-l">
+          <aside className="min-h-0 overflow-y-auto border-t p-3 pb-content-safe lg:border-t-0 lg:border-l lg:pb-3">
             {building && (
               <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border bg-muted/40 p-2.5">
                 <div className="min-w-0">

@@ -86,7 +86,7 @@ export function ControlPanel({
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto overscroll-contain">
+    <div className="flex h-full flex-col overflow-y-auto overscroll-contain pb-content-safe lg:pb-0">
       {/*
         The glass. `backdrop-blur` over a translucent card rather than an opaque
         one, so the design stays visible behind the panel — which is the whole

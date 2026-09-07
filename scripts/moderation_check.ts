@@ -28,8 +28,21 @@ const strikes = readFileSync("src/lib/moderation/strikes.ts", "utf8");
 const sql = readFileSync("supabase/migrations/0052_moderation.sql", "utf8");
 
 /** Comments stripped, so a check never matches the prose explaining itself. */
+/**
+ * NOTE ON STRIPPING BLOCK COMMENTS
+ *
+ * `/\*` is only treated as a comment opener when something that cannot be part
+ * of a token precedes it. Without that guard the `/\*` inside a string literal
+ * — `accept="image/\*"` is the common one — opens a comment that runs to the
+ * next real `*\/`, silently deleting everything between. In this repository
+ * that was 109 files and, in one case, 3,497 characters of real markup.
+ *
+ * Checks read the stripped text, so anything swallowed is code no assertion can
+ * see: the check passes because the thing it was looking for is not there to
+ * disagree with, which is worse than the check not existing.
+ */
 const code = (source: string) =>
-  source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  source.replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1").replace(/^\s*\/\/.*$/gm, "");
 
 /* -------------------------------------------------------------------------- */
 /* It fails closed                                                            */
@@ -361,7 +374,7 @@ const sources = walkAll("src").filter(
 
 for (const path of sources) {
   const source = readFileSync(path, "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
     .replace(/^\s*\/\/.*$/gm, "");
 
   // An upload call naming a public bucket directly. The moderation service is
@@ -390,7 +403,7 @@ for (const path of [
   "src/components/products/product-images-input.tsx",
 ]) {
   const source = readFileSync(path, "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
     .replace(/^\s*\/\/.*$/gm, "");
   check(
     `${path} quarantines before it publishes`,

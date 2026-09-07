@@ -49,7 +49,7 @@ export default async function Page(props: { params: Promise<{ slug: string }> })
   const category = CALCULATOR_CATEGORIES.find((one) => one.id === calculator.category);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 pb-[calc(var(--bottom-nav-h)+1.5rem)] sm:px-6 lg:pb-10">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
       <Link
         href="/calculators"
         className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"

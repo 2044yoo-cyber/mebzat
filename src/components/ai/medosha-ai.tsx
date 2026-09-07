@@ -516,7 +516,7 @@ export function MedoshaAi({
   );
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] min-h-0 flex-col">
+    <div className="flex h-[calc(100dvh-3.5rem-var(--content-bottom-gap))] min-h-0 flex-col">
       {/* ---- Balance ---------------------------------------------------- */}
       <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
         <p className="flex items-center gap-1.5 text-sm font-medium">

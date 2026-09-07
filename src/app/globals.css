@@ -66,15 +66,37 @@
 
   /* How much room the floating actions take above the bar.
    *
-   * The AI launcher and the + button stack in the bottom-right corner: two
-   * 44px targets, a 12px gap and 20px of padding. A scrolling column whose
-   * last control is a full-width button ends underneath them even when it has
-   * cleared the navigation bar itself — which is what the bar was getting
-   * blamed for.
+   * Measured rather than guessed, because the first version of this was and
+   * was 28px short. The stack is `p-5` around two controls with `gap-3`:
    *
-   * Named so a page that ends in a button can clear it without every page
-   * paying for the space. */
-  --floating-actions-h: 7.5rem;
+   *   20px padding
+   *   48px  Ask Medosha AI   (py-2.5 around a size-7 circle)
+   *   12px  gap
+   *   48px  quick actions    (size-12)
+   *   20px padding
+   *   ────
+   *   148px = 9.25rem
+   *
+   * A scrolling column whose last control is a full-width button ends
+   * underneath these even when it has cleared the navigation bar — which is
+   * what the bar was getting blamed for. */
+  --floating-actions-h: 9.25rem;
+
+  /* What a scrolling column must reserve at its foot, and the whole point of
+   * this file having these variables at all.
+   *
+   * Two fixed things overlap the bottom of every page and the shell renders
+   * both: the navigation bar, and the floating buttons that sit *above* it.
+   * Clearing only the bar — which is what the workspace did — leaves the last
+   * control of a page directly under the AI launcher and the + button. That is
+   * why "Save changes" could be tapped on some pages and not others: it
+   * depended entirely on whether the button happened to be full-width.
+   *
+   * The extra 1rem is so the last element is comfortably clear rather than
+   * flush against the furniture. */
+  --content-bottom-gap: calc(
+    var(--bottom-nav-h) + var(--floating-actions-h) + 1rem
+  );
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -157,6 +179,20 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* From lg up there is no bottom bar — the rail is a permanent column and
+ * BottomNav is `lg:hidden`. The floating buttons stay, so the reservation
+ * shrinks to them rather than disappearing: a desktop page ending in a wide
+ * button has the same overlap, just less of it.
+ *
+ * This keeps the "no unnecessary desktop spacing" rule honestly: the bar's
+ * height is dropped because the bar is not there, and the buttons' height is
+ * kept because they are. */
+@media (min-width: 1024px) {
+  :root {
+    --content-bottom-gap: calc(var(--floating-actions-h) + 1rem);
   }
 }
 
@@ -266,3 +302,44 @@
     margin: 14mm;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * The one utility that clears the bottom furniture
+ *
+ * Applied to the workspace's scroll container, which is what actually scrolls
+ * for nearly every page. A page with its own nested `overflow-y-auto` scrolls
+ * independently and does not inherit it, so those few carry the class
+ * themselves — that is the "small explicit handling for unusual containers"
+ * rather than a fix repeated per page.
+ *
+ * Deliberately a class and not a raw `pb-[...]` written at each site: the two
+ * places that had written the calculation out by hand had both got it wrong,
+ * and neither could be corrected without finding every copy.
+ * ------------------------------------------------------------------------- */
+
+@layer utilities {
+  .pb-content-safe {
+    padding-bottom: var(--content-bottom-gap);
+  }
+
+  /* For a container that already has its own padding and needs the gap added
+     to whatever that is, rather than replacing it. */
+  .scroll-pb-content-safe {
+    scroll-padding-bottom: var(--content-bottom-gap);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * A note on the workspaces that size themselves off the viewport
+ *
+ * Medosha AI, Render AI and the image studio are `100dvh` less the topbar,
+ * which made them exactly as tall as the visible column — so their composer,
+ * pinned at the bottom, landed precisely at the fold with the navigation bar
+ * over it. Reachable by scrolling, invisible until you did.
+ *
+ * They now subtract `--content-bottom-gap` as well, which makes the column's
+ * content and its visible height agree: the composer sits above the furniture
+ * with nothing to scroll. Subtracting it here rather than adding padding
+ * inside them is what avoids counting the same gap twice — the shell's scroll
+ * container already reserves it.
+ * ------------------------------------------------------------------------- */
