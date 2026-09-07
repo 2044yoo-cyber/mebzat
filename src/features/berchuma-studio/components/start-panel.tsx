@@ -102,9 +102,11 @@ export function StartPanel({
           // and not by tapping, which is a worse failure than not reaching it
           // at all.
           //
-          // Scroll padding, not a margin: it is space to scroll into, so
-          // nothing moves for a reader whose panel already fits.
-          "pb-actions-safe sm:pb-8",
+          // That used to be solved by reserving the buttons' *height* here,
+          // which cost about 4cm of a phone screen to avoid 88px of corner and
+          // left a visible band of nothing under the panel. The button steps
+          // around them instead — see `pr-actions-safe` on it below.
+          "pb-8",
           // A cut list is taller than the panel and scrolls inside itself, so
           // centring it vertically pushes its heading off the top. Only the
           // centring is conditional now: `min-h-0` used to be the other half
@@ -296,7 +298,11 @@ export function StartPanel({
           <button
             type="button"
             onClick={() => onStart(startingDesign(chosen.kind, { width }))}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+            // `pr-actions-safe` keeps the label clear of the floating stack
+            // in the corner without the whole panel being pushed above it. The
+            // button still spans the width; its text simply stops before the
+            // buttons do. Zero from lg up, where the rail moves them aside.
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 pr-actions-safe text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
           >
             <Sparkles className="size-4" aria-hidden />
             Start with a {chosen.label.toLowerCase()}

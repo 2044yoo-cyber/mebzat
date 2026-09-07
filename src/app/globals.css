@@ -91,19 +91,25 @@
    * but only about 90px wide, in one corner — reserving their full height
    * across the whole width to dodge a corner left a band of dead space under
    * every page, which is a different way of wasting the screen than hiding
-   * things under the bar. Surfaces whose last control genuinely runs the full
-   * width opt into `--actions-bottom-gap` below.
+   * things under the bar. A control that would otherwise run under them steps
+   * around them instead — see `--floating-actions-w` below.
    *
-   * The extra 1rem keeps the last element comfortably clear rather than flush
-   * against the bar. */
-  --content-bottom-gap: calc(var(--bottom-nav-h) + 1rem);
+   * The extra half-rem keeps the last element off the bar without a visible
+   * band under it. The bar is 3.5rem and on a 393px-wide phone that is already
+   * almost exactly a centimetre of glass, so the reservation lands at about
+   * 1.15cm — the bar, and just enough not to be flush against it. */
+  --content-bottom-gap: calc(var(--bottom-nav-h) + 0.5rem);
 
-  /* For a column that ends in a full-width control, which the buttons really
-   * do cover: the studio's "Start with a wardrobe" is the case this exists
-   * for. Opt-in, via `.pb-actions-safe`. */
-  --actions-bottom-gap: calc(
-    var(--bottom-nav-h) + var(--floating-actions-h) + 1rem
-  );
+  /* How much of the *width* the floating stack takes, rather than the height.
+   *
+   * 20px of padding either side of a 48px button. This is the number that
+   * matters for a control at the foot of a column: the buttons are a corner,
+   * and a corner is cheaper to step around than to sit above.
+   *
+   * The alternative — reserving `--floating-actions-h` at the foot — costs
+   * 3.97cm of vertical space on a phone to dodge 88px of horizontal, and the
+   * result is a band of nothing under the page. */
+  --floating-actions-w: 5.5rem;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -203,7 +209,8 @@
      * column — so there is nothing full-width to clear and the reservation
      * goes to nothing. This is the "desktop stays normal" rule. */
     --content-bottom-gap: 0px;
-    --actions-bottom-gap: calc(var(--floating-actions-h) + 1rem);
+    /* The rail takes the buttons out of the content's way from lg up. */
+    --floating-actions-w: 0px;
   }
 }
 
@@ -337,10 +344,11 @@
     scroll-padding-bottom: var(--content-bottom-gap);
   }
 
-  /* The opt-in, for a column ending in a control that runs the full width and
-     therefore passes under the floating buttons as well as the bar. */
-  .pb-actions-safe {
-    padding-bottom: var(--actions-bottom-gap);
+  /* For a control at the foot of a column that would otherwise run underneath
+     the floating buttons. It stops short of them instead of the whole column
+     being pushed above them. */
+  .pr-actions-safe {
+    padding-right: var(--floating-actions-w);
   }
 }
 

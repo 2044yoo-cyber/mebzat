@@ -96,7 +96,7 @@ check(
 );
 check(
   "with room to tap the last control rather than it sitting flush",
-  /--content-bottom-gap:\s*calc\([^;]*\+\s*1rem/.test(baseGap),
+  /--content-bottom-gap:\s*calc\([^;]*\+\s*0\.5rem/.test(baseGap),
 );
 
 // The floating buttons are 150px tall and about 90px wide, in one corner.
@@ -107,22 +107,25 @@ check(
   "the global reservation does NOT include the corner buttons",
   !/--content-bottom-gap:\s*calc\([^;]*--floating-actions-h/.test(baseGap),
 );
-check("but an opt-in reservation exists for columns that need them", /--actions-bottom-gap:/.test(baseGap));
+// A control at the foot of a column steps *around* the corner rather than the
+// whole column being lifted above it. Reserving the buttons' height cost about
+// 4cm of a phone screen to dodge 88px of width, and showed as a band of
+// nothing under the page.
+check("the floating stack's width is defined", /--floating-actions-w:\s*5\.5rem/.test(baseGap));
+check("with a utility to step around it", /\.pr-actions-safe\s*\{[\s\S]{0,80}var\(--floating-actions-w\)/.test(css));
 check(
-  "and that one counts both",
-  /--actions-bottom-gap:\s*calc\([^;]*--bottom-nav-h[^;]*--floating-actions-h/.test(baseGap),
+  "and nothing reserves the buttons' height at the foot of a column any more",
+  !/--actions-bottom-gap/.test(css),
 );
-check("with a utility to apply it", /\.pb-actions-safe\s*\{[\s\S]{0,80}var\(--actions-bottom-gap\)/.test(css));
 
-// The case the opt-in exists for: a column ending in a full-width button.
 {
   const startPanel = code("src/features/berchuma-studio/components/start-panel.tsx");
-  check("the studio's start panel opts in", /pb-actions-safe/.test(startPanel));
-  // And does not keep a hand-written copy alongside it, which is how the gap
-  // got counted twice and left 368px of nothing under the Start button.
+  check("the studio's Start button steps around the buttons", /pr-actions-safe/.test(startPanel));
+  // Two earlier versions of this reserved height here, and one of them stacked
+  // with the shell's to leave 368px of nothing under a clipped button.
   check(
-    "and does not also hand-write the same reservation",
-    !/pb-\[var\(--floating-actions-h\)\]/.test(startPanel),
+    "and no longer reserves their height",
+    !/pb-actions-safe/.test(startPanel) && !/pb-\[var\(--floating-actions-h\)\]/.test(startPanel),
   );
 }
 
@@ -160,7 +163,9 @@ check(
   // Nothing full-width to clear there — BottomNav is `lg:hidden` — so the
   // global reservation goes to nothing and desktop stays as it was.
   check("to nothing, because the bar is not rendered there", /--content-bottom-gap:\s*0px/.test(block));
-  check("while the opt-in still clears the buttons, which are there", /--actions-bottom-gap:\s*calc\([^;]*--floating-actions-h/.test(block));
+  // The rail moves the buttons aside from lg up, so there is nothing to step
+  // around either.
+  check("and the corner reservation goes to nothing too", /--floating-actions-w:\s*0px/.test(block));
 }
 
 // ---------------------------------------------------------------------------

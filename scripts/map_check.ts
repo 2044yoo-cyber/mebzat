@@ -200,12 +200,12 @@ check(
   /overflow-y-auto[^"]*pb-content-safe/.test(shell),
 );
 check(
-  // The corner buttons are no longer in the *global* reservation: they are
-  // 150px tall and 90px wide, and reserving their height across the whole
-  // width left a band of dead space under every page. A column that ends in a
-  // full-width control opts into `--actions-bottom-gap` instead.
-  "and there is a reservation that covers the buttons for columns that need it",
-  /--actions-bottom-gap:\s*calc\([^;]*--floating-actions-h/.test(css),
+  // The corner buttons are not reserved for vertically at all any more. They
+  // are 150px tall and 88px wide; clearing their height at the foot of a
+  // column cost about 4cm of a phone screen to dodge 88px of corner. A control
+  // that would run under them steps around them instead.
+  "and a control at the foot of a column can step around the buttons",
+  /--floating-actions-w:/.test(css),
 );
 check(
   "and the floating buttons sit above it",
@@ -528,12 +528,12 @@ check(
   /--floating-actions-h:\s*[\d.]+rem/.test(css),
 );
 check(
-  "the opening panel scrolls clear of them",
-  /pb-actions-safe/.test(start),
+  "the opening panel's button steps clear of them",
+  /pr-actions-safe/.test(start),
 );
 check(
-  "as scroll padding, so a panel that already fits does not move",
-  /"pb-actions-safe sm:pb-8"/.test(start),
+  "without lifting the whole panel above them",
+  !/pb-actions-safe/.test(start) && !/pb-\[var\(--floating-actions-h\)\]/.test(start),
 );
 check(
   "and the two clearances are separate values",
