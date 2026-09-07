@@ -23,14 +23,34 @@ export function fieldVisible(field: Field, state: FormState): boolean {
   return controlling !== undefined && field.showWhen.equals.includes(controlling);
 }
 
-/** The starting state: defaults where a field has one, blank where it does not. */
-export function initialState(fields: Field[]): FormState {
+/**
+ * The starting state: defaults where a field has one, blank where it does not.
+ *
+ * `seed` overrides those defaults and is how a design arriving from Berchuma
+ * Studio brings its width with it. Only fields the calculator actually declares
+ * are taken from it — an unknown key in a hand-edited URL is ignored rather
+ * than becoming a phantom value that `compute` never reads.
+ */
+export function initialState(fields: Field[], seed?: Record<string, string>): FormState {
   const state: FormState = {};
   for (const field of fields) {
     const unit = field.kind === "length" ? (field.defaultUnit ?? "m") : "m";
     let raw = "";
     if (field.kind === "select") raw = field.defaultValue;
     else if (field.defaultValue !== undefined) raw = String(field.defaultValue);
+
+    const supplied = seed?.[field.id];
+    if (supplied !== undefined && supplied.trim() !== "") {
+      const parsed = Number(supplied);
+      // A select takes the value verbatim if it is one of its options; a number
+      // field takes it only if it is a usable one. Neither trusts the URL.
+      if (field.kind === "select") {
+        if (field.options.some((option) => option.value === supplied)) raw = supplied;
+      } else if (Number.isFinite(parsed) && parsed >= 0) {
+        raw = supplied;
+      }
+    }
+
     state[field.id] = { raw, unit };
   }
   return state;

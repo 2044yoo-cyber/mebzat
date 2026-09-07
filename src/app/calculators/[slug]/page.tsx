@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -66,7 +68,12 @@ export default async function Page(props: { params: Promise<{ slug: string }> })
         <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{calculator.summary}</p>
       </header>
 
-      <CalculatorPage slug={calculator.slug} />
+      {/* `CalculatorPage` reads the query string, which a statically rendered
+          route can only do inside a boundary. The fallback is the page without
+          its seed values — the same form, a beat earlier. */}
+      <Suspense fallback={<CalculatorPage slug={calculator.slug} />}>
+        <CalculatorPage slug={calculator.slug} />
+      </Suspense>
     </div>
   );
 }

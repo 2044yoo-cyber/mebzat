@@ -5,7 +5,9 @@ import { useMemo, useState } from "react";
 import { Download, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CITIES } from "@/lib/calculators/cost";
 import { formatNumber, round } from "@/lib/calculators/units";
+import { PriceOffer } from "./price-offer";
 
 /**
  * A material list with a price against each line.
@@ -31,6 +33,7 @@ function value(raw: string): number {
 
 export function MaterialsCalculator({ currency = "ETB" }: { currency?: string }) {
   const [rows, setRows] = useState<Row[]>(() => [blankRow(), blankRow(), blankRow()]);
+  const [city, setCity] = useState("Addis Ababa");
   const [wastePercent, setWastePercent] = useState("5");
   const [taxPercent, setTaxPercent] = useState("15");
 
@@ -101,6 +104,14 @@ export function MaterialsCalculator({ currency = "ETB" }: { currency?: string })
                       aria-label={`Material for line ${index + 1}`}
                       className="h-10 w-full min-w-0 rounded-lg border bg-background px-2 text-sm"
                     />
+                    {/* Offered only, and only when Medosha actually has one.
+                        Tapping it fills the price column; nothing is written
+                        over what the reader typed themselves. */}
+                    <PriceOffer
+                      material={line.name}
+                      city={city}
+                      onUse={(price) => update(line.id, { price: String(price) })}
+                    />
                   </td>
                   <td className="px-2 py-1.5">
                     <input
@@ -162,6 +173,25 @@ export function MaterialsCalculator({ currency = "ETB" }: { currency?: string })
         <div className="rounded-2xl border p-4 sm:p-5">
           <p className="mb-4 text-sm font-medium">Additions</p>
           <div className="space-y-4">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium">Prices for</span>
+              <select
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+                className="h-11 w-full rounded-xl border bg-background px-3 text-sm"
+              >
+                {CITIES.map((one) => (
+                  <option key={one.value} value={one.label}>
+                    {one.label}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1.5 block text-xs text-muted-foreground">
+                Where a Medosha price exists for a material you type, it is offered here. Nothing is
+                filled in for you.
+              </span>
+            </label>
+
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium">Waste allowance</span>
               <span className="flex items-stretch gap-2">

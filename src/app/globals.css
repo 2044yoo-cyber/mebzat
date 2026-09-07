@@ -165,3 +165,104 @@
     @apply bg-background/70 backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-background/60;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Printing
+ *
+ * The calculators offer Print for a bill of quantities and a cut list, and both
+ * are documents somebody carries to a site or a saw. Without this they print
+ * the way the screen looks: the sidebar down the left, the bottom navigation
+ * across the page, a dark background eating a cartridge, and a table sliced
+ * through the middle of a row at the page break.
+ *
+ * Everything here is `@media print`, so nothing below changes the screen.
+ * ------------------------------------------------------------------------- */
+
+@media print {
+  /* Navigation is not part of the document. The topbar already opts out with
+     `print:hidden`; the rail and the bottom bar have no such class, and hiding
+     them by element keeps this working if either is ever restructured. */
+  nav,
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  /* Paper is white and ink is expensive. The app's surfaces are painted from
+     tokens, so this resets the ground rather than fighting each component. */
+  :root,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  * {
+    background-image: none !important;
+    box-shadow: none !important;
+    /* Chrome drops backgrounds when printing unless asked; the amber warning
+       panel and the result card are meaningful, so keep what colour remains. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Fixed and sticky elements repeat on every page or cover the content. */
+  .fixed,
+  .sticky {
+    position: static !important;
+  }
+
+  /* A scroll container prints only what was visible in it — which for a cut
+     list is the first eight rows and nothing else. On paper it has to flow. */
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-auto {
+    overflow: visible !important;
+  }
+
+  /* Tables are the reason any of this exists. A row split across a page break
+     puts a part's length on one sheet and its quantity on the next. */
+  table {
+    width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: collapse;
+    page-break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group; /* Repeat the header on every page. */
+  }
+
+  tr,
+  img {
+    page-break-inside: avoid;
+  }
+
+  th,
+  td {
+    border-bottom: 1px solid #ccc;
+    padding: 4px 6px !important;
+  }
+
+  /* Keep a result block and its heading together. */
+  h1,
+  h2,
+  h3 {
+    page-break-after: avoid;
+  }
+
+  /* Links print as text; a URL in brackets after every word is noise on a
+     document somebody is holding a tape measure against. */
+  a {
+    text-decoration: none !important;
+    color: #000 !important;
+  }
+
+  /* The working is the part a quantity surveyor checks, so it must be open on
+     paper whether or not the reader expanded it on screen. */
+  [data-print="working"] {
+    display: block !important;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}

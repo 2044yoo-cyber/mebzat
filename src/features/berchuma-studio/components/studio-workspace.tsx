@@ -9,6 +9,7 @@ import { DesignChat, type ChatMessage } from "./chat/design-chat";
 import { CostPanel } from "./pricing/cost-panel";
 import { DesignEditor } from "./editor/design-editor";
 import { PublishBar } from "./publish-bar";
+import { SendToCalculator } from "./send-to-calculator";
 import { StartPanel } from "./start-panel";
 import { useDesign } from "../hooks/use-design";
 import { startingDesign } from "../services/starting-designs";
@@ -238,7 +239,13 @@ export function StudioWorkspace({
                     {design.spec.carcass.board.label}
                   </p>
                 </div>
-                <PublishBar spec={design.spec} lastBrief={lastBrief} />
+                <div className="flex items-center gap-2">
+                  <SendToCalculator
+                    kind={design.spec.kind}
+                    width={design.spec.envelope.width}
+                  />
+                  <PublishBar spec={design.spec} lastBrief={lastBrief} />
+                </div>
               </div>
 
               {/* The editor takes the rest of the column. The panel inside it

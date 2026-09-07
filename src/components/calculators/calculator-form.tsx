@@ -27,13 +27,20 @@ import type { LengthUnit } from "@/lib/calculators/units";
 export function CalculatorForm({
   spec,
   currency = "ETB",
+  seed,
   onCalculated,
 }: {
   spec: CalculatorSpec;
   currency?: string;
+  /**
+   * Starting values from the URL, for a design arriving from the Studio.
+   * Applied once, when the form is first built — not pushed in later, which
+   * would overwrite whatever the reader had already typed.
+   */
+  seed?: Record<string, string>;
   onCalculated?: (summary: { headline: string; state: FormState }) => void;
 }) {
-  const [state, setState] = useState<FormState>(() => initialState(spec.fields));
+  const [state, setState] = useState<FormState>(() => initialState(spec.fields, seed));
   const [submitted, setSubmitted] = useState(false);
   const [showWorking, setShowWorking] = useState(false);
 
@@ -67,6 +74,9 @@ export function CalculatorForm({
   }
 
   function reset() {
+    // Reset goes back to the calculator's own defaults, not to the seed. A
+    // reader who pressed Reset wants a blank form, not the wardrobe they
+    // arrived with.
     setState(initialState(spec.fields));
     setSubmitted(false);
     setShowWorking(false);

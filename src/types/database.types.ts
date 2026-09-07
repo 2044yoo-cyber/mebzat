@@ -7126,6 +7126,25 @@ export interface Database {
         };
         Returns: boolean;
       };
+      /** 0067. The price the calculators offer for a material, or no row. */
+      calculator_material_price: {
+        Args: {
+          p_material: string;
+          p_city?: string | null;
+        };
+        Returns: {
+          price: number;
+          currency: string;
+          unit: string;
+          material: string;
+          city_region: string;
+          supplier: string | null;
+          data_status: PriceDataStatus;
+          verified: boolean;
+          price_date: string;
+          age_days: number;
+        }[];
+      };
       admin_can: {
         Args: {
           area: AdminArea;

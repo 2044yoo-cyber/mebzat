@@ -2,6 +2,8 @@
 
 import { AlertTriangle, ChevronDown, Printer, Sigma } from "lucide-react";
 
+import { ShareResult } from "./share-result";
+
 import { cn } from "@/lib/utils";
 import { safeText } from "@/lib/calculators/validate";
 import type { CalcOutput } from "@/lib/calculators/types";
@@ -39,6 +41,15 @@ export function ResultsPanel({
 }) {
   return (
     <div className="space-y-3">
+      {/* Only on paper. A printed sheet that does not say what it is gets
+          filed next to four others and none of them can be told apart. */}
+      <div className="hidden print:block">
+        <p className="text-lg font-semibold">{title}</p>
+        <p className="text-xs">
+          Medosha · medosha.net · {new Date().toLocaleDateString()}
+        </p>
+      </div>
+
       <div className="rounded-2xl border bg-card p-5 sm:p-6">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {output.headline.label}
@@ -135,7 +146,7 @@ export function ResultsPanel({
           type="button"
           onClick={onToggleWorking}
           aria-expanded={showWorking}
-          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium"
+          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium print:hidden"
         >
           <span className="flex items-center gap-2">
             <Sigma className="size-4" />
@@ -143,27 +154,31 @@ export function ResultsPanel({
           </span>
           <ChevronDown className={cn("size-4 transition-transform", showWorking && "rotate-180")} />
         </button>
-        {showWorking && (
-          <div className="border-t px-4 py-3">
-            <ol className="space-y-1.5 text-xs leading-relaxed text-muted-foreground">
-              {output.formula.map((step, index) => (
-                <li key={index} className="break-words font-mono">
-                  {step}
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
+        <div
+          data-print="working"
+          className={cn("border-t px-4 py-3", !showWorking && "hidden")}
+        >
+          <ol className="space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+            {output.formula.map((step, index) => (
+              <li key={index} className="break-words font-mono">
+                {step}
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => window.print()}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-colors hover:bg-muted print:hidden"
-      >
-        <Printer className="size-4" />
-        Print this {title.replace(" Calculator", "").toLowerCase()} result
-      </button>
+      <div className="flex gap-2 print:hidden">
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="flex flex-1 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-colors hover:bg-muted"
+        >
+          <Printer className="size-4" />
+          Print
+        </button>
+        <ShareResult title={title} output={output} />
+      </div>
     </div>
   );
 }

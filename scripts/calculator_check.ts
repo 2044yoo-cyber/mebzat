@@ -715,12 +715,180 @@ check("the mapping reverses", calculatorSlugForKind("wardrobe") === "wardrobe");
 // ---------------------------------------------------------------------------
 
 {
+  // Three files are allowed to touch the network, and none of them is a
+  // formula: saved.ts reads the documents somebody kept, storage.ts is the
+  // device-local store, and prices.ts asks the price book for a rate to
+  // *offer*. Everything else is arithmetic and must work on a dead connection.
+  const ALLOWED_TO_ASK = ["saved.ts", "storage.ts", "prices.ts"];
   const engineFiles = walkAll("src/lib/calculators").filter((f) => f.endsWith(".ts"));
   const networked = engineFiles.filter((file) => {
-    if (file.endsWith("saved.ts") || file.endsWith("storage.ts")) return false;
+    if (ALLOWED_TO_ASK.some((allowed) => file.endsWith(allowed))) return false;
     return /\bfetch\(|createClient\(|supabase/.test(code(file));
   });
   check("no calculator formula reaches for the network", networked.length === 0, networked.join(", "));
+
+  // The exemption above is only safe while nothing computable depends on those
+  // files. A spec that imported the price lookup would make its `compute`
+  // implicitly async and its answer dependent on a server — which is the thing
+  // the exemption is meant to keep possible, not to permit.
+  const specFiles = walkAll("src/lib/calculators/specs").filter((f) => f.endsWith(".ts"));
+  const leaked = [...specFiles, "src/lib/calculators/registry.ts"].filter((file) =>
+    /from "\.\.?\/(prices|saved|storage)"/.test(code(file)),
+  );
+  check("and no calculator spec imports one of the three that can", leaked.length === 0, leaked.join(", "));
+
+  // Every compute is synchronous. An async one would be a formula waiting on
+  // something, and nothing here has anything to wait for.
+  const asyncComputes = CALCULATORS.filter(
+    (one) => one.compute && one.compute.constructor.name === "AsyncFunction",
+  );
+  check("every compute is synchronous", asyncComputes.length === 0, asyncComputes.map((o) => o.slug).join(", "));
+}
+
+// ---------------------------------------------------------------------------
+// 21. Printing
+//
+// The Print buttons were shipped before there was a print stylesheet, so they
+// produced the sidebar, the bottom bar, a dark background and a cut list
+// sliced through the middle of a row at the page break.
+// ---------------------------------------------------------------------------
+
+{
+  const css = readFileSync("src/app/globals.css", "utf8");
+  const printBlock = css.slice(css.indexOf("@media print"));
+
+  check("there is a print stylesheet", css.includes("@media print"));
+  check("navigation does not print", /\bnav,/.test(printBlock));
+  check("fixed and sticky elements are unpinned so they do not repeat", /\.fixed,[\s\S]{0,40}\.sticky\s*\{[\s\S]{0,60}position: static/.test(printBlock));
+  check(
+    "scroll containers flow instead of printing only what was visible",
+    /\.overflow-x-auto,[\s\S]{0,120}overflow: visible/.test(printBlock),
+  );
+  check("the table header repeats on every page", /thead\s*\{[\s\S]{0,80}table-header-group/.test(printBlock));
+  check("a row is never split across a page break", /tr,[\s\S]{0,40}\{[\s\S]{0,60}page-break-inside: avoid/.test(printBlock));
+  check("the page is white, not the app's dark ground", /background: #fff/.test(printBlock));
+
+  const results = code("src/components/calculators/results-panel.tsx");
+  // The working must be in the DOM to print. Rendering it only when expanded
+  // meant Print produced a sheet with no sum on it — which is the one thing a
+  // quantity surveyor checks.
+  check(
+    "the working is always in the document, hidden by class rather than unmounted",
+    /data-print="working"/.test(results) && !/\{showWorking && \(/.test(results),
+  );
+  check("and print forces it visible", /\[data-print="working"\][\s\S]{0,60}display: block/.test(printBlock));
+  check("a printed sheet says which calculator it came from", /hidden print:block/.test(results));
+  check("the expand control itself does not print", /print:hidden/.test(results));
+}
+
+// ---------------------------------------------------------------------------
+// 22. The price book, wired rather than merely reachable
+//
+// The SQL function existed for a while with nothing calling it, which is the
+// disconnected architecture the brief warned against by name.
+// ---------------------------------------------------------------------------
+
+{
+  const hook = code("src/lib/calculators/prices.ts");
+  check("something actually calls the price function", /calculator_material_price/.test(hook));
+  check("it passes the parameter the function declares", /p_material:/.test(hook));
+  check(
+    "\"no price\" and \"could not ask\" are different answers",
+    /state: "none"/.test(hook) && /state: "unreachable"/.test(hook),
+  );
+  check("staleness uses the price book's own window, not a second one", /DEFAULT_VALIDITY_DAYS/.test(hook));
+  check("the trust level is carried through", /dataStatus/.test(hook));
+  check(
+    "and the pending state is derived, not set inside the effect",
+    /return \{ state: "asking" \};/.test(hook) && !/setLookup\(\{ state: "asking" \}\)/.test(hook),
+  );
+
+  const offer = code("src/components/calculators/price-offer.tsx");
+  check("the offer prints the price book's own status label", /PRICE_STATUS_LABELS/.test(offer));
+  check("and its caveat, rather than wording invented here", /PRICE_STATUS_NOTES/.test(offer));
+  check("with the collection date", /collectedLabel/.test(offer));
+  // Offered, never applied: a price arriving from the network must not
+  // overwrite a figure the reader typed.
+  check("the price is offered behind a tap, not written in", /onClick=\{\(\) => onUse\(price\.price\)\}/.test(offer));
+
+  const materials = code("src/components/calculators/materials-calculator.tsx");
+  check("the material list offers prices", /<PriceOffer[\s/>]/.test(materials));
+  check("and lets the reader pick the city they are buying in", /setCity\(/.test(materials));
+
+  const migration = readFileSync("supabase/migrations/0067_saved_calculations.sql", "utf8");
+  check("expired prices are never offered", /data_status <> 'expired'/.test(migration));
+  // Ranking on the generated boolean collapses the middle three statuses, so a
+  // seeded educational estimate can outrank a supplier's real price on date.
+  check(
+    "trust is ranked on the status enum, not the verified boolean",
+    /mp\.data_status desc/.test(migration) && !/mp\.verified desc/.test(migration),
+  );
+  check("and no second price table was created", !/create table[\s\S]{0,40}material_prices/.test(migration));
+}
+
+// ---------------------------------------------------------------------------
+// 23. Sharing
+// ---------------------------------------------------------------------------
+
+{
+  const share = code("src/components/calculators/share-result.tsx");
+  check("there is a share control", /navigator\.share/.test(share));
+  check("with a clipboard fallback for a browser that has no share sheet", /clipboard\.writeText/.test(share));
+  check("the numbers travel, not just a link", /output\.lines/.test(share) && /headline/.test(share));
+  // Not /output\.formula/ — the `if (output.formula.length > 0)` guard keeps
+  // that identifier alive while the line that actually appends the steps is
+  // gone. Assert on the append.
+  check(
+    "and the working goes with them",
+    /lines\.push\([\s\S]{0,80}output\.formula\.map\(/.test(share),
+  );
+  // Dismissing the share sheet throws AbortError. That is not a failure.
+  check("a dismissed share sheet is not reported as an error", /catch \{/.test(share));
+}
+
+// ---------------------------------------------------------------------------
+// 24. The Studio loop closes
+//
+// The calculators send a design in. Without this the reader could not get back
+// out, which would make it a one-way door rather than the loop the brief drew.
+// ---------------------------------------------------------------------------
+
+{
+  const send = code("src/features/berchuma-studio/components/send-to-calculator.tsx");
+  check("the studio offers a way back to the calculator", /calculatorSlugForKind\(/.test(send));
+  check("and carries the width with it", /width=\$\{rounded\}/.test(send));
+  check("a design with no matching calculator shows no button", /if \(!slug\) return null;/.test(send));
+
+  const workspace = code("src/features/berchuma-studio/components/studio-workspace.tsx");
+  // The boundary matters: /<SendToCalculator/ also matches <SendToCalculatorX,
+  // so a renamed-away component would satisfy it while rendering nothing.
+  check("and it is actually mounted in the studio", /<SendToCalculator[\s/>]/.test(workspace));
+
+  // The link is only real if the calculator reads what it sends.
+  const page = code("src/components/calculators/calculator-page.tsx");
+  check("the calculator reads the query string it is sent", /useSearchParams\(\)/.test(page));
+  check("and hands it to the form", /seed=\{seed\}/.test(page));
+
+  const route = code("src/app/calculators/[slug]/page.tsx");
+  check("inside a Suspense boundary, which a static route requires", /<Suspense[\s/>]/.test(route));
+
+  const validate = code("src/lib/calculators/validate.ts");
+  check("seeded values are applied at build time, not pushed in later", /initialState\(fields: Field\[\], seed\?/.test(validate));
+  check("a value from the URL is validated before it is trusted", /Number\.isFinite\(parsed\) && parsed >= 0/.test(validate));
+  check(
+    "and an unknown key in a hand-edited URL is ignored",
+    /const supplied = seed\?\.\[field\.id\];/.test(validate),
+  );
+}
+
+{
+  // Round trip: every furniture calculator maps to a kind that maps back.
+  const furniture = CALCULATORS.filter((one) => one.category === "furniture");
+  check("all six furniture calculators reach the studio", furniture.every((one) => studioKindFor(one.slug) !== null));
+  check(
+    "and every one of them comes back to itself",
+    furniture.every((one) => calculatorSlugForKind(studioKindFor(one.slug)!) === one.slug),
+  );
 }
 
 // ---------------------------------------------------------------------------

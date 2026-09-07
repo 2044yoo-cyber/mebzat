@@ -93,6 +93,9 @@ values
   -- date the tie broke the right way by luck and the check proved nothing.
   ('Cement', 'Ordinary Portland Cement', 'bag', 'Addis Ababa', 1200, 'admin_verified', current_date - 5, 'Probe Supplier'),
   ('Cement', 'Ordinary Portland Cement', 'bag', 'Addis Ababa', 1150, 'supplier_submitted', current_date, 'Probe Other'),
+  -- The newest Addis row of all, and the least trustworthy: this is what the
+  -- 0042 seed looks like, and it must not win on date alone.
+  ('Cement', 'Ordinary Portland Cement', 'bag', 'Addis Ababa', 9999, 'educational_estimate', current_date, 'Seed'),
   ('Cement', 'Ordinary Portland Cement', 'bag', 'Mekelle', 1320, 'supplier_submitted', current_date - 40, 'Probe North');
 
 set role authenticated;
@@ -114,6 +117,63 @@ select '4d. an unknown material returns no row, not a guess' as step,
        count(*) = 0 as should_be_true
 from public.calculator_material_price('Unobtainium', 'Addis Ababa');
 
+-- The seeded educational estimates say in their own notes that they are not
+-- market prices. Handing one to a calculator as a rate is the invented number
+-- this feature exists to avoid.
+select '4e. a newer educational estimate does not outrank a real price' as step,
+       price = 1200 as should_be_true
+from public.calculator_material_price('Ordinary Portland Cement', 'Addis Ababa');
+
+select '4f. and the trust level comes back so it can be shown' as step,
+       data_status = 'admin_verified' as should_be_true
+from public.calculator_material_price('Ordinary Portland Cement', 'Addis Ababa');
+
+-- ===================================================================
+-- 4h. Trust ordering between two UNVERIFIED rows.
+--
+-- 4e cannot tell `data_status desc` from `verified desc`: an admin-verified
+-- row wins under both, so that check passes whichever ordering is used and
+-- proves nothing about the ranking. The difference only shows between two
+-- rows that are both unverified — which is the ordinary case, because almost
+-- nothing in the price book is admin-verified.
+--
+-- Here the newest row is the educational estimate. Ranking on the boolean
+-- ties the two and lets the date decide, handing the calculator a seeded
+-- guess; ranking on the enum puts the supplier's real price first.
+-- ===================================================================
+reset role;
+insert into public.material_prices
+  (category, material, unit, city_region, price_etb, data_status, price_date, supplier)
+values
+  ('Aggregates', 'Washed sand', 'm3', 'Addis Ababa', 3400, 'supplier_submitted', current_date - 3, 'Real Supplier'),
+  ('Aggregates', 'Washed sand', 'm3', 'Addis Ababa', 8888, 'educational_estimate', current_date, 'Seed');
+
+set role authenticated;
+set local request.jwt.claim.sub = 'd0000000-0000-4000-8000-000000000002';
+
+select '4h. a supplier price outranks a newer seeded estimate' as step,
+       price = 3400 as should_be_true
+from public.calculator_material_price('Washed sand', 'Addis Ababa');
+
+select '4i. and it is the submitted status that comes back' as step,
+       data_status = 'supplier_submitted' as should_be_true
+from public.calculator_material_price('Washed sand', 'Addis Ababa');
+
+-- ===================================================================
+-- 4g. An expired price is not offered at all.
+-- ===================================================================
+reset role;
+insert into public.material_prices
+  (category, material, unit, city_region, price_etb, data_status, price_date, supplier)
+values ('Cement', 'Expired Cement', 'bag', 'Addis Ababa', 500, 'expired', current_date, 'Old');
+
+set role authenticated;
+set local request.jwt.claim.sub = 'd0000000-0000-4000-8000-000000000002';
+
+select '4g. an expired price is never offered' as step,
+       count(*) = 0 as should_be_true
+from public.calculator_material_price('Expired Cement', 'Addis Ababa');
+
 -- ===================================================================
 -- 5. A superseded price stops being the answer without being deleted.
 -- ===================================================================
@@ -133,7 +193,7 @@ select '5. a superseded row is skipped' as step,
 from public.calculator_material_price('Ordinary Portland Cement', 'Addis Ababa');
 
 select '5b. but the history is still there' as step,
-       count(*) = 3 as should_be_true
+       count(*) = 4 as should_be_true
 from public.material_prices where material = 'Ordinary Portland Cement';
 
 -- ===================================================================

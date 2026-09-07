@@ -1,6 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
+
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import { PencilRuler, Star } from "lucide-react";
 
@@ -25,6 +28,12 @@ export function CalculatorPage({ slug }: { slug: string }) {
   const spec = calculatorBySlug(slug);
   const { favourites, toggle } = useFavourites();
   const { remember } = useRecents();
+
+  // A design arriving from Berchuma Studio brings its dimensions in the URL.
+  // Every parameter is offered to the form, which keeps only the ones this
+  // calculator actually declares.
+  const params = useSearchParams();
+  const seed = useMemo(() => Object.fromEntries(params.entries()), [params]);
 
   if (!spec) return null;
 
@@ -67,6 +76,7 @@ export function CalculatorPage({ slug }: { slug: string }) {
       ) : (
         <CalculatorForm
           spec={spec}
+          seed={seed}
           onCalculated={({ headline }) =>
             remember({ slug: spec.slug, title: spec.title.replace(" Calculator", ""), headline })
           }

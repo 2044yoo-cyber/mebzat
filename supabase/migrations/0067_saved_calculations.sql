@@ -104,16 +104,31 @@ create policy saved_calculations_delete_own on public.saved_calculations
  *
  * ## The ordering
  *
- * Rows superseded by a newer one are excluded outright — that is what
- * `superseded_by` is for. Of what remains, an exact city match beats a price
- * from elsewhere, an admin-verified figure beats a submitted one, and among
- * equals the most recent wins.
+ * Rows superseded by a newer one are excluded, and so are expired ones — that
+ * is what `superseded_by` and the `expired` status are for. Of what remains, an
+ * exact city match wins first, then trust, then recency.
  *
- * `age_days` comes back with the price so the caller can print "Price last
- * updated: …" and grey out anything past its useful life. The price book's own
- * validity window is 180 days (see src/lib/prices/status.ts); this function
- * reports the age rather than applying that rule, so one definition of "stale"
- * stays in the application where the label is written.
+ * ## Trust ordering, and why it is `data_status desc`
+ *
+ * The enum is declared worst-to-best — expired, educational_estimate,
+ * web_sourced, supplier_submitted, admin_verified — so descending order *is*
+ * the trust ranking, and 0041's own lookup index is built on exactly that.
+ * Sorting on the generated `verified` boolean instead, as the first version of
+ * this did, collapses the middle three into one bucket: an educational estimate
+ * would then outrank a supplier's real submitted price purely on date.
+ *
+ * That matters here more than anywhere else in the platform. The seeded rows
+ * from 0042 are `educational_estimate` and say so in their own notes — "replace
+ * with current supplier/market price". Handing one of those to a calculator as
+ * though it were a market rate is precisely the invented number this whole
+ * feature was built to avoid, so `data_status` is returned with the price and
+ * the caller is expected to show it.
+ *
+ * `age_days` comes back too, so the caller can print "collected 12 days ago"
+ * and flag anything past its useful life. The price book's validity window is
+ * 180 days (src/lib/prices/status.ts); this function reports the age rather
+ * than applying that rule, so one definition of "stale" stays in the
+ * application where the label is written.
  */
 create or replace function public.calculator_material_price(
   p_material text,
@@ -149,10 +164,11 @@ as $$
     (current_date - mp.price_date)::integer as age_days
   from public.material_prices mp
   where mp.superseded_by is null
+    and mp.data_status <> 'expired'
     and lower(btrim(mp.material)) = lower(btrim(p_material))
   order by
     (lower(mp.city_region) = lower(coalesce(p_city, ''))) desc,
-    mp.verified desc,
+    mp.data_status desc,
     mp.price_date desc
   limit 1;
 $$;
