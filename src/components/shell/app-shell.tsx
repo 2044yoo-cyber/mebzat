@@ -164,8 +164,29 @@ export function AppShell({
             onClick={() => setNavOpenedAt(null)}
             className="absolute inset-0 cursor-default bg-black/50"
           />
-          <div className="relative h-full w-[280px] border-r bg-sidebar">
-            <Sidebar signedIn={signedIn} counts={live} />
+          {/* A compact icon rail, always, at about a centimetre across.
+
+              It used to be a flat 280px rendering whatever mode the desktop
+              rail was in. With that rail collapsed — which it was — the result
+              was 36px icons centred in 280px of panel: three quarters of a
+              phone screen covered to show a column of glyphs, and 220px of it
+              black. The rail is `w-full` and centres its icons, so it had no
+              way to object to the room it was given.
+
+              `collapsed` is forced rather than read from the store. The stored
+              value is the desktop rail's, and the control that changes it is
+              desktop-only: a reader who expanded it at a desk would get a 5cm
+              drawer on their phone, and one who collapsed it would have no way
+              to get labels back. Neither should follow you onto a phone.
+
+              The labelled menu is not lost — "More" in the bottom bar opens
+              every section with its name — which is what makes the drawer
+              affordable as a quick rail rather than the only way through. */}
+          <div
+            style={{ width: MOBILE_NAV_WIDTH }}
+            className="relative h-full border-r bg-sidebar"
+          >
+            <Sidebar signedIn={signedIn} counts={live} collapsed />
           </div>
         </div>
       )}
@@ -320,6 +341,15 @@ export function AppShell({
     </div>
   );
 }
+
+/**
+ * The phone drawer's width — about a centimetre of glass.
+ *
+ * Matches the desktop rail's collapsed width so the icons sit in the same
+ * column they always do, and stays a fixed number here because on a phone it
+ * is not a preference: there is no handle to drag and no toggle to press.
+ */
+const MOBILE_NAV_WIDTH = 60;
 
 /** Routes that render without the workspace frame. */
 const AUTH_ROUTES = [

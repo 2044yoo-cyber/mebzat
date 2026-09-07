@@ -28,13 +28,25 @@ import { NavPending, NavPendingTint } from "@/components/shell/nav-pending";
 export function Sidebar({
   signedIn,
   counts,
+  collapsed,
 }: {
   signedIn: boolean;
   counts: { messages: number; notifications: number };
+  /**
+   * Overrides the stored collapse state.
+   *
+   * The phone's drawer sets this. The stored value belongs to the desktop
+   * rail, where collapsing is a deliberate trade of labels for room and there
+   * is a control to undo it; on a phone there is no such control, so a reader
+   * who collapsed the rail at a desk would otherwise be stuck with an
+   * unlabelled drawer and no way back.
+   */
+  collapsed?: boolean;
 }) {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const { navCollapsed, collapsedSections, pins } = useShell();
+  const { navCollapsed: storedCollapsed, collapsedSections, pins } = useShell();
+  const navCollapsed = collapsed ?? storedCollapsed;
 
   const active = useMemo(
     () => matchNavItem(pathname, searchParams),
@@ -65,7 +77,7 @@ export function Sidebar({
         <Link
           href="/"
           aria-label="Medosha home"
-          className="mb-2 flex size-9 items-center justify-center rounded-lg bg-brand text-sm font-bold text-brand-foreground"
+          className="mb-2 flex size-11 items-center justify-center rounded-lg bg-brand text-sm font-bold text-brand-foreground"
         >
           M
         </Link>
@@ -84,7 +96,11 @@ export function Sidebar({
               aria-label={section.label}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex size-9 items-center justify-center rounded-lg transition-colors",
+                // 44px, not 36px. This rail is a desktop convenience on a
+                // desktop and the whole drawer on a phone, where 36px is
+                // under the minimum a thumb can hit reliably. It still fits
+                // the 60px column with room either side.
+                "flex size-11 items-center justify-center rounded-lg transition-colors",
                 isActive
                   ? "bg-brand/15 text-brand"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted active:text-foreground",

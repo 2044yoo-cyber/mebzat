@@ -181,6 +181,48 @@ check("the tint marker is hidden", /data-nav-pending=""[\s\S]{0,40}className="hi
 check("and is hidden from assistive technology", /aria-hidden data-nav-pending/.test(pending));
 
 // ---------------------------------------------------------------------------
+// The phone's navigation drawer
+//
+// It was a flat 280px panel rendering whatever mode the desktop rail was in.
+// With that rail collapsed it showed 36px icons centred in 280px — three
+// quarters of a phone screen to display a column of glyphs, most of it empty.
+// ---------------------------------------------------------------------------
+
+{
+  const shell = code("src/components/shell/app-shell.tsx");
+  const rail = code("src/components/shell/sidebar.tsx");
+
+  check("the drawer has a width of its own", /MOBILE_NAV_WIDTH = 60/.test(shell));
+  check("and uses it", /style=\{\{ width: MOBILE_NAV_WIDTH \}\}/.test(shell));
+  check("rather than the old flat panel", !/w-\[280px\]/.test(shell));
+
+  // The stored collapse state is the desktop rail's, and the control that
+  // changes it is desktop-only. Following it onto a phone strands the reader
+  // either way: expanded gives a 5cm drawer, collapsed gives no labels and no
+  // way to get them.
+  check("the drawer forces its own mode", /<Sidebar signedIn=\{signedIn\} counts=\{live\} collapsed \/>/.test(shell));
+  check("and the rail accepts the override", /collapsed \?\? storedCollapsed/.test(rail));
+
+  // Icons with no text beside them have to carry their name some other way.
+  check("every icon in the rail is named", /aria-label=\{section\.label\}/.test(rail));
+  check("and titled, for a pointer", /title=\{section\.label\}/.test(rail));
+  // 36px is under what a thumb hits reliably, and this rail is now the whole
+  // drawer on a phone rather than a desktop convenience.
+  // Every target in the rail, not just the section links: the home badge was
+  // still 36px after the sections were raised, and a measurement in the
+  // browser is what caught it rather than reading the class list back.
+  {
+    const collapsedBranch = rail.slice(rail.indexOf("if (navCollapsed)"), rail.indexOf("return (\n    <nav\n      aria-label=\"Workspace\""));
+    const sizes = [...collapsedBranch.matchAll(/flex size-(\d+) items-center justify-center rounded-lg/g)].map((m) => Number(m[1]));
+    check(
+      "every target in the rail is 44px",
+      sizes.length > 0 && sizes.every((n) => n >= 11),
+      `sizes found: ${sizes.map((n) => n * 4).join(", ")}px`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
