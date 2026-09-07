@@ -113,7 +113,15 @@ export function PublishBar({
   };
 
   return (
-    <div className="space-y-2 rounded-xl border bg-card p-3">
+    // On a phone this is a row of buttons and nothing else.
+    //
+    // The card — a border, 12px of padding all round and a line of prose
+    // under the buttons — is worth its space beside a design on a desktop.
+    // On a phone the header wraps, so it became a full-width block costing
+    // about 110px above the viewer, on a screen where the viewer is the
+    // point. The explanation goes with it: "Saving keeps a private copy" is
+    // useful the first time and furniture every time after.
+    <div className="space-y-2 sm:rounded-xl sm:border sm:bg-card sm:p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
@@ -160,7 +168,7 @@ export function PublishBar({
         ) : null}
       </div>
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="hidden text-[11px] text-muted-foreground sm:block">
         {published && !dirty
           ? "Live on the feed and in the gallery. Anyone can open it and remix it."
           : saved

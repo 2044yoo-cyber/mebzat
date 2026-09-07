@@ -283,6 +283,59 @@ check("and the utility for it exists", /\.scroll-pb-content-safe\s*\{[\s\S]{0,90
 
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// The studio's design column, on a phone
+//
+// The viewer is the point of that screen and it was getting less than half of
+// it. The single largest thing above it was the publish card: a border, 12px
+// of padding all round and a line of prose under the buttons. On a narrow
+// screen the header row wraps, so that card became a full-width block costing
+// about 119px directly out of the drawing.
+//
+// Measured in Chromium against the shell's real height chain: 372px of an
+// 800px screen before, 491px after — 47% to 61%.
+// ---------------------------------------------------------------------------
+
+{
+  const publish = code("src/features/berchuma-studio/components/publish-bar.tsx");
+
+  // The card is a desktop affordance. On a phone it is a row of buttons.
+  check(
+    "the publish card's chrome is desktop-only",
+    /className="space-y-2 sm:rounded-xl sm:border sm:bg-card sm:p-3"/.test(publish),
+  );
+  check(
+    "and it carries no border or padding of its own below sm",
+    !/className="space-y-2 rounded-xl border bg-card p-3"/.test(publish),
+  );
+  // "Saving keeps a private copy" is useful the first time and furniture
+  // every time after.
+  check(
+    "the explanation under the buttons is desktop-only too",
+    /className="hidden text-\[11px\] text-muted-foreground sm:block"/.test(publish),
+  );
+
+  // The viewer only gets that space if the chain above it still resolves.
+  const studio = code("src/features/berchuma-studio/components/studio-workspace.tsx");
+  check("the studio fills its column", /className="flex h-full flex-col"/.test(studio));
+  check("the design column can shrink below its content", /flex min-h-0 flex-col/.test(studio));
+  check("and the editor takes what is left", /<div className="min-h-0 flex-1">/.test(studio));
+
+  const editor = code("src/features/berchuma-studio/components/editor/design-editor.tsx");
+  // The controls are drawn over the drawing rather than stacked above it,
+  // which is what lets the viewer have the whole column.
+  check("the view controls overlay the viewer", /pointer-events-none absolute inset-x-0 top-0/.test(editor));
+  check("and so does the dimensions readout", /pointer-events-none absolute inset-x-0 bottom-0/.test(editor));
+  // Two elements use `absolute inset-0` here — the drawing and the mobile
+  // panel's backdrop — so a bare match went on passing after the drawing lost
+  // it. Anchored to the drawing's own wrapper, which is the child of the
+  // `relative min-h-0 flex-1` column.
+  check(
+    "the drawing itself fills its box",
+    /relative min-h-0 flex-1">\s*<div className="absolute inset-0">/.test(editor),
+  );
+}
+
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
   for (const failure of failures) console.log(`  ${RED}✗${RESET} ${failure}`);
