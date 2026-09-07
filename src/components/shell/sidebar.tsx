@@ -15,6 +15,7 @@ import {
 import { toggleSection, togglePin } from "@/lib/workspace/store";
 import { useShell } from "@/lib/workspace/use-shell";
 import { cn } from "@/lib/utils";
+import { NavPending, NavPendingTint } from "@/components/shell/nav-pending";
 
 /**
  * The left rail. Visible on every route, and the only thing in the shell that
@@ -86,7 +87,7 @@ export function Sidebar({
                 "flex size-9 items-center justify-center rounded-lg transition-colors",
                 isActive
                   ? "bg-brand/15 text-brand"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted active:text-foreground",
               )}
             >
               <section.icon className="size-4.5" />
@@ -142,7 +143,7 @@ export function Sidebar({
                   "mt-1 flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   pathname === section.href
                     ? "bg-brand/12 text-brand"
-                    : "text-foreground/80 hover:bg-muted hover:text-foreground",
+                    : "text-foreground/80 hover:bg-muted hover:text-foreground active:bg-muted active:text-foreground",
                 )}
               >
                 <span aria-hidden className="text-base leading-none">
@@ -230,12 +231,18 @@ function Row({
         href={href}
         aria-current={active ? "page" : undefined}
         className={cn(
+          // `active:` is the half that works on a phone. `hover:` never fires
+          // on a touchscreen, so without it a tap changed nothing at all until
+          // the next page painted — which is why people were tapping twice.
+          // `has-[[data-nav-pending]]` carries the tint through the wait.
           "flex items-center gap-2.5 rounded-lg py-1.5 pr-9 pl-8 text-sm transition-colors",
+          "active:bg-muted has-[[data-nav-pending]]:bg-muted",
           active
             ? "bg-brand/12 font-medium text-brand"
-            : "text-foreground/75 hover:bg-muted hover:text-foreground",
+            : "text-foreground/75 hover:bg-muted hover:text-foreground active:text-foreground",
         )}
       >
+        <NavPendingTint />
         <item.icon
           className={cn(
             "size-4 shrink-0",
@@ -243,6 +250,8 @@ function Row({
           )}
         />
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
+
+        <NavPending />
 
         {/* Live counts. Only meaningful signed in, where the number exists. */}
         {signedIn && badge > 0 && (

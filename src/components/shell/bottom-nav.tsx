@@ -21,6 +21,7 @@ import {
 
 import { NAV_SECTIONS } from "@/lib/workspace/navigation";
 import { cn } from "@/lib/utils";
+import { NavPending, NavPendingTint } from "@/components/shell/nav-pending";
 
 /**
  * The phone's navigation.
@@ -99,12 +100,23 @@ export function BottomNav({ signedIn }: { signedIn: boolean }) {
                   // 56px is comfortably above the 44px minimum and leaves
                   // room for a label a thumb can read without a second look.
                   "flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors",
+                  // A colour shift alone is easy to miss on a bright screen
+                  // outdoors. The background is what reads as "pressed", and
+                  // the tint holds through the wait so the gap between lifting
+                  // a finger and the page arriving is not silent.
+                  "active:bg-muted has-[[data-nav-pending]]:bg-muted",
                   isActive(item)
                     ? "text-brand"
                     : "text-muted-foreground active:text-foreground",
                 )}
               >
-                <item.icon className="size-5" />
+                <NavPendingTint />
+                <span className="relative">
+                  <item.icon className="size-5" />
+                  <span className="absolute -top-1 -right-2.5">
+                    <NavPending className="size-3" />
+                  </span>
+                </span>
                 {item.label}
               </Link>
             </li>
@@ -116,7 +128,7 @@ export function BottomNav({ signedIn }: { signedIn: boolean }) {
               onClick={() => setMoreOpen(true)}
               aria-expanded={moreOpen}
               aria-label="More sections"
-              className="flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground transition-colors active:text-foreground"
+              className="flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground transition-colors active:bg-muted active:text-foreground"
             >
               <LayoutGrid className="size-5" />
               More
@@ -169,10 +181,14 @@ function MoreSheet({
               key={item.href}
               href={item.href}
               onClick={onClose}
-              className="flex flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-center text-[11px] font-medium text-foreground active:bg-muted"
+              className="flex flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-center text-[11px] font-medium text-foreground active:bg-muted has-[[data-nav-pending]]:bg-muted"
             >
-              <span className="flex size-11 items-center justify-center rounded-full bg-muted text-brand">
+              <NavPendingTint />
+              <span className="relative flex size-11 items-center justify-center rounded-full bg-muted text-brand">
                 <item.icon className="size-5" />
+                <span className="absolute -top-0.5 -right-0.5">
+                  <NavPending className="size-3" />
+                </span>
               </span>
               <span className="line-clamp-2 leading-tight">{item.label}</span>
             </Link>
@@ -221,14 +237,16 @@ function MoreSheet({
                         onClick={onClose}
                         aria-current={active ? "page" : undefined}
                         className={cn(
-                          "flex h-11 items-center gap-2.5 rounded-lg px-2 text-sm transition-colors active:bg-muted",
+                          "flex h-11 items-center gap-2.5 rounded-lg px-2 text-sm transition-colors active:bg-muted has-[[data-nav-pending]]:bg-muted",
                           active
                             ? "bg-brand/10 font-medium text-brand"
                             : "text-foreground",
                         )}
                       >
+                        <NavPendingTint />
                         <item.icon className="size-4.5 shrink-0" />
                         <span className="flex-1 truncate">{item.label}</span>
+                        <NavPending />
                         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                       </Link>
                     </li>
