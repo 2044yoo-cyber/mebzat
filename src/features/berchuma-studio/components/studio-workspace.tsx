@@ -11,6 +11,8 @@ import { DesignEditor } from "./editor/design-editor";
 import { PublishBar } from "./publish-bar";
 import { StartPanel } from "./start-panel";
 import { useDesign } from "../hooks/use-design";
+import { startingDesign } from "../services/starting-designs";
+import type { DesignKind } from "../types/spec";
 import type { MarketRate } from "../types/cost";
 import type {
   DesignErrorResponse,
@@ -41,13 +43,32 @@ const TABS: { id: Tab; label: string; icon: typeof MessageSquare }[] = [
   { id: "cost", label: "Price", icon: Wallet },
 ];
 
-export function StudioWorkspace({ rates }: { rates: MarketRate[] }) {
+export function StudioWorkspace({
+  rates,
+  opening,
+}: {
+  rates: MarketRate[];
+  /**
+   * A design to open with, from `/studio?kind=…&width=…`.
+   *
+   * This is how a furniture calculator hands its unit over: the reader costs a
+   * 2400 mm wardrobe, presses "Open in Design Studio", and the studio starts on
+   * that wardrobe at that width rather than back at the picker. Absent for a
+   * plain visit, which still gets the start panel.
+   */
+  opening?: { kind: DesignKind; width?: number } | null;
+}) {
   // `rates` arrives from a server component and never changes for the life of
   // the page, but it is an array literal in props — memoised so the cost
   // recalculation is not invalidated on every render.
   const stableRates = useMemo(() => rates, [rates]);
 
-  const design = useDesign(stableRates);
+  // Built once, on the first render, from the URL. `startingDesign` validates
+  // as it builds, so a design arriving this way is held to the same carpentry
+  // rules as one the model wrote.
+  const design = useDesign(stableRates, () =>
+    opening ? startingDesign(opening.kind, opening.width ? { width: opening.width } : {}) : null,
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

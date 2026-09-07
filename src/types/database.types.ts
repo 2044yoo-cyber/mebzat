@@ -6919,6 +6919,42 @@ export interface Database {
         };
         Relationships: [];
       };
+
+      /** 0067. A named calculation somebody kept. */
+      saved_calculations: {
+        Row: {
+          id: string;
+          user_id: string;
+          slug: string;
+          name: string;
+          inputs: Json;
+          headline: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          slug: string;
+          name: string;
+          inputs?: Json;
+          headline?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          slug?: string;
+          name?: string;
+          inputs?: Json;
+          headline?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
     };
     Views: {
       feed_authors: {

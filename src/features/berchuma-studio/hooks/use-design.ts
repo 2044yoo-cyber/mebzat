@@ -60,8 +60,22 @@ type Held = { spec: DesignSpec | null; issues: SpecIssue[] };
 
 const EMPTY: Held = { spec: null, issues: [] };
 
-export function useDesign(rates: MarketRate[]): DesignController {
-  const [held, setHeld] = useState<Held>(EMPTY);
+/**
+ * @param initial A design to open holding, evaluated once on the first render.
+ *   Used when the studio is opened from a furniture calculator with a kind and
+ *   a width in the URL. Passed as a thunk and given to `useState` lazily, so
+ *   the starting design is built once and is present on the very first paint —
+ *   rather than being pushed in from an effect, which would render the picker
+ *   for a frame and then replace it.
+ */
+export function useDesign(
+  rates: MarketRate[],
+  initial?: () => DesignSpec | null,
+): DesignController {
+  const [held, setHeld] = useState<Held>(() => {
+    const spec = initial?.() ?? null;
+    return spec ? { spec, issues: [] } : EMPTY;
+  });
 
   const derived = useMemo(() => {
     if (!held.spec) return { parts: null, cost: null };

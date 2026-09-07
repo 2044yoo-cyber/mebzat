@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { CALCULATORS } from "@/lib/calculators/registry";
 import { createClient } from "@/lib/supabase/server";
 import { siteUrl } from "@/lib/site";
 
@@ -37,11 +38,29 @@ const STATIC_ROUTES: {
   { path: "/directory/contractor", priority: 0.7, changeFrequency: "weekly" },
   { path: "/directory/supplier", priority: 0.7, changeFrequency: "weekly" },
   { path: "/ai", priority: 0.6, changeFrequency: "monthly" },
+  { path: "/calculators", priority: 0.8, changeFrequency: "monthly" },
   { path: "/about", priority: 0.4, changeFrequency: "monthly" },
   { path: "/contact", priority: 0.4, changeFrequency: "monthly" },
   { path: "/privacy", priority: 0.2, changeFrequency: "yearly" },
   { path: "/terms", priority: 0.2, changeFrequency: "yearly" },
 ];
+
+/**
+ * Every calculator gets its own entry.
+ *
+ * These are the pages most likely to bring somebody to Medosha from a search
+ * engine — "concrete calculator", "rebar weight" — and they are static, so
+ * there is no query and nothing to fail.
+ */
+const CALCULATOR_ROUTES: {
+  path: string;
+  priority: number;
+  changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"];
+}[] = CALCULATORS.map((calculator) => ({
+  path: `/calculators/${calculator.slug}`,
+  priority: calculator.popular ? 0.7 : 0.6,
+  changeFrequency: "monthly",
+}));
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
@@ -121,7 +140,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ),
   ]);
 
-  const entries: MetadataRoute.Sitemap = STATIC_ROUTES.map((route) => ({
+  const entries: MetadataRoute.Sitemap = [...STATIC_ROUTES, ...CALCULATOR_ROUTES].map((route) => ({
     url: `${base}${route.path}`,
     lastModified: new Date(),
     changeFrequency: route.changeFrequency,

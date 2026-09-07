@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { StudioWorkspace } from "@/features/berchuma-studio/components/studio-workspace";
 import { marketRates } from "@/features/berchuma-studio/services/rates";
 import type { MarketRate } from "@/features/berchuma-studio/types/cost";
+import { designKinds, type DesignKind } from "@/features/berchuma-studio/types/spec";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -28,7 +29,9 @@ export const metadata: Metadata = {
  * rates at all; the only thing that genuinely needs Supabase is knowing who
  * you are, and that failing is worth saying out loud rather than crashing.
  */
-export default async function StudioPage() {
+export default async function StudioPage(props: {
+  searchParams: Promise<{ kind?: string; width?: string }>;
+}) {
   const session = await currentUser();
 
   if (session.state === "unreachable") {
@@ -48,7 +51,20 @@ export default async function StudioPage() {
     rates = [];
   }
 
-  return <StudioWorkspace rates={rates} />;
+  // Opened from a furniture calculator: /studio?kind=wardrobe&width=2400.
+  // Anything that is not a real design kind is ignored rather than trusted, so
+  // a hand-edited URL gets the ordinary start panel instead of a crash.
+  const { kind, width } = await props.searchParams;
+  const parsedWidth = Number(width);
+  const opening =
+    kind && (designKinds as readonly string[]).includes(kind)
+      ? {
+          kind: kind as DesignKind,
+          width: Number.isFinite(parsedWidth) && parsedWidth > 0 ? parsedWidth : undefined,
+        }
+      : null;
+
+  return <StudioWorkspace rates={rates} opening={opening} />;
 }
 
 type Session =

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { CalculatorRail } from "@/components/calculators/calculator-rail";
 import { SuggestedAuthors } from "@/components/feed/discovery-rail";
 import { Feed } from "@/components/feed/feed";
 import { FeedComposer } from "@/components/feed/feed-composer";
@@ -66,6 +67,8 @@ export default async function Home() {
         </div>
 
         <FeedComposer signedIn={signedIn} viewer={viewer} />
+
+        <CalculatorRail />
 
         {/* Narrow, the rail has nowhere to go, so the people row is injected
             into the stream where a reader will actually meet it. */}
