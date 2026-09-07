@@ -89,19 +89,42 @@ const shell = code("src/components/shell/app-shell.tsx");
 const baseGap = css.slice(0, css.indexOf("@media (min-width: 1024px)"));
 
 check("the gap is defined as a variable", /--content-bottom-gap:/.test(baseGap));
+// The bar spans the full width, so this part is genuinely global.
 check(
   "and it counts the bar",
   /--content-bottom-gap:\s*calc\([^;]*--bottom-nav-h/.test(baseGap),
-);
-// The half that was missing. The bar alone is what the shell used to reserve.
-check(
-  "and the floating buttons above it",
-  /--content-bottom-gap:\s*calc\([^;]*--floating-actions-h/.test(baseGap),
 );
 check(
   "with room to tap the last control rather than it sitting flush",
   /--content-bottom-gap:\s*calc\([^;]*\+\s*1rem/.test(baseGap),
 );
+
+// The floating buttons are 150px tall and about 90px wide, in one corner.
+// Reserving their height across the whole width — which the first version of
+// this did — put a band of dead space under every page. That is a different
+// way of wasting the screen, not a fix. They are opt-in instead.
+check(
+  "the global reservation does NOT include the corner buttons",
+  !/--content-bottom-gap:\s*calc\([^;]*--floating-actions-h/.test(baseGap),
+);
+check("but an opt-in reservation exists for columns that need them", /--actions-bottom-gap:/.test(baseGap));
+check(
+  "and that one counts both",
+  /--actions-bottom-gap:\s*calc\([^;]*--bottom-nav-h[^;]*--floating-actions-h/.test(baseGap),
+);
+check("with a utility to apply it", /\.pb-actions-safe\s*\{[\s\S]{0,80}var\(--actions-bottom-gap\)/.test(css));
+
+// The case the opt-in exists for: a column ending in a full-width button.
+{
+  const startPanel = code("src/features/berchuma-studio/components/start-panel.tsx");
+  check("the studio's start panel opts in", /pb-actions-safe/.test(startPanel));
+  // And does not keep a hand-written copy alongside it, which is how the gap
+  // got counted twice and left 368px of nothing under the Start button.
+  check(
+    "and does not also hand-write the same reservation",
+    !/pb-\[var\(--floating-actions-h\)\]/.test(startPanel),
+  );
+}
 
 // The bar's own height must include the home-indicator inset, or a reservation
 // built on it is short by ~34px on every iPhone since the X.
@@ -134,8 +157,10 @@ check(
   const media = css.slice(css.indexOf("@media (min-width: 1024px)"));
   const block = media.slice(0, media.indexOf("}\n}") + 3);
   check("from lg up the gap is redefined", /--content-bottom-gap/.test(block));
-  check("without the bar, which is not rendered there", !/--bottom-nav-h/.test(block));
-  check("but still clearing the buttons, which are", /--floating-actions-h/.test(block));
+  // Nothing full-width to clear there — BottomNav is `lg:hidden` — so the
+  // global reservation goes to nothing and desktop stays as it was.
+  check("to nothing, because the bar is not rendered there", /--content-bottom-gap:\s*0px/.test(block));
+  check("while the opt-in still clears the buttons, which are there", /--actions-bottom-gap:\s*calc\([^;]*--floating-actions-h/.test(block));
 }
 
 // ---------------------------------------------------------------------------

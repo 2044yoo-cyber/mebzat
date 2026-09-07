@@ -104,7 +104,7 @@ export function StartPanel({
           //
           // Scroll padding, not a margin: it is space to scroll into, so
           // nothing moves for a reader whose panel already fits.
-          "pb-[var(--floating-actions-h)] sm:pb-8",
+          "pb-actions-safe sm:pb-8",
           // A cut list is taller than the panel and scrolls inside itself, so
           // centring it vertically pushes its heading off the top. Only the
           // centring is conditional now: `min-h-0` used to be the other half

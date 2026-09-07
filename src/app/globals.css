@@ -82,19 +82,26 @@
    * what the bar was getting blamed for. */
   --floating-actions-h: 9.25rem;
 
-  /* What a scrolling column must reserve at its foot, and the whole point of
-   * this file having these variables at all.
+  /* What every scrolling column reserves at its foot.
    *
-   * Two fixed things overlap the bottom of every page and the shell renders
-   * both: the navigation bar, and the floating buttons that sit *above* it.
-   * Clearing only the bar — which is what the workspace did — leaves the last
-   * control of a page directly under the AI launcher and the + button. That is
-   * why "Save changes" could be tapped on some pages and not others: it
-   * depended entirely on whether the button happened to be full-width.
+   * The bar spans the full width, so every page has to clear all of it. That
+   * is the part that is genuinely global, and it is all this reserves.
    *
-   * The extra 1rem is so the last element is comfortably clear rather than
-   * flush against the furniture. */
-  --content-bottom-gap: calc(
+   * The floating buttons are deliberately *not* in here. They are 150px tall
+   * but only about 90px wide, in one corner — reserving their full height
+   * across the whole width to dodge a corner left a band of dead space under
+   * every page, which is a different way of wasting the screen than hiding
+   * things under the bar. Surfaces whose last control genuinely runs the full
+   * width opt into `--actions-bottom-gap` below.
+   *
+   * The extra 1rem keeps the last element comfortably clear rather than flush
+   * against the bar. */
+  --content-bottom-gap: calc(var(--bottom-nav-h) + 1rem);
+
+  /* For a column that ends in a full-width control, which the buttons really
+   * do cover: the studio's "Start with a wardrobe" is the case this exists
+   * for. Opt-in, via `.pb-actions-safe`. */
+  --actions-bottom-gap: calc(
     var(--bottom-nav-h) + var(--floating-actions-h) + 1rem
   );
 
@@ -192,7 +199,11 @@
  * kept because they are. */
 @media (min-width: 1024px) {
   :root {
-    --content-bottom-gap: calc(var(--floating-actions-h) + 1rem);
+    /* No bar from lg up — BottomNav is `lg:hidden` and the rail is a permanent
+     * column — so there is nothing full-width to clear and the reservation
+     * goes to nothing. This is the "desktop stays normal" rule. */
+    --content-bottom-gap: 0px;
+    --actions-bottom-gap: calc(var(--floating-actions-h) + 1rem);
   }
 }
 
@@ -322,10 +333,14 @@
     padding-bottom: var(--content-bottom-gap);
   }
 
-  /* For a container that already has its own padding and needs the gap added
-     to whatever that is, rather than replacing it. */
   .scroll-pb-content-safe {
     scroll-padding-bottom: var(--content-bottom-gap);
+  }
+
+  /* The opt-in, for a column ending in a control that runs the full width and
+     therefore passes under the floating buttons as well as the bar. */
+  .pb-actions-safe {
+    padding-bottom: var(--actions-bottom-gap);
   }
 }
 
