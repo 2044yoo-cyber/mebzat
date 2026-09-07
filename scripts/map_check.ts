@@ -350,8 +350,11 @@ check(
   !/h-\[\d+vh\]/.test(explorer),
 );
 check(
-  "full screen still fills, rather than taking the phone height",
-  /fullscreen \? "flex-1"/.test(explorer),
+  // Was `flex-1`, which fills a fixed-height box but collapses to nothing in
+  // a scrolling one — and full screen scrolls now, so the map states a whole
+  // viewport instead. Same outcome on screen, different mechanism.
+  "full screen still fills the screen",
+  /fullscreen \? "h-\[100dvh\] shrink-0"/.test(explorer),
 );
 
 check(
@@ -359,8 +362,11 @@ check(
   /panelOpen \|\| fullscreen/.test(explorer) && /!panelOpen && !fullscreen/.test(explorer),
 );
 check(
-  "and the frame around the map goes",
-  /fullscreen \? "p-0" : "p-3"/.test(explorer),
+  // The frame is gone at top and bottom, which is what "full screen" means
+  // vertically. What remains at the sides is not a frame: it is the strip the
+  // page keeps so a finger has somewhere to scroll from.
+  "and the frame above and below the map goes",
+  /fullscreen \? "px-\[var\(--map-scroll-gutter\)\] py-0" : "p-3"/.test(explorer),
 );
 
 // The rails are borrowed, not taken. Entering collapses them; exiting puts
@@ -577,6 +583,61 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Full screen still scrolls, and there is somewhere to scroll from
+//
+// A map fills its box and swallows every touch inside it. In full screen the
+// box was the whole screen and the container did not scroll, so the city
+// selector, the search box and the filters above the map could not be reached
+// without leaving the mode — and there was nowhere to put a finger that would
+// scroll rather than pan.
+// ---------------------------------------------------------------------------
+
+check(
+  "full screen scrolls",
+  /fullscreen && "overflow-y-auto overscroll-contain"/.test(explorer),
+);
+check(
+  "and has a definite height, so there is something to scroll",
+  /fullscreen \? "h-\[100dvh\] shrink-0"/.test(explorer),
+);
+// The height alone was not enough. A flex child defaults to `flex-shrink: 1`,
+// so a stated 100dvh inside a 100dvh column was compressed straight back to
+// fit: overflow set, height set, scroll range measured zero.
+check(
+  "and does not shrink back to fit, which leaves nothing to scroll",
+  /h-\[100dvh\] shrink-0/.test(explorer),
+);
+// `flex-1` resolves against content in a scrolling column, and a map has none.
+check(
+  "not flex-1, which would collapse the map to nothing",
+  !/fullscreen \? "flex-1"/.test(explorer),
+);
+
+check("there is a gutter the page keeps", /--map-scroll-gutter:/.test(css));
+check(
+  "and the map is inset by it in full screen",
+  /fullscreen \? "px-\[var\(--map-scroll-gutter\)\] py-0"/.test(explorer),
+);
+// Only at the sides. Padding at top or bottom would be a frame around a map
+// somebody asked to be full screen.
+check(
+  "at the sides only, not as a frame",
+  /px-\[var\(--map-scroll-gutter\)\] py-0/.test(explorer) &&
+    !/p-\[var\(--map-scroll-gutter\)\]/.test(explorer),
+);
+// CSS `mm` is defined against 96dpi and would be about 2.4mm of real glass.
+check(
+  "the gutter is sized in rem, not CSS millimetres",
+  /--map-scroll-gutter:\s*1\.5rem/.test(css),
+);
+// Narrowing the map has to re-measure it, or the canvas keeps the old width
+// and the city sits offset inside its own box.
+check(
+  "the canvas re-measures when the gutter changes its width",
+  /new ResizeObserver\(\(\) => map\.resize\(\)\)/.test(canvas),
+);
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);

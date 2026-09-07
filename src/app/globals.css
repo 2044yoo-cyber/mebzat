@@ -100,6 +100,22 @@
    * 1.15cm — the bar, and just enough not to be flush against it. */
   --content-bottom-gap: calc(var(--bottom-nav-h) + 0.5rem);
 
+  /* A strip down each side of a full-screen map that the page keeps.
+   *
+   * A map fills its box edge to edge and swallows every touch inside it —
+   * that is what a map is for. In full screen the box is the whole screen, so
+   * there is nowhere left to put a finger that scrolls the page instead of
+   * panning the city, and the header above it becomes unreachable.
+   *
+   * CSS `mm` is not millimetres on a phone: it is defined against 96dpi, so
+   * `4mm` resolves to about 15 CSS px and lands nearer 2.4mm of actual glass.
+   * Measured instead — a 393px-wide phone is about 7cm across, so a
+   * millimetre is close to 5.6 CSS px and 24px is a shade over 4mm.
+   *
+   * Wide enough for a thumb to start a swipe in, narrow enough that the city
+   * keeps almost all of the screen. */
+  --map-scroll-gutter: 1.5rem;
+
   /* How much of the *width* the floating stack takes, rather than the height.
    *
    * 20px of padding either side of a 48px button. This is the number that

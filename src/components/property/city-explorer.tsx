@@ -312,6 +312,11 @@ export function CityExplorer({
         // Its own scroller below lg, so the shell's reservation does not
         // reach it and it has to make the same room itself.
         !fullscreen && "overflow-y-auto pb-content-safe lg:overflow-hidden lg:pb-0",
+        // Full screen scrolls too. It used to be a fixed box exactly one
+        // viewport tall, so the city selector, the search box and the filters
+        // above the map could not be reached without leaving the mode — and
+        // with the map edge to edge there was no way to scroll back to them.
+        fullscreen && "overflow-y-auto overscroll-contain",
         fullscreen
           ? // Above the bottom navigation, which is fixed at z-50, and above
             // the context panel at z-40. An opaque layer over the bar is the
@@ -531,7 +536,17 @@ export function CityExplorer({
           // is the one that already accounts for the browser's own chrome, so
           // the map does not grow taller than the space and push the listings
           // it is meant to sit above off the screen.
-          fullscreen ? "flex-1" : "h-[70svh] lg:h-auto lg:flex-1",
+          // A definite height in full screen as well, and deliberately a whole
+          // viewport of it: the header sits above, so the column is a little
+          // taller than the screen and the header scrolls away and back.
+          // `flex-1` resolved against content in a scrolling column, which for
+          // a map is nothing.
+          // `shrink-0` matters as much as the height: a flex child defaults to
+          // `flex-shrink: 1`, so a stated 100dvh inside a 100dvh column is
+          // compressed straight back to fit and there is nothing to scroll.
+          // That is exactly what happened — the overflow was set, the height
+          // was set, and the scroll range measured zero.
+          fullscreen ? "h-[100dvh] shrink-0" : "h-[70svh] lg:h-auto lg:flex-1",
           // The results list gives way when a property is open: its detail is
           // already in the shell's panel, and the map deserves the room. In
           // full screen it gives way always — the point of the mode is to see
@@ -541,9 +556,17 @@ export function CityExplorer({
             : "lg:grid-cols-[minmax(0,1fr)_340px]",
         )}
       >
-        {/* No padding in full screen: a 12px frame around a map somebody asked
-            to be full screen is 12px of city they asked to see. */}
-        <div className={cn("min-h-64", fullscreen ? "p-0" : "p-3")}>
+        {/* Full screen keeps a strip down each side and nothing at top or
+            bottom. The strips are the only part of the screen that is not the
+            map, and so the only place a finger can start a swipe that scrolls
+            the page rather than panning the city. 24px each — a shade over
+            4mm of glass — against a map that keeps the rest. */}
+        <div
+          className={cn(
+            "min-h-64",
+            fullscreen ? "px-[var(--map-scroll-gutter)] py-0" : "p-3",
+          )}
+        >
           <MapBoundary>
             <CityCanvas
               city={city}
