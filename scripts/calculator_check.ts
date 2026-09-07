@@ -892,6 +892,62 @@ check("the mapping reverses", calculatorSlugForKind("wardrobe") === "wardrobe");
 }
 
 // ---------------------------------------------------------------------------
+// 25. A saved calculation actually comes back
+//
+// The table stores inputs rather than answers, which is right — re-running the
+// calculator over stored inputs always agrees with the calculator. It is also
+// worthless unless something puts those inputs back in the form. For a while
+// it did not: Save wrote them and the list linked to a blank page.
+// ---------------------------------------------------------------------------
+
+{
+  const list = code("src/components/calculators/saved-list.tsx");
+  check("the saved list carries the inputs back into the form", /restoreHref\(row\)/.test(list));
+  check("as query parameters the form already understands", /params\.set\(id, entry\.raw\)/.test(list));
+  // A thickness saved as 150 mm returning as 150 m is not a rounding error.
+  check("with the unit each value was typed in", /params\.set\(`\$\{id\}\.unit`/.test(list));
+
+  const validateSource = code("src/lib/calculators/validate.ts");
+  check("and the form reads that unit back", /seed\?\.\[`\$\{field\.id\}\.unit`\]/.test(validateSource));
+  check(
+    "checking it against the unit table rather than trusting the URL",
+    /suppliedUnit in LENGTH_IN_METRES/.test(validateSource),
+  );
+
+  // The round trip, in one assertion: a form filled in, saved the way the
+  // save control saves it, and rebuilt from the link the list would produce.
+  const spec = calculatorBySlug("concrete-slab")!;
+  const typedIn = {
+    length: { raw: "8", unit: "m" as const },
+    width: { raw: "6", unit: "m" as const },
+    thickness: { raw: "150", unit: "mm" as const },
+    grade: { raw: "C25", unit: "m" as const },
+    waste: { raw: "5", unit: "m" as const },
+  };
+
+  const asStored = Object.fromEntries(
+    Object.entries(typedIn).map(([id, entry]) => [id, { raw: entry.raw, unit: entry.unit }]),
+  );
+  const asQuery: Record<string, string> = {};
+  for (const [id, entry] of Object.entries(asStored)) {
+    asQuery[id] = entry.raw;
+    asQuery[`${id}.unit`] = entry.unit;
+  }
+
+  const rebuilt = initialState(spec.fields, asQuery);
+  check("a saved calculation rebuilds the same form", rebuilt.thickness?.raw === "150");
+  check("in the same units", rebuilt.thickness?.unit === "mm", rebuilt.thickness?.unit);
+
+  const before = spec.compute!(validate(spec.fields, typedIn).values);
+  const after = spec.compute!(validate(spec.fields, rebuilt).values);
+  check(
+    "and gives the identical answer, not one 1000x out",
+    before.headline.value === after.headline.value && after.headline.value === "7.560",
+    `${before.headline.value} vs ${after.headline.value}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);

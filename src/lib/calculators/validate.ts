@@ -1,5 +1,5 @@
 import type { Field, Values } from "./types";
-import { toMetres, type LengthUnit } from "./units";
+import { LENGTH_IN_METRES, toMetres, type LengthUnit } from "./units";
 
 /**
  * Turning what somebody typed into numbers a calculator can use.
@@ -51,7 +51,20 @@ export function initialState(fields: Field[], seed?: Record<string, string>): Fo
       }
     }
 
-    state[field.id] = { raw, unit };
+    // The unit travels with the value, under `<field>.unit`.
+    //
+    // Without it, reopening a saved calculation silently changes the answer:
+    // a thickness saved as "150 mm" comes back as 150 in whatever unit the
+    // field defaults to, and 150 metres of concrete is not a rounding error.
+    // Checked against the unit table rather than trusted, since it arrives in
+    // a URL.
+    const suppliedUnit = seed?.[`${field.id}.unit`];
+    const resolvedUnit =
+      field.kind === "length" && suppliedUnit && suppliedUnit in LENGTH_IN_METRES
+        ? (suppliedUnit as LengthUnit)
+        : unit;
+
+    state[field.id] = { raw, unit: resolvedUnit };
   }
   return state;
 }

@@ -16,6 +16,25 @@ import type { SavedCalculation } from "@/lib/calculators/saved";
  * for a round trip and a revalidation, because the alternative is a row that
  * sits there looking undeleted for a second and gets tapped again.
  */
+/**
+ * The link back into a saved calculation, carrying its inputs.
+ *
+ * What was stored is the inputs, not the answer — so reopening one has to put
+ * those inputs back in the form, or "Save" saves nothing anybody can use. Each
+ * field goes as `<id>=<value>`, and a length also sends `<id>.unit`, because a
+ * thickness saved as 150 mm coming back as 150 m is not a rounding error.
+ */
+function restoreHref(row: SavedCalculation): string {
+  const params = new URLSearchParams();
+  for (const [id, entry] of Object.entries(row.inputs ?? {})) {
+    if (!entry || typeof entry.raw !== "string" || entry.raw === "") continue;
+    params.set(id, entry.raw);
+    if (typeof entry.unit === "string" && entry.unit) params.set(`${id}.unit`, entry.unit);
+  }
+  const query = params.toString();
+  return query ? `/calculators/${row.slug}?${query}` : `/calculators/${row.slug}`;
+}
+
 export function SavedList({ saved }: { saved: SavedCalculation[] }) {
   const [rows, setRows] = useState(saved);
   const [editing, setEditing] = useState<string | null>(null);
@@ -64,7 +83,7 @@ export function SavedList({ saved }: { saved: SavedCalculation[] }) {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <Link
-                    href={`/calculators/${row.slug}`}
+                    href={restoreHref(row)}
                     className="block truncate text-sm font-medium hover:underline"
                   >
                     {row.name}
