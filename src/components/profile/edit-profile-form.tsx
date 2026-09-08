@@ -10,6 +10,7 @@ import {
 import { AvatarUpload } from "@/components/profile/avatar-upload";
 import { CoverUpload } from "@/components/profile/cover-upload";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -167,6 +168,48 @@ export function EditProfileForm({ profile }: { profile: Profile }) {
             />
           </div>
         </div>
+
+        {/* Off unless asked for. A number entered to receive a confirmation
+            code used to be published on the public profile as a side effect of
+            having entered it. */}
+        <fieldset className="space-y-3 rounded-xl border p-4">
+          <legend className="px-1 text-sm font-medium">
+            What visitors can see
+          </legend>
+          <div className="flex min-h-11 items-start gap-3">
+            <Checkbox
+              id="showPhone"
+              name="showPhone"
+              defaultChecked={profile.show_phone}
+              className="mt-1"
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="showPhone" className="font-medium">
+                Show my phone number on my profile
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Anyone can see it, signed in or not. Leave it off and people
+                reach you through Medosha messages instead.
+              </p>
+            </div>
+          </div>
+          <div className="flex min-h-11 items-start gap-3">
+            <Checkbox
+              id="showEmail"
+              name="showEmail"
+              defaultChecked={profile.show_email}
+              className="mt-1"
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="showEmail" className="font-medium">
+                Show my email address on my profile
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                A published address is an address that gets scraped.
+              </p>
+            </div>
+          </div>
+        </fieldset>
 
         <div className="space-y-2">
           <Label htmlFor="website">Website</Label>

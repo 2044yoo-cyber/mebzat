@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { ACCOUNT_TYPE_MAP } from "@/lib/constants/account-types";
+import { visibleContact } from "@/lib/data/professional-profile";
 import type { Profile } from "@/types/database.types";
 
 export function ProfileDisplay({
@@ -25,6 +26,12 @@ export function ProfileDisplay({
   const accountType = profile.account_type
     ? ACCOUNT_TYPE_MAP[profile.account_type]
     : null;
+  // Today this renders only on the owner's own dashboard, so the rule changes
+  // nothing here. It is applied anyway: the component is a `Profile` away from
+  // being dropped onto a public page, and the version that read
+  // `profile.phone` directly is how the number came to be published in the
+  // first place.
+  const contact = visibleContact(profile, isOwner);
   const displayName = profile.company_name || profile.full_name || "Unnamed";
   const initials = displayName
     .split(" ")
@@ -115,10 +122,10 @@ export function ProfileDisplay({
               </a>
             </div>
           )}
-          {profile.phone && (
+          {contact.phone && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Phone className="size-4 shrink-0" />
-              {profile.phone}
+              {contact.phone}
             </div>
           )}
           {typeof profile.years_experience === "number" && (

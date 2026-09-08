@@ -5390,6 +5390,8 @@ export interface Database {
           is_moderator: boolean;
           restricted_until: string | null;
           restriction_reason: string | null;
+          show_phone: boolean;
+          show_email: boolean;
         };
         Insert: {
           id: string;
@@ -5428,6 +5430,8 @@ export interface Database {
           is_moderator?: boolean;
           restricted_until?: string | null;
           restriction_reason?: string | null;
+          show_phone?: boolean;
+          show_email?: boolean;
         };
         Update: {
           id?: string;
@@ -5466,6 +5470,8 @@ export interface Database {
           is_moderator?: boolean;
           restricted_until?: string | null;
           restriction_reason?: string | null;
+          show_phone?: boolean;
+          show_email?: boolean;
         };
         Relationships: [];
       };
@@ -8195,6 +8201,12 @@ export interface Database {
           target_user_id: string;
         };
         Returns: { points: number; rank_percentile: number; badge_count: number; completed_projects: number; positive_reviews: number }[];
+      };
+      professional_reputation: {
+        Args: {
+          p_user: string;
+        };
+        Returns: { average: number; total: number; five: number; four: number; three: number; two: number; one: number; verified_total: number; service_count: number }[];
       };
       review_summary: {
         Args: {

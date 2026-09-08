@@ -24,6 +24,8 @@ export async function updateProfile(
     locationCity: formData.get("locationCity"),
     locationCountry: formData.get("locationCountry"),
     phone: formData.get("phone"),
+    showPhone: formData.get("showPhone") === "on",
+    showEmail: formData.get("showEmail") === "on",
     yearsExperience: formData.get("yearsExperience") || undefined,
     bio: formData.get("bio"),
     website: formData.get("website"),
@@ -55,6 +57,8 @@ export async function updateProfile(
     locationCity,
     locationCountry,
     phone,
+    showPhone,
+    showEmail,
     yearsExperience,
     bio,
     website,
@@ -71,6 +75,8 @@ export async function updateProfile(
       location_city: locationCity || null,
       location_country: locationCountry || null,
       phone: phone || null,
+      show_phone: showPhone,
+      show_email: showEmail,
       years_experience: yearsExperience ?? null,
       bio: bio || null,
       website: website || null,
@@ -89,5 +95,8 @@ export async function updateProfile(
 
   revalidatePath("/profile");
   revalidatePath("/dashboard");
+  // The public page renders these, so it has to be rebuilt or the owner
+  // switches their number off and still sees it published.
+  if (username) revalidatePath(`/u/${username}`);
   return { success: true };
 }
