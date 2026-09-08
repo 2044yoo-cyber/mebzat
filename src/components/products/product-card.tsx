@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ImageOff } from "lucide-react";
+import { ImageOff, MapPin } from "lucide-react";
 
+import { ConditionBadge } from "@/components/products/condition-badge";
 import { SaveButton } from "@/components/products/save-button";
 import { STOCK_STATUS } from "@/lib/constants/product-categories";
 import { cn, formatPrice } from "@/lib/utils";
@@ -18,6 +19,10 @@ export type ProductCardData = Pick<
   | "brand"
   | "stock_status"
   | "status"
+  | "condition"
+  | "used_grade"
+  | "location_city"
+  | "location_area"
 > & {
   supplier?: {
     full_name: string | null;
@@ -30,6 +35,11 @@ export function ProductCard({ product }: { product: ProductCardData }) {
   const supplierName =
     product.supplier?.company_name || product.supplier?.full_name;
   const stock = STOCK_STATUS[product.stock_status];
+  // Area first, city second — "Bole, Addis Ababa" is what somebody deciding
+  // whether to go and collect a sofa actually needs.
+  const place = [product.location_area, product.location_city]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <Link
@@ -50,11 +60,20 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             <ImageOff className="size-8" />
           </div>
         )}
-        {product.status === "draft" && (
-          <span className="absolute left-3 top-3 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium">
-            Draft
-          </span>
-        )}
+        <div className="absolute left-3 top-3 flex flex-wrap gap-1">
+          {product.status === "draft" && (
+            <span className="rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium">
+              Draft
+            </span>
+          )}
+          {/* From the column, so it cannot disagree with the section the
+              listing appears in. */}
+          <ConditionBadge
+            condition={product.condition}
+            grade={product.used_grade}
+            className="bg-background/90"
+          />
+        </div>
         <div className="absolute right-3 top-3">
           <SaveButton
             productId={product.id}
@@ -90,6 +109,12 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             {stock.label}
           </span>
         </div>
+        {place && (
+          <p className="flex items-center gap-1 truncate pt-1 text-xs text-muted-foreground">
+            <MapPin className="size-3 shrink-0" />
+            {place}
+          </p>
+        )}
         {supplierName && (
           <p className="truncate pt-1 text-xs text-muted-foreground">
             by {supplierName}

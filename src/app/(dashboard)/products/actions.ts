@@ -9,8 +9,13 @@ import {
   parseSpecs,
   productSchema,
   type ProductFormValues,
+  usedFieldsFor,
 } from "@/lib/validations/product";
-import type { ProductStatus, StockStatus } from "@/types/database.types";
+import type {
+  ProductCondition,
+  ProductStatus,
+  StockStatus,
+} from "@/types/database.types";
 
 export type ProductFormState = {
   error?: string;
@@ -40,7 +45,14 @@ function buildValues(formData: FormData) {
     currency: formData.get("currency"),
     unit: formData.get("unit"),
     stockStatus: formData.get("stockStatus"),
+    condition: formData.get("condition"),
+    usedGrade: formData.get("usedGrade"),
+    conditionNotes: formData.get("conditionNotes"),
+    knownDefects: formData.get("knownDefects"),
+    saleReason: formData.get("saleReason"),
+    ageMonths: formData.get("ageMonths") || undefined,
     locationCity: formData.get("locationCity"),
+    locationArea: formData.get("locationArea"),
     locationCountry: formData.get("locationCountry"),
     deliveryAvailable: formData.get("deliveryAvailable") === "on",
     specs: formData.get("specs"),
@@ -66,7 +78,12 @@ function toColumns(data: ProductFormValues) {
     currency: data.currency || "USD",
     unit: data.unit || null,
     stock_status: data.stockStatus as StockStatus,
+    // The single source of truth for which section the listing appears in.
+    // Nothing else on the row says "used", so nothing else can disagree.
+    condition: data.condition as ProductCondition,
+    ...usedFieldsFor(data),
     location_city: data.locationCity || null,
+    location_area: data.locationArea || null,
     location_country: data.locationCountry || null,
     delivery_available: Boolean(data.deliveryAvailable),
     specs: parseSpecs(data.specs),

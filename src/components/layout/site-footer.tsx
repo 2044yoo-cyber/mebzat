@@ -9,6 +9,7 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
       heading: "Explore",
       links: [
         { label: "Marketplace", href: "/marketplace" },
+        { label: "Used Items", href: "/marketplace/used" },
         { label: "Companies", href: "/companies" },
         { label: "Professionals", href: "/professionals" },
         { label: "Find suppliers", href: "/directory/supplier" },

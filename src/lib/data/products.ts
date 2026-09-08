@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ProductSort } from "@/lib/constants/product-categories";
+import type { ProductCondition, UsedGrade } from "@/types/database.types";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.types";
 import type { ProductCardData } from "@/components/products/product-card";
@@ -10,7 +11,7 @@ import type { ProductCardData } from "@/components/products/product-card";
 type Client = SupabaseClient<Database>;
 
 const CARD_COLUMNS =
-  "id, title, cover_image_url, price, currency, unit, brand, stock_status, status, supplier:profiles!owner_id(full_name, company_name)";
+  "id, title, cover_image_url, price, currency, unit, brand, stock_status, status, condition, used_grade, location_city, location_area, supplier:profiles!owner_id(full_name, company_name)";
 
 // Supabase .or() is comma/paren-delimited, so strip anything that could
 // break the filter grammar out of user search input.
@@ -46,7 +47,27 @@ export type MarketplaceQuery = {
   maxPrice?: number;
   page?: number;
   pageSize?: number;
+  /**
+   * Which section of the marketplace is being read.
+   *
+   * "new" is `condition = 'new'`; "used" is everything else, so refurbished
+   * and open-box listings land in the second-hand section the day the form
+   * offers them. Undefined reads both, which is what a global search wants.
+   */
+  section?: "new" | "used";
+  /** Only meaningful within the used section. */
+  usedGrade?: UsedGrade;
+  city?: string;
+  area?: string;
 };
+
+/** The conditions the used section covers. Anything that is not new. */
+const SECOND_HAND: ProductCondition[] = [
+  "used",
+  "refurbished",
+  "open_box",
+  "for_parts",
+];
 
 export type MarketplaceResult = {
   products: ProductCardData[];
@@ -68,6 +89,10 @@ export async function getMarketplaceProducts(
     maxPrice,
     page = 1,
     pageSize = 24,
+    section,
+    usedGrade,
+    city,
+    area,
   } = params;
 
   const supabase = await createClient();
@@ -76,6 +101,16 @@ export async function getMarketplaceProducts(
     .from("products")
     .select(CARD_COLUMNS, { count: "exact" })
     .eq("status", "published");
+
+  // The condition column is the only thing that decides the section. Nothing
+  // is copied into a second table and nothing is tagged by hand, so a listing
+  // cannot be in the wrong one.
+  if (section === "new") query = query.eq("condition", "new");
+  else if (section === "used") query = query.in("condition", SECOND_HAND);
+
+  if (usedGrade) query = query.eq("used_grade", usedGrade);
+  if (city) query = query.ilike("location_city", city);
+  if (area) query = query.ilike("location_area", `%${sanitize(area)}%`);
 
   if (categorySlug) {
     const { data: category } = await supabase

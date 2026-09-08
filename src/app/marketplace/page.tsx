@@ -3,6 +3,7 @@ import { PackageOpen, Store } from "lucide-react";
 
 import { ProductCard } from "@/components/products/product-card";
 import { MarketplaceFilters } from "@/components/products/marketplace-filters";
+import { MarketplaceSections } from "@/components/products/marketplace-sections";
 import { Pagination } from "@/components/ui/pagination";
 import { isProductSort, type ProductSort } from "@/lib/constants/product-categories";
 import {
@@ -13,9 +14,9 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Marketplace — Construction materials, furniture & more",
+  title: "Marketplace — New construction materials, furniture & more",
   description:
-    "Browse construction materials, furniture, fixtures, and equipment from verified suppliers on Medosha.",
+    "Browse new construction materials, furniture, fixtures, and equipment from suppliers on Medosha. Second-hand goods have their own section.",
 };
 
 const PAGE_SIZE = 24;
@@ -49,6 +50,9 @@ export default async function MarketplacePage(props: {
       maxPrice: toNumber(maxPrice),
       page,
       pageSize: PAGE_SIZE,
+      // New Items. Everything already listed defaults to `new`, so nothing
+      // that was here yesterday has moved.
+      section: "new",
     }),
     (await createClient()).auth.getUser(),
   ]);
@@ -77,10 +81,12 @@ export default async function MarketplacePage(props: {
           Everything for your build
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Materials, furniture, fixtures, and equipment from suppliers across
+          New materials, furniture, fixtures and equipment from suppliers across
           the network.
         </p>
       </div>
+
+      <MarketplaceSections active="new" className="mb-4" />
 
       <MarketplaceFilters
         categories={categories}
@@ -101,7 +107,7 @@ export default async function MarketplacePage(props: {
             description={
               q || category || minPrice || maxPrice
                 ? "Try adjusting your filters or search."
-                : "Be the first supplier to list a product."
+                : "Be the first supplier to list a product. Selling something second-hand? It goes under Used Items."
             }
           />
         ) : (

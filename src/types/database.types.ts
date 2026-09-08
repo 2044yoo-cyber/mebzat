@@ -685,6 +685,19 @@ export type PriceVatStatus =
   | "exclusive"
   | "exempt";
 
+export type ProductCondition =
+  | "new"
+  | "used"
+  | "refurbished"
+  | "open_box"
+  | "for_parts";
+
+export type UsedGrade =
+  | "like_new"
+  | "good"
+  | "fair"
+  | "needs_repair";
+
 export type ProductStatus =
   | "draft"
   | "published";
@@ -5308,6 +5321,13 @@ export interface Database {
           views: number;
           created_at: string;
           updated_at: string;
+          condition: ProductCondition;
+          used_grade: UsedGrade | null;
+          condition_notes: string | null;
+          known_defects: string | null;
+          sale_reason: string | null;
+          age_months: number | null;
+          location_area: string | null;
         };
         Insert: {
           id?: string;
@@ -5330,6 +5350,13 @@ export interface Database {
           views?: number;
           created_at?: string;
           updated_at?: string;
+          condition?: ProductCondition;
+          used_grade?: UsedGrade | null;
+          condition_notes?: string | null;
+          known_defects?: string | null;
+          sale_reason?: string | null;
+          age_months?: number | null;
+          location_area?: string | null;
         };
         Update: {
           id?: string;
@@ -5352,6 +5379,13 @@ export interface Database {
           views?: number;
           created_at?: string;
           updated_at?: string;
+          condition?: ProductCondition;
+          used_grade?: UsedGrade | null;
+          condition_notes?: string | null;
+          known_defects?: string | null;
+          sale_reason?: string | null;
+          age_months?: number | null;
+          location_area?: string | null;
         };
         Relationships: [];
       };

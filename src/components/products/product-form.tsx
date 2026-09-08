@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   createProduct,
@@ -21,8 +21,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { STOCK_STATUS } from "@/lib/constants/product-categories";
-import type { Product, ProductCategory } from "@/types/database.types";
+import {
+  CONDITIONS,
+  SELLABLE_CONDITIONS,
+  STOCK_STATUS,
+  USED_GRADES,
+} from "@/lib/constants/product-categories";
+import type {
+  Product,
+  ProductCategory,
+  ProductCondition,
+} from "@/types/database.types";
 
 const initialState: ProductFormState = {};
 
@@ -43,6 +52,15 @@ export function ProductForm({
     ? updateProduct.bind(null, product.id)
     : createProduct;
   const [state, formAction, pending] = useActionState(action, initialState);
+
+  // Which section the listing lands in, and the only thing that decides
+  // whether the second-hand fields are worth asking for. Held in state rather
+  // than read back from the form, because the fields have to appear as soon as
+  // the seller picks Used, not after a round trip.
+  const [condition, setCondition] = useState<ProductCondition>(
+    (product?.condition as ProductCondition | undefined) ?? "new",
+  );
+  const secondHand = condition !== "new";
 
   return (
     <form action={formAction} className="space-y-6">
@@ -131,6 +149,120 @@ export function ProductForm({
         </div>
       </div>
 
+      <div className="space-y-4 rounded-xl border p-4">
+        <div className="space-y-2">
+          <Label htmlFor="condition">Condition</Label>
+          <Select
+            name="condition"
+            value={condition}
+            onValueChange={(value) => setCondition(value as ProductCondition)}
+          >
+            <SelectTrigger id="condition" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SELLABLE_CONDITIONS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {CONDITIONS[value].label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {secondHand
+              ? "This listing will appear under Marketplace → Used Items. You do not need to post it twice."
+              : "This listing will appear under Marketplace → New Items."}
+          </p>
+          {state.fieldErrors?.condition && (
+            <p className="text-sm text-destructive">
+              {state.fieldErrors.condition}
+            </p>
+          )}
+        </div>
+
+        {/* Only asked for when they mean something. A form that shows every
+            field to everybody is a form people abandon halfway. */}
+        {secondHand && (
+          <div className="space-y-4 border-t pt-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="usedGrade">Used condition</Label>
+                <Select
+                  name="usedGrade"
+                  defaultValue={product?.used_grade ?? "good"}
+                >
+                  <SelectTrigger id="usedGrade" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(USED_GRADES).map(([value, grade]) => (
+                      <SelectItem key={value} value={value}>
+                        {grade.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ageMonths">Age in months (optional)</Label>
+                <Input
+                  id="ageMonths"
+                  name="ageMonths"
+                  type="number"
+                  min={0}
+                  max={1200}
+                  placeholder="30"
+                  defaultValue={product?.age_months ?? ""}
+                />
+                {state.fieldErrors?.ageMonths && (
+                  <p className="text-sm text-destructive">
+                    {state.fieldErrors.ageMonths}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="conditionNotes">
+                Condition details (optional)
+              </Label>
+              <Textarea
+                id="conditionNotes"
+                name="conditionNotes"
+                rows={2}
+                placeholder="One owner, kept indoors, all parts present."
+                defaultValue={product?.condition_notes ?? ""}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="knownDefects">Known defects (optional)</Label>
+              <Textarea
+                id="knownDefects"
+                name="knownDefects"
+                rows={2}
+                placeholder="Scratch on the left edge. Handle is loose."
+                defaultValue={product?.known_defects ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">
+                Say what is wrong. A buyer who finds out on collection leaves a
+                review about it.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="saleReason">Reason for selling (optional)</Label>
+              <Input
+                id="saleReason"
+                name="saleReason"
+                placeholder="Moving office"
+                defaultValue={product?.sale_reason ?? ""}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="stockStatus">Availability</Label>
         <Select
@@ -150,7 +282,7 @@ export function ProductForm({
         </Select>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="locationCity">City</Label>
           <Input
@@ -158,6 +290,18 @@ export function ProductForm({
             name="locationCity"
             defaultValue={product?.location_city ?? ""}
           />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="locationArea">Area (optional)</Label>
+          <Input
+            id="locationArea"
+            name="locationArea"
+            placeholder="Bole"
+            defaultValue={product?.location_area ?? ""}
+          />
+          <p className="text-xs text-muted-foreground">
+            A neighbourhood, not your address.
+          </p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="locationCountry">Country</Label>

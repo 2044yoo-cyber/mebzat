@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
  */
 const PUBLIC_LINKS = [
   { href: "/marketplace", label: "Marketplace" },
+  { href: "/marketplace/used", label: "Used Items" },
   { href: "/projects", label: "Projects" },
   { href: "/companies", label: "Companies" },
   { href: "/professionals", label: "Professionals" },

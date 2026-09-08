@@ -14,7 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PRODUCT_SORTS, type ProductSort } from "@/lib/constants/product-categories";
+import {
+  PRODUCT_SORTS,
+  USED_GRADES,
+  type ProductSort,
+} from "@/lib/constants/product-categories";
 import { cn } from "@/lib/utils";
 
 type Category = { id: string; slug: string; name: string };
@@ -22,6 +26,14 @@ type Category = { id: string; slug: string; name: string };
 export function MarketplaceFilters({
   categories,
   current,
+  searchPlaceholder = "Search products, brands, materials…",
+  /**
+   * Grade and place, which only mean anything about something second-hand.
+   * Shown on Used Items and nowhere else rather than being greyed out on the
+   * new marketplace, where they would be two controls that never do anything.
+   */
+  showUsedFilters = false,
+  cities = [],
 }: {
   categories: Category[];
   current: {
@@ -30,7 +42,13 @@ export function MarketplaceFilters({
     sort: ProductSort;
     minPrice: string;
     maxPrice: string;
+    usedGrade?: string;
+    city?: string;
+    area?: string;
   };
+  searchPlaceholder?: string;
+  showUsedFilters?: boolean;
+  cities?: string[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -42,6 +60,7 @@ export function MarketplaceFilters({
   const [showPrice, setShowPrice] = useState(
     Boolean(current.minPrice || current.maxPrice),
   );
+  const [area, setArea] = useState(current.area ?? "");
 
   function pushWith(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -55,7 +74,13 @@ export function MarketplaceFilters({
   }
 
   const hasFilters =
-    current.q || current.category || current.minPrice || current.maxPrice;
+    current.q ||
+    current.category ||
+    current.minPrice ||
+    current.maxPrice ||
+    current.usedGrade ||
+    current.city ||
+    current.area;
 
   return (
     <div className="space-y-4">
@@ -71,7 +96,7 @@ export function MarketplaceFilters({
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search products, brands, materials…"
+            placeholder={searchPlaceholder}
             className="pl-9"
             aria-label="Search products"
           />
@@ -143,6 +168,71 @@ export function MarketplaceFilters({
         </form>
       )}
 
+      {showUsedFilters && (
+        <div className="flex flex-wrap items-end gap-2 rounded-xl border p-3">
+          <div className="space-y-1">
+            <span className="text-xs text-muted-foreground">Condition</span>
+            <Select
+              value={current.usedGrade || "any"}
+              onValueChange={(value) =>
+                pushWith({ grade: value === "any" ? null : value })
+              }
+            >
+              <SelectTrigger className="w-40" aria-label="Filter by condition">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any condition</SelectItem>
+                {Object.entries(USED_GRADES).map(([value, grade]) => (
+                  <SelectItem key={value} value={value}>
+                    {grade.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-xs text-muted-foreground">City</span>
+            <Select
+              value={current.city || "any"}
+              onValueChange={(value) =>
+                pushWith({ city: value === "any" ? null : value })
+              }
+            >
+              <SelectTrigger className="w-44" aria-label="Filter by city">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Anywhere</SelectItem>
+                {cities.map((city) => (
+                  <SelectItem key={city} value={city}>
+                    {city}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              pushWith({ area: area.trim() || null });
+            }}
+            className="space-y-1"
+          >
+            <span className="block text-xs text-muted-foreground">Area</span>
+            <Input
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              placeholder="Bole"
+              className="h-9 w-32"
+              aria-label="Filter by area"
+            />
+          </form>
+        </div>
+      )}
+
       {/*
         Two rows on a phone, and never more.
 
@@ -211,6 +301,7 @@ export function MarketplaceFilters({
               setQ("");
               setMinPrice("");
               setMaxPrice("");
+              setArea("");
               router.push(pathname);
             }}
             className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1.5 text-xs whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground sm:px-3 sm:text-sm"
