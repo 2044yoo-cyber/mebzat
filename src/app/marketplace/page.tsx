@@ -4,6 +4,7 @@ import { PackageOpen, Store } from "lucide-react";
 import { ProductCard } from "@/components/products/product-card";
 import { MarketplaceFilters } from "@/components/products/marketplace-filters";
 import { MarketplaceSections } from "@/components/products/marketplace-sections";
+import { PostItemButton } from "@/components/products/post-item-button";
 import { Pagination } from "@/components/ui/pagination";
 import { isProductSort, type ProductSort } from "@/lib/constants/product-categories";
 import {
@@ -73,17 +74,22 @@ export default async function MarketplacePage(props: {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-10">
-      <div className="mb-8">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Store className="size-4" /> Marketplace
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Store className="size-4" /> Marketplace
+          </div>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">
+            Everything for your build
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            New materials, furniture, fixtures and equipment from suppliers
+            across the network.
+          </p>
         </div>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-          Everything for your build
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          New materials, furniture, fixtures and equipment from suppliers across
-          the network.
-        </p>
+        {/* On the page somebody is already on. Listing was reachable from four
+            other places and not from here. */}
+        <PostItemButton condition="new" className="shrink-0" />
       </div>
 
       <MarketplaceSections active="new" className="mb-4" />
@@ -109,6 +115,7 @@ export default async function MarketplacePage(props: {
                 ? "Try adjusting your filters or search."
                 : "Be the first supplier to list a product. Selling something second-hand? It goes under Used Items."
             }
+            action={<PostItemButton condition="new" />}
           />
         ) : (
           <>
@@ -139,16 +146,19 @@ function EmptyState({
   icon,
   title,
   description,
+  action,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed p-16 text-center">
       <div className="text-muted-foreground">{icon}</div>
       <p className="font-medium">{title}</p>
       <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
+      {action}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { safeRedirect } from "@/lib/auth/safe-redirect";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -35,6 +36,11 @@ export async function loginWithEmail(
     return { error: "Incorrect email or password." };
   }
 
+  // Guarded, not trusted. This value reaches the action through a hidden
+  // input whose value came from the query string, so `?redirect=//evil.example`
+  // would send somebody off Medosha the instant their password was accepted —
+  // the moment they are least likely to look at the address bar. The Google
+  // callback already checked its equivalent; this one did not.
   const redirectTo = formData.get("redirect");
-  redirect(typeof redirectTo === "string" && redirectTo ? redirectTo : "/dashboard");
+  redirect(safeRedirect(typeof redirectTo === "string" ? redirectTo : null));
 }

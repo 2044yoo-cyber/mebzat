@@ -3,6 +3,7 @@ import { PackageOpen, Recycle } from "lucide-react";
 
 import { MarketplaceFilters } from "@/components/products/marketplace-filters";
 import { MarketplaceSections } from "@/components/products/marketplace-sections";
+import { PostItemButton } from "@/components/products/post-item-button";
 import { ProductCard } from "@/components/products/product-card";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -123,18 +124,24 @@ export default async function UsedItemsPage(props: {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Recycle className="size-4" /> Marketplace
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Recycle className="size-4" /> Marketplace
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+            Used Items
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            Second-hand furniture, appliances, electronics, tools, doors,
+            windows and leftover materials. Anyone can sell here — you do not
+            need to be in construction.
+          </p>
         </div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
-          Used Items
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Second-hand furniture, appliances, electronics, tools, doors, windows
-          and leftover materials. Anyone can sell here — you do not need to be
-          in construction.
-        </p>
+        {/* Carries `condition=used` through, so the form opens already set to
+            Used rather than asking somebody who came from this page to find
+            the field and change it. */}
+        <PostItemButton condition="used" className="shrink-0" />
       </div>
 
       <MarketplaceSections active="used" className="mb-4" />
@@ -170,8 +177,9 @@ export default async function UsedItemsPage(props: {
             description={
               filtered
                 ? "Try a wider search — fewer filters, or a different city."
-                : "Have something to sell? List it and set the condition to Used."
+                : "Have something to sell? Post it here — it takes a photo and a price."
             }
+            action={<PostItemButton condition="used" />}
           />
         ) : (
           <>
@@ -202,16 +210,19 @@ function EmptyState({
   icon,
   title,
   description,
+  action,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed p-12 text-center sm:p-16">
       <span className="text-muted-foreground">{icon}</span>
       <p className="font-medium">{title}</p>
       <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
+      {action}
     </div>
   );
 }

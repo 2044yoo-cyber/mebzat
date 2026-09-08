@@ -62,7 +62,14 @@ export async function updateSession(request: NextRequest) {
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
+    // The whole address, not just the path. `/products/new?condition=used`
+    // used to come back as `/products/new`, so somebody who clicked "Sell
+    // something used", signed in, and was returned to the form found it set to
+    // New — and the parameters they had arrived with were left stranded on the
+    // login URL instead.
+    const target = pathname + request.nextUrl.search;
+    url.search = "";
+    url.searchParams.set("redirect", target);
     return NextResponse.redirect(url);
   }
 

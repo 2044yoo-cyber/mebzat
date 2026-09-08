@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { safeRedirect } from "@/lib/auth/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -11,33 +12,10 @@ import { createClient } from "@/lib/supabase/server";
  * cookies on the way past rather than gating it.
  */
 
-/**
- * Somewhere on Medosha, and nowhere else.
- *
- * `next` arrives in the query string, which means it arrives from whoever wrote
- * the link. Interpolating it into a redirect unchecked is an open redirect: a
- * value of `//evil.example` produces `https://medosha.net//evil.example`, which
- * browsers read as protocol-relative and follow off-site — landing somebody on
- * a stranger's page moments after signing in, still trusting the flow they
- * started. That is a convincing way to phish a member.
- *
- * So: one leading slash, no second slash, no scheme, no backslash. Anything
- * else falls back to the dashboard.
- */
-function safeNext(raw: string | null): string {
-  if (!raw) return "/dashboard";
-  if (!raw.startsWith("/")) return "/dashboard";
-  // `//host` is protocol-relative; `/\host` is the same trick with a backslash,
-  // which some browsers normalise into a forward slash.
-  if (raw.startsWith("//") || raw.startsWith("/\\")) return "/dashboard";
-  if (raw.includes("://")) return "/dashboard";
-  return raw;
-}
-
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = safeNext(searchParams.get("next"));
+  const next = safeRedirect(searchParams.get("next"));
 
   // Google's own refusal — the member closed the consent screen, or the app is
   // misconfigured at the provider. It arrives as a parameter, not an exception.

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Eye, GitFork, Sparkles } from "lucide-react";
+import { Eye, GitFork, Plus, Sparkles } from "lucide-react";
 
 import {
   listOwnDesigns,
@@ -49,15 +49,26 @@ export default async function DesignsPage({
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 p-3 @lg/ws:p-6">
-      <header>
-        <h1 className="text-2xl font-semibold">
-          {onlyMine ? "My designs" : "Designs"}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {onlyMine
-            ? "Everything you have designed in Berchuma Studio, published or not."
-            : "Fitted furniture designed on Medosha. Every one carries its own parts list and a price built from supplier rates — open any of them and remix it into your own."}
-        </p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">
+            {onlyMine ? "My designs" : "Designs"}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {onlyMine
+              ? "Everything you have designed in Berchuma Studio, published or not."
+              : "Fitted furniture designed on Medosha. Every one carries its own parts list and a price built from supplier rates — open any of them and remix it into your own."}
+          </p>
+        </div>
+        {/* The way in was only ever shown on the empty state, so as soon as
+            one design existed there was nothing on the page inviting a second.
+            This is the Digital Marketplace tab's equivalent of "Post an item". */}
+        <Link
+          href="/studio"
+          className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground sm:w-auto"
+        >
+          <Plus className="size-4" /> Design something
+        </Link>
       </header>
 
       <nav className="flex flex-wrap gap-1.5">

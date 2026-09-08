@@ -41,12 +41,15 @@ export function ProductForm({
   product,
   initialImageUrls = [],
   initialSpecs = {},
+  /** Preset by the page somebody arrived from — Used Items opens on Used. */
+  initialCondition,
 }: {
   userId: string;
   categories: Pick<ProductCategory, "id" | "name">[];
   product?: Product;
   initialImageUrls?: string[];
   initialSpecs?: Record<string, string>;
+  initialCondition?: ProductCondition;
 }) {
   const action = product
     ? updateProduct.bind(null, product.id)
@@ -58,7 +61,12 @@ export function ProductForm({
   // than read back from the form, because the fields have to appear as soon as
   // the seller picks Used, not after a round trip.
   const [condition, setCondition] = useState<ProductCondition>(
-    (product?.condition as ProductCondition | undefined) ?? "new",
+    // The listing being edited wins over the link that was followed: opening
+    // a new listing's form from Used Items should default to Used, but
+    // editing an existing new listing must not silently switch it.
+    (product?.condition as ProductCondition | undefined) ??
+      initialCondition ??
+      "new",
   );
   const secondHand = condition !== "new";
 

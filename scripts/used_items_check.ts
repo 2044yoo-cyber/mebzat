@@ -27,6 +27,7 @@ import {
   USED_GRADES,
   isSecondHand,
 } from "../src/lib/constants/product-categories.ts";
+import { safeRedirect } from "../src/lib/auth/safe-redirect.ts";
 import {
   productSchema,
   usedFieldsFor,
@@ -322,7 +323,12 @@ check(
   );
   check(
     "the page says anyone can sell, not only builders",
-    /you do not need to be\s*\n?\s*in construction/.test(usedPage),
+    // Whitespace-normalised. The sentence is wrapped by the formatter and
+    // moved every time the header layout changes, so a regex that pins the
+    // line breaks fails on a reflow that changed no words.
+    /you do not need to be in construction/.test(
+      usedPage.replace(/\s+/g, " "),
+    ),
   );
 }
 
@@ -480,7 +486,193 @@ check(
 }
 
 // ---------------------------------------------------------------------------
-// 10. Nothing else about the marketplace changed
+// 10. Posting, from the page you are already on
+//
+// Listing something was reachable from the sidebar, the dashboard, the feed
+// composer and the floating button — everywhere except the marketplace. The
+// moment somebody browsing decides to sell their own sofa is the moment they
+// have to leave the page and find the form, which is the moment most people
+// do not bother.
+// ---------------------------------------------------------------------------
+
+for (const [path, expected, what] of [
+  ["src/app/marketplace/page.tsx", "new", "New Items"],
+  ["src/app/marketplace/used/page.tsx", "used", "Used Items"],
+] as const) {
+  const page = code(path);
+  check(
+    `${what} carries a post action in its header`,
+    new RegExp(
+      `<PostItemButton condition="${expected}" className="shrink-0" />`,
+    ).test(page),
+  );
+  check(
+    `and again where ${what} is empty`,
+    new RegExp(
+      `action=\\{<PostItemButton condition="${expected}" />\\}`,
+    ).test(page),
+    "the empty state is exactly where somebody is told to be the first",
+  );
+  check(
+    `and the empty state actually renders what it is handed on ${what}`,
+    /\{action\}/.test(page),
+    "an `action` prop that is accepted and never rendered",
+  );
+}
+
+{
+  const button = code("src/components/products/post-item-button.tsx");
+  check(
+    "posting from Used Items carries the condition through",
+    /`\/products\/new\?condition=\$\{condition\}`/.test(button),
+    "otherwise the seller lands on a form set to New and has to find the field",
+  );
+  check(
+    "and posting from New Items does not add a redundant parameter",
+    /condition === "new"\s*\n?\s*\? "\/products\/new"/.test(button),
+  );
+  check(
+    "the button is a real tap target on a phone",
+    /min-h-11/.test(button),
+  );
+}
+
+{
+  const page = code("src/app/(dashboard)/products/new/page.tsx");
+  check(
+    "the form honours the condition it was opened with",
+    /initialCondition=\{condition\}/.test(page),
+  );
+  check(
+    "validated against what the form can offer, not trusted",
+    /\(SELLABLE_CONDITIONS as string\[\]\)\.includes\(raw\)/.test(page),
+    "a parameter naming a condition the form never shipped would save as new",
+  );
+  // Where a signed-out seller actually goes is decided by the middleware, not
+  // by this page — `/products/new` is in PROTECTED_ROUTES, so the redirect
+  // happens before the file runs. Checked by serving the build and following
+  // the link, which is how the page's own fallback was found to be both
+  // unreachable and using the wrong parameter name.
+  const middleware = code("src/lib/supabase/middleware.ts");
+  check(
+    "a signed-out seller is brought back to the whole address",
+    /const target = pathname \+ request\.nextUrl\.search;/.test(middleware),
+    "it sent back the path only, so ?condition=used was lost on sign-in",
+  );
+  check(
+    "and the login URL is not left carrying the original parameters",
+    /url\.search = "";/.test(middleware),
+  );
+  check(
+    "the page's own fallback uses the parameter the login form reads",
+    /redirect\(`\/login\?redirect=\$\{encodeURIComponent\(target\)\}`\)/.test(
+      page,
+    ),
+    "`next` is the OAuth callback's name for it and is ignored by the form",
+  );
+  check(
+    "and carries the condition with it",
+    /const target = condition\s*\n?\s*\? `\/products\/new\?condition=\$\{condition\}`/.test(
+      page,
+    ),
+  );
+
+  const form = code("src/components/products/product-form.tsx");
+  check(
+    "an existing listing's own condition wins over the link that was followed",
+    /\(product\?\.condition as ProductCondition \| undefined\) \?\?\s*\n?\s*initialCondition \?\?/.test(
+      form,
+    ),
+    "editing a new listing from a Used link must not silently switch it",
+  );
+}
+
+{
+  const designs = code("src/app/designs/page.tsx");
+  check(
+    "the Digital Marketplace tab has a create action outside its empty state",
+    (designs.match(/href="\/studio"/g) ?? []).length === 2,
+    "it was only shown when nothing had been published, so a second design was never invited",
+  );
+  check(
+    "in the header, beside the title",
+    /<header className="flex flex-col gap-4[\s\S]{0,900}Design something/.test(
+      designs,
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 11. Signing in does not send anybody off Medosha
+//
+// Found while checking that the condition survived a sign-in: the password
+// action redirected to whatever was in its hidden input, and the hidden input
+// came from the query string. The Google callback had guarded its equivalent
+// for exactly this reason; the password path had not. Widening what the
+// middleware puts in that parameter without fixing it would have made it
+// worse.
+// ---------------------------------------------------------------------------
+
+{
+  check(
+    "a same-site path is kept",
+    safeRedirect("/products/new?condition=used") ===
+      "/products/new?condition=used",
+  );
+  check(
+    "an absolute URL is refused",
+    safeRedirect("https://evil.example") === "/dashboard",
+  );
+  check(
+    "a protocol-relative one is refused",
+    safeRedirect("//evil.example") === "/dashboard",
+    "browsers read it as a scheme-less absolute URL and follow it off-site",
+  );
+  check(
+    "and the backslash variant of it",
+    safeRedirect("/\\evil.example") === "/dashboard",
+    "some browsers normalise the backslash into a forward slash",
+  );
+  check(
+    "an embedded scheme is refused",
+    safeRedirect("/redirect?to=https://evil.example") === "/dashboard",
+  );
+  // These two are what the leading-slash rule is for, and nothing else catches
+  // them: `javascript:` has a colon but no `://`, and a bare hostname has
+  // neither. Removing that rule left every other check passing.
+  check(
+    "a javascript: URL is refused",
+    safeRedirect("javascript:alert(1)") === "/dashboard",
+    "it has a colon but no `://`, so the scheme check does not see it",
+  );
+  check(
+    "and so is a bare hostname",
+    safeRedirect("evil.example") === "/dashboard",
+  );
+  check("nothing at all falls back", safeRedirect(null) === "/dashboard");
+
+  const action = code("src/app/(auth)/login/actions.ts");
+  check(
+    "the password sign-in guards where it sends people",
+    /redirect\(safeRedirect\(/.test(action),
+    "it redirected to the hidden input's value, and that value came from the URL",
+  );
+  const form = code("src/app/(auth)/login/login-form.tsx");
+  check(
+    "and the form never renders an off-site destination in the first place",
+    /safeRedirect\(searchParams\.get\("redirect"\)\)/.test(form),
+  );
+  const callback = code("src/app/auth/callback/route.ts");
+  check(
+    "the Google callback uses the same rule rather than its own copy",
+    /safeRedirect\(searchParams\.get\("next"\)\)/.test(callback) &&
+      !/function safeNext/.test(callback),
+    "two implementations of one rule is how the second comes to be missing",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 12. Nothing else about the marketplace changed
 // ---------------------------------------------------------------------------
 
 {
