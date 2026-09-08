@@ -15,6 +15,7 @@ import {
   User,
 } from "lucide-react";
 
+import { ReportDialog } from "@/components/moderation/report-dialog";
 import { ProjectOwnerActions } from "@/components/projects/project-owner-actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -271,6 +272,18 @@ export default async function ProjectDetailPage(props: {
               <DetailRow icon={User} label="Client" value={project.client} />
             )}
           </div>
+
+          {/* A portfolio is the surface people's photographs are lifted from,
+              and until now it was the one surface with nowhere to say so.
+              Not shown to the owner: nobody reports their own project. */}
+          {!isOwner && (
+            <ReportDialog
+              contentType="project"
+              contentId={project.id}
+              ownerId={project.owner_id}
+              variant="row"
+            />
+          )}
         </aside>
       </div>
 

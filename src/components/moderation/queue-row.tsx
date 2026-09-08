@@ -47,6 +47,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   scam: "Scam",
   spam: "Spam",
   illegal: "Illegal",
+  infringement: "Stolen work",
   other: "Other",
 };
 

@@ -28,7 +28,16 @@ insert into public.profiles (id, username, full_name, phone) values
   ('e0000000-0000-4000-8000-000000000001', 'probe_liar', 'Probe Liar', '+251900000001'),
   ('e0000000-0000-4000-8000-000000000002', 'probe_honest', 'Probe Honest', '+251900000002'),
   ('e0000000-0000-4000-8000-000000000003', 'probe_other', 'Probe Other', '+251900000003')
-on conflict (id) do nothing;
+on conflict (id) do update set
+  username = excluded.username,
+  full_name = excluded.full_name,
+  phone = excluded.phone;
+-- Not `do nothing`. Inserting into auth.users fires the trigger that creates
+-- the profile row, so the row already exists by the time this runs and `do
+-- nothing` left `phone` null on all three — which quietly disarmed the one
+-- fixture that separates a typed number from a confirmed one. Check 4c
+-- reported false, and an implementation trusting profiles.phone would have
+-- passed the rest.
 
 -- ===================================================================
 -- 1. A member cannot award themselves the badge.

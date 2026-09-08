@@ -28,6 +28,11 @@ import sharp from "sharp";
 
 import { applyWatermark } from "../src/lib/images/watermark.ts";
 import {
+  MODERATION_CATEGORIES,
+  REPORT_CATEGORIES,
+} from "../src/lib/moderation/types.ts";
+import { nextLevel } from "../src/lib/moderation/strikes.ts";
+import {
   DEFAULT_WATERMARK,
   normaliseSettings,
   shouldWatermark,
@@ -530,6 +535,85 @@ async function main() {
     /use_phone: settings\.use_phone === true,/.test(action),
   );
   check("nobody may save somebody else's row", /user_id: user\.id,/.test(action));
+
+  // -------------------------------------------------------------------------
+  // 11. Somewhere to say "that is my photograph"
+  //
+  // The mark only helps if the person who finds their own work on somebody
+  // else's listing has a way to report it that reaches a moderator as a
+  // copyright claim rather than as "Something else".
+  // -------------------------------------------------------------------------
+
+  check(
+    "there is a category for stolen work",
+    (MODERATION_CATEGORIES as readonly string[]).includes("infringement"),
+  );
+  check(
+    "and a reporter can choose it",
+    REPORT_CATEGORIES.some((entry) => entry.id === "infringement"),
+  );
+  check(
+    "worded as the person filing it would say it",
+    REPORT_CATEGORIES.some(
+      (entry) =>
+        entry.id === "infringement" &&
+        /my photos or work without permission/i.test(entry.label),
+    ),
+  );
+
+  // One person's word against another's until somebody looks. A first claim
+  // that restricts an account is a weapon handed to a competitor.
+  check(
+    "a first claim does not restrict the account",
+    nextLevel(0, "infringement") === "warning",
+  );
+  check(
+    "unlike the categories that do",
+    nextLevel(0, "illegal") === "restricted" && nextLevel(0, "threats") === "restricted",
+  );
+
+  {
+    const provider = code("src/lib/moderation/provider.ts");
+    check(
+      "no classifier verdict maps to it",
+      !/infringement/.test(provider),
+      "whether a photograph is somebody's own work is not visible in the pixels",
+    );
+  }
+  {
+    const queue = code("src/components/moderation/queue-row.tsx");
+    check(
+      "the moderator queue names it rather than showing the raw value",
+      /infringement: "Stolen work"/.test(queue),
+    );
+  }
+  {
+    const project = code("src/app/(dashboard)/projects/[id]/page.tsx");
+    check(
+      "a portfolio project can be reported",
+      /<ReportDialog[\s\n]/.test(project),
+      "the surface photographs are lifted from had no report path at all",
+    );
+    check(
+      "but not by its own owner",
+      /\{!isOwner && \(\s*<ReportDialog/.test(project),
+    );
+    check(
+      "and the report carries the owner, so a strike has somebody to land on",
+      /ownerId=\{project\.owner_id\}/.test(project),
+    );
+  }
+  {
+    const migration = readFileSync(
+      "supabase/migrations/0070_infringement_reports.sql",
+      "utf8",
+    ).replace(/^\s*--.*$/gm, "");
+    check(
+      "the value is added to the database enum",
+      /add value if not exists 'infringement'/.test(migration),
+      "and idempotently, so re-running the migration is safe",
+    );
+  }
 
   // -------------------------------------------------------------------------
 

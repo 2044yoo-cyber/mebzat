@@ -571,6 +571,7 @@ export type ModerationCategory =
   | "scam"
   | "spam"
   | "illegal"
+  | "infringement"
   | "other";
 
 export type ModerationStatus =

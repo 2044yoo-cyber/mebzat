@@ -23,6 +23,9 @@ export const MODERATION_CATEGORIES = [
   "scam",
   "spam",
   "illegal",
+  // Only ever set by a person. No classifier returns it: whether a photograph
+  // is somebody's own work is not visible in the pixels.
+  "infringement",
   "other",
 ] as const;
 export type ModerationCategory = (typeof MODERATION_CATEGORIES)[number];
@@ -60,6 +63,9 @@ export const REPORT_CATEGORIES = [
   { id: "violence", label: "Violence or threats" },
   { id: "spam", label: "Spam" },
   { id: "illegal", label: "Illegal content" },
+  // The reason the watermark exists. Filed under "Something else" a copyright
+  // claim reaches a moderator with nothing to act on.
+  { id: "infringement", label: "Uses my photos or work without permission" },
   { id: "other", label: "Something else" },
 ] as const satisfies readonly { id: ModerationCategory; label: string }[];
 
