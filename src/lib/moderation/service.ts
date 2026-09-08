@@ -2,6 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { watermarkForPublishing } from "@/lib/images/watermark-pipeline";
+
 import {
   activeProvider,
   isModerationConfigured,
@@ -173,22 +175,30 @@ export function worst(verdicts: ProviderVerdict[]): ProviderVerdict {
 }
 
 /**
- * Approving a quarantined file: copy to the public bucket, record the path.
+ * Approving a quarantined file: mark it, copy it to the public bucket, record
+ * the paths.
  *
  * The copy happens here and nowhere else, which is what makes "published"
  * mean "cleared". The database will refuse a public path on a row that is not
  * safe, so even a bug in this function cannot produce a published-but-unchecked
  * file — it can only fail to publish a clean one.
+ *
+ * It is also the only place where a private file becomes a public one, which
+ * makes it the only place a watermark can be applied and be certain to cover
+ * every surface. Eight upload components call this; none of them needs to know
+ * the feature exists.
  */
 export async function publishApproved(
   client: SupabaseClient,
   itemId: string,
   quarantinePath: string,
   publicBucket: string,
+  /** The sniffed type, not the browser's claim. */
+  mime?: string,
 ): Promise<string | null> {
   const { data: item } = await client
     .from("moderation_items")
-    .select("status, user_id")
+    .select("status, user_id, content_type")
     .eq("id", itemId)
     .maybeSingle();
 
@@ -203,12 +213,27 @@ export async function publishApproved(
     return null;
   }
 
+  const original = new Uint8Array(await download.data.arrayBuffer());
+  const contentType = mime ?? download.data.type ?? "image/jpeg";
+
+  const marked = await watermarkForPublishing({
+    client,
+    userId: item.user_id as string | null,
+    contentType: item.content_type as ContentKind,
+    bytes: original,
+    mime: contentType,
+  });
+
   // Same filename, new bucket. Keeping the name means a path that was recorded
-  // before approval still resolves afterwards.
+  // before approval still resolves afterwards — and it means the original in
+  // the private bucket sits at the path its published copy can be found by.
   const publicPath = quarantinePath;
   const upload = await client.storage
     .from(publicBucket)
-    .upload(publicPath, download.data, { upsert: false });
+    .upload(publicPath, marked ? marked.buffer : download.data, {
+      upsert: false,
+      contentType: marked ? marked.mime : contentType,
+    });
 
   if (upload.error) {
     console.error("[moderation] could not publish:", upload.error.message);
@@ -219,9 +244,28 @@ export async function publishApproved(
     data: { publicUrl },
   } = client.storage.from(publicBucket).getPublicUrl(publicPath);
 
+  // The unmarked file is only kept when the published one actually differs
+  // from it. Without this the author would have handed over their photograph
+  // and got back only the copy with a name written across it.
+  let originalPath: string | null = null;
+  if (marked?.watermarked) {
+    const kept = await client.storage
+      .from("image-originals")
+      .upload(publicPath, download.data, { upsert: true, contentType });
+    if (kept.error) {
+      console.error("[moderation] could not keep original:", kept.error.message);
+    } else {
+      originalPath = publicPath;
+    }
+  }
+
   await client
     .from("moderation_items")
-    .update({ public_path: publicPath })
+    .update({
+      public_path: publicPath,
+      watermarked: marked?.watermarked ?? false,
+      original_path: originalPath,
+    })
     .eq("id", itemId);
 
   // The quarantine copy is not kept. It has served its purpose and holding a

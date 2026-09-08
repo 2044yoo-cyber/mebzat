@@ -854,6 +854,16 @@ export type TourVisibility =
   | "private"
   | "archived";
 
+export type WatermarkPosition =
+  | "bottom_right"
+  | "bottom_left"
+  | "top_right"
+  | "top_left"
+  | "center"
+  | "tiled";
+
+export type WatermarkSize = "small" | "medium" | "large";
+
 export type VerificationStatus =
   | "unverified"
   | "pending"
@@ -4501,6 +4511,51 @@ export interface Database {
         };
         Relationships: [];
       };
+      watermark_settings: {
+        Row: {
+          user_id: string;
+          enabled: boolean;
+          use_username: boolean;
+          use_display_name: boolean;
+          use_company: boolean;
+          use_logo: boolean;
+          use_phone: boolean;
+          position: WatermarkPosition;
+          size: WatermarkSize;
+          opacity: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          enabled?: boolean;
+          use_username?: boolean;
+          use_display_name?: boolean;
+          use_company?: boolean;
+          use_logo?: boolean;
+          use_phone?: boolean;
+          position?: WatermarkPosition;
+          size?: WatermarkSize;
+          opacity?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          enabled?: boolean;
+          use_username?: boolean;
+          use_display_name?: boolean;
+          use_company?: boolean;
+          use_logo?: boolean;
+          use_phone?: boolean;
+          position?: WatermarkPosition;
+          size?: WatermarkSize;
+          opacity?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       moderation_items: {
         Row: {
           id: string;
@@ -4521,6 +4576,8 @@ export interface Database {
           created_at: string;
           reviewed_at: string | null;
           reviewed_by: string | null;
+          original_path: string | null;
+          watermarked: boolean;
         };
         Insert: {
           id?: string;
@@ -4541,6 +4598,8 @@ export interface Database {
           created_at?: string;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
+          original_path?: string | null;
+          watermarked?: boolean;
         };
         Update: {
           id?: string;
@@ -4561,6 +4620,8 @@ export interface Database {
           created_at?: string;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
+          original_path?: string | null;
+          watermarked?: boolean;
         };
         Relationships: [];
       };

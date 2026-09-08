@@ -132,6 +132,9 @@ export async function moderateQuarantinedImage(input: {
     outcome.itemId,
     input.quarantinePath,
     input.publicBucket,
+    // The sniffed type, so the published copy is encoded and served as what
+    // the bytes actually are rather than as whatever the filename claimed.
+    actual,
   );
 
   if (!publicUrl) {
