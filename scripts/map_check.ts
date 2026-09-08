@@ -143,8 +143,11 @@ check(
   /shell\.navCollapsed \? 60 : shell\.navWidth/.test(shell),
 );
 check(
-  "the panel is sized the same way",
-  /style=\{\{ width: shell\.panelWidth \}\}/.test(shell),
+  // Still a measured width rather than a class that hides it — but applied on
+  // desktop only. Below lg the panel is a bottom sheet the width of the
+  // screen, and the stored number is the desktop column's.
+  "the panel is sized the same way where it is a column",
+  /style=\{desktop \? \{ width: shell\.panelWidth \} : undefined\}/.test(shell),
 );
 check(
   "both sides are independent state, not one flag",

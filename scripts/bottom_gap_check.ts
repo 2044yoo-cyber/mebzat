@@ -336,6 +336,38 @@ check("and the utility for it exists", /\.scroll-pb-content-safe\s*\{[\s\S]{0,90
   );
 }
 
+// ---------------------------------------------------------------------------
+// The context panel on a phone
+//
+// It was a side sheet: full height, up to 90vw. On a phone that is the map
+// gone — and the map is the thing the panel is describing. A quarter of the
+// height along the bottom leaves three quarters of the city behind it.
+// ---------------------------------------------------------------------------
+
+{
+  const shell = code("src/components/shell/app-shell.tsx");
+  const panel = code("src/components/property/property-panel.tsx");
+
+  check("the panel is a bottom sheet below lg", /fixed inset-x-0 bottom-\[var\(--bottom-nav-h\)\] z-40 h-\[25svh\]/.test(shell));
+  check("and no longer a full-height side sheet", !/fixed inset-y-0 right-0 z-40 max-w-\[90vw\]/.test(shell));
+  // The navigation bar is fixed above this at z-50, so a sheet at bottom-0
+  // loses its last 57px underneath it.
+  check("it sits above the navigation bar rather than under it", /bottom-\[var\(--bottom-nav-h\)\]/.test(shell));
+  check("with a floor, so it is never uselessly short", /min-h-44/.test(shell));
+
+  // From lg up it is the column it always was.
+  check("the desktop column is restored explicitly", /lg:static lg:inset-auto lg:z-auto lg:h-auto lg:min-h-0/.test(shell));
+  check("including its square corners", /lg:rounded-none lg:border-t-0/.test(shell));
+  // The stored width is a desktop measurement; a sheet is the screen's width.
+  check("the stored width applies on desktop only", /style=\{desktop \? \{ width: shell\.panelWidth \} : undefined\}/.test(shell));
+
+  // A 4:3 photo at full width is 455px — more than twice the sheet — so the
+  // price and the title were below the fold of a panel meant to summarise.
+  check("the panel's photo is a strip on a phone", /relative h-24 bg-muted sm:aspect-\[4\/3\] sm:h-auto/.test(panel));
+  check("and it asks for a phone-sized image", /sizes="\(max-width: 640px\) 100vw, 420px"/.test(panel));
+  check("its left border is desktop-only, since a sheet has no column beside it", /bg-background lg:border-l/.test(panel));
+}
+
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
   for (const failure of failures) console.log(`  ${RED}✗${RESET} ${failure}`);

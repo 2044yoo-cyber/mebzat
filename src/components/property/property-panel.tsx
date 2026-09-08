@@ -177,15 +177,22 @@ function PanelBody({
     <aside
       role="dialog"
       aria-label={summary.title}
-      className="flex h-full w-full flex-col overflow-hidden border-l bg-background"
+      className="flex h-full w-full flex-col overflow-hidden bg-background lg:border-l"
     >
       <div className="relative shrink-0">
-        <div className="relative aspect-[4/3] bg-muted">
+        {/* A strip on a phone, the 4:3 frame it always was from sm up.
+            
+            The panel is a quarter-height sheet below sm — the whole point of
+            which is that the map stays visible behind it — and a 4:3 photo at
+            full width is 455px, more than twice the sheet. As a strip the
+            price and the title are in the sheet with it, and the photo is
+            still the first thing you see. */}
+        <div className="relative h-24 bg-muted sm:aspect-[4/3] sm:h-auto">
           <Image
             src={safeImageSrc(gallery[activeImage]?.url, PROJECT_PLACEHOLDER)}
             alt={summary.title}
             fill
-            sizes="420px"
+            sizes="(max-width: 640px) 100vw, 420px"
             className="object-cover"
             // Blurred placeholder while the full image decodes.
             placeholder="empty"

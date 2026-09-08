@@ -319,7 +319,9 @@ export function AppShell({
             />
           </div>
           <div
-            style={{ width: shell.panelWidth }}
+            // The stored width is the desktop column's. Below lg the sheet is
+            // the full width of the screen, so it is applied there only.
+            style={desktop ? { width: shell.panelWidth } : undefined}
             className={cn(
               // bg-background on the wrapper, not only on ContextPanel inside
               // it. Without it a panel with little to show was a transparent
@@ -330,8 +332,21 @@ export function AppShell({
               // z-40, not z-50: BottomNav is also fixed at z-50, and with equal
               // z-index the winner was decided by which rendered later in the
               // file. Navigation worked and nothing else did, by accident.
-              "fixed inset-y-0 right-0 z-40 max-w-[90vw] shadow-2xl",
-              "lg:static lg:z-auto lg:max-w-none lg:shadow-none",
+              //
+              // A sheet along the bottom, not down the side. As a side sheet
+              // it was full height and up to 90vw, which on a phone is the
+              // map gone — and the map is the thing the panel is describing.
+              // A quarter of the height leaves three quarters of the city
+              // visible behind it, which is the point.
+              //
+              // `bottom-[var(--bottom-nav-h)]` rather than `bottom-0`: the
+              // navigation bar is fixed above this at z-50, so a sheet at the
+              // very bottom loses its last 57px underneath it.
+              "fixed inset-x-0 bottom-[var(--bottom-nav-h)] z-40 h-[25svh] min-h-44",
+              "rounded-t-2xl border-t shadow-2xl",
+              // From lg up it is the column it always was.
+              "lg:static lg:inset-auto lg:z-auto lg:h-auto lg:min-h-0 lg:max-w-none",
+              "lg:rounded-none lg:border-t-0 lg:shadow-none",
             )}
           >
             <ContextPanel signedIn={signedIn} homeWidget={homeWidget} />
