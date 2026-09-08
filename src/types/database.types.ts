@@ -7145,6 +7145,14 @@ export interface Database {
           age_days: number;
         }[];
       };
+      /** 0068. The only route to the verified badge. */
+      sync_phone_verification: {
+        Args: Record<string, never>;
+        Returns: {
+          phone_verified: boolean;
+          verification_status: VerificationStatus;
+        }[];
+      };
       admin_can: {
         Args: {
           area: AdminArea;
