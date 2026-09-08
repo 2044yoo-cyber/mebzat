@@ -351,6 +351,23 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         id: "professionals",
         label: "Professionals",
+        icon: HardHat,
+        href: "/professionals",
+        hint: "Find a person by trade, city and rating",
+        keywords: [
+          "carpenter",
+          "contractor",
+          "engineer",
+          "architect",
+          "electrician",
+          "plumber",
+          "hire someone",
+          "tradesperson",
+        ],
+      },
+      {
+        id: "professionals",
+        label: "Professionals",
         icon: Users,
         href: "/directory/individual",
         private: true,

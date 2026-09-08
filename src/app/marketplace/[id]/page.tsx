@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  BadgeCheck,
   Eye,
   MapPin,
   Store,
@@ -23,6 +22,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cn, formatPrice } from "@/lib/utils";
 import type { ProductCardData } from "@/components/products/product-card";
 import { ReportDialog } from "@/components/moderation/report-dialog";
+import { VerifiedBadge } from "@/components/profile/verified-badge";
 
 type Supplier = {
   id: string;
@@ -307,7 +307,7 @@ export default async function ProductDetailPage(props: {
                 <p className="flex items-center gap-1 font-medium">
                   {supplierName}
                   {supplier.verification_status === "verified" && (
-                    <BadgeCheck className="size-4 text-brand" />
+                    <VerifiedBadge level="phone" showLabel={false} />
                   )}
                 </p>
                 {(supplier.location_city || supplier.location_country) && (

@@ -10,6 +10,7 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
       links: [
         { label: "Marketplace", href: "/marketplace" },
         { label: "Companies", href: "/companies" },
+        { label: "Professionals", href: "/professionals" },
         { label: "Find suppliers", href: "/directory/supplier" },
         { label: "Find contractors", href: "/directory/contractor" },
         { label: "Join Medosha", href: "/signup" },

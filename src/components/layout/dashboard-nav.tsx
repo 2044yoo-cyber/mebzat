@@ -20,6 +20,7 @@ const PUBLIC_LINKS = [
   { href: "/marketplace", label: "Marketplace" },
   { href: "/projects", label: "Projects" },
   { href: "/companies", label: "Companies" },
+  { href: "/professionals", label: "Professionals" },
 ];
 
 const MEMBER_LINKS = [

@@ -1,10 +1,10 @@
+import { VerifiedBadge } from "@/components/profile/verified-badge";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
-  BadgeCheck,
   Clock,
   Globe,
   MapPin,
@@ -217,10 +217,7 @@ export default async function ServicePage(props: {
                     <span className="truncate">{name}</span>
                   )}
                   {provider?.verification_status === "verified" && (
-                    <BadgeCheck
-                      className="size-4 shrink-0 text-brand"
-                      aria-label="Verified"
-                    />
+                    <VerifiedBadge level="phone" showLabel={false} />
                   )}
                 </p>
                 {provider?.account_type && (

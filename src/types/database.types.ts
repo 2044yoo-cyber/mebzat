@@ -8205,6 +8205,36 @@ export interface Database {
         };
         Returns: { points: number; rank_percentile: number; badge_count: number; completed_projects: number; positive_reviews: number }[];
       };
+      search_professionals: {
+        Args: {
+          p_query?: string | null;
+          p_category?: string | null;
+          p_city?: string | null;
+          p_min_rating?: number | null;
+          p_verified_only?: boolean | null;
+          p_available_only?: boolean | null;
+          p_limit?: number | null;
+          p_offset?: number | null;
+        };
+        Returns: {
+          id: string;
+          username: string | null;
+          full_name: string | null;
+          company_name: string | null;
+          avatar_url: string | null;
+          account_type: AccountType | null;
+          location_city: string | null;
+          years_experience: number | null;
+          phone_verified: boolean;
+          work_status: WorkStatus;
+          rating: number | null;
+          review_count: number;
+          verified_reviews: number;
+          service_count: number;
+          trades: string[];
+          total_count: number;
+        }[];
+      };
       company_reputation: {
         Args: {
           p_company: string;

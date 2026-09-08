@@ -130,11 +130,17 @@ export function listingBadges({
         : sellerKind === "agent"
           ? "Agent"
           : "Owner";
+    // `sellerVerified` comes from `profiles.verification_status`, which
+    // `sync_phone_verification()` sets from a confirmed one-time code and
+    // nothing else. The badge used to read "Medosha has checked this seller's
+    // identity", which is not what happened — and it was being read by
+    // somebody deciding how to negotiate on a house.
     badges.push({
       id: "seller-verified",
-      label: `Verified ${who}`,
+      label: `Phone-verified ${who}`,
       tone: "verified",
-      title: "Medosha has checked this seller's identity.",
+      title:
+        "This seller confirmed a one-time code sent to their phone. Medosha has not checked their identity.",
     });
   }
 
