@@ -13,6 +13,7 @@ import {
   Minus,
   Plus,
   WifiOff,
+  X,
 } from "lucide-react";
 
 import { describeError, trackRequest } from "@/lib/map/diagnostics";
@@ -31,6 +32,7 @@ import type { AiHighlight } from "@/lib/map/ai-highlight";
 import { loadSession, saveSession } from "@/lib/map/session";
 import { BASE_STYLE } from "@/lib/map/style";
 import { DevelopmentCard } from "@/components/property/development-card";
+import { PropertyHoverCard } from "@/components/property/hover-card";
 import {
   bandFor,
   buildPriceScale,
@@ -177,6 +179,16 @@ export function CityCanvas({
   const onResultsRef = useRef(onResults);
   const selectedRef = useRef(selectedId);
   const panelRef = useRef(panelOpen);
+  /**
+   * The current properties, by id.
+   *
+   * A marker whose price band has not changed is reused rather than rebuilt,
+   * so its listeners are the ones added when it was first created and they
+   * close over the property object from *that* render. Reading through this
+   * instead means a reused pin still previews the data the map is showing now
+   * rather than the data it was showing when the pin was made.
+   */
+  const propertiesRef = useRef(new Map<string, MapProperty>());
   useEffect(() => {
     filtersRef.current = filters;
     developmentsOnRef.current = (layers ?? []).includes("projects");
@@ -184,12 +196,25 @@ export function CityCanvas({
     onResultsRef.current = onResults;
     selectedRef.current = selectedId;
     panelRef.current = panelOpen;
+    propertiesRef.current = new Map(properties.map((one) => [one.id, one]));
   });
 
   // ---- Properties: independent of the map's own health --------------------
 
   const [developments, setDevelopments] = useState<MapDevelopment[]>([]);
   const [openDevelopment, setOpenDevelopment] = useState<MapDevelopment | null>(null);
+
+  /**
+   * The marker a reader is asking about.
+   *
+   * Built from the property the viewport query already returned, so opening it
+   * costs nothing — a fetch per marker on a map with three hundred pins is a
+   * request storm and a visible wait on every one.
+   *
+   * It matters most in full screen, where the shell's detail panel is behind
+   * the map's own layer and a tap therefore had nothing to show at all.
+   */
+  const [preview, setPreview] = useState<MapProperty | null>(null);
   const developmentsOn = (layers ?? []).includes("projects");
   const developmentsRequest = useRef<AbortController | null>(null);
 
@@ -410,7 +435,10 @@ export function CityCanvas({
     };
 
     map.on("moveend", onMoveEnd);
-    map.on("click", () => onSelectRef.current?.(null));
+    map.on("click", () => {
+      onSelectRef.current?.(null);
+      setPreview(null);
+    });
 
     return () => {
       clearTimeout(moveTimer);
@@ -603,9 +631,21 @@ export function CityCanvas({
 
       const element = createMarkerElement(
         property,
-        (chosen) => onSelectRef.current?.(chosen),
+        (chosen) => {
+          setPreview(propertiesRef.current.get(chosen.id) ?? chosen);
+          onSelectRef.current?.(chosen);
+        },
         band,
       );
+
+      // Hover is the desktop half. `pointerenter` rather than `mouseenter`
+      // so it is one listener for both, and a touch that becomes a tap has
+      // already opened the card by the time this fires — same card, so there
+      // is nothing to flicker.
+      element.addEventListener("pointerenter", (event) => {
+        if ((event as PointerEvent).pointerType === "touch") return;
+        setPreview(propertiesRef.current.get(property.id) ?? property);
+      });
       element.dataset.selected = String(selectedId === property.id);
       element.dataset.aiMatch = matchState(property.id);
 
@@ -840,6 +880,30 @@ export function CityCanvas({
           </span>
         )}
       </div>
+
+      {preview && (
+        <div
+          className={cn(
+            "absolute z-20",
+            // A thumb's reach on a phone, the map's corner on a desktop —
+            // the same placement the development card already uses, so two
+            // cards over the same map do not arrive from different corners.
+            "inset-x-2 bottom-2 sm:inset-x-auto sm:right-3 sm:bottom-3 sm:left-auto",
+          )}
+        >
+          <div className="relative">
+            <PropertyHoverCard property={preview} />
+            <button
+              type="button"
+              onClick={() => setPreview(null)}
+              aria-label="Close preview"
+              className="absolute -top-2 -right-2 flex size-8 items-center justify-center rounded-full border bg-background shadow-md transition-colors active:bg-muted"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {developmentsOn && openDevelopment && (
         <DevelopmentCard

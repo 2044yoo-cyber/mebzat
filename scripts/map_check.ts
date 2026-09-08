@@ -639,6 +639,71 @@ check(
   /new ResizeObserver\(\(\) => map\.resize\(\)\)/.test(canvas),
 );
 
+// ---------------------------------------------------------------------------
+// What a marker tells you
+//
+// `PropertyHoverCard` was written, complete with the photo, the price and the
+// square metres, and then nothing ever rendered it. On a phone in full screen
+// that mattered most: the shell's detail panel is behind the map's own layer,
+// so tapping a pin had nothing at all to show.
+// ---------------------------------------------------------------------------
+
+{
+  const card = code("src/components/property/hover-card.tsx");
+
+  check("something renders the preview card now", /<PropertyHoverCard[\s/>]/.test(canvas));
+  check("a tap on a marker opens it", /setPreview\(propertiesRef\.current\.get\(chosen\.id\)/.test(canvas));
+  // Hover is the desktop half; a touch has already opened the card by then.
+  check("a pointer hovering opens it too", /addEventListener\("pointerenter"/.test(canvas));
+  check("but a touch does not open it twice", /pointerType === "touch"\) return;/.test(canvas));
+  check("tapping the map closes it", /setPreview\(null\)/.test(canvas));
+  check("and there is a close control", /aria-label="Close preview"/.test(canvas));
+
+  // A reused marker's listener closes over the property from the render that
+  // made it, so reading the object directly shows the map's old data.
+  check(
+    "a reused marker previews current data, not the data it was built with",
+    /propertiesRef\.current = new Map\(properties\.map/.test(canvas),
+  );
+
+  // The whole point of the card: it is built from what the viewport query
+  // already returned. A fetch per marker on a map of three hundred pins is a
+  // request storm and a wait on every one.
+  check("the preview costs no request", !/fetch\(|useEffect\([^)]*preview/.test(card));
+
+  check("it carries the photo", /<Image/.test(card));
+  check("the price", /property\.price\.toLocaleString\("en-ET"\)/.test(card));
+  // Not /property\.area_m2/ — that survives in the type declaration and in the
+  // `!== null` guard while the printed value is gone. Anchored to the output.
+  check("the square metres", /\{property\.area_m2\} m²/.test(card));
+  check(
+    "and the bed and bath counts",
+    /<BedDouble className="size-3" \/>\s*\{property\.bedrooms\}/.test(card) &&
+      /<Bath className="size-3" \/>\s*\{property\.bathrooms\}/.test(card),
+  );
+  check("with a way through to the property", /href=\{`\/property\/\$\{property\.id\}`\}/.test(card));
+
+  // 256px with a 190px photo on top is fine hanging off a cursor and too tall
+  // for a card over a map on a phone.
+  check("it is a row on a phone and a card from sm up", /flex w-full sm:block sm:w-64/.test(card));
+  check("with a small square thumbnail rather than a 4:3 header", /aspect-square w-28 shrink-0 bg-muted sm:aspect-\[4\/3\]/.test(card));
+  check("and it asks the browser for a thumbnail-sized image", /sizes="\(max-width: 640px\) 112px, 256px"/.test(card));
+
+  // Placement matches the development card, so two cards over one map do not
+  // arrive from different corners.
+  check(
+    "it sits where the development card sits",
+    /inset-x-2 bottom-2 sm:inset-x-auto/.test(canvas),
+  );
+
+  // Said on the card, not only on the property page: a pin looks like a
+  // precise claim, and for these it is the middle of a neighbourhood.
+  check(
+    "an approximate pin still says so",
+    /location_accuracy === "approximate"/.test(card),
+  );
+}
+
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
   for (const failure of failures) console.log(`  ${RED}✗${RESET} ${failure}`);

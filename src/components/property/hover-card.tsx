@@ -53,17 +53,24 @@ export function PropertyHoverCard({
   return (
     <article
       className={cn(
-        "w-64 overflow-hidden rounded-2xl border bg-background shadow-lg",
+        "overflow-hidden rounded-2xl border bg-background shadow-lg",
+        // A row on a phone, the card it always was from sm up.
+        //
+        // 256px with a 4:3 photo on top is 190px of image before a word of
+        // text — fine hanging off a cursor, too tall for a card sitting over
+        // a map somebody is reading on a phone. Side by side, the same
+        // information is about 110px and leaves the map visible.
+        "flex w-full sm:block sm:w-64",
         className,
       )}
     >
-      <div className="relative aspect-[4/3] bg-muted">
+      <div className="relative aspect-square w-28 shrink-0 bg-muted sm:aspect-[4/3] sm:w-auto">
         {isRenderableSrc(property.cover_image_url) ? (
           <Image
             src={safeImageSrc(property.cover_image_url)}
             alt=""
             fill
-            sizes="256px"
+            sizes="(max-width: 640px) 112px, 256px"
             className="object-cover"
           />
         ) : (
@@ -76,7 +83,7 @@ export function PropertyHoverCard({
         </span>
       </div>
 
-      <div className="space-y-1.5 p-3">
+      <div className="min-w-0 flex-1 space-y-1 p-2.5 sm:space-y-1.5 sm:p-3">
         <p className="text-sm font-semibold">
           {property.price === null
             ? "Price on request"
@@ -89,7 +96,7 @@ export function PropertyHoverCard({
           )}
         </p>
 
-        <p className="line-clamp-2 text-sm">{property.title}</p>
+        <p className="line-clamp-1 text-sm sm:line-clamp-2">{property.title}</p>
 
         <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
           {property.bedrooms !== null && (
@@ -120,7 +127,7 @@ export function PropertyHoverCard({
         )}
 
         {property.agent_name && (
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="hidden truncate text-xs text-muted-foreground sm:block">
             {property.is_sample ? "Demo agent: " : ""}
             {property.agent_name}
           </p>
