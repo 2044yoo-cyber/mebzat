@@ -29,6 +29,7 @@ export function Sidebar({
   signedIn,
   counts,
   collapsed,
+  onPickSection,
 }: {
   signedIn: boolean;
   counts: { messages: number; notifications: number };
@@ -42,6 +43,17 @@ export function Sidebar({
    * unlabelled drawer and no way back.
    */
   collapsed?: boolean;
+  /**
+   * Turns each section in the collapsed rail from a link into a request to
+   * see what is inside it.
+   *
+   * The phone's drawer passes this. A rail of icons is a fine shortcut once
+   * you know the place; on a site nobody has learned yet it is a row of
+   * shapes, and jumping straight to a section's first page hides the other
+   * thirteen things in it. With this, the rail names the section and opening
+   * one lists what it holds.
+   */
+  onPickSection?: (id: string) => void;
 }) {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
@@ -88,6 +100,44 @@ export function Sidebar({
             active?.section.id === section.id ||
             (section.href === "/" && pathname === "/");
           if (!target) return null;
+
+          // A word under the glyph. The rail is 72px, which is under a
+          // centimetre and a half and still leaves room for two short lines
+          // at 9px — enough for "Berchuma Studio" to wrap rather than be
+          // guessed at.
+          const body = (
+            <>
+              <section.icon className="size-4.5" />
+              <span className="line-clamp-2 text-center text-[9px] leading-[1.15] font-medium">
+                {section.label}
+              </span>
+            </>
+          );
+
+          const shellClass = cn(
+            "flex w-full flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 transition-colors",
+            isActive
+              ? "bg-brand/15 text-brand"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted active:text-foreground",
+          );
+
+          // Sections with something in them open; Home and anything empty
+          // still go straight there, because a panel listing nothing is a
+          // worse answer than the page itself.
+          if (onPickSection && section.items.length > 0) {
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => onPickSection(section.id)}
+                aria-label={`${section.label} — ${section.items.length} pages`}
+                className={shellClass}
+              >
+                {body}
+              </button>
+            );
+          }
+
           return (
             <Link
               key={section.id}
@@ -95,18 +145,9 @@ export function Sidebar({
               title={section.label}
               aria-label={section.label}
               aria-current={isActive ? "page" : undefined}
-              className={cn(
-                // 44px, not 36px. This rail is a desktop convenience on a
-                // desktop and the whole drawer on a phone, where 36px is
-                // under the minimum a thumb can hit reliably. It still fits
-                // the 60px column with room either side.
-                "flex size-11 items-center justify-center rounded-lg transition-colors",
-                isActive
-                  ? "bg-brand/15 text-brand"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted active:text-foreground",
-              )}
+              className={shellClass}
             >
-              <section.icon className="size-4.5" />
+              {body}
             </Link>
           );
         })}

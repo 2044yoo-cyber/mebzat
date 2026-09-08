@@ -192,7 +192,7 @@ check("and is hidden from assistive technology", /aria-hidden data-nav-pending/.
   const shell = code("src/components/shell/app-shell.tsx");
   const rail = code("src/components/shell/sidebar.tsx");
 
-  check("the drawer has a width of its own", /MOBILE_NAV_WIDTH = 60/.test(shell));
+  check("the drawer has a width of its own", /MOBILE_NAV_WIDTH = 72/.test(shell));
   check("and uses it", /style=\{\{ width: MOBILE_NAV_WIDTH \}\}/.test(shell));
   check("rather than the old flat panel", !/w-\[280px\]/.test(shell));
 
@@ -200,7 +200,13 @@ check("and is hidden from assistive technology", /aria-hidden data-nav-pending/.
   // changes it is desktop-only. Following it onto a phone strands the reader
   // either way: expanded gives a 5cm drawer, collapsed gives no labels and no
   // way to get them.
-  check("the drawer forces its own mode", /<Sidebar signedIn=\{signedIn\} counts=\{live\} collapsed \/>/.test(shell));
+  // Matched on the prop, not the line. The element gained another prop and
+  // wrapped onto several lines; a regex pinned to the one-line spelling
+  // called that a regression.
+  check(
+    "the drawer forces its own mode",
+    /<Sidebar[\s\S]{0,160}?\bcollapsed\b[\s\S]{0,120}?\/>/.test(shell),
+  );
   check("and the rail accepts the override", /collapsed \?\? storedCollapsed/.test(rail));
 
   // Icons with no text beside them have to carry their name some other way.
@@ -223,6 +229,50 @@ check("and is hidden from assistive technology", /aria-hidden data-nav-pending/.
 }
 
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// A rail of glyphs is only a shortcut once you know the place
+//
+// The drawer was right-sized and unreadable: ten icons and no words, on a site
+// nobody has learned yet. Following one took you to that section's first page
+// without ever showing the other thirteen things in it.
+// ---------------------------------------------------------------------------
+
+{
+  const rail = code("src/components/shell/sidebar.tsx");
+  const shell = code("src/components/shell/app-shell.tsx");
+  const panel = code("src/components/shell/section-panel.tsx");
+
+  // A word under every glyph, and room for it to wrap — "Berchuma Studio" and
+  // "Material Exchange" both need two lines at this width.
+  check("every icon in the rail carries its name", /line-clamp-2 text-center text-\[9px\]/.test(rail));
+  check("and the rail is wide enough for it to wrap", /MOBILE_NAV_WIDTH = 72/.test(shell));
+
+  // Opening a section lists what is in it rather than jumping to its first
+  // page. Sections with nothing in them still navigate — a panel listing
+  // nothing is a worse answer than the page.
+  check("a section with pages opens instead of navigating", /onPickSection && section\.items\.length > 0/.test(rail));
+  check("and one without them still goes straight there", /if \(!target\) return null;/.test(rail));
+  check("the rail is told what to do by the drawer", /onPickSection=\{setOpenSection\}/.test(shell));
+  check("the panel is mounted when a section is picked", /<SectionPanel[\s/>]/.test(shell));
+
+  // The panel names each page and carries the one line the manifest already
+  // holds about it, which is the part that makes a new site choosable.
+  check("the panel lists a section's pages", /section\.items\.map/.test(panel));
+  check("with the manifest's own one-line hint", /\{item\.hint\}/.test(panel));
+  check("an unbuilt module is a disabled row, not a link into nothing", /Soon/.test(panel) && /if \(!item\.href\)/.test(panel));
+  check("a private page sends a signed-out reader to sign in", /item\.private && !signedIn/.test(panel));
+  check("its rows are 44px", /min-h-11/.test(panel));
+
+  // The wrapper stretched to the full width of the fixed overlay, so a strip
+  // of invisible wrapper past the panel swallowed taps meant for the backdrop
+  // and the drawer stopped closing when you tapped beside it.
+  check("the drawer is only as wide as what is in it", /relative flex h-full w-fit/.test(shell));
+
+  // Reopening the drawer starts at the rail rather than wherever the last
+  // visit left off.
+  check("closing the drawer forgets the open section", /setOpenSection\(null\)/.test(shell));
+}
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);

@@ -11,6 +11,7 @@ import { ContextPanel } from "@/components/shell/context-panel";
 import { MenuBar } from "@/components/shell/menu-bar";
 import { QuickActions } from "@/components/shell/quick-actions";
 import { ResizeHandle } from "@/components/shell/resize-handle";
+import { SectionPanel } from "@/components/shell/section-panel";
 import { Sidebar } from "@/components/shell/sidebar";
 import { SplitPane } from "@/components/shell/split-pane";
 import { TabBar } from "@/components/shell/tab-bar";
@@ -107,6 +108,11 @@ export function AppShell({
   /** Open only while the reader is still on the page they opened it from. */
   const mobileNav = navOpenedAt !== null && navOpenedAt === pathname;
 
+  // Which section's contents the drawer is showing, if any. Cleared with the
+  // drawer itself, so reopening it always starts at the rail rather than
+  // wherever the last visit left off.
+  const [openSection, setOpenSection] = useState<string | null>(null);
+
   const bare =
     searchParams?.get("_pane") === "1" ||
     AUTH_ROUTES.some((route) => pathname.startsWith(route));
@@ -161,7 +167,10 @@ export function AppShell({
           <button
             type="button"
             aria-label="Close navigation"
-            onClick={() => setNavOpenedAt(null)}
+            onClick={() => {
+              setNavOpenedAt(null);
+              setOpenSection(null);
+            }}
             className="absolute inset-0 cursor-default bg-black/50"
           />
           {/* A compact icon rail, always, at about a centimetre across.
@@ -182,11 +191,38 @@ export function AppShell({
               The labelled menu is not lost — "More" in the bottom bar opens
               every section with its name — which is what makes the drawer
               affordable as a quick rail rather than the only way through. */}
-          <div
-            style={{ width: MOBILE_NAV_WIDTH }}
-            className="relative h-full border-r bg-sidebar"
-          >
-            <Sidebar signedIn={signedIn} counts={live} collapsed />
+          {/* `w-fit`, or the row stretches to the full width of the fixed
+              overlay and a strip of invisible wrapper past the panel swallows
+              the taps meant for the backdrop behind it — the drawer stops
+              closing when you tap beside it. */}
+          <div className="relative flex h-full w-fit">
+            <div
+              style={{ width: MOBILE_NAV_WIDTH }}
+              className="h-full shrink-0 border-r bg-sidebar"
+            >
+              <Sidebar
+                signedIn={signedIn}
+                counts={live}
+                collapsed
+                onPickSection={setOpenSection}
+              />
+            </div>
+
+            {/* What is inside the section, named. A word on the rail says
+                where you are going; it does not say what is there, and
+                "Business" holds fourteen pages. */}
+            {openSection && (
+              <SectionPanel
+                sectionId={openSection}
+                pathname={pathname}
+                signedIn={signedIn}
+                onBack={() => setOpenSection(null)}
+                onNavigate={() => {
+                  setOpenSection(null);
+                  setNavOpenedAt(null);
+                }}
+              />
+            )}
           </div>
         </div>
       )}
@@ -345,11 +381,12 @@ export function AppShell({
 /**
  * The phone drawer's width — about a centimetre of glass.
  *
- * Matches the desktop rail's collapsed width so the icons sit in the same
- * column they always do, and stays a fixed number here because on a phone it
- * is not a preference: there is no handle to drag and no toggle to press.
+ * 72px rather than the desktop rail's 60: this one carries a word under each
+ * icon, and 60 leaves "Berchuma Studio" nowhere to wrap. Still a fixed number
+ * because on a phone it is not a preference — there is no handle to drag and
+ * no toggle to press.
  */
-const MOBILE_NAV_WIDTH = 60;
+const MOBILE_NAV_WIDTH = 72;
 
 /** Routes that render without the workspace frame. */
 const AUTH_ROUTES = [
