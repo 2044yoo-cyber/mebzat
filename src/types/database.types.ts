@@ -2238,6 +2238,7 @@ export interface Database {
           projects_completed: number;
           followers_count: number;
           rating: number | null;
+          review_count: number;
           verified: boolean;
           is_claimed: boolean;
           owner_id: string | null;
@@ -2272,6 +2273,7 @@ export interface Database {
           projects_completed?: number;
           followers_count?: number;
           rating?: number | null;
+          review_count?: number;
           verified?: boolean;
           is_claimed?: boolean;
           owner_id?: string | null;
@@ -2306,6 +2308,7 @@ export interface Database {
           projects_completed?: number;
           followers_count?: number;
           rating?: number | null;
+          review_count?: number;
           verified?: boolean;
           is_claimed?: boolean;
           owner_id?: string | null;
@@ -8201,6 +8204,16 @@ export interface Database {
           target_user_id: string;
         };
         Returns: { points: number; rank_percentile: number; badge_count: number; completed_projects: number; positive_reviews: number }[];
+      };
+      company_reputation: {
+        Args: {
+          p_company: string;
+        };
+        Returns: { average: number; total: number; five: number; four: number; three: number; two: number; one: number; verified_total: number; service_count: number }[];
+      };
+      refresh_company_aggregates: {
+        Args: Record<string, never>;
+        Returns: undefined;
       };
       professional_reputation: {
         Args: {

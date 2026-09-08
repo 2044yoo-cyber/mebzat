@@ -49,6 +49,18 @@ export const VERIFICATION_LEVELS = {
     detail: "Business registration documents were checked.",
     tone: "text-amber-600 dark:text-amber-500",
   },
+  // What `companies.verified` actually means. `approve_company_claim()` sets
+  // it when an admin approves somebody's claim to a directory listing, which
+  // establishes that the person controls the listing — not that the business
+  // is registered, and not that anybody checked a document. The page used to
+  // draw a bare tick for this, which reads as far more.
+  ownership: {
+    label: "Ownership confirmed",
+    short: "Claimed",
+    detail:
+      "Someone at this business claimed the listing and Medosha approved the claim. Business registration has not been checked.",
+    tone: "text-sky-600 dark:text-sky-500",
+  },
 } as const;
 
 export type VerificationLevel = keyof typeof VERIFICATION_LEVELS;
@@ -94,6 +106,22 @@ export function VerifiedBadge({
  * processes behind them exist, because a badge for a check nobody performed is
  * the thing this whole file is arranged to prevent.
  */
+/**
+ * What a business listing has earned.
+ *
+ * Only ever `ownership`, because that is the only thing the claim flow
+ * establishes. A `business` level exists in the vocabulary above and is not
+ * returned here: nothing in Medosha currently checks a registration document,
+ * and a badge saying otherwise would be the platform lying on a page somebody
+ * is using to decide whether to hand over money.
+ */
+export function companyVerificationLevelOf(company: {
+  verified: boolean;
+  is_claimed: boolean;
+}): VerificationLevel | null {
+  return company.verified && company.is_claimed ? "ownership" : null;
+}
+
 export function verificationLevelOf(profile: {
   phone_verified?: boolean | null;
 }): VerificationLevel | null {

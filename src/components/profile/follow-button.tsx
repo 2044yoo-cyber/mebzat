@@ -9,7 +9,7 @@ import { toggleFollow } from "@/app/community/actions";
 import { Button } from "@/components/ui/button";
 
 /**
- * Follow, on a profile.
+ * Follow, on a profile or a business.
  *
  * Calls the same `toggleFollow` the community feed uses rather than a second
  * action of its own — one follow, one row, whichever page created it.
@@ -17,12 +17,14 @@ import { Button } from "@/components/ui/button";
  * visitor gets a login screen instead of an error.
  */
 export function FollowButton({
-  profileId,
+  targetId,
+  targetType = "profile",
   following,
   signedIn,
   next,
 }: {
-  profileId: string;
+  targetId: string;
+  targetType?: "profile" | "company";
   following: boolean;
   signedIn: boolean;
   next: string;
@@ -43,7 +45,7 @@ export function FollowButton({
     setIsFollowing(optimistic);
 
     start(async () => {
-      const result = await toggleFollow("profile", profileId);
+      const result = await toggleFollow(targetType, targetId);
       if (result.error) {
         setIsFollowing(!optimistic);
         toast.error(result.error);

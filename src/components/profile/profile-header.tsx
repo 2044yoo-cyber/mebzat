@@ -126,7 +126,7 @@ export function ProfileHeader({ data }: { data: PublicProfile }) {
             ) : (
               <>
                 <FollowButton
-                  profileId={profile.id}
+                  targetId={profile.id}
                   following={data.viewerFollows === true}
                   signedIn={data.viewerFollows !== null}
                   next={backHere}

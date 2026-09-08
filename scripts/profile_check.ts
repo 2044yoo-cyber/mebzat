@@ -254,7 +254,7 @@ check("an empty rating is empty", NO_RATING.total === 0 && NO_RATING.average ===
   const follow = code("src/components/profile/follow-button.tsx");
   check(
     "following reuses the community action",
-    /toggleFollow\("profile", profileId\)/.test(follow),
+    /toggleFollow\(targetType, targetId\)/.test(follow),
     "a second follow table would be a second answer to who follows whom",
   );
   check(
