@@ -16,12 +16,13 @@ import { SaveButton } from "@/components/products/save-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { STOCK_STATUS } from "@/lib/constants/product-categories";
+import { STOCK_STATUS, isSecondHand } from "@/lib/constants/product-categories";
 import { withFavorites } from "@/lib/data/products";
 import { createClient } from "@/lib/supabase/server";
 import { cn, formatPrice } from "@/lib/utils";
 import type { ProductCardData } from "@/components/products/product-card";
 import type { ProductCondition, UsedGrade } from "@/types/database.types";
+import { MessageButton } from "@/components/messages/message-button";
 import {
   ConditionBadge,
   conditionSentence,
@@ -128,6 +129,7 @@ export default async function ProductDetailPage(props: {
   const stock = STOCK_STATUS[product.stock_status as keyof typeof STOCK_STATUS];
   const condition = (product.condition ?? "new") as ProductCondition;
   const usedGrade = (product.used_grade ?? null) as UsedGrade | null;
+  const secondHand = isSecondHand(condition);
   const supplierName = supplier?.company_name || supplier?.full_name || "Supplier";
   const price = product.price as number | null;
   const currency = product.currency as string;
@@ -316,12 +318,27 @@ export default async function ProductDetailPage(props: {
                   variant="labeled"
                   className="h-9"
                 />
+                {/* A message, not a link to a page with a phone number on
+                    it. "Contact supplier" went to the profile and left the
+                    buyer to work out how — and on a second-hand listing the
+                    seller is a person whose number is private by default, so
+                    there was often nothing there to find. The thread opens
+                    against this product, so the seller sees which one. */}
+                <MessageButton
+                  userId={String(product.owner_id)}
+                  contextType="product"
+                  contextId={id}
+                  subject={String(product.title)}
+                  label={secondHand ? "Message seller" : "Message supplier"}
+                  variant="default"
+                  className="w-auto [&_button]:w-auto"
+                />
                 {supplier?.username && (
                   <Link
                     href={`/u/${supplier.username}`}
-                    className={buttonVariants()}
+                    className={buttonVariants({ variant: "outline" })}
                   >
-                    <Store className="size-4" /> Contact supplier
+                    <Store className="size-4" /> View profile
                   </Link>
                 )}
               </>

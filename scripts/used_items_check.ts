@@ -404,7 +404,12 @@ check(
   );
   check(
     "the used fields only appear once Used is chosen",
-    /\{secondHand && \(/.test(form),
+    // Anchored on the block itself. `{secondHand && (` now guards two things —
+    // these fields and the photo shot list below — so a bare match would keep
+    // passing after one of them was deleted.
+    /\{secondHand && \(\s*\n\s*<div className="space-y-4 border-t pt-4">/.test(
+      form,
+    ),
     "a form that shows every field to everybody is one people abandon",
   );
   check(
@@ -418,7 +423,64 @@ check(
 }
 
 // ---------------------------------------------------------------------------
-// 9. Nothing else about the marketplace changed
+// 9. Reaching the seller, and photographing the thing
+// ---------------------------------------------------------------------------
+
+{
+  const detail = code("src/app/marketplace/[id]/page.tsx");
+  check(
+    "a buyer can message the seller from the listing",
+    /<MessageButton[\s\n]/.test(detail),
+    "\"Contact supplier\" was a link to a profile, and a private seller has no number on theirs",
+  );
+  check(
+    "the thread opens against this product",
+    /contextType="product"/.test(detail) && /contextId=\{id\}/.test(detail),
+    "a seller with six listings needs to know which one",
+  );
+  check(
+    "and it reaches the owner of the listing",
+    /userId=\{String\(product\.owner_id\)\}/.test(detail),
+  );
+  check(
+    "the profile link is still there, as the secondary action",
+    /View profile/.test(detail) &&
+      /buttonVariants\(\{ variant: "outline" \}\)/.test(detail),
+  );
+
+  const form = code("src/components/products/product-form.tsx");
+  check(
+    "a second-hand seller is told which photographs buyers ask for",
+    /What buyers ask for, in this order/.test(form),
+  );
+  for (const shot of [
+    "Front, straight on",
+    "Back",
+    "Side",
+    "Close-up",
+    "scratch, dent or missing part",
+    "Serial or model plate",
+  ]) {
+    check(
+      `including ${shot.toLowerCase()}`,
+      form.includes(shot),
+    );
+  }
+  check(
+    "the shot list is only on second-hand listings",
+    /\{secondHand && \(\s*\n\s*<div className="rounded-xl border border-dashed/.test(
+      form,
+    ),
+    "a shot list on every listing is a shot list nobody reads",
+  );
+  check(
+    "and sellers are told their photos carry a watermark",
+    /Published photos carry your watermark\./.test(form),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 10. Nothing else about the marketplace changed
 // ---------------------------------------------------------------------------
 
 {

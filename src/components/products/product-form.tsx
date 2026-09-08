@@ -83,8 +83,31 @@ export function ProductForm({
         <ProductImagesInput userId={userId} initialUrls={initialImageUrls} />
         <p className="text-xs text-muted-foreground">
           The first image is the cover. Hover an image to set a different cover
-          or remove it.
+          or remove it. Published photos carry your watermark.
         </p>
+        {/* Only on a second-hand listing. A supplier photographing new stock
+            does not need to be told to show the damage, and a shot list on
+            every listing is a shot list nobody reads. */}
+        {secondHand && (
+          <div className="rounded-xl border border-dashed p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">
+              What buyers ask for, in this order
+            </p>
+            <ul className="mt-1 grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
+              <li>Front, straight on</li>
+              <li>Back</li>
+              <li>Side</li>
+              <li>Close-up of the surface or finish</li>
+              <li>Every scratch, dent or missing part</li>
+              <li>Serial or model plate, if it has one</li>
+            </ul>
+            <p className="mt-1.5">
+              The damage photo is the one that sells it. A buyer who finds the
+              scratch on collection walks away; one who saw it first turns up
+              expecting it.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
