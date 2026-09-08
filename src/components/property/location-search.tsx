@@ -39,11 +39,30 @@ const ICONS: Record<string, typeof MapPin> = {
 
 export function LocationSearch({
   onSelect,
+  onQueryChange,
+  label = "Search a place",
   placeholder = "Search a city, neighbourhood, landmark, or paste coordinates",
   className,
 }: {
   onSelect: (hit: LocationHit) => void;
+  /**
+   * Every keystroke, for a caller that filters on the raw text as well.
+   *
+   * The city map does both: what you type narrows the listings, and choosing
+   * a suggestion moves the camera. Without this the map would have to keep a
+   * second input beside this one, and the two would disagree about what had
+   * been typed.
+   */
+  onQueryChange?: (value: string) => void;
   placeholder?: string;
+  /**
+   * The field's name for a screen reader.
+   *
+   * A `role="combobox"` with only a placeholder has no accessible name — a
+   * placeholder is a hint, and it disappears the moment anything is typed.
+   * Defaulted rather than optional-and-forgotten.
+   */
+  label?: string;
   className?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -60,8 +79,10 @@ export function LocationSearch({
 
   const boxRef = useRef<HTMLDivElement>(null);
   const onSelectRef = useRef(onSelect);
+  const onQueryChangeRef = useRef(onQueryChange);
   useEffect(() => {
     onSelectRef.current = onSelect;
+    onQueryChangeRef.current = onQueryChange;
   });
 
   // Debounced, and the previous request is abandoned rather than raced: a
@@ -124,6 +145,7 @@ export function LocationSearch({
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
+            onQueryChangeRef.current?.(event.target.value);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
@@ -145,6 +167,7 @@ export function LocationSearch({
           }}
           placeholder={placeholder}
           role="combobox"
+          aria-label={label}
           aria-expanded={open && results.length > 0}
           aria-controls="location-results"
           aria-autocomplete="list"
@@ -159,6 +182,7 @@ export function LocationSearch({
         <ul
           id="location-results"
           role="listbox"
+          aria-label={`${label} results`}
           className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border bg-background p-1 shadow-lg"
         >
           {results.map((hit, index) => {

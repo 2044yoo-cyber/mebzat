@@ -6,18 +6,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Building2,
-  Search,
   SlidersHorizontal,
   Sparkles,
   X,
 } from "lucide-react";
 
 import { getSnapshot, update } from "@/lib/workspace/store";
+import { LocationSearch } from "@/components/property/location-search";
 import { MapBoundary } from "@/components/property/map-boundary";
 import { MapDiagnostics } from "@/components/property/map-diagnostics";
 import { PropertyCard, toCardData } from "@/components/property/property-card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   AREA_BANDS,
   BEDROOM_OPTIONS,
@@ -113,6 +112,10 @@ export function CityExplorer({
    * remembered here and put back on the way out.
    */
   const [fullscreen, setFullscreen] = useState(false);
+  /** Where a chosen suggestion has asked the camera to go. */
+  const [focus, setFocus] = useState<
+    { latitude: number; longitude: number; zoom: number; key: string } | null
+  >(null);
   const restoreRails = useRef<{ nav: boolean; panel: boolean } | null>(null);
 
   const [results, setResults] = useState<MapProperty[]>(initialProperties);
@@ -345,14 +348,38 @@ export function CityExplorer({
           ))}
         </select>
 
-        <div className="relative min-w-48 flex-1 sm:max-w-xs">
-          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+        {/* Suggestions, not just a filter.
+            
+            This box used to narrow the listings by text and nothing else, so
+            typing "Bole" filtered to whatever happened to have the word in it
+            and left the camera wherever it was. The geocoder behind
+            `LocationSearch` — cities, sub cities, neighbourhoods, landmarks
+            and a pasted coordinate pair — already existed and was only wired
+            to the form for listing a property. Choosing a suggestion now
+            moves the map; typing still narrows the list. */}
+        <div className="min-w-48 flex-1 sm:max-w-xs">
+          <LocationSearch
+            label="Search properties by place"
             placeholder="Address, subcity, area…"
-            aria-label="Search properties"
-            className="h-9 pl-9"
+            onQueryChange={setQuery}
+            onSelect={(hit) => {
+              setQuery(hit.label);
+              setFocus({
+                latitude: hit.latitude,
+                longitude: hit.longitude,
+                // A city is a wide view; a building is a close one. Landing on
+                // a street at city zoom shows nothing you asked for.
+                zoom:
+                  hit.kind === "city"
+                    ? 12
+                    : hit.kind === "sub_city"
+                      ? 13.5
+                      : hit.kind === "neighbourhood"
+                        ? 15
+                        : 16.5,
+                key: `${hit.label}-${Date.now()}`,
+              });
+            }}
           />
         </div>
 
@@ -574,6 +601,7 @@ export function CityExplorer({
               filters={filters}
               selectedId={selected?.id ?? null}
               highlight={aiHighlight}
+              focus={focus}
               panelOpen={panelOpen}
               layers={layers}
               fullscreen={fullscreen}

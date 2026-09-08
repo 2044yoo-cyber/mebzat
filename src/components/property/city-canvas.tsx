@@ -80,6 +80,7 @@ export function CityCanvas({
   filters,
   selectedId,
   highlight,
+  focus,
   panelOpen,
   layers,
   fullscreen,
@@ -94,6 +95,15 @@ export function CityCanvas({
   selectedId: string | null;
   /** Listings Medosha AI just searched for, or null. */
   highlight?: AiHighlight | null;
+  /**
+   * Somewhere the reader asked to be taken.
+   *
+   * A place chosen from the search suggestions. Carries a `key` so choosing
+   * the same neighbourhood twice moves the camera twice — after panning away,
+   * picking Bole again should go back to Bole, and comparing coordinates alone
+   * would decide nothing had changed.
+   */
+  focus?: { latitude: number; longitude: number; zoom: number; key: string } | null;
   panelOpen: boolean;
   /**
    * Which optional layers are switched on. Only "projects" is read here; the
@@ -746,6 +756,29 @@ export function CityCanvas({
       // Camera moves are cosmetic.
     }
   }, [highlight, ready, panelOpen]);
+
+  // Go where the reader asked.
+  //
+  // `flyTo` rather than `easeTo`: this is a jump across the city rather than a
+  // nudge, and the arc reads as travel instead of the map being swapped under
+  // you. Keyed on `focus.key`, so picking the same place after panning away
+  // takes you back rather than deciding nothing changed.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !focus) return;
+
+    try {
+      map.flyTo({
+        center: [focus.longitude, focus.latitude],
+        zoom: focus.zoom,
+        duration: 900,
+        essential: true,
+      });
+    } catch {
+      // A place with impossible coordinates must not take the map with it.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.key, ready]);
 
   // Ease to a property chosen from the list, offset for the open panel.
   useEffect(() => {

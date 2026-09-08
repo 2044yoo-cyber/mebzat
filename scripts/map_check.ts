@@ -424,8 +424,10 @@ check(
   /onClick=\{onToggleFullscreen\}\s*\n\s*active=\{fullscreen\}/.test(canvas),
 );
 
-// Everything that was on the control row is still on it.
-for (const control of ["Search properties", "Layers", "Filters"]) {
+// Everything that was on the control row is still on it. The search control
+// changed from a plain input to the suggesting one, so it is named by what it
+// is rather than by the label the old input happened to carry.
+for (const control of ["Search properties by place", "Layers", "Filters"]) {
   check(`${control} survives full screen`, explorer.includes(control));
 }
 
@@ -701,6 +703,66 @@ check(
   check(
     "an approximate pin still says so",
     /location_accuracy === "approximate"/.test(card),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The map's search box suggests places
+//
+// It used to narrow the listings by text and nothing else: typing "Bole"
+// filtered to whatever happened to contain the word and left the camera where
+// it was. The geocoder — cities, sub cities, neighbourhoods, landmarks and a
+// pasted coordinate pair — already existed behind /api/locations/search and
+// was wired only to the form for listing a property.
+// ---------------------------------------------------------------------------
+
+{
+  const search = code("src/components/property/location-search.tsx");
+
+  check("the map's box is the suggesting one", /<LocationSearch[\s/>]/.test(explorer));
+  check("and the plain input it replaced is gone", !/aria-label="Search properties"/.test(explorer));
+
+  // Both jobs at once: the text still narrows the listings, and a chosen
+  // suggestion moves the camera. Otherwise the map needs a second box and the
+  // two disagree about what was typed.
+  check("typing still filters the listings", /onQueryChange=\{setQuery\}/.test(explorer));
+  check("and choosing a place moves the map", /setFocus\(\{/.test(explorer));
+  check("the canvas is told where to go", /focus=\{focus\}/.test(explorer));
+  check("and flies there", /map\.flyTo\(\{/.test(canvas));
+
+  // Picking the same place twice after panning away has to work; comparing
+  // coordinates alone would decide nothing had changed.
+  check("a repeat choice still moves the camera", /key: `\$\{hit\.label\}-\$\{Date\.now\(\)\}`/.test(explorer));
+  check("because the effect keys on that", /\[focus\?\.key, ready\]/.test(canvas));
+
+  // A city is a wide view and a building is a close one. Landing on a street
+  // at city zoom shows nothing that was asked for.
+  check("the zoom suits what was chosen", /hit\.kind === "city"/.test(explorer) && /16\.5/.test(explorer));
+
+  // The box itself: these are what make an autocomplete usable rather than
+  // merely present.
+  check("suggestions are debounced", /setTimeout\(async/.test(search));
+  check("and a slow answer cannot overwrite a fast one", /AbortController/.test(search));
+  check("the stale reply is ignored rather than cleared", /answer[\s\S]{0,80}term/.test(search));
+  check("arrow keys walk the list", /ArrowDown/.test(search) && /ArrowUp/.test(search));
+  check("enter picks", /event\.key === "Enter"/.test(search));
+  check("escape closes", /event\.key === "Escape"/.test(search));
+  check("a coordinate pair is understood", /coordinates/.test(search));
+  // A combobox with only a placeholder has no accessible name, and the
+  // placeholder disappears the moment anything is typed.
+  check("the field has a name, not just a placeholder", /aria-label=\{label\}/.test(search));
+  check("and the map gives it one", /label="Search properties by place"/.test(explorer));
+
+  // Privacy: the neighbourhood centroid is of the *published* points, so the
+  // endpoint cannot be used to find one hidden listing by its street.
+  const rpc = readFileSync("supabase/migrations/0022_location_privacy.sql", "utf8");
+  check(
+    "a neighbourhood suggestion is the centroid of published points",
+    /avg\(p\.display_latitude\) over \(partition by p\.neighbourhood\)/.test(rpc),
+  );
+  check(
+    "and a signed-out visitor can search",
+    /grant execute on function public\.search_locations\(text, integer\) to authenticated, anon;/.test(rpc),
   );
 }
 
