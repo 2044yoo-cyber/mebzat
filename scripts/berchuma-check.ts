@@ -2296,180 +2296,115 @@ function normalise(v: Vec): Vec {
 }
 
 // ---------------------------------------------------------------------------
-// Legs stand under all four corners
+// Wardrobes use a recessed, continuous plinth
 // ---------------------------------------------------------------------------
 
-// The reported bug: "the generated wardrobe appears to have legs/support only
-// on the FRONT". It did. The geometry emitted exactly one part — a plinth board
-// across the front at z = 0 — and nothing behind it.
+// Every wardrobe takes this path through the shared geometry builder. The
+// checks deliberately use distinct widths and a deeper cabinet, because a base
+// that only looks right at the preset dimensions is not parametric.
 {
-  const wardrobe = startingDesign("wardrobe", { width: 2400 });
-  const legs = buildParts(wardrobe).parts.filter((part) => part.role === "leg");
-
-  check("a wardrobe stands on legs", legs.length > 0);
-
-  const feet = legs.flatMap((part) => part.placements);
-  check(
-    "one placement per leg",
-    feet.length === legs.reduce((total, part) => total + part.quantity, 0),
-  );
-
-  const depth = wardrobe.envelope.depth;
-  const width = wardrobe.envelope.width;
-
-  const front = feet.filter((foot) => foot.z < depth / 2);
-  const back = feet.filter((foot) => foot.z >= depth / 2);
-
-  check(
-    "there are legs at the back, not only the front",
-    back.length > 0,
-    `${front.length} front, ${back.length} back — the reported bug was zero at the back`,
-  );
-  check("as many at the back as the front", front.length === back.length);
-
-  // Near the *edges*, not merely in the half. A wide carcass also gets
-  // intermediate legs, and "something in the right-hand half" is satisfied by
-  // one of those — which is how a mutation removing the right-hand corner
-  // legs survived the first version of this check.
-  const nearEdge = 200;
-  check(
-    "a leg near the left edge",
-    feet.some((foot) => foot.x < nearEdge),
-  );
-  check(
-    "a leg near the right edge",
-    feet.some((foot) => foot.x > width - nearEdge),
-    "intermediate legs sit in from the ends; this is the corner",
-  );
-  check(
-    "a leg near the front",
-    feet.some((foot) => foot.z < nearEdge),
-  );
-  check(
-    "a leg near the back",
-    feet.some((foot) => foot.z > depth - nearEdge),
-  );
-
-  // All four corners, named the way the brief names them, and measured from
-  // the corners rather than from the halves.
-  const corner = (left: boolean, front: boolean) =>
-    feet.some(
-      (foot) =>
-        (left ? foot.x < nearEdge : foot.x > width - nearEdge) &&
-        (front ? foot.z < nearEdge : foot.z > depth - nearEdge),
-    );
-
-  check("front-left", corner(true, true));
-  check("front-right", corner(false, true));
-  check("back-left", corner(true, false));
-  check("back-right", corner(false, false));
-
-  check(
-    "every leg stands on the floor",
-    feet.every((foot) => foot.y === 0),
-  );
-  check(
-    "and none pokes out past the carcass",
-    feet.every((foot) => foot.x >= 0 && foot.z >= 0 && foot.x < width && foot.z < depth),
-    "a leg outside the footprint is a leg holding up nothing",
-  );
-}
-
-// Legs are derived from the envelope, so a resize moves them. Part 19: "legs
-// reposition".
-{
-  const narrow = startingDesign("wardrobe", { width: 1800 });
+  const shallow = startingDesign("wardrobe", { width: 1200 });
+  const standard = startingDesign("wardrobe", { width: 2400 });
   const wide = startingDesign("wardrobe", { width: 3000 });
+  const deep = validateSpec({
+    ...standard,
+    cabinets: standard.cabinets.map((cabinet) => ({
+      ...cabinet,
+      size: { ...cabinet.size, depth: 800 },
+    })),
+  }).spec;
 
-  const feetOf = (spec: typeof narrow) =>
-    buildParts(spec)
-      .parts.filter((part) => part.role === "leg")
-      .flatMap((part) => part.placements);
+  for (const [label, wardrobe] of [
+    ["narrow wardrobe", shallow],
+    ["standard wardrobe", standard],
+    ["wide wardrobe", wide],
+    ["deep wardrobe", deep],
+  ] as const) {
+    const parts = buildParts(wardrobe).parts;
+    const front = parts.find((part) => /wardrobe-plinth-front$/.test(part.id));
+    const sides = parts.find((part) => /wardrobe-plinth-side$/.test(part.id));
+    const cabinet = wardrobe.cabinets[0]!;
+    const t = wardrobe.carcass.board.thickness;
+    const expectedRecess = Math.min(40, Math.max(0, cabinet.size.depth - 2 * t));
 
-  const narrowFeet = feetOf(narrow);
-  const wideFeet = feetOf(wide);
+    check(`${label}: has no individual feet`, parts.every((part) => part.role !== "leg"));
+    check(`${label}: has one continuous front plinth`, front?.quantity === 1);
+    check(
+      `${label}: front plinth follows the full width`,
+      front?.size.x === cabinet.size.width && front.length === cabinet.size.width,
+    );
+    check(
+      `${label}: front plinth preserves the reserved base height`,
+      front?.size.y === cabinet.plinthHeight && front.placements[0]?.y === 0,
+    );
+    check(
+      `${label}: front is recessed from the doors`,
+      front?.placements[0]?.z === expectedRecess && expectedRecess > 0,
+      `expected ${expectedRecess} mm`,
+    );
+    check(
+      `${label}: side returns meet the front without overlapping it`,
+      sides?.quantity === 2 &&
+        sides.placements.every((at) => at.z === expectedRecess + t) &&
+        sides.size.z === cabinet.size.depth - expectedRecess - t,
+    );
+    check(
+      `${label}: base stays inside the cabinet footprint`,
+      Boolean(front && sides) &&
+        front!.placements.every((at) => at.z >= 0 && at.z + front!.size.z <= cabinet.size.depth) &&
+        sides!.placements.every(
+          (at) =>
+            at.x >= 0 &&
+            at.x + sides!.size.x <= cabinet.size.width &&
+            at.z + sides!.size.z <= cabinet.size.depth,
+        ),
+    );
+  }
 
-  // The far *corner* leg, specifically. Comparing the overall maximum was
-  // satisfied by the intermediate legs, which scale with width even when the
-  // corners are hard-coded — so a pinned corner survived.
-  const farCorner = (feet: { x: number; z: number }[], width: number) =>
-    Math.max(...feet.filter((f) => f.x > width * 0.75).map((f) => f.x));
-
+  const cutList = buildCutList(standard, buildParts(standard));
   check(
-    "a wider wardrobe puts its far corner leg further out",
-    farCorner(wideFeet, 3000) > farCorner(narrowFeet, 1800),
-    `${farCorner(narrowFeet, 1800)} then ${farCorner(wideFeet, 3000)}`,
+    "the recessed plinth reaches the cut list",
+    cutList.rows.some((row) => /Recessed black plinth, front/.test(row.label)),
+  );
+
+  // A wardrobe can contain more than one cabinet. The common generator must
+  // supply a plinth for every cabinet rather than relying on the single
+  // wardrobe preset above.
+  const combined = duplicateCabinet(standard, standard.cabinets[0]!.id);
+  const combinedFronts = buildParts(combined)
+    .parts.filter((part) => /wardrobe-plinth-front$/.test(part.id))
+    .sort((left, right) => left.placements[0]!.x - right.placements[0]!.x);
+  check(
+    "combined wardrobes give every cabinet the shared plinth",
+    combinedFronts.length === combined.cabinets.length,
   );
   check(
-    "and that corner tracks the envelope, not a fixed number",
-    farCorner(wideFeet, 3000) > 3000 - 200,
-    "a hard-coded corner leaves the far end of a wide carcass unsupported",
+    "combined wardrobe plinths retain the 40 mm front recess",
+    combinedFronts.every((part) => part.placements[0]!.z === 40),
   );
+
+  // Changing a non-wardrobe item must not acquire the wardrobe treatment.
+  const tvUnit = startingDesign("tv_unit", { width: 1800 });
   check(
-    "and gets more of them",
-    wideFeet.length > narrowFeet.length,
-    `${narrowFeet.length} then ${wideFeet.length} — a 3 m bottom panel on four legs sags`,
+    "non-wardrobe furniture retains its existing legs",
+    buildParts(tvUnit).parts.some((part) => part.role === "leg"),
   );
-  check(
-    "the near legs stay near the corner",
-    Math.min(...wideFeet.map((f) => f.x)) ===
-      Math.min(...narrowFeet.map((f) => f.x)),
-  );
-}
 
-// Choosing "none" is a plinth, and even that is not front-only.
-{
-  const wardrobe = startingDesign("wardrobe", { width: 2400 });
-  const plinthed = {
-    ...wardrobe,
-    legs: {
-      kind: "none" as const,
-      height: 100,
-      thickness: 50,
-      inset: 35,
-      material: "White",
-    },
-  };
-
-  const parts = buildParts(plinthed).parts;
-  const plinths = parts.filter((part) => part.role === "plinth");
-
-  check("choosing no legs gives a plinth", plinths.length > 0);
-  check("and no legs", parts.every((part) => part.role !== "leg"));
-  check(
-    "the plinth wraps the sides too",
-    plinths.some((part) => /side/i.test(part.label)),
-    "a wardrobe with a floating side edge looks unfinished from every angle but one",
-  );
-}
-
-// The cut list and the BOQ follow, because they are built from the parts.
-{
-  const wardrobe = startingDesign("wardrobe", { width: 2400 });
-  const cutList = buildCutList(wardrobe, buildParts(wardrobe));
-
-  check(
-    "legs reach the cut list",
-    cutList.rows.some((row) => /leg/i.test(row.label)),
-    "a leg that is drawn but not listed is a leg the shop does not order",
-  );
-}
-
-// The viewer draws them in their own colour. A leg tinted with the wardrobe's
-// white disappears into the floor, which looks exactly like the reported bug
-// even once the geometry is right.
-{
+  // Scope the assertion to the material function and strip comments, so a
+  // string in an import or explanation cannot satisfy the check.
   const source = readFileSync(
     "src/features/berchuma-studio/components/viewer/model.tsx",
     "utf8",
   );
+  const colourFor = source
+    .slice(source.indexOf("function colourFor"), source.indexOf("function roughnessFor"))
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
   check(
-    "the viewer has a colour for a leg",
-    /case "leg":/.test(source),
-  );
-  check(
-    "and it is not a tint of the body",
-    !/case "leg":\s*\n\s*return base/.test(source),
+    "the viewer renders wardrobe plinths as black geometry",
+    /case "plinth":\s*return spec\.furnitureType === "wardrobe"\s*\? "#16181d"/.test(
+      colourFor,
+    ),
   );
 }
 
