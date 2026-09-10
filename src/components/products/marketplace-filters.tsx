@@ -57,8 +57,19 @@ export function MarketplaceFilters({
   const [q, setQ] = useState(current.q);
   const [minPrice, setMinPrice] = useState(current.minPrice);
   const [maxPrice, setMaxPrice] = useState(current.maxPrice);
-  const [showPrice, setShowPrice] = useState(
-    Boolean(current.minPrice || current.maxPrice),
+  // One disclosure for every refinement, opened by the filter button. It used
+  // to hold the price only, while the used-item filters sat permanently open
+  // above the category rail — about 250px of controls on a phone before a
+  // single product. Open on arrival when something is already set, so a
+  // shared link does not look unfiltered.
+  const [showMore, setShowMore] = useState(
+    Boolean(
+      current.minPrice ||
+        current.maxPrice ||
+        current.usedGrade ||
+        current.city ||
+        current.area,
+    ),
   );
   const [area, setArea] = useState(current.area ?? "");
 
@@ -120,18 +131,18 @@ export function MarketplaceFilters({
           </Select>
           <Button
             type="button"
-            variant={showPrice ? "secondary" : "outline"}
+            variant={showMore ? "secondary" : "outline"}
             size="icon"
-            aria-label="Price filter"
-            aria-pressed={showPrice}
-            onClick={() => setShowPrice((v) => !v)}
+            aria-label="More filters"
+            aria-pressed={showMore}
+            onClick={() => setShowMore((v) => !v)}
           >
             <SlidersHorizontal className="size-4" />
           </Button>
         </div>
       </div>
 
-      {showPrice && (
+      {showMore && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -168,7 +179,7 @@ export function MarketplaceFilters({
         </form>
       )}
 
-      {showUsedFilters && (
+      {showMore && showUsedFilters && (
         <div className="flex flex-wrap items-end gap-2 rounded-xl border p-3">
           <div className="space-y-1">
             <span className="text-xs text-muted-foreground">Condition</span>
@@ -302,6 +313,7 @@ export function MarketplaceFilters({
               setMinPrice("");
               setMaxPrice("");
               setArea("");
+              setShowMore(false);
               router.push(pathname);
             }}
             className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1.5 text-xs whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground sm:px-3 sm:text-sm"

@@ -124,24 +124,14 @@ export default async function UsedItemsPage(props: {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Recycle className="size-4" /> Marketplace
-          </div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
-            Used Items
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Second-hand furniture, appliances, electronics, tools, doors,
-            windows and leftover materials. Anyone can sell here — you do not
-            need to be in construction.
-          </p>
-        </div>
-        {/* Carries `condition=used` through, so the form opens already set to
-            Used rather than asking somebody who came from this page to find
-            the field and change it. */}
-        <PostItemButton condition="used" className="shrink-0" />
+      {/* `condition=used` still rides on the button, so the form opens set to
+          Used — that part is not decoration. The paragraph that used to sit
+          here was. */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Used Items
+        </h1>
+        <PostItemButton condition="used" />
       </div>
 
       <MarketplaceSections active="used" className="mb-4" />

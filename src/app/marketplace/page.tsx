@@ -74,22 +74,15 @@ export default async function MarketplacePage(props: {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-10">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Store className="size-4" /> Marketplace
-          </div>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-            Everything for your build
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            New materials, furniture, fixtures and equipment from suppliers
-            across the network.
-          </p>
-        </div>
-        {/* On the page somebody is already on. Listing was reachable from four
-            other places and not from here. */}
-        <PostItemButton condition="new" className="shrink-0" />
+      {/* A heading and the one action, and nothing between them. The eyebrow
+          repeated what the tabs underneath already say, and the paragraph
+          described a marketplace to people who are standing in it — five lines
+          on a phone before a single product. */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Marketplace
+        </h1>
+        <PostItemButton condition="new" />
       </div>
 
       <MarketplaceSections active="new" className="mb-4" />

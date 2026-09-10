@@ -321,15 +321,23 @@ check(
     /^\s*citiesWithUsedItems\(\),$/m.test(usedPage),
     "the call, not the identifier — the definition survives a hard-coded list",
   );
-  check(
-    "the page says anyone can sell, not only builders",
-    // Whitespace-normalised. The sentence is wrapped by the formatter and
-    // moved every time the header layout changes, so a regex that pins the
-    // line breaks fails on a reflow that changed no words.
-    /you do not need to be in construction/.test(
-      usedPage.replace(/\s+/g, " "),
-    ),
-  );
+  // Used to assert the page *said* anyone can sell. The sentence is gone —
+  // five lines of prose describing a marketplace to somebody standing in it —
+  // so what is checked now is the thing the sentence was describing: nothing
+  // anywhere in browsing or posting narrows by who the account belongs to.
+  // That is the property; the paragraph was only a claim about it.
+  for (const [path, what] of [
+    ["src/app/marketplace/used/page.tsx", "browsing used items"],
+    ["src/lib/data/products.ts", "the marketplace query"],
+    ["src/app/(dashboard)/products/actions.ts", "creating a listing"],
+    ["src/lib/validations/product.ts", "the listing form's rules"],
+  ] as const) {
+    check(
+      `${what} is not gated by account type`,
+      !/account_type/.test(code(path)),
+      "used items are open to everybody, not to construction accounts",
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -502,8 +510,11 @@ for (const [path, expected, what] of [
   const page = code(path);
   check(
     `${what} carries a post action in its header`,
+    // Scoped to the header block. Now that the header and the empty state
+    // render the identical element, a bare match on it would keep passing
+    // after the header's copy was deleted — the empty state's would satisfy it.
     new RegExp(
-      `<PostItemButton condition="${expected}" className="shrink-0" />`,
+      `<div className="mb-4 flex items-center justify-between gap-3">[\\s\\S]{0,400}<PostItemButton condition="${expected}" />`,
     ).test(page),
   );
   check(
@@ -535,6 +546,60 @@ for (const [path, expected, what] of [
     "the button is a real tap target on a phone",
     /min-h-11/.test(button),
   );
+  check(
+    "and says what it does in two words",
+    /\{label \?\? "Post Product"\}/.test(button),
+    'the labels were "Post an item" and "Sell something used" — a sentence each',
+  );
+  check(
+    "it sits beside the heading rather than under it",
+    /shrink-0/.test(button) && !/w-full/.test(button),
+    "a full-width button below the title is another row of a phone screen",
+  );
+}
+
+{
+  // The browse pages lead with a heading and the one action. Everything that
+  // used to sit between them and the products — an eyebrow repeating the tabs,
+  // a paragraph describing the marketplace to people standing in it, and a
+  // permanently open panel of refinements — is gone or folded away.
+  const filters = code("src/components/products/marketplace-filters.tsx");
+  check(
+    "the refinements are behind the filter button, not permanently open",
+    /\{showMore && showUsedFilters && \(/.test(filters),
+    "they were roughly 250px of controls between the search box and the products",
+  );
+  check(
+    "and one button opens all of them, not one panel each",
+    (filters.match(/\{showMore && /g) ?? []).length === 2 &&
+      !/showPrice/.test(filters),
+    "price had its own disclosure while grade, city and area had none",
+  );
+  check(
+    "a link that already carries a filter arrives with them open",
+    /const \[showMore, setShowMore\] = useState\(\s*\n?\s*Boolean\(/.test(
+      filters,
+    ) && /current\.usedGrade \|\|/.test(filters),
+    "otherwise a shared search looks unfiltered and the filters look broken",
+  );
+
+  for (const [path, what] of [
+    ["src/app/marketplace/page.tsx", "New Items"],
+    ["src/app/marketplace/used/page.tsx", "Used Items"],
+  ] as const) {
+    const page = code(path);
+    check(
+      `${what} does not explain itself in a paragraph`,
+      !/<p className="mt-1 text-muted-foreground">/.test(page),
+      "five lines of prose before a single product on a phone",
+    );
+    check(
+      `and ${what} does not repeat the tab bar above it`,
+      !/className="flex items-center gap-2 text-sm text-muted-foreground">\s*\n?\s*<(Store|Recycle)/.test(
+        page,
+      ),
+    );
+  }
 }
 
 {

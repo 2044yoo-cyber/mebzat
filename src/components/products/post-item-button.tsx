@@ -40,12 +40,15 @@ export function PostItemButton({
       href={href}
       className={cn(
         buttonVariants({ variant }),
-        "min-h-11 w-full sm:w-auto",
+        // Beside the heading at every width, not stacked under it. On a phone
+        // a full-width button below the title is another row of the screen
+        // spent before any product is visible.
+        "min-h-11 shrink-0",
         className,
       )}
     >
       <Plus data-icon="inline-start" />
-      {label ?? (condition === "new" ? "Post an item" : "Sell something used")}
+      {label ?? "Post Product"}
     </Link>
   );
 }
