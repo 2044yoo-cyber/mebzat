@@ -309,7 +309,12 @@ function colourFor(part: Part, spec: DesignSpec): string {
     case "drawer_front":
       return base.clone().multiplyScalar(1.08).getStyle();
     case "plinth":
-      return base.clone().multiplyScalar(0.6).getStyle();
+      // A wardrobe plinth is a deliberate dark shadow line beneath the
+      // carcass, not a shaded copy of its finish. It is still a real `plinth`
+      // part from the cut list; only its visual material differs.
+      return spec.furnitureType === "wardrobe"
+        ? "#16181d"
+        : base.clone().multiplyScalar(0.6).getStyle();
     // Legs are hardware, not carcass. Drawn in their own colour rather than a
     // shade of the body, because a Zekolo leg is a black steel or dark timber
     // foot and tinting it with the wardrobe's white would make it disappear

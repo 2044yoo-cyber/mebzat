@@ -148,29 +148,11 @@ function rotateThenPlace(
 }
 
 /**
- * Legs, or a plinth.
+ * The support beneath one cabinet.
  *
- * ## Four corners, not one front board
- *
- * A carcass needs support under each corner. The previous code put a single
- * board across the front, which drew a wardrobe with nothing holding up its
- * back — the reported bug — and which no shop would build.
- *
- * Corner legs are inset from the edges. Not zero: a leg flush with the side
- * shows in the reveal between two units, and one flush with the front is the
- * first thing a toe finds.
- *
- * ## Why wide carcasses get more than four
- *
- * A 3 m wardrobe on four legs sags in the middle — the bottom panel is 18 mm
- * board spanning nearly three metres. An intermediate pair every 900 mm is the
- * ordinary remedy, and it is arithmetic rather than a judgement, so it happens
- * here rather than being left to whoever fits it.
- *
- * ## Positions are derived
- *
- * Every leg's position comes from the envelope, so widening or deepening the
- * carcass moves them. Nothing is stored, so nothing can be stale.
+ * Wardrobes use one recessed plinth as their shared visual and physical base.
+ * Other furniture keeps its existing legs-or-plinth behaviour: a kitchen base
+ * cabinet and a freestanding wardrobe do not need to look the same.
  */
 function standParts(
   spec: DesignSpec,
@@ -180,6 +162,19 @@ function standParts(
   board: DesignSpec["carcass"]["board"],
   t: number,
 ): Part[] {
+  // `furnitureType`, not `kind`, is the durable classification here. `kind`
+  // is the starting preset; the type remains wardrobe after an edit or an
+  // upgrade of an older saved design.
+  if (spec.furnitureType === "wardrobe") {
+    return recessedWardrobePlinthParts(
+      envelope,
+      plinth,
+      board,
+      spec.carcass.edgeBand,
+      t,
+    );
+  }
+
   const legs = spec.legs;
 
   // No legs configured is not "no support". Every design written before legs
@@ -237,6 +232,63 @@ function standParts(
       size: { x: section, y: height, z: section },
       axis: "y",
       placements,
+    },
+  ];
+}
+
+/**
+ * A wardrobe's continuous, recessed base.
+ *
+ * The front is one full-width panel, so it reads as one uninterrupted black
+ * line below the doors. Two return panels take the base to the rear of the
+ * carcass, making it real support geometry rather than a painted strip. The
+ * reveal is derived from the board and cabinet depth, so it stays proportional
+ * for narrow and deep wardrobes without ever extending outside the envelope.
+ */
+function recessedWardrobePlinthParts(
+  envelope: { width: number; depth: number },
+  plinth: number,
+  board: DesignSpec["carcass"]["board"],
+  band: DesignSpec["carcass"]["edgeBand"],
+  t: number,
+): Part[] {
+  const NO: BandedEdges = { front: false, back: false, top: false, bottom: false };
+  // 40 mm is a visible but modest toe-kick. The clamp preserves enough depth
+  // for the rear returns on unusually shallow, still-valid cabinets.
+  const frontRecess = Math.min(40, Math.max(0, envelope.depth - 2 * t));
+  const sideDepth = envelope.depth - frontRecess - t;
+
+  return [
+    {
+      id: "wardrobe-plinth-front",
+      role: "plinth",
+      label: "Recessed black plinth, front",
+      board,
+      length: envelope.width,
+      width: plinth,
+      quantity: 1,
+      edges: { ...NO, top: true },
+      edgeBand: band,
+      placements: [{ x: 0, y: 0, z: frontRecess }],
+      size: { x: envelope.width, y: plinth, z: t },
+      axis: "z",
+    },
+    {
+      id: "wardrobe-plinth-side",
+      role: "plinth",
+      label: "Recessed black plinth, side",
+      board,
+      length: sideDepth,
+      width: plinth,
+      quantity: 2,
+      edges: { ...NO, top: true },
+      edgeBand: band,
+      placements: [
+        { x: 0, y: 0, z: frontRecess + t },
+        { x: envelope.width - t, y: 0, z: frontRecess + t },
+      ],
+      size: { x: t, y: plinth, z: sideDepth },
+      axis: "x",
     },
   ];
 }
@@ -538,8 +590,9 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   // resting on its back edge, and it is exactly what "the legs are only on the
   // front" was describing.
   //
-  // Now: legs at every corner, or a plinth on all three visible sides, chosen
-  // by the design rather than assumed.
+  // The shared support generator chooses the correct construction for the
+  // furniture family. Wardrobes use their recessed plinth; other families
+  // retain their existing legs-or-plinth behaviour.
   if (plinth > 0) {
     for (const part of standParts(spec, cabinet, envelope, plinth, board, t)) {
       push(part);
