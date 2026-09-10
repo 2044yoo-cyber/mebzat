@@ -685,6 +685,17 @@ export type PriceVatStatus =
   | "exclusive"
   | "exempt";
 
+export type ProductFulfilment = "physical" | "digital";
+
+export type DigitalKind =
+  | "course"
+  | "sketchup"
+  | "model_3d"
+  | "floor_plan"
+  | "other";
+
+export type DigitalLicense = "personal" | "commercial";
+
 export type ProductCondition =
   | "new"
   | "used"
@@ -5323,6 +5334,12 @@ export interface Database {
           updated_at: string;
           condition: ProductCondition;
           used_grade: UsedGrade | null;
+          fulfilment: ProductFulfilment;
+          digital_kind: DigitalKind | null;
+          file_format: string | null;
+          file_size_mb: number | null;
+          license: DigitalLicense | null;
+          is_sample: boolean;
           condition_notes: string | null;
           known_defects: string | null;
           sale_reason: string | null;
@@ -5352,6 +5369,12 @@ export interface Database {
           updated_at?: string;
           condition?: ProductCondition;
           used_grade?: UsedGrade | null;
+          fulfilment?: ProductFulfilment;
+          digital_kind?: DigitalKind | null;
+          file_format?: string | null;
+          file_size_mb?: number | null;
+          license?: DigitalLicense | null;
+          is_sample?: boolean;
           condition_notes?: string | null;
           known_defects?: string | null;
           sale_reason?: string | null;
@@ -5381,6 +5404,12 @@ export interface Database {
           updated_at?: string;
           condition?: ProductCondition;
           used_grade?: UsedGrade | null;
+          fulfilment?: ProductFulfilment;
+          digital_kind?: DigitalKind | null;
+          file_format?: string | null;
+          file_size_mb?: number | null;
+          license?: DigitalLicense | null;
+          is_sample?: boolean;
           condition_notes?: string | null;
           known_defects?: string | null;
           sale_reason?: string | null;

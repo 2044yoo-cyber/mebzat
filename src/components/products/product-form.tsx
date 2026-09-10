@@ -21,8 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   CONDITIONS,
+  DIGITAL_KINDS,
+  DIGITAL_LICENSES,
   SELLABLE_CONDITIONS,
   STOCK_STATUS,
   USED_GRADES,
@@ -31,6 +34,7 @@ import type {
   Product,
   ProductCategory,
   ProductCondition,
+  ProductFulfilment,
 } from "@/types/database.types";
 
 const initialState: ProductFormState = {};
@@ -69,6 +73,15 @@ export function ProductForm({
       "new",
   );
   const secondHand = condition !== "new";
+
+  // The other column that decides the section. A file is never second-hand and
+  // never shipped, so choosing Digital puts the condition and delivery
+  // questions away rather than leaving a seller to answer two that no longer
+  // apply and then meet a constraint error.
+  const [fulfilment, setFulfilment] = useState<ProductFulfilment>(
+    (product?.fulfilment as ProductFulfilment | undefined) ?? "physical",
+  );
+  const digital = fulfilment === "digital";
 
   return (
     <form action={formAction} className="space-y-6">
@@ -181,6 +194,104 @@ export function ProductForm({
       </div>
 
       <div className="space-y-4 rounded-xl border p-4">
+        <div className="space-y-2">
+          <Label htmlFor="fulfilment">What is being sold</Label>
+          <Select
+            name="fulfilment"
+            value={fulfilment}
+            onValueChange={(value) => setFulfilment(value as ProductFulfilment)}
+          >
+            <SelectTrigger id="fulfilment" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="physical">A thing</SelectItem>
+              <SelectItem value="digital">A file</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {digital
+              ? "This listing will appear under Marketplace → Digital."
+              : "Something physical — delivered, collected or installed."}
+          </p>
+        </div>
+
+        {digital && (
+          <div className="space-y-4 border-t pt-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="digitalKind">Kind of file</Label>
+                <Select
+                  name="digitalKind"
+                  defaultValue={product?.digital_kind ?? "course"}
+                >
+                  <SelectTrigger id="digitalKind" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(DIGITAL_KINDS).map(([value, kind]) => (
+                      <SelectItem key={value} value={value}>
+                        {kind.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="license">Licence</Label>
+                <Select
+                  name="license"
+                  defaultValue={product?.license ?? "personal"}
+                >
+                  <SelectTrigger id="license" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(DIGITAL_LICENSES).map(([value, entry]) => (
+                      <SelectItem key={value} value={value}>
+                        {entry.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="fileFormat">Formats</Label>
+                <Input
+                  id="fileFormat"
+                  name="fileFormat"
+                  placeholder="DWG + PDF"
+                  defaultValue={product?.file_format ?? ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fileSizeMb">Size in MB (optional)</Label>
+                <Input
+                  id="fileSizeMb"
+                  name="fileSizeMb"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="46"
+                  defaultValue={product?.file_size_mb ?? ""}
+                />
+                {state.fieldErrors?.fileSizeMb && (
+                  <p className="text-sm text-destructive">
+                    {state.fieldErrors.fileSizeMb}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* A file has no condition and no second-hand grade, so the whole block
+          goes away rather than being shown and ignored. */}
+      <div className={cn("space-y-4 rounded-xl border p-4", digital && "hidden")}>
         <div className="space-y-2">
           <Label htmlFor="condition">Condition</Label>
           <Select
@@ -313,7 +424,8 @@ export function ProductForm({
         </Select>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/* A file has no city and does not come in a van. */}
+      <div className={cn("grid gap-4 sm:grid-cols-3", digital && "hidden")}>
         <div className="space-y-2">
           <Label htmlFor="locationCity">City</Label>
           <Input
@@ -344,7 +456,7 @@ export function ProductForm({
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className={cn("flex items-center gap-2 text-sm", digital && "hidden")}>
         <Checkbox
           name="deliveryAvailable"
           value="on"

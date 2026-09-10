@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 import {
+  digitalFieldsFor,
   parseSpecs,
   productSchema,
   type ProductFormValues,
@@ -45,6 +46,11 @@ function buildValues(formData: FormData) {
     currency: formData.get("currency"),
     unit: formData.get("unit"),
     stockStatus: formData.get("stockStatus"),
+    fulfilment: formData.get("fulfilment"),
+    digitalKind: formData.get("digitalKind"),
+    fileFormat: formData.get("fileFormat"),
+    fileSizeMb: formData.get("fileSizeMb") || undefined,
+    license: formData.get("license"),
     condition: formData.get("condition"),
     usedGrade: formData.get("usedGrade"),
     conditionNotes: formData.get("conditionNotes"),
@@ -78,14 +84,24 @@ function toColumns(data: ProductFormValues) {
     currency: data.currency || "USD",
     unit: data.unit || null,
     stock_status: data.stockStatus as StockStatus,
-    // The single source of truth for which section the listing appears in.
-    // Nothing else on the row says "used", so nothing else can disagree.
-    condition: data.condition as ProductCondition,
-    ...usedFieldsFor(data),
+    // The two columns that decide the section. Nothing else on the row says
+    // "used" or "digital", so nothing else can disagree with them.
+    //
+    // A file is never second-hand and never shipped, and the database refuses
+    // a listing that claims otherwise. Forced rather than validated: a seller
+    // who set a condition and then chose Digital meant Digital.
+    condition: (data.fulfilment === "digital"
+      ? "new"
+      : data.condition) as ProductCondition,
+    ...usedFieldsFor(
+      data.fulfilment === "digital" ? { ...data, condition: "new" } : data,
+    ),
+    ...digitalFieldsFor(data),
     location_city: data.locationCity || null,
     location_area: data.locationArea || null,
     location_country: data.locationCountry || null,
-    delivery_available: Boolean(data.deliveryAvailable),
+    delivery_available:
+      data.fulfilment === "digital" ? false : Boolean(data.deliveryAvailable),
     specs: parseSpecs(data.specs),
     status: data.status as ProductStatus,
   };

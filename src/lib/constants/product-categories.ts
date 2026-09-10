@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 
 import type {
+  DigitalKind,
+  DigitalLicense,
   ProductCondition,
   StockStatus,
   UsedGrade,
@@ -150,7 +152,58 @@ export function isSecondHand(condition: ProductCondition): boolean {
 export const MARKETPLACE_SECTIONS = [
   { key: "new", label: "New Items", href: "/marketplace" },
   { key: "used", label: "Used Items", href: "/marketplace/used" },
-  { key: "digital", label: "Digital Marketplace", href: "/designs" },
+  // Not `/designs`. That is Berchuma Studio's gallery — a place to open
+  // somebody's fitted-wardrobe design and remix it, not a shop. Anybody who
+  // tapped this tab expecting to buy something found a portfolio.
+  { key: "digital", label: "Digital Marketplace", href: "/marketplace/digital" },
 ] as const;
 
 export type MarketplaceSection = (typeof MARKETPLACE_SECTIONS)[number]["key"];
+
+/**
+ * What a digital product is.
+ *
+ * The kind is the filter rail on the Digital Marketplace, so it stands where
+ * `product_categories` stands for physical goods — a course and a SketchUp
+ * library are not sorted by "furniture" or "lighting". Every digital listing
+ * has one, which the database insists on.
+ */
+export const DIGITAL_KINDS: Record<
+  DigitalKind,
+  { label: string; detail: string }
+> = {
+  course: {
+    label: "Courses",
+    detail: "Video or written training, with the files worked through in it.",
+  },
+  sketchup: {
+    label: "SketchUp",
+    detail: "Models, components and libraries to drop into a scene.",
+  },
+  model_3d: {
+    label: "3D files",
+    detail: "Models in the formats other tools open — FBX, OBJ, BLEND.",
+  },
+  floor_plan: {
+    label: "Floor plans",
+    detail: "Dimensioned plans, elevations and sections. DWG to edit, PDF to print.",
+  },
+  other: {
+    label: "Other",
+    detail: "Templates, spreadsheets and everything else that arrives as a file.",
+  },
+};
+
+export const DIGITAL_LICENSES: Record<
+  DigitalLicense,
+  { label: string; detail: string }
+> = {
+  personal: {
+    label: "Personal use",
+    detail: "For your own work. Not to resell or redistribute.",
+  },
+  commercial: {
+    label: "Commercial use",
+    detail: "May be used on paid work and in what you deliver to a client.",
+  },
+};

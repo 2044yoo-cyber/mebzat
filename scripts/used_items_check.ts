@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 
 import {
   CONDITIONS,
+  DIGITAL_KINDS,
   MARKETPLACE_SECTIONS,
   SELLABLE_CONDITIONS,
   USED_GRADES,
@@ -191,11 +192,27 @@ check(
 }
 
 check(
-  "the condition is required on the form",
+  "the fulfilment is required on the form",
+  // The same argument as the condition below: left blank, the column default
+  // decides, and the default puts a course among the cement bags.
   !productSchema.safeParse({
     title: "Desk",
     stockStatus: "in_stock",
     status: "published",
+    condition: "new",
+  }).success,
+  "which section a listing lands in is not a question with a silent answer",
+);
+check(
+  "the condition is required on the form",
+  // Everything else valid, so the parse can only fail on the missing
+  // condition. Without `fulfilment` here the check passed on a schema where
+  // condition was optional — it was failing on the wrong field.
+  !productSchema.safeParse({
+    title: "Desk",
+    stockStatus: "in_stock",
+    status: "published",
+    fulfilment: "physical",
   }).success,
   "a blank condition would let the default decide, and the default is New",
 );
@@ -205,6 +222,7 @@ check(
     title: "Desk",
     stockStatus: "in_stock",
     status: "published",
+    fulfilment: "physical",
     condition: "refurbished",
   }).success,
   "the enum has five values; the form has shipped two",
@@ -215,6 +233,7 @@ check(
     title: "Used desk",
     stockStatus: "in_stock",
     status: "published",
+    fulfilment: "physical",
     condition: "used",
     usedGrade: "good",
   }).success,
@@ -225,6 +244,7 @@ check(
     title: "Used desk",
     stockStatus: "in_stock",
     status: "published",
+    fulfilment: "physical",
     condition: "used",
     ageMonths: -1,
   }).success,
@@ -271,17 +291,12 @@ check(
 
 {
   const products = code("src/lib/data/products.ts");
+  // Checked in section 12, which knows about the fulfilment column these two
+  // now also narrow on. Left here as the pointer, so nobody adds a second
+  // pair that drifts.
   check(
-    "New Items is condition = new",
-    /if \(section === "new"\) query = query\.eq\("condition", "new"\);/.test(
-      products,
-    ),
-  );
-  check(
-    "Used Items is everything that is not new",
-    /else if \(section === "used"\) query = query\.in\("condition", SECOND_HAND\);/.test(
-      products,
-    ),
+    "the sections are decided in one place",
+    (products.match(/section === "(new|used|digital)"/g) ?? []).length === 3,
   );
   check(
     "and SECOND_HAND is every non-new condition",
@@ -378,10 +393,13 @@ check(
   );
 }
 check(
-  "Digital Marketplace points at the catalogue that already exists",
+  "Digital Marketplace is a marketplace section, not Berchuma's gallery",
   MARKETPLACE_SECTIONS.find((section) => section.key === "digital")?.href ===
-    "/designs",
-  "a fourth marketplace beside three working ones is not an improvement",
+    "/marketplace/digital",
+  // It pointed at `/designs`, which is a place to open somebody's fitted
+  // wardrobe and remix it. Anybody who tapped the tab expecting a shop found a
+  // portfolio belonging to a different product.
+  "a shop tab has to lead to a shop",
 );
 
 {
@@ -737,7 +755,148 @@ for (const [path, expected, what] of [
 }
 
 // ---------------------------------------------------------------------------
-// 12. Nothing else about the marketplace changed
+// 12. Digital is a marketplace section, not somebody else's gallery
+//
+// The tab pointed at `/designs` — Berchuma Studio's catalogue, a place to open
+// a fitted wardrobe and remix it. Tapping a shop tab and landing in a
+// portfolio belonging to a different product is the bug this closes.
+// ---------------------------------------------------------------------------
+
+{
+  const digitalMigration = readFileSync(
+    "supabase/migrations/0075_digital_products.sql",
+    "utf8",
+  ).replace(/^\s*--.*$/gm, "");
+
+  check(
+    "no second product table for files either",
+    !/create table/i.test(digitalMigration),
+  );
+  check(
+    "everything already listed stays physical",
+    /fulfilment public\.product_fulfilment\s*\n?\s*not null default 'physical'/.test(
+      digitalMigration,
+    ),
+  );
+  check(
+    "a physical listing cannot carry file details",
+    /fulfilment = 'digital'\s*\n\s*or \(\s*\n\s*digital_kind is null/.test(
+      digitalMigration,
+    ),
+  );
+  check(
+    "and a digital one must say what kind of file it is",
+    /fulfilment <> 'digital' or digital_kind is not null/.test(digitalMigration),
+    "otherwise the filter rail has listings that answer to none of it",
+  );
+  check(
+    "a file is never second-hand and never shipped",
+    /fulfilment <> 'digital' or \(condition = 'new' and delivery_available = false\)/.test(
+      digitalMigration,
+    ),
+    "either would put one listing in two sections",
+  );
+
+  const products = code("src/lib/data/products.ts");
+  check(
+    "Digital is read from the fulfilment column",
+    /if \(section === "digital"\) \{\s*\n\s*query = query\.eq\("fulfilment", "digital"\);/.test(
+      products,
+    ),
+  );
+  check(
+    "New Items narrows on fulfilment as well as condition",
+    /section === "new"[\s\S]{0,120}\.eq\("fulfilment", "physical"\)\.eq\("condition", "new"\)/.test(
+      products,
+    ),
+    "a digital product is condition new, so condition alone would list every course among the cement",
+  );
+  check(
+    "and Used Items does too",
+    /section === "used"[\s\S]{0,140}\.eq\("fulfilment", "physical"\)\.in\("condition", SECOND_HAND\)/.test(
+      products,
+    ),
+  );
+
+  const page = code("src/app/marketplace/digital/page.tsx");
+  check("there is a Digital Marketplace page", page.length > 0);
+  check("which asks for the digital section", /section: "digital",/.test(page));
+  check(
+    "the kind is its filter rail, not the physical categories",
+    /Object\.entries\(DIGITAL_KINDS\)\.map/.test(page) &&
+      !/getProductCategories/.test(page),
+    "a course is not sorted by \"lighting\"",
+  );
+  check(
+    "and it carries a post action like the other sections",
+    // In the header. The empty state renders the identical element, so a bare
+    // match would survive the header's copy being deleted.
+    /<div className="mb-4 flex items-center justify-between gap-3">[\s\S]{0,300}<PostItemButton condition="new" \/>/.test(
+      page,
+    ),
+  );
+
+  check(
+    "the five kinds the brief named are the five that exist",
+    Object.keys(DIGITAL_KINDS).join(",") ===
+      "course,sketchup,model_3d,floor_plan,other",
+  );
+
+  const form = code("src/components/products/product-form.tsx");
+  check(
+    "a seller can actually list one",
+    /name="fulfilment"/.test(form) && /name="digitalKind"/.test(form),
+    "a marketplace tab nobody can list into is the same dead end as the wrong link",
+  );
+  check(
+    "and is not asked the questions that no longer apply",
+    // Three of them — condition, location, delivery. Counted, because finding
+    // one leaves the other two free to come back.
+    (form.match(/digital && "hidden"/g) ?? []).length === 3,
+    "condition, city and delivery mean nothing about a file",
+  );
+
+  const action = code("src/app/(dashboard)/products/actions.ts");
+  check(
+    "choosing Digital forces the columns the database insists on",
+    /data\.fulfilment === "digital"\s*\n?\s*\? "new"/.test(action) &&
+      /data\.fulfilment === "digital" \? false : Boolean\(data\.deliveryAvailable\)/.test(
+        action,
+      ),
+    "otherwise the seller meets a check-constraint error instead of a saved listing",
+  );
+
+  // The samples exist so the section is not an empty page on the day it ships.
+  check(
+    "five samples are placed, one of each kind",
+    // Distinct kinds, not five matches. Two samples of the same kind still
+    // counted five and left a kind with an empty filter behind it.
+    new Set(
+      (digitalMigration.match(
+        /'digital', '(course|sketchup|model_3d|floor_plan|other)'/g,
+      ) ?? []).map((match) => match.split("'")[3]),
+    ).size === 5,
+  );
+  check(
+    "owned by an account that says it is not a real seller",
+    /is_demo = true/.test(digitalMigration) &&
+      /Not a real seller, and nothing here is for sale/.test(digitalMigration),
+  );
+  check(
+    "marked so nobody mistakes one for a listing they can buy",
+    /is_sample boolean not null default false/.test(digitalMigration) &&
+      /Sample/.test(code("src/components/products/product-card.tsx")),
+  );
+  check(
+    "and registered under a batch so they can be removed",
+    // The insert, not the comment beneath it explaining how to undo it — the
+    // comment stripper takes that away, and it would have been the only match.
+    /'products', id, 'digital_samples_0075'/.test(digitalMigration),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 13. Nothing else about the marketplace changed
 // ---------------------------------------------------------------------------
 
 {

@@ -20,9 +20,22 @@ export const productSchema = z.object({
   currency: z.string().trim().max(8).optional().or(z.literal("")),
   unit: optionalText,
   stockStatus: z.enum(["in_stock", "made_to_order", "out_of_stock"]),
-  // Which section of the marketplace this lands in. Required, because a
-  // marketplace where the seller can leave it blank is one where the default
-  // quietly decides — and the default would put second-hand goods under New.
+  // The two columns that decide the section. Both required, because a
+  // marketplace where the seller can leave them blank is one where the default
+  // quietly decides — and the defaults put second-hand goods under New and
+  // files among the cement bags.
+  fulfilment: z.enum(["physical", "digital"]),
+  digitalKind: z
+    .enum(["course", "sketchup", "model_3d", "floor_plan", "other"])
+    .optional()
+    .or(z.literal("")),
+  fileFormat: optionalText,
+  fileSizeMb: z.coerce
+    .number()
+    .positive("Enter a size in megabytes")
+    .max(100000, "That is larger than this marketplace handles")
+    .optional(),
+  license: z.enum(["personal", "commercial"]).optional().or(z.literal("")),
   condition: z.enum(["new", "used"]),
   usedGrade: z
     .enum(["like_new", "good", "fair", "needs_repair"])
@@ -107,5 +120,33 @@ export function usedFieldsFor(data: ProductFormValues) {
     known_defects: data.knownDefects || null,
     sale_reason: data.saleReason || null,
     age_months: typeof data.ageMonths === "number" ? data.ageMonths : null,
+  };
+}
+
+/**
+ * The digital fields, cleared when the listing is not a file.
+ *
+ * And the physical ones forced when it is. A file is never second-hand and
+ * never arrives in a van, so the database refuses a digital listing that says
+ * otherwise — but a seller who filled in a condition and then switched to
+ * Digital would meet that refusal as a check-constraint error rather than a
+ * saved listing. What they meant is not ambiguous, so it is applied.
+ */
+export function digitalFieldsFor(data: ProductFormValues) {
+  if (data.fulfilment !== "digital") {
+    return {
+      fulfilment: "physical" as const,
+      digital_kind: null,
+      file_format: null,
+      file_size_mb: null,
+      license: null,
+    };
+  }
+  return {
+    fulfilment: "digital" as const,
+    digital_kind: data.digitalKind || null,
+    file_format: data.fileFormat || null,
+    file_size_mb: typeof data.fileSizeMb === "number" ? data.fileSizeMb : null,
+    license: data.license || null,
   };
 }

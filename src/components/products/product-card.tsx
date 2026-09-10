@@ -1,10 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ImageOff, MapPin } from "lucide-react";
+import { FileDown, ImageOff, MapPin } from "lucide-react";
 
 import { ConditionBadge } from "@/components/products/condition-badge";
 import { SaveButton } from "@/components/products/save-button";
-import { STOCK_STATUS } from "@/lib/constants/product-categories";
+import { DIGITAL_KINDS, STOCK_STATUS } from "@/lib/constants/product-categories";
 import { cn, formatPrice } from "@/lib/utils";
 import type { Product } from "@/types/database.types";
 
@@ -23,6 +23,11 @@ export type ProductCardData = Pick<
   | "used_grade"
   | "location_city"
   | "location_area"
+  | "fulfilment"
+  | "digital_kind"
+  | "file_format"
+  | "license"
+  | "is_sample"
 > & {
   supplier?: {
     full_name: string | null;
@@ -73,6 +78,14 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             grade={product.used_grade}
             className="bg-background/90"
           />
+          {product.is_sample && (
+            <span
+              title="Placed by Medosha to show what this section is for. Not for sale."
+              className="rounded-full border border-transparent bg-amber-500 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-950 uppercase"
+            >
+              Sample
+            </span>
+          )}
         </div>
         <div className="absolute right-3 top-3">
           <SaveButton
@@ -109,11 +122,25 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             {stock.label}
           </span>
         </div>
-        {place && (
+        {product.fulfilment === "digital" ? (
+          // A file has no city. What a buyer wants instead is what they will
+          // be able to open.
           <p className="flex items-center gap-1 truncate pt-1 text-xs text-muted-foreground">
-            <MapPin className="size-3 shrink-0" />
-            {place}
+            <FileDown className="size-3 shrink-0" />
+            {[
+              product.digital_kind ? DIGITAL_KINDS[product.digital_kind].label : null,
+              product.file_format,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
+        ) : (
+          place && (
+            <p className="flex items-center gap-1 truncate pt-1 text-xs text-muted-foreground">
+              <MapPin className="size-3 shrink-0" />
+              {place}
+            </p>
+          )
         )}
         {supplierName && (
           <p className="truncate pt-1 text-xs text-muted-foreground">
