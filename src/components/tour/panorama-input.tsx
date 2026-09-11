@@ -163,7 +163,7 @@ export function PanoramaInput({
       // room.jpg" and occasionally "R0010234.JPG". Either way it is editable.
       const title = sceneName(file.name, scenes.length + added.length);
 
-      if (verdict.status === "safe" && verdict.publicUrl) {
+      if (verdict.publicUrl) {
         added.push({
           key: crypto.randomUUID(),
           title,

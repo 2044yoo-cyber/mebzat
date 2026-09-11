@@ -7,6 +7,7 @@ import {
   updateProduct,
   type ProductFormState,
 } from "@/app/(dashboard)/products/actions";
+import { DigitalFileInput } from "@/components/products/digital-file-input";
 import { ProductImagesInput } from "@/components/products/product-images-input";
 import { SpecsInput } from "@/components/products/specs-input";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import {
   CONDITIONS,
   DIGITAL_KINDS,
   DIGITAL_LICENSES,
+  RENTAL_PERIODS,
   SELLABLE_CONDITIONS,
   STOCK_STATUS,
   USED_GRADES,
@@ -82,6 +84,7 @@ export function ProductForm({
     (product?.fulfilment as ProductFulfilment | undefined) ?? "physical",
   );
   const digital = fulfilment === "digital";
+  const rental = fulfilment === "rental";
 
   return (
     <form action={formAction} className="space-y-6">
@@ -205,19 +208,65 @@ export function ProductForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="physical">A thing</SelectItem>
+              <SelectItem value="physical">A thing, for sale</SelectItem>
+              <SelectItem value="rental">A thing, for rent</SelectItem>
               <SelectItem value="digital">A file</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
             {digital
               ? "This listing will appear under Marketplace → Digital."
-              : "Something physical — delivered, collected or installed."}
+              : rental
+                ? "This listing will appear under Marketplace → Rental. The price is the rate."
+                : "This listing will appear under Marketplace → New or Used, by its condition."}
           </p>
         </div>
 
+        {rental && (
+          <div className="grid gap-4 border-t pt-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="rentalPeriod">Rate is per</Label>
+              <Select
+                name="rentalPeriod"
+                defaultValue={product?.rental_period ?? "daily"}
+              >
+                <SelectTrigger id="rentalPeriod" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(RENTAL_PERIODS).map(([value, entry]) => (
+                    <SelectItem key={value} value={value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rentalDeposit">Deposit (optional)</Label>
+              <Input
+                id="rentalDeposit"
+                name="rentalDeposit"
+                type="number"
+                min={0}
+                placeholder="2000"
+                defaultValue={product?.rental_deposit ?? ""}
+              />
+            </div>
+          </div>
+        )}
+
         {digital && (
           <div className="space-y-4 border-t pt-4">
+            <div className="space-y-2">
+              <Label>The file</Label>
+              <DigitalFileInput
+                userId={userId}
+                initialPath={product?.digital_file_path ?? ""}
+                initialName={product?.digital_file_name ?? ""}
+              />
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="digitalKind">Kind of file</Label>
@@ -290,7 +339,9 @@ export function ProductForm({
       </div>
 
       {/* A file has no condition and no second-hand grade, so the whole block
-          goes away rather than being shown and ignored. */}
+          goes away rather than being shown and ignored. A rental keeps it —
+          whether the scaffold is new or worn is exactly what somebody hiring
+          it wants to know — it just does not decide the section. */}
       <div className={cn("space-y-4 rounded-xl border p-4", digital && "hidden")}>
         <div className="space-y-2">
           <Label htmlFor="condition">Condition</Label>

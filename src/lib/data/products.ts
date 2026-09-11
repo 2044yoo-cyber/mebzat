@@ -15,7 +15,7 @@ import type { ProductCardData } from "@/components/products/product-card";
 type Client = SupabaseClient<Database>;
 
 const CARD_COLUMNS =
-  "id, title, cover_image_url, price, currency, unit, brand, stock_status, status, condition, used_grade, location_city, location_area, fulfilment, digital_kind, file_format, license, is_sample, supplier:profiles!owner_id(full_name, company_name)";
+  "id, title, cover_image_url, price, currency, unit, brand, stock_status, status, condition, used_grade, location_city, location_area, fulfilment, digital_kind, file_format, license, is_sample, rental_period, supplier:profiles!owner_id(full_name, company_name)";
 
 // Supabase .or() is comma/paren-delimited, so strip anything that could
 // break the filter grammar out of user search input.
@@ -64,7 +64,7 @@ export type MarketplaceQuery = {
    * always `condition = 'new'`, so a rule of "condition is new" alone would
    * list every course and floor plan among the cement bags.
    */
-  section?: "new" | "used" | "digital";
+  section?: "new" | "used" | "rental" | "digital";
   /** Only meaningful within the used section. */
   usedGrade?: UsedGrade;
   city?: string;
@@ -120,6 +120,8 @@ export async function getMarketplaceProducts(
   // cannot be in the wrong one.
   if (section === "digital") {
     query = query.eq("fulfilment", "digital");
+  } else if (section === "rental") {
+    query = query.eq("fulfilment", "rental");
   } else if (section === "new") {
     query = query.eq("fulfilment", "physical").eq("condition", "new");
   } else if (section === "used") {

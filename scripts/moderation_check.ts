@@ -26,6 +26,13 @@ const types = readFileSync("src/lib/moderation/types.ts", "utf8");
 const video = readFileSync("src/lib/moderation/video.ts", "utf8");
 const strikes = readFileSync("src/lib/moderation/strikes.ts", "utf8");
 const sql = readFileSync("supabase/migrations/0052_moderation.sql", "utf8");
+// 0052 declared the publish gate; 0076 replaced it. Both files stay on disk,
+// so a check that reads only the first keeps asserting a constraint the
+// database no longer has.
+const later = readFileSync(
+  "supabase/migrations/0076_review_after_posting.sql",
+  "utf8",
+);
 
 /** Comments stripped, so a check never matches the prose explaining itself. */
 /**
@@ -141,18 +148,38 @@ check(
 /* Published means cleared                                                    */
 /* -------------------------------------------------------------------------- */
 
+// 0076 moved the line. `review` publishes and is looked at afterwards, because
+// holding back everything a classifier was unsure about held back mostly
+// innocent work — and held back everything on a day no classifier was
+// configured. What must stay unrepresentable is publishing something a check
+// *refused*, or something no check has seen.
+//
+// These three read the old shape and kept passing after the application had
+// changed around them. `publishApproved` still carried `item.status !==
+// "safe"`, so the upload path stopped refusing a review verdict, asked this to
+// publish it, and got null — the seller was still stuck and nothing said so.
 check(
-  "a public path requires a safe status",
-  /constraint public_path_requires_safe check \([\s\S]{0,90}status = 'safe'/.test(sql),
-  "makes published-without-being-cleared unrepresentable, not merely avoided",
+  "a public path requires a cleared or in-review status",
+  /constraint public_path_requires_review_or_safe check \([\s\S]{0,90}status in \('safe', 'review'\)/.test(
+    later,
+  ),
+  "makes published-after-being-refused unrepresentable, not merely avoided",
 );
 check(
-  "publishing refuses anything not safe",
-  /item\.status !== "safe"\) return null;/.test(code(service)),
+  "and blocked is not one of them",
+  !/status in \('safe', 'review', 'blocked'\)/.test(later) &&
+    !/status in \('safe', 'review', 'pending'\)/.test(later),
 );
 check(
-  "only 'safe' is publishable",
-  /return status === "safe";/.test(code(types)),
+  "publishing asks the one function that decides",
+  /isPublishable\(item\.status as ModerationStatus\)\) return null;/.test(
+    code(service),
+  ),
+  "a second copy of the rule is the one that goes stale",
+);
+check(
+  "and that function admits safe and review, and nothing else",
+  /return status === "safe" \|\| status === "review";/.test(code(types)),
 );
 check(
   "the quarantine bucket is private",

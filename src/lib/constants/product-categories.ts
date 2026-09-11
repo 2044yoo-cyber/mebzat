@@ -21,6 +21,7 @@ import {
 import type {
   DigitalKind,
   DigitalLicense,
+  RentalPeriod,
   ProductCondition,
   StockStatus,
   UsedGrade,
@@ -152,6 +153,7 @@ export function isSecondHand(condition: ProductCondition): boolean {
 export const MARKETPLACE_SECTIONS = [
   { key: "new", label: "New Items", href: "/marketplace" },
   { key: "used", label: "Used Items", href: "/marketplace/used" },
+  { key: "rental", label: "Rental", href: "/marketplace/rental" },
   // Not `/designs`. That is Berchuma Studio's gallery — a place to open
   // somebody's fitted-wardrobe design and remix it, not a shop. Anybody who
   // tapped this tab expecting to buy something found a portfolio.
@@ -207,3 +209,18 @@ export const DIGITAL_LICENSES: Record<
     detail: "May be used on paid work and in what you deliver to a client.",
   },
 };
+
+/**
+ * Renting rather than selling.
+ *
+ * The periods are `rental_period` from 0011, which `equipment_bookings`
+ * already uses. Not a second enum with the same idea and different words —
+ * that is how two parts of one marketplace come to disagree about what a week
+ * is.
+ */
+export const RENTAL_PERIODS: Record<RentalPeriod, { label: string; per: string }> =
+  {
+    daily: { label: "Per day", per: "day" },
+    weekly: { label: "Per week", per: "week" },
+    monthly: { label: "Per month", per: "month" },
+  };

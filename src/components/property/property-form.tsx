@@ -195,7 +195,7 @@ export function PropertyForm() {
       // Held for review: the listing goes ahead without this photo rather
       // than failing outright. A seller who waited through six uploads should
       // not lose the whole form because one picture needs a second look.
-      if (verdict.status !== "safe" || !verdict.publicUrl) {
+      if (!verdict.publicUrl) {
         held += 1;
         continue;
       }
@@ -235,8 +235,8 @@ export function PropertyForm() {
       if (uploaded.held > 0) {
         toast.info(
           uploaded.held === 1
-            ? "One photo is under review and will appear once it is checked."
-            : `${uploaded.held} photos are under review and will appear once they are checked.`,
+            ? "One photo could not be added. Try again."
+            : `${uploaded.held} photos could not be added. Try again.`,
         );
       }
 

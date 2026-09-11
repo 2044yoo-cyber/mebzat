@@ -70,7 +70,7 @@ export function AvatarUpload({
     // The profile is only written on `safe`, and only with the URL the server
     // produced. On review or blocked the existing avatar stays exactly as it
     // was — a rejected upload must not clear the picture somebody already had.
-    if (verdict.status !== "safe" || !verdict.publicUrl) {
+    if (!verdict.publicUrl) {
       setUploading(false);
       if (verdict.status === "blocked") toast.error(verdict.message);
       else toast.info(verdict.message);

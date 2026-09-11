@@ -685,7 +685,7 @@ export type PriceVatStatus =
   | "exclusive"
   | "exempt";
 
-export type ProductFulfilment = "physical" | "digital";
+export type ProductFulfilment = "physical" | "digital" | "rental";
 
 export type DigitalKind =
   | "course"
@@ -4606,6 +4606,8 @@ export interface Database {
           reviewed_by: string | null;
           original_path: string | null;
           watermarked: boolean;
+          hidden_at: string | null;
+          hidden_reason: string | null;
         };
         Insert: {
           id?: string;
@@ -4628,6 +4630,8 @@ export interface Database {
           reviewed_by?: string | null;
           original_path?: string | null;
           watermarked?: boolean;
+          hidden_at?: string | null;
+          hidden_reason?: string | null;
         };
         Update: {
           id?: string;
@@ -4650,6 +4654,8 @@ export interface Database {
           reviewed_by?: string | null;
           original_path?: string | null;
           watermarked?: boolean;
+          hidden_at?: string | null;
+          hidden_reason?: string | null;
         };
         Relationships: [];
       };
@@ -5335,6 +5341,10 @@ export interface Database {
           condition: ProductCondition;
           used_grade: UsedGrade | null;
           fulfilment: ProductFulfilment;
+          rental_period: RentalPeriod | null;
+          rental_deposit: number | null;
+          digital_file_path: string | null;
+          digital_file_name: string | null;
           digital_kind: DigitalKind | null;
           file_format: string | null;
           file_size_mb: number | null;
@@ -5370,6 +5380,10 @@ export interface Database {
           condition?: ProductCondition;
           used_grade?: UsedGrade | null;
           fulfilment?: ProductFulfilment;
+          rental_period?: RentalPeriod | null;
+          rental_deposit?: number | null;
+          digital_file_path?: string | null;
+          digital_file_name?: string | null;
           digital_kind?: DigitalKind | null;
           file_format?: string | null;
           file_size_mb?: number | null;
@@ -5405,6 +5419,10 @@ export interface Database {
           condition?: ProductCondition;
           used_grade?: UsedGrade | null;
           fulfilment?: ProductFulfilment;
+          rental_period?: RentalPeriod | null;
+          rental_deposit?: number | null;
+          digital_file_path?: string | null;
+          digital_file_name?: string | null;
           digital_kind?: DigitalKind | null;
           file_format?: string | null;
           file_size_mb?: number | null;

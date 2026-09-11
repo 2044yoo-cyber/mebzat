@@ -102,7 +102,7 @@ export function FloorPlanInput({
       const title = sceneName(file.name, plans.length + added.length);
       const mediaType: "image" | "pdf" = pdf ? "pdf" : "image";
 
-      if (verdict.status === "safe" && verdict.publicUrl) {
+      if (verdict.publicUrl) {
         added.push({ key: crypto.randomUUID(), title, url: verdict.publicUrl, mediaType });
         continue;
       }

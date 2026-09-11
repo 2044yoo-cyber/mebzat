@@ -360,13 +360,13 @@ check(
 // ---------------------------------------------------------------------------
 
 check(
-  "the marketplace has three sections",
-  MARKETPLACE_SECTIONS.length === 3,
+  "the marketplace has four sections",
+  MARKETPLACE_SECTIONS.length === 4,
 );
 check(
-  "named New Items, Used Items and Digital Marketplace",
+  "named New Items, Used Items, Rental and Digital Marketplace",
   MARKETPLACE_SECTIONS.map((section) => section.label).join(" · ") ===
-    "New Items · Used Items · Digital Marketplace",
+    "New Items · Used Items · Rental · Digital Marketplace",
 );
 {
   // The word appears twice on purpose and neither is a name: "leftover
@@ -896,7 +896,236 @@ for (const [path, expected, what] of [
 }
 
 // ---------------------------------------------------------------------------
-// 13. Nothing else about the marketplace changed
+// 13. Posting is not held up, and a report takes the file down
+// ---------------------------------------------------------------------------
+
+{
+  const review = readFileSync(
+    "supabase/migrations/0076_review_after_posting.sql",
+    "utf8",
+  ).replace(/^\s*--.*$/gm, "");
+
+  const upload = code("src/app/moderation/upload-actions.ts");
+  check(
+    "only a refusal stops a seller",
+    /if \(outcome\.status === "blocked" \|\| !outcome\.itemId\) \{/.test(upload),
+    'it was `!== "safe"`, so an uncertain classifier held the listing back',
+  );
+  check(
+    "and the caller is told what actually happened",
+    /status: outcome\.status,\s*\n\s*publicUrl,/.test(upload),
+    "returning \"safe\" for something still being checked is a lie the UI repeats",
+  );
+
+  for (const surface of [
+    "src/components/products/product-images-input.tsx",
+    "src/components/projects/project-images-input.tsx",
+    "src/components/profile/avatar-upload.tsx",
+    "src/components/profile/cover-upload.tsx",
+    "src/components/companies/single-image-input.tsx",
+    "src/components/property/property-form.tsx",
+  ]) {
+    check(
+      `${surface.split("/").at(-1)} treats a URL as published`,
+      !/verdict\.status !== "safe"/.test(code(surface)),
+      "eight surfaces each had their own copy of the old rule",
+    );
+  }
+  for (const surface of [
+    "src/components/tour/panorama-input.tsx",
+    "src/components/tour/floor-plan-input.tsx",
+  ]) {
+    check(
+      `${surface.split("/").at(-1)} treats a URL as published`,
+      !/verdict\.status === "safe" &&/.test(code(surface)),
+    );
+  }
+
+  check(
+    "the seller is not told a published image was held back",
+    !/is under review/.test(code("src/components/products/product-images-input.tsx")),
+  );
+  check(
+    "and is told when one is published and still being checked",
+    /posted and still being checked/.test(
+      code("src/components/products/product-images-input.tsx"),
+    ),
+  );
+  {
+    // Whitespace-normalised once. The `||` that used to be here tested the
+    // same normalised string twice with two regexes that could not disagree,
+    // which is a check with a spare half rather than a stronger one.
+    const guidelines = code("src/app/(info)/guidelines/page.tsx").replace(
+      /\s+/g,
+      " ",
+    );
+    check(
+      "the public guidelines describe what actually happens",
+      /post goes up anyway and a person looks at it afterwards/.test(guidelines),
+      "a policy page describing a model the platform no longer uses is a false statement",
+    );
+    check(
+      "and no longer say uploads are checked before anyone can see them",
+      !/checked automatically before anyone else can see it/.test(guidelines),
+    );
+    check(
+      "and say what a report does before it takes anything down",
+      /One report does not take anything down/.test(guidelines),
+    );
+  }
+
+  // Reports
+  check(
+    "one report does not hide anything",
+    /select 3 \$\$/.test(review),
+    "it is one person's opinion, and 0052 says so in as many words",
+  );
+  check(
+    "severe categories do not wait for a third",
+    /category in \('sexual_minors', 'sexual_explicit', 'illegal', 'threats'\)/.test(
+      review,
+    ),
+  );
+  check(
+    "moderators are told when something is hidden",
+    /insert into public\.notifications[\s\S]{0,200}Content hidden pending review/.test(
+      review,
+    ),
+    "a queue nobody is watching leaves it hidden indefinitely",
+  );
+  check(
+    "and only when it was not already hidden",
+    /item\.hidden_at is null/.test(review),
+  );
+
+  const reportAction = code("src/app/moderation/actions.ts");
+  check(
+    "the report path no longer writes the count itself",
+    !/report_count: \(existing\?\.report_count \?\? 0\) \+ 1/.test(reportAction),
+    "the trigger owns it; two writers from a value read before the insert loses one",
+  );
+  check(
+    "a hidden file is actually taken out of the public bucket",
+    /await hideReported\(supabase, itemId, bucket\)/.test(reportAction),
+    "`hidden_at` hides nothing on its own — the pages hold the URL, not this row",
+  );
+  const service = code("src/lib/moderation/service.ts");
+  check(
+    "which re-quarantines it before removing it",
+    /\.from\("moderation-quarantine"\)\s*\n?\s*\.upload\(path, download\.data[\s\S]{0,300}\.remove\(\[path\]\)/.test(
+      service,
+    ),
+    "removing first and failing to keep it would lose the evidence",
+  );
+  check(
+    "and clears the public path so nothing renders it again",
+    /\.update\(\{ public_path: null, quarantine_path: path \}\)/.test(service),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 14. Rental, and the file being sold
+// ---------------------------------------------------------------------------
+
+{
+  const review = readFileSync(
+    "supabase/migrations/0076_review_after_posting.sql",
+    "utf8",
+  ).replace(/^\s*--.*$/gm, "");
+
+  check(
+    "rental is a value of the column, not a second table",
+    /alter type public\.product_fulfilment add value if not exists 'rental'/.test(
+      review,
+    ) && !/create table/i.test(review),
+  );
+  check(
+    "and reuses the rental period equipment already had",
+    !/create type public\.rental_period/.test(review),
+    "a second enum with the same name and different words is how two parts of one marketplace disagree about a week",
+  );
+  check(
+    "a rental must say per what",
+    /fulfilment <> 'rental' or rental_period is not null/.test(review),
+  );
+  check(
+    "and only a rental carries a period or a deposit",
+    /fulfilment = 'rental'\s*\n\s*or \(rental_period is null and rental_deposit is null\)/.test(
+      review,
+    ),
+  );
+  check(
+    "the file being sold is in a private bucket",
+    /values \('digital-goods', 'digital-goods', false,/.test(review),
+    "the file is the product; a public bucket gives it away to anybody who reads the HTML",
+  );
+  check(
+    "scoped to the seller's own folder",
+    /bucket_id = 'digital-goods'\s*\n\s*and \(storage\.foldername\(name\)\)\[1\] = auth\.uid\(\)::text/.test(
+      review,
+    ),
+  );
+  check(
+    "and only a digital listing may carry one",
+    /fulfilment = 'digital'\s*\n\s*or \(digital_file_path is null and digital_file_name is null\)/.test(
+      review,
+    ),
+  );
+
+  const form = code("src/components/products/product-form.tsx");
+  check(
+    "the posting page offers all three types",
+    /<SelectItem value="physical">/.test(form) &&
+      /<SelectItem value="rental">/.test(form) &&
+      /<SelectItem value="digital">/.test(form),
+  );
+  check(
+    "choosing a file asks for the file",
+    /\{digital && \([\s\S]{0,400}<DigitalFileInput/.test(form),
+  );
+  check(
+    "choosing a rental asks for the rate period",
+    /\{rental && \([\s\S]{0,400}name="rentalPeriod"/.test(form),
+  );
+
+  const fileInput = code("src/components/products/digital-file-input.tsx");
+  check(
+    "the file goes to the private bucket",
+    /\.from\("digital-goods"\)/.test(fileInput),
+  );
+  check(
+    "into the seller's own folder",
+    /`\$\{userId\}\//.test(fileInput),
+    "the storage policy checks the first path segment against auth.uid()",
+  );
+  check(
+    "and the seller is told there is no checkout yet",
+    /Medosha\s*\n?\s*does not take payment yet/.test(
+      fileInput.replace(/\s+/g, " "),
+    ) || /does not take payment yet/.test(fileInput),
+    "storing a file people think they are selling automatically would be worse than not storing it",
+  );
+
+  check(
+    "there is a Rental section",
+    MARKETPLACE_SECTIONS.some(
+      (section) => section.key === "rental" && section.href === "/marketplace/rental",
+    ),
+  );
+  const rentalPage = code("src/app/marketplace/rental/page.tsx");
+  check("with a page", rentalPage.length > 0);
+  check("which asks for the rental section", /section: "rental",/.test(rentalPage));
+
+  const card = code("src/components/products/product-card.tsx");
+  check(
+    "a rate says what it is per",
+    /RENTAL_PERIODS\[product\.rental_period\]\.per/.test(card),
+    'a number with no "per day" beside it reads as the purchase price',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 15. Nothing else about the marketplace changed
 // ---------------------------------------------------------------------------
 
 {

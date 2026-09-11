@@ -40,6 +40,11 @@ export function ProductImagesInput({
     // are held would otherwise stack three toasts on top of a phone screen.
     let held = 0;
     let refused = 0;
+    // Published, and still being looked at. Worth saying — it is why an image
+    // might disappear later — but it is not a failure and must not read like
+    // one, which is exactly how "One image is under review" read while it was
+    // also the reason the listing had no photograph.
+    let checking = 0;
 
     for (const file of files) {
       if (file.size > MAX_SIZE) {
@@ -66,11 +71,13 @@ export function ProductImagesInput({
 
       // One refusal must not cost the rest of the batch — the existing
       // per-file `continue` already had the right shape for this.
-      if (verdict.status !== "safe" || !verdict.publicUrl) {
+      // A URL means it is published. Only `blocked` comes back without one.
+      if (!verdict.publicUrl) {
         if (verdict.status === "blocked") refused += 1;
         else held += 1;
         continue;
       }
+      if (verdict.status === "review") checking += 1;
       uploaded.push(verdict.publicUrl);
     }
 
@@ -85,8 +92,17 @@ export function ProductImagesInput({
       );
     }
     if (held > 0) {
+      toast.error(
+        held === 1
+          ? "One image could not be added. Try again."
+          : `${held} images could not be added. Try again.`,
+      );
+    }
+    if (checking > 0) {
       toast.info(
-        held === 1 ? "One image is under review." : `${held} images are under review.`,
+        checking === 1
+          ? "One image is posted and still being checked."
+          : `${checking} images are posted and still being checked.`,
       );
     }
   }

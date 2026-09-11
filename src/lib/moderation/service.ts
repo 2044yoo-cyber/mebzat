@@ -9,11 +9,12 @@ import {
   isModerationConfigured,
   type ProviderVerdict,
 } from "./provider";
-import type {
-  ContentKind,
-  ModerationCategory,
-  ModerationOutcome,
-  ModerationStatus,
+import {
+  isPublishable,
+  type ContentKind,
+  type ModerationCategory,
+  type ModerationOutcome,
+  type ModerationStatus,
 } from "./types";
 
 /**
@@ -202,7 +203,12 @@ export async function publishApproved(
     .eq("id", itemId)
     .maybeSingle();
 
-  if (!item || item.status !== "safe") return null;
+  // `review` publishes too. This read `item.status !== "safe"`, which is what
+  // made the change in `upload-actions.ts` do nothing: the caller stopped
+  // refusing a review verdict and then asked this to publish it, and got null
+  // back. `blocked` and `pending` still return nothing, and the database
+  // constraint says the same thing independently.
+  if (!item || !isPublishable(item.status as ModerationStatus)) return null;
 
   const download = await client.storage
     .from("moderation-quarantine")
@@ -273,6 +279,68 @@ export async function publishApproved(
   await client.storage.from("moderation-quarantine").remove([quarantinePath]);
 
   return publicUrl;
+}
+
+/**
+ * Taking a reported file out of view.
+ *
+ * `hidden_at` on its own hides nothing: the file is in a public bucket and the
+ * pages that render it hold its URL, not a join to the moderation row. So this
+ * moves the bytes back to quarantine — private, folder-scoped, unreachable by
+ * URL — and clears `public_path`. A direct link stops working, which is the
+ * only version of "hidden" worth the name.
+ *
+ * The original is left where it is. Nothing has been decided yet, and a
+ * moderator who clears this needs something to put back.
+ *
+ * Never throws. A report that fails to hide must still be recorded, and it
+ * has been by the time this runs.
+ */
+export async function hideReported(
+  client: SupabaseClient,
+  itemId: string,
+  publicBucket: string,
+): Promise<boolean> {
+  const { data: item } = await client
+    .from("moderation_items")
+    .select("public_path, hidden_at")
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (!item?.public_path || !item.hidden_at) return false;
+
+  const path = item.public_path as string;
+
+  try {
+    const download = await client.storage.from(publicBucket).download(path);
+    if (download.error || !download.data) return false;
+
+    // Put it somewhere only a moderator and its author can reach before
+    // taking it out of the public bucket, so a failure here cannot lose it.
+    const kept = await client.storage
+      .from("moderation-quarantine")
+      .upload(path, download.data, { upsert: true });
+    if (kept.error) {
+      console.error("[moderation] could not re-quarantine:", kept.error.message);
+      return false;
+    }
+
+    const removed = await client.storage.from(publicBucket).remove([path]);
+    if (removed.error) {
+      console.error("[moderation] could not unpublish:", removed.error.message);
+      return false;
+    }
+
+    await client
+      .from("moderation_items")
+      .update({ public_path: null, quarantine_path: path })
+      .eq("id", itemId);
+
+    return true;
+  } catch (error) {
+    console.error("[moderation] hide failed:", error);
+    return false;
+  }
 }
 
 /** Appends to the trail. Never throws — a failed audit must not fail a decision. */

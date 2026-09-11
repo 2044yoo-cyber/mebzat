@@ -57,7 +57,7 @@ export function CoverUpload({
 
     // Only `safe` writes the profile, and only with the URL the server built.
     // A refused upload leaves the existing cover exactly where it was.
-    if (verdict.status !== "safe" || !verdict.publicUrl) {
+    if (!verdict.publicUrl) {
       setUploading(false);
       if (verdict.status === "blocked") toast.error(verdict.message);
       else toast.info(verdict.message);

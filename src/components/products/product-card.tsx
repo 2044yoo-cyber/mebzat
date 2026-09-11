@@ -4,7 +4,11 @@ import { FileDown, ImageOff, MapPin } from "lucide-react";
 
 import { ConditionBadge } from "@/components/products/condition-badge";
 import { SaveButton } from "@/components/products/save-button";
-import { DIGITAL_KINDS, STOCK_STATUS } from "@/lib/constants/product-categories";
+import {
+  DIGITAL_KINDS,
+  RENTAL_PERIODS,
+  STOCK_STATUS,
+} from "@/lib/constants/product-categories";
 import { cn, formatPrice } from "@/lib/utils";
 import type { Product } from "@/types/database.types";
 
@@ -28,6 +32,7 @@ export type ProductCardData = Pick<
   | "file_format"
   | "license"
   | "is_sample"
+  | "rental_period"
 > & {
   supplier?: {
     full_name: string | null;
@@ -104,7 +109,16 @@ export function ProductCard({ product }: { product: ProductCardData }) {
         <div className="flex items-baseline justify-between gap-2 pt-0.5">
           <span className="font-semibold">
             {formatPrice(product.price, product.currency)}
-            {product.price != null && product.unit && (
+            {/* A rental's price is a rate, and "80,000 ETB" without "per day"
+                beside it is a number somebody will read as the purchase
+                price. */}
+            {product.price != null && product.rental_period && (
+              <span className="text-xs font-normal text-muted-foreground">
+                {" "}
+                / {RENTAL_PERIODS[product.rental_period].per}
+              </span>
+            )}
+            {product.price != null && !product.rental_period && product.unit && (
               <span className="text-xs font-normal text-muted-foreground">
                 {" "}
                 / {product.unit}

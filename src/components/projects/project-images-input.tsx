@@ -65,7 +65,7 @@ export function ProjectImagesInput({
         publicBucket: "project-images",
       });
 
-      if (verdict.status !== "safe" || !verdict.publicUrl) {
+      if (!verdict.publicUrl) {
         if (verdict.status === "blocked") refused += 1;
         else held += 1;
         continue;
@@ -85,7 +85,9 @@ export function ProjectImagesInput({
     }
     if (held > 0) {
       toast.info(
-        held === 1 ? "One image is under review." : `${held} images are under review.`,
+        held === 1
+          ? "One image could not be added. Try again."
+          : `${held} images could not be added. Try again.`,
       );
     }
   }

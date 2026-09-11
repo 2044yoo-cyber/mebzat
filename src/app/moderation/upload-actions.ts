@@ -23,7 +23,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type UploadVerdict = {
   status: ModerationStatus;
-  /** Only ever set when status is "safe". */
+  /** Set for "safe" and for "review" — both are published. Never for "blocked". */
   publicUrl?: string;
   /** For an appeal, if the author wants one. */
   itemId?: string;
@@ -117,9 +117,16 @@ export async function moderateQuarantinedImage(input: {
     quarantinePath: input.quarantinePath,
   });
 
-  if (outcome.status !== "safe" || !outcome.itemId) {
-    // review and blocked both leave the file where it is: private, scoped to
-    // the uploader, unreachable by URL. A moderator can still reach it.
+  // `blocked` is the only refusal. It used to be that anything short of `safe`
+  // held the file in quarantine, so a seller whose photograph the classifier
+  // was unsure about — or who uploaded on a day no classifier was configured —
+  // saw "One image is under review" and got no listing. Most of what lands in
+  // `review` is fine, and holding all of it back to catch the little that is
+  // not means nobody can sell anything while the provider is down.
+  //
+  // So `review` publishes and stays in the moderator's queue. `blocked` does
+  // not, and `sexual_minors` cannot be marked safe by anything.
+  if (outcome.status === "blocked" || !outcome.itemId) {
     return {
       status: outcome.status,
       itemId: outcome.itemId,
@@ -146,10 +153,12 @@ export async function moderateQuarantinedImage(input: {
   }
 
   return {
-    status: "safe",
+    // What actually happened, not what was published. A caller that wants to
+    // say "we are still checking this" needs to be able to tell the two apart.
+    status: outcome.status,
     publicUrl,
     itemId: outcome.itemId,
-    message: uploadMessage("safe"),
+    message: uploadMessage(outcome.status),
   };
 }
 

@@ -80,16 +80,20 @@ export default function GuidelinesPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">How we check</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          What you upload is checked automatically before anyone else can see
-          it. Most things pass in a moment. If a check is uncertain, a person
-          looks at it before it goes live rather than it being refused
-          outright — automated checks get things wrong, and we would rather be
-          slow than unfair.
+          What you upload is checked automatically as it is posted. Most things
+          pass in a moment and go straight up. If a check is uncertain, your
+          post goes up anyway and a person looks at it afterwards — automated
+          checks get things wrong, and holding back everything they are unsure
+          about would mean holding back mostly innocent work.
         </p>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          You will see one of three things: <strong>Published</strong>,{" "}
-          <strong>Under review</strong>, or a message saying the content cannot
-          be published.
+          A small number of things are refused outright rather than posted. If
+          that happens you will be told, and you can appeal.
+        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          You will see one of three things: <strong>Published</strong>;{" "}
+          <strong>posted and still being checked</strong>; or a message saying
+          the content cannot be published.
         </p>
       </section>
 
@@ -100,6 +104,14 @@ export default function GuidelinesPage() {
           Reporting something does not delete it — it puts it in front of a
           moderator. Reports are not anonymous to us, and filing them in bulk
           to bury a competitor is itself a violation.
+        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          One report does not take anything down: it is one person&apos;s
+          opinion, and we will not let it unpublish somebody&apos;s work. Once
+          several people have reported the same thing — or one person reports
+          something in a category where being wrong for an afternoon is
+          expensive — it is hidden while a moderator decides, and the
+          moderators are told it is waiting.
         </p>
       </section>
 

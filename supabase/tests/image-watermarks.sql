@@ -326,15 +326,30 @@ begin
   where id = item;
   raise notice 'ok 5d: a marked, published image may keep its original';
 
-  -- And the pre-existing rule still holds: publishing something unchecked
-  -- remains unrepresentable.
+  -- Moving a published row back to `review` is now allowed and is exactly
+  -- what a report does: 0076 publishes on `review` and looks afterwards. What
+  -- stays unrepresentable is publishing something a check refused, or that no
+  -- check has seen.
+  update public.moderation_items set status = 'review' where id = item;
+  raise notice 'ok 5e: a published row can go back for another look';
+
   begin
-    update public.moderation_items set status = 'review' where id = item;
-    raise exception 'FAIL 5e: a published row was moved back to review';
+    update public.moderation_items set status = 'blocked' where id = item;
+    raise exception 'FAIL 5f: a published row was marked blocked';
   exception
     when check_violation then
-      raise notice 'ok 5e: a published row cannot become unreviewed';
+      raise notice 'ok 5f: but it cannot be published and refused at once';
   end;
+
+  begin
+    update public.moderation_items set status = 'pending' where id = item;
+    raise exception 'FAIL 5g: a published row went back to unchecked';
+  exception
+    when check_violation then
+      raise notice 'ok 5g: nor published and unchecked';
+  end;
+
+  update public.moderation_items set status = 'safe' where id = item;
 end;
 $$;
 

@@ -24,7 +24,17 @@ export const productSchema = z.object({
   // marketplace where the seller can leave them blank is one where the default
   // quietly decides — and the defaults put second-hand goods under New and
   // files among the cement bags.
-  fulfilment: z.enum(["physical", "digital"]),
+  fulfilment: z.enum(["physical", "rental", "digital"]),
+  rentalPeriod: z
+    .enum(["daily", "weekly", "monthly"])
+    .optional()
+    .or(z.literal("")),
+  rentalDeposit: z.coerce
+    .number()
+    .min(0, "A deposit cannot be negative")
+    .optional(),
+  digitalFilePath: optionalText,
+  digitalFileName: optionalText,
   digitalKind: z
     .enum(["course", "sketchup", "model_3d", "floor_plan", "other"])
     .optional()
@@ -135,18 +145,32 @@ export function usedFieldsFor(data: ProductFormValues) {
 export function digitalFieldsFor(data: ProductFormValues) {
   if (data.fulfilment !== "digital") {
     return {
-      fulfilment: "physical" as const,
       digital_kind: null,
       file_format: null,
       file_size_mb: null,
       license: null,
+      digital_file_path: null,
+      digital_file_name: null,
     };
   }
   return {
-    fulfilment: "digital" as const,
     digital_kind: data.digitalKind || null,
     file_format: data.fileFormat || null,
     file_size_mb: typeof data.fileSizeMb === "number" ? data.fileSizeMb : null,
     license: data.license || null,
+    digital_file_path: data.digitalFilePath || null,
+    digital_file_name: data.digitalFileName || null,
+  };
+}
+
+/** The rental fields, cleared when the listing is not a rental. */
+export function rentalFieldsFor(data: ProductFormValues) {
+  if (data.fulfilment !== "rental") {
+    return { rental_period: null, rental_deposit: null };
+  }
+  return {
+    rental_period: data.rentalPeriod || "daily",
+    rental_deposit:
+      typeof data.rentalDeposit === "number" ? data.rentalDeposit : null,
   };
 }

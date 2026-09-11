@@ -8,12 +8,14 @@ import { slugify } from "@/lib/utils";
 import {
   digitalFieldsFor,
   parseSpecs,
+  rentalFieldsFor,
   productSchema,
   type ProductFormValues,
   usedFieldsFor,
 } from "@/lib/validations/product";
 import type {
   ProductCondition,
+  ProductFulfilment,
   ProductStatus,
   StockStatus,
 } from "@/types/database.types";
@@ -47,6 +49,10 @@ function buildValues(formData: FormData) {
     unit: formData.get("unit"),
     stockStatus: formData.get("stockStatus"),
     fulfilment: formData.get("fulfilment"),
+    rentalPeriod: formData.get("rentalPeriod"),
+    rentalDeposit: formData.get("rentalDeposit") || undefined,
+    digitalFilePath: formData.get("digitalFilePath"),
+    digitalFileName: formData.get("digitalFileName"),
     digitalKind: formData.get("digitalKind"),
     fileFormat: formData.get("fileFormat"),
     fileSizeMb: formData.get("fileSizeMb") || undefined,
@@ -90,6 +96,7 @@ function toColumns(data: ProductFormValues) {
     // A file is never second-hand and never shipped, and the database refuses
     // a listing that claims otherwise. Forced rather than validated: a seller
     // who set a condition and then chose Digital meant Digital.
+    fulfilment: data.fulfilment as ProductFulfilment,
     condition: (data.fulfilment === "digital"
       ? "new"
       : data.condition) as ProductCondition,
@@ -97,6 +104,7 @@ function toColumns(data: ProductFormValues) {
       data.fulfilment === "digital" ? { ...data, condition: "new" } : data,
     ),
     ...digitalFieldsFor(data),
+    ...rentalFieldsFor(data),
     location_city: data.locationCity || null,
     location_area: data.locationArea || null,
     location_country: data.locationCountry || null,

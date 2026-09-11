@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { audit } from "@/lib/moderation/service";
+import { audit, hideReported } from "@/lib/moderation/service";
 import {
   type ContentKind,
   type ModerationCategory,
@@ -29,6 +29,24 @@ export type ActionResult =
 /** Reports one person may file per hour. Generous for a reader, useless for
  * somebody trying to bury a competitor's listing under a pile of reports. */
 const REPORTS_PER_HOUR = 20;
+
+/**
+ * Which public bucket each kind of upload went to.
+ *
+ * Needed to take a reported file back out of it. Only the kinds whose
+ * deliverable is a file appear here — a reported comment has no bucket, and
+ * `hideReported` is not called for one.
+ */
+const PUBLIC_BUCKETS: Partial<Record<ContentKind, string>> = {
+  product_image: "product-images",
+  project_image: "project-images",
+  profile_avatar: "avatars",
+  profile_cover: "covers",
+  listing: "property-images",
+  panorama: "panoramas",
+  floor_plan: "floor-plans",
+  company: "company-assets",
+};
 
 function isCategory(value: string): value is ModerationCategory {
   return (MODERATION_CATEGORIES as readonly string[]).includes(value);
@@ -134,11 +152,27 @@ export async function reportContent(input: {
     return { ok: false, message: "That report could not be submitted." };
   }
 
-  if (!duplicate) {
-    await supabase
+  // The count is not touched here. `bump_report_count()` fires on the insert
+  // above and its own comment says it is the only writer, "so the column
+  // cannot drift" — but this function then wrote it too, from a value read
+  // before the insert. Two reports arriving together would both compute the
+  // same number and one would be lost, and after 0076 that number is what
+  // decides whether the content gets hidden.
+
+  // Hiding is decided in the trigger; the file has to be moved from here,
+  // because `hidden_at` alone hides nothing — the pages that render an image
+  // hold its URL, not a join to this row.
+  if (!duplicate && itemId) {
+    const { data: after } = await supabase
       .from("moderation_items")
-      .update({ report_count: (existing?.report_count ?? 0) + 1 })
-      .eq("id", itemId);
+      .select("hidden_at, public_path")
+      .eq("id", itemId)
+      .maybeSingle();
+
+    if (after?.hidden_at && after.public_path) {
+      const bucket = PUBLIC_BUCKETS[input.contentType];
+      if (bucket) await hideReported(supabase, itemId, bucket);
+    }
   }
 
   await audit(supabase, itemId, user.id, "review", {

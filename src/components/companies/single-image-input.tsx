@@ -70,7 +70,9 @@ export function SingleImageInput({
       );
       return;
     }
-    if (verdict.status !== "safe" || !verdict.publicUrl) {
+    // A URL means it is published. `review` publishes now and keeps the
+    // item in the moderator's queue; only `blocked` comes back without one.
+    if (!verdict.publicUrl) {
       toast.info("This image is under review and will appear once it is checked.");
       return;
     }
