@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { KitchenSetup } from "../kitchen-setup";
+import { addKitchenUpper } from "../../services/kitchen-setup";
 import {
   Boxes,
   ChevronDown,
@@ -115,12 +117,13 @@ export function ControlPanel({
               cabinet={selected}
               onChange={onChange}
             />
-            {spec.furnitureType === "wardrobe" ? <TopCabinet
+            {spec.furnitureType === "wardrobe" || (spec.furnitureType === "kitchen" && ["wall", "tall"].includes(selected.kind)) ? <TopCabinet
               spec={spec}
               cabinet={selected}
               onSelect={onSelect}
               onChange={onChange}
             /> : null}
+            {spec.furnitureType === "kitchen" && selected.kind === "base" ? <SmallButton icon={Layers} label="Add upper cabinet above" onClick={() => onChange(addKitchenUpper(spec, selected.id))} /> : null}
             <Structure spec={spec} cabinet={selected} onChange={onChange} />
             <Components
               spec={spec}
@@ -135,6 +138,13 @@ export function ControlPanel({
           </p>
         )}
 
+        {spec.furnitureType === "kitchen" ? <Section title="Kitchen layout" icon={Layers}>
+          <p className="text-xs text-muted-foreground">Replacing the layout rearranges all cabinets. Your material selections are kept.</p>
+          <KitchenSetup key={JSON.stringify(spec.kitchenSetup)} initial={spec.kitchenSetup} submitLabel="Replace kitchen layout" onStart={(next) => {
+            onChange({ ...next, carcass: spec.carcass, finish: spec.finish, hardware: spec.hardware, worktop: spec.worktop });
+            onSelect(null);
+          }} />
+        </Section> : null}
         <Materials spec={spec} onChange={onChange} />
       </div>
     </div>
@@ -156,7 +166,7 @@ function TopCabinet({ spec, cabinet, onSelect, onChange }: {
       <SmallButton icon={Trash2} label="Remove top cabinet" tone="danger" onClick={() => { onChange(removeTopCabinet(spec, lower.id)); onSelect(lower.id); }} />
       <SmallButton icon={Layers} label="Edit top cabinet" onClick={() => onSelect(top.id)} />
     </div> : <div className="flex flex-wrap gap-1.5">
-      {[400, 500, 700, 1000].map((height) => <button key={height} type="button" className="rounded-md border px-2 py-1 text-[11px] hover:border-brand" onClick={() => {
+      {[400, 500, 700, 1000].map((height) => <button key={height} type="button" disabled={spec.furnitureType === "kitchen" && !!spec.kitchenSetup && lower.position.y + lower.size.height + height > spec.kitchenSetup.roomHeight} className="rounded-md border px-2 py-1 text-[11px] hover:border-brand disabled:opacity-40" onClick={() => {
         const next = addTopCabinet(spec, lower.id, height);
         onChange(next);
         onSelect(next.cabinets.find((candidate) => candidate.stackedOn === lower.id)?.id ?? lower.id);

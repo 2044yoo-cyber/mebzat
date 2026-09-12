@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { KitchenSetup } from "./kitchen-setup";
 import {
   Armchair,
   Boxes,
@@ -61,12 +62,16 @@ const SIZES = [1800, 2400, 3000, 3600, 4200, 5000];
 export function StartPanel({
   onStart,
   onOpenChat,
+  initialKind,
+  initialWidth,
 }: {
   onStart: (spec: DesignSpec) => void;
   onOpenChat: () => void;
+  initialKind?: DesignKind;
+  initialWidth?: number;
 }) {
-  const [kind, setKind] = useState<DesignKind | null>(null);
-  const [width, setWidth] = useState(3600);
+  const [kind, setKind] = useState<DesignKind | null>(initialKind ?? null);
+  const [width, setWidth] = useState(initialWidth ?? 3600);
   const [route, setRoute] = useState<"design" | "photo" | "opening" | "plan">("design");
 
   const chosen = CATEGORIES.find((entry) => entry.kind === kind);
@@ -254,11 +259,11 @@ export function StartPanel({
         ))}
       </div>
 
-      {chosen ? (
+      {chosen?.kind === "kitchen" ? <KitchenSetup initial={initialWidth ? { roomWidth: initialWidth } : undefined} onStart={onStart} /> : chosen ? (
         <div className="space-y-3 rounded-xl border p-4">
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-sm font-medium">
-              How wide is the {chosen.kind === "kitchen" ? "run" : "space"}?
+              How wide is the space?
             </span>
             <span className="text-sm tabular-nums text-muted-foreground">
               {width} mm

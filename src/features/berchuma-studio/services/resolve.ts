@@ -71,6 +71,7 @@ export type DesignWorldBounds = {
 export function resolveDesign(spec: DesignSpec): ResolvedDesign {
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
+    kitchenFacing: !!spec.kitchenSetup,
   });
 
   const byRun = new Map<string, RunPlacement>(
@@ -110,7 +111,7 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
     }
 
     const offset = cabinet.offset ?? 0;
-    const placed = placeOnRun(placement, offset);
+    const placed = placeOnRun(placement, offset, spec.kitchenSetup ? cabinet.size.depth : undefined);
 
     cabinets.push({
       cabinet,
@@ -125,7 +126,7 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
     // Wall units sit above base units on the same run and share its length —
     // counting both would report every kitchen as twice over-filled. Fill is
     // measured per kind, and only the fullest kind is reported.
-    const key = `${placement.runId}:${cabinet.kind}`;
+    const key = `${placement.runId}:${cabinet.kind}:${cabinet.position.y}`;
     filled.set(key, (filled.get(key) ?? 0) + cabinet.size.width);
   }
 
@@ -241,6 +242,7 @@ export function remainingOn(
 ): number {
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
+    kitchenFacing: !!spec.kitchenSetup,
   });
 
   const placement = layout.placements.find((entry) => entry.runId === runId);

@@ -23,6 +23,8 @@ export const layoutKinds = [
   "straight",
   "l_shaped",
   "u_shaped",
+  "g_shaped",
+  "island",
   "custom",
 ] as const;
 
@@ -36,6 +38,10 @@ export function layoutLabel(kind: LayoutKind): string {
       return "L-shaped";
     case "u_shaped":
       return "U-shaped";
+    case "g_shaped":
+      return "G-shaped";
+    case "island":
+      return "Island";
     case "custom":
       return "Custom";
   }
@@ -213,6 +219,10 @@ export function runLabelsFor(kind: LayoutKind): string[] {
       return ["Wall A", "Wall B"];
     case "u_shaped":
       return ["Left wall", "Back wall", "Right wall"];
+    case "g_shaped":
+      return ["Left wall", "Back wall", "Right wall", "Peninsula"];
+    case "island":
+      return ["Back wall", "Island"];
     case "custom":
       return ["Run 1"];
   }

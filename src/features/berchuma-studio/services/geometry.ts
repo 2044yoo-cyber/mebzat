@@ -331,6 +331,53 @@ function plinthParts(
  * run and starts another — because that is exactly what it does in the room.
  */
 function worktopParts(spec: DesignSpec): Part[] {
+  if (!spec.worktop) return [];
+  // Legacy straight designs also support authored world-position edits.
+  if (spec.layout === "straight" && !spec.kitchenSetup) return straightWorktopParts(spec);
+  const resolved = resolveDesign(spec);
+  const groups = new Map<string, typeof resolved.cabinets>();
+  for (const placed of resolved.cabinets) {
+    if (placed.cabinet.kind !== "base" && placed.cabinet.kind !== "island") continue;
+    const key = placed.runId ?? `free:${placed.z}:${placed.rotation}`;
+    const group = groups.get(key) ?? [];
+    group.push(placed);
+    groups.set(key, group);
+  }
+  const parts: Part[] = [];
+  let groupIndex = 0;
+  for (const placed of groups.values()) {
+    const first = placed[0];
+    const run = resolved.layout.placements.find((p) => p.runId === first.runId);
+    const origin = run?.origin ?? { x: 0, z: first.z };
+    const rotation = run?.rotation ?? first.rotation;
+    const cabinets = placed.map((p) => ({
+      ...p.cabinet,
+      position: { x: p.offset ?? p.x, y: p.y, z: 0 },
+    }));
+    for (const part of straightWorktopParts({ ...spec, cabinets })) {
+      // Islands and peninsulas have no wall behind them for an upstand.
+      if (part.role === "backsplash" && cabinets.every((c) => c.kind === "island")) continue;
+      parts.push({ ...part,
+        id: groupIndex === 0 ? part.id : `run-${groupIndex}-${part.id}`,
+        rotationY: rotation || undefined,
+        placements: part.placements.map((p) => rotateThenPlace(p, rotation, origin.x, 0, origin.z)),
+      });
+    }
+    groupIndex++;
+  }
+  for (const corner of resolved.layout.corners) {
+    parts.push({
+      id: `${corner.id}-worktop`, role: "worktop", label: "Corner worktop",
+      board: spec.worktop.board, length: corner.size, width: corner.size, quantity: 1,
+      edges: { front: true, back: false, top: true, bottom: false }, edgeBand: spec.carcass.edgeBand,
+      placements: [{ x: corner.x, y: corner.height, z: corner.z }],
+      size: { x: corner.size, y: spec.worktop.board.thickness, z: corner.size }, axis: "y",
+    });
+  }
+  return parts;
+}
+
+function straightWorktopParts(spec: DesignSpec): Part[] {
   const worktop = spec.worktop;
   if (!worktop) return [];
 

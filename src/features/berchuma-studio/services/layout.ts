@@ -103,6 +103,26 @@ const MIN_RUN = 300;
 export function solveLayout(
   kind: LayoutKind,
   runs: RunSpec[],
+  options: { cornerKind?: CornerKind; kitchenFacing?: boolean } = {},
+): SolvedLayout {
+  const solved = solveLayoutFrame(kind, runs, options);
+  if (!options.kitchenFacing) return solved;
+  // The legacy frame is useful for general joinery. A kitchen's back and
+  // right runs must face into the room, while keeping the same footprints.
+  return { ...solved, placements: solved.placements.map((placement, index) => {
+    const flip = kind === "straight" || kind === "island" ? index === 0
+      : kind === "l_shaped" ? true : index === 1 || index === 2;
+    if (!flip) return placement;
+    const end = placeOnRun(placement, placement.usableLength);
+    const radians = placement.rotation * Math.PI / 180;
+    return { ...placement, rotation: (placement.rotation + 180) % 360,
+      origin: { x: end.x - placement.depth * Math.sin(radians), z: end.z + placement.depth * Math.cos(radians) } };
+  }) };
+}
+
+function solveLayoutFrame(
+  kind: LayoutKind,
+  runs: RunSpec[],
   options: { cornerKind?: CornerKind } = {},
 ): SolvedLayout {
   const cornerKind = options.cornerKind ?? "l_corner";
@@ -114,6 +134,23 @@ export function solveLayout(
       return solveL(runs, cornerKind);
     case "u_shaped":
       return solveU(runs, cornerKind);
+    case "g_shaped": {
+      const solved = solveU(runs.slice(0, 3), cornerKind);
+      const peninsula = runs[3];
+      if (!peninsula || !runs[0]) return { ...solved, kind, notes: [...solved.notes, "A G layout needs a peninsula run."] };
+      return {
+        ...solved,
+        kind,
+        placements: [...solved.placements, {
+          runId: peninsula.id, label: peninsula.label,
+          origin: { x: runs[0].depth, z: runs[0].length - peninsula.depth },
+          rotation: 0, wallLength: peninsula.length, usableLength: peninsula.length,
+          depth: peninsula.depth, height: peninsula.height,
+        }],
+      };
+    }
+    case "island":
+      return { ...solveCustom(runs), kind };
     case "custom":
       return solveCustom(runs);
   }
@@ -435,6 +472,7 @@ function solveCustom(runs: RunSpec[]): SolvedLayout {
 export function placeOnRun(
   placement: RunPlacement,
   offset: number,
+  cabinetDepth = placement.depth,
 ): { x: number; z: number; rotation: number } {
   const radians = (placement.rotation * Math.PI) / 180;
 
@@ -444,8 +482,8 @@ export function placeOnRun(
   const dz = Math.sin(radians);
 
   return {
-    x: placement.origin.x + dx * offset,
-    z: placement.origin.z + dz * offset,
+    x: placement.origin.x + dx * offset - dz * (placement.depth - cabinetDepth),
+    z: placement.origin.z + dz * offset + dx * (placement.depth - cabinetDepth),
     rotation: placement.rotation,
   };
 }

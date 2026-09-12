@@ -144,6 +144,7 @@ function shiftAfter(
 function syncRunBoundPositions(spec: DesignSpec): void {
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
+    kitchenFacing: !!spec.kitchenSetup,
   });
   const placements = new Map(
     layout.placements.map((placement) => [placement.runId, placement]),
@@ -154,7 +155,7 @@ function syncRunBoundPositions(spec: DesignSpec): void {
     const placement = placements.get(cabinet.runId);
     if (!placement) continue;
 
-    const point = placeOnRun(placement, cabinet.offset ?? 0);
+    const point = placeOnRun(placement, cabinet.offset ?? 0, spec.kitchenSetup ? cabinet.size.depth : undefined);
     cabinet.position.x = point.x;
     cabinet.position.z = point.z;
   }
@@ -465,6 +466,7 @@ export function addTopCabinet(spec: DesignSpec, lowerId: string, height = 700): 
   return change(spec, (draft) => {
     const lower = find(draft, lowerId);
     if (!lower || lower.stackedOn || draft.cabinets.some((cabinet) => cabinet.stackedOn === lower.id)) return;
+    if (draft.furnitureType === "kitchen" && draft.kitchenSetup && lower.position.y + lower.size.height + height > draft.kitchenSetup.roomHeight) return;
     const width = lower.size.width;
     draft.cabinets.push({
       id: freshId("top-cabinet"),
@@ -565,6 +567,7 @@ function moveOffsetOnRun(
 
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
+    kitchenFacing: !!spec.kitchenSetup,
   });
   const placement = layout.placements.find(
     (entry) => entry.runId === cabinet.runId,

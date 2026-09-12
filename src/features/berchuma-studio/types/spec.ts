@@ -14,6 +14,7 @@ import { cornerFits } from "../services/layout";
 import { designWorldBounds } from "../services/resolve";
 import { openingClashes, openingFaults } from "../services/room-geometry";
 import { roomSchema } from "./room";
+import { kitchenSetupSchema } from "./kitchen";
 
 import {
   cornerKinds,
@@ -542,6 +543,7 @@ export const designSpecSchema = z.object({
   finish: finishSchema,
   lighting: lightingSchema.optional(),
   worktop: worktopSchema.optional(),
+  kitchenSetup: kitchenSetupSchema.optional(),
 
   /**
    * The legs. Optional so a v2 design without them still parses; the geometry

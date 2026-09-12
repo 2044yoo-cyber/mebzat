@@ -68,12 +68,12 @@ export function StudioWorkspace({
   // as it builds, so a design arriving this way is held to the same carpentry
   // rules as one the model wrote.
   const design = useDesign(stableRates, () =>
-    opening ? startingDesign(opening.kind, opening.width ? { width: opening.width } : {}) : null,
+    opening && opening.kind !== "kitchen" ? startingDesign(opening.kind, opening.width ? { width: opening.width } : {}) : null,
   );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("chat");
+  const [tab, setTab] = useState<Tab>(opening?.kind === "kitchen" ? "design" : "chat");
 
   // The last thing the user actually asked for. Saved as the version note, so
   // the history reads "make it wider" rather than "version 4".
@@ -259,6 +259,8 @@ export function StudioWorkspace({
             </>
           ) : (
             <StartPanel
+              initialKind={opening?.kind}
+              initialWidth={opening?.width}
               onStart={(spec) => {
                 // A starting design has already been validated, so it arrives
                 // with no outstanding issues — which is the point of it.
