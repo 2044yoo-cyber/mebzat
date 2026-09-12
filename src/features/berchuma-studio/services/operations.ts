@@ -474,9 +474,12 @@ export function addTopCabinet(spec: DesignSpec, lowerId: string, height = 700): 
       runId: lower.runId,
       offset: lower.offset,
       size: { width, height: clamp(height, 200, LIMITS.maxHeight), depth: lower.size.depth },
-      // Same bays and leaf counts give the upper doors/dividers the exact
-      // vertical lines of the cabinet below; either cabinet remains editable.
-      bays: structuredClone(lower.bays).map((bay) => ({ ...bay, id: freshId("bay") })),
+      // Keep only the lower cabinet's vertical and door layout upstairs.
+      bays: lower.bays.map((bay) => ({
+        ...bay,
+        id: freshId("bay"),
+        fitting: { kind: "open" as const },
+      })),
       plinthHeight: 0,
       stackedOn: lower.id,
     });

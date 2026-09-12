@@ -1295,6 +1295,10 @@ function validateCabinet(
   // a corner or adjacent module cannot develop a step in its continuous base.
   if (furnitureType === "wardrobe" && cabinet.stackedOn) {
     cabinet.plinthHeight = 0;
+    cabinet.bays = cabinet.bays.map((bay) => ({
+      ...bay,
+      fitting: { kind: "open" },
+    }));
   } else if (furnitureType === "wardrobe") {
     const standardPlinth = Math.max(50, Math.round(spec.carcass.plinthHeight || 100));
     if (cabinet.plinthHeight !== standardPlinth) {

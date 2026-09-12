@@ -490,7 +490,7 @@ function wardrobe(options: StartingDesignOptions): DesignSpec {
       "tall",
       0,
       0,
-      { width, height: 2400, depth: 600 },
+      { width, height: 2100, depth: 600 },
       bays,
       PLINTH,
     ),
@@ -501,7 +501,7 @@ function wardrobe(options: StartingDesignOptions): DesignSpec {
       style: "modern",
       prompt: "",
       assumptions: [
-        "Height assumed at 2400 mm for a 2700 mm ceiling.",
+        "Lower cabinet starts at 2100 mm; add a top cabinet when needed.",
         "Depth of 600 mm, which a hanger needs.",
       ],
       corrections: [],
