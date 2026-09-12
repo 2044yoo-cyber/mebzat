@@ -365,7 +365,7 @@ function findEocd(bytes: Uint8Array): number {
   const withRate = calculateCost(spec, parts, {
     rates: [
       {
-        key: "MDF 18mm walnut",
+        key: "MDF 18mm melamine",
         unit: "sheet",
         amount: 2900,
         currency: "ETB",

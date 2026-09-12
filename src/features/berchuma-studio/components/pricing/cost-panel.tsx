@@ -119,6 +119,21 @@ export function CostPanel({
           <span>Cost to make</span>
           <span className="tabular-nums">{money(cost.productionCost)}</span>
         </div>
+        {cost.frontAreaSqm != null && cost.frontAreaSqm > 0 && cost.productionCostPerSqm != null ? (
+          <div className="border-t px-4 py-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span>Product front area</span>
+              <span className="tabular-nums">{cost.frontAreaSqm.toLocaleString("en-US", { maximumFractionDigits: 3 })} m²</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3 font-medium">
+              <span>Cost to make per m²</span>
+              <span className="tabular-nums">{money(cost.productionCostPerSqm)} / m²</span>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Cabinet width × height, summed across cabinets. Includes the costs above; excludes margin and VAT.
+            </p>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between border-t px-4 py-3 text-sm">
           <span className="text-muted-foreground">
             Margin at {cost.margin.percent}%

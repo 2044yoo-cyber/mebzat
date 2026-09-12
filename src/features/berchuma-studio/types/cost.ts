@@ -50,6 +50,10 @@ export type CostBreakdown = {
   waste: { percent: number; amount: number };
   /** Direct plus waste. What it costs to make. */
   productionCost: number;
+  /** Sum of cabinet width × height, not floor area or cut-panel area. */
+  frontAreaSqm?: number;
+  /** Production cost divided by the unrounded front area; absent for zero area. */
+  productionCostPerSqm?: number;
   margin: { percent: number; amount: number };
   /** What the customer is quoted, before tax. */
   price: number;

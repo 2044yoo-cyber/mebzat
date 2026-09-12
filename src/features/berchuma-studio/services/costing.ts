@@ -293,8 +293,15 @@ export function calculateCost(
     );
   }
 
+  const frontAreaSqm = spec.cabinets.reduce(
+    (area, cabinet) => area + (cabinet.size.width * cabinet.size.height) / 1_000_000,
+    0,
+  );
+
   return {
     currency,
+    frontAreaSqm,
+    productionCostPerSqm: frontAreaSqm > 0 ? round(productionCost / frontAreaSqm, 2) : undefined,
     manufacturable,
     lines: lines.map((line) => ({
       ...line,
