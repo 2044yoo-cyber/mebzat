@@ -5818,6 +5818,7 @@ export interface Database {
           completion_date: string | null;
           client: string | null;
           cover_image_url: string | null;
+          company_id: string | null;
           status: ProjectStatus;
           category: ProjectCategory;
           metadata: Record<string, unknown>;
@@ -5844,6 +5845,7 @@ export interface Database {
           completion_date?: string | null;
           client?: string | null;
           cover_image_url?: string | null;
+          company_id?: string | null;
           status?: ProjectStatus;
           category?: ProjectCategory;
           metadata?: Record<string, unknown>;
@@ -5870,6 +5872,7 @@ export interface Database {
           completion_date?: string | null;
           client?: string | null;
           cover_image_url?: string | null;
+          company_id?: string | null;
           status?: ProjectStatus;
           category?: ProjectCategory;
           metadata?: Record<string, unknown>;

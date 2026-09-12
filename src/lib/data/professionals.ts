@@ -170,3 +170,38 @@ export async function serviceAreasFor(
     name: row.area_name as string,
   }));
 }
+
+/**
+ * The businesses somebody may publish work under.
+ *
+ * Owner or active member. The same rule 0080's trigger enforces, asked here so
+ * the form only offers what the database will accept — a select full of
+ * companies that all fail on save is worse than no select.
+ */
+export async function companiesFor(
+  userId: string,
+): Promise<{ id: string; name: string }[]> {
+  const supabase = await createClient();
+
+  const [owned, member] = await Promise.all([
+    supabase.from("companies").select("id, name").eq("owner_id", userId),
+    supabase
+      .from("company_members")
+      .select("company_id, companies(id, name)")
+      .eq("user_id", userId)
+      .eq("status", "active"),
+  ]);
+
+  const seen = new Map<string, string>();
+  for (const row of owned.data ?? []) {
+    seen.set(row.id as string, row.name as string);
+  }
+  for (const row of member.data ?? []) {
+    const company = row.companies as unknown as { id: string; name: string } | null;
+    if (company) seen.set(company.id, company.name);
+  }
+
+  return [...seen.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}

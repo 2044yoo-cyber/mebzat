@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { ProjectForm } from "@/components/projects/project-form";
+import { companiesFor } from "@/lib/data/professionals";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Edit Project" };
@@ -33,6 +34,8 @@ export default async function EditProjectPage(props: {
     redirect(`/projects/${id}`);
   }
 
+  const companies = await companiesFor(user.id);
+
   const { data: images } = await supabase
     .from("project_images")
     .select("url")
@@ -49,6 +52,7 @@ export default async function EditProjectPage(props: {
         userId={user.id}
         project={project}
         initialImageUrls={(images ?? []).map((i) => i.url)}
+        companies={companies}
       />
     </div>
   );

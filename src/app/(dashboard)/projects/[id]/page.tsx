@@ -16,7 +16,7 @@ import {
 
 import { ReportDialog } from "@/components/moderation/report-dialog";
 import { ProjectOwnerActions } from "@/components/projects/project-owner-actions";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ProjectProfessionalCard } from "@/components/projects/project-professional";
 import { Badge } from "@/components/ui/badge";
 import {
   PROJECT_CATEGORY_MAP,
@@ -98,7 +98,9 @@ export default async function ProjectDetailPage(props: {
       .order("position", { ascending: true }),
     supabase
       .from("profiles")
-      .select("username, full_name, company_name, avatar_url")
+      .select(
+        "id, username, full_name, company_name, avatar_url, profession, base_area, location_city, years_experience, show_phone, phone, phone_verified, id_verified, business_verified, license_verified",
+      )
       .eq("id", project.owner_id)
       .single(),
     // Owner-matched: tours.project_id carries no ownership check, so without
@@ -109,6 +111,35 @@ export default async function ProjectDetailPage(props: {
   if (!isOwner) {
     await supabase.rpc("increment_project_views", { project_id: id });
   }
+
+  // The rest of what the "work by" card needs. Fetched together so the page
+  // does not grow a waterfall for three small reads.
+  const [{ data: company }, { data: standing }, { count: builtCount }] =
+    await Promise.all([
+      project.company_id
+        ? supabase
+            .from("companies")
+            .select("slug, name")
+            .eq("id", project.company_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("reviews")
+        .select("rating")
+        .eq("subject_type", "professional")
+        .eq("subject_id", project.owner_id),
+      supabase
+        .from("projects")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_id", project.owner_id)
+        .eq("status", "published"),
+    ]);
+
+  const ratings = (standing ?? []).map((r) => r.rating as number);
+  const ownerRating =
+    ratings.length > 0
+      ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
+      : null;
 
   const category: ProjectCategory | null = isProjectCategory(project.category)
     ? project.category
@@ -147,14 +178,6 @@ export default async function ProjectDetailPage(props: {
   const location = [project.location_city, project.location_country]
     .filter(Boolean)
     .join(", ");
-  const ownerName = owner?.company_name || owner?.full_name || "Unknown";
-  const ownerInitials = ownerName
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
   const gallery = images ?? [];
 
   return (
@@ -273,19 +296,13 @@ export default async function ProjectDetailPage(props: {
 
         <aside className="space-y-5">
           {owner?.username && (
-            <Link
-              href={`/u/${owner.username}`}
-              className="flex items-center gap-3 rounded-2xl border p-4 transition-colors hover:bg-muted/50"
-            >
-              <Avatar className="size-10">
-                <AvatarImage src={owner.avatar_url ?? undefined} alt={ownerName} />
-                <AvatarFallback>{ownerInitials}</AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{ownerName}</p>
-                <p className="text-xs text-muted-foreground">View profile</p>
-              </div>
-            </Link>
+            <ProjectProfessionalCard
+              professional={owner}
+              rating={ownerRating}
+              reviewCount={ratings.length}
+              projectsCompleted={builtCount ?? 0}
+              company={company ?? null}
+            />
           )}
 
           <div className="space-y-4 rounded-2xl border p-5">

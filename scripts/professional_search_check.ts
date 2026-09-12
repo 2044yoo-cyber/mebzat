@@ -33,6 +33,7 @@ import {
   specialtiesFor,
 } from "../src/lib/constants/professions.ts";
 import { whatsappNumber } from "../src/lib/contact/phone.ts";
+import { boundsOf, mapPoints } from "../src/lib/professionals/map-points.ts";
 import { listingBadges } from "../src/lib/property/listing.ts";
 
 const GREEN = "\x1b[32m";
@@ -822,6 +823,245 @@ for (const [path, what] of [
   check(
     "and checks the trade against the list before storing it",
     /isProfession\(input\.profession \?\? ""\)/.test(action),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The map, and the thing it must never show
+// ---------------------------------------------------------------------------
+
+{
+  // The privacy property is structural: `search_professionals` has no
+  // latitude or longitude in its `returns table`, so the map has no exact
+  // coordinate to leak even if somebody wrote code that wanted one.
+  const migration = readFileSync(
+    "supabase/migrations/0078_service_areas.sql",
+    "utf8",
+  ).replace(/^\s*--.*$/gm, "");
+  const returns = migration.slice(
+    migration.indexOf("returns table ("),
+    migration.indexOf("language sql"),
+  );
+  check(
+    "the search never hands out a coordinate somebody set on their profile",
+    !/\blatitude\b/.test(returns) && !/\blongitude\b/.test(returns),
+    "a rule saying 'do not plot the exact pin' is one somebody breaks by adding a column to a select; not having it cannot be",
+  );
+
+  const points = mapPoints([
+    {
+      id: "a",
+      username: "one",
+      full_name: "Bole Welder",
+      company_name: null,
+      base_area: "Bole",
+      location_city: "Addis Ababa",
+      service_areas: ["Summit"],
+      serves_entire_city: false,
+    },
+    {
+      id: "b",
+      username: "two",
+      full_name: "No Base",
+      company_name: null,
+      base_area: null,
+      location_city: "Addis Ababa",
+      service_areas: ["CMC"],
+      serves_entire_city: false,
+    },
+    {
+      id: "c",
+      username: "three",
+      full_name: "Nowhere Named",
+      company_name: null,
+      base_area: null,
+      location_city: "Addis Ababa",
+      service_areas: [],
+      serves_entire_city: true,
+    },
+  ]);
+
+  check("somebody with a base area is placed there", points[0]?.areaName === "Bole");
+  check("and that is said to be their base", points[0]?.kind === "base");
+  check(
+    "somebody with no base falls back to an area they work in",
+    points[1]?.areaName === "CMC" && points[1]?.kind === "service",
+  );
+  check(
+    "and somebody who named no area at all is not placed",
+    points.length === 2,
+    "inventing a point puts a welder in the middle of the city who never said he worked there",
+  );
+
+  // Two people in the same area must not land on the same pixel, and the same
+  // person must land in the same place twice.
+  const twice = mapPoints([
+    {
+      id: "a",
+      username: "one",
+      full_name: "One",
+      company_name: null,
+      base_area: "Bole",
+      location_city: "Addis Ababa",
+      service_areas: [],
+      serves_entire_city: false,
+    },
+    {
+      id: "z",
+      username: "two",
+      full_name: "Two",
+      company_name: null,
+      base_area: "Bole",
+      location_city: "Addis Ababa",
+      service_areas: [],
+      serves_entire_city: false,
+    },
+  ]);
+  check(
+    "two professionals in one area do not stack on one point",
+    twice[0].latitude !== twice[1].latitude ||
+      twice[0].longitude !== twice[1].longitude,
+    "nine markers on one pixel is one marker, and eight of them are unreachable",
+  );
+  check(
+    "and the same person lands in the same place every time",
+    twice[0].latitude === points[0].latitude &&
+      twice[0].longitude === points[0].longitude,
+    "a map that rearranges itself on every render cannot be used",
+  );
+  check(
+    "a scattered point stays inside its own area",
+    Math.abs(twice[0].latitude - 9.01) < 0.01 &&
+      Math.abs(twice[0].longitude - 38.78) < 0.01,
+    "drifting into a neighbouring area says somebody works where they did not say",
+  );
+
+  check("no points, no bounds", boundsOf([]) === null);
+  const box = boundsOf(points)!;
+  check(
+    "the bounds contain every point",
+    points.every(
+      (p) =>
+        p.longitude >= box[0][0] &&
+        p.longitude <= box[1][0] &&
+        p.latitude >= box[0][1] &&
+        p.latitude <= box[1][1],
+    ),
+  );
+
+  const map = code("src/components/professionals/professionals-map.tsx");
+  check(
+    "the map says the markers are areas, not addresses",
+    /not an address/.test(map),
+    "a map of pins is read as a map of addresses unless it is told otherwise",
+  );
+  check(
+    "a browser that cannot draw it says so instead of crashing",
+    /setFailed\(true\)/.test(map) && /could not load/.test(map),
+  );
+
+  const panel = code("src/components/professionals/map-panel.tsx");
+  check(
+    "MapLibre is only fetched when somebody asks for the map",
+    /dynamic\(/.test(panel) && /ssr: false/.test(panel),
+    "most visits never leave the list",
+  );
+
+  const toggle = code("src/components/professionals/view-toggle.tsx");
+  check("there is a list and map toggle", /List/.test(toggle) && /Map/.test(toggle));
+  check(
+    "and the choice is in the URL like every other filter",
+    /query\.set\("view", "map"\)/.test(toggle),
+    "so a map view is a link, and back goes back to the list",
+  );
+  check(
+    "the toggle announces which one is on",
+    /aria-pressed=\{view === id\}/.test(toggle),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// A project is somebody's work
+// ---------------------------------------------------------------------------
+
+{
+  const claim = readFileSync(
+    "supabase/migrations/0080_project_professional_links.sql",
+    "utf8",
+  ).replace(/^\s*--.*$/gm, "");
+
+  check(
+    "a project can name the business it was built under",
+    /add column if not exists company_id uuid/.test(claim),
+  );
+  check(
+    "and only somebody who belongs to that business can name it",
+    // The condition as well as the message. The message survives the guard
+    // being short-circuited, and supabase/tests/project-company-claim.sql is
+    // what proves the behaviour — this is the cheap second line.
+    /if not exists \(/.test(claim) &&
+      /You can only attach a project to a company you belong to/.test(claim),
+    "0004's update policy says who may edit the row and nothing about which company they may write into it",
+  );
+  check(
+    "an invitation nobody accepted is not permission",
+    /m\.status = 'active'/.test(claim),
+  );
+  check(
+    "the guard runs as invoker, or current_user could never be an API role",
+    /security invoker/.test(claim),
+  );
+  check(
+    "deleting a business does not delete the work people did for it",
+    /on delete set null/.test(claim),
+  );
+
+  const card = code("src/components/projects/project-professional.tsx");
+  check(
+    "the project page says who did the work",
+    /Work by/.test(card),
+  );
+  check(
+    "with their trade",
+    // The guard, not the identifier: `professional.profession` still appears
+    // inside the block after the condition is mutated to `false`.
+    /\{professional\.profession && \(/.test(card),
+    "a name under a photograph does not say the person is for hire",
+  );
+  check(
+    "and how many projects they have on Medosha",
+    // The guard again, plus the words. `projectsCompleted` and "on Medosha"
+    // are split by the plural ternary, so the phrase is never contiguous.
+    /\{projectsCompleted > 0 && \(/.test(card) && /on Medosha/.test(card),
+  );
+  check(
+    "and offers both a profile and a quote",
+    /<ContactButtons/.test(card),
+  );
+  check(
+    "the number is still only shown when its owner published it",
+    /professional\.show_phone \? professional\.phone : null/.test(card),
+  );
+
+  const portfolio = code("src/components/projects/profile-projects.tsx");
+  check(
+    "the profile calls them completed Medosha projects",
+    /Completed Medosha projects/.test(portfolio),
+  );
+  check(
+    "and counts them",
+    /\{ count: "exact" \}/.test(portfolio),
+    "two reads differently from forty",
+  );
+
+  const form = code("src/components/projects/project-form.tsx");
+  check(
+    "the project form offers only the companies somebody belongs to",
+    /companies\.length > 0 &&/.test(form) && /name="companyId"/.test(form),
+  );
+  check(
+    "and most projects name none",
+    /<option value="">Just me<\/option>/.test(form),
   );
 }
 

@@ -64,6 +64,7 @@ function collectFieldErrors(issues: { path: PropertyKey[]; message: string }[]) 
 type ProjectColumns = {
   title: string;
   category: ProjectCategory;
+  company_id: string | null;
   metadata: Record<string, unknown>;
   tags: string[];
   description: string | null;
@@ -93,9 +94,16 @@ function toColumns(
     floors: data.floors,
   });
 
+  const companyId = formData.get("companyId");
+
   return {
     title: data.title,
     category,
+    // Whether this person may actually name that company is not decided here.
+    // 0080's trigger decides it, in the database, where a crafted form post
+    // cannot get past it — this only has to not send an empty string.
+    company_id:
+      typeof companyId === "string" && companyId.trim() ? companyId.trim() : null,
     metadata: parseMetadata(category, formData),
     tags: parseTags(formData.get("tags")),
     description: data.description || null,

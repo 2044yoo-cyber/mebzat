@@ -160,10 +160,13 @@ export function ProjectForm({
   userId,
   project,
   initialImageUrls = [],
+  companies = [],
 }: {
   userId: string;
   project?: Project;
   initialImageUrls?: string[];
+  /** Only the companies this person belongs to. 0080 refuses any other. */
+  companies?: { id: string; name: string }[];
 }) {
   const action = project
     ? updateProject.bind(null, project.id)
@@ -526,6 +529,27 @@ export function ProjectForm({
             <Label htmlFor="client">Client (optional)</Label>
             <Input id="client" name="client" defaultValue={project?.client ?? ""} />
           </div>
+
+          {/* Only offered to somebody who belongs to a business. A project is
+              usually one person's own work and names no company at all. */}
+          {companies.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="companyId">Built under</Label>
+              <select
+                id="companyId"
+                name="companyId"
+                defaultValue={project?.company_id ?? ""}
+                className="min-h-11 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+              >
+                <option value="">Just me</option>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Materials</Label>

@@ -5,6 +5,8 @@ import { HardHat, Plus } from "lucide-react";
 
 import { ProfessionalCard } from "@/components/professionals/professional-card";
 import { ProfessionalSearch } from "@/components/professionals/professional-search";
+import { MapPanel } from "@/components/professionals/map-panel";
+import { ViewToggle } from "@/components/professionals/view-toggle";
 import { buttonVariants } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -15,6 +17,7 @@ import {
   type ProviderType,
 } from "@/lib/data/professionals";
 import { getServiceCategories } from "@/lib/data/services";
+import { mapPoints } from "@/lib/professionals/map-points";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -55,6 +58,7 @@ export default async function ProfessionalsPage(props: {
   const verified = get("verified") === "1";
   const available = get("available") === "1";
   const page = Math.max(1, Number(get("page")) || 1);
+  const view = get("view") === "map" ? "map" : "list";
 
   const minRating = Number(ratingParam);
   const minExperience = Number(experienceParam);
@@ -94,6 +98,7 @@ export default async function ProfessionalsPage(props: {
       rating: ratingParam,
       experience: experienceParam,
       sort: sortParam,
+      view: view === "map" ? "map" : "",
     })) {
       if (value) params.set(key, value);
     }
@@ -167,26 +172,38 @@ export default async function ProfessionalsPage(props: {
           />
         ) : (
           <>
-            <p className="mb-4 text-sm text-muted-foreground">
-              {result.total}{" "}
-              {result.total === 1 ? "professional" : "professionals"}
-              {areaName ? ` who work in ${areaName}` : ""}
-            </p>
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {result.professionals.map((person) => (
-                <li key={person.id}>
-                  <ProfessionalCard person={person} jobArea={areaName} />
-                </li>
-              ))}
-            </ul>
-            <div className="mt-10">
-              <Pagination
-                page={page}
-                pageSize={PAGE_SIZE}
-                total={result.total}
-                makeHref={makeHref}
-              />
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-muted-foreground">
+                {result.total}{" "}
+                {result.total === 1 ? "professional" : "professionals"}
+                {areaName ? ` who work in ${areaName}` : ""}
+              </p>
+              <Suspense fallback={null}>
+                <ViewToggle />
+              </Suspense>
             </div>
+
+            {view === "map" ? (
+              <MapPanel points={mapPoints(result.professionals)} />
+            ) : (
+              <>
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {result.professionals.map((person) => (
+                    <li key={person.id}>
+                      <ProfessionalCard person={person} jobArea={areaName} />
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-10">
+                  <Pagination
+                    page={page}
+                    pageSize={PAGE_SIZE}
+                    total={result.total}
+                    makeHref={makeHref}
+                  />
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
