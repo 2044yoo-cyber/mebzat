@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, Briefcase } from "lucide-react";
 
 import { BriefForm } from "@/components/hire/brief-form";
+import { listAreas } from "@/lib/data/professionals";
 import { getServiceCategories } from "@/lib/data/services";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,7 +23,10 @@ export default async function NewBriefPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?redirect=/hire/new");
 
-  const categories = await getServiceCategories();
+  const [categories, areas] = await Promise.all([
+    getServiceCategories(),
+    listAreas(),
+  ]);
 
   return (
     <div className="container-page py-10">
@@ -48,7 +52,7 @@ export default async function NewBriefPage() {
           </p>
         </header>
 
-        <BriefForm categories={categories} />
+        <BriefForm categories={categories} areas={areas} />
       </div>
     </div>
   );

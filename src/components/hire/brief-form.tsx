@@ -9,6 +9,7 @@ import { AiField } from "@/components/ai/writing/ai-field";
 import { createBrief, type BriefInput } from "@/app/hire/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PROFESSIONS } from "@/lib/constants/professions";
 import { Label } from "@/components/ui/label";
 import { BUDGET_KIND, CONTRACT_SHAPE } from "@/lib/constants/services";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,14 @@ const EXAMPLES = [
   "Roof Replacement",
 ];
 
-export function BriefForm({ categories }: { categories: ServiceCategory[] }) {
+export function BriefForm({
+  categories,
+  areas = [],
+}: {
+  categories: ServiceCategory[];
+  /** Where the job can be. The matcher compares this to service areas. */
+  areas?: { slug: string; name: string; sub_city: string | null }[];
+}) {
   const router = useRouter();
 
   const [title, setTitle] = useState("");
@@ -51,6 +59,8 @@ export function BriefForm({ categories }: { categories: ServiceCategory[] }) {
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
   const [locationCity, setLocationCity] = useState("Addis Ababa");
+  const [locationArea, setLocationArea] = useState("");
+  const [profession, setProfession] = useState("");
   const [startsOn, setStartsOn] = useState("");
   const [deadlineOn, setDeadlineOn] = useState("");
   const [bidsCloseOn, setBidsCloseOn] = useState("");
@@ -92,6 +102,8 @@ export function BriefForm({ categories }: { categories: ServiceCategory[] }) {
       budgetMin: needsBudget ? optionalNumber(budgetMin) : null,
       budgetMax: needsBudget ? optionalNumber(budgetMax) : null,
       locationCity,
+      locationArea,
+      profession,
       startsOn: startsOn || null,
       deadlineOn: deadlineOn || null,
       bidsCloseOn: bidsCloseOn || null,
@@ -174,6 +186,20 @@ export function BriefForm({ categories }: { categories: ServiceCategory[] }) {
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="Trade needed" htmlFor="b-profession">
+            <Input
+              id="b-profession"
+              list="brief-profession-list"
+              value={profession}
+              onChange={(event) => setProfession(event.target.value)}
+              placeholder="Welder, Carpenter, Electrician…"
+            />
+            <datalist id="brief-profession-list">
+              {PROFESSIONS.map((p) => (
+                <option key={p.value} value={p.value} />
+              ))}
+            </datalist>
           </Field>
           <Field label="Subcategory" htmlFor="b-subcategory">
             <Input
@@ -305,6 +331,28 @@ export function BriefForm({ categories }: { categories: ServiceCategory[] }) {
               value={locationCity}
               onChange={(event) => setLocationCity(event.target.value)}
             />
+          </Field>
+          {/* The area, not just the city. This is what decides who hears about
+              the job: it is compared against the areas professionals said they
+              work in, so "Summit" reaches the welder in Bole who goes there
+              and not the one who does not. Left blank, everybody in the trade
+              hears — which is the old behaviour and the right default for
+              somebody who does not know the area name. */}
+          <Field label="Area the job is in" htmlFor="b-area">
+            <select
+              id="b-area"
+              value={locationArea}
+              onChange={(event) => setLocationArea(event.target.value)}
+              className="min-h-11 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+            >
+              <option value="">Anywhere in the city</option>
+              {areas.map((area) => (
+                <option key={area.slug} value={area.slug}>
+                  {area.name}
+                  {area.sub_city ? ` — ${area.sub_city}` : ""}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Bids close on" htmlFor="b-close">
             <Input

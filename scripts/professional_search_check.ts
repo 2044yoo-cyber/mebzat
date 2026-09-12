@@ -720,6 +720,112 @@ for (const [path, what] of [
 }
 
 // ---------------------------------------------------------------------------
+// Post a Job
+//
+// The other half of the same idea: a job is somewhere, and the people who
+// should hear about it are the people who work there. 0015's matcher scored
+// locality as `s.location_city = b.location_city`, so a posted job reached the
+// welder in Bole exactly as often as the directory search had — never, for a
+// job in Summit.
+// ---------------------------------------------------------------------------
+
+{
+  // SQL comments stripped. The header of 0079 quotes the line it replaced —
+  // `when s.location_city = b.location_city then 0.15` — so the check below
+  // that the line is *gone* was satisfied by the prose explaining why it went.
+  const matcher = readFileSync(
+    "supabase/migrations/0079_job_area_matching.sql",
+    "utf8",
+  ).replace(/^\s*--.*$/gm, "");
+
+  check(
+    "a job can say which area it is in",
+    /add column if not exists location_area text/.test(matcher),
+    "a brief had a city, and the only city is the city",
+  );
+  check(
+    "the matcher checks the areas professionals listed",
+    /from public\.professional_service_areas a, job j/.test(matcher),
+  );
+  check(
+    "and not whether they live in the same city",
+    !/s\.location_city = b\.location_city/.test(matcher),
+    "this is the line that made a Summit job miss the welder in Bole",
+  );
+  check(
+    "somebody who does not cover the area is not told about the job",
+    /where s\.coverage is not null/.test(matcher),
+    "do not send unrelated job requests to every professional",
+  );
+  check(
+    "nor is somebody in the wrong trade",
+    /and s\.trade > 0/.test(matcher),
+  );
+  check(
+    "a brief with no area stated still matches",
+    /when m\.job_slug is null then 'unstated'/.test(matcher),
+    "every brief written before this column exists has a null there; reading it as 'covers nowhere' breaks posting a job for everyone",
+  );
+  check(
+    "a professional with a trade and no service listing can be matched",
+    /where bs\.provider_id is not null or p\.profession is not null/.test(matcher),
+    "the matcher started from services, so everyone the Professionals page finds was invisible to it",
+  );
+  check(
+    "saying you work there outranks being caught by a radius",
+    /when 'area' then 0\.15[\s\S]{0,80}when 'radius' then 0\.12[\s\S]{0,80}when 'city' then 0\.10/.test(
+      matcher,
+    ),
+  );
+  check(
+    "and the client is told that is the reason",
+    /when s\.coverage = 'area' then 'Works in the area you named'/.test(matcher),
+    "a marketplace that cannot explain its own ranking is one nobody trusts",
+  );
+  check(
+    "a restricted account is not recommended for a job",
+    /p\.restricted_until is null or p\.restricted_until < now\(\)/.test(matcher),
+    "telling somebody about a job is recommending them",
+  );
+  check(
+    "nobody is offered their own job",
+    /p\.id <> b\.client_id/.test(matcher),
+  );
+  check(
+    "and filler is still excluded",
+    /and s\.total >= 0\.33/.test(matcher),
+  );
+
+  const form = code("src/components/hire/brief-form.tsx");
+  check(
+    "the Post a Job form asks which area the job is in",
+    /Area the job is in/.test(form),
+  );
+  check(
+    "as a list, so the matcher can resolve it",
+    /<select\s*\n\s*id="b-area"/.test(form),
+  );
+  check(
+    "leaving it blank means the whole city rather than nowhere",
+    /<option value="">Anywhere in the city<\/option>/.test(form),
+  );
+  check(
+    "and it asks which trade is needed",
+    /Trade needed/.test(form),
+  );
+
+  const action = code("src/app/hire/actions.ts");
+  check(
+    "the brief stores the area it was given",
+    /location_area: input\.locationArea/.test(action),
+  );
+  check(
+    "and checks the trade against the list before storing it",
+    /isProfession\(input\.profession \?\? ""\)/.test(action),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // The menu
 // ---------------------------------------------------------------------------
 

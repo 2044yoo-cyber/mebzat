@@ -5617,6 +5617,8 @@ export interface Database {
           budget_max: number | null;
           currency: string;
           location_city: string | null;
+          location_area: string | null;
+          profession: string | null;
           location_country: string;
           latitude: number | null;
           longitude: number | null;
@@ -5648,6 +5650,8 @@ export interface Database {
           budget_max?: number | null;
           currency?: string;
           location_city?: string | null;
+          location_area?: string | null;
+          profession?: string | null;
           location_country?: string;
           latitude?: number | null;
           longitude?: number | null;
@@ -5679,6 +5683,8 @@ export interface Database {
           budget_max?: number | null;
           currency?: string;
           location_city?: string | null;
+          location_area?: string | null;
+          profession?: string | null;
           location_country?: string;
           latitude?: number | null;
           longitude?: number | null;

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { isProfession } from "@/lib/constants/professions";
 import { createClient } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 import type {
@@ -34,6 +35,10 @@ export type BriefInput = {
   budgetMin?: number | null;
   budgetMax?: number | null;
   locationCity?: string;
+  /** A location_areas slug. What the matcher compares against service areas. */
+  locationArea?: string;
+  /** The trade asked for, so somebody with no service listing can still match. */
+  profession?: string;
   latitude?: number | null;
   longitude?: number | null;
   startsOn?: string | null;
@@ -106,6 +111,10 @@ export async function createBrief(input: BriefInput): Promise<HireResult> {
       budget_min: min,
       budget_max: max,
       location_city: input.locationCity?.trim() || null,
+      location_area: input.locationArea?.trim().toLowerCase() || null,
+      profession: isProfession(input.profession ?? "")
+        ? (input.profession as string).trim()
+        : null,
       latitude: input.latitude ?? null,
       longitude: input.longitude ?? null,
       starts_on: input.startsOn || null,
