@@ -2443,6 +2443,58 @@ function normalise(v: Vec): Vec {
   );
 }
 
+// Zekolo is the default, and the default is what almost every design uses.
+//
+// `startingDesign` emits no `legs` block at all, so every wardrobe above
+// reaches the geometry with `spec.legs === undefined` and is standing on the
+// `?? "zekolo"` fallback. That fallback is the whole of the decision: a design
+// saved before legs existed, or written by the model without a legs block, is
+// an Ethiopian shop's turned timber foot rather than a generic leg or a board
+// across the front.
+//
+// None of the checks above can see it. Swapping the fallback to "standard"
+// changes no position, no count and no dimension — only the name on the part —
+// and all of them still pass. So the name is checked here, on the path with no
+// legs block, which is the path that carries the default.
+{
+  const wardrobe = startingDesign("wardrobe", { width: 2400 });
+  check(
+    "a starting design carries no legs block, so it is the default that draws it",
+    wardrobe.legs === undefined,
+    "if this ever gains an explicit block, the check below stops testing the default",
+  );
+
+  const legsOf = (spec: DesignSpec) =>
+    buildParts(spec).parts.filter((part) => part.role === "leg");
+
+  check(
+    "and it stands on Zekolo legs",
+    legsOf(wardrobe).every((part) => part.label === "Zekolo leg"),
+    `got ${JSON.stringify([...new Set(legsOf(wardrobe).map((p) => p.label))])}`,
+  );
+
+  // Explicitly, with the block absent rather than merely unset by the factory:
+  // this is the shape a design saved before legs existed deserialises into.
+  const legacy = { ...wardrobe };
+  delete (legacy as { legs?: unknown }).legs;
+
+  const revived = legsOf(legacy as DesignSpec);
+  check(
+    "a design saved before legs existed gets them too",
+    revived.length > 0,
+    "the plinth-only wardrobe was the reported bug; it must not come back by omission",
+  );
+  check(
+    "and gets Zekolo, not a generic leg",
+    revived.every((part) => part.label === "Zekolo leg"),
+    `got ${JSON.stringify([...new Set(revived.map((p) => p.label))])}`,
+  );
+  check(
+    "and no plinth board, because it is on legs",
+    buildParts(legacy as DesignSpec).parts.every((part) => part.role !== "plinth"),
+  );
+}
+
 // The cut list and the BOQ follow, because they are built from the parts.
 {
   const wardrobe = startingDesign("wardrobe", { width: 2400 });
