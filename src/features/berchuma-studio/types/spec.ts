@@ -1293,7 +1293,9 @@ function validateCabinet(
   // The recessed plinth is structural wardrobe construction, not a decorative
   // option. Every connected wardrobe module uses the same positive height, so
   // a corner or adjacent module cannot develop a step in its continuous base.
-  if (furnitureType === "wardrobe") {
+  if (furnitureType === "wardrobe" && cabinet.stackedOn) {
+    cabinet.plinthHeight = 0;
+  } else if (furnitureType === "wardrobe") {
     const standardPlinth = Math.max(50, Math.round(spec.carcass.plinthHeight || 100));
     if (cabinet.plinthHeight !== standardPlinth) {
     issues.push({

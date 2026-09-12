@@ -465,7 +465,6 @@ export function addTopCabinet(spec: DesignSpec, lowerId: string, height = 700): 
   return change(spec, (draft) => {
     const lower = find(draft, lowerId);
     if (!lower || lower.stackedOn || draft.cabinets.some((cabinet) => cabinet.stackedOn === lower.id)) return;
-    const t = draft.carcass.board.thickness;
     const width = lower.size.width;
     draft.cabinets.push({
       id: freshId("top-cabinet"),
@@ -475,13 +474,9 @@ export function addTopCabinet(spec: DesignSpec, lowerId: string, height = 700): 
       runId: lower.runId,
       offset: lower.offset,
       size: { width, height: clamp(height, 200, LIMITS.maxHeight), depth: lower.size.depth },
-      bays: [{
-        id: freshId("bay"),
-        width: width - 2 * t,
-        fitting: { kind: "shelves", count: 1, adjustable: true },
-        door: "hinged",
-        doorLeaves: width - 2 * t > LIMITS.hingedLeafWidth ? 2 : 1,
-      }],
+      // Same bays and leaf counts give the upper doors/dividers the exact
+      // vertical lines of the cabinet below; either cabinet remains editable.
+      bays: structuredClone(lower.bays).map((bay) => ({ ...bay, id: freshId("bay") })),
       plinthHeight: 0,
       stackedOn: lower.id,
     });
