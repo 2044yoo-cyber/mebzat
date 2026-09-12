@@ -440,4 +440,111 @@ begin
 end;
 $$;
 
+-- ===================================================================
+-- 7. The stage, which is the progress screen's only honest source.
+--
+--    Section 10 wants five steps and no invented percentages. The
+--    phone can see its own upload; the three in the middle happen
+--    inside one request on the server, so the server writes down
+--    where it is and the screen reads it back.
+-- ===================================================================
+reset role;
+
+insert into public.panorama_jobs (id, owner_id, status, frames_prefix)
+values ('88800000-0000-4000-8000-000000000003',
+        '77700000-0000-4000-8000-000000000001', 'processing',
+        '77700000-0000-4000-8000-000000000001/staged');
+
+do $$
+declare j public.panorama_jobs;
+begin
+  select * into j from public.panorama_jobs
+  where id = '88800000-0000-4000-8000-000000000003';
+  if j.stage is not null then
+    raise exception 'FAIL 7a: a job invented a stage nobody set';
+  end if;
+  raise notice 'ok 7a: a job claims no stage until the server names one';
+end;
+$$;
+
+update public.panorama_jobs set stage = 'aligning'
+where id = '88800000-0000-4000-8000-000000000003';
+update public.panorama_jobs set stage = 'stitching'
+where id = '88800000-0000-4000-8000-000000000003';
+update public.panorama_jobs set stage = 'optimizing'
+where id = '88800000-0000-4000-8000-000000000003';
+
+do $$
+declare j public.panorama_jobs;
+begin
+  select * into j from public.panorama_jobs
+  where id = '88800000-0000-4000-8000-000000000003';
+  if j.stage <> 'optimizing' then
+    raise exception 'FAIL 7b: the stage did not follow the server (%)', j.stage;
+  end if;
+  raise notice 'ok 7b: all three of section 10''s middle steps are recordable';
+end;
+$$;
+
+do $$
+begin
+  update public.panorama_jobs set stage = 'nearly done'
+  where id = '88800000-0000-4000-8000-000000000003';
+  raise exception 'FAIL 7c: a stage arrived that no screen has a label for';
+exception
+  when check_violation then
+    raise notice 'ok 7c: and nothing else is a stage, so the screen never blanks';
+end;
+$$;
+
+do $$
+begin
+  update public.panorama_jobs
+  set status = 'failed', error_code = 'low_overlap'
+  where id = '88800000-0000-4000-8000-000000000003';
+  raise exception 'FAIL 7d: a finished job kept its stage, which reads as still working';
+exception
+  when check_violation then
+    raise notice 'ok 7d: a job that stops processing has to let go of its stage';
+end;
+$$;
+
+update public.panorama_jobs
+set status = 'failed', error_code = 'low_overlap', stage = null
+where id = '88800000-0000-4000-8000-000000000003';
+
+do $$
+declare j public.panorama_jobs;
+begin
+  select * into j from public.panorama_jobs
+  where id = '88800000-0000-4000-8000-000000000003';
+  if j.status <> 'failed' or j.stage is not null then
+    raise exception 'FAIL 7e: clearing the stage with the status did not work';
+  end if;
+  raise notice 'ok 7e: and letting go of it together with the status is allowed';
+end;
+$$;
+
+-- The stage is advisory. A browser writing one is reporting its own progress,
+-- which is the same thing `uploading` already is — it is the *result* the
+-- guard protects, and a stage is not a result.
+set role authenticated;
+set local request.jwt.claim.sub = '77700000-0000-4000-8000-000000000001';
+
+do $$
+declare seen text;
+begin
+  select stage into seen from public.panorama_jobs
+  where id = '88800000-0000-4000-8000-000000000002';
+  raise notice 'ok 7f: the owner can read the stage of their own job';
+
+  select stage into seen from public.panorama_jobs
+  where id = '88800000-0000-4000-8000-000000000003';
+  if seen is not null then
+    raise exception 'FAIL 7g: a cleared stage came back';
+  end if;
+  raise notice 'ok 7g: and a cleared one stays cleared';
+end;
+$$;
+
 rollback;

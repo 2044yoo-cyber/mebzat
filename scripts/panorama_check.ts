@@ -821,6 +821,170 @@ function blockAfter(src: string, marker: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Where photos are uploaded — sections 1, 10, 11, 14 and 15
+// ---------------------------------------------------------------------------
+
+{
+  const capture = code("src/components/tour/panorama-capture.tsx");
+
+  // --- section 10: five steps, and none of them guessed at -----------------
+  check(
+    "the processing screen names all five of section 10's steps",
+    ["Uploading", "Aligning photos", "Stitching panorama", "Optimizing", "Ready"]
+      .every((label) => capture.includes(`"${label}"`)),
+    "three of five leaves the two longest parts of a stitch looking like a hang",
+  );
+
+  const poll = blockAfter(capture, 'if (phase !== "processing" || !uploadedJob) return;');
+  check("the screen asks the server where it has got to", poll.length > 0);
+  check(
+    "and the step shown is the one the server reported",
+    /STAGE_STEP\[\s*data\.stage\s*\]/.test(poll),
+    "a timer walking through the step names reads the same on a fast stitch and lies on a slow one",
+  );
+  check(
+    "the stage is read from the job, not invented",
+    /\.select\("stage"\)/.test(poll) && /\.eq\("id",\s*uploadedJob\)/.test(poll),
+  );
+
+  const route = code("src/app/api/panorama/stitch/route.ts");
+  check(
+    "and the server writes each of the three stages it passes through",
+    ["aligning", "stitching", "optimizing"].every((name) =>
+      new RegExp(`stage\\(supabase, jobId, "${name}"\\)|stage: "${name}"`).test(route),
+    ),
+    "a step the server never reports is a step the screen can never reach",
+  );
+  check(
+    "a progress note cannot fail the stitch",
+    /void supabase[\s\S]{0,220}?\.then\(undefined, \(\) => undefined\)/.test(route),
+    "a panorama that stitched must not be reported as failed because a progress note did not land",
+  );
+  check(
+    "and the stage is cleared when the job stops processing",
+    (route.match(/stage: null/g) ?? []).length >= 2,
+    "a stage left on a finished job reads as still working",
+  );
+
+  // --- section 11: the preview is the viewer --------------------------------
+  check(
+    "the finished panorama opens in the viewer, not as a flat photograph",
+    /<PanoramaViewer/.test(capture),
+    "an equirectangular image shown flat looks bent at exactly the edges a stitch goes wrong at",
+  );
+  check(
+    "and it is the panorama that was just made",
+    /src=\{result\.url\}/.test(capture),
+  );
+  check(
+    "Retake and Save 360 are both still offered",
+    /Retake/.test(capture) && /Save 360/.test(capture),
+  );
+
+  // --- section 2: the fallback when the camera is refused -------------------
+  check(
+    "a refused camera is offered the upload route instead",
+    /Upload Existing 360 Photo/.test(capture),
+    "section 2: a denied camera permission is sticky, so Try again is telling somebody to repeat what just failed",
+  );
+  check(
+    "and that offer is made only when something went wrong",
+    /\{problem \? \(/.test(capture),
+    "offering it unconditionally buries Start 360 Capture under a fallback nobody needed",
+  );
+
+  // --- the capture screen stands on its own --------------------------------
+  check(
+    "capture can be used where no user id is to hand",
+    /userId\?:\s*string \| null/.test(capture),
+    "the listing form has no reason to know who is signed in; threading it through would make one",
+  );
+  check(
+    "and it resolves the owner itself when it is not given",
+    /auth\.getUser\(\)/.test(blockAfter(capture, "const upload = useCallback(")),
+  );
+}
+
+{
+  const uploader = code("src/components/property/photo-uploader.tsx");
+
+  // --- section 1: the choice, where photos are uploaded --------------------
+  check(
+    "the listing's photo step offers both Add Photos and Create 360°",
+    /Add Photos/.test(uploader) && /Create 360°/.test(uploader),
+    "section 1 puts the choice where photos are uploaded, which is here",
+  );
+  check(
+    "Create 360° opens the capture screen",
+    /setCapturing\(true\)/.test(uploader) && /<PanoramaCapture/.test(uploader),
+  );
+  check(
+    "and capture takes the whole field while it runs",
+    /if \(room && capturing\) \{[\s\S]{0,400}?return \(/.test(uploader),
+    "a drop zone under a live camera is one more thing to hit while turning around holding a phone",
+  );
+  check(
+    "a finished capture joins the listing's 360 photos",
+    /room\.set\(\[\.\.\.room\.list,/.test(uploader),
+  );
+
+  // --- section 14: both kinds, labelled ------------------------------------
+  check(
+    "the 360 photos are shown apart from the ordinary ones",
+    /360° photos/.test(uploader),
+    "section 14: a listing may hold both, and they are not to be mixed without labels",
+  );
+  check(
+    "each one carries the 360° badge",
+    /360°\s*<\/span>/.test(uploader),
+  );
+  check(
+    "they are shown in the viewer, so a bad stitch is visible before it is published",
+    /<PanoramaViewer/.test(uploader),
+  );
+  check(
+    "and one can be removed again",
+    /room\.list\.filter\(/.test(uploader),
+  );
+  check(
+    "there is a ceiling on how many a listing carries",
+    /MAX_PANORAMAS/.test(uploader) && /room\.list\.length >= MAX_PANORAMAS/.test(uploader),
+  );
+  check(
+    "the uploader is unchanged where no panorama can be attached",
+    /const room = onPanoramas\s*\?/.test(uploader),
+    "passing neither prop has to leave the plain uploader exactly as it was",
+  );
+
+  // --- section 15: one media system, not two -------------------------------
+  const actions = code("src/app/property/actions.ts");
+  check(
+    "a panorama is stored as property media, not in a system of its own",
+    /kind: "panorama_360" as const/.test(actions),
+    "section 15: reuse the existing media infrastructure",
+  );
+  const panoramaInsert = blockAfter(actions, "const panoramas = input.panoramas ?? [];");
+  check(
+    "its position continues the sequence the photos started",
+    /position: photos\.length \+ index/.test(panoramaInsert),
+    "starting again at zero puts a panorama joint-first with the cover photo",
+  );
+  check(
+    "and a panorama is never made the listing's cover",
+    !/cover_image_url: panorama/.test(actions)
+      && /cover_image_url: photos\[0\]\.url/.test(actions),
+    "an equirectangular image in a card is a bent smear that reads as a broken photograph",
+  );
+
+  const form = code("src/components/property/property-form.tsx");
+  check(
+    "the form carries the panoramas through to the listing",
+    /panoramas: panoramas\.map\(/.test(form),
+    "collecting them and not sending them is the failure that looks like success",
+  );
+}
+
+// ---------------------------------------------------------------------------
 // No AI — section 20
 // ---------------------------------------------------------------------------
 

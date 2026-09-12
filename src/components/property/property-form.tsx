@@ -17,6 +17,7 @@ import {
   PhotoUploader,
   compressionSummary,
   type ListingPhoto,
+  type ListingPanorama,
 } from "@/components/property/photo-uploader";
 import {
   CONTACT_METHODS,
@@ -88,6 +89,7 @@ export function PropertyForm() {
   const [woreda, setWoreda] = useState("");
   const [condominium, setCondominium] = useState("");
   const [photos, setPhotos] = useState<ListingPhoto[]>([]);
+  const [panoramas, setPanoramas] = useState<ListingPanorama[]>([]);
   const [sellerKind, setSellerKind] = useState<SellerKind | "">("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactPhoneAlt, setContactPhoneAlt] = useState("");
@@ -278,6 +280,13 @@ export function PropertyForm() {
         amenities,
         coverImageUrl: coverUrl.trim() || null,
         photos: uploaded.media,
+        // Already stitched, moderated and in the public bucket — there is
+        // nothing left to upload, only a row to write.
+        panoramas: panoramas.map((panorama) => ({
+          url: panorama.url,
+          width: panorama.width,
+          height: panorama.height,
+        })),
       });
 
       // A listing that was never created leaves its photos orphaned in the
@@ -323,6 +332,8 @@ export function PropertyForm() {
           <PhotoUploader
             photos={photos}
             onChange={setPhotos}
+            panoramas={panoramas}
+            onPanoramas={setPanoramas}
           />
         </Section>
       )}
@@ -866,6 +877,12 @@ export function PropertyForm() {
                 }
               />
               <Review label="Photos" value={`${photos.length}`} />
+              {panoramas.length > 0 && (
+                <Review
+                  label="360° photos"
+                  value={`${panoramas.length}`}
+                />
+              )}
               <Review
                 label="Map shows"
                 value={

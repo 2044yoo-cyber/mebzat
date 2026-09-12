@@ -6,11 +6,15 @@ import {
   Check,
   ImagePlus,
   Loader2,
+  Rotate3d,
   Star,
   Trash2,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+
+import { PanoramaCapture } from "@/components/tour/panorama-capture";
+import { PanoramaViewer } from "@/components/tour/panorama-viewer";
 
 import {
   MAX_PHOTOS,
@@ -54,16 +58,52 @@ export type ListingPhoto = {
 
 type Pending = { id: string; name: string };
 
+/**
+ * A finished 360 panorama attached to this listing.
+ *
+ * Not a `ListingPhoto`: by the time one of these exists it is already stitched,
+ * moderated and in the public bucket, so it has a URL and no blob, and it must
+ * not be run through `preparePhoto` — resizing an equirectangular image to
+ * 2000px wide would destroy the one property the viewer depends on.
+ */
+export type ListingPanorama = {
+  id: string;
+  url: string;
+  width: number;
+  height: number;
+};
+
+/**
+ * How many 360 photos one listing may carry.
+ *
+ * Section 22 asks that a listing be able to hold several, so that rooms can be
+ * linked up later. It does not ask for thirty: each one is a minute of
+ * standing in a room turning around, and a listing with a panorama of every
+ * cupboard is a listing nobody scrolls to the end of.
+ */
+export const MAX_PANORAMAS = 6;
+
 export function PhotoUploader({
   photos,
   onChange,
   onContinue,
+  panoramas,
+  onPanoramas,
 }: {
   photos: ListingPhoto[];
   onChange: (photos: ListingPhoto[]) => void;
   onContinue?: () => void;
+  /**
+   * The listing's 360 photos. Both of these together are what turns the plain
+   * uploader into the two-way choice; passing neither leaves it exactly as it
+   * was, which is what the places that have no listing to attach a panorama to
+   * still want.
+   */
+  panoramas?: ListingPanorama[];
+  onPanoramas?: (panoramas: ListingPanorama[]) => void;
 }) {
   const [pending, setPending] = useState<Pending[]>([]);
+  const [capturing, setCapturing] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -161,8 +201,49 @@ export function PhotoUploader({
     0,
   );
 
+  const room = onPanoramas
+    ? { list: panoramas ?? [], set: onPanoramas }
+    : null;
+
+  // Capture takes the whole field while it is running. It is a camera with
+  // instructions over it; a drop zone underneath would be one more thing to
+  // hit by accident while turning around holding a phone.
+  if (room && capturing) {
+    return (
+      <PanoramaCapture
+        cancelLabel="Add photos instead"
+        onCancel={() => setCapturing(false)}
+        onSaved={(panorama) => {
+          room.set([...room.list, { id: crypto.randomUUID(), ...panorama }]);
+          setCapturing(false);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {/* ---- Photos, or a 360 of the room ------------------------------ */}
+      {room && (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="flex min-h-12 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-colors hover:border-brand hover:bg-brand/5"
+          >
+            <ImagePlus className="size-4" aria-hidden /> Add Photos
+          </button>
+          <button
+            type="button"
+            onClick={() => setCapturing(true)}
+            disabled={room.list.length >= MAX_PANORAMAS}
+            className="flex min-h-12 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-colors hover:border-brand hover:bg-brand/5 disabled:opacity-50"
+          >
+            <Rotate3d className="size-4" aria-hidden /> Create 360°
+          </button>
+        </div>
+      )}
+
       {/* ---- The drop zone --------------------------------------------- */}
       <label
         onDragOver={(event) => {
@@ -354,6 +435,58 @@ export function PhotoUploader({
             </button>
           )}
         </>
+      )}
+
+      {/* ---- The 360 photos, kept apart from the ordinary ones ----------
+          Section 14: a listing may hold both, and they are not to be mixed
+          without labels. A panorama in the photo grid would be picked as the
+          cover and would look like a bent, smeared photograph in every card
+          it appeared in — the two kinds behave differently enough that one
+          grid could not describe both honestly. */}
+      {room && room.list.length > 0 && (
+        <section className="space-y-2 rounded-2xl border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-1.5 text-sm font-medium">
+              <Rotate3d className="size-4" aria-hidden />
+              360° photos
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              {room.list.length} of {MAX_PANORAMAS}
+            </span>
+          </div>
+
+          <ul className="space-y-2">
+            {room.list.map((panorama, index) => (
+              <li key={panorama.id} className="space-y-1.5">
+                <div className="relative">
+                  <PanoramaViewer
+                    src={panorama.url}
+                    width={panorama.width}
+                    height={panorama.height}
+                    className="aspect-[2/1] w-full overflow-hidden rounded-xl border"
+                  />
+                  <span className="pointer-events-none absolute top-2 left-2 rounded-full bg-background/90 px-2 py-0.5 text-[0.6875rem] font-medium backdrop-blur">
+                    360°
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    Room {index + 1} — drag to look around
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      room.set(room.list.filter((item) => item.id !== panorama.id))
+                    }
+                    className="flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground transition-colors hover:text-destructive"
+                  >
+                    <Trash2 className="size-3.5" aria-hidden /> Remove
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

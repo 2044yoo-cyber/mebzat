@@ -5788,6 +5788,7 @@ export interface Database {
           width: number | null;
           height: number | null;
           error_code: string | null;
+          stage: string | null;
           property_id: string | null;
           project_id: string | null;
           frames_expire_at: string | null;
@@ -5805,6 +5806,7 @@ export interface Database {
           width?: number | null;
           height?: number | null;
           error_code?: string | null;
+          stage?: string | null;
           property_id?: string | null;
           project_id?: string | null;
           frames_expire_at?: string | null;
@@ -5822,6 +5824,7 @@ export interface Database {
           width?: number | null;
           height?: number | null;
           error_code?: string | null;
+          stage?: string | null;
           property_id?: string | null;
           project_id?: string | null;
           frames_expire_at?: string | null;

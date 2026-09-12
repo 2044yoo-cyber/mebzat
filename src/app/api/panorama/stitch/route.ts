@@ -37,6 +37,26 @@ export const maxDuration = 180;
 
 type Body = { jobId?: unknown };
 
+/**
+ * Record which part of the stitch is happening, for the progress screen.
+ *
+ * Deliberately not awaited at the callsites and deliberately unable to fail
+ * the request: this is the difference between a screen that says "Optimizing"
+ * and one that says "Stitching panorama" for a second longer. A stitch that
+ * worked must not be reported as failed because a progress note did not land.
+ */
+function stage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  jobId: string,
+  name: "aligning" | "stitching" | "optimizing",
+) {
+  void supabase
+    .from("panorama_jobs")
+    .update({ stage: name })
+    .eq("id", jobId)
+    .then(undefined, () => undefined);
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -83,7 +103,7 @@ export async function POST(request: Request) {
 
   await supabase
     .from("panorama_jobs")
-    .update({ status: "processing" })
+    .update({ status: "processing", stage: "aligning" })
     .eq("id", jobId);
 
   // ---- gather the frames ------------------------------------------------
@@ -119,12 +139,14 @@ export async function POST(request: Request) {
   }
 
   // ---- stitch ------------------------------------------------------------
+  stage(supabase, jobId, "stitching");
   const outcome = await composePanorama(frames);
   if (!outcome.ok) {
     return fail(supabase, jobId, outcome.code);
   }
 
   // ---- publish it the way every other image is published ------------------
+  stage(supabase, jobId, "optimizing");
   const quarantinePath = `${user.id}/${crypto.randomUUID()}.jpg`;
   const stored = await supabase.storage
     .from("moderation-quarantine")
@@ -176,6 +198,7 @@ export async function POST(request: Request) {
       height: outcome.height,
       frames_expire_at: keepUntil,
       error_code: null,
+      stage: null,
     })
     .eq("id", jobId);
 
@@ -215,6 +238,7 @@ async function fail(
     .update({
       status: "failed",
       error_code: code,
+      stage: null,
       frames_expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     })
     .eq("id", jobId);

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { PanoramaViewer } from "@/components/tour/panorama-viewer";
 import {
   advance,
   captureManually,
@@ -65,21 +66,51 @@ type Phase =
   | "ready"
   | "failed";
 
-const STEP_LABEL: Record<string, string> = {
+/**
+ * The five steps of section 10, in order.
+ *
+ * The first is the phone's and the last is the answer; the three in the middle
+ * happen on the server, which writes down which one it is on. Nothing here is
+ * a percentage, because the server has no honest percentage to give: `sharp`
+ * does not report how far through a composite it is, and a bar sitting at 70%
+ * is worse than a word.
+ */
+const STEPS = ["uploading", "aligning", "stitching", "optimizing", "ready"] as const;
+type Step = (typeof STEPS)[number];
+
+const STEP_LABEL: Record<Step, string> = {
   uploading: "Uploading",
-  processing: "Stitching panorama",
+  aligning: "Aligning photos",
+  stitching: "Stitching panorama",
+  optimizing: "Optimizing",
   ready: "Ready",
+};
+
+/** The stage names 0082 allows, mapped onto the steps shown. */
+const STAGE_STEP: Record<string, Step> = {
+  aligning: "aligning",
+  stitching: "stitching",
+  optimizing: "optimizing",
 };
 
 export function PanoramaCapture({
   userId,
   onSaved,
   onCancel,
+  cancelLabel = "Cancel",
 }: {
-  userId: string;
-  /** Called with the finished panorama, for the builder to add as a scene. */
+  /**
+   * Whose capture this is. Optional, and resolved from the session when it is
+   * not given: the tour builder already knows, the listing form does not, and
+   * a component that can answer the question itself is one less prop to thread
+   * through a form that has nothing else to do with authentication.
+   */
+  userId?: string | null;
+  /** Called with the finished panorama, for the caller to attach. */
   onSaved: (panorama: { url: string; width: number; height: number }) => void;
   onCancel: () => void;
+  /** What backing out of the intro is called, where it is not just "Cancel". */
+  cancelLabel?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -96,6 +127,8 @@ export function PanoramaCapture({
   const [sent, setSent] = useState(0);
   /** The job whose frames are in storage, once they all are. Null before that. */
   const [uploadedJob, setUploadedJob] = useState<string | null>(null);
+  /** Where the server says it has got to. Null until it says. */
+  const [stage, setStage] = useState<Step | null>(null);
 
   /**
    * The capture state, mirrored where the sensor loop can read it.
@@ -177,6 +210,7 @@ export function PanoramaCapture({
    */
   const stitch = useCallback(async (jobId: string) => {
     setProblem(null);
+    setStage(null);
     setPhase("processing");
 
     try {
@@ -224,12 +258,23 @@ export function PanoramaCapture({
     const supabase = createClient();
     const frames = framesRef.current;
 
+    let owner = userId ?? null;
+    if (!owner) {
+      const { data } = await supabase.auth.getUser();
+      owner = data.user?.id ?? null;
+    }
+    if (!owner) {
+      setProblem("Sign in again to save your 360 photo.");
+      setPhase("failed");
+      return;
+    }
+
     // The row exists before the first byte goes up, so leaving the screen
     // mid-upload leaves something to come back to rather than nothing.
     const { data: job, error } = await supabase
       .from("panorama_jobs")
       .insert({
-        owner_id: userId,
+        owner_id: owner,
         status: "uploading",
         expected_frames: frames.length,
       })
@@ -242,7 +287,7 @@ export function PanoramaCapture({
       return;
     }
 
-    const prefix = `${userId}/${job.id}`;
+    const prefix = `${owner}/${job.id}`;
 
     for (const [index, frame] of frames.entries()) {
       const path = `${prefix}/${frameName(index, frame.angle)}`;
@@ -288,6 +333,42 @@ export function PanoramaCapture({
     },
     [upload],
   );
+
+  /**
+   * While the server is stitching, ask it where it has got to.
+   *
+   * Three or four requests over a couple of seconds. The alternative was to
+   * animate through the step names on a timer, which would have been
+   * indistinguishable on a fast stitch and a lie on a slow one — the screen
+   * would have reached "Optimizing" and sat there while the server was still
+   * downloading frames.
+   *
+   * RLS scopes the read to the caller's own job, so this cannot be pointed at
+   * anybody else's capture.
+   */
+  useEffect(() => {
+    if (phase !== "processing" || !uploadedJob) return;
+
+    let cancelled = false;
+    const supabase = createClient();
+
+    const poll = window.setInterval(async () => {
+      if (cancelled) return;
+      const { data } = await supabase
+        .from("panorama_jobs")
+        .select("stage")
+        .eq("id", uploadedJob)
+        .maybeSingle();
+      if (cancelled) return;
+      const named = typeof data?.stage === "string" ? STAGE_STEP[data.stage] : null;
+      if (named) setStage(named);
+    }, 700);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+    };
+  }, [phase, uploadedJob]);
 
   // The sensor loop. Reads the compass, asks `advance` what to do, and does it.
   useEffect(() => {
@@ -369,6 +450,7 @@ export function PanoramaCapture({
   function restart() {
     framesRef.current = [];
     setUploadedJob(null);
+    setStage(null);
     setResult(null);
     setProblem(null);
     applyState(startCapture(DEFAULT_FRAMES));
@@ -399,9 +481,26 @@ export function PanoramaCapture({
           <Button onClick={start} className="min-h-12 w-full text-base">
             Start 360 Capture
           </Button>
-          <Button variant="outline" onClick={onCancel} className="min-h-11 w-full">
-            Cancel
-          </Button>
+
+          {/* Somebody whose camera is refused has not stopped wanting a 360
+              photo, and a locked-down browser or a denied permission is
+              sticky — telling them to try again is telling them to do the
+              thing that just failed. If they own a 360 camera, or took one on
+              another phone, that route is still open, so it is offered here
+              rather than left for them to find. */}
+          {problem ? (
+            <Button
+              variant="outline"
+              onClick={onCancel}
+              className="min-h-11 w-full"
+            >
+              Upload Existing 360 Photo
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={onCancel} className="min-h-11 w-full">
+              {cancelLabel}
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -497,44 +596,47 @@ export function PanoramaCapture({
 
   // ---- processing ----------------------------------------------------------
   if (phase === "uploading" || phase === "processing") {
+    // Where the five steps have got to. The upload is the phone's own
+    // business, so it is known first-hand; after that the screen believes the
+    // server, and falls back to "Aligning photos" for the moment between the
+    // last frame landing and the server's first note.
+    const at =
+      phase === "uploading" ? 0 : STEPS.indexOf(stage ?? "aligning");
+
     return (
       <div className="space-y-4 rounded-2xl border p-6 text-center">
         <Loader2 className="mx-auto size-8 animate-spin text-muted-foreground" />
         <p className="font-medium">Creating your 360 photo…</p>
 
-        {/* Steps, not a percentage. The server cannot say how far through a
-            stitch it is, and a bar that sits at 70% is worse than a word. */}
+        {/* Steps, not a percentage: the server cannot say how far through a
+            composite it is, and a bar that sits at 70% is worse than a word. */}
         <ol className="mx-auto max-w-xs space-y-1 text-sm">
-          {(["uploading", "processing", "ready"] as const).map((step) => {
-            const order = ["uploading", "processing", "ready"];
-            const at = order.indexOf(phase);
-            const here = order.indexOf(step);
-            return (
-              <li
-                key={step}
-                className={cn(
-                  "flex items-center justify-center gap-2",
-                  here < at && "text-muted-foreground",
-                  here === at && "font-medium",
-                  here > at && "text-muted-foreground/50",
-                )}
-              >
-                {here < at ? (
-                  <Check className="size-3.5" />
-                ) : here === at ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <span className="size-3.5" />
-                )}
-                {STEP_LABEL[step]}
-                {step === "uploading" && phase === "uploading" && (
-                  <span className="text-muted-foreground">
-                    {sent} of {state.plan.length}
-                  </span>
-                )}
-              </li>
-            );
-          })}
+          {STEPS.map((step, here) => (
+            <li
+              key={step}
+              className={cn(
+                "flex items-center justify-center gap-2",
+                here < at && "text-muted-foreground",
+                here === at && "font-medium",
+                here > at && "text-muted-foreground/50",
+              )}
+              aria-current={here === at ? "step" : undefined}
+            >
+              {here < at ? (
+                <Check className="size-3.5" aria-hidden />
+              ) : here === at ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <span className="size-3.5" />
+              )}
+              {STEP_LABEL[step]}
+              {step === "uploading" && phase === "uploading" && (
+                <span className="text-muted-foreground">
+                  {sent} of {state.plan.length}
+                </span>
+              )}
+            </li>
+          ))}
         </ol>
 
         <p className="text-xs text-muted-foreground">
@@ -581,19 +683,26 @@ export function PanoramaCapture({
   }
 
   // ---- ready ---------------------------------------------------------------
+  //
+  // The finished panorama opens in the same viewer a visitor will see it in,
+  // not as a flat photograph. A 2:1 equirectangular image shown flat looks
+  // bent and wrong at the edges — exactly the places a stitch goes wrong — so
+  // a flat preview both misrepresents a good panorama and hides a bad one.
+  // Retake is only a real choice if you can see what you would be retaking.
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium">Your 360 photo is ready</p>
       {result && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <PanoramaViewer
           src={result.url}
-          alt="The panorama that was just captured"
-          className="w-full rounded-xl border"
+          width={result.width}
+          height={result.height}
+          className="aspect-[4/3] w-full overflow-hidden rounded-xl border"
         />
       )}
       <p className="text-xs text-muted-foreground">
-        Drag it around after saving to check the whole room is there.
+        Drag to look around, pinch to zoom. Check the whole room is there
+        before saving.
       </p>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={restart} className="min-h-11">

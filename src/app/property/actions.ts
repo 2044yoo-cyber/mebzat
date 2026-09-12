@@ -72,6 +72,16 @@ export type PropertyInput = {
    * separately can leave a listing with no photos if the user closes the tab.
    */
   photos?: { url: string; width?: number; height?: number; bytes?: number; blurDataUrl?: string }[];
+  /**
+   * Finished 360 panoramas, which arrive as URLs rather than as files.
+   *
+   * They have already been through the stitcher and the moderation path by
+   * the time they get here — the capture screen does not hand one back until
+   * it is published — so unlike the photos there is nothing to upload, only a
+   * `property_media` row to write. They go in the same table with a different
+   * `kind`, which is what section 15 asks for: one media system, not two.
+   */
+  panoramas?: { url: string; width: number; height: number }[];
 };
 
 /**
@@ -255,6 +265,41 @@ export async function createProperty(
         .from("properties")
         .update({ cover_image_url: photos[0].url })
         .eq("id", data.id);
+    }
+  }
+
+  // The 360 photos, after the ordinary ones so their positions continue the
+  // same sequence.
+  //
+  // A panorama is never made the cover, even when it is the only media on the
+  // listing. An equirectangular image shown flat in a card is a bent, smeared
+  // thing that looks like a broken photograph — `has_360` is what tells the
+  // card there is a tour to advertise, and it is maintained by 0017's trigger
+  // off these very rows.
+  const panoramas = input.panoramas ?? [];
+  if (panoramas.length > 0) {
+    const { error: panoramaError } = await supabase.from("property_media").insert(
+      panoramas.map((panorama, index) => ({
+        property_id: data.id,
+        kind: "panorama_360" as const,
+        url: panorama.url,
+        position: photos.length + index,
+        width: panorama.width,
+        height: panorama.height,
+      })),
+    );
+
+    if (panoramaError) {
+      // Same reasoning as the photos: the listing took six steps to fill in
+      // and a failure here is not worth throwing that away. The panorama is
+      // already in the public bucket and can be attached by editing.
+      const detail = reportFailure(
+        "CREATE LISTING PANORAMA ERROR",
+        panoramaError,
+        "The listing was created, but its 360 photo could not be attached. Edit the listing to add it.",
+      );
+      revalidatePath("/city");
+      return { id: data.id, error: detail };
     }
   }
 
