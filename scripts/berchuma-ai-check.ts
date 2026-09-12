@@ -28,7 +28,7 @@ import {
   systemPrompt,
 } from "../src/features/berchuma-studio/services/prompt.ts";
 import { looksLikeVision } from "../src/lib/ai/vision-models.ts";
-import { allBays } from "../src/features/berchuma-studio/types/spec.ts";
+import { allBays, LIMITS } from "../src/features/berchuma-studio/types/spec.ts";
 import { calculateCost } from "../src/features/berchuma-studio/services/costing.ts";
 import { buildParts } from "../src/features/berchuma-studio/services/geometry.ts";
 import {
@@ -78,7 +78,10 @@ const GOOD_SPEC = {
   ],
   carcass: {
     board: "mdf-18-walnut",
-    backBoard: "hdf-4-white",
+    frontBoard: "mdf-18-oak",
+    interiorBoard: "mdf-18-white",
+    backBoard: "hdf-6-white",
+    plinthBoard: "mdf-18-black",
     edgeBand: "pvc-2-walnut",
     plinthHeight: 100,
     doorGap: 2,
@@ -170,6 +173,13 @@ const BRIEF = "A walnut wardrobe about 1.8 m wide for a bedroom in Bahir Dar.";
       "the price key came with it",
       spec.carcass.board.priceKey === "MDF 18mm walnut",
     );
+    check(
+      "each wardrobe material zone is hydrated from its stock id",
+      spec.carcass.frontBoard?.id === "mdf-18-oak" &&
+        spec.carcass.interiorBoard?.id === "mdf-18-white" &&
+        spec.carcass.backBoard.id === "hdf-6-white" &&
+        spec.carcass.plinthBoard?.id === "mdf-18-black",
+    );
     check("the edge band resolved", spec.carcass.edgeBand.id === "pvc-2-walnut");
     check("all four hardware ids resolved", spec.hardware.length === 4);
 
@@ -243,7 +253,25 @@ const BRIEF = "A walnut wardrobe about 1.8 m wide for a bedroom in Bahir Dar.";
   const result = hydrateSpec({ ...GOOD_SPEC, carcass }, BRIEF);
   check(
     "a missing back board is filled in",
-    result.ok && result.spec.carcass.backBoard.id === "hdf-4-white",
+    result.ok && result.spec.carcass.backBoard.id === "hdf-6-white",
+    result.ok ? "" : result.error,
+  );
+}
+
+{
+  // HDF4 was Medosha's old generated wardrobe default. It is not a custom
+  // board selection, so loading an existing system wardrobe upgrades it to the
+  // measured 6 mm construction rule as well.
+  const result = hydrateSpec(
+    {
+      ...GOOD_SPEC,
+      carcass: { ...GOOD_SPEC.carcass, backBoard: "hdf-4-white" },
+    },
+    BRIEF,
+  );
+  check(
+    "an existing default HDF4 wardrobe upgrades to 6 mm",
+    result.ok && result.spec.carcass.backBoard.id === "hdf-6-white",
     result.ok ? "" : result.error,
   );
 }
@@ -288,8 +316,11 @@ const BRIEF = "A walnut wardrobe about 1.8 m wide for a bedroom in Bahir Dar.";
       allBays(result.spec)[0]?.doorLeaves === 2,
     );
     check(
-      "the sagging shelf span was reported",
-      result.issues.some((issue) => issue.message.includes("sag")),
+      "the sagging shelf becomes divider-supported physical modules",
+      allBays(result.spec).every(
+        (bay) => bay.fitting.kind !== "shelves" || bay.width <= LIMITS.shelfSpan,
+      ) &&
+        result.issues.some((issue) => issue.correction?.includes("divided wide bays")),
     );
     check(
       "every repair is recorded on the spec",

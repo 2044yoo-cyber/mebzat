@@ -1,4 +1,9 @@
 import { placeOnRun, solveLayout, type SolvedLayout } from "./layout";
+import {
+  rotatedRectBounds,
+  transformPlanPoint,
+  unionPlanBounds,
+} from "./part-transform";
 import type { Cabinet, DesignSpec } from "../types/spec";
 import type { RunPlacement } from "../types/layout";
 
@@ -52,6 +57,15 @@ export type ResolvedDesign = {
    * over-filled while somebody is typing a new wall length.
    */
   issues: string[];
+};
+
+/** Bounds of the resolved geometry frame, including run rotation and corners. */
+export type DesignWorldBounds = {
+  min: { x: number; y: number; z: number };
+  max: { x: number; y: number; z: number };
+  width: number;
+  height: number;
+  depth: number;
 };
 
 export function resolveDesign(spec: DesignSpec): ResolvedDesign {
@@ -131,6 +145,64 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
   }
 
   return { layout, cabinets, issues };
+}
+
+/**
+ * The one display/selection envelope for a placed design.
+ *
+ * Stored cabinet coordinates are deliberately not trusted here: run-bound
+ * cabinets move with their walls and can be rotated, while L/U corners are
+ * real physical blocks with no Cabinet record of their own. Four transformed
+ * corners make custom 45° runs correct as well as the normal 0/90/180/270°.
+ */
+export function designWorldBounds(spec: DesignSpec): DesignWorldBounds {
+  const resolved = resolveDesign(spec);
+  const frontProjection =
+    spec.carcass.frontBoard?.thickness ?? spec.carcass.board.thickness;
+  const plan = resolved.cabinets.map((placed) =>
+    // Doors and drawer fronts stand proud of the local front plane. Including
+    // that small projection prevents an otherwise-correct camera frame from
+    // clipping the actual rendered front on rotated runs.
+    rotatedRectBounds(
+      transformPlanPoint(
+        { x: placed.x, z: placed.z },
+        placed.rotation,
+        { x: 0, z: -frontProjection },
+      ),
+      {
+        width: placed.cabinet.size.width,
+        depth: placed.cabinet.size.depth + frontProjection,
+      },
+      placed.rotation,
+    ),
+  );
+  for (const corner of resolved.layout.corners) {
+    plan.push(
+      rotatedRectBounds(
+        { x: corner.x, z: corner.z },
+        { width: corner.size, depth: corner.size },
+      ),
+    );
+  }
+
+  const footprint = unionPlanBounds(plan);
+  const heights = [
+    ...resolved.cabinets.map(
+      (placed) => placed.y + placed.cabinet.size.height,
+    ),
+    ...resolved.layout.corners.map((corner) => corner.height),
+    0,
+  ];
+  const minimumY = Math.min(...resolved.cabinets.map((placed) => placed.y), 0);
+  const maximumY = Math.max(...heights);
+
+  return {
+    min: { x: footprint.minX, y: minimumY, z: footprint.minZ },
+    max: { x: footprint.maxX, y: maximumY, z: footprint.maxZ },
+    width: Math.max(1, Math.ceil(footprint.maxX - footprint.minX)),
+    height: Math.max(1, Math.ceil(maximumY - minimumY)),
+    depth: Math.max(1, Math.ceil(footprint.maxZ - footprint.minZ)),
+  };
 }
 
 /**

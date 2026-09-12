@@ -83,6 +83,12 @@ export async function requestQuote(input: {
   if (!record) return { ok: false, error: "That design could not be found." };
 
   const cutList = buildCutList(record.spec, buildParts(record.spec));
+  if (!cutList.buildable) {
+    return {
+      ok: false,
+      error: "This design has panels that do not fit its stocked sheets, so it cannot be sent for a manufacturing quote yet.",
+    };
+  }
 
   const { data, error } = await supabase.rpc("berchuma_request_quote", {
     p_design: input.designId,

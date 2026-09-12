@@ -33,7 +33,13 @@ import { buildParts } from "../src/features/berchuma-studio/services/geometry.ts
 import {
   cornerHardware,
   cornerParts,
+  hingesPerLeaf,
 } from "../src/features/berchuma-studio/services/corners.ts";
+import {
+  rotatedRectBounds,
+  transformPlanPoint,
+} from "../src/features/berchuma-studio/services/part-transform.ts";
+import type { Part } from "../src/features/berchuma-studio/types/parts.ts";
 import {
   defaultRuns,
   furnitureLabel,
@@ -63,12 +69,16 @@ function runRect(placement: {
   usableLength: number;
   depth: number;
 }) {
-  const alongX = placement.rotation % 180 === 0;
+  const bounds = rotatedRectBounds(
+    placement.origin,
+    { width: placement.usableLength, depth: placement.depth },
+    placement.rotation,
+  );
   return {
-    x0: placement.origin.x,
-    z0: placement.origin.z,
-    x1: placement.origin.x + (alongX ? placement.usableLength : placement.depth),
-    z1: placement.origin.z + (alongX ? placement.depth : placement.usableLength),
+    x0: bounds.minX,
+    z0: bounds.minZ,
+    x1: bounds.maxX,
+    z1: bounds.maxZ,
   };
 }
 
@@ -88,6 +98,49 @@ function overlapArea(a: Rect, b: Rect): number {
   const width = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
   const depth = Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0);
   return width > 0 && depth > 0 ? width * depth : 0;
+}
+
+/** Exact x/z SAT check for a rotated board, plus its vertical volume overlap. */
+function partsOverlapInVolume(left: Part, right: Part): boolean {
+  const polygonsOverlap = (
+    first: { x: number; z: number }[],
+    second: { x: number; z: number }[],
+  ) => {
+    for (const polygon of [first, second]) {
+      for (const [index, point] of polygon.entries()) {
+        const next = polygon[(index + 1) % polygon.length]!;
+        const axis = { x: -(next.z - point.z), z: next.x - point.x };
+        const project = (shape: { x: number; z: number }[]) => {
+          const values = shape.map((candidate) => candidate.x * axis.x + candidate.z * axis.z);
+          return { min: Math.min(...values), max: Math.max(...values) };
+        };
+        const a = project(first);
+        const b = project(second);
+        if (Math.min(a.max, b.max) - Math.max(a.min, b.min) <= 0.01) return false;
+      }
+    }
+    return true;
+  };
+
+  const footprint = (part: Part, placement: { x: number; y: number; z: number }) => {
+    const rotation = part.rotationY ?? 0;
+    return [
+      { x: 0, z: 0 },
+      { x: part.size.x, z: 0 },
+      { x: part.size.x, z: part.size.z },
+      { x: 0, z: part.size.z },
+    ].map((point) => transformPlanPoint(placement, rotation, point));
+  };
+
+  return left.placements.some((leftAt) =>
+    right.placements.some((rightAt) => {
+      const vertical =
+        Math.min(leftAt.y + left.size.y, rightAt.y + right.size.y) -
+        Math.max(leftAt.y, rightAt.y) >
+        0.01;
+      return vertical && polygonsOverlap(footprint(left, leftAt), footprint(right, rightAt));
+    }),
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -193,7 +246,7 @@ check(
 );
 check(
   "but it does move Wall B's origin",
-  lWiderA.placements[1]!.origin.x === 4000 - 600,
+  lWiderA.placements[1]!.origin.x === 4000,
   "the corner is where the walls meet, so lengthening one moves the meeting point",
 );
 check(
@@ -270,7 +323,7 @@ check(
 );
 check(
   "U: the right wall is at the far end",
-  ur!.origin.x === 3000 - 600,
+  ur!.origin.x === 3000,
 );
 
 // Every pair, in both directions.
@@ -330,7 +383,7 @@ check(
 );
 check(
   "and the right wall follows the right corner",
-  uWiderBack.placements[2]!.origin.x === 4200 - 600,
+  uWiderBack.placements[2]!.origin.x === 4200,
 );
 check(
   "while the left wall does not move",
@@ -773,18 +826,36 @@ const corner = cornerParts(lKitchen, resolvedKitchen);
 
 check("an L corner produces panels", corner.length > 0);
 check(
-  "including two gables",
-  corner.find((part) => part.role === "gable")?.quantity === 2,
-  "a corner has two closed faces, against the two walls",
+  "including a real left gable and return hinge stiles",
+  corner.some((part) => /gable-left/.test(part.id)) &&
+    corner.some((part) => /return-hinge-stile/.test(part.id)) &&
+    corner.some((part) => /return-rear-stile/.test(part.id)),
+  "the return must open into the cabinet rather than onto a full-height gable",
 );
 check(
-  "and two backs",
-  corner.find((part) => part.role === "back")?.quantity === 2,
-  "a corner has two walls behind it, not one",
+  "and one non-overlapping rear back",
+  corner.filter((part) => part.role === "back").length === 1 &&
+    corner.find((part) => part.role === "back")?.placements[0]?.z === 594,
+  "the old front-plane HDF collided with every corner door",
 );
 check(
   "and a door on each open face",
-  corner.find((part) => part.role === "door")?.quantity === 2,
+  corner.filter((part) => part.role === "door").length === 2 &&
+    Math.abs(
+      (corner.find((part) => /door-front/.test(part.id))?.rotationY ?? 0) -
+        (corner.find((part) => /door-return/.test(part.id))?.rotationY ?? 0),
+    ) === 90,
+);
+const cornerDoors = corner.filter((part) => part.role === "door");
+const cornerStructure = corner.filter((part) =>
+  ["gable", "back", "top", "bottom", "divider"].includes(part.role),
+);
+check(
+  "L-corner doors clear every real carcass panel in perspective",
+  cornerDoors.every(
+    (door) => !cornerStructure.some((panel) => partsOverlapInVolume(door, panel)),
+  ),
+  "a return leaf that intersects a gable is a decorative door, not an opening",
 );
 check(
   "every corner panel has a real size",
@@ -819,7 +890,7 @@ check(
 );
 check(
   "and no pair of doors",
-  !blind.some((part) => part.role === "door" && part.quantity === 2),
+  blind.filter((part) => part.role === "door").length === 1,
   "one face is closed off — that is what blind means",
 );
 
@@ -834,17 +905,75 @@ check(
   (diagonalFace?.width ?? 0) > 600,
   `${diagonalFace?.width} — a 45° face spans √2 times the side`,
 );
+check(
+  "a diagonal face clears its gable and rear HDF with exact rotated geometry",
+  diagonalFace !== undefined &&
+    !diagonal
+      .filter((part) => ["gable", "back"].includes(part.role))
+      .some((panel) => partsOverlapInVolume(diagonalFace, panel)),
+  "a 45° panel must not run through the rectangular shell behind it",
+);
 
 check(
   "an L corner is given wide-opening hinges",
   cornerHardware(resolvedKitchen).some((line) => /165/.test(line.label)),
   "a 110° hinge will not let a corner door clear the return",
 );
+for (const leafHeight of [1200, 1600, 2000]) {
+  const overallHeight =
+    leafHeight +
+    lKitchen.carcass.plinthHeight +
+    lKitchen.carcass.doorGap;
+  const thresholdSpec = {
+    ...lKitchen,
+    runs: lKitchen.runs.map((run) => ({ ...run, height: overallHeight })),
+  };
+  const thresholdResolved = resolveDesign(thresholdSpec);
+  const thresholdParts = cornerParts(thresholdSpec, thresholdResolved);
+  const schedule = cornerHardware(thresholdResolved, thresholdParts).find(
+    (line) => line.catalogueId === "hinge-corner-165",
+  );
+  const leaves = thresholdParts.filter(
+    (part) => part.role === "door" && part.doorStyle === "corner",
+  );
+  check(
+    `L corner ${leafHeight} mm leaf uses the shared hinge threshold from its actual parts`,
+    leaves.length === 2 &&
+      leaves.every((leaf) => leaf.length === leafHeight) &&
+      schedule?.quantity === leaves.reduce(
+        (total, leaf) => total + leaf.quantity * hingesPerLeaf(leaf.length),
+        0,
+      ),
+    `${schedule?.quantity ?? "missing"} hinges for ${leaves.map((leaf) => leaf.length).join(", ")} mm leaves`,
+  );
+}
 check(
   "a diagonal corner gets a carousel",
   cornerHardware(resolveDesign({ ...lKitchen, cornerKind: "diagonal" })).some(
     (line) => /carousel/i.test(line.label),
   ),
+);
+const diagonalBreakdown = buildParts({ ...lKitchen, cornerKind: "diagonal" });
+const diagonalHinges = diagonalBreakdown.hardware.filter(
+  (line) => line.hardware.id === "hinge-soft-close",
+);
+const diagonalHingeParts = diagonalBreakdown.parts.filter(
+  (part) =>
+    part.role === "door" &&
+    (part.doorStyle === undefined ||
+      part.doorStyle === "hinged" ||
+      part.doorStyle === "corner"),
+);
+check(
+  "ordinary and diagonal-door hinges share one purchased SKU line",
+  diagonalHinges.length === 1 &&
+    diagonalHinges[0]?.quantity ===
+      diagonalHingeParts.reduce(
+        (total, door) => total + door.quantity * hingesPerLeaf(door.length),
+        0,
+      ) &&
+    /110° hinge/.test(diagonalHinges[0]?.note ?? ""),
+  `${diagonalHinges.length} lines, ${diagonalHinges.map((line) => `${line.quantity}: ${line.note}`).join(" | ")}`,
 );
 check(
   "a blind corner gets a pull-out",

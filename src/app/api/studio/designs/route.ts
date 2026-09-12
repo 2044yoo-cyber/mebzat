@@ -6,7 +6,6 @@ import {
   saveDesign,
 } from "@/features/berchuma-studio/services/designs";
 import { requestQuote } from "@/features/berchuma-studio/services/quotes";
-import { upgradeSpec, designSpecSchema } from "@/features/berchuma-studio/types/spec";
 
 /**
  * Saving, publishing and remixing.
@@ -34,17 +33,9 @@ export async function POST(request: Request) {
   const action = typeof body.action === "string" ? body.action : "save";
 
   if (action === "save") {
-    const parsed = designSpecSchema.safeParse(upgradeSpec(body.spec));
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "That design could not be read." },
-        { status: 400 },
-      );
-    }
-
     const result = await saveDesign({
       designId: typeof body.designId === "string" ? body.designId : undefined,
-      spec: parsed.data,
+      spec: body.spec,
       note: typeof body.note === "string" ? body.note.slice(0, 300) : undefined,
     });
 

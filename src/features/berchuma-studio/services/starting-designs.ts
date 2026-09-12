@@ -178,7 +178,17 @@ function shell(
   extras: Partial<DesignSpec> = {},
 ): DesignSpec {
   const board = findBoard("mdf-18-white") ?? BOARDS[0]!;
-  const backBoard = findBoard("hdf-4-white") ?? board;
+  const furnitureType = furnitureTypeFor(kind);
+  // The reference's back is a 6 mm board. Other products retain their
+  // established 4 mm default; a wardrobe's new construction must not change
+  // a kitchen or TV unit simply because they share this shell helper.
+  const backBoard =
+    findBoard(furnitureType === "wardrobe" ? "hdf-6-white" : "hdf-4-white") ??
+    board;
+  const plinthBoard =
+    furnitureType === "wardrobe"
+      ? findBoard("mdf-18-black") ?? board
+      : board;
   const edgeBand = findEdgeBand("pvc-1-white") ?? EDGE_BANDS[0]!;
   const colour = options.colour ?? { name: "White", hex: "#f2f0ec" };
 
@@ -197,7 +207,7 @@ function shell(
   return {
     version: 3,
     kind,
-    furnitureType: furnitureTypeFor(kind),
+    furnitureType,
     layout: "straight",
     cornerKind: "l_corner",
     runs: [
@@ -215,13 +225,20 @@ function shell(
     envelope,
     carcass: {
       board,
+      frontBoard: board,
+      interiorBoard: board,
       backBoard,
+      plinthBoard,
       edgeBand,
       plinthHeight: PLINTH,
       doorGap: 2,
       shelfSetback: 10,
     },
-    hardware: defaultHardware(),
+    // Wardrobes stand on their manufactured plinth, not bought individual
+    // legs. Other furniture keeps its existing adjustable-leg hardware.
+    hardware: defaultHardware().filter(
+      (item) => furnitureType !== "wardrobe" || item.kind !== "leg",
+    ),
     finish: { colour: colour.name, hex: colour.hex, sheen: "satin" },
     lighting: { ledStrip: false, colourTemperature: 3000 },
     meta: {
@@ -426,7 +443,46 @@ function baseModules(
 function wardrobe(options: StartingDesignOptions): DesignSpec {
   const width = clamp(options.width ?? 2400, 900, 6000);
   const t = 18;
-  const bayWidth = Math.round((width - 2 * t - 2 * t) / 3);
+  // Keep every bay below a practical 850 mm-ish working width. A 900 mm
+  // wardrobe therefore gets two useful bays rather than three 288 mm slivers;
+  // a wide wall gains dividers instead of shelves that sag.
+  const bayCount = Math.max(2, Math.ceil((width - 2 * t) / (850 + t)));
+  const bayWidth = Math.round(
+    (width - 2 * t - (bayCount - 1) * t) / bayCount,
+  );
+  const leaves: 1 | 2 = bayWidth > LIMITS.hingedLeafWidth ? 2 : 1;
+
+  const mixedModule: Bay["fitting"] = {
+    kind: "stack",
+    sections: [
+      // Reference-informed proportions: compact upper storage, a full-length
+      // hanging zone, then a practical two-drawer bank at the bottom.
+      { id: "top-storage", kind: "open", share: 3 },
+      { id: "hanging", kind: "hanging", share: 9, rails: 1 },
+      { id: "drawers", kind: "drawers", share: 3, drawers: 2 },
+    ],
+  };
+
+  const mixedIndex = bayCount === 2 ? 0 : Math.floor(bayCount / 2);
+  const bays = Array.from({ length: bayCount }, (_, index) => {
+    if (index === mixedIndex) {
+      return bay(bayWidth, structuredClone(mixedModule), "hinged", leaves);
+    }
+    if (index === bayCount - 1) {
+      return bay(
+        bayWidth,
+        { kind: "shelves", count: 5, adjustable: true },
+        "hinged",
+        leaves,
+      );
+    }
+    return bay(
+      bayWidth,
+      { kind: "hanging", rails: 1, shelfAbove: true },
+      "hinged",
+      leaves,
+    );
+  });
 
   const cabinets = [
     unit(
@@ -435,11 +491,7 @@ function wardrobe(options: StartingDesignOptions): DesignSpec {
       0,
       0,
       { width, height: 2400, depth: 600 },
-      [
-        bay(bayWidth, { kind: "hanging", rails: 1, shelfAbove: true }, "hinged", 2),
-        bay(bayWidth, { kind: "drawers", count: 4 }),
-        bay(bayWidth, { kind: "shelves", count: 5, adjustable: true }, "hinged", 2),
-      ],
+      bays,
       PLINTH,
     ),
   ];

@@ -72,10 +72,39 @@ export function hydrateSpec(input: unknown, prompt: string): HydrateResult {
     };
   }
 
+  const optionalBoard = (field: "frontBoard" | "interiorBoard" | "plinthBoard") =>
+    resolve(carcass[field], findBoard);
+
+  const frontBoard = optionalBoard("frontBoard");
+  if (carcass.frontBoard !== undefined && !frontBoard) {
+    return {
+      ok: false,
+      error: `carcass.frontBoard must be one of: ${BOARDS.map((b) => b.id).join(", ")}.`,
+    };
+  }
+  const interiorBoard = optionalBoard("interiorBoard");
+  if (carcass.interiorBoard !== undefined && !interiorBoard) {
+    return {
+      ok: false,
+      error: `carcass.interiorBoard must be one of: ${BOARDS.map((b) => b.id).join(", ")}.`,
+    };
+  }
+  const plinthBoard = optionalBoard("plinthBoard");
+  if (carcass.plinthBoard !== undefined && !plinthBoard) {
+    return {
+      ok: false,
+      error: `carcass.plinthBoard must be one of: ${BOARDS.map((b) => b.id).join(", ")}.`,
+    };
+  }
+
+  const wardrobe = input.furnitureType === "wardrobe" || input.kind === "wardrobe";
+
   // A missing back board is the single most common omission, and it has an
   // obvious right answer, so it is filled rather than refused.
   const backBoard =
-    resolve(carcass.backBoard, findBoard) ?? findBoard("hdf-4-white") ?? board;
+    resolve(carcass.backBoard, findBoard) ??
+    findBoard(wardrobe ? "hdf-6-white" : "hdf-4-white") ??
+    board;
 
   const edgeBand =
     resolve(carcass.edgeBand, findEdgeBand) ?? EDGE_BANDS[0];
@@ -107,7 +136,12 @@ export function hydrateSpec(input: unknown, prompt: string): HydrateResult {
     carcass: {
       ...carcass,
       board,
+      frontBoard: frontBoard ?? board,
+      interiorBoard: interiorBoard ?? board,
       backBoard,
+      plinthBoard:
+        plinthBoard ??
+        (wardrobe ? findBoard("mdf-18-black") ?? board : board),
       edgeBand,
       plinthHeight: numberOr(carcass.plinthHeight, 100),
       doorGap: numberOr(carcass.doorGap, 2),

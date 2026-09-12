@@ -37,6 +37,8 @@ export function calculateCost(
      * area-plus-allowance estimate, which is what the note on each line says.
      */
     sheetCounts?: Record<string, number>;
+    /** Comes from the same nesting result as `sheetCounts`. */
+    manufacturable?: boolean;
   } = {},
 ): CostBreakdown {
   const shop: ShopRates = { ...DEFAULT_SHOP_RATES, ...options.shop };
@@ -44,6 +46,7 @@ export function calculateCost(
   const rates = options.rates ?? [];
   const lines: CostLine[] = [];
   const assumptions: string[] = [];
+  const manufacturable = options.manufacturable ?? true;
 
   /** Live rate for a price key, or the material's own fallback. */
   const rateFor = (key: string, fallback: number) => {
@@ -64,7 +67,7 @@ export function calculateCost(
   // Priced by the sheet, not by the square metre, because that is how it is
   // bought: half a sheet left over is still a sheet paid for.
   const sheets: CostBreakdown["sheets"] = [];
-  const boards = collectBoards(spec);
+  const boards = collectBoards(breakdown);
 
   for (const [boardId, area] of Object.entries(breakdown.totals.areaByBoard)) {
     const board = boards.get(boardId);
@@ -108,7 +111,7 @@ export function calculateCost(
   }
 
   // ---- Edge band ---------------------------------------------------------
-  const bands = collectBands(spec);
+  const bands = collectBands(breakdown);
   for (const [bandId, metres] of Object.entries(breakdown.totals.bandByEdge)) {
     const band = bands.get(bandId);
     if (!band) continue;
@@ -140,27 +143,6 @@ export function calculateCost(
       source: rate.source,
       listingId: rate.listingId,
       note: line.note,
-    });
-  }
-
-  // ---- Lighting ----------------------------------------------------------
-  if (spec.lighting?.ledStrip) {
-    // A strip runs the width of the unit unless the spec says otherwise.
-    const metres =
-      spec.lighting.metres ?? round(spec.envelope.width / 1000, 2);
-    const strip = spec.hardware.find((item) => item.id === "led-strip");
-    const fallback = strip?.fallbackRate ?? 260;
-    const rate = rateFor(strip?.priceKey ?? "LED strip warm white", fallback);
-    lines.push({
-      id: "lighting-led",
-      group: "hardware",
-      label: `LED strip, ${spec.lighting.colourTemperature}K`,
-      quantity: metres,
-      unit: "m",
-      rate: rate.amount,
-      amount: metres * rate.amount,
-      source: rate.source,
-      listingId: rate.listingId,
     });
   }
 
@@ -297,12 +279,23 @@ export function calculateCost(
     );
   }
 
-  assumptions.push(
-    `Sheet count assumes ${shop.wastePercent}% offcut; real nesting will change it.`,
-  );
+  if (!manufacturable) {
+    assumptions.push(
+      "At least one physical panel does not fit its stocked sheet. This is a provisional estimate only and cannot be issued as a manufacturing quote.",
+    );
+  } else if (options.sheetCounts) {
+    assumptions.push(
+      "Sheet quantities come from the current nesting layout, including saw kerf rather than a flat offcut allowance.",
+    );
+  } else {
+    assumptions.push(
+      `Sheet count assumes ${shop.wastePercent}% offcut; real nesting will change it.`,
+    );
+  }
 
   return {
     currency,
+    manufacturable,
     lines: lines.map((line) => ({
       ...line,
       rate: round(line.rate, 2),
@@ -324,16 +317,21 @@ export function calculateCost(
 
 // ---------------------------------------------------------------------------
 
-function collectBoards(spec: DesignSpec) {
+function collectBoards(breakdown: PartsBreakdown) {
   const map = new Map<string, DesignSpec["carcass"]["board"]>();
-  map.set(spec.carcass.board.id, spec.carcass.board);
-  map.set(spec.carcass.backBoard.id, spec.carcass.backBoard);
+  for (const part of breakdown.parts) {
+    if (part.manufacture === "purchased") continue;
+    map.set(part.board.id, part.board);
+  }
   return map;
 }
 
-function collectBands(spec: DesignSpec) {
+function collectBands(breakdown: PartsBreakdown) {
   const map = new Map<string, DesignSpec["carcass"]["edgeBand"]>();
-  map.set(spec.carcass.edgeBand.id, spec.carcass.edgeBand);
+  for (const part of breakdown.parts) {
+    if (part.manufacture === "purchased") continue;
+    map.set(part.edgeBand.id, part.edgeBand);
+  }
   return map;
 }
 

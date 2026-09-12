@@ -9,6 +9,12 @@ import * as THREE from "three";
 
 import { CabinetHandles, DimensionLabel, type DragChange } from "./handles";
 import { buildParts } from "../../services/geometry";
+import { partCentre, partRotationRadians } from "../../services/part-transform";
+import {
+  designWorldBounds,
+  resolveDesign,
+} from "../../services/resolve";
+import { boardColour, boardSheen } from "../../services/wardrobe-materials";
 import type { Part } from "../../types/parts";
 import type { Cabinet, DesignSpec } from "../../types/spec";
 
@@ -61,10 +67,29 @@ export default function Model({
     );
   }, [spec, hideFronts]);
 
-  const { width, height, depth } = spec.envelope;
+  const resolved = useMemo(() => resolveDesign(spec), [spec]);
+  const bounds = useMemo(() => designWorldBounds(spec), [spec]);
+  const { width, height, depth } = bounds;
+  const originX = bounds.min.x + width / 2;
+  const originZ = bounds.min.z + depth / 2;
   const reach = Math.max(width, height, depth) * MM;
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedCabinetId) ?? null;
+  const selectedPlacement = selected
+    ? resolved.cabinets.find((placed) => placed.cabinet.id === selected.id) ?? null
+    : null;
+  const positionedSelected =
+    selected && selectedPlacement
+      ? {
+          ...selected,
+          position: {
+            ...selected.position,
+            x: selectedPlacement.x,
+            y: selectedPlacement.y,
+            z: selectedPlacement.z,
+          },
+        }
+      : selected;
 
   // Orbiting and dragging an edge are both "the pointer moved", so one of them
   // has to stand down. Without this, pulling a cabinet wider also swung the
@@ -98,13 +123,13 @@ export default function Model({
       {spec.room ? (
         <RoomShell
           room={spec.room}
-          offset={[-(width * MM) / 2, 0, (depth * MM) / 2]}
+          offset={[-originX * MM, 0, originZ * MM]}
         />
       ) : null}
 
       <group
         // Centred left to right and front to back, standing on y = 0.
-        position={[-(width * MM) / 2, 0, (depth * MM) / 2]}
+        position={[-originX * MM, 0, originZ * MM]}
       >
         {parts.map((part) =>
           part.placements.map((placement, index) => (
@@ -130,32 +155,46 @@ export default function Model({
                       // being broken — so it selects the cabinet beneath the
                       // point that was actually clicked.
                       (point) => {
-                        const local = point.x / MM + width / 2;
-                        const under = spec.cabinets.find(
-                          (cabinet) =>
-                            cabinet.position.x <= local &&
-                            cabinet.position.x + cabinet.size.width >= local &&
-                            cabinet.kind !== "wall",
-                        );
-                        onSelectCabinet(under?.id ?? null);
+                        const x = point.x / MM + originX;
+                        const z = originZ - point.z / MM;
+                        const under = resolved.cabinets.find((placed) => {
+                          if (placed.cabinet.kind === "wall") return false;
+                          const radians = (placed.rotation * Math.PI) / 180;
+                          const localX =
+                            (x - placed.x) * Math.cos(radians) +
+                            (z - placed.z) * Math.sin(radians);
+                          const localZ =
+                            -(x - placed.x) * Math.sin(radians) +
+                            (z - placed.z) * Math.cos(radians);
+                          return (
+                            localX >= 0 &&
+                            localX <= placed.cabinet.size.width &&
+                            localZ >= 0 &&
+                            localZ <= placed.cabinet.size.depth
+                          );
+                        });
+                        onSelectCabinet(under?.cabinet.id ?? null);
                       }
               }
             />
           )),
         )}
 
-        {selected ? (
+        {positionedSelected ? (
           <>
-            <SelectionBox cabinet={selected} />
-            {onResize ? (
+            <SelectionBox
+              cabinet={positionedSelected}
+              rotation={selectedPlacement?.rotation ?? 0}
+            />
+            {onResize && (selectedPlacement?.rotation ?? 0) === 0 ? (
               <CabinetHandles
-                cabinet={selected}
+                cabinet={positionedSelected}
                 offset={{ x: 0, z: 0 }}
                 onDragState={setDragging}
-                onDrag={(change) => onResize(selected.id, change)}
+                onDrag={(change) => onResize(positionedSelected.id, change)}
               />
             ) : null}
-            <SelectionLabels cabinet={selected} reach={reach} />
+            <SelectionLabels cabinet={positionedSelected} reach={reach} />
           </>
         ) : null}
       </group>
@@ -207,15 +246,17 @@ function PartMesh({
   // The spec's z runs backwards from the front face; three.js runs it towards
   // the camera. Negating it is what puts the doors in front of the carcass
   // rather than behind the back panel.
+  const centre = partCentre(part, placement);
   const position: [number, number, number] = [
-    (placement.x + part.size.x / 2) * MM,
-    (placement.y + part.size.y / 2) * MM,
-    -(placement.z + part.size.z / 2) * MM,
+    centre.x * MM,
+    centre.y * MM,
+    -centre.z * MM,
   ];
 
   return (
     <mesh
       position={position}
+      rotation={[0, partRotationRadians(part), 0]}
       onPointerDown={
         onSelect
           ? (event) => {
@@ -232,7 +273,7 @@ function PartMesh({
       <boxGeometry args={size} />
       <meshStandardMaterial
         color={colourFor(part, spec)}
-        roughness={roughnessFor(spec)}
+        roughness={roughnessFor(part, spec)}
         metalness={0.02}
         // Lit rather than tinted. Tinting the selection changed what the
         // material looked like, which is the one thing somebody choosing a
@@ -254,16 +295,27 @@ const BLACK = new THREE.Color("#000000");
  * even where the doors stand proud of it, and so an empty-looking selection
  * still reads as a selection.
  */
-function SelectionBox({ cabinet }: { cabinet: Cabinet }) {
+function SelectionBox({
+  cabinet,
+  rotation,
+}: {
+  cabinet: Cabinet;
+  rotation: number;
+}) {
   const { position, size } = cabinet;
+  const centre = partCentre(
+    { size: { x: size.width, y: size.height, z: size.depth }, rotationY: rotation },
+    position,
+  );
 
   return (
     <lineSegments
       position={[
-        (position.x + size.width / 2) * MM,
-        (position.y + size.height / 2) * MM,
-        -(position.z + size.depth / 2) * MM,
+        centre.x * MM,
+        centre.y * MM,
+        -centre.z * MM,
       ]}
+      rotation={[0, partRotationRadians({ rotationY: rotation }), 0]}
       renderOrder={2}
       // Not pickable, and this one cost an afternoon. Three.js raycasts lines
       // against a threshold measured in world units, and it defaults to 1 —
@@ -290,31 +342,12 @@ function SelectionBox({ cabinet }: { cabinet: Cabinet }) {
 /**
  * What a part is made of, as a colour.
  *
- * Board-driven rather than role-driven: the back panel is a different product
- * from the carcass and it looks like one, and the plinth is set back in shadow
- * so it reads darker even though it is the same board. Fronts are lifted
- * slightly, which is how a real unit looks under a ceiling light and, more
- * usefully, is what makes the door gaps legible.
+ * Board-driven rather than role-driven: the selected front, interior and
+ * plinth boards are the same manufacturing materials used by the cut list and
+ * quote. There is no visual-only tint that can drift from what gets ordered.
  */
 function colourFor(part: Part, spec: DesignSpec): string {
-  const base = new THREE.Color(spec.finish.hex);
-
-  if (part.board.id !== spec.carcass.board.id) {
-    // A back or a drawer base: whatever it is, it is not the show face.
-    return base.clone().multiplyScalar(0.55).getStyle();
-  }
-
   switch (part.role) {
-    case "door":
-    case "drawer_front":
-      return base.clone().multiplyScalar(1.08).getStyle();
-    case "plinth":
-      // A wardrobe plinth is a deliberate dark shadow line beneath the
-      // carcass, not a shaded copy of its finish. It is still a real `plinth`
-      // part from the cut list; only its visual material differs.
-      return spec.furnitureType === "wardrobe"
-        ? "#16181d"
-        : base.clone().multiplyScalar(0.6).getStyle();
     // Legs are hardware, not carcass. Drawn in their own colour rather than a
     // shade of the body, because a Zekolo leg is a black steel or dark timber
     // foot and tinting it with the wardrobe's white would make it disappear
@@ -329,15 +362,14 @@ function colourFor(part: Part, spec: DesignSpec): string {
       return "#b9bfc6";
     case "drawer_side":
     case "drawer_back":
-      return base.clone().multiplyScalar(0.82).getStyle();
     default:
-      return base.getStyle();
+      return boardColour(part.board, spec);
   }
 }
 
 /** Melamine is not gloss lacquer, and gloss lacquer is not matt foil. */
-function roughnessFor(spec: DesignSpec): number {
-  switch (spec.finish.sheen) {
+function roughnessFor(part: Part, spec: DesignSpec): number {
+  switch (boardSheen(part.board, spec)) {
     case "gloss":
       return 0.18;
     case "satin":

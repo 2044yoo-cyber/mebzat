@@ -4,8 +4,30 @@ import type {
   Part,
   PartsBreakdown,
 } from "../types/parts";
-import { cornerParts } from "./corners";
+import { findHardware } from "../types/catalogue";
+import {
+  cornerHardware,
+  cornerParts,
+  hingesPerLeaf as hingesForLeaf,
+} from "./corners";
+export { hingesPerLeaf } from "./corners";
+import { resolveDrawerConstruction } from "./drawer-construction";
+import {
+  distributeDimension,
+  distributeDimensionWithMinimum,
+} from "./dimensions";
+import { splitSpanAtSupports } from "./panel-segmentation";
+import { transformPlanPoint } from "./part-transform";
 import { resolveDesign } from "./resolve";
+import { ledHardwareLine } from "./lighting";
+import {
+  constructionMaterials,
+  edgeBandForConstructionBoard,
+} from "./wardrobe-materials";
+import {
+  recessedWardrobePlinthParts,
+  WARDROBE_PLINTH_VISIBLE_RECESS,
+} from "./wardrobe-plinth";
 import type {
   Bay,
   Cabinet,
@@ -34,14 +56,6 @@ import type {
  * construction are different part lists and would be different builders.
  */
 
-/** Clearance each side of a drawer box for the runner. */
-const RUNNER_CLEARANCE = 13;
-/** How far a drawer box sits back from the front of the carcass. */
-const DRAWER_BOX_SETBACK = 20;
-/** Gap between drawer fronts. */
-const DRAWER_FRONT_GAP = 3;
-/** Height of a drawer side, as a share of the front it sits behind. */
-const DRAWER_SIDE_RATIO = 0.75;
 /**
  * Where a hanging rail's shelf sits, as a share of the bay's interior height.
  *
@@ -53,6 +67,7 @@ export const RAIL_SHELF_HEIGHTS = [0.84, 0.5] as const;
 
 /** Diameter of a hanging rail, in mm. 25 is what every shop in Addis stocks. */
 const RAIL_DIAMETER = 25;
+export { WARDROBE_PLINTH_VISIBLE_RECESS } from "./wardrobe-plinth";
 /**
  * How far the rail hangs below the shelf it is fixed under.
  *
@@ -114,7 +129,13 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
   parts.push(...cornerParts(spec, resolved));
   parts.push(...worktopParts(spec));
 
-  return summarise(parts, hardwareFor(spec, parts));
+  const lighting = ledHardwareLine(spec);
+  return summarise(
+    parts,
+    lighting
+      ? [...hardwareFor(spec, parts, resolved), lighting]
+      : hardwareFor(spec, parts, resolved),
+  );
 }
 
 /**
@@ -132,18 +153,11 @@ function rotateThenPlace(
   y: number,
   z: number,
 ): { x: number; y: number; z: number } {
-  if (rotation === 0) {
-    return { x: local.x + x, y: local.y + y, z: local.z + z };
-  }
-
-  const radians = (rotation * Math.PI) / 180;
-  const cos = Math.cos(radians);
-  const sin = Math.sin(radians);
-
+  const plan = transformPlanPoint({ x, z }, rotation, local);
   return {
-    x: x + local.x * cos - local.z * sin,
+    x: plan.x,
     y: local.y + y,
-    z: z + local.x * sin + local.z * cos,
+    z: plan.z,
   };
 }
 
@@ -161,17 +175,28 @@ function standParts(
   plinth: number,
   board: DesignSpec["carcass"]["board"],
   t: number,
+  frontThickness: number,
+  supportJoints: readonly number[],
 ): Part[] {
   // `furnitureType`, not `kind`, is the durable classification here. `kind`
   // is the starting preset; the type remains wardrobe after an edit or an
   // upgrade of an older saved design.
   if (spec.furnitureType === "wardrobe") {
     return recessedWardrobePlinthParts(
-      envelope,
-      plinth,
-      board,
-      spec.carcass.edgeBand,
-      t,
+      {
+        width: envelope.width,
+        depth: envelope.depth,
+        height: plinth,
+        board,
+        edgeBand: edgeBandForConstructionBoard(
+          spec,
+          board,
+          spec.carcass.edgeBand,
+        ),
+        carcassThickness: t,
+        frontThickness,
+        supportJoints,
+      },
     );
   }
 
@@ -222,6 +247,7 @@ function standParts(
       role: "leg",
       label: legLabel(kind),
       board,
+      manufacture: "purchased",
       // A leg is bought, not cut from a sheet, so its "length" is its height
       // and the cut list shows it as a piece rather than a panel.
       length: height,
@@ -232,63 +258,6 @@ function standParts(
       size: { x: section, y: height, z: section },
       axis: "y",
       placements,
-    },
-  ];
-}
-
-/**
- * A wardrobe's continuous, recessed base.
- *
- * The front is one full-width panel, so it reads as one uninterrupted black
- * line below the doors. Two return panels take the base to the rear of the
- * carcass, making it real support geometry rather than a painted strip. The
- * reveal is derived from the board and cabinet depth, so it stays proportional
- * for narrow and deep wardrobes without ever extending outside the envelope.
- */
-function recessedWardrobePlinthParts(
-  envelope: { width: number; depth: number },
-  plinth: number,
-  board: DesignSpec["carcass"]["board"],
-  band: DesignSpec["carcass"]["edgeBand"],
-  t: number,
-): Part[] {
-  const NO: BandedEdges = { front: false, back: false, top: false, bottom: false };
-  // 40 mm is a visible but modest toe-kick. The clamp preserves enough depth
-  // for the rear returns on unusually shallow, still-valid cabinets.
-  const frontRecess = Math.min(40, Math.max(0, envelope.depth - 2 * t));
-  const sideDepth = envelope.depth - frontRecess - t;
-
-  return [
-    {
-      id: "wardrobe-plinth-front",
-      role: "plinth",
-      label: "Recessed black plinth, front",
-      board,
-      length: envelope.width,
-      width: plinth,
-      quantity: 1,
-      edges: { ...NO, top: true },
-      edgeBand: band,
-      placements: [{ x: 0, y: 0, z: frontRecess }],
-      size: { x: envelope.width, y: plinth, z: t },
-      axis: "z",
-    },
-    {
-      id: "wardrobe-plinth-side",
-      role: "plinth",
-      label: "Recessed black plinth, side",
-      board,
-      length: sideDepth,
-      width: plinth,
-      quantity: 2,
-      edges: { ...NO, top: true },
-      edgeBand: band,
-      placements: [
-        { x: 0, y: 0, z: frontRecess + t },
-        { x: envelope.width - t, y: 0, z: frontRecess + t },
-      ],
-      size: { x: t, y: plinth, z: sideDepth },
-      axis: "x",
     },
   ];
 }
@@ -472,7 +441,19 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   const { carcass } = spec;
   const envelope = cabinet.size;
   const bays = cabinet.bays;
-  const board = carcass.board;
+  const materials = constructionMaterials(spec);
+  const board = materials.body;
+  const bodyBand = edgeBandForConstructionBoard(spec, board, carcass.edgeBand);
+  const backBand = edgeBandForConstructionBoard(
+    spec,
+    materials.back,
+    carcass.edgeBand,
+  );
+  const plinthBand = edgeBandForConstructionBoard(
+    spec,
+    materials.plinth,
+    carcass.edgeBand,
+  );
   const t = board.thickness;
   const plinth = cabinet.plinthHeight;
 
@@ -481,12 +462,17 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   const carcassHeight = envelope.height - plinth;
   const interiorHeight = carcassHeight - 2 * t;
   const depth = envelope.depth;
-  const backThickness = carcass.backBoard.thickness;
-  /** Usable depth in front of the back panel. */
-  const interiorDepth = depth - backThickness;
+  const backBoard = materials.back;
+  const backThickness = backBoard.thickness;
+  // The 6 mm back is applied at the rear of the shell. Carcass boards stop at
+  // its front face, so the complete cabinet still keeps its specified depth
+  // without the back intersecting gables, dividers or top/bottom boards.
+  const shellDepth = depth - backThickness;
+  /** Usable depth in front of the applied back panel. */
+  const interiorDepth = shellDepth;
 
-  const push = (part: Omit<Part, "edgeBand">) =>
-    parts.push({ ...part, edgeBand: carcass.edgeBand });
+  const push = (part: Omit<Part, "edgeBand">, edgeBand = bodyBand) =>
+    parts.push({ ...part, edgeBand });
 
   // ---- Gables ------------------------------------------------------------
   // Full-height outer sides. Only the front edge shows.
@@ -496,11 +482,11 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     label: "Left gable",
     board,
     length: carcassHeight,
-    width: depth,
+    width: shellDepth,
     quantity: 1,
     edges: { ...NO_EDGES, front: true },
     placements: [{ x: 0, y: plinth, z: 0 }],
-    size: { x: t, y: carcassHeight, z: depth },
+    size: { x: t, y: carcassHeight, z: shellDepth },
     axis: "x",
   });
   push({
@@ -509,43 +495,56 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     label: "Right gable",
     board,
     length: carcassHeight,
-    width: depth,
+    width: shellDepth,
     quantity: 1,
     edges: { ...NO_EDGES, front: true },
     placements: [{ x: envelope.width - t, y: plinth, z: 0 }],
-    size: { x: t, y: carcassHeight, z: depth },
+    size: { x: t, y: carcassHeight, z: shellDepth },
     axis: "x",
   });
 
   // ---- Top and bottom ----------------------------------------------------
-  // Housed between the gables, so their length is the envelope less both.
+  // Housed between the gables, so their total length is the envelope less
+  // both. Wide wardrobes use sections that meet at divider centre lines: each
+  // join is carried by a real vertical divider instead of asking a shop to cut
+  // one unplaceable 3–6 m board or hiding an unsupported visual seam.
   const spanWidth = envelope.width - 2 * t;
-  push({
-    id: "carcass-bottom",
-    role: "bottom",
-    label: "Bottom",
+  const dividerCentres = cabinetDividerCentres(cabinet, t);
+  const horizontalSections = splitSpanAtSupports(
+    spanWidth,
     board,
-    length: spanWidth,
-    width: depth,
-    quantity: 1,
-    edges: { ...NO_EDGES, front: true },
-    placements: [{ x: t, y: plinth, z: 0 }],
-    size: { x: spanWidth, y: t, z: depth },
-    axis: "y",
-  });
-  push({
-    id: "carcass-top",
-    role: "top",
-    label: "Top",
-    board,
-    length: spanWidth,
-    width: depth,
-    quantity: 1,
-    edges: { ...NO_EDGES, front: true },
-    placements: [{ x: t, y: envelope.height - t, z: 0 }],
-    size: { x: spanWidth, y: t, z: depth },
-    axis: "y",
-  });
+    dividerCentres.map((centre) => centre - t),
+  );
+  for (const [index, section] of horizontalSections.entries()) {
+    const suffix = horizontalSections.length === 1 ? "" : `-${index + 1}`;
+    const sectionLabel = horizontalSections.length === 1 ? "" : ` — section ${index + 1}`;
+    push({
+      id: `carcass-bottom${suffix}`,
+      role: "bottom",
+      label: `Bottom${sectionLabel}`,
+      board,
+      length: section.length,
+      width: shellDepth,
+      quantity: 1,
+      edges: { ...NO_EDGES, front: true },
+      placements: [{ x: t + section.offset, y: plinth, z: 0 }],
+      size: { x: section.length, y: t, z: shellDepth },
+      axis: "y",
+    });
+    push({
+      id: `carcass-top${suffix}`,
+      role: "top",
+      label: `Top${sectionLabel}`,
+      board,
+      length: section.length,
+      width: shellDepth,
+      quantity: 1,
+      edges: { ...NO_EDGES, front: true },
+      placements: [{ x: t + section.offset, y: envelope.height - t, z: 0 }],
+      size: { x: section.length, y: t, z: shellDepth },
+      axis: "y",
+    });
+  }
 
   // ---- Back --------------------------------------------------------------
   // One piece per bay, not one across the unit.
@@ -563,21 +562,37 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       // Half a divider at each internal edge, a full gable at each outer edge.
       const width = bay.width + (first ? t : t / 2) + (last ? t : t / 2);
 
-      parts.push({
-        id: `back-${bay.id}`,
-        role: "back",
-        label: `Back panel — ${bay.id}`,
-        bayId: bay.id,
-        board: carcass.backBoard,
-        length: carcassHeight,
-        width: Math.round(width),
-        quantity: 1,
-        edges: { ...NO_EDGES },
-        edgeBand: carcass.edgeBand,
-        placements: [{ x: backX, y: plinth, z: depth - backThickness }],
-        size: { x: Math.round(width), y: carcassHeight, z: backThickness },
-        axis: "z",
-      });
+      // The usual 2440 mm sheet cannot make a full back for the tallest
+      // valid wardrobe. Split it horizontally when necessary, keeping every
+      // emitted panel a real part that can be nested and installed on the
+      // carcass. Default 2400 mm wardrobes remain one piece per bay.
+      const maximumLength = Math.max(backBoard.sheet.length, backBoard.sheet.width);
+      const pieceCount = Math.max(1, Math.ceil(carcassHeight / maximumLength));
+      const nominalLength = Math.ceil(carcassHeight / pieceCount);
+
+      for (let piece = 0; piece < pieceCount; piece += 1) {
+        const pieceY = plinth + piece * nominalLength;
+        const length = Math.min(nominalLength, plinth + carcassHeight - pieceY);
+
+        parts.push({
+          id: `back-${bay.id}-${piece}`,
+          role: "back",
+          label:
+            pieceCount === 1
+              ? `Back panel — ${bay.id}`
+              : `Back panel — ${bay.id}, ${piece === 0 ? "lower" : "upper"}`,
+          bayId: bay.id,
+          board: backBoard,
+          length,
+          width: Math.round(width),
+          quantity: 1,
+          edges: { ...NO_EDGES },
+          edgeBand: backBand,
+          placements: [{ x: backX, y: pieceY, z: depth - backThickness }],
+          size: { x: Math.round(width), y: length, z: backThickness },
+          axis: "z",
+        });
+      }
 
       backX += width;
     }
@@ -594,8 +609,24 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   // furniture family. Wardrobes use their recessed plinth; other families
   // retain their existing legs-or-plinth behaviour.
   if (plinth > 0) {
-    for (const part of standParts(spec, cabinet, envelope, plinth, board, t)) {
-      push(part);
+    // An open wardrobe has no proud door/drawer face to measure from. Its
+    // plinth therefore uses the full 20 mm recess from the carcass plane;
+    // enclosed and mixed wardrobes measure the same reveal from their outer
+    // front boards.
+    const visibleFrontThickness = cabinetHasVisibleFronts(cabinet)
+      ? materials.fronts.thickness
+      : 0;
+    for (const part of standParts(
+      spec,
+      cabinet,
+      envelope,
+      plinth,
+      materials.plinth,
+      t,
+      visibleFrontThickness,
+      dividerCentres,
+    )) {
+      push(part, plinthBand);
     }
   }
 
@@ -629,11 +660,11 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         label: `Divider ${index + 1}`,
         board,
         length: interiorHeight,
-        width: depth,
+        width: shellDepth,
         quantity: 1,
         edges: { ...NO_EDGES, front: true },
         placements: [{ x, y: plinth + t, z: 0 }],
-        size: { x: t, y: interiorHeight, z: depth },
+        size: { x: t, y: interiorHeight, z: shellDepth },
         axis: "x",
       });
       x += t;
@@ -646,6 +677,38 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   parts.push(...doorParts(spec, cabinet));
 
   return parts;
+}
+
+/** Whether this cabinet actually generates a proud door or drawer front. */
+function cabinetHasVisibleFronts(cabinet: Cabinet): boolean {
+  return cabinet.bays.some((bay) => {
+    if (bay.fitting.kind === "drawers") return true;
+    if (bay.fitting.kind !== "stack") return bay.door !== "none";
+
+    const hasDrawers = bay.fitting.sections.some(
+      (section) => section.kind === "drawers",
+    );
+    const hasDoorableSection = bay.fitting.sections.some(
+      (section) => section.kind !== "drawers",
+    );
+    return hasDrawers || (bay.door !== "none" && hasDoorableSection);
+  });
+}
+
+/** Divider centre lines are safe structural joints for long horizontal boards. */
+function cabinetDividerCentres(cabinet: Cabinet, thickness: number): number[] {
+  const centres: number[] = [];
+  let x = thickness;
+
+  for (const [index, bay] of cabinet.bays.entries()) {
+    x += bay.width;
+    if (index < cabinet.bays.length - 1) {
+      centres.push(x + thickness / 2);
+      x += thickness;
+    }
+  }
+
+  return centres;
 }
 
 // ---------------------------------------------------------------------------
@@ -661,7 +724,18 @@ function bayParts(input: {
   interiorDepth: number;
 }): Part[] {
   const { spec, bay, x, y, interiorHeight, interiorDepth } = input;
-  const board = spec.carcass.board;
+  const materials = constructionMaterials(spec);
+  const board = materials.interior;
+  const interiorBand = edgeBandForConstructionBoard(
+    spec,
+    board,
+    spec.carcass.edgeBand,
+  );
+  const backBand = edgeBandForConstructionBoard(
+    spec,
+    materials.back,
+    spec.carcass.edgeBand,
+  );
   const setback = spec.carcass.shelfSetback;
   const parts: Part[] = [];
 
@@ -672,7 +746,12 @@ function bayParts(input: {
    * the cut list and the objects in the room are the same thing counted twice
    * rather than two numbers that have to be kept in step.
    */
-  const shelf = (id: string, heights: number[], note: string): Part => ({
+  const shelf = (
+    id: string,
+    heights: number[],
+    note: string,
+    adjustable = false,
+  ): Part => ({
     id,
     role: "shelf",
     label: note,
@@ -683,7 +762,8 @@ function bayParts(input: {
     width: interiorDepth - setback,
     quantity: heights.length,
     edges: { ...NO_EDGES, front: true },
-    edgeBand: spec.carcass.edgeBand,
+    edgeBand: interiorBand,
+    adjustable,
     placements: heights.map((shelfY) => ({ x, y: shelfY, z: setback })),
     size: { x: bay.width, y: board.thickness, z: interiorDepth - setback },
     axis: "y",
@@ -703,6 +783,7 @@ function bayParts(input: {
               (_, index) => y + step * (index + 1),
             ),
             `Shelf — ${bay.id}${bay.fitting.adjustable ? "" : " (fixed)"}`,
+            bay.fitting.adjustable,
           ),
         );
       }
@@ -734,7 +815,11 @@ function bayParts(input: {
       // The shelf above a rail is what the rail hangs from.
       if (bay.fitting.shelfAbove) {
         parts.push(
-          shelf(`${bay.id}-rail-shelf`, shelfHeights, `Rail shelf — ${bay.id}`),
+          shelf(
+            `${bay.id}-rail-shelf`,
+            shelfHeights,
+            `Rail shelf — ${bay.id}`,
+          ),
         );
       }
 
@@ -758,11 +843,12 @@ function bayParts(input: {
           label: `Hanging rail — ${bay.id}`,
           bayId: bay.id,
           board,
+          manufacture: "purchased",
           length: railLength,
           width: RAIL_DIAMETER,
           quantity: shelfHeights.length,
           edges: { ...NO_EDGES },
-          edgeBand: spec.carcass.edgeBand,
+          edgeBand: interiorBand,
           // Centred in the depth of the bay, so a coat hangs clear of both the
           // back panel and the door.
           placements: shelfHeights.map((shelfY) => ({
@@ -778,18 +864,21 @@ function bayParts(input: {
     }
 
     case "drawers": {
-      const { count } = bay.fitting;
-      const heights = drawerHeights(bay.fitting.frontHeights, count, interiorHeight);
-      // A drawer box is narrower than its opening by the runners, and shorter
-      // than the carcass is deep so the back clears the back panel.
-      const boxWidth = bay.width - 2 * RUNNER_CLEARANCE;
-      const boxDepth = interiorDepth - DRAWER_BOX_SETBACK;
-      const boxX = x + RUNNER_CLEARANCE;
-      const floors = drawerFloors(heights, y, interiorHeight);
+      const construction = drawerConstructionFor(
+        spec,
+        bay.width,
+        interiorHeight,
+        y,
+        interiorDepth,
+        bay.fitting.count,
+        bay.fitting.frontHeights,
+      );
+      const boxX = x + construction.sideClearance;
 
-      for (const [i, frontHeight] of heights.entries()) {
-        const sideHeight = Math.round(frontHeight * DRAWER_SIDE_RATIO);
-        const floor = floors[i] ?? y;
+      for (const [i, face] of construction.faces.entries()) {
+        const sideHeight = construction.sideHeights[i] ?? 0;
+        const boxFloor = face.floor;
+        const sideFloor = boxFloor + construction.bottomThickness;
 
         parts.push({
           id: `${bay.id}-drawer-${i}-sides`,
@@ -797,21 +886,25 @@ function bayParts(input: {
           label: `Drawer ${i + 1} sides — ${bay.id}`,
           bayId: bay.id,
           board,
-          length: boxDepth,
+          length: construction.boxDepth,
           width: sideHeight,
           quantity: 2,
           edges: { ...NO_EDGES, top: true },
-          edgeBand: spec.carcass.edgeBand,
+          edgeBand: interiorBand,
           // Left and right, a runner's clearance inside the opening.
           placements: [
-            { x: boxX, y: floor, z: DRAWER_BOX_SETBACK },
+            { x: boxX, y: sideFloor, z: construction.frontSetback },
             {
-              x: boxX + boxWidth - board.thickness,
-              y: floor,
-              z: DRAWER_BOX_SETBACK,
+              x: boxX + construction.boxWidth - board.thickness,
+              y: sideFloor,
+              z: construction.frontSetback,
             },
           ],
-          size: { x: board.thickness, y: sideHeight, z: boxDepth },
+          size: {
+            x: board.thickness,
+            y: sideHeight,
+            z: construction.boxDepth,
+          },
           axis: "x",
         });
 
@@ -821,26 +914,29 @@ function bayParts(input: {
           label: `Drawer ${i + 1} front and back — ${bay.id}`,
           bayId: bay.id,
           board,
-          length: boxWidth - 2 * board.thickness,
+          length: construction.boxWidth - 2 * board.thickness,
           width: sideHeight,
           quantity: 2,
           edges: { ...NO_EDGES, top: true },
-          edgeBand: spec.carcass.edgeBand,
+          edgeBand: interiorBand,
           // Between the sides, at each end of the box.
           placements: [
             {
               x: boxX + board.thickness,
-              y: floor,
-              z: DRAWER_BOX_SETBACK,
+              y: sideFloor,
+              z: construction.frontSetback,
             },
             {
               x: boxX + board.thickness,
-              y: floor,
-              z: DRAWER_BOX_SETBACK + boxDepth - board.thickness,
+              y: sideFloor,
+              z:
+                construction.frontSetback +
+                construction.boxDepth -
+                board.thickness,
             },
           ],
           size: {
-            x: boxWidth - 2 * board.thickness,
+            x: construction.boxWidth - 2 * board.thickness,
             y: sideHeight,
             z: board.thickness,
           },
@@ -852,17 +948,23 @@ function bayParts(input: {
           role: "drawer_base",
           label: `Drawer ${i + 1} base — ${bay.id}`,
           bayId: bay.id,
-          board: spec.carcass.backBoard,
-          length: boxWidth,
-          width: boxDepth,
+          board: materials.back,
+          length: construction.boxWidth,
+          width: construction.boxDepth,
           quantity: 1,
           edges: { ...NO_EDGES },
-          edgeBand: spec.carcass.edgeBand,
-          placements: [{ x: boxX, y: floor, z: DRAWER_BOX_SETBACK }],
+          edgeBand: backBand,
+          placements: [
+            {
+              x: boxX,
+              y: boxFloor,
+              z: construction.frontSetback,
+            },
+          ],
           size: {
-            x: boxWidth,
-            y: spec.carcass.backBoard.thickness,
-            z: boxDepth,
+            x: construction.boxWidth,
+            y: materials.back.thickness,
+            z: construction.boxDepth,
           },
           axis: "y",
         });
@@ -925,7 +1027,8 @@ function bayParts(input: {
             width: Math.round(interiorDepth - setback),
             quantity: 1,
             edges: { ...NO_EDGES, front: true },
-            edgeBand: spec.carcass.edgeBand,
+            edgeBand: interiorBand,
+            adjustable: false,
             placements: [{ x, y: bottom - board.thickness, z: 0 }],
             size: {
               x: Math.round(bay.width),
@@ -970,7 +1073,9 @@ export function sectionBands(
   dividerThickness: number,
 ): { section: StackSection; floor: number; height: number }[] {
   const totalShare = sections.reduce((total, section) => total + section.share, 0);
-  const usable = openingHeight - (sections.length - 1) * dividerThickness;
+  const usable = Math.floor(
+    openingHeight - (sections.length - 1) * dividerThickness,
+  );
 
   // Guarded rather than assumed. Shares summing to zero would divide by zero
   // and place every section at NaN, which draws nothing and reports no error;
@@ -978,10 +1083,17 @@ export function sectionBands(
   if (totalShare <= 0 || usable <= 0) return [];
 
   const bands: { section: StackSection; floor: number; height: number }[] = [];
+  const heights = distributeDimensionWithMinimum(
+    sections.map((section) => section.share),
+    usable,
+    sections.map((section) =>
+      section.kind === "drawers" ? 90 : 0,
+    ),
+  );
   let top = openingFloor + openingHeight;
 
   for (const [index, section] of sections.entries()) {
-    const height = (section.share / totalShare) * usable;
+    const height = heights[index] ?? 0;
     const floor = top - height;
     bands.push({ section, floor, height });
     top = floor - (index === sections.length - 1 ? 0 : dividerThickness);
@@ -1027,45 +1139,43 @@ export function sectionFitting(section: {
 }
 
 /**
- * Drawer front heights.
+ * Resolves one drawer bank from its clear opening and selected runner.
  *
- * Given explicit heights, use them. Given none, divide the opening equally —
- * which is what "four drawers" means to everyone who is not a designer. The
- * gaps between fronts come out of the total, so the fronts always add up to
- * the opening.
+ * Both the board box and the visible fronts call this exact function. The
+ * result is therefore the shared manufacturing definition, not two similar
+ * calculations which can drift by a gap or a board thickness.
  */
-/**
- * The floor height of each drawer, in mm above the ground.
- *
- * Heights run top to bottom, the way somebody describes a chest of drawers, so
- * this walks down from the top of the opening. The box and the front it sits
- * behind both call it, which is what stops a front from being drawn in front
- * of a different drawer's box.
- */
-function drawerFloors(
-  heights: number[],
-  openingFloor: number,
+function drawerConstructionFor(
+  spec: DesignSpec,
+  openingWidth: number,
   openingHeight: number,
-): number[] {
-  const floors: number[] = [];
-  let ceiling = openingFloor + openingHeight;
-  for (const height of heights) {
-    ceiling -= height;
-    floors.push(ceiling);
-    ceiling -= DRAWER_FRONT_GAP;
-  }
-  return floors;
-}
-
-function drawerHeights(
-  explicit: number[] | undefined,
+  openingFloor: number,
+  interiorDepth: number,
   count: number,
-  opening: number,
-): number[] {
-  if (explicit && explicit.length === count) return explicit;
-  const gaps = (count - 1) * DRAWER_FRONT_GAP;
-  const each = Math.floor((opening - gaps) / count);
-  return Array.from({ length: count }, () => each);
+  frontHeights?: number[],
+) {
+  const materials = constructionMaterials(spec);
+  const selectedRunner = spec.hardware.find(
+    (item) => item.kind === "drawer_runner",
+  );
+  // Persisted legacy specs sometimes retain only a hardware id. Always resolve
+  // the same stocked product that hardwareFor will quote rather than silently
+  // using soft-close dimensions while pricing a basic runner.
+  const runner =
+    selectedRunner?.drawerRunner ??
+    (selectedRunner ? findHardware(selectedRunner.id)?.drawerRunner : undefined);
+
+  return resolveDrawerConstruction({
+    openingWidth,
+    openingHeight,
+    openingFloor,
+    interiorDepth,
+    count,
+    frontHeights,
+    drawerSideThickness: materials.interior.thickness,
+    drawerBottomThickness: materials.back.thickness,
+    runner,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1074,19 +1184,25 @@ function drawerHeights(
 
 function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   const parts: Part[] = [];
-  const board = spec.carcass.board;
+  const materials = constructionMaterials(spec);
+  const board = materials.fronts;
+  const frontBand = edgeBandForConstructionBoard(
+    spec,
+    board,
+    spec.carcass.edgeBand,
+  );
   const gap = spec.carcass.doorGap;
   const plinth = cabinet.plinthHeight;
-  const t = board.thickness;
+  const t = materials.body.thickness;
+  const frontThickness = board.thickness;
   const height = cabinet.size.height;
+  const interiorDepth = cabinet.size.depth - materials.back.thickness;
 
   let x = t;
 
   for (const bay of cabinet.bays) {
     const bayX = x;
     x += bay.width + t;
-
-    if (bay.door === "none") continue;
 
     const opening = height - plinth - 2 * t;
     const openingFloor = plinth + t;
@@ -1105,26 +1221,39 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       bandFloor: number,
       bandHeight: number,
     ) => {
-      const heights = drawerHeights(explicit, count, bandHeight);
-      const floors = drawerFloors(heights, bandFloor, bandHeight);
+      const construction = drawerConstructionFor(
+        spec,
+        bay.width,
+        bandHeight,
+        bandFloor,
+        interiorDepth,
+        count,
+        explicit,
+      );
 
-      for (const [i, frontHeight] of heights.entries()) {
+      for (const face of construction.faces) {
         parts.push({
-          id: `${idPrefix}-front-${i}`,
+          id: `${idPrefix}-front-${face.index}`,
           role: "drawer_front",
-          label: `Drawer front ${i + 1} — ${idPrefix}`,
+          label: `Drawer front ${face.index + 1} — ${idPrefix}`,
           bayId: bay.id,
           board,
-          length: frontHeight,
+          length: face.height,
           width: bay.width - 2 * gap,
           quantity: 1,
           // A front shows on all four edges.
           edges: { front: true, back: true, top: true, bottom: true },
-          edgeBand: spec.carcass.edgeBand,
+          edgeBand: frontBand,
           // Stacked on the same floors as the boxes behind them, and standing
           // proud of the carcass — hence the negative z.
-          placements: [{ x: bayX + gap, y: floors[i] ?? bandFloor, z: -t }],
-          size: { x: bay.width - 2 * gap, y: frontHeight, z: t },
+          placements: [
+            { x: bayX + gap, y: face.floor, z: -frontThickness },
+          ],
+          size: {
+            x: bay.width - 2 * gap,
+            y: face.height,
+            z: frontThickness,
+          },
           axis: "z",
         });
       }
@@ -1147,14 +1276,18 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         width: leafWidth,
         quantity: leaves,
         edges: { front: true, back: true, top: true, bottom: true },
-        edgeBand: spec.carcass.edgeBand,
+        edgeBand: frontBand,
+        doorStyle:
+          bay.door === "hinged" || bay.door === "sliding" || bay.door === "bifold"
+            ? bay.door
+            : undefined,
         // Side by side across the bay, a gap between each and at both ends.
         placements: Array.from({ length: leaves }, (_, leaf) => ({
           x: bayX + gap + leaf * (leafWidth + gap),
           y: bandFloor + gap,
-          z: -t,
+          z: -frontThickness,
         })),
-        size: { x: leafWidth, y: leafHeight, z: t },
+        size: { x: leafWidth, y: leafHeight, z: frontThickness },
         axis: "z",
       });
     };
@@ -1194,7 +1327,9 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
 
       const closeRun = () => {
         if (!run) return;
-        doorLeaves(`-${runIndex}`, run.floor, run.top - run.floor);
+        if (bay.door !== "none") {
+          doorLeaves(`-${runIndex}`, run.floor, run.top - run.floor);
+        }
         runIndex += 1;
         run = null;
       };
@@ -1220,6 +1355,8 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       continue;
     }
 
+    if (bay.door === "none") continue;
+
     // A plain bay's door covers the whole carcass front, which starts at the
     // plinth rather than at the interior floor — the door hides the bottom
     // board too.
@@ -1241,26 +1378,43 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
  * does not. The hinge count per leaf is the trade's own rule: two up to
  * 1200 mm, three to 1600, four to 2000, five above.
  */
-function hardwareFor(spec: DesignSpec, parts: Part[]): HardwareLine[] {
+function hardwareFor(
+  spec: DesignSpec,
+  parts: Part[],
+  resolved: ReturnType<typeof resolveDesign>,
+): HardwareLine[] {
   const lines: HardwareLine[] = [];
+  const fallbackHardware: Partial<Record<Hardware["kind"], string>> = {
+    hinge: "hinge-soft-close",
+    handle: "handle-bar",
+    drawer_runner: "runner-soft-close",
+    shelf_pin: "shelf-pin",
+    hanging_rail: "hanging-rail",
+    sliding_gear: "sliding-gear",
+    leg: "leg-adjustable",
+  };
   const pick = (kind: Hardware["kind"]) =>
-    spec.hardware.find((item) => item.kind === kind);
+    spec.hardware.find((item) => item.kind === kind) ??
+    (fallbackHardware[kind] ? findHardware(fallbackHardware[kind]!) : undefined);
 
   const doors = parts.filter((part) => part.role === "door");
   const drawerFronts = parts.filter((part) => part.role === "drawer_front");
   const shelves = parts.filter((part) => part.role === "shelf");
 
+  const hingedDoors = doors.filter(
+    (door) => door.doorStyle === undefined || door.doorStyle === "hinged",
+  );
   const hinge = pick("hinge");
   if (hinge) {
-    const count = doors.reduce(
-      (total, door) => total + door.quantity * hingesPerLeaf(door.length),
+    const count = hingedDoors.reduce(
+      (total, door) => total + door.quantity * hingesForLeaf(door.length),
       0,
     );
     if (count > 0) {
       lines.push({
         hardware: hinge,
         quantity: count,
-        note: `${doors.reduce((n, d) => n + d.quantity, 0)} door leaves`,
+        note: `${hingedDoors.reduce((n, d) => n + d.quantity, 0)} hinged door leaves`,
       });
     }
   }
@@ -1268,24 +1422,44 @@ function hardwareFor(spec: DesignSpec, parts: Part[]): HardwareLine[] {
   const handle = pick("handle");
   if (handle) {
     const count =
-      doors.reduce((total, door) => total + door.quantity, 0) +
-      drawerFronts.length;
+      doors
+        .filter((door) => door.doorStyle !== "fixed")
+        .reduce(
+          (total, door) =>
+            total +
+            (door.doorStyle === "bifold"
+              ? Math.ceil(door.quantity / 2)
+              : door.quantity),
+          0,
+        ) +
+      drawerFronts.reduce((total, front) => total + front.quantity, 0);
     if (count > 0) {
       lines.push({ hardware: handle, quantity: count, note: "One per front" });
     }
   }
 
-  const runner = pick("drawer_runner");
-  if (runner && drawerFronts.length > 0) {
+  const drawerBoxes = parts.filter((part) => part.role === "drawer_base");
+  const drawerCount = drawerBoxes.reduce(
+    (total, box) => total + box.quantity,
+    0,
+  );
+  // `drawerConstructionFor` uses the soft-close profile when a legacy or AI
+  // spec omitted hardware. Quote that same physical runner here; otherwise a
+  // cut list can include runner clearances while the hardware order contains
+  // zero pairs.
+  const runner = drawerCount > 0 ? pick("drawer_runner") : undefined;
+  if (runner && drawerCount > 0) {
     lines.push({
       hardware: runner,
-      quantity: drawerFronts.length,
-      note: `${drawerFronts.length} drawers, one pair each`,
+      quantity: drawerCount,
+      note: `${drawerCount} drawers, one pair each`,
     });
   }
 
   const pin = pick("shelf_pin");
-  const adjustable = shelves.reduce((total, part) => total + part.quantity, 0);
+  const adjustable = shelves
+    .filter((part) => part.adjustable === true)
+    .reduce((total, part) => total + part.quantity, 0);
   if (pin && adjustable > 0) {
     lines.push({
       hardware: pin,
@@ -1327,7 +1501,7 @@ function hardwareFor(spec: DesignSpec, parts: Part[]): HardwareLine[] {
   }
 
   const leg = pick("leg");
-  if (leg) {
+  if (leg && spec.furnitureType !== "wardrobe") {
     // A leg every 500 mm along the front of each cabinet that stands on a
     // plinth, doubled for the back. Counted per cabinet rather than across the
     // run: a wall unit has no legs, and a run measured end to end would buy
@@ -1349,7 +1523,9 @@ function hardwareFor(spec: DesignSpec, parts: Part[]): HardwareLine[] {
   }
 
   const sliding = pick("sliding_gear");
-  const slidingDoors = allBays.filter((bay) => bay.door === "sliding").length;
+  const slidingDoors = doors
+    .filter((door) => door.doorStyle === "sliding")
+    .reduce((total, door) => total + door.quantity, 0);
   if (sliding && slidingDoors > 0) {
     lines.push({
       hardware: sliding,
@@ -1358,14 +1534,75 @@ function hardwareFor(spec: DesignSpec, parts: Part[]): HardwareLine[] {
     });
   }
 
-  return lines;
+  const bifoldDoors = doors.filter((door) => door.doorStyle === "bifold");
+  const bifoldPairs = bifoldDoors.reduce(
+    (total, door) => total + Math.ceil(door.quantity / 2),
+    0,
+  );
+  if (bifoldPairs > 0) {
+    const connectingHinge = findHardware("bifold-connecting-hinge");
+    const pivotSet = findHardware("bifold-pivot-set");
+    if (connectingHinge) {
+      lines.push({
+        hardware: connectingHinge,
+        quantity: bifoldPairs,
+        note: `${bifoldPairs} bi-fold door pairs`,
+      });
+    }
+    if (pivotSet) {
+      lines.push({
+        hardware: pivotSet,
+        quantity: bifoldPairs,
+        note: `${bifoldPairs} bi-fold door pairs`,
+      });
+    }
+  }
+
+  // Corner construction has special hardware that cannot be inferred from a
+  // generic door leaf: an L return needs 165° hinges, a diagonal needs its
+  // carousel, and a blind corner needs a pull-out. The helper reads the same
+  // resolved corner blocks that produced the panels above, so those parts can
+  // never appear in the scene without their purchased hardware appearing in
+  // the order and cost.
+  for (const requirement of cornerHardware(resolved, parts)) {
+    const hardware = findHardware(requirement.catalogueId);
+    if (!hardware) continue;
+    lines.push({
+      hardware,
+      quantity: requirement.quantity,
+      note: requirement.label,
+    });
+  }
+
+  return aggregateHardwareLines(lines);
 }
 
-export function hingesPerLeaf(height: number): number {
-  if (height <= 1200) return 2;
-  if (height <= 1600) return 3;
-  if (height <= 2000) return 4;
-  return 5;
+/**
+ * One purchased SKU gets one line everywhere downstream.
+ *
+ * Normal doors and a diagonal corner can both correctly require the stocked
+ * soft-close hinge. They are distinct construction rules, but duplicating the
+ * same SKU here produces duplicate cost-row identifiers and makes an order
+ * look as though it contains two different hinge products. Keep the rule
+ * notes, while making the quantity and price a single physical purchase line.
+ */
+function aggregateHardwareLines(lines: HardwareLine[]): HardwareLine[] {
+  const byHardwareId = new Map<string, HardwareLine>();
+
+  for (const line of lines) {
+    const existing = byHardwareId.get(line.hardware.id);
+    if (!existing) {
+      byHardwareId.set(line.hardware.id, { ...line });
+      continue;
+    }
+
+    existing.quantity += line.quantity;
+    const notes = new Set(existing.note.split("; ").filter(Boolean));
+    notes.add(line.note);
+    existing.note = [...notes].join("; ");
+  }
+
+  return [...byHardwareId.values()];
 }
 
 // ---------------------------------------------------------------------------
@@ -1377,6 +1614,11 @@ function summarise(parts: Part[], hardware: HardwareLine[]): PartsBreakdown {
   const bandByEdge: Record<string, number> = {};
 
   for (const part of parts) {
+    // Legs and rails are bought hardware. They remain in `parts` so the same
+    // 3D scene can show the real physical component that the hardware list
+    // buys, but they are never material cut from a board sheet.
+    if (part.manufacture === "purchased") continue;
+
     // Square metres, from millimetres.
     const area = (part.length * part.width * part.quantity) / 1_000_000;
     areaByBoard[part.board.id] = (areaByBoard[part.board.id] ?? 0) + area;
@@ -1407,7 +1649,9 @@ function summarise(parts: Part[], hardware: HardwareLine[]): PartsBreakdown {
     parts,
     hardware,
     totals: {
-      partCount: parts.reduce((total, part) => total + part.quantity, 0),
+      partCount: parts
+        .filter((part) => part.manufacture !== "purchased")
+        .reduce((total, part) => total + part.quantity, 0),
       areaByBoard,
       bandByEdge,
     },

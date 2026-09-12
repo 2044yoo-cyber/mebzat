@@ -26,11 +26,16 @@ import {
   type ModuleConfig,
 } from "../../services/module-configs";
 import {
+  wardrobeBackBoards,
+  wardrobeStructuralBoards,
+} from "../../services/wardrobe-materials";
+import {
   addBay,
   addDrawer,
   addModule,
   adjustBayCount,
   duplicateDrawer,
+  drawerCountRangeOf,
   evenDrawers,
   frontHeightsOf,
   hasCustomFronts,
@@ -435,6 +440,7 @@ function DrawerList({
 
   const opening = openingHeightOf(cabinet, spec.carcass.board.thickness);
   const heights = frontHeightsOf(bay.fitting, opening);
+  const drawerRange = drawerCountRangeOf(cabinet, spec.carcass.board.thickness);
   const custom = hasCustomFronts(spec, cabinet.id, bay.id);
 
   return (
@@ -465,7 +471,7 @@ function DrawerList({
             type="number"
             value={height}
             min={LIMITS.minDrawerFront}
-            max={opening}
+            max={LIMITS.maxDrawerFront}
             step={10}
             aria-label={`Drawer ${index + 1} front height in millimetres`}
             onChange={(event) => {
@@ -501,7 +507,7 @@ function DrawerList({
             </IconButton>
             <IconButton
               label={`Duplicate drawer ${index + 1}`}
-              disabled={heights.length >= 8}
+              disabled={heights.length >= drawerRange.maximum}
               onClick={() =>
                 onChange(duplicateDrawer(spec, cabinet.id, bay.id, index))
               }
@@ -510,7 +516,7 @@ function DrawerList({
             </IconButton>
             <IconButton
               label={`Remove drawer ${index + 1}`}
-              disabled={heights.length <= 1}
+              disabled={heights.length <= drawerRange.minimum}
               onClick={() =>
                 onChange(removeDrawer(spec, cabinet.id, bay.id, index))
               }
@@ -521,7 +527,7 @@ function DrawerList({
         </div>
       ))}
 
-      {heights.length < 8 ? (
+      {heights.length < drawerRange.maximum ? (
         <SmallButton
           icon={Plus}
           label="Add a drawer"
@@ -713,32 +719,103 @@ function Materials({
     mutate(draft);
     onChange(draft);
   };
+  const isWardrobe = spec.furnitureType === "wardrobe";
+  const faceBoard = spec.carcass.frontBoard ?? spec.carcass.board;
+  const interiorBoard = spec.carcass.interiorBoard ?? spec.carcass.board;
+  const plinthBoard = spec.carcass.plinthBoard ?? spec.carcass.board;
+  const structuralBoards = wardrobeStructuralBoards();
+  const backBoards = wardrobeBackBoards();
 
   return (
     <Section title="Materials" icon={Palette}>
-      <Picker
-        label="Carcass and doors"
-        value={spec.carcass.board.id}
-        options={BOARDS.filter((board) => board.thickness >= 12 && !board.id.startsWith("worktop"))}
-        onChange={(id) =>
-          set((draft) => {
-            const board = findBoard(id);
-            if (board) draft.carcass.board = board;
-          })
-        }
-      />
+      {isWardrobe ? (
+        <>
+          <Picker
+            label="Body / carcass"
+            value={spec.carcass.board.id}
+            options={structuralBoards}
+            onChange={(id) =>
+              set((draft) => {
+                const board = findBoard(id);
+                if (board) draft.carcass.board = board;
+              })
+            }
+          />
+          <Picker
+            label="Doors and drawer fronts"
+            value={faceBoard.id}
+            options={structuralBoards}
+            onChange={(id) =>
+              set((draft) => {
+                const board = findBoard(id);
+                if (board) draft.carcass.frontBoard = board;
+              })
+            }
+          />
+          <Picker
+            label="Interior shelves and drawer boxes"
+            value={interiorBoard.id}
+            options={structuralBoards}
+            onChange={(id) =>
+              set((draft) => {
+                const board = findBoard(id);
+                if (board) draft.carcass.interiorBoard = board;
+              })
+            }
+          />
+          <Picker
+            label="Back panel (6 mm)"
+            value={spec.carcass.backBoard.id}
+            options={backBoards}
+            onChange={(id) =>
+              set((draft) => {
+                const board = findBoard(id);
+                if (board) draft.carcass.backBoard = board;
+              })
+            }
+          />
+          <Picker
+            label="Recessed plinth"
+            value={plinthBoard.id}
+            options={structuralBoards}
+            onChange={(id) =>
+              set((draft) => {
+                const board = findBoard(id);
+                if (board) draft.carcass.plinthBoard = board;
+              })
+            }
+          />
+          <p className="rounded-md bg-muted/50 px-2 py-1.5 text-[11px] text-muted-foreground">
+            Board selections drive the 3D colours, cut list, nesting, matching stocked edge bands and price.
+          </p>
+        </>
+      ) : (
+        <>
+          <Picker
+            label="Carcass and doors"
+            value={spec.carcass.board.id}
+            options={structuralBoards}
+            onChange={(id) =>
+              set((draft) => {
+                const board = findBoard(id);
+                if (board) draft.carcass.board = board;
+              })
+            }
+          />
 
-      <Picker
-        label="Back panel"
-        value={spec.carcass.backBoard.id}
-        options={BOARDS}
-        onChange={(id) =>
-          set((draft) => {
-            const board = findBoard(id);
-            if (board) draft.carcass.backBoard = board;
-          })
-        }
-      />
+          <Picker
+            label="Back panel"
+            value={spec.carcass.backBoard.id}
+            options={BOARDS}
+            onChange={(id) =>
+              set((draft) => {
+                const board = findBoard(id);
+                if (board) draft.carcass.backBoard = board;
+              })
+            }
+          />
+        </>
+      )}
 
       {spec.worktop ? (
         <Picker
@@ -755,7 +832,7 @@ function Materials({
       ) : null}
 
       <Picker
-        label="Edge banding"
+        label={isWardrobe ? "Fallback edge banding" : "Edge banding"}
         value={spec.carcass.edgeBand.id}
         options={EDGE_BANDS}
         onChange={(id) =>
@@ -766,7 +843,7 @@ function Materials({
         }
       />
 
-      <div className="space-y-1">
+      {!isWardrobe ? <div className="space-y-1">
         <span className="text-[11px] text-muted-foreground">Colour</span>
         <div className="flex items-center gap-2">
           <input
@@ -793,9 +870,9 @@ function Materials({
             className="h-8 min-w-0 flex-1 rounded-md border bg-background/60 px-2 text-sm"
           />
         </div>
-      </div>
+      </div> : null}
 
-      <div className="flex flex-wrap gap-1">
+      {!isWardrobe ? <div className="flex flex-wrap gap-1">
         {(["matt", "satin", "gloss"] as const).map((sheen) => (
           <button
             key={sheen}
@@ -816,7 +893,7 @@ function Materials({
             {sheen}
           </button>
         ))}
-      </div>
+      </div> : null}
     </Section>
   );
 }

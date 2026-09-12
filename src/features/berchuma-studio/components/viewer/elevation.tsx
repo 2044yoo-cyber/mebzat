@@ -8,6 +8,15 @@ import {
   sectionBands,
   sectionFitting,
 } from "../../services/geometry";
+import {
+  drawerFaceSvgTop,
+  resolveDrawerFaces,
+} from "../../services/drawer-construction";
+import {
+  boardColour,
+  constructionMaterials,
+} from "../../services/wardrobe-materials";
+import { resolveDesign } from "../../services/resolve";
 import type { Bay, Cabinet, DesignSpec } from "../../types/spec";
 
 /**
@@ -41,7 +50,23 @@ export function Elevation({
 }) {
   const gradientId = useId();
   const { envelope } = spec;
-  const shade = spec.finish.hex;
+  const resolved = resolveDesign(spec);
+  // A front elevation is an orthographic view of one wall. Projecting an L or
+  // U onto the same x axis would overlap its turned return and omit its real
+  // corner module, which is worse than offering no drawing at all. The 3D
+  // viewer remains the accurate front/side/perspective inspection for those
+  // layouts; straight runs use the resolver below, never stale snapshots.
+  const supportsFrontElevation =
+    spec.furnitureType !== "wardrobe" || spec.layout === "straight";
+  const elevationCabinets =
+    spec.furnitureType === "wardrobe"
+      ? resolved.cabinets
+      : spec.cabinets.map((cabinet) => ({
+          cabinet,
+          x: cabinet.position.x,
+          y: cabinet.position.y,
+        }));
+  const shade = boardColour(constructionMaterials(spec).body, spec);
 
   return (
     <svg
@@ -76,11 +101,11 @@ export function Elevation({
         a base unit, moved up the page, which is why this took a transform
         rather than an argument threaded through every child.
       */}
-      {spec.cabinets.map((cabinet) => (
+      {supportsFrontElevation ? elevationCabinets.map(({ cabinet, x, y }) => (
         <g
           key={cabinet.id}
-          transform={`translate(${cabinet.position.x}, ${
-            envelope.height - cabinet.position.y - cabinet.size.height
+          transform={`translate(${x}, ${
+            envelope.height - y - cabinet.size.height
           })`}
           onClick={onSelectCabinet ? () => onSelectCabinet(cabinet.id) : undefined}
           className={onSelectCabinet ? "cursor-pointer" : undefined}
@@ -92,9 +117,30 @@ export function Elevation({
             selected={cabinet.id === selectedCabinetId}
           />
         </g>
-      ))}
+      )) : (
+        <g>
+          <text
+            x={envelope.width / 2}
+            y={envelope.height / 2 - 20}
+            textAnchor="middle"
+            className="fill-foreground text-[72px] font-medium"
+          >
+            Front elevation is available for a straight wall run.
+          </text>
+          <text
+            x={envelope.width / 2}
+            y={envelope.height / 2 + 90}
+            textAnchor="middle"
+            className="fill-muted-foreground text-[48px]"
+          >
+            Use the 3D view to inspect L/U front, side and perspective geometry.
+          </text>
+        </g>
+      )}
 
-      <Dimensions width={envelope.width} height={envelope.height} />
+      {supportsFrontElevation ? (
+        <Dimensions width={envelope.width} height={envelope.height} />
+      ) : null}
     </svg>
   );
 }
@@ -111,6 +157,7 @@ function CabinetDrawing({
   gradientId: string;
   selected: boolean;
 }) {
+  const materials = constructionMaterials(spec);
   const t = spec.carcass.board.thickness;
   const plinth = cabinet.plinthHeight;
   const { width, height } = cabinet.size;
@@ -140,7 +187,9 @@ function CabinetDrawing({
           y={top(plinth)}
           width={width}
           height={plinth}
-          className="fill-foreground/10 stroke-foreground/30"
+          fill={boardColour(materials.plinth, spec)}
+          fillOpacity={0.9}
+          className="stroke-foreground/30"
           strokeWidth={4}
         />
       ) : null}
@@ -156,6 +205,8 @@ function CabinetDrawing({
           top={top}
           gap={spec.carcass.doorGap}
           board={t}
+          frontColour={boardColour(materials.fronts, spec)}
+          interiorColour={boardColour(materials.interior, spec)}
         />
       ))}
     </>
@@ -178,9 +229,22 @@ type BayProps = {
   gap: number;
   /** Board thickness, in mm. A stack's dividers are cut from it. */
   board: number;
+  frontColour: string;
+  interiorColour: string;
 };
 
-function BayDrawing({ bay, x, width, bottom, height, top, gap, board }: BayProps) {
+function BayDrawing({
+  bay,
+  x,
+  width,
+  bottom,
+  height,
+  top,
+  gap,
+  board,
+  frontColour,
+  interiorColour,
+}: BayProps) {
   const openingTop = top(bottom + height);
 
   return (
@@ -190,7 +254,9 @@ function BayDrawing({ bay, x, width, bottom, height, top, gap, board }: BayProps
         y={openingTop}
         width={width}
         height={height}
-        className="fill-background/40 stroke-foreground/20"
+        fill={interiorColour}
+        fillOpacity={0.2}
+        className="stroke-foreground/20"
         strokeWidth={3}
       />
 
@@ -201,6 +267,8 @@ function BayDrawing({ bay, x, width, bottom, height, top, gap, board }: BayProps
         y={openingTop}
         height={height}
         board={board}
+        frontColour={frontColour}
+        interiorColour={interiorColour}
       />
 
       {/* A drawer bay has fronts, not doors — and `buildParts` makes none, so
@@ -220,6 +288,7 @@ function BayDrawing({ bay, x, width, bottom, height, top, gap, board }: BayProps
           y={openingTop}
           height={height}
           gap={gap}
+          colour={frontColour}
         />
       ) : null}
 
@@ -232,6 +301,7 @@ function BayDrawing({ bay, x, width, bottom, height, top, gap, board }: BayProps
           height={height}
           gap={gap}
           board={board}
+          colour={frontColour}
         />
       ) : null}
     </g>
@@ -271,7 +341,8 @@ function StackDoors({
   height,
   gap,
   board,
-}: Box & { bay: Bay; gap: number; board: number }) {
+  colour,
+}: Box & { bay: Bay; gap: number; board: number; colour: string }) {
   if (bay.fitting.kind !== "stack") return null;
 
   const boxes = bandBoxes(bay.fitting.sections, y, height, board);
@@ -303,6 +374,7 @@ function StackDoors({
           y={run.top}
           height={run.bottom - run.top}
           gap={gap}
+          colour={colour}
         />
       ))}
     </>
@@ -318,7 +390,9 @@ function Fitting({
   y,
   height,
   board,
-}: Box & { bay: Bay; board: number }) {
+  frontColour,
+  interiorColour,
+}: Box & { bay: Bay; board: number; frontColour: string; interiorColour: string }) {
   const fitting = bay.fitting;
 
   if (fitting.kind === "stack") {
@@ -337,6 +411,8 @@ function Fitting({
               y={box.top}
               height={box.height}
               board={board}
+              frontColour={frontColour}
+              interiorColour={interiorColour}
             />
             {/* The fixed shelf between this band and the one below. */}
             {index < boxes.length - 1 ? (
@@ -345,7 +421,7 @@ function Fitting({
                 x2={x + width}
                 y1={box.top + box.height}
                 y2={box.top + box.height}
-                className="stroke-foreground/55"
+              stroke={interiorColour}
                 strokeWidth={7}
               />
             ) : null}
@@ -360,7 +436,7 @@ function Fitting({
     // topmost one below the ceiling of the bay rather than on it.
     const step = height / (fitting.count + 1);
     return (
-      <g className="stroke-foreground/45" strokeWidth={5}>
+      <g stroke={interiorColour} strokeWidth={5}>
         {Array.from({ length: fitting.count }, (_, index) => (
           <line
             key={index}
@@ -410,7 +486,7 @@ function Fitting({
                 x2={x + width}
                 y1={shelfY}
                 y2={shelfY}
-                className="stroke-foreground/45"
+                stroke={interiorColour}
                 strokeWidth={5}
               />
             ))
@@ -447,10 +523,12 @@ function Fitting({
     // inside the map: a running total mutated during render is a value that
     // depends on how many times React chose to render, which is not a thing a
     // drawing may depend on.
-    const stack = stackDrawers(
-      drawerHeights(fitting.count, fitting.frontHeights, height),
-      y + height,
-    );
+    const stack = resolveDrawerFaces({
+      count: fitting.count,
+      openingHeight: height,
+      openingFloor: 0,
+      frontHeights: fitting.frontHeights,
+    });
 
     return (
       <g>
@@ -458,17 +536,19 @@ function Fitting({
           <g key={index}>
             <rect
               x={x + 6}
-              y={drawer.top + 4}
+              y={drawerFaceSvgTop(drawer, y, height) + 4}
               width={width - 12}
               height={drawer.height - 8}
-              className="fill-foreground/5 stroke-foreground/45"
+              fill={frontColour}
+              fillOpacity={0.72}
+              stroke={frontColour}
               strokeWidth={5}
             />
             <line
               x1={x + width * 0.3}
               x2={x + width * 0.7}
-              y1={drawer.top + drawer.height * 0.22}
-              y2={drawer.top + drawer.height * 0.22}
+              y1={drawerFaceSvgTop(drawer, y, height) + drawer.height * 0.22}
+              y2={drawerFaceSvgTop(drawer, y, height) + drawer.height * 0.22}
               className="stroke-foreground/50"
               strokeWidth={12}
               strokeLinecap="round"
@@ -509,7 +589,15 @@ function Fitting({
   return null;
 }
 
-function Doors({ bay, x, width, y, height, gap }: Box & { bay: Bay; gap: number }) {
+function Doors({
+  bay,
+  x,
+  width,
+  y,
+  height,
+  gap,
+  colour,
+}: Box & { bay: Bay; gap: number; colour: string }) {
   const leaves = bay.door === "hinged" ? bay.doorLeaves : bay.door === "sliding" ? 2 : 2;
   const leafWidth = (width - gap * (leaves + 1)) / leaves;
 
@@ -528,7 +616,9 @@ function Doors({ bay, x, width, y, height, gap }: Box & { bay: Bay; gap: number 
               y={y + gap + offset}
               width={leafWidth}
               height={height - gap * 2}
-              className="fill-foreground/[0.06] stroke-foreground/55"
+              fill={colour}
+              fillOpacity={0.8}
+              stroke={colour}
               strokeWidth={6}
               rx={8}
             />
@@ -637,34 +727,4 @@ function layOutBays(cabinet: Cabinet, t: number) {
     cursor += bay.width + t;
     return { bay, x, width: bay.width };
   });
-}
-
-/** Drawer fronts placed bottom-up, each with its own top edge. */
-function stackDrawers(
-  heights: number[],
-  floor: number,
-): { top: number; height: number }[] {
-  const placed: { top: number; height: number }[] = [];
-  let cursor = floor;
-  for (const height of heights) {
-    cursor -= height;
-    placed.push({ top: cursor, height });
-  }
-  return placed;
-}
-
-/** Drawer front heights, equal unless the spec says otherwise. */
-function drawerHeights(
-  count: number,
-  declared: number[] | undefined,
-  available: number,
-): number[] {
-  if (declared && declared.length === count) {
-    const total = declared.reduce((sum, value) => sum + value, 0);
-    if (total > 0) {
-      const scale = available / total;
-      return declared.map((value) => value * scale);
-    }
-  }
-  return Array.from({ length: count }, () => available / count);
 }

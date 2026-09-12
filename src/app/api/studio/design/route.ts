@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { designTurn } from "@/features/berchuma-studio/services/ai";
-import { upgradeSpec, designSpecSchema } from "@/features/berchuma-studio/types/spec";
+import { parseSpec } from "@/features/berchuma-studio/types/spec";
 import type { DesignResponse } from "@/features/berchuma-studio/types/api";
 import { configurationError } from "@/lib/ai/provider";
 import { sanitizeHistory, validateQuestion } from "@/lib/ai/security";
@@ -71,8 +71,8 @@ export async function POST(request: Request) {
   // A spec the browser could not have produced is dropped rather than
   // rejected: the worst case is that the model designs from scratch instead of
   // editing, which is recoverable, whereas a 400 loses the user's message.
-  const parsedCurrent = designSpecSchema.safeParse(upgradeSpec(body.current));
-  const current = parsedCurrent.success ? parsedCurrent.data : null;
+  const parsedCurrent = parseSpec(body.current);
+  const current = parsedCurrent.ok ? parsedCurrent.spec : null;
 
   const gated = await withCredits<NextResponse>(
     AI_OPERATIONS.designChat,
