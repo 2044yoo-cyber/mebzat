@@ -719,6 +719,13 @@ export type ProjectStatus =
   | "private"
   | "archived";
 
+export type PanoramaJobStatus =
+  | "capturing"
+  | "uploading"
+  | "processing"
+  | "ready"
+  | "failed";
+
 export type ProjectCategory =
   | "building_construction"
   | "architecture"
@@ -5766,6 +5773,60 @@ export interface Database {
           latitude?: number | null;
           longitude?: number | null;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      panorama_jobs: {
+        Row: {
+          id: string;
+          owner_id: string;
+          status: PanoramaJobStatus;
+          expected_frames: number;
+          uploaded_frames: number;
+          frames_prefix: string | null;
+          panorama_url: string | null;
+          width: number | null;
+          height: number | null;
+          error_code: string | null;
+          property_id: string | null;
+          project_id: string | null;
+          frames_expire_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          status?: PanoramaJobStatus;
+          expected_frames?: number;
+          uploaded_frames?: number;
+          frames_prefix?: string | null;
+          panorama_url?: string | null;
+          width?: number | null;
+          height?: number | null;
+          error_code?: string | null;
+          property_id?: string | null;
+          project_id?: string | null;
+          frames_expire_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          status?: PanoramaJobStatus;
+          expected_frames?: number;
+          uploaded_frames?: number;
+          frames_prefix?: string | null;
+          panorama_url?: string | null;
+          width?: number | null;
+          height?: number | null;
+          error_code?: string | null;
+          property_id?: string | null;
+          project_id?: string | null;
+          frames_expire_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };

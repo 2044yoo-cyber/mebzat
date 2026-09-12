@@ -6,7 +6,8 @@ import { Eye, Globe, Link2, Loader2, MapPin, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { FloorPlanInput, type DraftPlan } from "@/components/tour/floor-plan-input";
-import { PanoramaInput, type DraftScene } from "@/components/tour/panorama-input";
+import { type DraftScene } from "@/components/tour/panorama-input";
+import { RoomSource } from "@/components/tour/room-source";
 import { PanoramaViewer } from "@/components/tour/panorama-viewer";
 import {
   createTour,
@@ -229,7 +230,7 @@ export function TourBuilder({
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium">Rooms</h2>
-        <PanoramaInput userId={userId} scenes={scenes} onChange={addScenes} />
+        <RoomSource userId={userId} scenes={scenes} onChange={addScenes} />
       </section>
 
       <section className="space-y-3">

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import * as THREE from "three";
+import { Maximize2 } from "lucide-react";
 
 import {
   clampFov,
@@ -102,6 +103,8 @@ export function PanoramaViewer({
   className?: string;
 }) {
   const mount = useRef<HTMLDivElement>(null);
+  // The wrapper, not the canvas: fullscreen has to take the hotspots with it.
+  const shellRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
@@ -356,8 +359,35 @@ export function PanoramaViewer({
 
   const broken = failed || !supported;
 
+  /**
+   * Fullscreen.
+   *
+   * The viewer already dragged, pinched and wheel-zoomed; this was the one
+   * thing on the brief's list it did not do, and it is the one that matters
+   * most on a phone — a 360 view in a 200px card is a keyhole.
+   *
+   * The whole wrapper goes fullscreen rather than the canvas, so the hotspot
+   * buttons, which are ordinary DOM positioned over it, go with it. Sending
+   * only the canvas would take the room fullscreen and leave the doors behind.
+   */
+  async function toggleFullscreen() {
+    const node = shellRef.current;
+    if (!node) return;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await node.requestFullscreen();
+    } catch {
+      // An iPhone in Safari refuses this on a div. Nothing is broken; the
+      // viewer stays the size it was.
+    }
+  }
+
   return (
-    <div className={className} style={{ position: "relative", overflow: "hidden" }}>
+    <div
+      ref={shellRef}
+      className={className}
+      style={{ position: "relative", overflow: "hidden" }}
+    >
       <div ref={mount} style={{ position: "absolute", inset: 0 }} />
 
       {loading && !broken && (
@@ -391,6 +421,17 @@ export function PanoramaViewer({
             {hotspot.title}
           </button>
         ))}
+
+      {!loading && !broken && (
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          aria-label="Toggle fullscreen"
+          className="absolute bottom-3 right-3 z-10 flex size-11 items-center justify-center rounded-full border border-white/25 bg-black/55 text-white backdrop-blur transition-colors hover:bg-black/75"
+        >
+          <Maximize2 className="size-4" aria-hidden />
+        </button>
+      )}
     </div>
   );
 }
