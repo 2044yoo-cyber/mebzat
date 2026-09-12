@@ -79,6 +79,18 @@ export function CostPanel({
         </dl>
       </div>
 
+      {!cost.manufacturable ? (
+        <div className="rounded-xl border border-destructive/50 bg-destructive/5 p-4 text-xs">
+          <p className="flex items-center gap-1.5 font-medium text-destructive">
+            <AlertTriangle className="size-3.5" aria-hidden />
+            Manufacturing blocked
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            One or more panels do not fit their stocked sheets. The figure above is provisional and cannot be exported or sent to a workshop.
+          </p>
+        </div>
+      ) : null}
+
       {issues.length > 0 ? <Issues issues={issues} /> : null}
 
       <div className="rounded-xl border bg-card">

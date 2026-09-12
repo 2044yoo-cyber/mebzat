@@ -222,8 +222,10 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
     {
       runId: b.id,
       label: b.label,
-      // Starts where the corner ends, against the right-hand wall.
-      origin: { x: a.length - corner, z: corner },
+      // A +90° local depth projects towards -x. Anchor its front-right
+      // corner at the wall so the returned carcass fills x = La-d…La below
+      // the corner, rather than floating one depth to the left of it.
+      origin: { x: a.length, z: corner },
       rotation: 90,
       wallLength: b.length,
       usableLength: Math.max(0, usableB),
@@ -303,7 +305,7 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
       runId: left.id,
       label: left.label,
       // Down the left wall, starting below the left corner.
-      origin: { x: 0, z: leftCorner },
+      origin: { x: left.depth, z: leftCorner },
       rotation: 90,
       wallLength: left.length,
       usableLength: Math.max(0, usableLeft),
@@ -324,7 +326,9 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
     {
       runId: right.id,
       label: right.label,
-      origin: { x: back.length - rightCorner, z: rightCorner },
+      // Same +90° convention as the L return: local depth reaches left from
+      // the anchor, so the right wall is anchored at the room's outer edge.
+      origin: { x: back.length, z: rightCorner },
       rotation: 90,
       wallLength: right.length,
       usableLength: Math.max(0, usableRight),

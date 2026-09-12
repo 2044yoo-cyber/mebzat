@@ -44,11 +44,11 @@ function catalogueBlock(): string {
   }));
 
   return [
-    "BOARDS (carcass, doors, drawer boxes):",
+    "BOARDS (body, doors/drawer fronts, interior boxes and plinth):",
     JSON.stringify(boards),
     "",
-    "BACK BOARDS: use hdf-4-white unless the customer asks for a visible back,",
-    "in which case use the same board as the carcass.",
+    "WARDROBE BACKS: use hdf-6-white. Other cabinet backs may use hdf-4-white.",
+    "For wardrobes use a black mdf-18-black plinth unless the customer specifies another stocked board.",
     "",
     "EDGE BANDS:",
     JSON.stringify(bands),
@@ -67,7 +67,7 @@ function catalogueBlock(): string {
 const EXAMPLE = `{
   "reply": "A two-bay 1800 mm wardrobe: hanging on the left behind a pair of doors, five shelves on the right. I've assumed 2100 mm high and 600 mm deep, which suits a standard bedroom.",
   "spec": {
-    "version": 2,
+    "version": 3,
     "kind": "wardrobe",
     "units": "mm",
     "title": "Two-bay bedroom wardrobe",
@@ -99,13 +99,16 @@ const EXAMPLE = `{
     ],
     "carcass": {
       "board": "mdf-18-white",
-      "backBoard": "hdf-4-white",
+      "frontBoard": "mdf-18-white",
+      "interiorBoard": "mdf-18-white",
+      "backBoard": "hdf-6-white",
+      "plinthBoard": "mdf-18-black",
       "edgeBand": "pvc-1-white",
       "plinthHeight": 100,
       "doorGap": 2,
       "shelfSetback": 10
     },
-    "hardware": ["hinge-soft-close", "handle-bar", "shelf-pin", "hanging-rail", "leg-adjustable"],
+    "hardware": ["hinge-soft-close", "handle-bar", "shelf-pin", "hanging-rail"],
     "finish": { "colour": "White", "hex": "#f2f0ec", "sheen": "matt" },
     "lighting": { "ledStrip": false, "colourTemperature": 3000 },
     "meta": {
@@ -150,12 +153,13 @@ ${EXAMPLE}
 
 ## Rules that are not negotiable
 
-- Every dimension is millimetres. "units" is always "mm". "version" is always 2.
+- Every dimension is millimetres. "units" is always "mm". "version" is always 3.
 - "kind" is one of: ${designKinds.join(", ")}.
 - "door" is one of: ${doorStyles.join(", ")}.
-- "carcass.board", "carcass.backBoard", "carcass.edgeBand" and each entry of
-  "hardware" are ids from the catalogue below. Never invent an id. Never write
-  an object where an id is expected.
+- "carcass.board", "carcass.frontBoard", "carcass.interiorBoard",
+  "carcass.backBoard", "carcass.plinthBoard", "carcass.edgeBand" and each
+  entry of "hardware" are ids from the catalogue below. Never invent an id.
+  Never write an object where an id is expected.
 
 ## Cabinets
 
@@ -198,7 +202,9 @@ wardrobe. A kitchen is eight or ten.
   TV units 400; vanities 500.
 - Standard heights: wardrobe 2100–2400, kitchen base 900 including worktop,
   TV unit 450–600, vanity 850.
-- Drawers come in banks of 3 or 4 in a bay, not one drawer over a void.
+- In a tall wardrobe, use a stacked drawer module below hanging/storage. A
+  full-height drawer bank needs enough fronts to keep each near 280 mm or
+  less; do not make four door-sized false drawers.
 
 ## Assumptions
 
@@ -257,7 +263,10 @@ function compactSpec(spec: DesignSpec): unknown {
     })),
     carcass: {
       board: spec.carcass.board.id,
+      frontBoard: spec.carcass.frontBoard?.id ?? spec.carcass.board.id,
+      interiorBoard: spec.carcass.interiorBoard?.id ?? spec.carcass.board.id,
       backBoard: spec.carcass.backBoard.id,
+      plinthBoard: spec.carcass.plinthBoard?.id ?? spec.carcass.board.id,
       edgeBand: spec.carcass.edgeBand.id,
       plinthHeight: spec.carcass.plinthHeight,
       doorGap: spec.carcass.doorGap,

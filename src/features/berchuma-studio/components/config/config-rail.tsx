@@ -135,7 +135,7 @@ export function ConfigRail({
         <Dimension
           label="Plinth"
           value={cabinet.plinthHeight}
-          min={0}
+          min={spec.furnitureType === "wardrobe" ? 50 : 0}
           max={250}
           step={5}
           onChange={(plinthHeight) =>

@@ -91,12 +91,22 @@ export function useDesign(
       cost: calculateCost(held.spec, parts, {
         rates,
         sheetCounts: sheetCountsOf(cutList),
+        manufacturable: cutList.buildable,
       }),
     };
   }, [held.spec, rates]);
 
   const replace = useCallback((spec: DesignSpec, issues: SpecIssue[]) => {
-    setHeld({ spec, issues });
+    // A chat response is untrusted input just as a slider draft is. Running it
+    // through the shared validator closes the only client-side path that could
+    // otherwise draw and price a schema-shaped but unmanufacturable design.
+    const draft = structuredClone(spec);
+    draft.meta.corrections = [];
+    const result = validateSpec(draft);
+    setHeld({
+      spec: result.spec,
+      issues: [...issues, ...result.issues],
+    });
   }, []);
 
   const edit = useCallback((mutate: (draft: DesignSpec) => void) => {

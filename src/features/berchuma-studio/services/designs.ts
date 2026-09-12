@@ -3,10 +3,11 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
 import { calculateCost } from "./costing";
+import { buildCutList, sheetCountsOf } from "./cutlist";
 import { buildParts } from "./geometry";
 import { marketRates } from "./rates";
 import type { DesignVisibility } from "@/types/database.types";
-import { designSpecSchema, upgradeSpec, type DesignSpec } from "../types/spec";
+import { parseSpec, type DesignSpec } from "../types/spec";
 
 /**
  * Designs, stored.
@@ -28,7 +29,7 @@ export type SavedDesign = { id: string; slug: string };
 export type SaveInput = {
   /** Omitted to create; supplied to update an existing design. */
   designId?: string;
-  spec: DesignSpec;
+  spec: unknown;
   /** What the user asked for on the turn that produced this version. */
   note?: string;
 };
@@ -45,11 +46,11 @@ export async function saveDesign(
 
   // Re-parsed even though the caller typed it, because "the caller" is a
   // browser and this is the last place before the database.
-  const parsed = designSpecSchema.safeParse(upgradeSpec(input.spec));
-  if (!parsed.success) {
+  const parsed = parseSpec(input.spec);
+  if (!parsed.ok) {
     return { ok: false, error: "That design could not be read." };
   }
-  const spec = parsed.data;
+  const spec = parsed.spec;
 
   const { estimatedCost, confidence } = await priceOf(spec);
 
@@ -129,9 +130,36 @@ export async function publishDesign(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sign in to publish." };
 
+  // A remix or an older direct database write can contain a schema-shaped but
+  // non-manufacturable object. Decode it before changing visibility so public
+  // cards, quotes and price snapshots all refer to the same repaired parts.
+  const { data: stored, error: readError } = await supabase
+    .from("designs")
+    .select("id, spec")
+    .eq("id", designId)
+    .maybeSingle();
+  if (readError || !stored) {
+    return { ok: false, error: "That design could not be published." };
+  }
+
+  const decoded = parseSpec(stored.spec);
+  if (!decoded.ok) {
+    return { ok: false, error: "That design could not be read safely enough to publish." };
+  }
+  const { estimatedCost, confidence } = await priceOf(decoded.spec);
+
   const { data: design, error } = await supabase
     .from("designs")
-    .update({ visibility, published_at: new Date().toISOString() })
+    .update({
+      visibility,
+      published_at: new Date().toISOString(),
+      kind: decoded.spec.kind,
+      title: decoded.spec.title,
+      prompt: decoded.spec.meta.prompt || null,
+      spec: decoded.spec,
+      estimated_cost: estimatedCost,
+      price_confidence: confidence,
+    })
     .eq("id", designId)
     .select(
       "id, slug, kind, title, prompt, cover_url, currency, estimated_cost, spec",
@@ -241,11 +269,30 @@ export async function remixDesign(
 
   const { data } = await supabase
     .from("designs")
-    .select("slug")
+    .select("id, slug, spec")
     .eq("id", newId)
     .maybeSingle();
 
   if (!data) return { ok: false, error: "The remix was made but could not be opened." };
+  const decoded = parseSpec(data.spec);
+  if (!decoded.ok) {
+    return { ok: false, error: "The remix was made but needs a valid construction spec." };
+  }
+  const { estimatedCost, confidence } = await priceOf(decoded.spec);
+  const { error: updateError } = await supabase
+    .from("designs")
+    .update({
+      kind: decoded.spec.kind,
+      title: decoded.spec.title,
+      prompt: decoded.spec.meta.prompt || null,
+      spec: decoded.spec,
+      estimated_cost: estimatedCost,
+      price_confidence: confidence,
+    })
+    .eq("id", data.id);
+  if (updateError) {
+    return { ok: false, error: "The remix was made but could not be prepared." };
+  }
   return { ok: true, slug: data.slug };
 }
 
@@ -304,8 +351,8 @@ export async function getDesign(slug: string): Promise<DesignRecord | null> {
 
   if (error || !data) return null;
 
-  const parsed = designSpecSchema.safeParse(upgradeSpec(data.spec));
-  if (!parsed.success) return null;
+  const parsed = parseSpec(data.spec);
+  if (!parsed.ok) return null;
 
   const [owner, parent, versions] = await Promise.all([
     supabase
@@ -347,7 +394,7 @@ export async function getDesign(slug: string): Promise<DesignRecord | null> {
     kind: data.kind,
     title: data.title,
     prompt: data.prompt,
-    spec: parsed.data,
+    spec: parsed.spec,
     coverUrl: data.cover_url,
     currency: data.currency,
     estimatedCost: data.estimated_cost,
@@ -482,7 +529,13 @@ export async function recordDesignView(designId: string): Promise<void> {
 /** The price as the server computes it, from live rates. */
 async function priceOf(spec: DesignSpec) {
   const rates = await marketRates();
-  const cost = calculateCost(spec, buildParts(spec), { rates });
+  const parts = buildParts(spec);
+  const cutList = buildCutList(spec, parts);
+  const cost = calculateCost(spec, parts, {
+    rates,
+    sheetCounts: sheetCountsOf(cutList),
+    manufacturable: cutList.buildable,
+  });
   return {
     estimatedCost: Math.round(cost.price),
     confidence: Math.round(cost.confidence * 100) / 100,

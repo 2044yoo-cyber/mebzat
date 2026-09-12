@@ -1,6 +1,7 @@
 import { buildCutList, sheetCountsOf, type CutList } from "./cutlist";
 import { calculateCost } from "./costing";
 import { buildParts } from "./geometry";
+import { constructionMaterials } from "./wardrobe-materials";
 import { buildXlsx, type Sheet } from "./xlsx";
 import type { CostBreakdown, MarketRate } from "../types/cost";
 import { allBays, type DesignSpec } from "../types/spec";
@@ -39,6 +40,11 @@ export type ExportBundle = {
 export function buildExport(input: ExportInput): ExportBundle {
   const parts = buildParts(input.spec);
   const cutList = buildCutList(input.spec, parts);
+  if (!cutList.buildable) {
+    throw new Error(
+      "This design contains panel sizes that do not fit stocked sheets and cannot be exported for manufacture.",
+    );
+  }
 
   // Priced from the layout, not from an allowance. The order matters: nest
   // first, then cost, so the sheets on the invoice are the sheets on the
@@ -46,10 +52,11 @@ export function buildExport(input: ExportInput): ExportBundle {
   const cost = calculateCost(input.spec, parts, {
     rates: input.rates ?? [],
     sheetCounts: sheetCountsOf(cutList),
+    manufacturable: cutList.buildable,
   });
 
   const workbook = buildXlsx([
-    cutSheet(cutList, input.spec),
+    cutSheet(cutList),
     layoutSheet(cutList),
     hardwareSheet(parts),
     summarySheet(input, cutList, cost),
@@ -69,7 +76,7 @@ export function buildExport(input: ExportInput): ExportBundle {
  * works in: one trip to the rack per board, and the big panels off the sheet
  * before the offcuts get committed to small ones.
  */
-function cutSheet(cutList: CutList, spec: DesignSpec): Sheet {
+function cutSheet(cutList: CutList): Sheet {
   const rows: (string | number | null)[][] = [
     [
       "#",
@@ -129,7 +136,11 @@ function cutSheet(cutList: CutList, spec: DesignSpec): Sheet {
   ]);
 
   rows.push([]);
-  rows.push([`Sheet size: ${spec.carcass.board.sheet.length} × ${spec.carcass.board.sheet.width} mm`]);
+  for (const board of cutList.byBoard) {
+    rows.push([
+      `Sheet size — ${board.boardLabel}: ${board.nesting.sheet.length} × ${board.nesting.sheet.width} mm`,
+    ]);
+  }
   for (const note of cutList.notes) rows.push([note]);
 
   return {
@@ -246,6 +257,17 @@ function summarySheet(
     ["Bays", allBays(input.spec).length],
     ["Finish", `${input.spec.finish.colour}, ${input.spec.finish.sheen}`],
   ];
+
+  if (input.spec.furnitureType === "wardrobe") {
+    const materials = constructionMaterials(input.spec);
+    rows.push(
+      ["Body board", materials.body.label],
+      ["Doors / drawer fronts", materials.fronts.label],
+      ["Interior boards", materials.interior.label],
+      ["Back board", materials.back.label],
+      ["Recessed plinth", materials.plinth.label],
+    );
+  }
 
   if (input.preparedFor) rows.push(["Prepared for", input.preparedFor]);
   if (input.url) rows.push(["Live design", input.url]);

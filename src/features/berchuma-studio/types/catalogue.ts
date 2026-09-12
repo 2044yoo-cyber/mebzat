@@ -21,6 +21,7 @@ export const BOARDS: Board[] = [
     thickness: 18,
     sheet: { length: 2440, width: 1220 },
     grain: "none",
+    appearance: { colour: "White", hex: "#f2f0ec", sheen: "satin" },
     priceKey: "MDF 18mm melamine",
     fallbackRate: 2450,
   },
@@ -32,6 +33,7 @@ export const BOARDS: Board[] = [
     // A wood-grain foil runs along the sheet. Rotating a part to save
     // material makes the join obvious, so the nesting is not allowed to.
     grain: "length",
+    appearance: { colour: "Walnut", hex: "#6b4a32", sheen: "satin" },
     priceKey: "MDF 18mm walnut",
     fallbackRate: 3100,
   },
@@ -41,6 +43,7 @@ export const BOARDS: Board[] = [
     thickness: 18,
     sheet: { length: 2440, width: 1220 },
     grain: "length",
+    appearance: { colour: "Oak", hex: "#b88757", sheen: "satin" },
     priceKey: "MDF 18mm oak",
     fallbackRate: 3050,
   },
@@ -50,6 +53,7 @@ export const BOARDS: Board[] = [
     thickness: 18,
     sheet: { length: 2440, width: 1220 },
     grain: "none",
+    appearance: { colour: "White", hex: "#e9e7e1", sheen: "matt" },
     priceKey: "Chipboard 18mm melamine",
     fallbackRate: 1850,
   },
@@ -59,8 +63,19 @@ export const BOARDS: Board[] = [
     thickness: 18,
     sheet: { length: 2440, width: 1220 },
     grain: "length",
+    appearance: { colour: "Birch", hex: "#d6b27b", sheen: "matt" },
     priceKey: "Plywood 18mm",
     fallbackRate: 3400,
+  },
+  {
+    id: "mdf-18-black",
+    label: "18 mm MDF, black melamine",
+    thickness: 18,
+    sheet: { length: 2440, width: 1220 },
+    grain: "none",
+    appearance: { colour: "Black", hex: "#16181d", sheen: "matt" },
+    priceKey: "MDF 18mm black melamine",
+    fallbackRate: 2750,
   },
   // Worktops. Thicker, sold in narrower sheets, and priced separately —
   // a kitchen top is the single most expensive board on the job and quoting it
@@ -71,6 +86,7 @@ export const BOARDS: Board[] = [
     thickness: 38,
     sheet: { length: 3000, width: 650 },
     grain: "length",
+    appearance: { colour: "Oak", hex: "#9a7045", sheen: "satin" },
     priceKey: "Worktop 38mm oak",
     fallbackRate: 6800,
   },
@@ -80,6 +96,7 @@ export const BOARDS: Board[] = [
     thickness: 38,
     sheet: { length: 3000, width: 650 },
     grain: "length",
+    appearance: { colour: "Granite", hex: "#5e6062", sheen: "matt" },
     priceKey: "Worktop 38mm stone",
     fallbackRate: 7200,
   },
@@ -89,6 +106,7 @@ export const BOARDS: Board[] = [
     thickness: 20,
     sheet: { length: 3000, width: 640 },
     grain: "none",
+    appearance: { colour: "Quartz", hex: "#d8d5cc", sheen: "gloss" },
     priceKey: "Quartz worktop 20mm",
     fallbackRate: 24000,
   },
@@ -98,8 +116,19 @@ export const BOARDS: Board[] = [
     thickness: 4,
     sheet: { length: 2440, width: 1220 },
     grain: "none",
+    appearance: { colour: "White", hex: "#d9d6cf", sheen: "matt" },
     priceKey: "HDF 4mm",
     fallbackRate: 720,
+  },
+  {
+    id: "hdf-6-white",
+    label: "6 mm HDF back panel, white",
+    thickness: 6,
+    sheet: { length: 2440, width: 1220 },
+    grain: "none",
+    appearance: { colour: "White", hex: "#d9d6cf", sheen: "matt" },
+    priceKey: "HDF 6mm",
+    fallbackRate: 980,
   },
 ];
 
@@ -125,6 +154,20 @@ export const EDGE_BANDS: EdgeBand[] = [
     priceKey: "Edge band PVC 2mm",
     fallbackRate: 26,
   },
+  {
+    id: "pvc-2-birch",
+    label: "2 mm PVC edge band, birch",
+    thickness: 2,
+    priceKey: "Edge band PVC 2mm",
+    fallbackRate: 26,
+  },
+  {
+    id: "pvc-2-black",
+    label: "2 mm PVC edge band, black",
+    thickness: 2,
+    priceKey: "Edge band PVC 2mm",
+    fallbackRate: 26,
+  },
 ];
 
 export const HARDWARE: Hardware[] = [
@@ -143,6 +186,22 @@ export const HARDWARE: Hardware[] = [
     unit: "each",
     priceKey: "Concealed hinge",
     fallbackRate: 85,
+  },
+  {
+    id: "hinge-corner-165",
+    label: "Wide-opening corner hinge, 165°",
+    kind: "hinge",
+    unit: "each",
+    priceKey: "Corner hinge 165 degree",
+    fallbackRate: 235,
+  },
+  {
+    id: "bifold-connecting-hinge",
+    label: "Bi-fold connecting hinge",
+    kind: "hinge",
+    unit: "each",
+    priceKey: "Bi fold connecting hinge",
+    fallbackRate: 180,
   },
   {
     id: "handle-bar",
@@ -167,6 +226,13 @@ export const HARDWARE: Hardware[] = [
     unit: "pair",
     priceKey: "Drawer runner soft close",
     fallbackRate: 620,
+    drawerRunner: {
+      nominalLengths: [300, 350, 400, 450, 500, 550, 600],
+      sideClearance: 13,
+      frontSetback: 20,
+      rearClearance: 20,
+      boxLengthAllowance: 20,
+    },
   },
   {
     id: "runner-basic",
@@ -175,6 +241,13 @@ export const HARDWARE: Hardware[] = [
     unit: "pair",
     priceKey: "Drawer runner",
     fallbackRate: 280,
+    drawerRunner: {
+      nominalLengths: [300, 350, 400, 450, 500],
+      sideClearance: 13,
+      frontSetback: 20,
+      rearClearance: 20,
+      boxLengthAllowance: 20,
+    },
   },
   {
     id: "shelf-pin",
@@ -215,6 +288,30 @@ export const HARDWARE: Hardware[] = [
     unit: "metre",
     priceKey: "LED strip warm white",
     fallbackRate: 260,
+  },
+  {
+    id: "corner-carousel",
+    label: "Corner carousel storage set",
+    kind: "lift_mechanism",
+    unit: "set",
+    priceKey: "Corner carousel",
+    fallbackRate: 4800,
+  },
+  {
+    id: "blind-corner-pullout",
+    label: "Blind-corner pull-out set",
+    kind: "lift_mechanism",
+    unit: "set",
+    priceKey: "Blind corner pull out",
+    fallbackRate: 6200,
+  },
+  {
+    id: "bifold-pivot-set",
+    label: "Bi-fold door pivot and track set",
+    kind: "lift_mechanism",
+    unit: "set",
+    priceKey: "Bi fold door pivot set",
+    fallbackRate: 1350,
   },
 ];
 

@@ -40,6 +40,8 @@ export type CostGroup = (typeof costGroups)[number];
 
 export type CostBreakdown = {
   currency: string;
+  /** False when one or more listed parts cannot be cut from stocked sheets. */
+  manufacturable: boolean;
   lines: CostLine[];
   /** Sum per group, in the order above. */
   subtotals: Record<CostGroup, number>;

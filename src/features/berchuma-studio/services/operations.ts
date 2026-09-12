@@ -1,6 +1,8 @@
 import { findModule } from "./kitchen-modules";
-import { LIMITS, validateSpec } from "../types/spec";
+import { placeOnRun, solveLayout } from "./layout";
+import { LIMITS, practicalDrawerCount, validateSpec } from "../types/spec";
 import type { Bay, Cabinet, CabinetKind, DesignSpec } from "../types/spec";
+import { drawerFrontHeights } from "./drawer-construction";
 
 /**
  * What somebody can do to a design.
@@ -31,6 +33,11 @@ function change(
 ): DesignSpec {
   const draft = structuredClone(spec);
   mutate(draft);
+  // `position.x`/`position.z` are snapshots for run-bound cabinets. Keep them
+  // in sync after an operation so legacy readers and the derived envelope see
+  // the same layout as the resolver; the operation arithmetic itself still
+  // reads and writes the authoritative run offset below.
+  syncRunBoundPositions(draft);
   // Cleared first because the validator appends: without this, twenty edits
   // leave twenty copies of the same line and the panel reads like the design
   // is falling apart.
@@ -39,16 +46,58 @@ function change(
 }
 
 /**
- * Cabinets standing at the same height, left to right.
+ * Cabinets standing in the same editable row, left to right.
  *
  * A kitchen is two rows — base units on the floor, wall units at 1450 — and an
- * edit to one must not disturb the other. Widening a base unit should push the
- * base units beside it, not the cupboards over its head.
+ * edit to one must not disturb the other. A run-bound row additionally belongs
+ * to one wall run: an edit on Wall B must never push a cabinet on Wall A just
+ * because their stored y coordinates match. A free-standing cabinet continues
+ * to use its own stored x coordinate and does not join a wall row by accident.
  */
-function row(spec: DesignSpec, y: number): Cabinet[] {
+type CabinetRow = {
+  runId: string | null;
+  y: number;
+};
+
+function rowOf(cabinet: Cabinet): CabinetRow {
+  return { runId: cabinet.runId ?? null, y: cabinet.position.y };
+}
+
+function sameRow(cabinet: Cabinet, target: CabinetRow): boolean {
+  return (
+    Math.abs(cabinet.position.y - target.y) < 1 &&
+    (target.runId === null
+      ? !cabinet.runId
+      : cabinet.runId === target.runId)
+  );
+}
+
+/** The coordinate that is authoritative for the cabinet's kind of placement. */
+function along(cabinet: Cabinet): number {
+  return cabinet.runId ? (cabinet.offset ?? 0) : cabinet.position.x;
+}
+
+/**
+ * Move a cabinet along its own placement axis.
+ *
+ * `position.x` is deliberately not updated here for a run-bound cabinet:
+ * callers must not be able to make an L/U layout overlap by treating a world
+ * x coordinate as a distance along a turned wall. `syncRunBoundPositions`
+ * writes the derived snapshot once the run arithmetic is complete.
+ */
+function setAlong(cabinet: Cabinet, value: number): void {
+  const next = Math.max(0, Math.round(value));
+  if (cabinet.runId) {
+    cabinet.offset = next;
+  } else {
+    cabinet.position.x = next;
+  }
+}
+
+function row(spec: DesignSpec, target: CabinetRow): Cabinet[] {
   return spec.cabinets
-    .filter((cabinet) => Math.abs(cabinet.position.y - y) < 1)
-    .sort((a, b) => a.position.x - b.position.x);
+    .filter((cabinet) => sameRow(cabinet, target))
+    .sort((a, b) => along(a) - along(b));
 }
 
 /**
@@ -60,15 +109,40 @@ function row(spec: DesignSpec, y: number): Cabinet[] {
  */
 function shiftAfter(
   spec: DesignSpec,
-  y: number,
+  target: CabinetRow,
   fromX: number,
   delta: number,
 ): void {
   if (delta === 0) return;
+  for (const cabinet of row(spec, target)) {
+    if (along(cabinet) < fromX - 0.5) continue;
+    setAlong(cabinet, along(cabinet) + delta);
+  }
+}
+
+/**
+ * Refresh derived world-coordinate snapshots for valid run bindings.
+ *
+ * The resolver intentionally ignores these snapshots for normal rendering,
+ * but validation still derives the envelope from them and old integrations may
+ * display them. A missing run remains a true fallback and is left untouched.
+ */
+function syncRunBoundPositions(spec: DesignSpec): void {
+  const layout = solveLayout(spec.layout, spec.runs, {
+    cornerKind: spec.cornerKind,
+  });
+  const placements = new Map(
+    layout.placements.map((placement) => [placement.runId, placement]),
+  );
+
   for (const cabinet of spec.cabinets) {
-    if (Math.abs(cabinet.position.y - y) >= 1) continue;
-    if (cabinet.position.x < fromX - 0.5) continue;
-    cabinet.position.x = Math.max(0, cabinet.position.x + delta);
+    if (!cabinet.runId) continue;
+    const placement = placements.get(cabinet.runId);
+    if (!placement) continue;
+
+    const point = placeOnRun(placement, cabinet.offset ?? 0);
+    cabinet.position.x = point.x;
+    cabinet.position.z = point.z;
   }
 }
 
@@ -118,14 +192,15 @@ export function addModule(
     // puts it on the wall, where a wall cupboard goes.
     const y =
       after && after.kind === preset.kind ? after.position.y : defaults.y;
+    const targetRow = after
+      ? { runId: after.runId ?? null, y }
+      : defaultRow(draft, preset.kind, y);
     const x =
       after && after.kind === preset.kind
-        ? after.position.x + after.size.width
-        : rightEdge(row(draft, y));
+        ? along(after) + after.size.width
+        : rightEdge(row(draft, targetRow));
 
-    shiftAfter(draft, y, x, width);
-
-    draft.cabinets.push({
+    const added: Cabinet = {
       id: freshId(preset.kind),
       label: preset.label,
       kind: preset.kind,
@@ -137,7 +212,10 @@ export function addModule(
       },
       bays: preset.bays(width - 2 * t),
       plinthHeight: defaults.plinth,
-    });
+    };
+    bindToRow(added, targetRow, x);
+    shiftAfter(draft, targetRow, x, width);
+    draft.cabinets.push(added);
   });
 }
 
@@ -163,14 +241,17 @@ export function addCabinet(
     // cupboard" next to a wall unit produces a wall unit at wall height rather
     // than one on the floor under it.
     const y = after ? after.position.y : preset.y;
+    const targetRow = after
+      ? rowOf(after)
+      : defaultRow(draft, options.kind, y);
     const x = after
-      ? after.position.x + after.size.width
-      : rightEdge(row(draft, y));
+      ? along(after) + after.size.width
+      : rightEdge(row(draft, targetRow));
 
     // Make room before standing in it.
-    shiftAfter(draft, y, x, width);
+    shiftAfter(draft, targetRow, x, width);
 
-    draft.cabinets.push({
+    const added: Cabinet = {
       id: freshId(options.kind),
       label: labelFor(options.kind),
       kind: options.kind,
@@ -194,7 +275,9 @@ export function addCabinet(
         },
       ],
       plinthHeight: after ? after.plinthHeight : preset.plinth,
-    });
+    };
+    bindToRow(added, targetRow, x);
+    draft.cabinets.push(added);
   });
 }
 
@@ -211,8 +294,50 @@ function sameRowShape(after: Cabinet, kind: CabinetKind): boolean {
 function rightEdge(cabinets: Cabinet[]): number {
   if (cabinets.length === 0) return 0;
   return Math.max(
-    ...cabinets.map((cabinet) => cabinet.position.x + cabinet.size.width),
+    ...cabinets.map((cabinet) => along(cabinet) + cabinet.size.width),
   );
+}
+
+/**
+ * Choose the natural destination for an add with no selected neighbour.
+ *
+ * A single matching run is unambiguous, so the new cabinet joins it. More than
+ * one run is intentionally left free-standing: silently choosing Wall A for a
+ * cabinet added to an L/U plan is worse than asking the caller to provide an
+ * `afterId`.
+ */
+function defaultRow(
+  spec: DesignSpec,
+  kind: CabinetKind,
+  y: number,
+): CabinetRow {
+  const runIds = new Set(
+    spec.cabinets
+      .filter(
+        (cabinet) =>
+          cabinet.kind === kind &&
+          Math.abs(cabinet.position.y - y) < 1 &&
+          Boolean(cabinet.runId),
+      )
+      .map((cabinet) => cabinet.runId!),
+  );
+
+  return {
+    runId: runIds.size === 1 ? [...runIds][0]! : null,
+    y,
+  };
+}
+
+/** Apply a row binding to a freshly-created cabinet without copying stale x. */
+function bindToRow(cabinet: Cabinet, target: CabinetRow, offset: number): void {
+  if (target.runId) {
+    cabinet.runId = target.runId;
+    cabinet.offset = Math.max(0, Math.round(offset));
+  } else {
+    delete cabinet.runId;
+    delete cabinet.offset;
+    cabinet.position.x = Math.max(0, Math.round(offset));
+  }
 }
 
 function labelFor(kind: CabinetKind): string {
@@ -246,8 +371,10 @@ export function removeCabinet(spec: DesignSpec, id: string): DesignSpec {
     const target = find(draft, id);
     if (!target) return;
 
+    const targetRow = rowOf(target);
+    const targetStart = along(target);
     draft.cabinets = draft.cabinets.filter((cabinet) => cabinet.id !== id);
-    shiftAfter(draft, target.position.y, target.position.x, -target.size.width);
+    shiftAfter(draft, targetRow, targetStart, -target.size.width);
   });
 }
 
@@ -260,12 +387,13 @@ export function duplicateCabinet(spec: DesignSpec, id: string): DesignSpec {
 
     const copy = structuredClone(target);
     copy.id = freshId(target.kind);
-    copy.position = { ...target.position, x: target.position.x + target.size.width };
+    const insertAt = along(target) + target.size.width;
+    bindToRow(copy, rowOf(target), insertAt);
     // Bay ids must be fresh too. Two bays sharing an id put two parts at the
     // same key in the viewer and one of them stops updating.
     copy.bays = copy.bays.map((bay) => ({ ...bay, id: freshId("bay") }));
 
-    shiftAfter(draft, target.position.y, copy.position.x, target.size.width);
+    shiftAfter(draft, rowOf(target), insertAt, target.size.width);
     draft.cabinets.push(copy);
   });
 }
@@ -308,8 +436,8 @@ export function resizeCabinet(
       redivide(target, draft.carcass.board.thickness);
       shiftAfter(
         draft,
-        target.position.y,
-        target.position.x + before,
+        rowOf(target),
+        along(target) + before,
         target.size.width - before,
       );
     }
@@ -343,18 +471,66 @@ export function moveCabinet(
     const target = find(draft, id);
     if (!target) return;
 
-    const wasAt = target.position.y;
+    const previousRow = rowOf(target);
 
-    if (to.x !== undefined) target.position.x = Math.max(0, Math.round(to.x));
+    if (target.runId) {
+      const offset = moveOffsetOnRun(draft, target, to);
+      if (offset !== undefined) setAlong(target, offset);
+    } else {
+      if (to.x !== undefined) target.position.x = Math.max(0, Math.round(to.x));
+      if (to.z !== undefined) target.position.z = Math.round(to.z);
+    }
     if (to.y !== undefined) target.position.y = Math.max(0, Math.round(to.y));
-    if (to.z !== undefined) target.position.z = Math.round(to.z);
 
     if (options.reflow !== false) {
-      reflowRow(draft, target.position.y);
+      reflowRow(draft, rowOf(target));
       // Leaving the row it came from also closes that row up.
-      if (Math.abs(wasAt - target.position.y) >= 1) reflowRow(draft, wasAt);
+      if (
+        previousRow.runId !== target.runId ||
+        Math.abs(previousRow.y - target.position.y) >= 1
+      ) {
+        reflowRow(draft, previousRow);
+      }
     }
   });
+}
+
+/**
+ * Turn a requested world point back into the distance along a run.
+ *
+ * Drag handles historically supplied only x, which is enough on a straight
+ * wall. Passing x and z is exact for a turned/custom run: the dot product
+ * projects the point onto the wall direction and deliberately ignores any
+ * perpendicular pointer wobble. If the run was removed, there is no honest
+ * coordinate system to project through, so the offset is retained rather than
+ * falling back to stale raw coordinates.
+ */
+function moveOffsetOnRun(
+  spec: DesignSpec,
+  cabinet: Cabinet,
+  to: Partial<{ x: number; y: number; z: number }>,
+): number | undefined {
+  if (!cabinet.runId || (to.x === undefined && to.z === undefined)) {
+    return undefined;
+  }
+
+  const layout = solveLayout(spec.layout, spec.runs, {
+    cornerKind: spec.cornerKind,
+  });
+  const placement = layout.placements.find(
+    (entry) => entry.runId === cabinet.runId,
+  );
+  if (!placement) return undefined;
+
+  const current = placeOnRun(placement, along(cabinet));
+  const x = to.x ?? current.x;
+  const z = to.z ?? current.z;
+  const radians = (placement.rotation * Math.PI) / 180;
+  const alongRun =
+    (x - placement.origin.x) * Math.cos(radians) +
+    (z - placement.origin.z) * Math.sin(radians);
+
+  return Math.max(0, Math.round(alongRun));
 }
 
 /**
@@ -364,13 +540,13 @@ export function moveCabinet(
  * because two tall units stand to the left of it does not slide to the wall
  * because somebody dragged a cupboard.
  */
-function reflowRow(spec: DesignSpec, y: number): void {
-  const cabinets = row(spec, y);
+function reflowRow(spec: DesignSpec, target: CabinetRow): void {
+  const cabinets = row(spec, target);
   if (cabinets.length === 0) return;
 
-  let cursor = Math.min(...cabinets.map((cabinet) => cabinet.position.x));
+  let cursor = Math.min(...cabinets.map((cabinet) => along(cabinet)));
   for (const cabinet of cabinets) {
-    cabinet.position.x = Math.round(cursor);
+    setAlong(cabinet, cursor);
     cursor += cabinet.size.width;
   }
 }
@@ -484,7 +660,7 @@ export function adjustBayCount(
     if (bay.fitting.kind === "shelves") {
       bay.fitting.count = clamp(bay.fitting.count + delta, 0, 20);
     } else if (bay.fitting.kind === "drawers") {
-      bay.fitting.count = clamp(bay.fitting.count + delta, 1, 8);
+      bay.fitting.count = clamp(bay.fitting.count + delta, 1, 12);
       // Explicit heights no longer match the count, and a stale array is worse
       // than none: it would size four fronts for a bank of five.
       bay.fitting.frontHeights = undefined;
@@ -585,13 +761,11 @@ export function frontHeightsOf(
   fitting: Extract<Bay["fitting"], { kind: "drawers" }>,
   opening: number,
 ): number[] {
-  if (fitting.frontHeights?.length === fitting.count) {
-    return [...fitting.frontHeights];
-  }
-  // Equal division is what "four drawers" means to everyone who is not a
-  // designer, and it is what the geometry already assumes.
-  const each = Math.floor(opening / fitting.count);
-  return Array.from({ length: fitting.count }, () => each);
+  return drawerFrontHeights(
+    fitting.count,
+    opening,
+    fitting.frontHeights,
+  );
 }
 
 /**
@@ -602,25 +776,31 @@ export function frontHeightsOf(
  * silently shrink the bay's last drawer to nothing.
  */
 function normaliseFronts(heights: number[], opening: number): number[] {
-  const total = heights.reduce((sum, height) => sum + height, 0);
-  if (total <= 0 || opening <= 0) return heights;
-
-  const scale = opening / total;
-  const scaled = heights.map((height) => Math.round(height * scale));
-
-  // Rounding leaves a millimetre or two. It goes on the bottom drawer, which is
-  // the biggest and where it will never be seen.
-  const drift = opening - scaled.reduce((sum, height) => sum + height, 0);
-  const last = scaled.length - 1;
-  if (last >= 0 && scaled[last] !== undefined) {
-    scaled[last] = Math.max(1, scaled[last] + drift);
-  }
-  return scaled;
+  return drawerFrontHeights(heights.length, opening, heights);
 }
 
 /** The clear opening a bay's drawers divide, in mm. */
 export function openingHeightOf(cabinet: Cabinet, boardThickness: number): number {
   return cabinet.size.height - cabinet.plinthHeight - 2 * boardThickness;
+}
+
+/**
+ * The only drawer-count range exposed to editing controls.
+ *
+ * The schema still has an absolute cap of twelve, while this adds the physical
+ * limit from the cabinet's actual clear opening. A short drawer module should
+ * stop offering “add” at five fronts, not let the user create a sixth sliver
+ * and wait for validation to undo it.
+ */
+export function drawerCountRangeOf(
+  cabinet: Cabinet,
+  boardThickness: number,
+): { minimum: number; maximum: number } {
+  const range = practicalDrawerCount(openingHeightOf(cabinet, boardThickness));
+  return {
+    minimum: Math.min(12, range.minimum),
+    maximum: Math.min(12, range.maximum),
+  };
 }
 
 /** Sets one drawer's front height, in mm. The rest give way proportionally. */
@@ -642,7 +822,10 @@ export function setDrawerHeight(
 
     // A floor, not a free number. A 5 mm drawer front is not a drawer, and
     // letting one be typed produces a design the shop returns.
-    heights[index] = Math.max(LIMITS.minDrawerFront, Math.round(height));
+    heights[index] = Math.min(
+      LIMITS.maxDrawerFront,
+      Math.max(LIMITS.minDrawerFront, Math.round(height)),
+    );
     bay.fitting.frontHeights = normaliseFronts(heights, opening);
   });
 }
@@ -658,9 +841,13 @@ export function addDrawer(
     const cabinet = find(draft, cabinetId);
     const bay = cabinet?.bays.find((entry) => entry.id === bayId);
     if (!cabinet || !bay || bay.fitting.kind !== "drawers") return;
-    if (bay.fitting.count >= 8) return;
-
     const opening = openingHeightOf(cabinet, draft.carcass.board.thickness);
+    if (
+      bay.fitting.count >=
+      drawerCountRangeOf(cabinet, draft.carcass.board.thickness).maximum
+    ) {
+      return;
+    }
     const heights = frontHeightsOf(bay.fitting, opening);
     const at = after === undefined ? heights.length : after + 1;
 
@@ -687,10 +874,15 @@ export function removeDrawer(
     const cabinet = find(draft, cabinetId);
     const bay = cabinet?.bays.find((entry) => entry.id === bayId);
     if (!cabinet || !bay || bay.fitting.kind !== "drawers") return;
-    // One drawer is a chest of drawers; none is a hole.
-    if (bay.fitting.count <= 1) return;
-
     const opening = openingHeightOf(cabinet, draft.carcass.board.thickness);
+    // One is not always the physical floor: a 514 mm opening needs at least
+    // two fronts because one 514 mm slab is neither realistic nor cuttable.
+    if (
+      bay.fitting.count <=
+      drawerCountRangeOf(cabinet, draft.carcass.board.thickness).minimum
+    ) {
+      return;
+    }
     const heights = frontHeightsOf(bay.fitting, opening);
     if (index < 0 || index >= heights.length) return;
 
@@ -711,9 +903,13 @@ export function duplicateDrawer(
     const cabinet = find(draft, cabinetId);
     const bay = cabinet?.bays.find((entry) => entry.id === bayId);
     if (!cabinet || !bay || bay.fitting.kind !== "drawers") return;
-    if (bay.fitting.count >= 8) return;
-
     const opening = openingHeightOf(cabinet, draft.carcass.board.thickness);
+    if (
+      bay.fitting.count >=
+      drawerCountRangeOf(cabinet, draft.carcass.board.thickness).maximum
+    ) {
+      return;
+    }
     const heights = frontHeightsOf(bay.fitting, opening);
     const source = heights[index];
     if (source === undefined) return;

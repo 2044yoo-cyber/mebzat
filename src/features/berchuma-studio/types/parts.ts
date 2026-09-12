@@ -56,6 +56,12 @@ export type Part = {
   /** The bay this part belongs to, when it belongs to one. */
   bayId?: string;
   board: Board;
+  /**
+   * Board parts are cut, nested and priced by the sheet. Rails and legs are
+   * drawn from this same physical list but bought hardware, so they must never
+   * be mistaken for strips cut from the selected MDF sheet.
+   */
+  manufacture?: "cut" | "purchased";
   /** Cut length in mm — the dimension along the grain where grain matters. */
   length: number;
   /** Cut width in mm. */
@@ -63,6 +69,17 @@ export type Part = {
   quantity: number;
   edges: BandedEdges;
   edgeBand: EdgeBand;
+  /**
+   * Door hardware follows the physical leaf rather than the bay that happened
+   * to produce it. A sliding leaf must never receive concealed hinges.
+   */
+  doorStyle?: "hinged" | "sliding" | "bifold" | "corner" | "fixed";
+  /**
+   * Only shelves carried on adjustable pins consume shelf-pin hardware.
+   * Fixed stack dividers and rail support shelves are real boards, but they
+   * are screwed into the carcass rather than sitting on four pins.
+   */
+  adjustable?: boolean;
   /**
    * Where each instance sits — one entry per unit of `quantity`.
    *

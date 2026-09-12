@@ -32,6 +32,7 @@ import {
   wardrobeExample,
 } from "../src/features/berchuma-studio/services/examples.ts";
 import { hydrateSpec } from "../src/features/berchuma-studio/services/hydrate.ts";
+import { resolveDesign } from "../src/features/berchuma-studio/services/resolve.ts";
 import { readFileSync } from "node:fs";
 
 import {
@@ -64,14 +65,34 @@ import {
   removeDrawer,
   setDrawerHeight,
 } from "../src/features/berchuma-studio/services/operations.ts";
-import { buildParts, hingesPerLeaf } from "../src/features/berchuma-studio/services/geometry.ts";
+import {
+  buildParts,
+  hingesPerLeaf,
+  WARDROBE_PLINTH_VISIBLE_RECESS,
+} from "../src/features/berchuma-studio/services/geometry.ts";
+import {
+  drawerFaceSvgTop,
+  resolveDrawerFaces,
+  resolveDrawerConstruction,
+} from "../src/features/berchuma-studio/services/drawer-construction.ts";
+import { partWorldBounds } from "../src/features/berchuma-studio/services/part-transform.ts";
+import {
+  boardColour,
+  boardSheen,
+  edgeBandForConstructionBoard,
+  wardrobeBackBoards,
+  wardrobeStructuralBoards,
+} from "../src/features/berchuma-studio/services/wardrobe-materials.ts";
+import { findBoard } from "../src/features/berchuma-studio/types/catalogue.ts";
 import {
   allBays,
   boundingBox,
+  LIMITS,
   parseSpec,
   validateSpec,
 } from "../src/features/berchuma-studio/types/spec.ts";
 import type { Bay, DesignSpec } from "../src/features/berchuma-studio/types/spec.ts";
+import type { Part } from "../src/features/berchuma-studio/types/parts.ts";
 
 const GREEN = "[32m";
 const RED = "[31m";
@@ -91,6 +112,68 @@ function check(name: string, condition: boolean, detail = "") {
 
 function near(actual: number, expected: number, tolerance = 0.5): boolean {
   return Math.abs(actual - expected) <= tolerance;
+}
+
+/** Positive-volume intersection, not harmless panel-to-panel face contact. */
+function intersectsInVolume(
+  left: Part,
+  leftAt: { x: number; y: number; z: number },
+  right: Part,
+  rightAt: { x: number; y: number; z: number },
+): boolean {
+  const overlaps = (startA: number, lengthA: number, startB: number, lengthB: number) =>
+    Math.min(startA + lengthA, startB + lengthB) - Math.max(startA, startB) > 0.01;
+
+  return (
+    overlaps(leftAt.x, left.size.x, rightAt.x, right.size.x) &&
+    overlaps(leftAt.y, left.size.y, rightAt.y, right.size.y) &&
+    overlaps(leftAt.z, left.size.z, rightAt.z, right.size.z)
+  );
+}
+
+/** Every collision name is included so a failed perspective check is actionable. */
+function physicalCollisions(parts: Part[]): string[] {
+  const cutParts = parts.filter((part) => part.manufacture !== "purchased");
+  const collisions: string[] = [];
+
+  for (const [leftIndex, left] of cutParts.entries()) {
+    for (const [leftPlacementIndex, leftAt] of left.placements.entries()) {
+      for (let rightIndex = leftIndex; rightIndex < cutParts.length; rightIndex += 1) {
+        const right = cutParts[rightIndex]!;
+        for (const [rightPlacementIndex, rightAt] of right.placements.entries()) {
+          if (
+            rightIndex === leftIndex &&
+            rightPlacementIndex <= leftPlacementIndex
+          ) {
+            continue;
+          }
+          if (intersectsInVolume(left, leftAt, right, rightAt)) {
+            collisions.push(`${left.id}[${leftPlacementIndex}] × ${right.id}[${rightPlacementIndex}]`);
+          }
+        }
+      }
+    }
+  }
+
+  return collisions;
+}
+
+/** Rotated collision check for parts such as an L corner's return door. */
+function worldPartsIntersect(left: Part, right: Part): boolean {
+  const overlaps = (a0: number, a1: number, b0: number, b1: number) =>
+    Math.min(a1, b1) - Math.max(a0, b0) > 0.01;
+
+  return left.placements.some((leftAt) => {
+    const leftBounds = partWorldBounds(left, leftAt);
+    return right.placements.some((rightAt) => {
+      const rightBounds = partWorldBounds(right, rightAt);
+      return (
+        overlaps(leftBounds.min.x, leftBounds.max.x, rightBounds.min.x, rightBounds.max.x) &&
+        overlaps(leftBounds.min.y, leftBounds.max.y, rightBounds.min.y, rightBounds.max.y) &&
+        overlaps(leftBounds.min.z, leftBounds.max.z, rightBounds.min.z, rightBounds.max.z)
+      );
+    });
+  });
 }
 
 /** The zip end-of-central-directory signature, scanned from the back. */
@@ -129,7 +212,11 @@ function findEocd(bytes: Uint8Array): number {
   // Gables run the full carcass height and the full depth.
   const left = find("gable-left");
   check("gable height", left?.length === carcassHeight, `got ${left?.length}`);
-  check("gable depth", left?.width === spec.envelope.depth, `got ${left?.width}`);
+  check(
+    "gable depth stops at the applied 6 mm back",
+    left?.width === spec.envelope.depth - spec.carcass.backBoard.thickness,
+    `got ${left?.width}`,
+  );
   check("gable front edge banded", left?.edges.front === true);
   check("gable back edge not banded", left?.edges.back === false);
 
@@ -155,21 +242,30 @@ function findEocd(bytes: Uint8Array): number {
     `got ${shelves[0]?.width}`,
   );
 
-  // Bay 2 has four drawers: sides, ends and a base each.
+  // Bay 2 has a practical lower three-drawer module: sides, ends and a base
+  // each. Its top storage and hanging sections remain behind one upper door.
   const drawerBases = parts.filter((part) => part.role === "drawer_base");
-  check("four drawer bases", drawerBases.length === 4, `got ${drawerBases.length}`);
+  check("three drawer bases", drawerBases.length === 3, `got ${drawerBases.length}`);
   const drawerSides = parts.filter((part) => part.role === "drawer_side");
   check("drawer sides come in twos", drawerSides.every((part) => part.quantity === 2));
 
-  // Doors: bay 1 and 3 are pairs, bay 2 is drawers so it gets fronts.
+  // Doors: bays 1 and 3 are pairs; the upper non-drawer part of bay 2 gets
+  // one leaf and the lower section gets drawer fronts.
   const doors = parts.filter((part) => part.role === "door");
   const leaves = doors.reduce((total, part) => total + part.quantity, 0);
-  check("four door leaves (two pairs)", leaves === 4, `got ${leaves}`);
+  check("five door leaves including the upper mixed section", leaves === 5, `got ${leaves}`);
   const fronts = parts.filter((part) => part.role === "drawer_front");
-  check("four drawer fronts", fronts.length === 4, `got ${fronts.length}`);
+  check("three compact drawer fronts", fronts.length === 3, `got ${fronts.length}`);
   check(
-    "a drawer bay has no door",
-    doors.every((door) => door.bayId !== "bay-2"),
+    "the direct wardrobe example never emits door-sized drawer fronts",
+    fronts.every((front) => front.size.y <= 280),
+    fronts.map((front) => front.size.y).join(", "),
+  );
+  check(
+    "the mixed bay keeps its drawer section free of a full-height door",
+    doors
+      .filter((door) => door.bayId === "bay-2")
+      .every((door) => door.length < spec.envelope.height - plinth - 2 * spec.carcass.doorGap),
   );
 
   // A 2300 mm leaf needs five hinges by the trade rule.
@@ -178,34 +274,42 @@ function findEocd(bytes: Uint8Array): number {
   check("hinges per leaf, 1600 mm", hingesPerLeaf(1600) === 3);
 
   const hinges = hardware.find((line) => line.hardware.kind === "hinge");
-  const doorHeight = spec.envelope.height - plinth - 2 * spec.carcass.doorGap;
   check(
-    "hinge count follows the doors",
-    hinges?.quantity === leaves * hingesPerLeaf(doorHeight),
-    `got ${hinges?.quantity} for ${leaves} leaves at ${doorHeight} mm`,
+    "hinge count follows each generated door's height",
+    hinges?.quantity ===
+      doors.reduce(
+        (total, door) => total + door.quantity * hingesPerLeaf(door.length),
+        0,
+      ),
+    `got ${hinges?.quantity} for ${leaves} leaves`,
   );
 
-  // A handle on every front: 4 doors + 4 drawers.
+  // A handle on every front: 5 doors + 3 drawers.
   const handles = hardware.find((line) => line.hardware.kind === "handle");
   check("one handle per front", handles?.quantity === 8, `got ${handles?.quantity}`);
 
   // One pair of runners per drawer.
   const runners = hardware.find((line) => line.hardware.kind === "drawer_runner");
-  check("four pairs of runners", runners?.quantity === 4, `got ${runners?.quantity}`);
+  check("three pairs of runners", runners?.quantity === 3, `got ${runners?.quantity}`);
 
   // Four pins per adjustable shelf. Bay 1 has a rail shelf, bay 3 has five.
   const pins = hardware.find((line) => line.hardware.kind === "shelf_pin");
   check("shelf pins are four per shelf", (pins?.quantity ?? 0) % 4 === 0, `got ${pins?.quantity}`);
 
-  // Board area must be positive and split across the two boards used.
+  // Board area must be positive and split across the real body, back and
+  // recessed-plinth boards used.
   check("carcass board area recorded", (totals.areaByBoard["mdf-18-walnut"] ?? 0) > 0);
-  check("back board area recorded", (totals.areaByBoard["hdf-4-white"] ?? 0) > 0);
+  check("6 mm back board area recorded", (totals.areaByBoard["hdf-6-white"] ?? 0) > 0);
+  check("black plinth board area recorded", (totals.areaByBoard["mdf-18-black"] ?? 0) > 0);
   check("edge band metres recorded", (totals.bandByEdge["pvc-2-walnut"] ?? 0) > 0);
 
   // Sanity: a 2.4 × 2.4 × 0.6 wardrobe is roughly 25–40 m² of board. Outside
   // that range something is wrong by a factor, which is the failure that
   // matters.
-  const boardArea = totals.areaByBoard["mdf-18-walnut"] ?? 0;
+  const boardArea = Object.values(totals.areaByBoard).reduce(
+    (total, area) => total + area,
+    0,
+  );
   check(
     "board area is physically plausible",
     boardArea > 20 && boardArea < 45,
@@ -263,12 +367,12 @@ function findEocd(bytes: Uint8Array): number {
 
   check(
     "an over-tall carcass is capped",
-    spec.cabinets[0]?.size.height === 2700,
+    spec.cabinets[0]?.size.height === 2540,
     `got ${spec.cabinets[0]?.size.height}`,
   );
   check(
     "and the overall box follows it down",
-    spec.envelope.height === 2700,
+    spec.envelope.height === 2540,
     `got ${spec.envelope.height}`,
   );
   check(
@@ -282,15 +386,27 @@ function findEocd(bytes: Uint8Array): number {
     `got ${allBays(spec)[0]?.doorLeaves}`,
   );
 
-  // 1200 + 900 = 2100 declared against an interior of 2400 - 36 - 18 = 2346.
+  // Oversized bays are now split at physical divider supports. The usable
+  // width must therefore account for every newly generated divider as well as
+  // the two outer gables.
   const declared = allBays(spec).reduce((total, bay) => total + bay.width, 0);
+  const target =
+    spec.cabinets[0]!.size.width -
+    2 * spec.carcass.board.thickness -
+    (allBays(spec).length - 1) * spec.carcass.board.thickness;
   check(
-    "bay widths rescaled to fit the carcass",
-    near(declared, 2346, 2),
-    `summed to ${declared}`,
+    "supported wardrobe bay widths fill the carcass after divider allowance",
+    declared === target && allBays(spec).every((bay) => bay.width <= LIMITS.wardrobeBayWidth),
+    `summed to ${declared} inside ${target}`,
   );
 
-  check("long shelf span was flagged", issues.some((issue) => issue.path.includes("width") && issue.message.includes("sag")));
+  check(
+    "a long shelf becomes divider-supported rather than remaining a sagging span",
+    allBays(spec).every(
+      (bay) => bay.fitting.kind !== "shelves" || bay.width <= LIMITS.shelfSpan,
+    ) &&
+      issues.some((issue) => issue.correction?.includes("divided wide bays")),
+  );
   check("every issue carries a path", issues.every((issue) => issue.path.length > 0));
   check("corrections recorded on the spec", spec.meta.corrections.length > 0);
 
@@ -303,6 +419,387 @@ function findEocd(bytes: Uint8Array): number {
   // Garbage in must fail cleanly rather than throw.
   const result = parseSpec({ version: 1, kind: "spaceship" });
   check("nonsense is rejected with a message", result.ok === false && result.error.length > 0);
+}
+
+// ---------------------------------------------------------------------------
+// OBJ-informed wardrobe construction
+// ---------------------------------------------------------------------------
+//
+// The professional reference is in centimetres and proves the construction
+// rules, not a fixed model to import: 18 mm carcass/front board, 6 mm back,
+// approximately 13 mm runner clearance per side, 20 mm box setback and a
+// 500 mm runner producing a 480 mm box side in a 600 mm cabinet. These checks
+// exercise the same generated Parts which the viewer, cut list and price use.
+{
+  const base = startingDesign("wardrobe", { width: 1200 });
+  const cabinet = base.cabinets[0]!;
+  const body = findBoard("mdf-18-walnut")!;
+  const front = findBoard("mdf-18-oak")!;
+  const interior = findBoard("mdf-18-white")!;
+  const back = findBoard("hdf-6-white")!;
+  const plinth = findBoard("mdf-18-black")!;
+
+  // A 919 mm clear opening is the representative bay measured from the OBJ.
+  // It is intentionally a new fixture id, so an unrelated drawer cannot make
+  // a check pass by coincidence.
+  const reference: DesignSpec = {
+    ...base,
+    title: "OBJ informed drawer fixture",
+    envelope: { width: 955, height: 2700, depth: 600 },
+    runs: base.runs.map((run) => ({ ...run, length: 955, height: 2700, depth: 600 })),
+    carcass: {
+      ...base.carcass,
+      board: body,
+      frontBoard: front,
+      interiorBoard: interior,
+      backBoard: back,
+      plinthBoard: plinth,
+    },
+    cabinets: [
+      {
+        ...cabinet,
+        id: "obj_reference",
+        size: { width: 955, height: 2700, depth: 600 },
+        bays: [
+          {
+            id: "obj_drawer_bay",
+            width: 919,
+            fitting: { kind: "drawers", count: 2 },
+            // Fronts belong to drawers whether or not there is a separate
+            // outer door. This catches the previous early-return bug.
+            door: "none",
+            doorLeaves: 1,
+          },
+        ],
+      },
+    ],
+  };
+
+  const runner = reference.hardware.find(
+    (item) => item.kind === "drawer_runner",
+  )?.drawerRunner;
+  const resolved = resolveDrawerConstruction({
+    openingWidth: 919,
+    openingHeight: 405,
+    openingFloor: 118,
+    interiorDepth: 594,
+    count: 2,
+    drawerSideThickness: 18,
+    drawerBottomThickness: 6,
+    runner,
+  });
+
+  check("OBJ rule: 6 mm back board is selected", reference.carcass.backBoard.thickness === 6);
+  const structuralChoices = wardrobeStructuralBoards();
+  const backChoices = wardrobeBackBoards();
+  check(
+    "wardrobe colour choices only offer the shared 18 mm construction stock",
+    structuralChoices.length > 0 &&
+      structuralChoices.every((board) => Math.abs(board.thickness - 18) < 0.1) &&
+      structuralChoices.some((board) => board.id === "mdf-18-walnut") &&
+      structuralChoices.some((board) => board.id === "mdf-18-black"),
+    structuralChoices.map((board) => `${board.id}/${board.thickness}`).join(", "),
+  );
+  check(
+    "the back material choices retain the exact 6 mm manufacturing rule",
+    backChoices.length > 0 &&
+      backChoices.every((board) => Math.abs(board.thickness - 6) < 0.1) &&
+      backChoices.some((board) => board.id === "hdf-6-white"),
+    backChoices.map((board) => `${board.id}/${board.thickness}`).join(", "),
+  );
+  const nonWardrobe = tvUnitExample();
+  check(
+    "non-wardrobe rendering preserves its existing free finish colour and sheen",
+    boardColour(front, nonWardrobe) === nonWardrobe.finish.hex &&
+      boardSheen(front, nonWardrobe) === nonWardrobe.finish.sheen,
+    `${boardColour(front, nonWardrobe)} / ${boardSheen(front, nonWardrobe)}`,
+  );
+  check(
+    "non-wardrobe cut parts preserve their explicitly selected edge band",
+    edgeBandForConstructionBoard(
+      nonWardrobe,
+      front,
+      nonWardrobe.carcass.edgeBand,
+    ).id === nonWardrobe.carcass.edgeBand.id,
+  );
+  const directLegacyBack = validateSpec({
+    ...reference,
+    carcass: {
+      ...reference.carcass,
+      backBoard: findBoard("hdf-4-white")!,
+    },
+  }).spec;
+  check(
+    "direct wardrobe validation also enforces the 6 mm back rule",
+    directLegacyBack.carcass.backBoard.thickness === 6,
+    `${directLegacyBack.carcass.backBoard.thickness} mm`,
+  );
+  check("OBJ rule: drawer box is 26 mm narrower than its opening", resolved.boxWidth === 893, `${resolved.boxWidth}`);
+  check(
+    "OBJ rule: drawer internal width accounts for two 18 mm sides",
+    resolved.boxWidth - 2 * resolved.sideThickness === 857,
+    `${resolved.boxWidth - 2 * resolved.sideThickness}`,
+  );
+  check("OBJ rule: 600 mm cabinet selects a 480 mm box side", resolved.boxDepth === 480, `${resolved.boxDepth}`);
+  check("OBJ rule: runner clearance is bilateral", resolved.sideClearance === 13);
+  check(
+    "OBJ rule: rear clearance survives the selected runner depth",
+    resolved.actualRearClearance >= resolved.rearClearance,
+    `${resolved.actualRearClearance} mm`,
+  );
+  check(
+    "OBJ rule: drawer sides stay below the practical maximum",
+    resolved.sideHeights.every((height) => height > 0 && height <= 160),
+    resolved.sideHeights.join(", "),
+  );
+
+  const built = buildParts(reference);
+  const parts = built.parts;
+  const drawerSides = parts.find((part) =>
+    part.id.endsWith("obj_drawer_bay-drawer-0-sides"),
+  );
+  const drawerBase = parts.find((part) =>
+    part.id.endsWith("obj_drawer_bay-drawer-0-base"),
+  );
+  const drawerFronts = parts.filter(
+    (part) => part.role === "drawer_front" && part.bayId === "obj_drawer_bay",
+  );
+  const backPart = parts.find((part) => part.id.endsWith("back-obj_drawer_bay-0"));
+
+  check("doorless drawer bay still produces its two fronts", drawerFronts.length === 2);
+  check("drawer fronts use their selected MDF", drawerFronts.every((part) => part.board.id === front.id));
+  check(
+    "drawer fronts receive the matching oak manufacturing edge band",
+    drawerFronts.every((part) => part.edgeBand.id === "pvc-2-oak"),
+  );
+  check("drawer boxes use their selected interior MDF", drawerSides?.board.id === interior.id);
+  check(
+    "drawer boxes receive the matching white manufacturing edge band",
+    drawerSides?.edgeBand.id === "pvc-1-white",
+  );
+  check("drawer bottoms use the same 6 mm back board", drawerBase?.board.id === back.id && drawerBase.size.y === 6);
+  check("back is real 6 mm geometry at the rear face", backPart?.size.z === 6 && backPart.placements[0]?.z === 594);
+  check(
+    "shell boards stop exactly at the 6 mm back's front face",
+    parts
+      .filter((part) =>
+        ["gable", "top", "bottom", "divider"].includes(part.role),
+      )
+      .every((part) => part.size.z === 594),
+  );
+  check(
+    "OBJ fixture has no positive-volume intersections in front, side or perspective",
+    physicalCollisions(parts).length === 0,
+    physicalCollisions(parts).slice(0, 4).join("; "),
+  );
+  check(
+    "drawer boxes have the exact two runner clearances",
+    drawerSides !== undefined &&
+      drawerSides.placements[0]?.x === 18 + 13 &&
+      drawerSides.placements[1] !== undefined &&
+      18 + 919 - (drawerSides.placements[1]!.x + drawerSides.size.x) === 13,
+  );
+  check(
+    "drawer sides sit on the 6 mm bottom without z-fighting",
+    drawerSides !== undefined &&
+      drawerBase !== undefined &&
+      drawerSides.placements.every(
+        (placement) => placement.y === drawerBase.placements[0]!.y + drawerBase.size.y,
+      ),
+  );
+  check(
+    "drawer box clears the back panel in side and perspective views",
+    drawerSides !== undefined &&
+      drawerSides.placements.every(
+        (placement) => placement.z + drawerSides.size.z <= 594 - 20,
+      ),
+  );
+
+  const cutList = buildCutList(reference, built);
+  const hdfParts = parts.filter(
+    (part) => part.manufacture !== "purchased" && part.board.id === back.id,
+  );
+  const hdfRows = cutList.rows.filter((row) => row.boardId === back.id);
+  check(
+    "6 mm HDF cut-list quantity is derived from back and drawer-bottom parts",
+    hdfRows.reduce((total, row) => total + row.quantity, 0) ===
+      hdfParts.reduce((total, part) => total + part.quantity, 0),
+  );
+  check("every HDF cut-list row is 6 mm", hdfRows.every((row) => row.thickness === 6));
+  check(
+    "all five physical material zones reach the same cut list",
+    [body.id, front.id, interior.id, back.id, plinth.id].every((id) =>
+      cutList.byBoard.some((entry) => entry.boardId === id),
+    ),
+  );
+  const priced = calculateCost(reference, built, { sheetCounts: sheetCountsOf(cutList) });
+  check(
+    "the price uses every board that the generated cut list nests",
+      cutList.byBoard.every((entry) => priced.sheets.some((sheet) => sheet.boardId === entry.boardId)),
+  );
+  const zoneBandIds = ["pvc-2-walnut", "pvc-2-oak", "pvc-1-white", "pvc-2-black"];
+  check(
+    "zone-matched edge bands reach the same cut list",
+    zoneBandIds.every((id) => cutList.rows.some((row) => row.bandLabel.includes(id.split("-").at(-1) ?? ""))),
+    cutList.rows.map((row) => row.bandLabel).join("; "),
+  );
+  check(
+    "zone-matched edge bands reach the same price calculation",
+    zoneBandIds.every((id) => priced.lines.some((line) => line.id === `band-${id}`)),
+    priced.lines
+      .filter((line) => line.group === "edge_band")
+      .map((line) => line.id)
+      .join(", "),
+  );
+  const runners = built.hardware.find((line) => line.hardware.kind === "drawer_runner");
+  check("runner hardware counts actual generated drawer boxes", runners?.quantity === 2, `${runners?.quantity}`);
+
+  const depths = [550, 600, 700];
+  const drawerDepths = depths.map((depth) => {
+    const atDepth: DesignSpec = {
+      ...reference,
+      envelope: { ...reference.envelope, depth },
+      runs: reference.runs.map((run) => ({ ...run, depth })),
+      cabinets: reference.cabinets.map((entry) => ({
+        ...entry,
+        size: { ...entry.size, depth },
+      })),
+    };
+    const atDepthParts = buildParts(atDepth).parts;
+    const side = atDepthParts.find((part) =>
+      part.id.endsWith("obj_drawer_bay-drawer-0-sides"),
+    );
+    const insideBack = depth - atDepth.carcass.backBoard.thickness;
+    check(
+      `${depth} mm deep wardrobe: drawer stays in front of its back`,
+      side !== undefined &&
+        side.placements.every((placement) => placement.z + side.size.z <= insideBack - 20),
+    );
+    check(
+      `${depth} mm deep wardrobe: no positive-volume intersection in perspective`,
+      physicalCollisions(atDepthParts).length === 0,
+      physicalCollisions(atDepthParts).slice(0, 4).join("; "),
+    );
+    return side?.size.z ?? 0;
+  });
+  check(
+    "deeper wardrobes gain supported drawer depth without incorrect scaling",
+    drawerDepths[0]! <= drawerDepths[1]! && drawerDepths[1]! < drawerDepths[2]!,
+    drawerDepths.join(", "),
+  );
+
+  const tall = startingDesign("wardrobe", { width: 2400 });
+  const tallWardrobe: DesignSpec = {
+    ...tall,
+    envelope: { ...tall.envelope, height: 2700 },
+    runs: tall.runs.map((run) => ({ ...run, height: 2700 })),
+    cabinets: tall.cabinets.map((entry) => ({
+      ...entry,
+      size: { ...entry.size, height: 2700 },
+    })),
+  };
+  const tallBacks = buildParts(tallWardrobe).parts.filter(
+    (part) => part.role === "back",
+  );
+  check(
+    "a tall wardrobe splits every 6 mm back into sheet-cuttable parts",
+    tallBacks.length > tallWardrobe.cabinets[0]!.bays.length &&
+      tallBacks.every(
+        (part) =>
+          part.length <= Math.max(part.board.sheet.length, part.board.sheet.width),
+      ),
+  );
+
+  for (const width of [900, 1460, 2400, 3000]) {
+    const wardrobe = startingDesign("wardrobe", { width });
+    const wardrobeParts = buildParts(wardrobe).parts;
+    const wardrobeCabinet = wardrobe.cabinets[0]!;
+    const exactInterior =
+      wardrobeCabinet.size.width -
+      2 * wardrobe.carcass.board.thickness -
+      (wardrobeCabinet.bays.length - 1) * wardrobe.carcass.board.thickness;
+    check(
+      `${width} mm wardrobe: every generated back is 6 mm`,
+      wardrobeParts
+        .filter((part) => part.role === "back")
+        .every((part) => part.board.thickness === 6 && part.size.z === 6),
+    );
+    check(
+      `${width} mm wardrobe: continuous plinth uses black board geometry`,
+      wardrobeParts
+        .filter((part) => part.role === "plinth")
+        .every((part) => part.board.id === "mdf-18-black"),
+    );
+    check(
+      `${width} mm wardrobe: integer bay widths fill the clear carcass exactly`,
+      wardrobeCabinet.bays.reduce((sum, bay) => sum + bay.width, 0) === exactInterior,
+      `${wardrobeCabinet.bays.map((bay) => bay.width).join(" + ")} vs ${exactInterior}`,
+    );
+    check(
+      `${width} mm wardrobe: no front, side or perspective geometry collision`,
+      physicalCollisions(wardrobeParts).length === 0,
+      physicalCollisions(wardrobeParts).slice(0, 4).join("; "),
+    );
+  }
+
+  // Integer rounding has to work between the named presets too. This was the
+  // source of a 2 mm shelf/gable intersection at 3000 mm: each equal bay was
+  // rounded independently. Exercise the complete supported wardrobe range in
+  // 10 mm steps, while the perspective collision checks above cover geometry.
+  const widthAllocationErrors: string[] = [];
+  for (let width = 900; width <= 6000; width += 10) {
+    const wardrobe = startingDesign("wardrobe", { width });
+    const cabinet = wardrobe.cabinets[0]!;
+    const target =
+      cabinet.size.width -
+      2 * wardrobe.carcass.board.thickness -
+      (cabinet.bays.length - 1) * wardrobe.carcass.board.thickness;
+    const actual = cabinet.bays.reduce((sum, bay) => sum + bay.width, 0);
+    if (actual !== target) widthAllocationErrors.push(`${width}: ${actual}/${target}`);
+  }
+  check(
+    "every supported 10 mm wardrobe width allocates bays exactly",
+    widthAllocationErrors.length === 0,
+    widthAllocationErrors.slice(0, 8).join("; "),
+  );
+
+  const defaultWardrobe = startingDesign("wardrobe", { width: 2400 });
+  const defaultDrawers = buildParts(defaultWardrobe).parts.filter(
+    (part) => part.role === "drawer_front",
+  );
+  check(
+    "default wardrobe uses a compact reference-informed drawer module",
+    defaultDrawers.length === 2 &&
+      defaultDrawers.every(
+        (part) =>
+          part.size.y >= LIMITS.minDrawerFront &&
+          part.size.y <= LIMITS.maxDrawerFront,
+      ),
+    defaultDrawers.map((part) => part.size.y).join(", "),
+  );
+  const plainDrawerWardrobe = validateSpec({
+    ...defaultWardrobe,
+    cabinets: defaultWardrobe.cabinets.map((entry, index) =>
+      index === 0
+        ? {
+            ...entry,
+            bays: entry.bays.map((bay, bayIndex) =>
+              bayIndex === 0
+                ? { ...bay, fitting: { kind: "drawers" as const, count: 4 } }
+                : bay,
+            ),
+          }
+        : entry,
+    ),
+  }).spec;
+  const plainFronts = buildParts(plainDrawerWardrobe).parts.filter(
+    (part) => part.role === "drawer_front" && part.bayId === plainDrawerWardrobe.cabinets[0]!.bays[0]!.id,
+  );
+  check(
+    "a full-height wardrobe drawer bank gains enough practical fronts",
+    plainFronts.length >= 9 && plainFronts.every((part) => part.size.y <= 280),
+    plainFronts.map((part) => part.size.y).join(", "),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -420,11 +917,25 @@ function findEocd(bytes: Uint8Array): number {
 
   // Removing all the drawers must not cost more.
   const noDrawers = wardrobeExample();
-  noDrawers.cabinets[0]!.bays = noDrawers.cabinets[0]!.bays.map((bay) =>
-    bay.fitting.kind === "drawers"
-      ? { ...bay, fitting: { kind: "shelves" as const, count: 4, adjustable: true } }
-      : bay,
-  );
+  noDrawers.cabinets[0]!.bays = noDrawers.cabinets[0]!.bays.map((bay) => {
+    if (bay.fitting.kind !== "stack") return bay;
+    return {
+      ...bay,
+      fitting: {
+        ...bay.fitting,
+        sections: bay.fitting.sections.map((section) =>
+          section.kind === "drawers"
+            ? {
+                id: section.id,
+                kind: "shelves" as const,
+                share: section.share,
+                count: 3,
+              }
+            : section,
+        ),
+      },
+    };
+  });
   const noDrawerPrice = calculateCost(noDrawers, buildParts(noDrawers)).price;
   check(
     "swapping drawers for shelves is cheaper",
@@ -465,8 +976,8 @@ function findEocd(bytes: Uint8Array): number {
     `${list.totals.pieces} vs ${parts.totals.partCount}`,
   );
 
-  // Two boards means two blocks.
-  check("grouped by board", list.byBoard.length === 2, `got ${list.byBoard.length}`);
+  // Body, 6 mm back and black plinth are distinct physical boards.
+  check("grouped by board", list.byBoard.length === 3, `got ${list.byBoard.length}`);
   check(
     "board blocks account for every piece",
     list.byBoard.reduce((total, block) => total + block.pieces, 0) === list.totals.pieces,
@@ -975,7 +1486,9 @@ for (const spec of [wardrobeExample(), tvUnitExample()]) {
   // spec, so a disagreement means one of them is grouping wrongly — which is
   // how a shop ends up two panels short.
   const parts = buildParts(spec);
-  const partPieces = parts.parts.reduce((total, part) => total + part.quantity, 0);
+  const partPieces = parts.parts
+    .filter((part) => part.manufacture !== "purchased")
+    .reduce((total, part) => total + part.quantity, 0);
   check(
     "the cut list totals the same pieces as the parts list",
     bundle.cutList.totals.pieces === partPieces,
@@ -1212,9 +1725,9 @@ for (const spec of [wardrobeExample(), tvUnitExample()]) {
 
 {
   // Every design already published on Medosha is version 1: one envelope, one
-  // list of bays. They have to keep opening, and they have to produce exactly
-  // the parts they produced before, or a customer's cut list has changed under
-  // them without anybody touching the design.
+  // list of bays. They must keep opening and must be upgraded to the same
+  // current construction rule as an equivalent newly-created wardrobe. That
+  // includes the approved 6 mm back and practical drawer-front limit.
   const modern = wardrobeExample();
   const legacy = {
     version: 1,
@@ -1225,7 +1738,10 @@ for (const spec of [wardrobeExample(), tvUnitExample()]) {
     bays: modern.cabinets[0]!.bays,
     carcass: {
       board: modern.carcass.board.id,
-      backBoard: modern.carcass.backBoard.id,
+      // A saved version-1 wardrobe predates the approved 6 mm construction.
+      // Hydration must upgrade the old stock default rather than carrying a
+      // 4 mm visual-only back into its next cut list.
+      backBoard: "hdf-4-white",
       edgeBand: modern.carcass.edgeBand.id,
       plinthHeight: 100,
       doorGap: 2,
@@ -1254,19 +1770,32 @@ for (const spec of [wardrobeExample(), tvUnitExample()]) {
       revived.spec.cabinets[0]?.plinthHeight === 100,
       `got ${revived.spec.cabinets[0]?.plinthHeight}`,
     );
-
-    // The real test: the same design, the same parts, the same money.
-    const oldParts = buildParts(revived.spec);
-    const newParts = buildParts(modern);
     check(
-      "it cuts the same number of parts as before",
+      "a legacy wardrobe back upgrades from 4 mm to the shared 6 mm rule",
+      revived.spec.carcass.backBoard.thickness === 6,
+      `${revived.spec.carcass.backBoard.id}, ${revived.spec.carcass.backBoard.thickness} mm`,
+    );
+    check(
+      "a legacy wardrobe receives the shared black plinth material",
+      revived.spec.carcass.plinthBoard?.id === "mdf-18-black",
+      revived.spec.carcass.plinthBoard?.id,
+    );
+
+    // Compare canonical forms. The raw hand-written fixture predates the
+    // approved construction upgrade, while hydrate always validates a saved
+    // design before it reaches geometry or pricing.
+    const oldParts = buildParts(revived.spec);
+    const current = validateSpec(modern).spec;
+    const newParts = buildParts(current);
+    check(
+      "it cuts the same number of parts as the current construction rule",
       oldParts.totals.partCount === newParts.totals.partCount,
       `${oldParts.totals.partCount} vs ${newParts.totals.partCount}`,
     );
     check(
-      "it costs what it cost before",
+      "and it costs the same as the current construction rule",
       calculateCost(revived.spec, oldParts).price ===
-        calculateCost(modern, newParts).price,
+        calculateCost(current, newParts).price,
     );
   }
 }
@@ -1631,6 +2160,167 @@ function noOverlaps(spec: ReturnType<typeof startingDesign>): boolean {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// Run-bound cabinet operations — offset is the source of truth
+// ---------------------------------------------------------------------------
+
+{
+  const source = startingDesign("kitchen", { width: 3600 });
+  const sink = source.cabinets.find((cabinet) => cabinet.label === "Sink unit")!;
+  const runId = sink.runId!;
+  const sameRunFloor = source.cabinets
+    .filter(
+      (cabinet) =>
+        cabinet.runId === runId && Math.abs(cabinet.position.y - sink.position.y) < 1,
+    )
+    .sort((left, right) => (left.offset ?? 0) - (right.offset ?? 0));
+  const sinkIndex = sameRunFloor.findIndex((cabinet) => cabinet.id === sink.id);
+  const follower = sameRunFloor[sinkIndex + 1]!;
+
+  // The old bug was invisible in a straight starter because x and offset began
+  // equal. Poison the snapshots so every operation has to read the run-local
+  // value instead of accidentally passing through the old coordinate.
+  const withStaleSnapshots = () => {
+    const stale = structuredClone(source);
+    stale.cabinets.forEach((cabinet, index) => {
+      if (!cabinet.runId) return;
+      cabinet.position.x = 20_000 + index * 137;
+      cabinet.position.z = -4_000 - index * 71;
+    });
+    return stale;
+  };
+
+  const resized = resizeCabinet(withStaleSnapshots(), sink.id, {
+    width: sink.size.width + 150,
+  });
+  const resizedSink = resized.cabinets.find((cabinet) => cabinet.id === sink.id)!;
+  const resizedFollower = resized.cabinets.find((cabinet) => cabinet.id === follower.id)!;
+  check(
+    "resizing a run cabinet preserves its local offset despite a stale x snapshot",
+    resizedSink.offset === sink.offset,
+    `${resizedSink.offset} vs ${sink.offset}`,
+  );
+  check(
+    "resizing a run cabinet shifts only its run neighbours by the gained width",
+    resizedFollower.offset === (follower.offset ?? 0) + 150,
+    `${resizedFollower.offset} vs ${(follower.offset ?? 0) + 150}`,
+  );
+  check("a run resize leaves no resolved overlap", noResolvedRowOverlaps(resized));
+
+  const duplicated = duplicateCabinet(withStaleSnapshots(), sink.id);
+  const copy = duplicated.cabinets.find(
+    (cabinet) => !source.cabinets.some((original) => original.id === cabinet.id),
+  )!;
+  check(
+    "duplicating a run cabinet keeps its run identity and inserts by offset",
+    copy.runId === runId && copy.offset === (sink.offset ?? 0) + sink.size.width,
+    `${copy.runId ?? "none"} @ ${copy.offset}`,
+  );
+  check("a duplicated run cabinet does not overlap in the resolver", noResolvedRowOverlaps(duplicated));
+
+  const added = addCabinet(withStaleSnapshots(), {
+    kind: "base",
+    afterId: sink.id,
+    width: 600,
+  });
+  const addedCabinet = added.cabinets.find(
+    (cabinet) => !source.cabinets.some((original) => original.id === cabinet.id),
+  )!;
+  check(
+    "adding beside a run cabinet inherits the run and local insertion offset",
+    addedCabinet.runId === runId &&
+      addedCabinet.offset === (sink.offset ?? 0) + sink.size.width,
+    `${addedCabinet.runId ?? "none"} @ ${addedCabinet.offset}`,
+  );
+  check("an added run cabinet does not overlap in the resolver", noResolvedRowOverlaps(added));
+
+  const moduleAdded = addModule(withStaleSnapshots(), "base-cupboard", sink.id);
+  const namedModule = moduleAdded.cabinets.find(
+    (cabinet) => !source.cabinets.some((original) => original.id === cabinet.id),
+  )!;
+  check(
+    "a named module beside a run cabinet inherits its run and offset",
+    namedModule.runId === runId &&
+      namedModule.offset === (sink.offset ?? 0) + sink.size.width,
+    `${namedModule.runId ?? "none"} @ ${namedModule.offset}`,
+  );
+  check("a named run module does not overlap in the resolver", noResolvedRowOverlaps(moduleAdded));
+
+  const removed = removeCabinet(withStaleSnapshots(), sink.id);
+  const closedFollower = removed.cabinets.find((cabinet) => cabinet.id === follower.id)!;
+  check(
+    "removing a run cabinet closes the local offset gap",
+    closedFollower.offset === (follower.offset ?? 0) - sink.size.width,
+    `${closedFollower.offset} vs ${(follower.offset ?? 0) - sink.size.width}`,
+  );
+  check("a removed run cabinet leaves no resolved overlap", noResolvedRowOverlaps(removed));
+
+  const moved = moveCabinet(withStaleSnapshots(), sink.id, { x: 2400 });
+  const movedSink = moved.cabinets.find((cabinet) => cabinet.id === sink.id)!;
+  check(
+    "moving a run cabinet updates offset rather than its stale position snapshot",
+    movedSink.offset !== sink.offset,
+    `${movedSink.offset} vs ${sink.offset}`,
+  );
+  check("reflowing a moved run cabinet leaves no resolved overlap", noResolvedRowOverlaps(moved));
+
+  // A turned wall needs both world axes. Moving to 900 mm along this L's side
+  // run is exact; x alone cannot encode distance along the turned wall.
+  const lPlan = withStaleSnapshots();
+  lPlan.layout = "l_shaped";
+  lPlan.runs = [
+    { ...lPlan.runs[0]!, id: "back", length: 5000, depth: 600 },
+    { id: "side", label: "Wall B", length: 3000, depth: 600, height: 2400 },
+  ];
+  for (const cabinet of lPlan.cabinets) cabinet.runId = "back";
+  const sideCabinet = lPlan.cabinets.find((cabinet) => cabinet.kind === "base")!;
+  sideCabinet.runId = "side";
+  sideCabinet.offset = 100;
+  sideCabinet.position.x = 99_999;
+  sideCabinet.position.z = -99_999;
+
+  const sideRun = resolveDesign(lPlan).layout.placements.find(
+    (placement) => placement.runId === "side",
+  )!;
+  const targetPoint = {
+    x: sideRun.origin.x,
+    z: sideRun.origin.z + 900,
+  };
+
+  const turned = moveCabinet(lPlan, sideCabinet.id, targetPoint, {
+    reflow: false,
+  });
+  const turnedCabinet = turned.cabinets.find((cabinet) => cabinet.id === sideCabinet.id)!;
+  const turnedPlacement = resolveDesign(turned).cabinets.find(
+    (placed) => placed.cabinet.id === sideCabinet.id,
+  )!;
+  check(
+    "moving on a turned run projects world x/z onto its local offset",
+    turnedCabinet.offset === 900,
+    `${turnedCabinet.offset}`,
+  );
+  check(
+    "the turned-run move resolves at the requested world point",
+    near(turnedPlacement.x, targetPoint.x) && near(turnedPlacement.z, targetPoint.z),
+    `${turnedPlacement.x}, ${turnedPlacement.z}`,
+  );
+
+  const free = structuredClone(startingDesign("custom"));
+  const freeCabinet = free.cabinets[0]!;
+  delete freeCabinet.runId;
+  delete freeCabinet.offset;
+  freeCabinet.position = { x: 250, y: 0, z: 50 };
+  const freeMoved = moveCabinet(free, freeCabinet.id, { x: 900, z: 300 }, {
+    reflow: false,
+  });
+  const freeAfter = freeMoved.cabinets[0]!;
+  check(
+    "a free-standing cabinet still moves by its stored world coordinates",
+    !freeAfter.runId && freeAfter.position.x === 900 && freeAfter.position.z === 300,
+    `${freeAfter.runId ?? "free"} @ ${freeAfter.position.x},${freeAfter.position.z}`,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Dragging — the arithmetic behind a handle
@@ -2239,10 +2929,12 @@ function normalise(v: Vec): Vec {
     }).parts;
 
   const heightOf = (parts: ReturnType<typeof build>) =>
-    Math.min(
+    Math.max(
       ...parts
         .filter((part) => part.role === "drawer_front")
-        .flatMap((part) => part.placements.map((p) => p.y)),
+        .flatMap((part) =>
+          part.placements.map((p) => p.y + part.size.y),
+        ),
     );
 
   check(
@@ -2313,34 +3005,118 @@ function normalise(v: Vec): Vec {
       size: { ...cabinet.size, depth: 800 },
     })),
   }).spec;
+  const open = validateSpec({
+    ...standard,
+    cabinets: standard.cabinets.map((cabinet) => ({
+      ...cabinet,
+      bays: cabinet.bays.map((bay) => ({
+        ...bay,
+        fitting: { kind: "open" as const },
+        door: "none" as const,
+      })),
+    })),
+  }).spec;
 
   for (const [label, wardrobe] of [
     ["narrow wardrobe", shallow],
     ["standard wardrobe", standard],
     ["wide wardrobe", wide],
     ["deep wardrobe", deep],
+    ["open wardrobe", open],
   ] as const) {
     const parts = buildParts(wardrobe).parts;
-    const front = parts.find((part) => /wardrobe-plinth-front$/.test(part.id));
+    const placed = resolveDesign(wardrobe).cabinets.find(
+      (entry) => entry.cabinet.id === wardrobe.cabinets[0]!.id,
+    )!;
+    const fronts = parts.filter(
+      (part) =>
+        part.cabinetId === placed.cabinet.id &&
+        /wardrobe-plinth-front(?:-|$)/.test(part.id),
+    );
     const sides = parts.find((part) => /wardrobe-plinth-side$/.test(part.id));
+    const rears = parts.filter((part) => /wardrobe-plinth-rear(?:-|$)/.test(part.id));
+    const plinths = parts.filter(
+      (part) => part.cabinetId === placed.cabinet.id && part.role === "plinth",
+    );
     const cabinet = wardrobe.cabinets[0]!;
     const t = wardrobe.carcass.board.thickness;
-    const expectedRecess = Math.min(40, Math.max(0, cabinet.size.depth - 2 * t));
+    const visibleFront = parts.find(
+      (part) =>
+        part.cabinetId === cabinet.id &&
+        (part.role === "door" || part.role === "drawer_front"),
+    );
+    const frontThickness = visibleFront?.size.z ?? 0;
+    const expectedRecess = Math.min(
+      Math.max(0, WARDROBE_PLINTH_VISIBLE_RECESS - frontThickness),
+      Math.max(0, cabinet.size.depth - 2 * t),
+    );
+    const frontSpans = fronts
+      .flatMap((part) =>
+        part.placements.map((placement) => ({
+          start: placement.x - placed.x,
+          end: placement.x - placed.x + part.size.x,
+          z: placement.z - placed.z,
+          y: placement.y - placed.y,
+          part,
+        })),
+      )
+      .sort((left, right) => left.start - right.start);
+    const rearSpans = rears
+      .flatMap((part) =>
+        part.placements.map((placement) => ({
+          start: placement.x - placed.x,
+          end: placement.x - placed.x + part.size.x,
+          z: placement.z - placed.z,
+          part,
+        })),
+      )
+      .sort((left, right) => left.start - right.start);
+    const hasContinuousFront =
+      frontSpans.length > 0 &&
+      near(frontSpans[0]!.start, 0, 1) &&
+      near(frontSpans.at(-1)!.end, cabinet.size.width, 1) &&
+      frontSpans.every(
+        (span, index) =>
+          index === 0 || near(frontSpans[index - 1]!.end, span.start, 1),
+      );
+    const hasContinuousRear =
+      rearSpans.length > 0 &&
+      near(rearSpans[0]!.start, t, 1) &&
+      near(rearSpans.at(-1)!.end, cabinet.size.width - t, 1) &&
+      rearSpans.every(
+        (span, index) =>
+          index === 0 || near(rearSpans[index - 1]!.end, span.start, 1),
+      );
 
     check(`${label}: has no individual feet`, parts.every((part) => part.role !== "leg"));
-    check(`${label}: has one continuous front plinth`, front?.quantity === 1);
+    check(`${label}: has a physically continuous front plinth`, hasContinuousFront);
     check(
-      `${label}: front plinth follows the full width`,
-      front?.size.x === cabinet.size.width && front.length === cabinet.size.width,
+      `${label}: plinth is cut from the black material selected for it`,
+      plinths.length > 0 && plinths.every((part) => part.board.id === "mdf-18-black"),
+      plinths.map((part) => part.board.id).join(", "),
+    );
+    check(
+      `${label}: front plinth follows the full width through supported cut sections`,
+      frontSpans.reduce((total, span) => total + span.part.size.x, 0) === cabinet.size.width,
+      frontSpans.map((span) => `${span.start}..${span.end}`).join(", "),
     );
     check(
       `${label}: front plinth preserves the reserved base height`,
-      front?.size.y === cabinet.plinthHeight && front.placements[0]?.y === 0,
+      frontSpans.every(
+        (span) => span.part.size.y === cabinet.plinthHeight && span.y === 0,
+      ),
     );
     check(
-      `${label}: front is recessed from the doors`,
-      front?.placements[0]?.z === expectedRecess && expectedRecess > 0,
+      `${label}: plinth face is recessed from the outer doors`,
+      frontSpans.every((span) => span.z === expectedRecess),
       `expected ${expectedRecess} mm`,
+    );
+    check(
+      `${label}: visible plinth reveal is exactly 20 mm`,
+      frontSpans.length > 0 &&
+        frontSpans.every((span) => span.z === expectedRecess) &&
+        expectedRecess + frontThickness === WARDROBE_PLINTH_VISIBLE_RECESS,
+      `${frontSpans[0]?.z ?? "missing"} + ${frontThickness}`,
     );
     check(
       `${label}: side returns meet the front without overlapping it`,
@@ -2349,14 +3125,24 @@ function normalise(v: Vec): Vec {
         sides.size.z === cabinet.size.depth - expectedRecess - t,
     );
     check(
+      `${label}: rear plinth closes the real support box without overlap`,
+      hasContinuousRear &&
+        rearSpans.every((span) => span.z === cabinet.size.depth - t),
+    );
+    check(
       `${label}: base stays inside the cabinet footprint`,
-      Boolean(front && sides) &&
-        front!.placements.every((at) => at.z >= 0 && at.z + front!.size.z <= cabinet.size.depth) &&
-        sides!.placements.every(
-          (at) =>
-            at.x >= 0 &&
-            at.x + sides!.size.x <= cabinet.size.width &&
-            at.z + sides!.size.z <= cabinet.size.depth,
+      Boolean(sides) &&
+        plinths.every((part) =>
+          part.placements.every(
+            (at) =>
+              at.x - placed.x >= -1 &&
+              at.x - placed.x + part.size.x <= cabinet.size.width + 1 &&
+              at.z - placed.z >= -1 &&
+              at.z - placed.z + part.size.z <= cabinet.size.depth + 1 &&
+              part.size.x > 0 &&
+              part.size.y > 0 &&
+              part.size.z > 0,
+          ),
         ),
     );
   }
@@ -2364,7 +3150,11 @@ function normalise(v: Vec): Vec {
   const cutList = buildCutList(standard, buildParts(standard));
   check(
     "the recessed plinth reaches the cut list",
-    cutList.rows.some((row) => /Recessed black plinth, front/.test(row.label)),
+    cutList.rows.some(
+      (row) =>
+        /Recessed plinth, front/.test(row.label) &&
+        row.boardId === "mdf-18-black",
+    ),
   );
 
   // A wardrobe can contain more than one cabinet. The common generator must
@@ -2378,9 +3168,15 @@ function normalise(v: Vec): Vec {
     "combined wardrobes give every cabinet the shared plinth",
     combinedFronts.length === combined.cabinets.length,
   );
+  const combinedFrontThickness =
+    combined.carcass.frontBoard?.thickness ?? combined.carcass.board.thickness;
   check(
-    "combined wardrobe plinths retain the 40 mm front recess",
-    combinedFronts.every((part) => part.placements[0]!.z === 40),
+    "combined wardrobe plinths retain the 20 mm visible front recess",
+    combinedFronts.every(
+      (part) =>
+        part.placements[0]!.z + combinedFrontThickness ===
+        WARDROBE_PLINTH_VISIBLE_RECESS,
+    ),
   );
 
   // Changing a non-wardrobe item must not acquire the wardrobe treatment.
@@ -2390,8 +3186,9 @@ function normalise(v: Vec): Vec {
     buildParts(tvUnit).parts.some((part) => part.role === "leg"),
   );
 
-  // Scope the assertion to the material function and strip comments, so a
-  // string in an import or explanation cannot satisfy the check.
+  // The viewer receives the exact board assigned to each generated part. This
+  // is call syntax rather than a comment/identifier search, so a visual-only
+  // hard-coded plinth cannot satisfy it.
   const source = readFileSync(
     "src/features/berchuma-studio/components/viewer/model.tsx",
     "utf8",
@@ -2401,10 +3198,63 @@ function normalise(v: Vec): Vec {
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/.*$/gm, "");
   check(
-    "the viewer renders wardrobe plinths as black geometry",
-    /case "plinth":\s*return spec\.furnitureType === "wardrobe"\s*\? "#16181d"/.test(
-      colourFor,
-    ),
+    "the viewer renders the plinth from its selected board material",
+    /return boardColour\(part\.board, spec\)/.test(colourFor),
+  );
+}
+
+// Diagonal corners use one shared physical depth. A 600 mm main run joined to
+// a 400 mm return cannot have a continuous diagonal face; validation expands
+// the connected shell rather than leaving a hidden triangular void or quietly
+// switching the customer to another corner type.
+{
+  const base = startingDesign("wardrobe", { width: 900 });
+  const source = base.cabinets[0]!;
+  const cabinetFor = (
+    id: string,
+    runId: string,
+    depth: number,
+    position: { x: number; z: number },
+  ) => ({
+    ...structuredClone(source),
+    id,
+    label: id,
+    runId,
+    offset: 0,
+    position: { x: position.x, y: 0, z: position.z },
+    size: { ...source.size, depth },
+    bays: source.bays.map((bay, index) => ({
+      ...structuredClone(bay),
+      id: `${id}-bay-${index + 1}`,
+    })),
+  });
+  const mismatch = validateSpec({
+    ...base,
+    layout: "l_shaped",
+    cornerKind: "diagonal",
+    runs: [
+      { id: "wall-a", label: "Wall A", length: 1800, depth: 600, height: 2400 },
+      { id: "wall-b", label: "Wall B", length: 1800, depth: 400, height: 2400 },
+    ],
+    cabinets: [
+      cabinetFor("diagonal-a", "wall-a", 600, { x: 0, z: 0 }),
+      cabinetFor("diagonal-b", "wall-b", 400, { x: 1800, z: 600 }),
+    ],
+  });
+  check(
+    "a mismatched-depth diagonal wardrobe normalises every joined run and cabinet",
+    mismatch.spec.runs.every((run) => run.depth === 600) &&
+      mismatch.spec.cabinets.every((cabinet) => cabinet.size.depth === 600) &&
+      mismatch.issues.some((issue) => issue.correction?.includes("common 600 mm depth")),
+  );
+  const diagonalParts = buildParts(mismatch.spec);
+  const diagonalCutList = buildCutList(mismatch.spec, diagonalParts);
+  check(
+    "a repaired diagonal wardrobe has real angled geometry and a fully nestable cut list",
+    diagonalParts.parts.some(
+      (part) => /diagonal-face$/.test(part.id) && Math.abs(part.rotationY ?? 0) === 135,
+    ) && diagonalCutList.buildable && diagonalCutList.unplaced.length === 0,
+    diagonalCutList.unplaced.flatMap((entry) => entry.pieces).map((piece) => piece.reason).join("; "),
   );
 }
 
@@ -2420,6 +3270,18 @@ function normalise(v: Vec): Vec {
   const source = readFileSync(
     "src/features/berchuma-studio/components/viewer/elevation.tsx",
     "utf8",
+  );
+
+  const elevation = source
+    .slice(source.indexOf("export function Elevation"), source.indexOf("/** One cabinet"))
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+  check(
+    "the elevation resolves run-bound cabinet positions and refuses a misleading turned layout projection",
+    /const resolved\s*=\s*resolveDesign\(spec\)/.test(elevation) &&
+      /spec\.furnitureType\s*!==\s*"wardrobe"\s*\|\|\s*spec\.layout\s*===\s*"straight"/.test(elevation) &&
+      /spec\.furnitureType\s*===\s*"wardrobe"\s*\?\s*resolved\.cabinets/.test(elevation) &&
+      /supportsFrontElevation\s*\?\s*elevationCabinets\.map/.test(elevation),
   );
 
   // Call syntax, not the bare name: the word appears in the import line and in
@@ -2438,6 +3300,56 @@ function normalise(v: Vec): Vec {
     "and builds each band's contents from the same fitting the geometry uses",
     /sectionFitting\(/.test(source),
   );
+
+  // Construction y grows upward from the floor, while SVG y grows downward
+  // from the page top. An unequal pair catches the silent reversal that equal
+  // drawers hide: the short first/front must remain visually above the deep
+  // second/front exactly as its generated 3D position says.
+  const unequal = resolveDrawerFaces({
+    count: 2,
+    openingHeight: 500,
+    openingFloor: 0,
+    frontHeights: [100, 300],
+  });
+  const svgTops = unequal.map((face) => drawerFaceSvgTop(face, 80, 500));
+  check(
+    "unequal drawer elevation preserves the generated top-to-bottom order",
+    (unequal[0]?.floor ?? 0) > (unequal[1]?.floor ?? 0) &&
+      (svgTops[0] ?? Infinity) < (svgTops[1] ?? -Infinity),
+    `${unequal.map((face) => `${face.floor}/${face.height}`).join(", ")} → ${svgTops.join(", ")}`,
+  );
+  const fitting = source
+    .slice(source.indexOf("function Fitting"), source.indexOf("function Doors"))
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+  check(
+    "the elevation converts drawer fronts through the shared SVG transform",
+    /drawerFaceSvgTop\(drawer, y, height\)/.test(fitting),
+  );
+}
+
+/**
+ * Run-bound cabinets are ordered by local `offset`, not their position snapshot.
+ * This deliberately checks the resolver's output: raw x can look non-overlapping
+ * while an L/U run places two boxes on top of each other.
+ */
+function noResolvedRowOverlaps(spec: DesignSpec): boolean {
+  const placed = resolveDesign(spec).cabinets;
+
+  for (const [index, left] of placed.entries()) {
+    for (const right of placed.slice(index + 1)) {
+      if (Math.abs(left.y - right.y) >= 1) continue;
+      if (left.runId !== right.runId) continue;
+
+      const leftStart = left.offset ?? left.x;
+      const rightStart = right.offset ?? right.x;
+      const apart =
+        leftStart + left.cabinet.size.width <= rightStart + 1 ||
+        rightStart + right.cabinet.size.width <= leftStart + 1;
+      if (!apart) return false;
+    }
+  }
+  return true;
 }
 
 
@@ -2452,19 +3364,27 @@ function normalise(v: Vec): Vec {
 // the jumpers go.
 {
   const base = startingDesign("wardrobe", { width: 900 });
-  const cabinet = base.cabinets[0]!;
-  const bay = cabinet.bays[0]!;
+  const sourceCabinet = base.cabinets[0]!;
+  const sourceBay = sourceCabinet.bays[0]!;
 
-  const withDrawers: DesignSpec = {
+  // 650 mm overall leaves 514 mm between the 100 mm plinth and 18 mm top /
+  // bottom panels: four 126 mm fronts are buildable, and a fifth remains a
+  // practical 100 mm front. The old full-height fixture started invalid and
+  // therefore made every editor action test validator repair rather than the
+  // action being tested.
+  const withDrawers = validateSpec({
     ...base,
     cabinets: [
       {
-        ...cabinet,
-        bays: [{ ...bay, fitting: { kind: "drawers", count: 4 } }],
+        ...sourceCabinet,
+        size: { ...sourceCabinet.size, height: 650 },
+        bays: [{ ...sourceBay, fitting: { kind: "drawers", count: 4 } }],
       },
       ...base.cabinets.slice(1),
     ],
-  };
+  }).spec;
+  const cabinet = withDrawers.cabinets[0]!;
+  const bay = cabinet.bays[0]!;
 
   const opening = openingHeightOf(
     withDrawers.cabinets[0]!,
@@ -2480,6 +3400,8 @@ function normalise(v: Vec): Vec {
     const fitting = spec.cabinets[0]!.bays[0]!.fitting;
     return fitting.kind === "drawers" ? fitting.count : 0;
   };
+  const frontSpace = (spec: DesignSpec): number =>
+    opening - Math.max(0, countOf(spec) - 1) * 3;
 
   /** The fronts as the geometry actually draws them, top to bottom. */
   const drawnFronts = (spec: DesignSpec) =>
@@ -2495,13 +3417,13 @@ function normalise(v: Vec): Vec {
 
   check(
     "a bay of four drawers starts equal",
-    new Set(heightsOf(withDrawers)).size === 1,
+    Math.max(...heightsOf(withDrawers)) - Math.min(...heightsOf(withDrawers)) <= 1,
     heightsOf(withDrawers).join(", "),
   );
 
   // ---- Setting a height ---------------------------------------------------
 
-  const deepBottom = setDrawerHeight(withDrawers, cabinet.id, bay.id, 3, 600);
+  const deepBottom = setDrawerHeight(withDrawers, cabinet.id, bay.id, 3, 180);
   const after = heightsOf(deepBottom);
 
   check(
@@ -2511,8 +3433,8 @@ function normalise(v: Vec): Vec {
   );
   check(
     "and the others give way rather than the bay growing",
-    Math.abs(after.reduce((sum, height) => sum + height, 0) - opening) <= 2,
-    `${after.reduce((sum, height) => sum + height, 0)} vs opening ${opening}`,
+    Math.abs(after.reduce((sum, height) => sum + height, 0) - frontSpace(deepBottom)) <= 2,
+    `${after.reduce((sum, height) => sum + height, 0)} vs usable front space ${frontSpace(deepBottom)}`,
   );
   check(
     "and the change reaches the geometry",
@@ -2531,7 +3453,7 @@ function normalise(v: Vec): Vec {
   const tiny = setDrawerHeight(withDrawers, cabinet.id, bay.id, 0, 20);
   check(
     "a drawer front cannot be made absurdly short",
-    (heightsOf(tiny)[0] ?? 0) >= 60,
+    (heightsOf(tiny)[0] ?? 0) >= LIMITS.minDrawerFront,
     `${heightsOf(tiny)[0]} mm`,
   );
 
@@ -2541,7 +3463,7 @@ function normalise(v: Vec): Vec {
   check("adding a drawer raises the count", countOf(five) === 5);
   check(
     "and the fronts still fill the opening",
-    Math.abs(heightsOf(five).reduce((sum, h) => sum + h, 0) - opening) <= 2,
+    Math.abs(heightsOf(five).reduce((sum, h) => sum + h, 0) - frontSpace(five)) <= 2,
   );
   check(
     "and the geometry draws five",
@@ -2553,35 +3475,50 @@ function normalise(v: Vec): Vec {
   check("removing a drawer lowers the count", countOf(three) === 3);
   check(
     "and the space goes back to the others",
-    Math.abs(heightsOf(three).reduce((sum, h) => sum + h, 0) - opening) <= 2,
+    Math.abs(heightsOf(three).reduce((sum, h) => sum + h, 0) - frontSpace(three)) <= 2,
   );
 
-  // The floor: one drawer is a chest of drawers, none is a hole in the front.
+  // The physical floor: this opening needs at least two fronts because one
+  // 514 mm slab is beyond the 280 mm manufactured maximum.
   let stripped = withDrawers;
   for (let i = 0; i < 10; i += 1) {
     stripped = removeDrawer(stripped, cabinet.id, bay.id, 0);
   }
   check(
-    "the last drawer cannot be removed",
-    countOf(stripped) === 1,
+    "drawers cannot be removed below the physical front-height minimum",
+    countOf(stripped) === 2,
     `${countOf(stripped)} left`,
   );
 
-  // And the ceiling.
+  // And the ceiling. This particular 514 mm opening can physically carry five
+  // fronts; the schema's global twelve-front limit is only a second cap.
   let piled = withDrawers;
   for (let i = 0; i < 12; i += 1) {
     piled = addDrawer(piled, cabinet.id, bay.id);
   }
   check(
-    "drawers stop at the schema's maximum",
-    countOf(piled) === 8,
+    "drawers stop at their cabinet's physical maximum",
+    countOf(piled) === 5,
     `${countOf(piled)}`,
+  );
+  const controls = readFileSync(
+    "src/features/berchuma-studio/components/editor/control-panel.tsx",
+    "utf8",
+  );
+  const drawerControls = controls
+    .slice(controls.indexOf("function DrawerList"), controls.indexOf("function IconButton"))
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+  check(
+    "the editor uses the shared physical drawer-count maximum",
+    /heights\.length\s*<\s*drawerRange\.maximum/.test(drawerControls) &&
+      /heights\.length\s*<=\s*drawerRange\.minimum/.test(drawerControls),
   );
 
   // Duplicated from the *middle*, deliberately. Copying the last drawer cannot
   // tell "insert below the original" from "append to the end" — they are the
   // same position — so the check would pass on either.
-  const tallTop = setDrawerHeight(withDrawers, cabinet.id, bay.id, 0, 700);
+  const tallTop = setDrawerHeight(withDrawers, cabinet.id, bay.id, 0, 150);
   const duplicated = duplicateDrawer(tallTop, cabinet.id, bay.id, 0);
   check("duplicating a drawer raises the count", countOf(duplicated) === 5);
 
@@ -2632,7 +3569,7 @@ function normalise(v: Vec): Vec {
   );
   check(
     "and the fronts are equal again",
-    new Set(heightsOf(evened)).size === 1,
+    Math.max(...heightsOf(evened)) - Math.min(...heightsOf(evened)) <= 1,
   );
 
   // ---- Nothing escapes ----------------------------------------------------
@@ -2738,16 +3675,17 @@ function normalise(v: Vec): Vec {
     "a rail the full width of the opening has nowhere for its sockets",
   );
 
-  // A rail is bought tube, not a panel cut from a sheet. The existing invariant
-  // suite would otherwise treat it as board and put it in the nesting.
+  // A rail is bought tube, not a panel cut from a sheet. It must appear on the
+  // hardware schedule and never be nested as a fictitious MDF strip.
   const cutList = buildCutList(
     withFitting({ kind: "hanging", rails: 1, shelfAbove: true }),
     single,
   );
   check(
-    "the rail reaches the cut list",
-    cutList.rows.some((row) => /rail/i.test(row.label)),
-    "the shop has to buy it",
+    "the rail is hardware, not a cut-board row",
+    !cutList.rows.some((row) => /^Hanging rail\b/i.test(row.label)) &&
+      cutList.hardware.some((line) => /rail/i.test(line.label)),
+    "the shop has to buy it but must not cut it from MDF",
   );
 }
 

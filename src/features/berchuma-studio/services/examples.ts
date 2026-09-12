@@ -13,6 +13,8 @@ import { boundingBox, type Bay, type Cabinet, type DesignSpec } from "../types/s
 
 const carcassBoard = findBoard("mdf-18-walnut") ?? BOARDS[0]!;
 const backBoard = findBoard("hdf-4-white") ?? BOARDS[BOARDS.length - 1]!;
+const wardrobeBackBoard = findBoard("hdf-6-white") ?? backBoard;
+const blackPlinthBoard = findBoard("mdf-18-black") ?? carcassBoard;
 const band = findEdgeBand("pvc-2-walnut") ?? EDGE_BANDS[0]!;
 
 /** A cabinet, without repeating the position-and-size boilerplate each time. */
@@ -38,7 +40,9 @@ function cabinet(
 
 /**
  * The bread-and-butter job: a 2400 mm three-bay wardrobe, hanging in the two
- * outer bays, drawers and shelves in the middle.
+ * outer bays, shelves on one side and a reference-informed mixed storage bay
+ * in the middle. It deliberately uses compact lower drawers rather than a
+ * full-height bank of oversized false fronts.
  */
 export function wardrobeExample(): DesignSpec {
   const cabinets = [
@@ -60,7 +64,14 @@ export function wardrobeExample(): DesignSpec {
         {
           id: "bay-2",
           width: 776,
-          fitting: { kind: "drawers", count: 4 },
+          fitting: {
+            kind: "stack",
+            sections: [
+              { id: "top-storage", kind: "open", share: 3 },
+              { id: "hanging", kind: "hanging", share: 8, rails: 1 },
+              { id: "drawers", kind: "drawers", share: 4, drawers: 3 },
+            ],
+          },
           door: "hinged",
           doorLeaves: 1,
         },
@@ -91,7 +102,10 @@ export function wardrobeExample(): DesignSpec {
     envelope: run.envelope,
     carcass: {
       board: carcassBoard,
-      backBoard,
+      frontBoard: carcassBoard,
+      interiorBoard: carcassBoard,
+      backBoard: wardrobeBackBoard,
+      plinthBoard: blackPlinthBoard,
       edgeBand: band,
       plinthHeight: 100,
       doorGap: 2,

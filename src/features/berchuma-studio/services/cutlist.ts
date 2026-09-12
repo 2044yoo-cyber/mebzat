@@ -38,6 +38,8 @@ export type CutListRow = {
 
 export type CutList = {
   title: string;
+  /** True only when every listed physical part fits its assigned stock sheet. */
+  buildable: boolean;
   rows: CutListRow[];
   /** One block per board type, because that is one trip to the rack. */
   byBoard: {
@@ -53,6 +55,12 @@ export type CutList = {
   }[];
   hardware: { label: string; quantity: number; unit: string; note: string }[];
   totals: { pieces: number; area: number; bandMetres: number };
+  /** Explicit production blockers, grouped by their stocked board. */
+  unplaced: {
+    boardId: string;
+    boardLabel: string;
+    pieces: { index: number; label: string; reason: string }[];
+  }[];
   notes: string[];
 };
 
@@ -65,11 +73,18 @@ export function buildCutList(
   options: { nesting?: NestOptions } = {},
 ): CutList {
 
+  // Rails and legs are rendered physical components but are bought hardware,
+  // not strips to nest from MDF. Only cut-board parts belong on this sheet.
+  const cutParts = breakdown.parts.filter(
+    (part) => part.manufacture !== "purchased",
+  );
+  const boards = new Map(cutParts.map((part) => [part.board.id, part.board]));
+
   // Group by everything that makes two pieces genuinely different. Size alone
   // is not enough: a 600×500 shelf in walnut and one in white are two rows.
   const groups = new Map<string, { part: Part; quantity: number }>();
 
-  for (const part of breakdown.parts) {
+  for (const part of cutParts) {
     const key = [
       part.board.id,
       part.length,
@@ -134,10 +149,13 @@ export function buildCutList(
   const byBoard = boardIds.map((boardId) => {
     const boardRows = rows.filter((row) => row.boardId === boardId);
     const area = boardRows.reduce((total, row) => total + row.area, 0);
-    const board =
-      spec.carcass.board.id === boardId
-        ? spec.carcass.board
-        : spec.carcass.backBoard;
+    const board = boards.get(boardId);
+    if (!board) {
+      // A row can only have been created from `cutParts`, so reaching this
+      // branch would mean its own board reference was lost. Keeping the guard
+      // avoids silently nesting a front MDF on a back-panel sheet.
+      throw new Error(`No board definition found for ${boardId}.`);
+    }
 
     // The sheet count is now a consequence of laying the parts out, not an
     // assumption in front of it. It used to be area ÷ sheet area with a flat
@@ -166,6 +184,20 @@ export function buildCutList(
     `Sheet counts come from the layout on the following pages, not from an offcut allowance.`,
   ];
 
+  const unplaced = byBoard
+    .filter((board) => board.nesting.unplaced.length > 0)
+    .map((board) => ({
+      boardId: board.boardId,
+      boardLabel: board.boardLabel,
+      pieces: board.nesting.unplaced,
+    }));
+
+  if (unplaced.length > 0) {
+    notes.push(
+      "This design has parts that do not fit their assigned stock sheet. It cannot be exported or sent for manufacture until corrected.",
+    );
+  }
+
   if (rows.some((row) => row.grainLocked)) {
     notes.push(
       "Grain-matched parts are marked and must not be rotated when nesting.",
@@ -177,6 +209,7 @@ export function buildCutList(
 
   return {
     title: spec.title,
+    buildable: unplaced.length === 0,
     rows,
     byBoard,
     hardware: breakdown.hardware.map((line) => ({
@@ -193,6 +226,7 @@ export function buildCutList(
       ),
       bandMetres: round(bandMetres, 2),
     },
+    unplaced,
     notes,
   };
 }
@@ -246,6 +280,13 @@ function round(value: number, places: number): number {
  */
 export function sheetCountsOf(cutList: CutList): Record<string, number> {
   const counts: Record<string, number> = {};
-  for (const board of cutList.byBoard) counts[board.boardId] = board.sheets;
+  for (const board of cutList.byBoard) {
+    // Zero sheets is not a price. Omitting an unplaceable board makes the cost
+    // engine use its explicit estimate path instead of falsely pricing a
+    // physical panel as free while the design is blocked from manufacture.
+    if (board.nesting.unplaced.length === 0) {
+      counts[board.boardId] = board.sheets;
+    }
+  }
   return counts;
 }
