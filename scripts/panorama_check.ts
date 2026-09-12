@@ -31,9 +31,15 @@ import {
   captureManually,
   frameName,
   frameWidthFor,
+  HALF_FOV_DEGREES,
   guidance,
+  headingFrom,
   isComplete,
+  isLevel,
   progress,
+  relativeHeading,
+  targetOffset,
+  tiltOff,
   startCapture,
   targetAngle,
 } from "../src/lib/panorama/capture.ts";
@@ -547,11 +553,123 @@ function code(path: string): string {
 
   check(
     "the guidance is short, because the person is turning",
-    guidance({ action: "wait", turnBy: 30, state: startCapture() }).length < 24,
+    guidance({ action: "wait", turnBy: 30, reason: "turn", state: startCapture() })
+      .length < 34,
   );
   check(
     "turning too far says to come back",
-    /back/i.test(guidance({ action: "wait", turnBy: -20, state: startCapture() })),
+    /back/i.test(
+      guidance({ action: "wait", turnBy: -50, reason: "turn", state: startCapture() }),
+    ),
+  );
+  check(
+    "once the target is on screen it says to line it up, not to turn more",
+    /line/i.test(
+      guidance({ action: "wait", turnBy: -20, reason: "turn", state: startCapture() }),
+    ),
+    "a target the person can see is a thing to aim at; telling them to keep turning walks them past it",
+  );
+  check(
+    "and a phone held at the wrong height is told so, not told to turn",
+    /level/i.test(
+      guidance({ action: "wait", turnBy: 0, reason: "level", state: startCapture() }),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Which way is the phone facing — the bug behind the melted panorama
+// ---------------------------------------------------------------------------
+
+{
+  check(
+    "iOS's compass heading is preferred over its alpha",
+    headingFrom({ alpha: 200, compass: 90 }) === 90,
+    "iOS fires no `deviceorientationabsolute` and its alpha is measured from wherever the page loaded — reading it gives a number that moves like a heading and points nowhere",
+  );
+  check(
+    "a compass bearing is taken as it is, clockwise from north",
+    headingFrom({ compass: 0 }) === 0 && headingFrom({ compass: 359 }) === 359,
+  );
+  check(
+    "alpha is flipped, because it counts the other way",
+    headingFrom({ alpha: 90 }) === 270,
+  );
+  check(
+    "and a reading with neither is no reading",
+    headingFrom({}) === null
+      && headingFrom({ alpha: null, compass: null }) === null
+      && headingFrom({ alpha: Number.NaN }) === null,
+    "a NaN heading would fire every frame at once",
+  );
+  check(
+    "every heading comes back inside one turn",
+    [0, 90, 359.9, 400, -30].every((alpha) => {
+      const heading = headingFrom({ alpha });
+      return heading !== null && heading >= 0 && heading < 360;
+    }),
+  );
+
+  check(
+    "the plan is measured from where the person is standing",
+    relativeHeading(200, 200) === 0,
+    "the plan counts 0, 40, 80 from the start — read as compass bearings, the first frame only fires if somebody happens to be facing the sensor's zero",
+  );
+  check(
+    "and it wraps rather than going negative",
+    relativeHeading(10, 350) === 20 && relativeHeading(350, 10) === 340,
+  );
+  check(
+    "a quarter turn from the start is a quarter turn",
+    relativeHeading(275, 185) === 90,
+  );
+
+  // The tilt, which is the brief's second instruction.
+  check("level is level", isLevel(0) && isLevel(10) && isLevel(-10));
+  check(
+    "and far enough off is not",
+    !isLevel(30) && !isLevel(-30),
+    "a frame shot ten degrees lower shares a horizon with none of its neighbours",
+  );
+  check(
+    "no tilt sensor means the tilt is not checked, not that it is wrong",
+    isLevel(null) && tiltOff(null, 5) === null && tiltOff(5, null) === null,
+    "refusing to capture on a phone that cannot report tilt would refuse to capture at all",
+  );
+  check("tilt is measured against how it was first held", tiltOff(70, 85) === -15);
+
+  {
+    const level = advance(startCapture(), { heading: 0, tilt: 2 });
+    check("a level phone pointing at the target captures", level.action === "capture");
+
+    const tilted = advance(startCapture(), { heading: 0, tilt: 40 });
+    check(
+      "the same phone tilted does not",
+      tilted.action === "wait" && tilted.reason === "level",
+      "it would land in the panorama at an angle its neighbours do not share, and no seam rescues that",
+    );
+
+    const unknown = advance(startCapture(), { heading: 0 });
+    check(
+      "and a phone that cannot say still captures",
+      unknown.action === "capture",
+    );
+  }
+
+  // Where the target is drawn.
+  check("a target dead ahead is dead centre", targetOffset(0) === 0);
+  check(
+    "one at the edge of the view is at the edge of the screen",
+    targetOffset(HALF_FOV_DEGREES) === 1 && targetOffset(-HALF_FOV_DEGREES) === -1,
+  );
+  check(
+    "and one behind you is not on the screen at all",
+    targetOffset(90) === null && targetOffset(-90) === null,
+    "a target pinned to the edge that is really 90° away tells somebody to stop turning far too early",
+  );
+  check(
+    "the offset is signed the way the turn is",
+    (targetOffset(16) ?? 0) > 0 && (targetOffset(-16) ?? 0) < 0,
   );
 }
 
@@ -701,6 +819,21 @@ function windowAfter(src: string, marker: string, chars = 400): string {
   return at < 0 ? "" : src.slice(at, at + chars);
 }
 
+/**
+ * One whole top-level function, from its `function` keyword to the next one.
+ *
+ * `blockAfter` cannot scope a component: its first `{` is the destructured
+ * props, not the body, so the check ends up reading the parameter list. This
+ * is still scoped — a sibling component's lines are not in it — which is the
+ * property that matters.
+ */
+function wholeFunction(src: string, name: string): string {
+  const at = src.indexOf(`function ${name}(`);
+  if (at < 0) return "";
+  const next = src.indexOf("\nfunction ", at + 1);
+  return next < 0 ? src.slice(at) : src.slice(at, next);
+}
+
 function blockAfter(src: string, marker: string): string {
   const start = src.indexOf(marker);
   if (start < 0) return "";
@@ -829,6 +962,135 @@ function blockAfter(src: string, marker: string): string {
   check(
     "and it exits as well as enters",
     /exitFullscreen\(\)/.test(viewer),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Somewhere to aim, and rules for how to shoot — sections 3, 4 and 5
+// ---------------------------------------------------------------------------
+
+{
+  const capture = code("src/components/tour/panorama-capture.tsx");
+
+  // --- the heading, which is what the melted panorama came down to ---------
+  const reading = blockAfter(capture, "const onOrientation = useCallback(");
+  check("the sensor reading is findable", reading.length > 0);
+  check(
+    "the heading source is chosen, not assumed to be alpha",
+    /headingFrom\(\{ alpha: event\.alpha, compass \}\)/.test(reading),
+    "reading alpha on an iPhone gives a number that moves like a heading and points nowhere",
+  );
+  check(
+    "iOS's own compass property is the one actually read",
+    /\}\)\.webkitCompassHeading;/.test(reading),
+    "the type declaration names it too, so matching the name alone passes with the read gone",
+  );
+  check(
+    "the first reading becomes the zero the plan is measured from",
+    /originRef\.current = \{ heading/.test(reading)
+      && /relativeHeading\(heading, originRef\.current\.heading\)/.test(reading),
+    "the plan counts 0, 40, 80 from where somebody stands; read as bearings the ring fills at arbitrary true directions while the frames are labelled as if it had not",
+  );
+  check(
+    "and how the phone was first held becomes the level to keep",
+    /tiltOff\(event\.beta \?\? null, originRef\.current\.beta\)/.test(reading),
+  );
+  check(
+    "a fresh capture forgets the last one's starting point",
+    /originRef\.current = null/.test(blockAfter(capture, "async function start()")),
+    "a second room measured from the first room's zero starts the plan pointing at a wall behind you",
+  );
+  check(
+    "the tilt reaches the decision",
+    /tilt: tiltRef\.current/.test(blockAfter(capture, "tick = window.setInterval(")),
+    "a value read off the sensor and never passed anywhere is a check that does nothing",
+  );
+
+  // --- section 5: something to aim at --------------------------------------
+  check(
+    "the camera view has a target on it",
+    /<Aim\b/.test(capture),
+    "a degree reading tells somebody holding a phone nothing about where to point it",
+  );
+  const aim = wholeFunction(capture, "Aim");
+  check("the target is findable", aim.length > 0);
+  check(
+    "the box moves across the view by how far is left to turn",
+    /translateX\(\$\{offset \* 42\}vw\)/.test(aim),
+  );
+  check(
+    "the ring does not move, because it is where the camera points",
+    /absolute size-16 rounded-full/.test(aim) && !/translateX[\s\S]{0,80}size-16/.test(aim),
+  );
+  check(
+    "landing on the target is visible without reading anything",
+    (aim.match(/onTarget\s*\n?\s*\?\s*"border-emerald/g) ?? []).length >= 2,
+    "the box and the ring both have to answer — asserting that one of them does passes on the other one being broken",
+  );
+  check(
+    "and a target behind you is an arrow, not a box pinned to the edge",
+    /offset === null &&/.test(aim) && /ChevronRight|ChevronLeft/.test(aim),
+    "a box stuck at the edge that is really 90° away says stop turning far too early",
+  );
+  check(
+    "the overlay never eats a touch meant for the controls under it",
+    /pointer-events-none/.test(aim),
+  );
+  check(
+    "being held at the wrong height is said plainly, while it is happening",
+    /bg-amber-[\s\S]{0,140}?Keep the phone at the same height/.test(capture),
+    "the intro screen says the same sentence, so matching it anywhere in the file is satisfied by the advice while the warning is gone",
+  );
+  check(
+    "the tap route is told how far to turn between photos",
+    /Turn about \$\{Math\.round\(captureStep\(state\.plan\.length\)\)\}°/.test(capture),
+    "without a sensor nothing stops nine taps at one wall, which is nine copies of one photograph",
+  );
+
+  // --- the rules ------------------------------------------------------------
+  const rules = code("src/components/tour/capture-rules.tsx");
+  check(
+    "there are rules for how to shoot one",
+    /export const CAPTURE_RULES: Rule\[\]/.test(rules) && /<CaptureRules/.test(capture),
+  );
+  check(
+    "and there are several of them, not one",
+    (rules.match(/\n    title:/g) ?? []).length >= 4,
+  );
+  check(
+    "and the one that ruins a panorama is among them",
+    /Stand in one place/.test(rules) && /Don't walk/.test(rules),
+    "walking while turning cannot be reconciled by any seam: the wall arrives twice at two different sizes",
+  );
+  check(
+    "so is holding the phone at one height",
+    /close to your chest/i.test(rules),
+  );
+  check(
+    "each rule says why, not only what",
+    (rules.match(/\n    because:/g) ?? []).length ===
+      (rules.match(/\n    title:/g) ?? []).length,
+    "somebody who knows why the photo has to come from one spot will hold the phone right in a room this screen never anticipated",
+  );
+  check(
+    "they are stepped rather than one wall of text",
+    /step === 0 \? onCancel\(\) : setStep\(step - 1\)/.test(rules)
+      && /last \? onDone\(\) : setStep\(step \+ 1\)/.test(rules),
+  );
+  check(
+    "and skippable, for the fourth room",
+    /Skip and start/.test(rules),
+  );
+  check(
+    "the rules come before the camera is asked for",
+    /onClick=\{\(\) => setPhase\("rules"\)\}/.test(capture)
+      && /onDone=\{\(\) => void start\(\)\}/.test(capture),
+    "a permission prompt that arrives before somebody knows what it is for is a prompt they deny, and a denied camera is sticky",
+  );
+  check(
+    "a refused camera lands back where the message and the fallback are",
+    /setProblem\("Camera access is required[\s\S]{0,200}?setPhase\("intro"\)/.test(capture),
+    "leaving it on the rules screen shows the error on a screen that has nowhere to go",
   );
 }
 

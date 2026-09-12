@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Camera,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   Pause,
   Play,
@@ -12,16 +14,23 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CaptureRules } from "@/components/tour/capture-rules";
 import { PanoramaViewer } from "@/components/tour/panorama-viewer";
 import {
   advance,
   captureManually,
   frameName,
   frameWidthFor,
+  captureStep,
   guidance,
+  headingFrom,
   isComplete,
+  isLevel,
+  relativeHeading,
   startCapture,
   targetAngle,
+  targetOffset,
+  tiltOff,
   type CaptureState,
 } from "@/lib/panorama/capture";
 import { DEFAULT_FRAMES, stitchErrorMessage } from "@/lib/panorama/stitch";
@@ -59,6 +68,7 @@ import { cn } from "@/lib/utils";
 
 type Phase =
   | "intro"
+  | "rules"
   | "capturing"
   | "paused"
   | "uploading"
@@ -115,12 +125,34 @@ export function PanoramaCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const headingRef = useRef<number | null>(null);
+  /**
+   * Where the phone was pointing, and how it was held, at the first reading.
+   *
+   * Everything after is measured from here, which is what makes the plan a
+   * series of turns from where somebody is standing rather than a set of
+   * compass bearings they have to go and find.
+   */
+  const originRef = useRef<{ heading: number; beta: number | null } | null>(null);
+  const tiltRef = useRef<number | null>(null);
   const busyRef = useRef(false);
   const framesRef = useRef<{ blob: Blob; angle: number }[]>([]);
 
   const [phase, setPhase] = useState<Phase>("intro");
   const [state, setState] = useState<CaptureState>(() => startCapture(DEFAULT_FRAMES));
   const [hint, setHint] = useState("Turn slowly to the right");
+  /**
+   * Where to draw the target, and whether the phone is on it.
+   *
+   * `offset` is -1 at the left edge of the view and +1 at the right; null
+   * means the next frame is somewhere behind the person and the screen should
+   * be showing an arrow rather than a box.
+   */
+  const [aim, setAim] = useState<{
+    offset: number | null;
+    turnBy: number;
+    level: boolean;
+    onTarget: boolean;
+  }>({ offset: null, turnBy: 0, level: true, onTarget: false });
   const [hasSensor, setHasSensor] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [result, setResult] = useState<{ url: string; width: number; height: number } | null>(null);
@@ -155,11 +187,22 @@ export function PanoramaCapture({
   useEffect(() => stopCamera, [stopCamera]);
 
   const onOrientation = useCallback((event: DeviceOrientationEvent) => {
-    if (event.alpha === null || event.alpha === undefined) return;
-    // `alpha` counts anticlockwise from north; a person turning to their right
-    // sees it decrease, and the capture plan counts up. Flipping it here keeps
-    // every angle in the rest of the feature in one direction.
-    headingRef.current = (360 - event.alpha) % 360;
+    // iOS puts the real compass bearing on a property of its own and leaves
+    // `alpha` measured from wherever the page loaded, so the source has to be
+    // chosen rather than assumed. `headingFrom` does the choosing.
+    const compass = (event as DeviceOrientationEvent & {
+      webkitCompassHeading?: number;
+    }).webkitCompassHeading;
+
+    const heading = headingFrom({ alpha: event.alpha, compass });
+    if (heading === null) return;
+
+    if (!originRef.current) {
+      originRef.current = { heading, beta: event.beta ?? null };
+    }
+
+    headingRef.current = relativeHeading(heading, originRef.current.heading);
+    tiltRef.current = tiltOff(event.beta ?? null, originRef.current.beta);
     setHasSensor(true);
   }, []);
 
@@ -416,9 +459,18 @@ export function PanoramaCapture({
       const heading = headingRef.current;
       if (heading === null) return;
 
-      const decision = advance(stateRef.current, { heading });
+      const decision = advance(stateRef.current, {
+        heading,
+        tilt: tiltRef.current,
+      });
       applyState(decision.state);
       setHint(guidance(decision));
+      setAim({
+        offset: decision.action === "wait" ? targetOffset(decision.turnBy) : 0,
+        turnBy: decision.action === "wait" ? decision.turnBy : 0,
+        level: isLevel(tiltRef.current),
+        onTarget: decision.action === "capture",
+      });
 
       if (decision.action === "capture") {
         void take(decision.angle).then(() => finish(decision.state, stop));
@@ -441,6 +493,10 @@ export function PanoramaCapture({
       });
     } catch {
       setProblem("Camera access is required to create a 360 photo.");
+      // Back to the intro, because that is the screen the message is on — and
+      // the one carrying the upload fallback, which is the only route still
+      // open to somebody whose browser will not give up the camera.
+      setPhase("intro");
       return;
     }
 
@@ -468,6 +524,11 @@ export function PanoramaCapture({
     }
 
     framesRef.current = [];
+    // A new capture starts wherever the person is standing now, not where
+    // they were standing for the one they abandoned.
+    originRef.current = null;
+    headingRef.current = null;
+    tiltRef.current = null;
     applyState(startCapture(DEFAULT_FRAMES));
     setPhase("capturing");
   }
@@ -508,7 +569,15 @@ export function PanoramaCapture({
         )}
 
         <div className="flex flex-col gap-2">
-          <Button onClick={start} className="min-h-12 w-full text-base">
+          {/* The rules come before `getUserMedia`, which is also the right
+              order for the permission prompt: by the time the camera is asked
+              for, the person has read what it is for and what they are about
+              to do with it. A prompt that arrives before that is a prompt
+              people deny, and a denied camera permission is sticky. */}
+          <Button
+            onClick={() => setPhase("rules")}
+            className="min-h-12 w-full text-base"
+          >
             Start 360 Capture
           </Button>
 
@@ -533,6 +602,16 @@ export function PanoramaCapture({
           )}
         </div>
       </div>
+    );
+  }
+
+  // ---- how to shoot one ----------------------------------------------------
+  if (phase === "rules") {
+    return (
+      <CaptureRules
+        onDone={() => void start()}
+        onCancel={() => setPhase("intro")}
+      />
     );
   }
 
@@ -571,11 +650,28 @@ export function PanoramaCapture({
             </button>
           </div>
 
+          {/* ---- The thing to aim at --------------------------------------
+              A degree reading tells somebody holding a phone nothing. A box
+              sitting in the room, and a ring to put over it, tells them
+              exactly where to point and when they have got there — and the
+              shutter fires itself, so nobody is pressing a button with the
+              hand that is supposed to be holding the phone still. */}
+          {hasSensor && phase === "capturing" && (
+            <Aim offset={aim.offset} turnBy={aim.turnBy} onTarget={aim.onTarget} />
+          )}
+
           <div className="flex flex-col items-center gap-4">
             <Ring total={state.plan.length} done={state.next} />
             <p className="text-lg font-medium text-white drop-shadow">
-              {hasSensor ? hint : "Tap to take each photo"}
+              {hasSensor
+                ? hint
+                : `Turn about ${Math.round(captureStep(state.plan.length))}°, then tap`}
             </p>
+            {hasSensor && !aim.level && (
+              <p className="rounded-full bg-amber-500/90 px-3 py-1 text-sm font-medium text-black">
+                Keep the phone at the same height
+              </p>
+            )}
             {hasSensor && target !== null && (
               <p className="text-sm text-white/70">{Math.round(target)}°</p>
             )}
@@ -752,6 +848,73 @@ export function PanoramaCapture({
           Save 360
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The target, and the ring you put over it.
+ *
+ * The ring never moves: it is the middle of the camera, which is the middle of
+ * the frame that will be taken. The box moves, because it is a place in the
+ * room. Turning the phone moves the room past the ring, and when the box is
+ * under it the frame is taken — which is the same mechanic every 360 app uses
+ * and is the reason people can follow them without reading anything.
+ *
+ * When the next frame is somewhere behind the person there is no box to draw,
+ * only a direction, so the screen shows an arrow at the edge they should be
+ * turning towards.
+ */
+function Aim({
+  offset,
+  turnBy,
+  onTarget,
+}: {
+  offset: number | null;
+  turnBy: number;
+  onTarget: boolean;
+}) {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 flex items-center justify-center"
+      aria-hidden
+    >
+      {/* The box, placed across the view by how far there is left to turn. */}
+      {offset !== null && (
+        <span
+          className={cn(
+            "absolute h-36 w-24 rounded-2xl border-4 transition-colors duration-150",
+            onTarget
+              ? "border-emerald-400 bg-emerald-400/30"
+              : "border-white/80 bg-white/10",
+          )}
+          style={{ transform: `translateX(${offset * 42}vw)` }}
+        />
+      )}
+
+      {/* The ring, which is simply where the camera is pointing. */}
+      <span
+        className={cn(
+          "absolute size-16 rounded-full border-4 transition-colors duration-150",
+          onTarget ? "border-emerald-400 bg-emerald-400/40" : "border-white/90",
+        )}
+      />
+
+      {/* Nothing to aim at yet — just which way to keep going. */}
+      {offset === null && (
+        <span
+          className={cn(
+            "absolute flex size-14 items-center justify-center rounded-full bg-black/60 text-white",
+            turnBy > 0 ? "right-6" : "left-6",
+          )}
+        >
+          {turnBy > 0 ? (
+            <ChevronRight className="size-8" />
+          ) : (
+            <ChevronLeft className="size-8" />
+          )}
+        </span>
+      )}
     </div>
   );
 }
