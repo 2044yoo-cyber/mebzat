@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { composePanorama, type FrameInput } from "@/lib/panorama/compose";
-import { MAX_FRAMES, MIN_FRAMES } from "@/lib/panorama/stitch";
 import { moderate, publishApproved } from "@/lib/moderation/service";
 import { createClient } from "@/lib/supabase/server";
 
@@ -84,7 +83,7 @@ export async function POST(request: Request) {
   // message that confirms it exists.
   const { data: job } = await supabase
     .from("panorama_jobs")
-    .select("id, owner_id, frames_prefix, expected_frames, status")
+    .select("id, owner_id, frames_prefix, expected_frames, status, frames")
     .eq("id", jobId)
     .maybeSingle();
 
@@ -101,6 +100,15 @@ export async function POST(request: Request) {
     return fail(supabase, jobId, "frames_missing");
   }
 
+  // The poses the phone recorded, which are the stitcher's starting estimate.
+  // Without them there is nothing to stitch from: forty photographs of a room
+  // with no idea which way any of them was facing is a jigsaw with the picture
+  // on the box thrown away.
+  const poses = readPoses(job.frames);
+  if (poses.size < MIN_SPHERE_FRAMES) {
+    return fail(supabase, jobId, "too_few_frames");
+  }
+
   await supabase
     .from("panorama_jobs")
     .update({ status: "processing", stage: "aligning" })
@@ -109,23 +117,25 @@ export async function POST(request: Request) {
   // ---- gather the frames ------------------------------------------------
   const { data: listing, error: listError } = await supabase.storage
     .from("panorama-frames")
-    .list(prefix, { limit: 64 });
+    .list(prefix, { limit: 80 });
 
   if (listError || !listing) {
     return fail(supabase, jobId, "frames_missing");
   }
 
   const wanted = listing
-    .map((entry) => ({ name: entry.name, yaw: yawFromName(entry.name) }))
-    .filter((entry): entry is { name: string; yaw: number } => entry.yaw !== null)
-    .sort((a, b) => a.yaw - b.yaw);
+    .map((entry) => ({ name: entry.name, pose: poses.get(entry.name) }))
+    .filter(
+      (entry): entry is { name: string; pose: Pose } => entry.pose !== undefined,
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-  if (wanted.length < MIN_FRAMES) {
+  if (wanted.length < MIN_SPHERE_FRAMES) {
     return fail(supabase, jobId, "too_few_frames");
   }
 
   const frames: FrameInput[] = [];
-  for (const entry of wanted.slice(0, MAX_FRAMES)) {
+  for (const entry of wanted.slice(0, MAX_SPHERE_FRAMES)) {
     const { data, error } = await supabase.storage
       .from("panorama-frames")
       .download(`${prefix}/${entry.name}`);
@@ -133,7 +143,10 @@ export async function POST(request: Request) {
       return fail(supabase, jobId, "frames_missing");
     }
     frames.push({
-      yaw: entry.yaw,
+      yaw: entry.pose.yaw,
+      pitch: entry.pose.pitch,
+      roll: entry.pose.roll,
+      hfov: entry.pose.fov,
       bytes: new Uint8Array(await data.arrayBuffer()),
     });
   }
@@ -208,22 +221,56 @@ export async function POST(request: Request) {
     width: outcome.width,
     height: outcome.height,
     weakSeams: outcome.weakSeams,
+    covered: outcome.covered,
   });
 }
 
+/** Fewest frames that can cover a sphere well enough to be worth stitching. */
+const MIN_SPHERE_FRAMES = 20;
+const MAX_SPHERE_FRAMES = 60;
+
+type Pose = { yaw: number; pitch: number; roll: number; fov: number };
+
 /**
- * The frame's angle, from its name.
+ * The recorded poses, by frame name, with anything malformed left out.
  *
- * The capture screen writes `003_120.jpg` — the third frame, taken at 120°.
- * Reading the angle off the name rather than out of a second table means the
- * stitcher needs exactly one thing from storage, and a frame that failed to
- * upload is simply a frame that is not in the listing.
+ * This column is written by a browser, so every number in it is a number a
+ * client chose. None of them can do any harm — a wrong pose makes a worse
+ * panorama for the person who sent it and nobody else — but a string where a
+ * number should be would crash the compositor, and a pitch of 4000 would send
+ * it looking outside its own canvas. So each one is checked and the frame is
+ * dropped rather than the request failed.
  */
-function yawFromName(name: string): number | null {
-  const match = /^\d+_(\d{1,3})\./.exec(name);
-  if (!match) return null;
-  const yaw = Number(match[1]);
-  return Number.isFinite(yaw) && yaw >= 0 && yaw < 360 ? yaw : null;
+function readPoses(value: unknown): Map<string, Pose> {
+  const poses = new Map<string, Pose>();
+  if (!Array.isArray(value)) return poses;
+
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const row = entry as Record<string, unknown>;
+    const name = typeof row.name === "string" ? row.name : null;
+    if (!name) continue;
+
+    const yaw = finite(row.yaw);
+    const pitch = finite(row.pitch);
+    const roll = finite(row.roll);
+    if (yaw === null || pitch === null || roll === null) continue;
+    if (pitch < -90 || pitch > 90) continue;
+
+    const fov = finite(row.fov);
+    poses.set(name, {
+      yaw: ((yaw % 360) + 360) % 360,
+      pitch,
+      roll,
+      fov: fov !== null && fov >= 20 && fov <= 120 ? fov : 60,
+    });
+  }
+
+  return poses;
+}
+
+function finite(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 async function fail(

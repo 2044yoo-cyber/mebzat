@@ -3,235 +3,628 @@ import "server-only";
 import sharp from "sharp";
 
 import {
-  MIN_CONFIDENCE,
-  columnProfile,
-  exposureGains,
-  featherWeights,
-  hasUsableOverlap,
-  matchOffset,
-  outputSize,
-  solvePlacements,
-  type Match,
-} from "./stitch";
+  ASSUMED_HFOV,
+} from "./sphere";
+import {
+  basisFrom,
+  directionOf,
+  dot,
+  verticalFov,
+  type Basis,
+  type Vector3,
+} from "./orientation";
 
 /**
- * The half of stitching that needs pixels.
+ * Photographs of a room in, one equirectangular panorama out.
  *
- * `stitch.ts` decides *where* each frame goes; this puts them there. It is
- * separate because that half is arithmetic that can be checked in a script,
- * and this half needs an image library, a server and a few megabytes of
- * buffers.
+ * ## Why the old one collapsed to a point
  *
- * `sharp` was already a dependency — 0069 uses it to draw watermarks — so this
- * adds no package. That mattered to the choice: OpenCV and Hugin are the
- * obvious tools for this job and neither can be carried by a serverless Node
- * deployment, and opencv.js in the browser is around eight megabytes of WASM
- * on a phone, which is the thing the brief warns against.
+ * It projected every frame onto a cylinder and laid them out in a row. A
+ * cylinder has no top and no bottom, so the rows of the output above and below
+ * the band that had actually been photographed were filled by stretching the
+ * nearest pixels outwards — and at the pole, "outwards" is every direction at
+ * once, so the whole ceiling converged on one point. The funnel was not a bug
+ * in the blending. It was the projection being asked a question it could not
+ * answer.
+ *
+ * This maps the sphere instead. Every output pixel is a direction; for each
+ * direction it asks which photographs can see it and samples them. A direction
+ * nothing photographed gets no pixels, rather than somebody else's pixels
+ * stretched to reach it — which is why the capture screen will not let anybody
+ * finish with a hole in the sphere.
+ *
+ * ## The pose comes from the phone, then from the pixels
+ *
+ * Each frame arrives with the yaw, pitch and roll the phone reported when it
+ * was taken. That is a good first guess and a bad final answer: the sensors
+ * drift, and a degree of error puts a doorway two hundred pixels from itself.
+ * So the poses are refined against the image content — each frame is nudged
+ * over a small grid of offsets and scored against the mosaic already built,
+ * which is the same normalised cross-correlation the old cylindrical stitcher
+ * used, in two dimensions instead of one.
  */
 
 export type FrameInput = {
-  /** Where the phone was pointing, in degrees, when this frame was taken. */
+  /** Where the phone said it was pointing, in the capture's local frame. */
   yaw: number;
+  pitch: number;
+  roll: number;
+  /** What the camera sees across, in degrees. */
+  hfov?: number;
   bytes: Uint8Array;
 };
 
 export type StitchOutcome =
-  | { ok: true; jpeg: Buffer; width: number; height: number; weakSeams: number }
+  | {
+      ok: true;
+      jpeg: Buffer;
+      width: number;
+      height: number;
+      /** How much of the sphere ended up with real pixels, 0–1. */
+      covered: number;
+      /** Frames the refinement could not settle against their neighbours. */
+      weakSeams: number;
+    }
   | { ok: false; code: string };
 
-/** Downsampled width used for matching. Enough to align, cheap to scan. */
-const PROFILE_WIDTH = 512;
+/** Below this the panorama has holes worth refusing rather than publishing. */
+export const MIN_COVERAGE = 0.9;
+
+/** The widest output worth making from phone frames. */
+const MAX_OUTPUT_WIDTH = 4096;
+
+/** What each frame is decoded to before it is sampled. */
+const WORK_WIDTH = 1400;
+
+/** The low-resolution pass the pose refinement scores against. */
+const REFINE_WIDTH = 512;
+
+/** How far a frame may be nudged from where the phone said it was. */
+const REFINE_RANGE = 3;
+const REFINE_STEP = 1;
+
+/** Below this correlation the refinement did not find anything to lock onto. */
+const WEAK_SEAM = 0.25;
 
 /**
- * Turn a ring of frames into one equirectangular JPEG.
+ * How much better than leaving it alone a nudge has to score before it is
+ * taken.
  *
- * The steps are the brief's, in order. Each one is small; what makes the whole
- * thing tractable is that the capture screen recorded a yaw for every frame,
- * so nothing here has to search for where a photograph belongs — only to
- * refine it.
+ * Without this the refinement is free to move every frame by whatever offset
+ * scored highest on noise, and because each frame is then painted at its new
+ * pose for the next one to match against, those movements accumulate: on a
+ * synthetic room with exactly correct poses the whole ring drifted three
+ * degrees and the output got thirty times worse. A correction has to earn its
+ * place against the sensor reading, which is already a good answer.
  */
+const ACCEPT_MARGIN = 0.05;
+
+type Decoded = {
+  pose: { yaw: number; pitch: number; roll: number };
+  hfov: number;
+  vfov: number;
+  width: number;
+  height: number;
+  pixels: Uint8Array;
+  gain: number;
+};
+
+/** A sphere's worth of accumulated colour, waiting to be divided by its weight. */
+type Canvas = {
+  width: number;
+  height: number;
+  sum: Float32Array;
+  weight: Float32Array;
+};
+
+function blankCanvas(width: number, height: number): Canvas {
+  return {
+    width,
+    height,
+    sum: new Float32Array(width * height * 3),
+    weight: new Float32Array(width * height),
+  };
+}
+
 export async function composePanorama(
   frames: FrameInput[],
 ): Promise<StitchOutcome> {
-  if (frames.length < 2) return { ok: false, code: "too_few_frames" };
+  if (frames.length < 4) return { ok: false, code: "too_few_frames" };
 
-  // Sorted by where they were taken, not by when they arrived: uploads finish
-  // out of order on a phone, and a ring assembled in arrival order is a ring
-  // in the wrong order.
-  const ring = [...frames].sort((a, b) => a.yaw - b.yaw);
+  // ---- decode, at a size worth sampling -----------------------------------
+  const decoded: Decoded[] = [];
+  for (const frame of frames) {
+    try {
+      const image = sharp(Buffer.from(frame.bytes), { failOn: "none" }).rotate();
+      const meta = await image.metadata();
+      if (!meta.width || !meta.height) return { ok: false, code: "unreadable" };
 
-  // ---- 1. is there any overlap to work with at all? ----------------------
-  for (let i = 0; i < ring.length; i += 1) {
-    const next = ring[(i + 1) % ring.length];
-    const gap = i === ring.length - 1 ? 360 - ring[i].yaw + next.yaw : next.yaw - ring[i].yaw;
-    if (!hasUsableOverlap(gap)) return { ok: false, code: "no_overlap" };
-  }
+      const scale = Math.min(1, WORK_WIDTH / meta.width);
+      const width = Math.max(1, Math.round(meta.width * scale));
+      const height = Math.max(1, Math.round(meta.height * scale));
 
-  // ---- decode, and normalise every frame to the same height --------------
-  let meta: { width: number; height: number };
-  try {
-    const first = await sharp(Buffer.from(ring[0].bytes)).metadata();
-    if (!first.width || !first.height) return { ok: false, code: "decode_failed" };
-    meta = { width: first.width, height: first.height };
-  } catch {
-    return { ok: false, code: "decode_failed" };
-  }
+      const { data } = await image
+        .resize(width, height, { fit: "fill" })
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
 
-  const { width: outWidth, height: outHeight } = outputSize(
-    meta.width,
-    ring.length,
-  );
-
-  // Each frame covers 360/n degrees of the output, plus the overlap either
-  // side. Widening it by the overlap is what gives the blend something to
-  // work with.
-  const sliceWidth = Math.round((outWidth / ring.length) * 1.45);
-
-  let prepared: { data: Buffer; profile: Float64Array; mean: number }[];
-  try {
-    prepared = await Promise.all(
-      ring.map(async (frame) => {
-        const image = sharp(Buffer.from(frame.bytes), { failOn: "none" })
-          // `.rotate()` with no argument applies the EXIF orientation. A phone
-          // held in portrait writes landscape pixels plus a rotation flag, and
-          // stitching the pixels without honouring it builds the room on its
-          // side.
-          .rotate()
-          .resize(sliceWidth, outHeight, { fit: "fill" });
-
-        const data = await image.clone().jpeg({ quality: 92 }).toBuffer();
-
-        // The greyscale copy the matcher reads. Small on purpose.
-        const grey = await image
-          .clone()
-          .greyscale()
-          .resize(PROFILE_WIDTH, 64, { fit: "fill" })
-          .raw()
-          .toBuffer();
-
-        const profile = columnProfile(grey, PROFILE_WIDTH, 64);
-        const mean =
-          profile.reduce((sum, v) => sum + v, 0) / (profile.length || 1);
-
-        return { data, profile, mean };
-      }),
-    );
-  } catch {
-    return { ok: false, code: "decode_failed" };
-  }
-
-  // ---- 2 and 3. match each adjacent pair, refine the transform -----------
-  const scale = sliceWidth / PROFILE_WIDTH;
-  const nominalStep = outWidth / ring.length;
-  const expectedInProfile = Math.round(nominalStep / scale);
-
-  const matches: Match[] = [];
-  let weakSeams = 0;
-  for (let i = 0; i < prepared.length - 1; i += 1) {
-    const found = matchOffset(
-      prepared[i].profile,
-      prepared[i + 1].profile,
-      expectedInProfile,
-      Math.round(expectedInProfile * 0.35),
-    );
-    if (found.confidence < MIN_CONFIDENCE) weakSeams += 1;
-    matches.push({
-      offset: Math.round(found.offset * scale),
-      confidence: found.confidence,
-    });
-  }
-
-  // ---- 5. align ----------------------------------------------------------
-  const placements = solvePlacements(matches, nominalStep, outWidth);
-
-  // ---- 6. exposure compensation -----------------------------------------
-  const gains = exposureGains(prepared.map((p) => p.mean));
-
-  // ---- 7 and 8. seam and feather ----------------------------------------
-  // The blend band is the overlap, capped: a band wider than the overlap
-  // reaches into pixels the other frame never saw.
-  const band = Math.min(
-    Math.round(sliceWidth - nominalStep),
-    Math.round(sliceWidth * 0.4),
-  );
-  const feather = featherWeights(Math.max(1, band));
-
-  // Composited left to right so each frame's feathered left edge falls over
-  // the frame before it. `sharp` blends with the alpha we give it, which is
-  // what turns a hard cut into a ramp.
-  const layers: sharp.OverlayOptions[] = [];
-  for (let i = 0; i < prepared.length; i += 1) {
-    const gain = gains[i];
-    const withGain =
-      Math.abs(gain - 1) < 0.01
-        ? sharp(prepared[i].data)
-        : sharp(prepared[i].data).linear(gain, 0);
-
-    const masked = await applyLeftFeather(withGain, sliceWidth, outHeight, feather, i === 0);
-
-    const x = Math.round(placements[i].x) % outWidth;
-    layers.push({ input: masked, left: x, top: 0 });
-
-    // A slice that runs off the right-hand edge continues at the left: the
-    // image wraps, because the room does.
-    if (x + sliceWidth > outWidth) {
-      layers.push({ input: masked, left: x - outWidth, top: 0 });
+      const hfov = frame.hfov && frame.hfov > 20 ? frame.hfov : ASSUMED_HFOV;
+      decoded.push({
+        pose: { yaw: frame.yaw, pitch: frame.pitch, roll: frame.roll },
+        hfov,
+        vfov: verticalFov(hfov, width, height),
+        width,
+        height,
+        pixels: new Uint8Array(data),
+        gain: 1,
+      });
+    } catch {
+      return { ok: false, code: "unreadable" };
     }
   }
 
-  // ---- 9. output ---------------------------------------------------------
-  try {
-    const jpeg = await sharp({
-      create: {
-        width: outWidth,
-        height: outHeight,
-        channels: 3,
-        background: { r: 20, g: 20, b: 22 },
-      },
+  // ---- exposure compensation ----------------------------------------------
+  //
+  // A phone re-meters between a window and a dark corner, so two frames of the
+  // same wall differ by a stop. Scaling each towards the middle of the set
+  // makes the seams stop showing as bands; it cannot and does not try to
+  // rescue a frame that was actually blown out.
+  const means = decoded.map(meanLuma);
+  const target = median(means);
+  decoded.forEach((frame, i) => {
+    frame.gain = means[i] > 4 ? clamp(target / means[i], 0.72, 1.4) : 1;
+  });
+
+  // ---- order: the horizon first, then outwards ----------------------------
+  //
+  // Each frame is refined against what is already down, so the order decides
+  // what there is to refine against. Starting at the horizon and working
+  // towards the poles means every frame after the first few has a neighbour.
+  const order = decoded
+    .map((frame, index) => ({ frame, index }))
+    .sort((a, b) => {
+      const byPitch = Math.abs(a.frame.pose.pitch) - Math.abs(b.frame.pose.pitch);
+      return byPitch !== 0 ? byPitch : a.frame.pose.yaw - b.frame.pose.yaw;
     })
-      .composite(layers)
+    .map((entry) => entry.frame);
+
+  // ---- refine the poses against the pixels --------------------------------
+  const weakSeams = refinePoses(order);
+
+  // ---- paint the sphere ----------------------------------------------------
+  const outWidth = outputWidth(order);
+  const canvas = blankCanvas(outWidth, outWidth / 2);
+  const table = yawTable(canvas.width);
+  for (const frame of order) paint(canvas, frame, table);
+
+  const { rgb, covered } = resolve(canvas);
+  if (covered < MIN_COVERAGE) return { ok: false, code: "incomplete_sphere" };
+
+  try {
+    const jpeg = await sharp(Buffer.from(rgb), {
+      raw: { width: canvas.width, height: canvas.height, channels: 3 },
+    })
       .jpeg({ quality: 86, mozjpeg: true })
       .toBuffer();
 
-    return { ok: true, jpeg, width: outWidth, height: outHeight, weakSeams };
+    return {
+      ok: true,
+      jpeg,
+      width: canvas.width,
+      height: canvas.height,
+      covered,
+      weakSeams,
+    };
   } catch {
     return { ok: false, code: "unknown" };
   }
 }
 
 /**
- * Fade a slice in from its left edge.
+ * The output's width, which sets its height at half.
  *
- * The alpha channel is built by hand rather than with a gradient overlay: a
- * gradient would need an SVG the size of the slice, parsed and rasterised per
- * frame, to express nine hundred numbers we already have.
+ * A frame covering 60° across at 1400px implies 8400px for a full turn, which
+ * is more than a phone's optics justify and more than a phone can then
+ * display. This takes what the frames support and caps it.
  */
-async function applyLeftFeather(
-  image: sharp.Sharp,
-  width: number,
-  height: number,
-  feather: Float64Array,
-  opaque: boolean,
-): Promise<Buffer> {
-  if (opaque) return image.jpeg({ quality: 92 }).toBuffer();
+function outputWidth(frames: Decoded[]): number {
+  const best = frames.reduce(
+    (wide, frame) => Math.max(wide, (frame.width * 360) / frame.hfov),
+    0,
+  );
+  const capped = Math.min(MAX_OUTPUT_WIDTH, Math.max(2048, best));
+  // Even, and a multiple of two so the 2:1 height is a whole number.
+  return Math.round(capped / 64) * 64;
+}
 
-  const alpha = Buffer.alloc(width * height);
+/**
+ * Nudge each frame until it agrees with its neighbours.
+ *
+ * Scored on a small canvas, because the question is whether a wall lines up
+ * and not what its grout looks like — and because the search is a few dozen
+ * placements per frame, which at full size would be the whole stitch over
+ * again for each one.
+ */
+function refinePoses(order: Decoded[]): number {
+  const canvas = blankCanvas(REFINE_WIDTH, REFINE_WIDTH / 2);
+  const table = yawTable(canvas.width);
+  let weak = 0;
+
+  order.forEach((frame, index) => {
+    if (index === 0) {
+      paint(canvas, frame, table);
+      return;
+    }
+
+    // What staying put is worth. Every other placement is measured against it.
+    const staying = agreement(canvas, frame, 0, 0);
+
+    let best = { score: staying, dYaw: 0, dPitch: 0 };
+    for (let dy = -REFINE_RANGE; dy <= REFINE_RANGE; dy += REFINE_STEP) {
+      for (let dp = -REFINE_RANGE; dp <= REFINE_RANGE; dp += REFINE_STEP) {
+        if (dy === 0 && dp === 0) continue;
+        const score = agreement(canvas, frame, dy, dp);
+        if (score > best.score) best = { score, dYaw: dy, dPitch: dp };
+      }
+    }
+
+    // Nothing to lock onto — a blank wall, or no overlap at all. The phone's
+    // own reading is then the best answer available, so it is kept rather than
+    // replaced by whichever offset happened to score highest on noise.
+    if (best.score < WEAK_SEAM) {
+      weak += 1;
+    } else if (best.score > staying + ACCEPT_MARGIN) {
+      frame.pose.yaw += best.dYaw;
+      frame.pose.pitch = clamp(frame.pose.pitch + best.dPitch, -90, 90);
+    }
+
+    paint(canvas, frame, table);
+  });
+
+  return weak;
+}
+
+/**
+ * How well a frame agrees with what is already on the canvas, at an offset.
+ *
+ * Normalised cross-correlation over the pixels they share: normalised because
+ * the two may differ in brightness and the question is whether the *pattern*
+ * matches, not whether the exposure does.
+ */
+function agreement(
+  canvas: Canvas,
+  frame: Decoded,
+  dYaw: number,
+  dPitch: number,
+): number {
+  const basis = basisFrom(
+    frame.pose.yaw + dYaw,
+    clamp(frame.pose.pitch + dPitch, -90, 90),
+    frame.pose.roll,
+  );
+  const tanH = Math.tan((frame.hfov / 2) * (Math.PI / 180));
+  const tanV = Math.tan((frame.vfov / 2) * (Math.PI / 180));
+
+  let n = 0;
+  let sumA = 0;
+  let sumB = 0;
+  let sumAA = 0;
+  let sumBB = 0;
+  let sumAB = 0;
+
+  const box = footprint(canvas, frame, dPitch);
+  for (let y = box.top; y <= box.bottom; y += 2) {
+    const pitch = 90 - (y / (canvas.height - 1)) * 180;
+    for (let i = 0; i < box.columns.length; i += 2) {
+      const x = box.columns[i];
+      const index = y * canvas.width + x;
+      if (canvas.weight[index] <= 0) continue;
+
+      const yaw = (x / canvas.width) * 360;
+      const hit = sample(frame, directionOf(yaw, pitch), basis, tanH, tanV);
+      if (!hit) continue;
+
+      const w = canvas.weight[index];
+      const a =
+        (0.2126 * canvas.sum[index * 3] +
+          0.7152 * canvas.sum[index * 3 + 1] +
+          0.0722 * canvas.sum[index * 3 + 2]) /
+        w;
+      const b = (0.2126 * hit.r + 0.7152 * hit.g + 0.0722 * hit.b) * frame.gain;
+      n += 1;
+      sumA += a;
+      sumB += b;
+      sumAA += a * a;
+      sumBB += b * b;
+      sumAB += a * b;
+    }
+  }
+
+  // Too little shared ground to be evidence of anything.
+  if (n < 60) return -1;
+
+  const varA = sumAA - (sumA * sumA) / n;
+  const varB = sumBB - (sumB * sumB) / n;
+  if (varA <= 1e-6 || varB <= 1e-6) return -1;
+  return (sumAB - (sumA * sumB) / n) / Math.sqrt(varA * varB);
+}
+
+/** Which output pixels one frame could possibly touch. */
+function footprint(
+  canvas: Canvas,
+  frame: Decoded,
+  dPitch = 0,
+): { top: number; bottom: number; columns: number[] } {
+  const pitch = clamp(frame.pose.pitch + dPitch, -90, 90);
+  // The half-angle to a corner, which is what actually bounds the frame.
+  const halfDiag =
+    (Math.atan(
+      Math.hypot(
+        Math.tan((frame.hfov / 2) * (Math.PI / 180)),
+        Math.tan((frame.vfov / 2) * (Math.PI / 180)),
+      ),
+    ) *
+      180) /
+    Math.PI;
+
+  const top = Math.max(
+    0,
+    Math.floor(((90 - (pitch + halfDiag)) / 180) * (canvas.height - 1)),
+  );
+  const bottom = Math.min(
+    canvas.height - 1,
+    Math.ceil(((90 - (pitch - halfDiag)) / 180) * (canvas.height - 1)),
+  );
+
+  // Near a pole a frame spans every longitude, so there is no useful column
+  // range to narrow to — and cos(pitch) there is the number that would make
+  // the arithmetic below divide by nearly zero.
+  const columns: number[] = [];
+  const flat = Math.cos((pitch * Math.PI) / 180);
+  if (Math.abs(pitch) + halfDiag >= 88 || flat < 1e-3) {
+    for (let x = 0; x < canvas.width; x += 1) columns.push(x);
+    return { top, bottom, columns };
+  }
+
+  const halfYaw = Math.min(180, halfDiag / flat);
+  const centre = (frame.pose.yaw / 360) * canvas.width;
+  const span = Math.ceil((halfYaw / 360) * canvas.width);
+  for (let d = -span; d <= span; d += 1) {
+    columns.push((Math.round(centre) + d + canvas.width * 2) % canvas.width);
+  }
+  return { top, bottom, columns };
+}
+
+/** Read one direction out of one frame, bilinearly, or null if it misses. */
+function sample(
+  frame: Decoded,
+  direction: Vector3,
+  basis: Basis,
+  tanH: number,
+  tanV: number,
+): { r: number; g: number; b: number; edge: number } | null {
+  const depth = dot(direction, basis.forward);
+  if (depth <= 1e-6) return null;
+
+  const sx = dot(direction, basis.right) / depth / tanH;
+  const sy = dot(direction, basis.up) / depth / tanV;
+  if (sx < -1 || sx > 1 || sy < -1 || sy > 1) return null;
+
+  const fx = ((sx + 1) / 2) * (frame.width - 1);
+  const fy = ((1 - sy) / 2) * (frame.height - 1);
+  const x0 = Math.floor(fx);
+  const y0 = Math.floor(fy);
+  const x1 = Math.min(frame.width - 1, x0 + 1);
+  const y1 = Math.min(frame.height - 1, y0 + 1);
+  const tx = fx - x0;
+  const ty = fy - y0;
+
+  const at = (x: number, y: number, c: number) =>
+    frame.pixels[(y * frame.width + x) * 3 + c];
+
+  const mix = (c: number) =>
+    (at(x0, y0, c) * (1 - tx) + at(x1, y0, c) * tx) * (1 - ty) +
+    (at(x0, y1, c) * (1 - tx) + at(x1, y1, c) * tx) * ty;
+
+  return {
+    r: mix(0),
+    g: mix(1),
+    b: mix(2),
+    // 1 in the middle of the frame, 0 at its edge. This is the feathering:
+    // where two frames overlap, the one looking more directly at the wall
+    // contributes more, and neither arrives as a hard line.
+    edge: (1 - Math.abs(sx)) * (1 - Math.abs(sy)),
+  };
+}
+
+/**
+ * A canvas-wide table of the sine and cosine of every column's yaw.
+ *
+ * Built once and reused by every frame. Without it the inner loop of the
+ * stitch runs four trigonometric functions per pixel per frame — about eighty
+ * million of them for one panorama, which was most of the time the whole
+ * stitch took.
+ */
+function yawTable(width: number): { sin: Float64Array; cos: Float64Array } {
+  const sin = new Float64Array(width);
+  const cos = new Float64Array(width);
   for (let x = 0; x < width; x += 1) {
-    const value =
-      x < feather.length ? Math.round(feather[x] * 255) : 255;
-    for (let y = 0; y < height; y += 1) alpha[y * width + x] = value;
+    const yaw = ((x / width) * 360 * Math.PI) / 180;
+    sin[x] = Math.sin(yaw);
+    cos[x] = Math.cos(yaw);
   }
+  return { sin, cos };
+}
 
-  const rgb = await image.removeAlpha().raw().toBuffer();
-  const rgba = Buffer.alloc(width * height * 4);
+/**
+ * Add one frame's contribution to the canvas.
+ *
+ * Written flat — no per-pixel objects, the projection inlined — because this
+ * is the loop that runs tens of millions of times. `sample` says the same
+ * thing more legibly and is what the refinement uses, where it runs on a
+ * canvas a seventh the width and legibility is worth more than the
+ * microseconds.
+ */
+function paint(canvas: Canvas, frame: Decoded, table: ReturnType<typeof yawTable>): void {
+  const basis = basisFrom(frame.pose.yaw, frame.pose.pitch, frame.pose.roll);
+  const tanH = Math.tan((frame.hfov / 2) * (Math.PI / 180));
+  const tanV = Math.tan((frame.vfov / 2) * (Math.PI / 180));
+  const box = footprint(canvas, frame);
+
+  const [fx0, fy0, fz0] = basis.forward;
+  const [rx, ry, rz] = basis.right;
+  const [ux, uy, uz] = basis.up;
+  const { pixels, width: fw, height: fh, gain } = frame;
+  const lastX = fw - 1;
+  const lastY = fh - 1;
+
+  for (let y = box.top; y <= box.bottom; y += 1) {
+    const pitch = ((90 - (y / (canvas.height - 1)) * 180) * Math.PI) / 180;
+    const flat = Math.cos(pitch);
+    const dz = Math.sin(pitch);
+    const row = y * canvas.width;
+
+    for (const x of box.columns) {
+      const dx = flat * table.sin[x];
+      const dy = flat * table.cos[x];
+
+      const depth = dx * fx0 + dy * fy0 + dz * fz0;
+      if (depth <= 1e-6) continue;
+
+      const sx = (dx * rx + dy * ry + dz * rz) / depth / tanH;
+      if (sx < -1 || sx > 1) continue;
+      const sy = (dx * ux + dy * uy + dz * uz) / depth / tanV;
+      if (sy < -1 || sy > 1) continue;
+
+      const px = ((sx + 1) / 2) * lastX;
+      const py = ((1 - sy) / 2) * lastY;
+      const x0 = px | 0;
+      const y0 = py | 0;
+      const x1 = x0 < lastX ? x0 + 1 : lastX;
+      const y1 = y0 < lastY ? y0 + 1 : lastY;
+      const tx = px - x0;
+      const ty = py - y0;
+      const w00 = (1 - tx) * (1 - ty);
+      const w10 = tx * (1 - ty);
+      const w01 = (1 - tx) * ty;
+      const w11 = tx * ty;
+
+      const i00 = (y0 * fw + x0) * 3;
+      const i10 = (y0 * fw + x1) * 3;
+      const i01 = (y1 * fw + x0) * 3;
+      const i11 = (y1 * fw + x1) * 3;
+
+      // 1 in the middle of the frame, 0 at its edge, squared so the frame
+      // looking most directly at this bit of wall dominates decisively rather
+      // than being averaged with its neighbour into a soft double image.
+      const edge = (1 - (sx < 0 ? -sx : sx)) * (1 - (sy < 0 ? -sy : sy));
+      const w = edge * edge + 1e-4;
+      const gw = gain * w;
+
+      const out = (row + x) * 3;
+      canvas.sum[out] +=
+        (pixels[i00] * w00 + pixels[i10] * w10 + pixels[i01] * w01 + pixels[i11] * w11) * gw;
+      canvas.sum[out + 1] +=
+        (pixels[i00 + 1] * w00 + pixels[i10 + 1] * w10 + pixels[i01 + 1] * w01 + pixels[i11 + 1] * w11) * gw;
+      canvas.sum[out + 2] +=
+        (pixels[i00 + 2] * w00 + pixels[i10 + 2] * w10 + pixels[i01 + 2] * w01 + pixels[i11 + 2] * w11) * gw;
+      canvas.weight[row + x] += w;
+    }
+  }
+}
+
+/**
+ * Divide the accumulated colour by its weight, and deal with what is missing.
+ *
+ * Small holes — a pixel or two between two frames that not quite met — are
+ * filled from their neighbours. Anything larger is left grey, because filling
+ * it would mean inventing a part of the room nobody photographed, and because
+ * a panorama with a grey patch is a panorama somebody can see is unfinished.
+ * The capture screen is what stops it getting this far.
+ */
+function resolve(canvas: Canvas): { rgb: Uint8Array; covered: number } {
+  const { width, height } = canvas;
+  const rgb = new Uint8Array(width * height * 3);
+  const filled = new Uint8Array(width * height);
+
+  let covered = 0;
   for (let i = 0; i < width * height; i += 1) {
-    rgba[i * 4] = rgb[i * 3];
-    rgba[i * 4 + 1] = rgb[i * 3 + 1];
-    rgba[i * 4 + 2] = rgb[i * 3 + 2];
-    rgba[i * 4 + 3] = alpha[i];
+    const w = canvas.weight[i];
+    if (w > 0) {
+      rgb[i * 3] = clamp(canvas.sum[i * 3] / w, 0, 255);
+      rgb[i * 3 + 1] = clamp(canvas.sum[i * 3 + 1] / w, 0, 255);
+      rgb[i * 3 + 2] = clamp(canvas.sum[i * 3 + 2] / w, 0, 255);
+      filled[i] = 1;
+      covered += 1;
+    }
   }
 
-  return sharp(rgba, { raw: { width, height, channels: 4 } })
-    .png({ compressionLevel: 1 })
-    .toBuffer();
+  // A bounded number of passes, so this can only close seams — it cannot creep
+  // across a missing ceiling one ring of pixels at a time.
+  for (let pass = 0; pass < 6; pass += 1) {
+    const grown = filled.slice();
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const i = y * width + x;
+        if (filled[i]) continue;
+        let n = 0;
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        for (let dy = -1; dy <= 1; dy += 1) {
+          const ny = y + dy;
+          if (ny < 0 || ny >= height) continue;
+          for (let dx = -1; dx <= 1; dx += 1) {
+            const nx = (x + dx + width) % width;
+            const j = ny * width + nx;
+            if (!filled[j]) continue;
+            n += 1;
+            r += rgb[j * 3];
+            g += rgb[j * 3 + 1];
+            b += rgb[j * 3 + 2];
+          }
+        }
+        if (n >= 3) {
+          rgb[i * 3] = r / n;
+          rgb[i * 3 + 1] = g / n;
+          rgb[i * 3 + 2] = b / n;
+          grown[i] = 1;
+        }
+      }
+    }
+    filled.set(grown);
+  }
+
+  for (let i = 0; i < width * height; i += 1) {
+    if (!filled[i]) {
+      rgb[i * 3] = 28;
+      rgb[i * 3 + 1] = 28;
+      rgb[i * 3 + 2] = 30;
+    }
+  }
+
+  return { rgb, covered: covered / (width * height) };
+}
+
+function meanLuma(frame: Decoded): number {
+  let total = 0;
+  let n = 0;
+  for (let i = 0; i < frame.pixels.length; i += 3 * 37) {
+    total +=
+      0.2126 * frame.pixels[i] +
+      0.7152 * frame.pixels[i + 1] +
+      0.0722 * frame.pixels[i + 2];
+    n += 1;
+  }
+  return n === 0 ? 0 : total / n;
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? 0;
+}
+
+function clamp(value: number, low: number, high: number): number {
+  return value < low ? low : value > high ? high : value;
 }

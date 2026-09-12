@@ -4,11 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Camera,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
-  Pause,
-  Play,
   RotateCcw,
   X,
 } from "lucide-react";
@@ -17,23 +13,31 @@ import { Button } from "@/components/ui/button";
 import { CaptureRules } from "@/components/tour/capture-rules";
 import { PanoramaViewer } from "@/components/tour/panorama-viewer";
 import {
-  advance,
+  STEADY_MS,
   captureManually,
+  decide,
   frameName,
   frameWidthFor,
-  captureStep,
   guidance,
-  headingFrom,
-  isComplete,
-  isLevel,
-  relativeHeading,
+  progress,
   startCapture,
-  targetAngle,
-  targetOffset,
-  tiltOff,
   type CaptureState,
+  type Target,
 } from "@/lib/panorama/capture";
-import { DEFAULT_FRAMES, stitchErrorMessage } from "@/lib/panorama/stitch";
+import {
+  forwardOf,
+  project,
+  rollOf,
+  rotationMatrix,
+  unsteadiness,
+  verticalFov,
+  withLocalZero,
+  yawPitchOf,
+  type Matrix3,
+  type Vector3,
+} from "@/lib/panorama/orientation";
+import { ASSUMED_HFOV } from "@/lib/panorama/sphere";
+import { stitchErrorMessage } from "@/lib/panorama/stitch";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -124,36 +128,38 @@ export function PanoramaCapture({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const headingRef = useRef<number | null>(null);
-  /**
-   * Where the phone was pointing, and how it was held, at the first reading.
-   *
-   * Everything after is measured from here, which is what makes the plan a
-   * series of turns from where somebody is standing rather than a set of
-   * compass bearings they have to go and find.
-   */
-  const originRef = useRef<{ heading: number; beta: number | null } | null>(null);
-  const tiltRef = useRef<number | null>(null);
+  /** The live rotation, in the capture's own frame. Read every animation frame. */
+  const poseRef = useRef<Matrix3 | null>(null);
+  /** The yaw the capture began at, which becomes this capture's zero. */
+  const zeroRef = useRef<number | null>(null);
+  /** The last few forward vectors, for deciding whether the phone is still. */
+  const recentRef = useRef<Vector3[]>([]);
+  /** When the phone first became both aligned and steady on the current target. */
+  const heldSinceRef = useRef<number | null>(null);
   const busyRef = useRef(false);
-  const framesRef = useRef<{ blob: Blob; angle: number }[]>([]);
-
-  const [phase, setPhase] = useState<Phase>("intro");
-  const [state, setState] = useState<CaptureState>(() => startCapture(DEFAULT_FRAMES));
-  const [hint, setHint] = useState("Turn slowly to the right");
   /**
-   * Where to draw the target, and whether the phone is on it.
+   * The photographs taken so far, each with the pose it was taken at.
    *
-   * `offset` is -1 at the left edge of the view and +1 at the right; null
-   * means the next frame is somewhere behind the person and the screen should
-   * be showing an arrow rather than a box.
+   * Section 6: the pose travels with the image, because by the time the
+   * stitcher sees it there is nothing in the pixels that says which way the
+   * camera was facing.
    */
-  const [aim, setAim] = useState<{
-    offset: number | null;
-    turnBy: number;
-    level: boolean;
-    onTarget: boolean;
-  }>({ offset: null, turnBy: 0, level: true, onTarget: false });
-  const [hasSensor, setHasSensor] = useState(false);
+  const framesRef = useRef<
+    {
+      blob: Blob;
+      targetId: string;
+      yaw: number;
+      pitch: number;
+      roll: number;
+      fov: number;
+      width: number;
+      height: number;
+      at: number;
+    }[]
+  >([]);
+  const [phase, setPhase] = useState<Phase>("intro");
+  const [state, setState] = useState<CaptureState>(() => startCapture());
+  const [hint, setHint] = useState("Find the first circle");
   const [problem, setProblem] = useState<string | null>(null);
   const [result, setResult] = useState<{ url: string; width: number; height: number } | null>(null);
   const [sent, setSent] = useState(0);
@@ -161,17 +167,28 @@ export function PanoramaCapture({
   const [uploadedJob, setUploadedJob] = useState<string | null>(null);
   /** Where the server says it has got to. Null until it says. */
   const [stage, setStage] = useState<Step | null>(null);
+  const [hasSensor, setHasSensor] = useState(false);
 
   /**
-   * The capture state, mirrored where the sensor loop can read it.
+   * Everything the overlay draws, refreshed on every animation frame.
    *
-   * The loop ticks eight times a second and has to ask `advance` about the
-   * *current* state, but it is not a render — reading `state` out of its
-   * closure would hand it whatever was true when the effect last ran. Keeping
-   * a ref alongside means every decision is made against the real state, and
-   * it is why `advance` is never called inside a `setState` updater: deciding
-   * to take a photograph is a side effect, and updaters are not the place for
-   * one.
+   * Held in one piece of state rather than several because it is all one
+   * reading: the targets are where they are *because* the camera is pointing
+   * where it is, and updating them separately would draw a frame in which the
+   * two disagree.
+   */
+  const [view, setView] = useState<{
+    targets: { id: string; x: number; y: number; taken: boolean }[];
+    aligned: boolean;
+    flash: string | null;
+  }>({ targets: [], aligned: false, flash: null });
+
+  /**
+   * The capture state, mirrored where the animation loop can read it.
+   *
+   * The loop runs sixty times a second and has to ask `decide` about the
+   * *current* state; reading `state` out of its closure would hand it whatever
+   * was true when the effect last ran.
    */
   const stateRef = useRef(state);
   const applyState = useCallback((next: CaptureState) => {
@@ -186,23 +203,26 @@ export function PanoramaCapture({
 
   useEffect(() => stopCamera, [stopCamera]);
 
+  /**
+   * One sensor reading, turned into a rotation in this capture's own frame.
+   *
+   * The first reading sets the zero: every yaw after it is measured from where
+   * the phone was pointing when the capture began. Section 2 — indoors a
+   * magnetometer is sitting inside a steel-framed building next to a fridge,
+   * and its idea of north wanders, so the absolute bearing is never what any
+   * of this depends on.
+   */
   const onOrientation = useCallback((event: DeviceOrientationEvent) => {
-    // iOS puts the real compass bearing on a property of its own and leaves
-    // `alpha` measured from wherever the page loaded, so the source has to be
-    // chosen rather than assumed. `headingFrom` does the choosing.
-    const compass = (event as DeviceOrientationEvent & {
-      webkitCompassHeading?: number;
-    }).webkitCompassHeading;
-
-    const heading = headingFrom({ alpha: event.alpha, compass });
-    if (heading === null) return;
-
-    if (!originRef.current) {
-      originRef.current = { heading, beta: event.beta ?? null };
+    if (event.alpha === null || event.beta === null || event.gamma === null) {
+      return;
     }
 
-    headingRef.current = relativeHeading(heading, originRef.current.heading);
-    tiltRef.current = tiltOff(event.beta ?? null, originRef.current.beta);
+    const world = rotationMatrix(event.alpha, event.beta, event.gamma);
+    if (zeroRef.current === null) {
+      zeroRef.current = yawPitchOf(forwardOf(world)).yaw;
+    }
+
+    poseRef.current = withLocalZero(world, zeroRef.current);
     setHasSensor(true);
   }, []);
 
@@ -212,12 +232,19 @@ export function PanoramaCapture({
     stopCamera();
   }, [onOrientation, stopCamera]);
 
-  /** Pull one frame off the video element, downscaled, as a JPEG. */
-  const grab = useCallback(async (): Promise<Blob | null> => {
+  /**
+   * Pull one frame off the video element as a JPEG.
+   *
+   * Section 6: this is the camera's own image at the resolution the stream is
+   * running at, scaled once to the upload width — not a screenshot of the
+   * preview, which would carry the overlay with it and be the size of the
+   * phone's screen rather than the size of its sensor.
+   */
+  const grab = useCallback(async (frameCount: number): Promise<Blob | null> => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return null;
 
-    const width = frameWidthFor(state.plan.length);
+    const width = frameWidthFor(frameCount);
     const scale = Math.min(1, width / video.videoWidth);
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(video.videoWidth * scale);
@@ -228,29 +255,47 @@ export function PanoramaCapture({
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     return new Promise((resolve) =>
-      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.86),
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.88),
     );
-  }, [state.plan.length]);
+  }, []);
 
+  /**
+   * Photograph the target the camera is on, and record where it was pointing.
+   *
+   * The pose is read at the moment of the grab rather than from the decision
+   * that led to it: a few tens of milliseconds pass between the two, and the
+   * stitcher wants to know where the camera was when the shutter went, not
+   * where it was when the screen decided to fire it.
+   */
   const take = useCallback(
-    async (angle: number) => {
+    async (target: Target, planned: number) => {
       if (busyRef.current) return;
       busyRef.current = true;
-      const blob = await grab();
-      if (blob) framesRef.current.push({ blob, angle });
+
+      const pose = poseRef.current;
+      const blob = await grab(planned);
+      const video = videoRef.current;
+
+      if (blob && pose && video) {
+        const facing = yawPitchOf(forwardOf(pose));
+        framesRef.current.push({
+          blob,
+          targetId: target.id,
+          yaw: facing.yaw,
+          pitch: facing.pitch,
+          roll: rollOf(pose),
+          fov: ASSUMED_HFOV,
+          width: video.videoWidth,
+          height: video.videoHeight,
+          at: Date.now(),
+        });
+      }
+
       busyRef.current = false;
     },
     [grab],
   );
 
-  /**
-   * Ask the server to stitch a job that already has its frames in storage.
-   *
-   * Separate from `upload` because it is the part worth repeating. 0081 keeps
-   * the frames for a day after a stitch fails, so a second attempt costs one
-   * request — not another turn around the room, which is what "Try again"
-   * used to mean and what the screen already promises it does not.
-   */
   const stitch = useCallback(async (jobId: string) => {
     setProblem(null);
     setStage(null);
@@ -332,25 +377,55 @@ export function PanoramaCapture({
 
     const prefix = `${owner}/${job.id}`;
 
+    const poses: {
+      name: string;
+      targetId: string;
+      yaw: number;
+      pitch: number;
+      roll: number;
+      fov: number;
+      width: number;
+      height: number;
+      at: number;
+    }[] = [];
+
     for (const [index, frame] of frames.entries()) {
-      const path = `${prefix}/${frameName(index, frame.angle)}`;
+      const name = frameName(index);
       const put = await supabase.storage
         .from("panorama-frames")
-        .upload(path, frame.blob, { contentType: "image/jpeg" });
+        .upload(`${prefix}/${name}`, frame.blob, { contentType: "image/jpeg" });
 
       if (put.error) {
         setProblem(stitchErrorMessage("frames_missing"));
         setPhase("failed");
         return;
       }
+
+      poses.push({
+        name,
+        targetId: frame.targetId,
+        // Rounded to a hundredth of a degree: further than that is below what
+        // any phone's sensors resolve, and the column has a size limit.
+        yaw: round2(frame.yaw),
+        pitch: round2(frame.pitch),
+        roll: round2(frame.roll),
+        fov: frame.fov,
+        width: frame.width,
+        height: frame.height,
+        at: frame.at,
+      });
       setSent(index + 1);
     }
 
+    // The poses go up with the last frame rather than one at a time: a row
+    // that lists frames which are not in storage yet is a row the stitcher
+    // would act on and then fail to find anything for.
     await supabase
       .from("panorama_jobs")
       .update({
         frames_prefix: prefix,
         uploaded_frames: frames.length,
+        frames: poses,
         status: "processing",
       })
       .eq("id", job.id);
@@ -368,24 +443,108 @@ export function PanoramaCapture({
    * both a cascading render and a race: two ticks can land before the render
    * happens and the upload starts twice.
    */
-  const finish = useCallback(
-    (next: CaptureState, stop?: () => void) => {
-      if (!isComplete(next)) return;
-      stop?.();
-      void upload();
-    },
-    [upload],
-  );
+  /**
+   * The capture loop.
+   *
+   * On every animation frame: read the rotation, work out which target is
+   * nearest, project every target onto the screen, and fire the shutter when
+   * the phone has been pointing at one and holding still for long enough.
+   *
+   * `requestAnimationFrame` rather than an interval, because this drives
+   * something that has to look like it is attached to the room. At 8Hz the
+   * targets visibly step; at the display's own rate they move with it.
+   */
+  useEffect(() => {
+    if (phase !== "capturing" || !hasSensor) return;
+
+    let running = true;
+    let frameId = 0;
+
+    const tick = () => {
+      if (!running) return;
+      frameId = window.requestAnimationFrame(tick);
+
+      const pose = poseRef.current;
+      const video = videoRef.current;
+      if (!pose || !video?.videoWidth) return;
+
+      const facing = forwardOf(pose);
+
+      // A short history of where the camera has been pointing, which is how
+      // "steady" is measured. Four frames is about 60ms — long enough to
+      // notice a swing, short enough not to punish somebody who has just
+      // stopped moving.
+      const recent = recentRef.current;
+      recent.push(facing);
+      if (recent.length > 4) recent.shift();
+
+      const hfov = ASSUMED_HFOV;
+      const vfov = verticalFov(hfov, video.videoWidth, video.videoHeight);
+
+      const decision = decide(
+        stateRef.current,
+        facing,
+        unsteadiness(recent),
+        heldSinceRef.current === null ? 0 : Date.now() - heldSinceRef.current,
+      );
+
+      // Where every target sits on the screen right now. This is the whole of
+      // the gyroscope interaction: a projection of a fixed direction through
+      // the live rotation. Nothing here is animated — a target moves because
+      // the phone moved, and if the phone is still so is the target.
+      const taken = new Set(stateRef.current.taken);
+      const targets: { id: string; x: number; y: number; taken: boolean }[] = [];
+      for (const target of stateRef.current.plan) {
+        const at = project(target.direction, pose, hfov, vfov);
+        if (at) {
+          targets.push({ id: target.id, x: at.x, y: at.y, taken: taken.has(target.id) });
+        }
+      }
+
+      if (decision.action === "done") {
+        running = false;
+        window.cancelAnimationFrame(frameId);
+        stopCamera();
+        void upload();
+        return;
+      }
+
+      if (decision.action === "aim") {
+        // Start the clock when the phone first settles on a target, and reset
+        // it the moment it leaves. Without the reset, a phone swinging past a
+        // target twice accumulates enough "held" time to fire while moving.
+        heldSinceRef.current =
+          decision.aligned && decision.steady
+            ? (heldSinceRef.current ?? Date.now())
+            : null;
+
+        setHint(guidance(decision, facing));
+        setView({ targets, aligned: decision.aligned, flash: null });
+        return;
+      }
+
+      // Captured. Recording it first is what stops the same target firing
+      // twice: `decision.state` already has it, and the next tick reads that.
+      heldSinceRef.current = null;
+      applyState(decision.state);
+      setHint("Captured");
+      setView({ targets, aligned: true, flash: decision.target.id });
+      void take(decision.target, stateRef.current.plan.length);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+    return () => {
+      running = false;
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [phase, hasSensor, take, applyState, upload, stopCamera]);
 
   /**
    * Put the camera on the screen, once there is a screen to put it on.
    *
-   * `start()` cannot do this. It runs from the intro, where the <video> has
+   * `start()` cannot do this. It runs from the rules, where the <video> has
    * not been rendered yet, so `videoRef.current` is null and the assignment
-   * goes nowhere — which is not a black preview and nothing else, but a
-   * capture that quietly produces no photographs at all: `grab()` returns null
-   * for a video with no dimensions, the ring fills on the sensor readings
-   * regardless, and a full turn around the room ends in "That didn't work".
+   * goes nowhere — a black preview, and a capture that photographs nothing.
    */
   useEffect(() => {
     if (phase !== "capturing" && phase !== "paused") return;
@@ -401,14 +560,9 @@ export function PanoramaCapture({
   /**
    * While the server is stitching, ask it where it has got to.
    *
-   * Three or four requests over a couple of seconds. The alternative was to
-   * animate through the step names on a timer, which would have been
-   * indistinguishable on a fast stitch and a lie on a slow one — the screen
-   * would have reached "Optimizing" and sat there while the server was still
-   * downloading frames.
-   *
-   * RLS scopes the read to the caller's own job, so this cannot be pointed at
-   * anybody else's capture.
+   * Three or four requests over a couple of seconds. A timer walking through
+   * the step names would read identically on a fast stitch and lie on a slow
+   * one. RLS scopes the read to the caller's own job.
    */
   useEffect(() => {
     if (phase !== "processing" || !uploadedJob) return;
@@ -434,52 +588,6 @@ export function PanoramaCapture({
     };
   }, [phase, uploadedJob]);
 
-  // The sensor loop. Reads the compass, asks `advance` what to do, and does it.
-  useEffect(() => {
-    if (phase !== "capturing" || !hasSensor) return;
-
-    let cancelled = false;
-    let tick = 0;
-    const stop = () => {
-      cancelled = true;
-      window.clearInterval(tick);
-    };
-
-    tick = window.setInterval(() => {
-      if (cancelled) return;
-      // A frame is still being read off the video element. Deciding now would
-      // advance the plan past an angle whose photograph `take` then drops,
-      // leaving a hole in the ring that nothing downstream can fill.
-      if (busyRef.current) return;
-      // And the camera has to be delivering pixels. `videoWidth` is 0 between
-      // the element mounting and the first frame arriving; capturing in that
-      // window advances the plan and photographs nothing, which is how a ring
-      // reaches 9 of 9 with an empty frame list.
-      if (!videoRef.current?.videoWidth) return;
-      const heading = headingRef.current;
-      if (heading === null) return;
-
-      const decision = advance(stateRef.current, {
-        heading,
-        tilt: tiltRef.current,
-      });
-      applyState(decision.state);
-      setHint(guidance(decision));
-      setAim({
-        offset: decision.action === "wait" ? targetOffset(decision.turnBy) : 0,
-        turnBy: decision.action === "wait" ? decision.turnBy : 0,
-        level: isLevel(tiltRef.current),
-        onTarget: decision.action === "capture",
-      });
-
-      if (decision.action === "capture") {
-        void take(decision.angle).then(() => finish(decision.state, stop));
-      }
-    }, 120);
-
-    return stop;
-  }, [phase, hasSensor, take, applyState, finish]);
-
   async function start() {
     setProblem(null);
 
@@ -500,9 +608,7 @@ export function PanoramaCapture({
       return;
     }
 
-    // Held, not attached. The <video> does not exist yet — this screen is
-    // still showing the intro, and the camera is only mounted once the phase
-    // changes below. The effect that watches for it does the attaching.
+    // Held, not attached: the <video> does not exist until the phase changes.
     streamRef.current = stream;
 
     // iOS requires the permission to be asked for from a gesture, which this
@@ -524,31 +630,30 @@ export function PanoramaCapture({
     }
 
     framesRef.current = [];
-    // A new capture starts wherever the person is standing now, not where
-    // they were standing for the one they abandoned.
-    originRef.current = null;
-    headingRef.current = null;
-    tiltRef.current = null;
-    applyState(startCapture(DEFAULT_FRAMES));
+    // A new capture starts wherever the person is standing now, not where they
+    // were standing for the one they abandoned.
+    zeroRef.current = null;
+    poseRef.current = null;
+    recentRef.current = [];
+    heldSinceRef.current = null;
+    applyState(startCapture());
     setPhase("capturing");
   }
 
   function restart() {
     // Restart is reached from mid-capture as well as from the two end screens,
-    // and from mid-capture the camera is still running. Without this, going
-    // round again asks for a second stream and leaves the first one live —
-    // which on a phone is a camera light that stays on.
+    // and from mid-capture the camera is still running.
     teardown();
     framesRef.current = [];
     setUploadedJob(null);
     setStage(null);
     setResult(null);
     setProblem(null);
-    applyState(startCapture(DEFAULT_FRAMES));
+    applyState(startCapture());
     setPhase("intro");
   }
 
-  const target = targetAngle(state);
+  const covered = progress(state);
 
   // ---- intro ---------------------------------------------------------------
   if (phase === "intro") {
@@ -556,9 +661,10 @@ export function PanoramaCapture({
       <div className="space-y-4 rounded-2xl border p-4 text-center">
         <Camera className="mx-auto size-8 text-muted-foreground" />
         <div className="space-y-1">
-          <p className="font-medium">Stand in one place and slowly turn around.</p>
+          <p className="font-medium">Stand in one place and look around.</p>
           <p className="text-sm text-muted-foreground">
-            Keep the phone at the same height while rotating.
+            Circles appear around you. Put the middle of the screen on each one
+            and it takes the photo itself — above and below as well as around.
           </p>
         </div>
 
@@ -571,9 +677,7 @@ export function PanoramaCapture({
         <div className="flex flex-col gap-2">
           {/* The rules come before `getUserMedia`, which is also the right
               order for the permission prompt: by the time the camera is asked
-              for, the person has read what it is for and what they are about
-              to do with it. A prompt that arrives before that is a prompt
-              people deny, and a denied camera permission is sticky. */}
+              for, the person has read what it is for. */}
           <Button
             onClick={() => setPhase("rules")}
             className="min-h-12 w-full text-base"
@@ -581,18 +685,8 @@ export function PanoramaCapture({
             Start 360 Capture
           </Button>
 
-          {/* Somebody whose camera is refused has not stopped wanting a 360
-              photo, and a locked-down browser or a denied permission is
-              sticky — telling them to try again is telling them to do the
-              thing that just failed. If they own a 360 camera, or took one on
-              another phone, that route is still open, so it is offered here
-              rather than left for them to find. */}
           {problem ? (
-            <Button
-              variant="outline"
-              onClick={onCancel}
-              className="min-h-11 w-full"
-            >
+            <Button variant="outline" onClick={onCancel} className="min-h-11 w-full">
               Upload Existing 360 Photo
             </Button>
           ) : (
@@ -619,9 +713,7 @@ export function PanoramaCapture({
   if (phase === "capturing" || phase === "paused") {
     return (
       // The bottom navigation is `fixed … z-50` and renders after the page, so
-      // at z-50 it wins the tie and sits on top of the capture controls — which
-      // is what hides Pause and Restart behind Home/Market/Property. z-[60] is
-      // what the city explorer's full-screen sheet already uses to get over it.
+      // at z-50 it wins the tie and sits on top of the capture controls.
       <div className="fixed inset-0 z-[60] flex h-[100dvh] flex-col bg-black">
         <video
           ref={videoRef}
@@ -631,11 +723,15 @@ export function PanoramaCapture({
           className="absolute inset-0 size-full object-cover"
         />
 
-        {/* Nothing over the camera but what is needed to turn around. */}
+        {hasSensor && phase === "capturing" && (
+          <Sphere targets={view.targets} aligned={view.aligned} flash={view.flash} />
+        )}
+
+        {/* Nothing over the camera but what is needed to look around. */}
         <div className="relative flex flex-1 flex-col justify-between p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-[calc(env(safe-area-inset-top)+1rem)]">
           <div className="flex items-start justify-between gap-2">
-            <span className="rounded-full bg-black/60 px-3 py-1.5 text-sm text-white">
-              {state.next} of {state.plan.length}
+            <span className="rounded-full bg-black/60 px-3 py-1.5 text-sm tabular-nums text-white">
+              {covered.taken} / {covered.total}
             </span>
             <button
               type="button"
@@ -650,74 +746,58 @@ export function PanoramaCapture({
             </button>
           </div>
 
-          {/* ---- The thing to aim at --------------------------------------
-              A degree reading tells somebody holding a phone nothing. A box
-              sitting in the room, and a ring to put over it, tells them
-              exactly where to point and when they have got there — and the
-              shutter fires itself, so nobody is pressing a button with the
-              hand that is supposed to be holding the phone still. */}
-          {hasSensor && phase === "capturing" && (
-            <Aim offset={aim.offset} turnBy={aim.turnBy} onTarget={aim.onTarget} />
-          )}
-
-          <div className="flex flex-col items-center gap-4">
-            <Ring total={state.plan.length} done={state.next} />
+          <div className="flex flex-col items-center gap-3">
             <p className="text-lg font-medium text-white drop-shadow">
-              {hasSensor
-                ? hint
-                : `Turn about ${Math.round(captureStep(state.plan.length))}°, then tap`}
+              {hasSensor ? hint : "Hold the phone upright to begin"}
             </p>
-            {hasSensor && !aim.level && (
-              <p className="rounded-full bg-amber-500/90 px-3 py-1 text-sm font-medium text-black">
-                Keep the phone at the same height
+
+            {/* Section 8: this cannot be pressed into existence. Until every
+                required direction has been photographed there is a hole in the
+                sphere, and the only thing that fills it is pointing the camera
+                at it. */}
+            {!covered.complete && (
+              <p className="text-sm text-white/70">
+                {covered.missing.length} left — look for the open circles
               </p>
-            )}
-            {hasSensor && target !== null && (
-              <p className="text-sm text-white/70">{Math.round(target)}°</p>
             )}
 
             <div className="flex w-full items-center justify-center gap-3">
-              {!hasSensor && (
-                <Button
-                  onClick={() => {
-                    if (busyRef.current) return;
-                    if (!videoRef.current?.videoWidth) return;
-                    const decision = captureManually(stateRef.current);
-                    applyState(decision.state);
-                    if (decision.action === "capture") {
-                      void take(decision.angle).then(() =>
-                        finish(decision.state),
-                      );
-                    }
-                  }}
-                  className="min-h-14 flex-1 text-base"
-                >
-                  Take photo
-                </Button>
-              )}
-              {hasSensor && (
-                <Button
-                  variant="outline"
-                  onClick={() => setPhase(phase === "paused" ? "capturing" : "paused")}
-                  className="min-h-12 bg-black/50 text-white"
-                >
-                  {phase === "paused" ? (
-                    <>
-                      <Play className="size-4" /> Resume
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="size-4" /> Pause
-                    </>
-                  )}
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (busyRef.current) return;
+                  if (!videoRef.current?.videoWidth) return;
+                  const pose = poseRef.current;
+                  if (!pose) return;
+                  const decision = decide(stateRef.current, forwardOf(pose), 0, STEADY_MS);
+                  if (decision.action !== "aim") return;
+                  const manual = captureManually(stateRef.current, decision.target);
+                  if (manual.action !== "capture") return;
+                  applyState(manual.state);
+                  void take(manual.target, stateRef.current.plan.length);
+                }}
+                className="min-h-12 bg-black/50 text-white"
+              >
+                <Camera className="size-4" /> Take it now
+              </Button>
+
+              <Button
+                onClick={() => {
+                  stopCamera();
+                  void upload();
+                }}
+                disabled={!covered.complete}
+                className="min-h-12"
+              >
+                <Check className="size-4" /> Create 360°
+              </Button>
+
               <Button
                 variant="outline"
                 onClick={restart}
                 className="min-h-12 bg-black/50 text-white"
               >
-                <RotateCcw className="size-4" /> Restart
+                <RotateCcw className="size-4" />
               </Button>
             </div>
           </div>
@@ -851,105 +931,60 @@ export function PanoramaCapture({
     </div>
   );
 }
-
 /**
- * The target, and the ring you put over it.
+ * The targets, floating in the room, and the aim that does not move.
  *
- * The ring never moves: it is the middle of the camera, which is the middle of
- * the frame that will be taken. The box moves, because it is a place in the
- * room. Turning the phone moves the room past the ring, and when the box is
- * under it the frame is taken — which is the same mechanic every 360 app uses
- * and is the reason people can follow them without reading anything.
- *
- * When the next frame is somewhere behind the person there is no box to draw,
- * only a direction, so the screen shows an arrow at the edge they should be
- * turning towards.
+ * Every circle here is a direction with a rotation applied to it. The aim in
+ * the middle is where the camera is pointing, by definition, so it is drawn at
+ * the centre and stays there; a target drifts towards it as the phone turns
+ * towards that part of the room, and away as it turns off. That is the whole
+ * mechanic, and it is why none of this is a CSS animation: a transform that
+ * ran on a timer would keep moving with the phone held still.
  */
-function Aim({
-  offset,
-  turnBy,
-  onTarget,
+function Sphere({
+  targets,
+  aligned,
+  flash,
 }: {
-  offset: number | null;
-  turnBy: number;
-  onTarget: boolean;
+  targets: { id: string; x: number; y: number; taken: boolean }[];
+  aligned: boolean;
+  flash: string | null;
 }) {
   return (
-    <div
-      className="pointer-events-none absolute inset-0 flex items-center justify-center"
-      aria-hidden
-    >
-      {/* The box, placed across the view by how far there is left to turn. */}
-      {offset !== null && (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+      {targets.map((target) => (
         <span
+          key={target.id}
           className={cn(
-            "absolute h-36 w-24 rounded-2xl border-4 transition-colors duration-150",
-            onTarget
-              ? "border-emerald-400 bg-emerald-400/30"
-              : "border-white/80 bg-white/10",
+            "absolute size-14 rounded-full border-4",
+            target.id === flash
+              ? "border-emerald-300 bg-emerald-300/60"
+              : target.taken
+                ? "border-emerald-400/70 bg-emerald-400/20"
+                : "border-white/80 bg-white/10",
           )}
-          style={{ transform: `translateX(${offset * 42}vw)` }}
+          style={{
+            // -1…+1 across the view becomes 0…100% of it, and the y axis
+            // flips because a screen counts downwards and the sky is up.
+            left: `calc(${((target.x + 1) / 2) * 100}% - 1.75rem)`,
+            top: `calc(${((1 - target.y) / 2) * 100}% - 1.75rem)`,
+          }}
         />
-      )}
+      ))}
 
-      {/* The ring, which is simply where the camera is pointing. */}
+      {/* The aim. Fixed, because it is the middle of the frame that will be
+          taken — it cannot be anywhere else. */}
       <span
         className={cn(
-          "absolute size-16 rounded-full border-4 transition-colors duration-150",
-          onTarget ? "border-emerald-400 bg-emerald-400/40" : "border-white/90",
+          "absolute top-1/2 left-1/2 size-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px]",
+          aligned ? "border-emerald-400 bg-emerald-400/25" : "border-white",
         )}
       />
-
-      {/* Nothing to aim at yet — just which way to keep going. */}
-      {offset === null && (
-        <span
-          className={cn(
-            "absolute flex size-14 items-center justify-center rounded-full bg-black/60 text-white",
-            turnBy > 0 ? "right-6" : "left-6",
-          )}
-        >
-          {turnBy > 0 ? (
-            <ChevronRight className="size-8" />
-          ) : (
-            <ChevronLeft className="size-8" />
-          )}
-        </span>
-      )}
+      <span className="absolute top-1/2 left-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
     </div>
   );
 }
 
-/** Eight to twelve dots around a circle: captured green, remaining grey. */
-function Ring({ total, done }: { total: number; done: number }) {
-  return (
-    <div
-      className="relative size-32"
-      role="progressbar"
-      aria-label="Photos taken"
-      aria-valuemin={0}
-      aria-valuemax={total}
-      aria-valuenow={done}
-    >
-      {Array.from({ length: total }, (_, i) => {
-        const angle = (i / total) * Math.PI * 2 - Math.PI / 2;
-        const r = 56;
-        return (
-          <span
-            key={i}
-            className={cn(
-              "absolute size-3 rounded-full transition-colors",
-              i < done ? "bg-emerald-400" : "bg-white/35",
-            )}
-            style={{
-              left: `calc(50% + ${Math.cos(angle) * r}px - 0.375rem)`,
-              top: `calc(50% + ${Math.sin(angle) * r}px - 0.375rem)`,
-            }}
-          />
-        );
-      })}
-      <span className="absolute inset-0 flex items-center justify-center text-2xl font-semibold text-white">
-        {done}/{total}
-      </span>
-    </div>
-  );
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }

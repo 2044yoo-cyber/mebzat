@@ -275,11 +275,13 @@ exception
 end;
 $$;
 
+-- The ceiling moved with the plan: 0081 capped this at 40 for a single
+-- horizontal ring, and a sphere is around thirty-eight.
 do $$
 begin
   insert into public.panorama_jobs (owner_id, expected_frames)
-  values ('77700000-0000-4000-8000-000000000001', 41);
-  raise exception 'FAIL 4c: a capture claimed 41 frames';
+  values ('77700000-0000-4000-8000-000000000001', 61);
+  raise exception 'FAIL 4c: a capture claimed 61 frames';
 exception
   when check_violation then
     raise notice 'ok 4c: a frame count has a ceiling, so storage is not one either';
@@ -546,5 +548,107 @@ begin
   raise notice 'ok 7g: and a cleared one stays cleared';
 end;
 $$;
+
+-- ===================================================================
+-- 8. The pose of every frame.
+--
+--    A sphere needs a yaw, a pitch, a roll and a field of view per
+--    photograph, which do not fit in a filename without being rounded
+--    to whole degrees. The stitcher starts its search from these, so a
+--    degree of rounding on every frame is a degree it has to find
+--    again by correlation — work it does not always win.
+-- ===================================================================
+reset role;
+
+do $$
+declare j public.panorama_jobs;
+begin
+  select * into j from public.panorama_jobs
+  where id = '88800000-0000-4000-8000-000000000002';
+  if j.frames is not null then
+    raise exception 'FAIL 8a: a job invented frames nobody uploaded';
+  end if;
+  raise notice 'ok 8a: a job lists no frames until some are uploaded';
+end;
+$$;
+
+set role authenticated;
+set local request.jwt.claim.sub = '77700000-0000-4000-8000-000000000001';
+
+-- The phone reports its own frames, the same way it reports its own
+-- upload progress. Nothing here is a result, so nothing here is guarded.
+update public.panorama_jobs
+set frames = '[{"name":"000.jpg","targetId":"0_0","yaw":0.5,"pitch":0,"roll":-1.25,"fov":60,"width":1920,"height":1080,"at":1}]'::jsonb
+where id = '88800000-0000-4000-8000-000000000002';
+
+do $$
+declare j public.panorama_jobs;
+begin
+  select * into j from public.panorama_jobs
+  where id = '88800000-0000-4000-8000-000000000002';
+  if jsonb_array_length(j.frames) <> 1 then
+    raise exception 'FAIL 8b: the phone could not record where it was pointing';
+  end if;
+  if (j.frames -> 0 ->> 'roll')::numeric <> -1.25 then
+    raise exception 'FAIL 8b: the pose came back changed';
+  end if;
+  raise notice 'ok 8b: the phone records a pose per frame, fractions and all';
+end;
+$$;
+
+do $$
+begin
+  update public.panorama_jobs
+  set frames = '{"not":"an array"}'::jsonb
+  where id = '88800000-0000-4000-8000-000000000002';
+  raise exception 'FAIL 8c: frames took something that is not a list of frames';
+exception
+  when check_violation then
+    raise notice 'ok 8c: frames is a list, so the stitcher can iterate it';
+end;
+$$;
+
+do $$
+declare many jsonb;
+begin
+  select jsonb_agg(jsonb_build_object('name', i::text, 'yaw', i))
+  into many from generate_series(1, 80) i;
+
+  update public.panorama_jobs set frames = many
+  where id = '88800000-0000-4000-8000-000000000002';
+  raise exception 'FAIL 8d: a capture claimed eighty frames';
+exception
+  when check_violation then
+    raise notice 'ok 8d: and a bounded one, so this is not free storage';
+end;
+$$;
+
+-- A sphere is around thirty-eight frames. 0081 capped both counts at 40 for a
+-- single horizontal ring, and a cap that refuses the plan refuses every
+-- capture — so the ceiling has to move with it.
+--
+-- Inside a block with a handler, because a bare update that trips a constraint
+-- aborts the transaction and takes every check after it down with no FAIL line
+-- to say which one was being tested.
+do $$
+declare j public.panorama_jobs;
+begin
+  begin
+    update public.panorama_jobs set expected_frames = 38, uploaded_frames = 38
+    where id = '88800000-0000-4000-8000-000000000002';
+  exception
+    when check_violation then
+      raise exception 'FAIL 8e: a whole sphere does not fit in the frame count';
+  end;
+
+  select * into j from public.panorama_jobs
+  where id = '88800000-0000-4000-8000-000000000002';
+  if j.uploaded_frames <> 38 then
+    raise exception 'FAIL 8e: a sphere''s frames were not recorded';
+  end if;
+  raise notice 'ok 8e: a sphere''s worth of frames fits the count';
+end;
+$$;
+
 
 rollback;

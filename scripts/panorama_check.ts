@@ -3,18 +3,13 @@
  *
  *   npx tsx scripts/panorama_check.ts
  *
- * The stitching maths is written as pure functions over plain arrays precisely
- * so that it can be checked here — without a camera, a browser, a GPU or a
- * server. What is checked is the part that decides whether a panorama comes
- * out straight: where the frames are placed, how the overlap is matched, and
- * what happens when the match is worthless.
+ * The spherical geometry is written as pure functions over plain numbers
+ * precisely so that it can be checked here — without a phone, a gyroscope, a
+ * camera or a server. The last section photographs a synthetic room from
+ * thirty-eight directions and stitches it back, which is the only check that
+ * can tell a panorama from a funnel.
  *
- * The warping and compositing are not here. They need an image library and
- * live in the route; what this can do is make sure the numbers handed to them
- * are right.
- *
- * Plain Node with type stripping; no test framework, in keeping with the rest
- * of scripts/.
+ * Plain Node with type stripping; no test framework, in keeping with scripts/.
  */
 
 import "./lib/allow-server-only.ts";
@@ -23,49 +18,47 @@ import { readFileSync } from "node:fs";
 
 import sharp from "sharp";
 
-import { composePanorama } from "../src/lib/panorama/compose.ts";
+import { composePanorama, type FrameInput } from "../src/lib/panorama/compose.ts";
 import {
-  CAPTURE_TOLERANCE_DEGREES,
-  REARM_DEGREES,
-  advance,
+  ALIGN_TOLERANCE_DEGREES,
+  STEADY_DEGREES,
+  STEADY_MS,
   captureManually,
+  decide,
   frameName,
   frameWidthFor,
-  HALF_FOV_DEGREES,
   guidance,
-  headingFrom,
   isComplete,
-  isLevel,
   progress,
-  relativeHeading,
-  targetOffset,
-  tiltOff,
+  record,
   startCapture,
-  targetAngle,
 } from "../src/lib/panorama/capture.ts";
-
 import {
-  DEFAULT_FRAMES,
-  EQUIRECT_RATIO,
-  MAX_FRAMES,
-  MIN_CONFIDENCE,
-  MIN_FRAMES,
-  angleDelta,
-  bestSeam,
-  capturePlan,
-  captureStep,
-  columnAngles,
-  columnProfile,
-  correlate,
-  exposureGains,
-  featherWeights,
-  hasUsableOverlap,
-  matchOffset,
-  outputSize,
-  overlapWindow,
-  solvePlacements,
-  stitchErrorMessage,
-} from "../src/lib/panorama/stitch.ts";
+  ASSUMED_HFOV,
+  OVERLAP,
+  coverage,
+  nearestTarget,
+  ringCount,
+  spherePlan,
+  steer,
+} from "../src/lib/panorama/sphere.ts";
+import {
+  angleBetween,
+  basisFrom,
+  directionOf,
+  forwardOf,
+  project,
+  rollOf,
+  rotationMatrix,
+  rightOf,
+  unsteadiness,
+  upOf,
+  verticalFov,
+  withLocalZero,
+  yawPitchOf,
+  type Vector3,
+} from "../src/lib/panorama/orientation.ts";
+import { stitchErrorMessage } from "../src/lib/panorama/stitch.ts";
 
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
@@ -86,752 +79,9 @@ function code(path: string): string {
     .replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
-// ---------------------------------------------------------------------------
-// The capture plan — section 4
-// ---------------------------------------------------------------------------
-
-{
-  const plan = capturePlan(9);
-  check("nine frames is nine angles", plan.length === 9);
-  check("starting at zero", plan[0] === 0);
-  check(
-    "evenly spaced around one turn",
-    plan.every((a, i) => Math.abs(a - i * 40) < 0.05),
-    plan.join(", "),
-  );
-  check(
-    "and none of them is a full turn, which is the first frame again",
-    plan.every((a) => a < 360),
-  );
-
-  check("eight to twelve frames, as the brief says", MIN_FRAMES === 8 && MAX_FRAMES === 12);
-  check(
-    "the default sits inside that",
-    DEFAULT_FRAMES >= MIN_FRAMES && DEFAULT_FRAMES <= MAX_FRAMES,
-  );
-  check(
-    "too few frames is clamped up rather than accepted",
-    capturePlan(2).length === MIN_FRAMES,
-    "three photographs cannot cover a room, and pretending they can produces a smear",
-  );
-  check("and too many clamped down", capturePlan(40).length === MAX_FRAMES);
-
-  check(
-    "the spacing lands in the 30–45° the brief asks for",
-    [8, 9, 10, 11, 12].every((n) => {
-      const step = captureStep(n);
-      return step >= 30 && step <= 45;
-    }),
-    "every frame count the form can produce has to leave enough overlap",
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Angles wrap
-// ---------------------------------------------------------------------------
-
-{
-  check("a small turn is a small number", angleDelta(10, 40) === 30);
-  check(
-    "crossing north is +20, not -340",
-    angleDelta(350, 10) === 20,
-    "the capture screen reads the sign as 'keep turning'",
-  );
-  check("and the other way is -20", angleDelta(10, 350) === -20);
-  check("no turn is zero", angleDelta(90, 90) === 0);
-  check("half a turn stays positive", angleDelta(0, 180) === 180);
-  check(
-    "and is never reported as a full turn",
-    Math.abs(angleDelta(0, 360)) < 1e-9,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Overlap — section 17's most useful error
-// ---------------------------------------------------------------------------
-
-{
-  check(
-    "frames 40° apart on a 65° lens overlap plenty",
-    hasUsableOverlap(40),
-  );
-  check(
-    "frames 70° apart share nothing",
-    !hasUsableOverlap(70),
-    "no amount of cleverness recovers a gap; the answer is to say so",
-  );
-  check(
-    "and the boundary is where the brief puts it",
-    hasUsableOverlap(53) && !hasUsableOverlap(54),
-    "65° of view less 12° of required overlap",
-  );
-
-  const window = overlapWindow(40)!;
-  check("an overlap has a width", window.fraction > 0);
-  check(
-    "the shared strip is the right-hand end of one frame",
-    window.leftStart > 0.5 && window.leftStart < 1,
-  );
-  check(
-    "and the left-hand end of the next",
-    window.rightEnd > 0 && window.rightEnd < 0.5,
-  );
-  check(
-    "the two strips are the same width",
-    Math.abs((1 - window.leftStart) - window.rightEnd) < 1e-9,
-  );
-  check("no overlap, no window", overlapWindow(90) === null);
-}
-
-// ---------------------------------------------------------------------------
-// Matching
-// ---------------------------------------------------------------------------
-
-{
-  // A synthetic wall: a few features at known columns.
-  const wall = (width: number, shift: number) => {
-    const out = new Float64Array(width);
-    for (let x = 0; x < width; x += 1) {
-      const t = x + shift;
-      out[x] = 120 + 60 * Math.sin(t / 9) + 25 * Math.sin(t / 31);
-    }
-    return out;
-  };
-
-  const left = wall(300, 0);
-  // The same wall, seen 37 columns further round. The sign matters and is the
-  // matcher's, not the eye's: `matchOffset` compares left[i] against
-  // right[i - shift], so the frame that continues the wall to the right is
-  // `wall(width, +37)`. The first version of this fixture had it backwards and
-  // the check failed on a correct matcher.
-  const right = wall(300, 37);
-
-  const match = matchOffset(left, right, 40, 40);
-  check(
-    "the matcher finds the real offset, not the one the angle guessed",
-    match.offset === 37,
-    `got ${match.offset}`,
-  );
-  check("and is confident about it", match.confidence > 0.9);
-
-  // The reason the search is bounded: a repeating pattern has many peaks, and
-  // an unbounded search picks whichever is highest by luck.
-  const bounded = matchOffset(left, right, 40, 5);
-  check(
-    "the search only looks near where the angle said",
-    Math.abs(bounded.offset - 40) <= 5,
-    "an unconstrained search finds a false peak in a tiled floor or a row of windows",
-  );
-
-  // A blank wall.
-  const flat = new Float64Array(300).fill(180);
-  const flatMatch = matchOffset(flat, new Float64Array(300).fill(180), 40, 20);
-  check(
-    "a featureless wall reports no confidence, rather than perfect confidence",
-    flatMatch.confidence === 0,
-    "'I cannot tell' must not read as 'a perfect match', or blank walls win every alignment",
-  );
-
-  check(
-    "a strip correlates perfectly with itself",
-    Math.abs(correlate(left, left) - 1) < 1e-9,
-  );
-  check(
-    "and not at all with its own negative",
-    correlate([1, 2, 3, 4], [4, 3, 2, 1]) < -0.99,
-  );
-  check("nothing to compare is zero", correlate([], []) === 0);
-  check(
-    "and a constant has no correlation to give",
-    correlate([5, 5, 5], [1, 2, 3]) === 0,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Column profiles
-// ---------------------------------------------------------------------------
-
-{
-  // Three columns, two rows: [10 20 30 / 30 40 50] → means 20, 30, 40.
-  const profile = columnProfile([10, 20, 30, 30, 40, 50], 3, 2);
-  check(
-    "a column's value is the mean down that column",
-    profile[0] === 20 && profile[1] === 30 && profile[2] === 40,
-    [...profile].join(", "),
-  );
-  check("one value per column", profile.length === 3);
-}
-
-// ---------------------------------------------------------------------------
-// Placement — where every frame lands
-// ---------------------------------------------------------------------------
-
-{
-  const width = 3600;
-  const n = 9;
-  const step = width / n; // 400
-  const matches = Array.from({ length: n - 1 }, () => ({
-    offset: step,
-    confidence: 0.9,
-  }));
-
-  const placed = solvePlacements(matches, step, width);
-  check("one placement per frame", placed.length === n);
-  check("the first frame is at the origin", placed[0].x === 0);
-  check(
-    "a perfect ring needs no correction",
-    placed.every((p, i) => Math.abs(p.x - i * step) < 1e-6),
-    placed.map((p) => Math.round(p.x)).join(", "),
-  );
-
-  // Now every match is 10 columns long, so the ring over-runs by 80.
-  const drifting = Array.from({ length: n - 1 }, () => ({
-    offset: step + 10,
-    confidence: 0.9,
-  }));
-  const corrected = solvePlacements(drifting, step, width);
-  check(
-    "a ring that does not close is corrected",
-    Math.abs(corrected[n - 1].x - (width * (n - 1)) / n) < 1e-6,
-    `last frame at ${corrected[n - 1].x}, wanted ${(width * (n - 1)) / n}`,
-  );
-  check(
-    "and the correction is spread over every frame, not dumped on the last seam",
-    corrected.every((p, i) => i === 0 || p.x < i * (step + 10)),
-    "one visibly wrong join is exactly where a viewer's eye goes; every join slightly soft is not",
-  );
-  check(
-    "the frames stay in order",
-    corrected.every((p, i) => i === 0 || p.x > corrected[i - 1].x),
-  );
-
-  // A match nobody should trust.
-  const untrusted = [
-    { offset: 4000, confidence: 0.05 },
-    ...Array.from({ length: n - 2 }, () => ({ offset: step, confidence: 0.9 })),
-  ];
-  const fallback = solvePlacements(untrusted, step, width);
-  check(
-    "a worthless match falls back to the angle the phone recorded",
-    fallback[1].x < step * 2,
-    `a 4000-column jump would have thrown the panorama apart; got ${fallback[1].x}`,
-  );
-  check(
-    "the confidence threshold is what decides that",
-    MIN_CONFIDENCE > 0 && MIN_CONFIDENCE < 1,
-  );
-  check(
-    "and the confidence is carried through so a weak stitch can be reported",
-    fallback[1].confidence === 0.05,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Exposure — section 7 step 6
-// ---------------------------------------------------------------------------
-
-{
-  const gains = exposureGains([100, 200, 100, 200]);
-  check("four frames, four gains", gains.length === 4);
-  check(
-    "a dark frame is brightened and a bright one dimmed",
-    gains[0] > 1 && gains[1] < 1,
-    gains.map((g) => g.toFixed(2)).join(", "),
-  );
-  check(
-    "but only partly, because lens falloff at the edges is real",
-    gains[0] < 200 / 100,
-    "flattening it completely costs more than the banding it fixes",
-  );
-
-  const even = exposureGains([150, 150, 150]);
-  check(
-    "frames that already match are left alone",
-    even.every((g) => Math.abs(g - 1) < 1e-9),
-  );
-
-  const extreme = exposureGains([1, 250]);
-  check(
-    "a nearly-black frame is not multiplied into noise",
-    extreme.every((g) => g >= 0.5 && g <= 2),
-    extreme.map((g) => g.toFixed(2)).join(", "),
-  );
-  check("no frames, no crash", exposureGains([]).length === 0);
-}
-
-// ---------------------------------------------------------------------------
-// Seam and blend — steps 7 and 8
-// ---------------------------------------------------------------------------
-
-{
-  const a = new Float64Array([10, 10, 50, 10, 10]);
-  const b = new Float64Array([90, 90, 50, 90, 90]);
-  check(
-    "the seam goes where the two frames already agree",
-    bestSeam(a, b, 0, 5) === 2,
-    "cutting at a fixed midpoint puts the join through whoever walked past",
-  );
-  check("an empty range returns its start", bestSeam(a, b, 3, 3) === 3);
-
-  const weights = featherWeights(4);
-  check("a blend band has one weight per column", weights.length === 4);
-  check(
-    "it rises from left to right",
-    weights.every((w, i) => i === 0 || w > weights[i - 1]),
-  );
-  check(
-    "and never reaches a hard 0 or 1, which is a hard cut by another name",
-    weights[0] > 0 && weights[weights.length - 1] < 1,
-    [...weights].map((w) => w.toFixed(2)).join(", "),
-  );
-  check("a band of nothing is still a band of one", featherWeights(0).length === 1);
-}
-
-// ---------------------------------------------------------------------------
-// The output
-// ---------------------------------------------------------------------------
-
-{
-  const angles = columnAngles(360);
-  check("the first column is due west", angles[0] === -180);
-  check("the middle is dead ahead", Math.abs(angles[180] - 0) < 1e-9);
-  check(
-    "and the last stops short of a full turn",
-    angles[359] === 179,
-    "column 0 and column `width` are the same longitude, so the last column is one step short of +180",
-  );
-
-  const size = outputSize(2000, 9);
-  check(
-    "the output is twice as wide as it is tall",
-    size.width === size.height * EQUIRECT_RATIO,
-    `${size.width}x${size.height}`,
-  );
-  check(
-    "and is capped where the bucket and the viewer already cap it",
-    size.width <= 4096,
-    "section 19: a reliable medium-resolution panorama beats a slow large one",
-  );
-  check(
-    "a small capture still produces a usable panorama",
-    outputSize(600, 8).width >= 2048,
-  );
-  check("the width is even, so the halves are equal", size.width % 2 === 0);
-}
-
-// ---------------------------------------------------------------------------
-// Section 17 — messages somebody can act on
-// ---------------------------------------------------------------------------
-
-{
-  check(
-    "not enough overlap says what to do differently",
-    /rotate more slowly/i.test(stitchErrorMessage("no_overlap")),
-  );
-  check(
-    "an unknown failure says the photos are safe",
-    /try again/i.test(stitchErrorMessage("unknown")),
-  );
-  check(
-    "and a code nobody recognises still gets a sentence",
-    stitchErrorMessage("something_new").length > 0 &&
-      stitchErrorMessage(null).length > 0,
-    "a generic error is still better than an empty dialog",
-  );
-  check(
-    "no message is a raw code or a stack",
-    !/[_]{1}[a-z]+_[a-z]/.test(stitchErrorMessage("no_overlap")),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// The capture state machine — sections 3, 4 and 5
-// ---------------------------------------------------------------------------
-
-{
-  let state = startCapture(9);
-  check("a fresh capture wants nine angles", state.plan.length === 9);
-  check("and the first is zero", targetAngle(state) === 0);
-  check("nothing captured yet", progress(state) === 0 && !isComplete(state));
-
-  // Standing still at 0° fires the first frame.
-  let decision = advance(state, { heading: 0 });
-  check("pointing at the first angle captures", decision.action === "capture");
-  state = decision.state;
-  check("and moves on to the next", targetAngle(state) === 40);
-
-  // The hand shakes back onto the same angle. It must not fire again.
-  decision = advance(state, { heading: 1 });
-  check(
-    "a hand shaking on the boundary does not capture twice",
-    decision.action === "wait",
-    "four photographs of one wall and none of the opposite one",
-  );
-  state = decision.state;
-
-  // Turning past the re-arm distance but not yet to the next target.
-  decision = advance(state, { heading: 20 });
-  check("turning away re-arms without capturing", decision.action === "wait");
-  state = decision.state;
-  check("and it is armed again", state.armed);
-
-  decision = advance(state, { heading: 39 });
-  check(
-    "close enough to the next angle captures",
-    decision.action === "capture",
-    `tolerance is ${CAPTURE_TOLERANCE_DEGREES} degrees`,
-  );
-  state = decision.state;
-
-  check(
-    "the re-arm distance is wider than the capture tolerance",
-    REARM_DEGREES > CAPTURE_TOLERANCE_DEGREES,
-    "otherwise a reading sitting just outside the tolerance re-arms and fires forever",
-  );
-
-  // Walk the rest of the ring.
-  for (const target of [80, 120, 160, 200, 240, 280, 320]) {
-    state = advance(state, { heading: target - 20 }).state;
-    const fired = advance(state, { heading: target });
-    check(`the ring reaches ${target}`, fired.action === "capture");
-    state = fired.state;
-  }
-
-  check("nine captures completes the ring", isComplete(state));
-  check("and progress is full", progress(state) === 1);
-  check("with nothing left to point at", targetAngle(state) === null);
-  check(
-    "a reading after the ring is done says so",
-    advance(state, { heading: 10 }).action === "done",
-  );
-  check("all nine angles were recorded", state.taken.length === 9);
-}
-
-{
-  // Section 3: no gyroscope is not a dead end.
-  let state = startCapture(8);
-  for (let i = 0; i < 8; i += 1) {
-    const decision = captureManually(state);
-    check(`manual capture ${i + 1} fires`, decision.action === "capture");
-    state = decision.state;
-  }
-  check("a manual ring completes too", isComplete(state));
-  check(
-    "and the angles are the planned ones, not wherever the phone was",
-    state.taken.every((a, i) => Math.abs(a - i * 45) < 0.05),
-    state.taken.join(", "),
-  );
-  check(
-    "a manual capture past the end does nothing",
-    captureManually(state).action === "done",
-  );
-}
-
-{
-  // Section 6: the upload size.
-  check("twelve frames go up smaller", frameWidthFor(12) === 1600);
-  check("nine go up larger", frameWidthFor(9) === 2200);
-  check(
-    "every choice sits in the 1600–2500 the brief asks for",
-    [8, 9, 10, 11, 12].every((n) => {
-      const w = frameWidthFor(n);
-      return w >= 1600 && w <= 2500;
-    }),
-  );
-
-  check(
-    "a frame's name carries its angle",
-    frameName(3, 120) === "003_120.jpg",
-    "the stitcher reads the angle off the listing rather than out of a second table",
-  );
-  check(
-    "and sorts lexically into capture order",
-    ["003_120.jpg", "010_040.jpg", "001_000.jpg"].sort()[0] === "001_000.jpg",
-  );
-  check("a full turn is named as zero", frameName(0, 360) === "000_000.jpg");
-  check("and angles are padded", frameName(1, 40) === "001_040.jpg");
-
-  check(
-    "the guidance is short, because the person is turning",
-    guidance({ action: "wait", turnBy: 30, reason: "turn", state: startCapture() })
-      .length < 34,
-  );
-  check(
-    "turning too far says to come back",
-    /back/i.test(
-      guidance({ action: "wait", turnBy: -50, reason: "turn", state: startCapture() }),
-    ),
-  );
-  check(
-    "once the target is on screen it says to line it up, not to turn more",
-    /line/i.test(
-      guidance({ action: "wait", turnBy: -20, reason: "turn", state: startCapture() }),
-    ),
-    "a target the person can see is a thing to aim at; telling them to keep turning walks them past it",
-  );
-  check(
-    "and a phone held at the wrong height is told so, not told to turn",
-    /level/i.test(
-      guidance({ action: "wait", turnBy: 0, reason: "level", state: startCapture() }),
-    ),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Which way is the phone facing — the bug behind the melted panorama
-// ---------------------------------------------------------------------------
-
-{
-  check(
-    "iOS's compass heading is preferred over its alpha",
-    headingFrom({ alpha: 200, compass: 90 }) === 90,
-    "iOS fires no `deviceorientationabsolute` and its alpha is measured from wherever the page loaded — reading it gives a number that moves like a heading and points nowhere",
-  );
-  check(
-    "a compass bearing is taken as it is, clockwise from north",
-    headingFrom({ compass: 0 }) === 0 && headingFrom({ compass: 359 }) === 359,
-  );
-  check(
-    "alpha is flipped, because it counts the other way",
-    headingFrom({ alpha: 90 }) === 270,
-  );
-  check(
-    "and a reading with neither is no reading",
-    headingFrom({}) === null
-      && headingFrom({ alpha: null, compass: null }) === null
-      && headingFrom({ alpha: Number.NaN }) === null,
-    "a NaN heading would fire every frame at once",
-  );
-  check(
-    "every heading comes back inside one turn",
-    [0, 90, 359.9, 400, -30].every((alpha) => {
-      const heading = headingFrom({ alpha });
-      return heading !== null && heading >= 0 && heading < 360;
-    }),
-  );
-
-  check(
-    "the plan is measured from where the person is standing",
-    relativeHeading(200, 200) === 0,
-    "the plan counts 0, 40, 80 from the start — read as compass bearings, the first frame only fires if somebody happens to be facing the sensor's zero",
-  );
-  check(
-    "and it wraps rather than going negative",
-    relativeHeading(10, 350) === 20 && relativeHeading(350, 10) === 340,
-  );
-  check(
-    "a quarter turn from the start is a quarter turn",
-    relativeHeading(275, 185) === 90,
-  );
-
-  // The tilt, which is the brief's second instruction.
-  check("level is level", isLevel(0) && isLevel(10) && isLevel(-10));
-  check(
-    "and far enough off is not",
-    !isLevel(30) && !isLevel(-30),
-    "a frame shot ten degrees lower shares a horizon with none of its neighbours",
-  );
-  check(
-    "no tilt sensor means the tilt is not checked, not that it is wrong",
-    isLevel(null) && tiltOff(null, 5) === null && tiltOff(5, null) === null,
-    "refusing to capture on a phone that cannot report tilt would refuse to capture at all",
-  );
-  check("tilt is measured against how it was first held", tiltOff(70, 85) === -15);
-
-  {
-    const level = advance(startCapture(), { heading: 0, tilt: 2 });
-    check("a level phone pointing at the target captures", level.action === "capture");
-
-    const tilted = advance(startCapture(), { heading: 0, tilt: 40 });
-    check(
-      "the same phone tilted does not",
-      tilted.action === "wait" && tilted.reason === "level",
-      "it would land in the panorama at an angle its neighbours do not share, and no seam rescues that",
-    );
-
-    const unknown = advance(startCapture(), { heading: 0 });
-    check(
-      "and a phone that cannot say still captures",
-      unknown.action === "capture",
-    );
-  }
-
-  // Where the target is drawn.
-  check("a target dead ahead is dead centre", targetOffset(0) === 0);
-  check(
-    "one at the edge of the view is at the edge of the screen",
-    targetOffset(HALF_FOV_DEGREES) === 1 && targetOffset(-HALF_FOV_DEGREES) === -1,
-  );
-  check(
-    "and one behind you is not on the screen at all",
-    targetOffset(90) === null && targetOffset(-90) === null,
-    "a target pinned to the edge that is really 90° away tells somebody to stop turning far too early",
-  );
-  check(
-    "the offset is signed the way the turn is",
-    (targetOffset(16) ?? 0) > 0 && (targetOffset(-16) ?? 0) < 0,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// End to end: nine photographs in, one panorama out
-//
-// The arithmetic above can all be right while the thing that assembles the
-// pixels is wrong, so this builds a synthetic room, cuts nine overlapping
-// frames out of it the way a phone would see them, and stitches them back.
-// A correct stitch puts the room back together; a broken one produces a blank
-// canvas, a smear, or the wrong shape — and every one of those passes the
-// unit checks above.
-// ---------------------------------------------------------------------------
-
-
-async function endToEnd() {
-  const SRC_W = 3600;
-  const SRC_H = 900;
-
-  const raw = Buffer.alloc(SRC_W * SRC_H * 3);
-  for (let y = 0; y < SRC_H; y += 1) {
-    for (let x = 0; x < SRC_W; x += 1) {
-      const i = (y * SRC_W + x) * 3;
-      // Vertical features at two irregular spacings, so the matcher has
-      // something to lock onto that does not repeat, and a horizon band, so a
-      // vertical misalignment would be visible as a step.
-      const stripe = Math.sin(x / 17) * 60 + Math.sin(x / 53) * 40;
-      const horizon = y < SRC_H * 0.45 ? 40 : -20;
-      raw[i] = Math.max(0, Math.min(255, 128 + stripe + horizon));
-      raw[i + 1] = Math.max(0, Math.min(255, 120 + stripe * 0.7));
-      raw[i + 2] = Math.max(0, Math.min(255, 110 - stripe * 0.4 + horizon));
-    }
-  }
-
-  const source = await sharp(raw, {
-    raw: { width: SRC_W, height: SRC_H, channels: 3 },
-  })
-    .jpeg()
-    .toBuffer();
-
-  const frameW = Math.round(SRC_W * (65 / 360));
-  const wrapStrip = await sharp(source)
-    .extract({ left: 0, top: 0, width: frameW, height: SRC_H })
-    .toBuffer();
-  // The room wraps, so the strip past the right-hand edge is the left-hand
-  // edge again. Without this the last frame would be half black.
-  const wrapped = await sharp(source)
-    .extend({ right: frameW, background: { r: 0, g: 0, b: 0 } })
-    .composite([{ input: wrapStrip, left: SRC_W, top: 0 }])
-    .toBuffer();
-
-  const frames = [];
-  for (const yaw of capturePlan(9)) {
-    const left = Math.round((yaw / 360) * SRC_W);
-    const bytes = await sharp(wrapped)
-      .extract({ left, top: 0, width: frameW, height: SRC_H })
-      .jpeg({ quality: 92 })
-      .toBuffer();
-    frames.push({ yaw, bytes: new Uint8Array(bytes) });
-  }
-
-  const started = Date.now();
-  const result = await composePanorama(frames);
-  const elapsed = Date.now() - started;
-
-  check("nine frames stitch into something", result.ok, result.ok ? "" : result.code);
-
-  if (result.ok) {
-    const meta = await sharp(result.jpeg).metadata();
-    const stats = await sharp(result.jpeg).stats();
-
-    check(
-      "the output is equirectangular",
-      meta.width === meta.height! * EQUIRECT_RATIO,
-      `${meta.width}x${meta.height}`,
-    );
-    check(
-      "the panorama has real detail in it",
-      stats.channels[0].stdev > 10,
-      `luminance stdev ${stats.channels[0].stdev.toFixed(1)} — a blank canvas would be near zero`,
-    );
-    check(
-      "every seam matched confidently",
-      result.weakSeams === 0,
-      `${result.weakSeams} weak seams on a synthetic room with plenty of features`,
-    );
-
-    // The horizon in the source is a hard step at 45% height. If the frames
-    // were assembled with a vertical error, the step would be at different
-    // heights in different columns, and a column-wise check of where it falls
-    // would disagree across the image.
-    const { data, info } = await sharp(result.jpeg)
-      .greyscale()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-
-    const stepRows: number[] = [];
-    for (let x = 20; x < info.width - 20; x += Math.floor(info.width / 24)) {
-      let bestRow = 0;
-      let bestJump = 0;
-      for (let y = 1; y < info.height; y += 1) {
-        const jump = Math.abs(
-          data[y * info.width + x] - data[(y - 1) * info.width + x],
-        );
-        if (jump > bestJump) {
-          bestJump = jump;
-          bestRow = y;
-        }
-      }
-      stepRows.push(bestRow);
-    }
-    const spread = Math.max(...stepRows) - Math.min(...stepRows);
-    check(
-      "the horizon comes out level across the whole panorama",
-      spread <= 4,
-      `the strongest horizontal edge moves ${spread} rows between columns; a tilted or stepped stitch moves far more`,
-    );
-
-    check(
-      "and it does not take an hour",
-      elapsed < 30_000,
-      `${elapsed}ms for nine frames — section 19 asks for minutes, not the hour the app being replaced took`,
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// The capture screen's wiring — sections 5, 16 and 23
-// ---------------------------------------------------------------------------
-
-/**
- * The body of the first `{ … }` at or after `marker`, brace-balanced.
- *
- * Scoped rather than whole-file on purpose: this component has several
- * callbacks that all read the same refs, and a check against the whole file
- * passes because a sibling still has the line the mutation removed.
- */
-/**
- * The `chars` characters following `marker`.
- *
- * For a region with no nested braces of its own, which `blockAfter` cannot
- * scope — it would run past the end and find the next function's body, and the
- * check would then pass on a line belonging to something else entirely.
- */
 function windowAfter(src: string, marker: string, chars = 400): string {
   const at = src.indexOf(marker);
   return at < 0 ? "" : src.slice(at, at + chars);
-}
-
-/**
- * One whole top-level function, from its `function` keyword to the next one.
- *
- * `blockAfter` cannot scope a component: its first `{` is the destructured
- * props, not the body, so the check ends up reading the parameter list. This
- * is still scoped — a sibling component's lines are not in it — which is the
- * property that matters.
- */
-function wholeFunction(src: string, name: string): string {
-  const at = src.indexOf(`function ${name}(`);
-  if (at < 0) return "";
-  const next = src.indexOf("\nfunction ", at + 1);
-  return next < 0 ? src.slice(at) : src.slice(at, next);
 }
 
 function blockAfter(src: string, marker: string): string {
@@ -851,498 +101,1095 @@ function blockAfter(src: string, marker: string): string {
   return "";
 }
 
-{
-  const capture = code("src/components/tour/panorama-capture.tsx");
-
-  const tick = blockAfter(capture, "tick = window.setInterval(");
-  check("the sensor loop is findable at all", tick.length > 0);
-  check(
-    "the loop decides against the live state, not a stale closure",
-    /advance\(\s*stateRef\.current/.test(tick),
-    "an effect that reads `state` decides with whatever was true when it last ran",
-  );
-  check(
-    "the loop does not decide while a frame is still being read",
-    /if\s*\(\s*busyRef\.current\s*\)\s*return/.test(tick),
-    "without this the plan advances past an angle whose photograph `take` drops, leaving a hole in the ring",
-  );
-  check(
-    "and it takes the photograph the decision asked for",
-    /take\(\s*decision\.angle\s*\)/.test(tick),
-  );
-
-  check(
-    "nothing in the screen calls `advance` inside a setState updater",
-    !/setState\(\s*\(/.test(capture),
-    "an updater that fires the camera runs twice under StrictMode and once per replay",
-  );
-  check(
-    "and no effect watches the frame count to start the upload",
-    !/\[\s*phase\s*,\s*state\.next\s*\]/.test(capture),
-    "reacting to your own render to start an upload races two ticks into two uploads",
-  );
-
-  const finish = blockAfter(capture, "const finish = useCallback(");
-  check("the ring-closing step is findable", finish.length > 0);
-  check(
-    "and it uploads only once the ring is actually closed",
-    /if\s*\(\s*!isComplete\(\s*next\s*\)\s*\)\s*return/.test(finish),
-    "without the guard every frame starts an upload of a half-finished room",
-  );
-
-  const upload = blockAfter(capture, "const upload = useCallback(");
-  check("the upload is findable", upload.length > 0);
-  check(
-    "the frames are uploaded before the stitch is asked for",
-    upload.indexOf("panorama-frames") < upload.indexOf("stitch("),
-    "asking the server to stitch frames that are not in storage yet fails as `too_few_frames`",
-  );
-  const remembered = upload.indexOf("setUploadedJob(job.id)");
-  check(
-    "and the job is remembered before the stitch is asked for, not after it",
-    remembered > 0 && remembered < upload.indexOf("await stitch("),
-    "section 16 keeps the frames for a day so a failed stitch can be retried; remembering the id only after the stitch returns means the one case that needs it — the stitch failing — is the one case it is missing",
-  );
-
-  const stitch = blockAfter(capture, "const stitch = useCallback(");
-  check("the stitch request is its own step", stitch.length > 0);
-  check(
-    "it posts the job id it was given, not one of its own",
-    /body:\s*JSON\.stringify\(\{\s*jobId\s*\}\)/.test(stitch),
-  );
-  check(
-    "a failed stitch is retried without turning around the room again",
-    /void stitch\(\s*uploadedJob\s*\)/.test(capture),
-    "the screen tells people their photos are saved; Try again has to mean it",
-  );
-  check(
-    "and re-shooting is still offered, as the second choice",
-    /Shoot the room again/.test(capture),
-  );
-  check(
-    "starting over forgets the finished job",
-    /setUploadedJob\(null\)/.test(blockAfter(capture, "function restart(")),
-    "otherwise Try again re-stitches the room somebody just abandoned",
-  );
-
-  check(
-    "leaving the screen stops the camera",
-    /stopCamera\(\)/.test(blockAfter(capture, "const teardown = useCallback(")),
-    "a live camera behind a closed screen is a light left on somebody's phone",
-  );
-}
-
-{
-  const builder = code("src/components/tour/tour-builder.tsx");
-  check(
-    "the tour builder offers both ways in",
-    /<RoomSource\b/.test(builder),
-    "section 23: capture is reached from the place panoramas are already added",
-  );
-
-  const source = code("src/components/tour/room-source.tsx");
-  check(
-    "uploading a 360 photo is still there",
-    /<PanoramaInput\b/.test(source),
-    "capture is offered, not imposed — a Ricoh owner has nothing to capture",
-  );
-  check("and capture is the other half", /<PanoramaCapture\b/.test(source));
-  check(
-    "a captured panorama is declared equirectangular rather than guessed at",
-    /kind:\s*"equirectangular"/.test(source),
-    "the compositor builds 2:1 by construction, so there is nothing to warn about",
-  );
-
-  const viewer = code("src/components/tour/panorama-viewer.tsx");
-  check(
-    "the viewer can go fullscreen",
-    /requestFullscreen\(\)/.test(viewer),
-    "section 12 asks for it, and a 360 photo in a card is a keyhole",
-  );
-  check(
-    "and it exits as well as enters",
-    /exitFullscreen\(\)/.test(viewer),
-  );
+function wholeFunction(src: string, name: string): string {
+  const at = src.indexOf(`function ${name}(`);
+  if (at < 0) return "";
+  const next = src.indexOf("\nfunction ", at + 1);
+  return next < 0 ? src.slice(at) : src.slice(at, next);
 }
 
 // ---------------------------------------------------------------------------
-// Somewhere to aim, and rules for how to shoot — sections 3, 4 and 5
+// Orientation — section 2
 // ---------------------------------------------------------------------------
 
 {
-  const capture = code("src/components/tour/panorama-capture.tsx");
-
-  // --- the heading, which is what the melted panorama came down to ---------
-  const reading = blockAfter(capture, "const onOrientation = useCallback(");
-  check("the sensor reading is findable", reading.length > 0);
+  // The basis round trip is the contract between the two halves of the
+  // feature: the capture screen writes a pose down, the stitcher reads it
+  // back, and if they disagree about what roll means every frame is mirrored
+  // about its own centre while the arithmetic looks right in both places.
+  let worst = 0;
+  for (const [a, b, g] of [
+    [0, 90, 0],
+    [45, 70, 10],
+    [200, 110, -25],
+    [300, 45, 80],
+    [10, 20, -60],
+    [123, 90, 179],
+  ] as [number, number, number][]) {
+    const r = rotationMatrix(a, b, g);
+    const f = forwardOf(r);
+    const { yaw, pitch } = yawPitchOf(f);
+    const basis = basisFrom(yaw, pitch, rollOf(r));
+    worst = Math.max(
+      worst,
+      angleBetween(basis.forward, f),
+      angleBetween(basis.right, rightOf(r)),
+      angleBetween(basis.up, upOf(r)),
+    );
+  }
   check(
-    "the heading source is chosen, not assumed to be alpha",
-    /headingFrom\(\{ alpha: event\.alpha, compass \}\)/.test(reading),
-    "reading alpha on an iPhone gives a number that moves like a heading and points nowhere",
-  );
-  check(
-    "iOS's own compass property is the one actually read",
-    /\}\)\.webkitCompassHeading;/.test(reading),
-    "the type declaration names it too, so matching the name alone passes with the read gone",
-  );
-  check(
-    "the first reading becomes the zero the plan is measured from",
-    /originRef\.current = \{ heading/.test(reading)
-      && /relativeHeading\(heading, originRef\.current\.heading\)/.test(reading),
-    "the plan counts 0, 40, 80 from where somebody stands; read as bearings the ring fills at arbitrary true directions while the frames are labelled as if it had not",
-  );
-  check(
-    "and how the phone was first held becomes the level to keep",
-    /tiltOff\(event\.beta \?\? null, originRef\.current\.beta\)/.test(reading),
-  );
-  check(
-    "a fresh capture forgets the last one's starting point",
-    /originRef\.current = null/.test(blockAfter(capture, "async function start()")),
-    "a second room measured from the first room's zero starts the plan pointing at a wall behind you",
-  );
-  check(
-    "the tilt reaches the decision",
-    /tilt: tiltRef\.current/.test(blockAfter(capture, "tick = window.setInterval(")),
-    "a value read off the sensor and never passed anywhere is a check that does nothing",
+    "a pose written down and read back is the same pose",
+    worst < 0.01,
+    `worst disagreement ${worst.toFixed(4)}° — the capture screen and the stitcher have to mean the same thing by roll`,
   );
 
-  // --- section 5: something to aim at --------------------------------------
   check(
-    "the camera view has a target on it",
-    /<Aim\b/.test(capture),
-    "a degree reading tells somebody holding a phone nothing about where to point it",
-  );
-  const aim = wholeFunction(capture, "Aim");
-  check("the target is findable", aim.length > 0);
-  check(
-    "the box moves across the view by how far is left to turn",
-    /translateX\(\$\{offset \* 42\}vw\)/.test(aim),
+    "a phone held upright looks at the horizon, and tilting it up looks up",
+    Math.abs(yawPitchOf(forwardOf(rotationMatrix(0, 90, 0))).pitch) < 1 &&
+      yawPitchOf(forwardOf(rotationMatrix(0, 120, 0))).pitch > 25,
+    "beta 90 is a phone held up in front of somebody, which is level — and on its own that is satisfied by a pitch stuck at zero",
   );
   check(
-    "the ring does not move, because it is where the camera points",
-    /absolute size-16 rounded-full/.test(aim) && !/translateX[\s\S]{0,80}size-16/.test(aim),
-  );
-  check(
-    "landing on the target is visible without reading anything",
-    (aim.match(/onTarget\s*\n?\s*\?\s*"border-emerald/g) ?? []).length >= 2,
-    "the box and the ring both have to answer — asserting that one of them does passes on the other one being broken",
-  );
-  check(
-    "and a target behind you is an arrow, not a box pinned to the edge",
-    /offset === null &&/.test(aim) && /ChevronRight|ChevronLeft/.test(aim),
-    "a box stuck at the edge that is really 90° away says stop turning far too early",
-  );
-  check(
-    "the overlay never eats a touch meant for the controls under it",
-    /pointer-events-none/.test(aim),
-  );
-  check(
-    "being held at the wrong height is said plainly, while it is happening",
-    /bg-amber-[\s\S]{0,140}?Keep the phone at the same height/.test(capture),
-    "the intro screen says the same sentence, so matching it anywhere in the file is satisfied by the advice while the warning is gone",
-  );
-  check(
-    "the tap route is told how far to turn between photos",
-    /Turn about \$\{Math\.round\(captureStep\(state\.plan\.length\)\)\}°/.test(capture),
-    "without a sensor nothing stops nine taps at one wall, which is nine copies of one photograph",
+    "laid on its back it looks at the floor",
+    yawPitchOf(forwardOf(rotationMatrix(0, 0, 0))).pitch < -80,
   );
 
-  // --- the rules ------------------------------------------------------------
-  const rules = code("src/components/tour/capture-rules.tsx");
+  // Turning right increases yaw, which is the direction the plan counts in.
+  {
+    const before = yawPitchOf(forwardOf(rotationMatrix(0, 90, 0))).yaw;
+    const after = yawPitchOf(forwardOf(rotationMatrix(-40, 90, 0))).yaw;
+    check(
+      "turning to the right counts upwards",
+      ((after - before + 540) % 360) - 180 > 20,
+      "if this is backwards every instruction on the screen sends people the wrong way",
+    );
+  }
+
   check(
-    "there are rules for how to shoot one",
-    /export const CAPTURE_RULES: Rule\[\]/.test(rules) && /<CaptureRules/.test(capture),
+    "a direction and its yaw and pitch are the same thing",
+    [
+      [0, 0],
+      [90, 30],
+      [187, -45],
+      [300, 89],
+    ].every(([yaw, pitch]) => {
+      const round = yawPitchOf(directionOf(yaw, pitch));
+      return (
+        Math.abs(((round.yaw - yaw + 540) % 360) - 180) < 0.01 &&
+        Math.abs(round.pitch - pitch) < 0.01
+      );
+    }),
+  );
+
+  // The local zero, which is what makes the compass unnecessary.
+  {
+    const world = rotationMatrix(215, 90, 0);
+    const zero = yawPitchOf(forwardOf(world)).yaw;
+    const local = withLocalZero(world, zero);
+    check(
+      "the direction the capture starts in becomes its zero",
+      Math.abs(yawPitchOf(forwardOf(local)).yaw) < 0.01,
+      "section 2: indoors the magnetometer is next to a fridge, so no target may depend on true north",
+    );
+    check(
+      "and squaring up to it does not change how level it is",
+      Math.abs(
+        yawPitchOf(forwardOf(local)).pitch -
+          yawPitchOf(forwardOf(world)).pitch,
+      ) < 0.01,
+      "pitch comes from gravity, which is not confused by a fridge, so it must survive the yaw offset untouched",
+    );
+  }
+
+  check(
+    "the vertical field of view follows the horizontal one",
+    Math.abs(verticalFov(60, 640, 480) - 46.8) < 1,
+    "guessing the two separately gives a frame whose shape does not match the photograph",
+  );
+
+  check(
+    "a phone that has not moved is steady",
+    unsteadiness([directionOf(10, 0), directionOf(10, 0)]) < 0.01,
   );
   check(
-    "and there are several of them, not one",
-    (rules.match(/\n    title:/g) ?? []).length >= 4,
+    "one that is swinging is not",
+    unsteadiness([directionOf(0, 0), directionOf(9, 0)]) > STEADY_DEGREES,
+    "firing mid-swing is a smeared frame, and a smeared frame takes its neighbours with it",
   );
   check(
-    "and the one that ruins a panorama is among them",
-    /Stand in one place/.test(rules) && /Don't walk/.test(rules),
-    "walking while turning cannot be reconciled by any seam: the wall arrives twice at two different sizes",
-  );
-  check(
-    "so is holding the phone at one height",
-    /close to your chest/i.test(rules),
-  );
-  check(
-    "each rule says why, not only what",
-    (rules.match(/\n    because:/g) ?? []).length ===
-      (rules.match(/\n    title:/g) ?? []).length,
-    "somebody who knows why the photo has to come from one spot will hold the phone right in a room this screen never anticipated",
-  );
-  check(
-    "they are stepped rather than one wall of text",
-    /step === 0 \? onCancel\(\) : setStep\(step - 1\)/.test(rules)
-      && /last \? onDone\(\) : setStep\(step \+ 1\)/.test(rules),
-  );
-  check(
-    "and skippable, for the fourth room",
-    /Skip and start/.test(rules),
-  );
-  check(
-    "the rules come before the camera is asked for",
-    /onClick=\{\(\) => setPhase\("rules"\)\}/.test(capture)
-      && /onDone=\{\(\) => void start\(\)\}/.test(capture),
-    "a permission prompt that arrives before somebody knows what it is for is a prompt they deny, and a denied camera is sticky",
-  );
-  check(
-    "a refused camera lands back where the message and the fallback are",
-    /setProblem\("Camera access is required[\s\S]{0,200}?setPhase\("intro"\)/.test(capture),
-    "leaving it on the rules screen shows the error on a screen that has nowhere to go",
+    "and one reading is not evidence of stillness",
+    unsteadiness([directionOf(0, 0)]) > 90,
   );
 }
 
 // ---------------------------------------------------------------------------
-// The camera is actually on the screen — section 18, and a reported bug
+// Acceptance 1 and 2, and section 5: the targets move with the phone
 // ---------------------------------------------------------------------------
 
 {
-  const capture = code("src/components/tour/panorama-capture.tsx");
+  const hfov = 60;
+  const vfov = verticalFov(hfov, 640, 480);
 
-  const starter = blockAfter(capture, "async function start()");
-  check("starting the camera is findable", starter.length > 0);
+  // Acceptance 1. A target to the right, and a phone turning right.
+  {
+    // 25°, because 45° is outside the frame of a 60° lens and so is not drawn
+    // at all — which is itself correct, and checked below.
+    const near = directionOf(25, 0);
+    const straight = project(near, withLocalZero(rotationMatrix(0, 90, 0), 0), hfov, vfov);
+    const turned = project(
+      near,
+      withLocalZero(rotationMatrix(-25, 90, 0), 0),
+      hfov,
+      vfov,
+    );
+    check(
+      "a target off to the right starts off to the right, and turning brings it to the centre",
+      straight !== null &&
+        straight.x > 0.3 &&
+        turned !== null &&
+        Math.abs(turned.x) < 0.05,
+      "acceptance 1: both halves in one check, because arriving at the centre is true of any scaling — it is only evidence when it started somewhere else",
+    );
+
+    // Acceptance 1 as the brief states it: 90° right, and a target 90° away.
+    {
+      const far = directionOf(90, 0);
+      const before = project(far, withLocalZero(rotationMatrix(0, 90, 0), 0), hfov, vfov);
+      const after = project(far, withLocalZero(rotationMatrix(-90, 90, 0), 0), hfov, vfov);
+      check(
+        "rotating 90° right brings a target 90° to the right onto the aim",
+        before === null && after !== null && Math.abs(after.x) < 0.05,
+        "the brief's own acceptance test: out of sight to begin with, dead centre when you get there",
+      );
+    }
+    check(
+      "the edge of the screen is the edge of the field of view",
+      (() => {
+        const edge = project(
+          directionOf(hfov / 2, 0),
+          withLocalZero(rotationMatrix(0, 90, 0), 0),
+          hfov,
+          vfov,
+        );
+        return edge !== null && Math.abs(edge.x - 1) < 0.02;
+      })(),
+      "without the field of view in the divisor the targets are drawn at the right sign and the wrong distance, so nothing lines up with what the camera can see",
+    );
+  }
+
+  // Acceptance 2. A target above, and a phone tilting up.
+  {
+    const target = directionOf(0, 30);
+    const level = project(target, withLocalZero(rotationMatrix(0, 90, 0), 0), hfov, vfov);
+    const lifted = project(
+      target,
+      withLocalZero(rotationMatrix(0, 120, 0), 0),
+      hfov,
+      vfov,
+    );
+    check(
+      "a target 30° up starts above the middle and tilting up brings it to the centre",
+      level !== null &&
+        level.y > 0.3 &&
+        lifted !== null &&
+        Math.abs(lifted.y) < 0.05,
+      "acceptance 2: tilting up must move the upper targets towards the aim — and up has to mean up, which arriving at zero cannot show",
+    );
+  }
+
   check(
-    "start() holds the stream rather than attaching it",
-    /streamRef\.current = stream/.test(starter)
-      && !/videoRef\.current\.srcObject/.test(starter),
-    "start() runs from the intro, where the <video> has not rendered — assigning there goes nowhere and the preview is black",
+    "something directly behind is not drawn at the edge as if it were beside you",
+    project(directionOf(180, 0), withLocalZero(rotationMatrix(0, 90, 0), 0), hfov, vfov) === null,
+    "a target pinned to the edge that is really 180° away tells somebody to stop turning half a room early",
+  );
+  check(
+    "and neither is one well off to the side but still in front",
+    project(directionOf(75, 0), withLocalZero(rotationMatrix(0, 90, 0), 0), hfov, vfov) === null,
+    "depth alone does not bound the screen: 75° away is in front of the camera and nowhere near the frame, so it needs the margin to stop it being drawn",
   );
 
-  const attach = windowAfter(
-    capture,
-    'if (phase !== "capturing" && phase !== "paused") return;',
-  );
-  check("something attaches the camera once its element exists", attach.length > 0);
   check(
-    "and it attaches the held stream to the video",
-    /video\.srcObject = stream/.test(attach) && /video\.play\(\)/.test(attach),
-  );
-  check(
-    "without re-attaching the stream it already has",
-    /if \(video\.srcObject === stream\) return/.test(attach),
-    "re-assigning srcObject restarts the preview, which flickers on every pause",
-  );
-
-  // The half of this that is not cosmetic.
-  const tick = blockAfter(capture, "tick = window.setInterval(");
-  check(
-    "the ring does not advance before the camera delivers pixels",
-    /if \(!videoRef\.current\?\.videoWidth\) return/.test(tick),
-    "videoWidth is 0 until the first frame arrives; capturing in that window advances the plan and photographs nothing, which is how a ring reaches 9 of 9 with an empty frame list",
-  );
-  check(
-    "and neither does the manual button",
-    (capture.match(/if \(!videoRef\.current\?\.videoWidth\) return/g) ?? []).length >= 2,
-    "the tap route reaches the same state machine by the same door",
-  );
-
-  // Section 18: the capture screen is the whole screen.
-  check(
-    "the capture screen sits above the app's own bottom navigation",
-    /fixed inset-0 z-\[60\]/.test(capture),
-    "the nav is fixed at z-50 and renders after the page, so at z-50 it wins the tie and covers Pause and Restart",
-  );
-  check(
-    "and it is measured against the visible viewport",
-    /h-\[100dvh\]/.test(capture),
-    "100vh on a phone is taller than the window the browser chrome leaves, so the controls sit below the fold",
+    "a target dead ahead is dead centre",
+    (() => {
+      const at = project(directionOf(0, 0), withLocalZero(rotationMatrix(0, 90, 0), 0), hfov, vfov);
+      return at !== null && Math.abs(at.x) < 0.02 && Math.abs(at.y) < 0.02;
+    })(),
   );
 
   check(
-    "going round again releases the camera first",
-    /teardown\(\);/.test(blockAfter(capture, "function restart(")),
-    "restart is reached from mid-capture, where a second getUserMedia would leave the first stream live and the camera light on",
+    "the projection moves only when the phone does",
+    (() => {
+      // A direction that is actually on screen, so that "they agree" is
+      // evidence of determinism rather than of both being off the edge.
+      const r = withLocalZero(rotationMatrix(0, 90, 0), 0);
+      const a = project(directionOf(12, 6), r, hfov, vfov);
+      const b = project(directionOf(12, 6), r, hfov, vfov);
+      return (
+        a !== null &&
+        b !== null &&
+        Math.abs(a.x) < 1 &&
+        a.x === b.x &&
+        a.y === b.y
+      );
+    })(),
+    "acceptance 11: a target that drifts with the phone held still is an animation pretending to be a gyroscope",
   );
 }
 
 // ---------------------------------------------------------------------------
-// Where photos are uploaded — sections 1, 10, 11, 14 and 15
+// Acceptance 5, and section 3: the whole sphere, not one ring
 // ---------------------------------------------------------------------------
 
 {
-  const capture = code("src/components/tour/panorama-capture.tsx");
+  const plan = spherePlan(ASSUMED_HFOV);
+  const pitches = new Set(plan.map((t) => t.pitch));
 
-  // --- section 10: five steps, and none of them guessed at -----------------
   check(
-    "the processing screen names all five of section 10's steps",
-    ["Uploading", "Aligning photos", "Stitching panorama", "Optimizing", "Ready"]
-      .every((label) => capture.includes(`"${label}"`)),
-    "three of five leaves the two longest parts of a stitch looking like a hang",
+    "there are targets above the horizon",
+    plan.some((t) => t.pitch > 20),
+    "acceptance 5: one horizontal row leaves the ceiling unphotographed, and something then has to be invented to fill it",
   );
-
-  const poll = blockAfter(capture, 'if (phase !== "processing" || !uploadedJob) return;');
-  check("the screen asks the server where it has got to", poll.length > 0);
+  check("and below it", plan.some((t) => t.pitch < -20));
+  check("and at it", plan.some((t) => t.pitch === 0));
   check(
-    "and the step shown is the one the server reported",
-    /STAGE_STEP\[\s*data\.stage\s*\]/.test(poll),
-    "a timer walking through the step names reads the same on a fast stitch and lies on a slow one",
+    "including straight up and straight down",
+    pitches.has(90) && pitches.has(-90),
   );
   check(
-    "the stage is read from the job, not invented",
-    /\.select\("stage"\)/.test(poll) && /\.eq\("id",\s*uploadedJob\)/.test(poll),
+    "which is five rings and two poles",
+    pitches.size === 7,
+    [...pitches].sort((a, b) => b - a).join(", "),
   );
 
-  const route = code("src/app/api/panorama/stitch/route.ts");
   check(
-    "and the server writes each of the three stages it passes through",
-    ["aligning", "stitching", "optimizing"].every((name) =>
-      new RegExp(`stage\\(supabase, jobId, "${name}"\\)|stage: "${name}"`).test(route),
+    "the horizon gets the most photographs",
+    ringCount(0, ASSUMED_HFOV) > ringCount(30, ASSUMED_HFOV) &&
+      ringCount(30, ASSUMED_HFOV) > ringCount(60, ASSUMED_HFOV),
+    "a ring at 60° is half the circumference of the horizon and needs half the frames to cover it as well",
+  );
+  check(
+    "a pole is one photograph",
+    ringCount(90, ASSUMED_HFOV) === 1 && ringCount(-90, ASSUMED_HFOV) === 1,
+  );
+  check(
+    "the horizon ring is the ten to twelve the brief asks for",
+    ringCount(0, ASSUMED_HFOV) >= 10 && ringCount(0, ASSUMED_HFOV) <= 12,
+    `got ${ringCount(0, ASSUMED_HFOV)}`,
+  );
+  check(
+    "and the whole plan is around forty, not nine",
+    plan.length >= 30 && plan.length <= 48,
+    `got ${plan.length}`,
+  );
+
+  check(
+    "neighbours on a ring overlap by the third the stitcher needs",
+    (() => {
+      const n = ringCount(0, ASSUMED_HFOV);
+      const spacing = 360 / n;
+      const shared = (ASSUMED_HFOV - spacing) / ASSUMED_HFOV;
+      return shared >= 0.25 && shared <= 0.55;
+    })(),
+    "too little and there is nothing to match on; too much and it is forty photographs of the same wall",
+  );
+  check("the overlap asked for is the brief's 30–40%", OVERLAP >= 0.3 && OVERLAP <= 0.4);
+
+  check(
+    "a wider lens needs fewer photographs",
+    ringCount(0, 90) < ringCount(0, 50),
+    "section 3: the count adapts to the camera rather than being written down",
+  );
+
+  check(
+    "every target has a direction that matches its angles",
+    plan.every((t) => angleBetween(t.direction, directionOf(t.yaw, t.pitch)) < 0.01),
+  );
+  check(
+    "no two targets are the same direction",
+    new Set(plan.map((t) => t.id)).size === plan.length,
+  );
+  check(
+    "the horizon comes first, so a capture given up halfway kept the useful half",
+    plan[0].pitch === 0 && Math.abs(plan[plan.length - 1].pitch) === 90,
+    "reversing the list satisfies 'no further out than the last one' while putting the nadir first",
+  );
+
+  // Every direction on the sphere is within reach of some target.
+  {
+    let worst = 0;
+    for (let yaw = 0; yaw < 360; yaw += 7) {
+      for (let pitch = -85; pitch <= 85; pitch += 7) {
+        const d = directionOf(yaw, pitch);
+        let nearest = 180;
+        for (const t of plan) nearest = Math.min(nearest, angleBetween(d, t.direction));
+        worst = Math.max(worst, nearest);
+      }
+    }
+    check(
+      "no part of the room is further than half a frame from a target",
+      worst < ASSUMED_HFOV / 2,
+      `the loneliest direction is ${worst.toFixed(1)}° from the nearest target — anything beyond half the field of view is a place no photograph reaches`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Acceptance 3, 4 and 6: aiming, capturing once, and the gate
+// ---------------------------------------------------------------------------
+
+{
+  const fresh = startCapture();
+  const first = fresh.plan[0];
+
+  // Acceptance 3.
+  {
+    const aimed = decide(fresh, first.direction, 0.5, STEADY_MS);
+    check(
+      "pointing at a target and holding still takes the photograph",
+      aimed.action === "capture" && aimed.target.id === first.id,
+      "acceptance 3: aligning the circle with the aim must capture, without anybody pressing anything",
+    );
+  }
+
+  check(
+    "pointing at it and still moving does not",
+    decide(fresh, first.direction, STEADY_DEGREES + 3, STEADY_MS).action === "aim",
+    "section 4: steady for 300–600ms, because a frame taken mid-swing is the one the matcher cannot place",
+  );
+  check(
+    "and holding still for only a moment does not either",
+    decide(fresh, first.direction, 0.5, STEADY_MS - 120).action === "aim",
+  );
+  check("the wait is the 300–600ms asked for", STEADY_MS >= 300 && STEADY_MS <= 600);
+
+  {
+    const away = decide(fresh, directionOf(first.yaw + 40, first.pitch + 40), 0, STEADY_MS);
+    check(
+      "pointing somewhere else does not take a photograph of somewhere else",
+      away.action === "aim" && !away.aligned,
+    );
+    check(
+      "and the nearest target is the one being aimed at",
+      away.action === "aim" && away.error <= 60,
+    );
+  }
+
+  // Acceptance 4.
+  {
+    const after = decide(fresh, first.direction, 0.5, STEADY_MS);
+    if (after.action !== "capture") {
+      check("acceptance 4 needs a capture to work from", false);
+    } else {
+      check(
+        "a captured target is recorded",
+        after.state.taken.includes(first.id),
+      );
+      const again = decide(after.state, first.direction, 0.5, STEADY_MS);
+      check(
+        "and cannot be captured a second time",
+        again.action !== "capture" || again.target.id !== first.id,
+        "acceptance 4: forty photographs of the one wall somebody lingered on is not a sphere",
+      );
+      check(
+        "recording the same target twice changes nothing",
+        record(after.state, first.id).taken.length === after.state.taken.length,
+      );
+    }
+  }
+
+  // Acceptance 6.
+  {
+    check(
+      "a capture with nothing in it is not finished",
+      !isComplete(fresh),
+      "acceptance 6: finishing with major areas missing is asking the stitcher to invent them",
+    );
+
+    let partial = fresh;
+    for (const target of fresh.plan.filter((t) => t.pitch === 0)) {
+      partial = record(partial, target.id);
+    }
+    check(
+      "and neither is one that photographed only the horizon",
+      !isComplete(partial),
+      "which is exactly the capture that produced the funnel",
+    );
+    check(
+      "the missing directions are the ones not yet photographed",
+      progress(partial).missing.every((t) => t.pitch !== 0) &&
+        progress(partial).missing.length > 0,
+    );
+
+    let required = fresh;
+    for (const target of fresh.plan.filter((t) => t.required)) {
+      required = record(required, target.id);
+    }
+    check(
+      "photographing every required direction finishes it",
+      isComplete(required),
+    );
+    check(
+      "and the poles are not held against somebody",
+      fresh.plan.some((t) => !t.required) &&
+        fresh.plan.filter((t) => !t.required).every((t) => Math.abs(t.pitch) === 90),
+      "the nadir is a photograph of your own shoes; everything between the poles is required",
+    );
+  }
+
+  check(
+    "the tolerance is tight enough to mean something",
+    ALIGN_TOLERANCE_DEGREES > 3 && ALIGN_TOLERANCE_DEGREES < 15,
+  );
+
+  // The manual backup, section 4.
+  {
+    const manual = captureManually(fresh, first);
+    check(
+      "a frame can still be taken by hand",
+      manual.action === "capture" && manual.state.taken.includes(first.id),
+    );
+  }
+
+  check(
+    "nothing is left to aim at once everything is photographed",
+    (() => {
+      let all = fresh;
+      for (const t of fresh.plan) all = record(all, t.id);
+      return decide(all, first.direction, 0, STEADY_MS).action === "done";
+    })(),
+  );
+
+  check(
+    "the nearest target ignores the ones already done",
+    (() => {
+      const done = new Set([first.id]);
+      const found = nearestTarget(fresh.plan, done, first.direction);
+      return found !== null && found.target.id !== first.id;
+    })(),
+  );
+
+  check(
+    "coverage counts what was taken against what was planned",
+    coverage(fresh.plan, new Set([first.id])).taken === 1 &&
+      coverage(fresh.plan, new Set()).total === fresh.plan.length,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section 9: what the screen says
+// ---------------------------------------------------------------------------
+
+{
+  const fresh = startCapture();
+  const target = { yaw: 90, pitch: 0 };
+
+  check("turn right", /right/i.test(steer(target, { yaw: 0, pitch: 0 }, false, false)));
+  check("turn left", /left/i.test(steer(target, { yaw: 180, pitch: 0 }, false, false)));
+  check(
+    "look up",
+    /up/i.test(steer({ yaw: 0, pitch: 60 }, { yaw: 0, pitch: 0 }, false, false)),
+  );
+  check(
+    "look down",
+    /down/i.test(steer({ yaw: 0, pitch: -60 }, { yaw: 0, pitch: 0 }, false, false)),
+  );
+  check(
+    "hold steady once it is lined up",
+    /steady/i.test(steer(target, { yaw: 90, pitch: 0 }, true, false)),
+  );
+  check("and captured when it is taken", /captur/i.test(steer(target, target, true, true)));
+  check(
+    "the instruction names the axis that is furthest out",
+    /up/i.test(steer({ yaw: 5, pitch: 70 }, { yaw: 0, pitch: 0 }, false, false)),
+    "two instructions at once is two things to get wrong",
+  );
+  check(
+    "a small correction is not shouted as a full turn",
+    /little|slight/i.test(steer({ yaw: 8, pitch: 0 }, { yaw: 0, pitch: 0 }, false, false)),
+  );
+
+  check(
+    "the guidance never says to turn 40 degrees",
+    !/40°|about 40/i.test(
+      guidance(decide(fresh, directionOf(200, 40), 9, 0), directionOf(200, 40)),
     ),
-    "a step the server never reports is a step the screen can never reach",
-  );
-  check(
-    "a progress note cannot fail the stitch",
-    /void supabase[\s\S]{0,220}?\.then\(undefined, \(\) => undefined\)/.test(route),
-    "a panorama that stitched must not be reported as failed because a progress note did not land",
-  );
-  check(
-    "and the stage is cleared when the job stops processing",
-    (route.match(/stage: null/g) ?? []).length >= 2,
-    "a stage left on a finished job reads as still working",
+    "section 9: a number of degrees tells somebody holding a phone nothing about where to point it",
   );
 
-  // --- section 11: the preview is the viewer --------------------------------
   check(
-    "the finished panorama opens in the viewer, not as a flat photograph",
-    /<PanoramaViewer/.test(capture),
-    "an equirectangular image shown flat looks bent at exactly the edges a stitch goes wrong at",
+    "frames are named in capture order",
+    frameName(0) === "000.jpg" && frameName(12) === "012.jpg",
   );
   check(
-    "and it is the panorama that was just made",
-    /src=\{result\.url\}/.test(capture),
-  );
-  check(
-    "Retake and Save 360 are both still offered",
-    /Retake/.test(capture) && /Save 360/.test(capture),
+    "a sphere's worth of frames is uploaded smaller than a ring's worth",
+    frameWidthFor(38) < frameWidthFor(12) && frameWidthFor(38) >= 1200,
+    "forty frames at 2200px is a hundred megabytes on a phone connection",
   );
 
-  // --- section 2: the fallback when the camera is refused -------------------
   check(
-    "a refused camera is offered the upload route instead",
-    /Upload Existing 360 Photo/.test(capture),
-    "section 2: a denied camera permission is sticky, so Try again is telling somebody to repeat what just failed",
+    "a stitch that failed for want of coverage says so, and says what to do",
+    /hole|never photographed|above and below/i.test(
+      stitchErrorMessage("incomplete_sphere"),
+    ),
   );
   check(
-    "and that offer is made only when something went wrong",
-    /\{problem \? \(/.test(capture),
-    "offering it unconditionally buries Start 360 Capture under a fallback nobody needed",
-  );
-
-  // --- the capture screen stands on its own --------------------------------
-  check(
-    "capture can be used where no user id is to hand",
-    /userId\?:\s*string \| null/.test(capture),
-    "the listing form has no reason to know who is signed in; threading it through would make one",
-  );
-  check(
-    "and it resolves the owner itself when it is not given",
-    /auth\.getUser\(\)/.test(blockAfter(capture, "const upload = useCallback(")),
-  );
-}
-
-{
-  const uploader = code("src/components/property/photo-uploader.tsx");
-
-  // --- section 1: the choice, where photos are uploaded --------------------
-  check(
-    "the listing's photo step offers both Add Photos and Create 360°",
-    /Add Photos/.test(uploader) && /Create 360°/.test(uploader),
-    "section 1 puts the choice where photos are uploaded, which is here",
-  );
-  check(
-    "Create 360° opens the capture screen",
-    /setCapturing\(true\)/.test(uploader) && /<PanoramaCapture/.test(uploader),
-  );
-  check(
-    "and capture takes the whole field while it runs",
-    /if \(room && capturing\) \{[\s\S]{0,400}?return \(/.test(uploader),
-    "a drop zone under a live camera is one more thing to hit while turning around holding a phone",
-  );
-  check(
-    "a finished capture joins the listing's 360 photos",
-    /room\.set\(\[\.\.\.room\.list,/.test(uploader),
-  );
-
-  // --- section 14: both kinds, labelled ------------------------------------
-  check(
-    "the 360 photos are shown apart from the ordinary ones",
-    /360° photos/.test(uploader),
-    "section 14: a listing may hold both, and they are not to be mixed without labels",
-  );
-  check(
-    "each one carries the 360° badge",
-    /360°\s*<\/span>/.test(uploader),
-  );
-  check(
-    "they are shown in the viewer, so a bad stitch is visible before it is published",
-    /<PanoramaViewer/.test(uploader),
-  );
-  check(
-    "and one can be removed again",
-    /room\.list\.filter\(/.test(uploader),
-  );
-  check(
-    "there is a ceiling on how many a listing carries",
-    /MAX_PANORAMAS/.test(uploader) && /room\.list\.length >= MAX_PANORAMAS/.test(uploader),
-  );
-  check(
-    "the uploader is unchanged where no panorama can be attached",
-    /const room = onPanoramas\s*\?/.test(uploader),
-    "passing neither prop has to leave the plain uploader exactly as it was",
-  );
-
-  // --- section 15: one media system, not two -------------------------------
-  const actions = code("src/app/property/actions.ts");
-  check(
-    "a panorama is stored as property media, not in a system of its own",
-    /kind: "panorama_360" as const/.test(actions),
-    "section 15: reuse the existing media infrastructure",
-  );
-  const panoramaInsert = blockAfter(actions, "const panoramas = input.panoramas ?? [];");
-  check(
-    "its position continues the sequence the photos started",
-    /position: photos\.length \+ index/.test(panoramaInsert),
-    "starting again at zero puts a panorama joint-first with the cover photo",
-  );
-  check(
-    "and a panorama is never made the listing's cover",
-    !/cover_image_url: panorama/.test(actions)
-      && /cover_image_url: photos\[0\]\.url/.test(actions),
-    "an equirectangular image in a card is a bent smear that reads as a broken photograph",
-  );
-
-  const form = code("src/components/property/property-form.tsx");
-  check(
-    "the form carries the panoramas through to the listing",
-    /panoramas: panoramas\.map\(/.test(form),
-    "collecting them and not sending them is the failure that looks like success",
+    "and an unknown code still says something useful",
+    stitchErrorMessage("wat").length > 30,
   );
 }
 
 // ---------------------------------------------------------------------------
-// No AI — section 20
+// Section 7: no AI, and no old cylinder
 // ---------------------------------------------------------------------------
 
 {
-  const stitcher = code("src/lib/panorama/stitch.ts");
+  const stitcher = code("src/lib/panorama/compose.ts");
   check(
     "the stitcher calls no model and no provider",
     !/openai|anthropic|replicate|fetch\(/i.test(stitcher),
-    "section 20: conventional stitching only",
+    "section 7 of the first brief and section 20 of this one: conventional stitching only",
+  );
+  check("and reaches no network at all", !/https?:\/\//i.test(stitcher));
+
+  check(
+    "the old single-row capture plan is gone",
+    !/capturePlan|captureStep/.test(code("src/lib/panorama/stitch.ts")) &&
+      !/capturePlan|captureStep/.test(code("src/lib/panorama/capture.ts")),
+    "section 1: remove the nine-photo horizontal workflow, not merely stop calling it",
   );
   check(
-    "and reaches no network at all",
-    !/http/i.test(stitcher.replace(/https?:\/\/[^\s"']*/g, "")),
+    "and so is the cylinder it projected onto",
+    !/cylind/i.test(stitcher),
+    "a cylinder has no top and no bottom, which is the whole of why the old output collapsed",
+  );
+
+  check(
+    "the pose the phone recorded is the starting estimate",
+    /basisFrom\(\s*frame\.pose\.yaw/.test(stitcher),
+    "section 7 step 2",
+  );
+  check(
+    "it is refined against the pixels rather than trusted",
+    /function refinePoses/.test(stitcher) && /function agreement/.test(stitcher),
+    "section 7 steps 3–5: sensors drift, and a degree of drift puts a doorway two hundred pixels from itself",
+  );
+  check(
+    "a refinement has to beat leaving the frame alone before it is taken",
+    /best\.score > staying \+ ACCEPT_MARGIN/.test(stitcher),
+    "without this the refinement moves every frame by whatever scored highest on noise, and because each is then painted for the next to match against, it accumulates — on a synthetic room with perfect poses the whole ring drifted three degrees",
+  );
+  check(
+    "frames are warped onto a sphere",
+    /directionOf/.test(stitcher) && /depth/.test(stitcher),
+    "section 7 step 6",
+  );
+  check(
+    "exposure is compensated",
+    /frame\.gain = means\[i\] > 4 \? clamp\(target \/ means\[i\]/.test(stitcher),
+    "a phone re-meters between a window and a dark corner, so two frames of one wall differ by a stop — and the word `gain` appearing somewhere is not the same as it being computed",
+  );
+  check(
+    "and the gain actually reaches the pixels",
+    /const gw = gain \* w;/.test(stitcher) && /\* gw;/.test(stitcher),
+    "a compensation computed and not applied is a variable, not a correction",
+  );
+  check(
+    "overlaps are blended rather than cut",
+    /edge \* edge/.test(stitcher),
+    "section 7 steps 8 and 9 — a hard boundary between two exposures is a visible line down a wall",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Acceptance 7, 8 and 9, and section 8: a synthetic room, photographed
+// and put back together
+// ---------------------------------------------------------------------------
+
+const TW = 1024;
+const TH = 512;
+
+/** A room with four coloured walls, straight rails, and a patterned ceiling. */
+function room(): Uint8Array {
+  const p = new Uint8Array(TW * TH * 3);
+  for (let y = 0; y < TH; y += 1) {
+    const pitch = 90 - (y / (TH - 1)) * 180;
+    for (let x = 0; x < TW; x += 1) {
+      const yaw = (x / TW) * 360;
+      const i = (y * TW + x) * 3;
+      const wall = Math.floor(yaw / 90) % 4;
+      const base = [
+        [200, 90, 80],
+        [90, 170, 200],
+        [200, 190, 100],
+        [120, 200, 120],
+      ][wall];
+      const edge =
+        yaw % 30 < 1.2 || Math.abs(pitch - 20) < 1.2 || Math.abs(pitch + 20) < 1.2;
+      const ceiling = pitch > 55;
+      const floor = pitch < -55;
+      const checker =
+        (Math.floor(yaw / 15) + Math.floor((pitch + 90) / 15)) % 2 === 0;
+      let c = ceiling ? [230, 230, 235] : floor ? [70, 60, 55] : base;
+      if ((ceiling || floor) && checker) c = c.map((v) => v * 0.75);
+      if (edge && !ceiling && !floor) c = [20, 20, 25];
+      p[i] = c[0];
+      p[i + 1] = c[1];
+      p[i + 2] = c[2];
+    }
+  }
+  return p;
+}
+
+function readRoom(p: Uint8Array, yaw: number, pitch: number): number[] {
+  const x = Math.round((((yaw % 360) + 360) % 360 / 360) * TW) % TW;
+  const y = Math.min(TH - 1, Math.max(0, Math.round(((90 - pitch) / 180) * (TH - 1))));
+  const i = (y * TW + x) * 3;
+  return [p[i], p[i + 1], p[i + 2]];
+}
+
+/** What a camera at this pose would photograph of that room. */
+async function photograph(
+  p: Uint8Array,
+  yaw: number,
+  pitch: number,
+  roll: number,
+  hfov: number,
+): Promise<Buffer> {
+  const w = 640;
+  const h = 480;
+  const vfov = verticalFov(hfov, w, h);
+  const b = basisFrom(yaw, pitch, roll);
+  const tanH = Math.tan(((hfov / 2) * Math.PI) / 180);
+  const tanV = Math.tan(((vfov / 2) * Math.PI) / 180);
+  const px = Buffer.alloc(w * h * 3);
+
+  for (let j = 0; j < h; j += 1) {
+    const sy = 1 - (2 * j) / (h - 1);
+    for (let i = 0; i < w; i += 1) {
+      const sx = (2 * i) / (w - 1) - 1;
+      const d: Vector3 = [
+        b.forward[0] + b.right[0] * sx * tanH + b.up[0] * sy * tanV,
+        b.forward[1] + b.right[1] * sx * tanH + b.up[1] * sy * tanV,
+        b.forward[2] + b.right[2] * sx * tanH + b.up[2] * sy * tanV,
+      ];
+      const len = Math.hypot(d[0], d[1], d[2]);
+      const c = readRoom(
+        p,
+        (Math.atan2(d[0] / len, d[1] / len) * 180) / Math.PI,
+        (Math.asin(d[2] / len) * 180) / Math.PI,
+      );
+      const o = (j * w + i) * 3;
+      px[o] = c[0];
+      px[o + 1] = c[1];
+      px[o + 2] = c[2];
+    }
+  }
+
+  return sharp(px, { raw: { width: w, height: h, channels: 3 } })
+    .jpeg({ quality: 92 })
+    .toBuffer();
+}
+
+async function endToEnd() {
+  const truth = room();
+  const plan = spherePlan(60);
+  const frames: FrameInput[] = [];
+
+  // Three degrees of error on every frame, which is roughly what a phone's
+  // sensors give after a minute of turning. A stitcher that only works on
+  // perfect input does not work.
+  let seed = 7;
+  const jitter = () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return (seed / 2147483648 - 0.5) * 3;
+  };
+
+  for (const target of plan) {
+    frames.push({
+      yaw: target.yaw + jitter(),
+      pitch: target.pitch + jitter(),
+      roll: 0,
+      hfov: 60,
+      bytes: new Uint8Array(await photograph(truth, target.yaw, target.pitch, 0, 60)),
+    });
+  }
+
+  const started = Date.now();
+  const out = await composePanorama(frames);
+  const elapsed = Date.now() - started;
+
+  if (!out.ok) {
+    check("the synthetic room stitches at all", false, out.code);
+    return;
+  }
+
+  // Acceptance 7.
+  check(
+    "the panorama is 2:1 equirectangular",
+    Math.abs(out.width / out.height - 2) < 0.001,
+    `${out.width}x${out.height}`,
+  );
+  check(
+    "at a resolution worth looking at",
+    out.width >= 2048,
+    `${out.width} across`,
+  );
+  check(
+    "and the whole sphere has real pixels in it",
+    out.covered > 0.995,
+    `${(out.covered * 100).toFixed(1)}% covered — section 8: what was not photographed must not be stretched into`,
+  );
+
+  const got = new Uint8Array(
+    await sharp(out.jpeg).resize(TW, TH, { fit: "fill" }).removeAlpha().raw().toBuffer(),
+  );
+
+  // Acceptance 8. A funnel has one colour all the way across its top row,
+  // because every pixel up there came from the same stretched edge.
+  const spread = (row: number) => {
+    let low = 255;
+    let high = 0;
+    for (let x = 0; x < TW; x += 1) {
+      const v = got[(row * TW + x) * 3];
+      low = Math.min(low, v);
+      high = Math.max(high, v);
+    }
+    return high - low;
+  };
+  check(
+    "the ceiling is photographed, not smeared to a point",
+    spread(3) > 12,
+    `the top row varies by ${spread(3)} — a funnel collapses it to nearly nothing`,
+  );
+  check("and so is the floor", spread(TH - 4) > 12, `${spread(TH - 4)}`);
+
+  // Acceptance 9. The room has to be in the right places.
+  const soften = async (buf: Uint8Array) =>
+    new Uint8Array(
+      await sharp(Buffer.from(buf), { raw: { width: TW, height: TH, channels: 3 } })
+        .blur(2)
+        .raw()
+        .toBuffer(),
+    );
+  const a = await soften(truth);
+  const b = await soften(got);
+
+  let n = 0;
+  let sa = 0;
+  let sb = 0;
+  let saa = 0;
+  let sbb = 0;
+  let sab = 0;
+  let bad = 0;
+  for (let i = 0; i < TW * TH; i += 1) {
+    n += 1;
+    sa += a[i * 3];
+    sb += b[i * 3];
+    saa += a[i * 3] * a[i * 3];
+    sbb += b[i * 3] * b[i * 3];
+    sab += a[i * 3] * b[i * 3];
+    if (Math.abs(a[i * 3] - b[i * 3]) > 70) bad += 1;
+  }
+  const ncc = (sab - (sa * sb) / n) / Math.sqrt((saa - (sa * sa) / n) * (sbb - (sb * sb) / n));
+
+  check(
+    "the panorama is the room that was photographed",
+    ncc > 0.7,
+    `correlation ${ncc.toFixed(3)} against the room the frames were taken from`,
+  );
+  check(
+    "with almost nothing in the wrong place",
+    bad / n < 0.08,
+    `${((bad / n) * 100).toFixed(1)}% of pixels badly wrong`,
+  );
+
+  // The walls have to be where the walls are: a systematic shift means every
+  // frame was laid down in the wrong place, which is what a drifting
+  // refinement does.
+  let best = { shift: 0, error: Infinity };
+  const mid = Math.floor(TH / 2);
+  for (let shift = -20; shift <= 20; shift += 1) {
+    let error = 0;
+    for (let x = 0; x < TW; x += 1) {
+      const j = ((x + shift) % TW + TW) % TW;
+      error += Math.abs(a[(mid * TW + x) * 3] - b[(mid * TW + j) * 3]);
+    }
+    if (error < best.error) best = { shift, error };
+  }
+  check(
+    "and the horizon has not drifted round the room",
+    Math.abs(best.shift) <= 3,
+    `best alignment is ${best.shift}px of ${TW} — a non-zero shift is every frame laid down in the wrong place`,
+  );
+
+  check(
+    "a whole sphere stitches in a reasonable time",
+    elapsed < 90_000,
+    `${(elapsed / 1000).toFixed(1)}s for ${frames.length} frames — section 19 asks for minutes, not the hour the app being replaced took`,
+  );
+
+  // The refinement must not move frames that were already right.
+  //
+  // The jittered run above cannot show this: with three degrees of error on
+  // every frame there is real work for the refinement to do, and a drift of a
+  // degree or two hides inside it. With exact poses there is nothing to
+  // correct, so any movement at all is the refinement chasing noise — and
+  // because each frame is painted for the next one to match against, that
+  // movement accumulates around the ring.
+  {
+    const exact: FrameInput[] = [];
+    for (const target of plan) {
+      exact.push({
+        yaw: target.yaw,
+        pitch: target.pitch,
+        roll: 0,
+        hfov: 60,
+        bytes: new Uint8Array(await photograph(truth, target.yaw, target.pitch, 0, 60)),
+      });
+    }
+
+    const clean = await composePanorama(exact);
+    if (!clean.ok) {
+      check("a set of exactly-posed frames stitches", false, clean.code);
+    } else {
+      const shown = new Uint8Array(
+        await sharp(clean.jpeg)
+          .resize(TW, TH, { fit: "fill" })
+          .removeAlpha()
+          .raw()
+          .toBuffer(),
+      );
+      const softened = await soften(shown);
+
+      let drift = { shift: 0, error: Infinity };
+      for (let shift = -20; shift <= 20; shift += 1) {
+        let error = 0;
+        for (let x = 0; x < TW; x += 1) {
+          const j = ((x + shift) % TW + TW) % TW;
+          error += Math.abs(a[(mid * TW + x) * 3] - softened[(mid * TW + j) * 3]);
+        }
+        if (error < drift.error) drift = { shift, error };
+      }
+
+      check(
+        "frames that were already in the right place are left there",
+        drift.shift === 0,
+        `the room came out ${drift.shift}px of ${TW} from where it was photographed, with nothing wrong with the poses to begin with`,
+      );
+
+      let badly = 0;
+      for (let i = 0; i < TW * TH; i += 1) {
+        if (Math.abs(a[i * 3] - softened[i * 3]) > 70) badly += 1;
+      }
+      check(
+        "and exact poses give the best panorama, not a worse one",
+        badly / (TW * TH) < 0.02,
+        `${((badly / (TW * TH)) * 100).toFixed(2)}% badly wrong from perfect input — a refinement free to move anything makes this worse than the jittered run`,
+      );
+    }
+  }
+
+  // Section 8, the other half: a capture with a hole in it is refused rather
+  // than filled in.
+  const horizonOnly = frames.filter((_, i) => Math.abs(plan[i].pitch) < 1);
+  const partial = await composePanorama(horizonOnly);
+  check(
+    "a capture that photographed only one ring is refused",
+    !partial.ok && partial.code === "incomplete_sphere",
+    partial.ok
+      ? `it produced a panorama ${(partial.covered * 100).toFixed(0)}% covered instead of refusing`
+      : partial.code,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The screen — sections 1, 9, 10 and 11, and acceptance 10 to 12
+// ---------------------------------------------------------------------------
+
+{
+  const capture = code("src/components/tour/panorama-capture.tsx");
+
+  check(
+    "the nine-photo workflow is gone from the screen too",
+    !/Turn about|then tap/i.test(capture) && !/\{state\.next\}/.test(capture),
+    "section 1: do not show 0/9 and Turn about 40°, then tap",
+  );
+  check(
+    "progress is counted against the whole sphere",
+    /\{covered\.taken\} \/ \{covered\.total\}/.test(capture),
+    "section 9: 18 / 39",
+  );
+
+  const overlay = wholeFunction(capture, "Sphere");
+  check("the overlay is findable", overlay.length > 0);
+  check(
+    "every target is drawn where the projection puts it",
+    /\{targets\.map\(\(target\) => \(/.test(overlay) &&
+      /left: `calc\(\$\{\(\(target\.x \+ 1\) \/ 2\) \* 100\}%/.test(overlay) &&
+      /top: `calc\(\$\{\(\(1 - target\.y\) \/ 2\) \* 100\}%/.test(overlay),
+    "acceptance 11 and section 5: the position comes from the projection, so it moves when and only when the phone does",
+  );
+  check(
+    "and nothing in the overlay animates itself",
+    !/animate-|transition|keyframes/.test(overlay),
+    "acceptance 11: a transform on a timer would keep moving with the phone held still — that is the faked gyroscope the brief forbids",
+  );
+  check(
+    "the aim does not move",
+    /top-1\/2 left-1\/2[\s\S]{0,120}?-translate-x-1\/2 -translate-y-1\/2/.test(overlay) &&
+      !/translateX\(\$\{/.test(overlay),
+    "section 1: the aim is the middle of the frame that will be taken, so it cannot be anywhere else",
+  );
+  check(
+    "a captured target is shown as captured",
+    /target\.taken[\s\S]{0,90}?emerald/.test(overlay),
+    "section 9: ✓ rather than ○",
+  );
+  check(
+    "landing on one is visible without reading anything",
+    /aligned \? "border-emerald/.test(overlay),
+  );
+  check(
+    "the overlay never eats a touch meant for the controls",
+    /pointer-events-none/.test(overlay),
+  );
+
+  const loop = blockAfter(capture, 'if (phase !== "capturing" || !hasSensor) return;');
+  check("the capture loop is findable", loop.length > 0);
+  check(
+    "it runs at the display's own rate",
+    /requestAnimationFrame/.test(loop),
+    "at 8Hz the targets visibly step rather than moving with the room",
+  );
+  check(
+    "the decision is made against the live rotation",
+    /forwardOf\(pose\)/.test(loop) && /decide\(\s*stateRef\.current/.test(loop),
+  );
+  check(
+    "every target is projected through it",
+    /project\(target\.direction, pose/.test(loop),
+  );
+  check(
+    "the hold clock resets the moment the phone leaves a target",
+    /decision\.aligned && decision\.steady\s*\?[\s\S]{0,80}?: null/.test(loop),
+    "without the reset a phone swinging past a target twice accumulates enough held time to fire while moving",
+  );
+
+  const reading = blockAfter(capture, "const onOrientation = useCallback(");
+  check(
+    "the rotation is built from all three angles, not a heading",
+    /rotationMatrix\(event\.alpha, event\.beta, event\.gamma\)/.test(reading),
+    "section 2: yaw, pitch and roll — a compass bearing on its own cannot say which way is up",
+  );
+  check(
+    "the first reading becomes this capture's zero",
+    /zeroRef\.current = yawPitchOf\(forwardOf\(world\)\)\.yaw/.test(reading) &&
+      /withLocalZero\(world, zeroRef\.current\)/.test(reading),
+    "section 2: indoors the magnetometer is next to a fridge",
+  );
+
+  const taking = blockAfter(capture, "const take = useCallback(");
+  check(
+    "the pose is read at the moment of the photograph",
+    /const pose = poseRef\.current;[\s\S]{0,120}?await grab\(/.test(taking),
+    "section 6: tens of milliseconds pass between deciding and firing, and the stitcher wants where the camera was when the shutter went",
+  );
+  check(
+    "and every frame carries its own pose",
+    /yaw: facing\.yaw/.test(taking) &&
+      /pitch: facing\.pitch/.test(taking) &&
+      /roll: rollOf\(pose\)/.test(taking) &&
+      /fov: ASSUMED_HFOV/.test(taking) &&
+      /width: video\.videoWidth/.test(taking),
+    "section 6: by the time the stitcher sees the image there is nothing in the pixels that says which way the camera was facing",
+  );
+
+  const grabbing = blockAfter(capture, "const grab = useCallback(");
+  check(
+    "the camera's own image is captured, not the screen",
+    /drawImage\(video, 0, 0/.test(grabbing) && /video\.videoWidth/.test(grabbing),
+    "section 6: a screenshot of the preview carries the overlay with it and is the size of the phone's screen",
+  );
+
+  check(
+    "the poses are uploaded with the frames",
+    /frames: poses,/.test(capture),
+    "section 6 — and without them the stitcher has forty photographs and no idea which way any of them was facing",
+  );
+
+  // Acceptance 6, at the screen.
+  check(
+    "Create 360° cannot be pressed while the sphere has holes in it",
+    /disabled=\{!covered\.complete\}/.test(capture),
+    "section 8: the gate, not a suggestion",
+  );
+  check(
+    "and the screen says how many are left",
+    /\{covered\.missing\.length\} left/.test(capture),
+  );
+
+  check(
+    "a frame can still be taken by hand",
+    /captureManually\(stateRef\.current, decision\.target\)/.test(capture),
+    "section 4: manual capture remains as a backup",
+  );
+
+  check(
+    "the capture screen sits above the app's own bottom navigation",
+    /fixed inset-0 z-\[60\]/.test(capture) && /h-\[100dvh\]/.test(capture),
+  );
+  check(
+    "the camera is attached once its element exists",
+    /video\.srcObject = stream/.test(
+      windowAfter(capture, 'if (phase !== "capturing" && phase !== "paused") return;'),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section 11 and acceptance 10 and 12: the rest of Medosha is still there
+// ---------------------------------------------------------------------------
+
+{
+  const source = code("src/components/tour/room-source.tsx");
+  check("Upload 360 Photo is still offered", /Upload 360 Photo/.test(source));
+  check("and Create 360°", /Create 360°/.test(source));
+
+  const viewer = code("src/components/tour/panorama-viewer.tsx");
+  check(
+    "the viewer still looks all the way round",
+    /requestFullscreen\(\)/.test(viewer) && /exitFullscreen\(\)/.test(viewer),
+    "acceptance 10 and section 12",
+  );
+  check(
+    "the finished panorama opens in it rather than as a flat photograph",
+    /<PanoramaViewer/.test(code("src/components/tour/panorama-capture.tsx")),
+  );
+
+  const builder = code("src/components/tour/tour-builder.tsx");
+  check("the tour builder is untouched", /<RoomSource/.test(builder));
+  check(
+    "and the listing's photo step still offers both",
+    /Add Photos/.test(code("src/components/property/photo-uploader.tsx")) &&
+      /Create 360°/.test(code("src/components/property/photo-uploader.tsx")),
+    "acceptance 12: only the capture and the stitching were to change",
+  );
+
+  const rules = code("src/components/tour/capture-rules.tsx");
+  check(
+    "the rules still come before the camera",
+    /CAPTURE_RULES/.test(rules) && /<CaptureRules/.test(code("src/components/tour/panorama-capture.tsx")),
+    "section 10",
+  );
+  check(
+    "and they say to stand in one place",
+    /Stand in one place/.test(rules) && /chest/i.test(rules),
+    "section 10: plant your feet and rotate on the spot, which is what keeps parallax out",
   );
 }
 
 // ---------------------------------------------------------------------------
 
-// The synthetic stitch is the only asynchronous part, so it runs last and the
-// summary waits for it. `tsx` compiles this file to CommonJS, which has no
-// top-level await.
 endToEnd().then(report, (error: unknown) => {
   failures.push(`the end-to-end stitch threw — ${String(error)}`);
   report();
@@ -1357,5 +1204,5 @@ function report() {
   }
 
   console.log(`${GREEN}${passed} passed, 0 failed${RESET}`);
-  console.log(`${DIM}panorama: nine photographs, one equirectangular image${RESET}`);
+  console.log(`${DIM}panorama: a whole sphere, photographed and put back together${RESET}`);
 }
