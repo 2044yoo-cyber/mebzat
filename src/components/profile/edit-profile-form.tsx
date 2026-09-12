@@ -9,6 +9,10 @@ import {
 } from "@/app/(dashboard)/profile/edit/actions";
 import { AvatarUpload } from "@/components/profile/avatar-upload";
 import { CoverUpload } from "@/components/profile/cover-upload";
+import {
+  TradeAndAreas,
+  type AreaOption,
+} from "@/components/profile/trade-and-areas";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -27,7 +31,15 @@ import type { AccountType, Profile } from "@/types/database.types";
 
 const initialState: EditProfileState = {};
 
-export function EditProfileForm({ profile }: { profile: Profile }) {
+export function EditProfileForm({
+  profile,
+  areas = [],
+  serviceAreaSlugs = [],
+}: {
+  profile: Profile;
+  areas?: AreaOption[];
+  serviceAreaSlugs?: string[];
+}) {
   const [state, formAction, pending] = useActionState(
     updateProfile,
     initialState,
@@ -168,6 +180,17 @@ export function EditProfileForm({ profile }: { profile: Profile }) {
             />
           </div>
         </div>
+
+        <TradeAndAreas
+          areas={areas}
+          profession={profile.profession}
+          specialties={profile.specialties ?? []}
+          baseArea={profile.base_area}
+          serviceAreaSlugs={serviceAreaSlugs}
+          travelRadiusKm={profile.travel_radius_km}
+          servesEntireCity={profile.serves_entire_city}
+          workStatus={profile.work_status}
+        />
 
         {/* Off unless asked for. A number entered to receive a confirmation
             code used to be published on the public profile as a side effect of

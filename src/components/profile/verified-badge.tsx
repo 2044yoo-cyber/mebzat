@@ -122,8 +122,52 @@ export function companyVerificationLevelOf(company: {
   return company.verified && company.is_claimed ? "ownership" : null;
 }
 
-export function verificationLevelOf(profile: {
+export type VerifiableProfile = {
   phone_verified?: boolean | null;
-}): VerificationLevel | null {
-  return profile.phone_verified ? "phone" : null;
+  id_verified?: boolean | null;
+  business_verified?: boolean | null;
+  license_verified?: boolean | null;
+};
+
+/**
+ * Every level a profile has actually earned, strongest first.
+ *
+ * Still derived rather than stored as a label, and still one boolean per fact:
+ * 0078 added the three columns this file was written waiting for, and 0078's
+ * trigger refuses all three to an API session for the same reason 0068 refuses
+ * `phone_verified` — a badge somebody can set on themselves is worse than no
+ * badge, because it is read as an assurance.
+ *
+ * Strongest first because a card has room for one or two, and the one worth
+ * the space is the one that took a document.
+ */
+export function verificationLevelsOf(
+  profile: VerifiableProfile,
+): VerificationLevel[] {
+  const levels: VerificationLevel[] = [];
+  if (profile.license_verified) levels.push("professional");
+  if (profile.business_verified) levels.push("business");
+  if (profile.id_verified) levels.push("identity");
+  if (profile.phone_verified) levels.push("phone");
+  return levels;
+}
+
+export function verificationLevelOf(
+  profile: VerifiableProfile,
+): VerificationLevel | null {
+  return verificationLevelsOf(profile)[0] ?? null;
+}
+
+/**
+ * Whether somebody has been verified in the sense the search filter means.
+ *
+ * A confirmed phone number is deliberately not enough. It proves somebody
+ * holds a handset, which is the weakest fact on the list and the only one that
+ * costs nothing to obtain again under another name — so a "Verified" filter
+ * that included it would return mostly people nobody has checked.
+ */
+export function isDocumentVerified(profile: VerifiableProfile): boolean {
+  return Boolean(
+    profile.license_verified || profile.business_verified || profile.id_verified,
+  );
 }

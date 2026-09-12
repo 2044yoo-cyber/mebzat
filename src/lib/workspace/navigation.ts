@@ -404,14 +404,6 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
-        id: "professionals",
-        label: "Professionals",
-        icon: Users,
-        href: "/directory/individual",
-        private: true,
-        hint: "Architects, engineers, designers",
-      },
-      {
         id: "projects",
         label: "Projects",
         icon: HardHat,

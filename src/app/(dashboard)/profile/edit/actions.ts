@@ -2,9 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 
+import {
+  isProfession,
+  isTravelRadius,
+  parseSpecialties,
+} from "@/lib/constants/professions";
 import { createClient } from "@/lib/supabase/server";
 import { profileDetailsSchema } from "@/lib/validations/profile";
-import type { AccountType } from "@/types/database.types";
+import type { AccountType, WorkStatus } from "@/types/database.types";
+
+/** The four the form offers, on the enum that already existed. */
+const WORK_STATUSES = new Set<WorkStatus>([
+  "available",
+  "limited",
+  "busy",
+  "fully_booked",
+]);
 
 export type EditProfileState = {
   error?: string;
@@ -65,9 +78,30 @@ export async function updateProfile(
     languages,
   } = parsed.data;
 
+  // The trade block. Validated against the constants rather than trusted:
+  // `profession` is a text column precisely so the list can grow without a
+  // migration, which means this is the only thing standing between it and
+  // whatever a crafted post puts there.
+  const professionRaw = String(formData.get("profession") ?? "").trim();
+  const profession = isProfession(professionRaw) ? professionRaw : null;
+
+  const baseArea = String(formData.get("baseArea") ?? "").trim().slice(0, 80);
+
+  const radiusRaw = Number(formData.get("travelRadius"));
+  const travelRadius = isTravelRadius(radiusRaw) ? radiusRaw : null;
+
+  const statusRaw = String(formData.get("workStatus") ?? "") as WorkStatus;
+  const workStatus = WORK_STATUSES.has(statusRaw) ? statusRaw : undefined;
+
   const { error } = await supabase
     .from("profiles")
     .update({
+      profession,
+      specialties: parseSpecialties(formData.get("specialties")),
+      base_area: baseArea || null,
+      travel_radius_km: travelRadius,
+      serves_entire_city: formData.get("servesEntireCity") === "on",
+      ...(workStatus ? { work_status: workStatus } : {}),
       account_type: accountType as AccountType,
       full_name: fullName,
       company_name: companyName || null,
@@ -93,7 +127,45 @@ export async function updateProfile(
     return { error: error.message };
   }
 
+  // Service areas are rows, not a column, so they are replaced rather than
+  // merged: the form posts the whole set every time and a deselected area has
+  // to actually go. Only the caller's own rows are touched, and RLS says the
+  // same thing independently.
+  const slugs = String(formData.get("serviceAreas") ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 40);
+
+  await supabase
+    .from("professional_service_areas")
+    .delete()
+    .eq("profile_id", user.id);
+
+  if (slugs.length > 0) {
+    // Names come from the gazetteer, not from the browser: a posted slug is
+    // checked against a real area, so an invented one writes nothing rather
+    // than creating an area that exists only on one profile.
+    const { data: known } = await supabase
+      .from("location_areas")
+      .select("slug, name, city, country")
+      .in("slug", slugs);
+
+    const rows = (known ?? []).map((area) => ({
+      profile_id: user.id,
+      area_slug: area.slug,
+      area_name: area.name,
+      city: area.city,
+      country: area.country,
+    }));
+
+    if (rows.length > 0) {
+      await supabase.from("professional_service_areas").insert(rows);
+    }
+  }
+
   revalidatePath("/profile");
+  revalidatePath("/professionals");
   revalidatePath("/dashboard");
   // The public page renders these, so it has to be rebuilt or the owner
   // switches their number off and still sees it published.

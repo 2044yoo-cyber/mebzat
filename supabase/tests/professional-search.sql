@@ -182,11 +182,27 @@ begin
   end if;
   raise notice 'ok 3b: a draft service does not';
 
-  select count(*) into hit from public.search_professionals(p_city => 'Hawassa');
-  if hit <> 1 then
-    raise exception 'FAIL 3c: the city filter returned %, expected 1', hit;
+  -- `p_city` used to narrow to people whose *base* was that city, and this
+  -- asserted it did. 0078 is the change that says base location must never be
+  -- what decides whether somebody is offered for a job, so the parameter now
+  -- says which city's gazetteer the job area is read from — and on its own it
+  -- narrows nothing. A welder in Bole who works in Summit is the whole point;
+  -- filtering him out for not living there is the bug.
+  --
+  -- supabase/tests/service-areas.sql covers what does narrow.
+  select count(*) into hit from public.search_professionals(p_city => 'Addis Ababa');
+  if hit = 0 then
+    raise exception 'FAIL 3c: naming a city with no job area returned nobody';
   end if;
-  raise notice 'ok 3c: filtering by city works';
+  raise notice 'ok 3c: naming a city alone narrows nobody out by where they live';
+
+  select count(*) into hit
+  from public.search_professionals(p_city => 'Hawassa') hit_row
+  where hit_row.username = 'probe_carpenter';
+  if hit <> 1 then
+    raise exception 'FAIL 3c2: somebody based in Addis was dropped for a Hawassa search';
+  end if;
+  raise notice 'ok 3c2: and somebody based elsewhere is still a candidate';
 
   select count(*) into hit from public.search_professionals(p_verified_only => true)
   where username = 'probe_plumber';

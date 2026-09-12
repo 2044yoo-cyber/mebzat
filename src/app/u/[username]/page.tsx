@@ -5,6 +5,8 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReviewCard } from "@/components/reviews/review-card";
 import { ProfileCredentials } from "@/components/profile/profile-credentials";
+import { WorksInYourArea } from "@/components/professionals/works-in-your-area";
+import { listAreas, serviceAreasFor } from "@/lib/data/professionals";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfilePortfolio } from "@/components/profile/profile-portfolio";
 import { ProfileServices } from "@/components/profile/profile-services";
@@ -62,7 +64,11 @@ export default async function PublicProfilePage(props: {
 
   // Reviews left against the person directly. Reviews of their services live
   // on the service pages, where the thing being reviewed is named.
-  const reviews = await getReviews("professional", profile.id, 10);
+  const [reviews, serviceAreas, areaChoices] = await Promise.all([
+    getReviews("professional", profile.id, 10),
+    serviceAreasFor(profile.id),
+    listAreas(),
+  ]);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -105,6 +111,17 @@ export default async function PublicProfilePage(props: {
                 />
               </div>
               <div className="space-y-4">
+                {/* Where they are, and separately where they will go. The
+                    second is the one a customer needs and the one that was
+                    missing. */}
+                <WorksInYourArea
+                  baseArea={profile.base_area}
+                  serviceAreas={serviceAreas}
+                  servesEntireCity={profile.serves_entire_city}
+                  travelRadiusKm={profile.travel_radius_km}
+                  areas={areaChoices}
+                  city={profile.location_city}
+                />
                 <ProfileStanding rating={data.rating} />
                 <ProfileCredentials credentials={data.credentials} />
               </div>

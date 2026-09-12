@@ -5494,6 +5494,14 @@ export interface Database {
           restriction_reason: string | null;
           show_phone: boolean;
           show_email: boolean;
+          profession: string | null;
+          specialties: string[];
+          base_area: string | null;
+          travel_radius_km: number | null;
+          serves_entire_city: boolean;
+          id_verified: boolean;
+          business_verified: boolean;
+          license_verified: boolean;
         };
         Insert: {
           id: string;
@@ -5534,6 +5542,14 @@ export interface Database {
           restriction_reason?: string | null;
           show_phone?: boolean;
           show_email?: boolean;
+          profession?: string | null;
+          specialties?: string[];
+          base_area?: string | null;
+          travel_radius_km?: number | null;
+          serves_entire_city?: boolean;
+          id_verified?: boolean;
+          business_verified?: boolean;
+          license_verified?: boolean;
         };
         Update: {
           id?: string;
@@ -5574,6 +5590,14 @@ export interface Database {
           restriction_reason?: string | null;
           show_phone?: boolean;
           show_email?: boolean;
+          profession?: string | null;
+          specialties?: string[];
+          base_area?: string | null;
+          travel_radius_km?: number | null;
+          serves_entire_city?: boolean;
+          id_verified?: boolean;
+          business_verified?: boolean;
+          license_verified?: boolean;
         };
         Relationships: [];
       };
@@ -5696,6 +5720,75 @@ export interface Database {
           url?: string;
           caption?: string | null;
           position?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      location_areas: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          sub_city: string | null;
+          city: string;
+          region: string;
+          country: string;
+          latitude: number | null;
+          longitude: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          sub_city?: string | null;
+          city?: string;
+          region?: string;
+          country?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          name?: string;
+          sub_city?: string | null;
+          city?: string;
+          region?: string;
+          country?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      professional_service_areas: {
+        Row: {
+          id: string;
+          profile_id: string;
+          area_slug: string;
+          area_name: string;
+          city: string;
+          country: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          area_slug: string;
+          area_name: string;
+          city?: string;
+          country?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string;
+          area_slug?: string;
+          area_name?: string;
+          city?: string;
+          country?: string;
           created_at?: string;
         };
         Relationships: [];

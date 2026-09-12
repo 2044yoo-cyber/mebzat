@@ -140,10 +140,45 @@ check("and a failure there does not block signing in", /catch \{/.test(otp));
 
 check("the badge names the level", /label: "Phone verified"/.test(badge));
 check("and does not claim identity was checked", !/label: "Verified",/.test(badge));
-check("the stronger levels exist as labels, unearned", /identity:/.test(badge) && /business:/.test(badge));
+check("the stronger levels exist as labels", /identity:/.test(badge) && /business:/.test(badge));
+
+// This asserted that only phone could be earned, which was true until 0078
+// added the three columns this file's own comment said were waiting for a
+// process. They can be earned now — by somebody other than their owner.
 check(
-  "but only phone can currently be earned",
-  /return profile\.phone_verified \? "phone" : null;/.test(badge),
+  "the strongest level earned is the one shown",
+  /export function verificationLevelsOf/.test(badge) &&
+    /return verificationLevelsOf\(profile\)\[0\] \?\? null;/.test(badge),
+  "showing the weakest is how a phone check ends up standing in for a licence",
+);
+check(
+  "and they are ordered strongest first",
+  /if \(profile\.license_verified\) levels\.push\("professional"\);[\s\S]{0,200}if \(profile\.phone_verified\) levels\.push\("phone"\);/.test(
+    badge,
+  ),
+);
+check(
+  "a phone number alone is not 'verified' for the search filter",
+  /export function isDocumentVerified/.test(badge) &&
+    !/phone_verified \|\|/.test(
+      badge.slice(badge.indexOf("export function isDocumentVerified")),
+    ),
+  "it proves somebody holds a handset, which costs nothing to obtain again under another name",
+);
+check(
+  "and none of the three can be self-granted",
+  (() => {
+    const migration = readFileSync(
+      "supabase/migrations/0078_service_areas.sql",
+      "utf8",
+    );
+    return (
+      /id_verified cannot be changed from an authenticated session/.test(migration) &&
+      /business_verified cannot be changed from an authenticated session/.test(migration) &&
+      /license_verified cannot be changed from an authenticated session/.test(migration)
+    );
+  })(),
+  "0068 guarded phone_verified; the columns it said did not exist yet now do",
 );
 check("the level is announced to a screen reader", /sr-only/.test(badge));
 check("and explained on hover", /title=\{info\.detail\}/.test(badge));
