@@ -4,14 +4,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   Banknote,
-  BedDouble,
-  Building2,
   CalendarCheck,
   Eye,
-  Layers,
+  ListChecks,
   MapPin,
   Palette,
   Rotate3d,
+  Tag,
   User,
 } from "lucide-react";
 
@@ -19,7 +18,13 @@ import { ReportDialog } from "@/components/moderation/report-dialog";
 import { ProjectOwnerActions } from "@/components/projects/project-owner-actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { BUILDING_TYPE_MAP } from "@/lib/constants/building-types";
+import {
+  PROJECT_CATEGORY_MAP,
+  displayValue,
+  fieldsFor,
+  isProjectCategory,
+  type ProjectCategory,
+} from "@/lib/constants/project-categories";
 import { createClient } from "@/lib/supabase/server";
 import { listToursFor } from "@/lib/tour/queries";
 
@@ -105,9 +110,40 @@ export default async function ProjectDetailPage(props: {
     await supabase.rpc("increment_project_views", { project_id: id });
   }
 
-  const buildingType = project.building_type
-    ? BUILDING_TYPE_MAP[project.building_type]
+  const category: ProjectCategory | null = isProjectCategory(project.category)
+    ? project.category
     : null;
+
+  /**
+   * The answers this project actually has, in the order its category asks for
+   * them.
+   *
+   * Driven by the same spec the form renders from, so a field that is not part
+   * of this category has no row here to leave empty — which is what put
+   * "Bedrooms: —" on a kitchen. A field the category does ask for but the
+   * author left blank is dropped too: a portfolio page is not a form, and a
+   * list of dashes says nothing about the work.
+   */
+  const metadata = (project.metadata ?? {}) as Record<string, unknown>;
+  const details = (category ? fieldsFor(category) : [])
+    .map((field) => ({
+      field,
+      value: displayValue(
+        field,
+        field.source === "column"
+          ? // buildingType is the form's name for it; the column is building_type.
+            (project[
+              (field.id === "buildingType"
+                ? "building_type"
+                : field.id) as keyof typeof project
+            ] as unknown)
+          : metadata[field.id],
+      ),
+    }))
+    .filter((row): row is { field: (typeof row)["field"]; value: string } =>
+      row.value !== null,
+    );
+
   const location = [project.location_city, project.location_country]
     .filter(Boolean)
     .join(", ");
@@ -129,8 +165,19 @@ export default async function ProjectDetailPage(props: {
             <h1 className="text-2xl font-semibold tracking-tight">
               {project.title}
             </h1>
-            {project.status === "draft" && (
-              <Badge variant="secondary">Draft</Badge>
+            {category && (
+              <Badge variant="secondary">
+                {PROJECT_CATEGORY_MAP[category]}
+              </Badge>
+            )}
+            {project.status !== "published" && (
+              <Badge variant="secondary">
+                {project.status === "draft"
+                  ? "Draft"
+                  : project.status === "private"
+                    ? "Private"
+                    : "Archived"}
+              </Badge>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -193,6 +240,21 @@ export default async function ProjectDetailPage(props: {
             </div>
           )}
 
+          {project.tags.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-sm font-medium text-muted-foreground">
+                Skills used
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {project.tags.map((t) => (
+                  <Badge key={t} variant="outline">
+                    <Tag className="size-3" /> {t}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
           {project.materials.length > 0 && (
             <div className="space-y-2">
               <h2 className="text-sm font-medium text-muted-foreground">
@@ -227,29 +289,16 @@ export default async function ProjectDetailPage(props: {
           )}
 
           <div className="space-y-4 rounded-2xl border p-5">
-            {buildingType && (
+            {details.map(({ field, value }) => (
               <DetailRow
-                icon={Building2}
-                label="Building type"
-                value={buildingType.label}
+                key={field.id}
+                icon={ListChecks}
+                label={field.label}
+                value={value}
               />
-            )}
+            ))}
             {project.style && (
               <DetailRow icon={Palette} label="Style" value={project.style} />
-            )}
-            {typeof project.bedrooms === "number" && (
-              <DetailRow
-                icon={BedDouble}
-                label="Bedrooms"
-                value={String(project.bedrooms)}
-              />
-            )}
-            {typeof project.floors === "number" && (
-              <DetailRow
-                icon={Layers}
-                label="Floors"
-                value={String(project.floors)}
-              />
             )}
             {typeof project.budget === "number" && (
               <DetailRow

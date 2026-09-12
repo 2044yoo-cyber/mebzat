@@ -715,7 +715,25 @@ export type ProductStatus =
 
 export type ProjectStatus =
   | "draft"
-  | "published";
+  | "published"
+  | "private"
+  | "archived";
+
+export type ProjectCategory =
+  | "building_construction"
+  | "architecture"
+  | "interior_design"
+  | "kitchen"
+  | "furniture"
+  | "wardrobe"
+  | "joinery"
+  | "renovation"
+  | "finishing"
+  | "electrical"
+  | "plumbing"
+  | "landscaping"
+  | "construction_product"
+  | "other";
 
 export type PropertyMediaKind =
   | "photo"
@@ -5702,6 +5720,9 @@ export interface Database {
           client: string | null;
           cover_image_url: string | null;
           status: ProjectStatus;
+          category: ProjectCategory;
+          metadata: Record<string, unknown>;
+          tags: string[];
           views: number;
           created_at: string;
           updated_at: string;
@@ -5725,6 +5746,9 @@ export interface Database {
           client?: string | null;
           cover_image_url?: string | null;
           status?: ProjectStatus;
+          category?: ProjectCategory;
+          metadata?: Record<string, unknown>;
+          tags?: string[];
           views?: number;
           created_at?: string;
           updated_at?: string;
@@ -5748,6 +5772,9 @@ export interface Database {
           client?: string | null;
           cover_image_url?: string | null;
           status?: ProjectStatus;
+          category?: ProjectCategory;
+          metadata?: Record<string, unknown>;
+          tags?: string[];
           views?: number;
           created_at?: string;
           updated_at?: string;
@@ -8632,6 +8659,7 @@ export interface Database {
       price_vat_status: PriceVatStatus;
       product_status: ProductStatus;
       project_status: ProjectStatus;
+      project_category: ProjectCategory;
       property_media_kind: PropertyMediaKind;
       property_status: PropertyStatus;
       property_type: PropertyType;

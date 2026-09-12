@@ -12,7 +12,7 @@ export async function ProfileProjects({
   let query = supabase
     .from("projects")
     .select(
-      "id, title, cover_image_url, building_type, location_city, location_country, status",
+      "id, title, cover_image_url, category, description, location_city, location_country, status",
     )
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false })

@@ -84,7 +84,7 @@ export type PanelData = {
     id: string;
     title: string;
     coverUrl: string | null;
-    buildingType: string | null;
+    category: string | null;
     city: string | null;
   }[];
   professionals: {
@@ -566,7 +566,7 @@ function Projects({ items }: { items: PanelData["projects"] }) {
 
   const cities = new Set(items.map((item) => item.city).filter(Boolean)).size;
   const types = new Set(
-    items.map((item) => item.buildingType).filter(Boolean),
+    items.map((item) => item.category).filter(Boolean),
   ).size;
 
   return (
@@ -609,7 +609,7 @@ function Projects({ items }: { items: PanelData["projects"] }) {
               {project.title}
             </span>
             <span className="block truncate text-[11px] text-muted-foreground">
-              {project.city ?? project.buildingType ?? ""}
+              {project.city ?? project.category ?? ""}
             </span>
           </Link>
         ))}

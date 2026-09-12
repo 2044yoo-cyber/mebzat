@@ -4,6 +4,10 @@ import { getCompanies } from "@/lib/data/companies";
 import { getEquipment } from "@/lib/data/equipment";
 import { getPrices } from "@/lib/data/price-exchange";
 import { getMarketplaceProducts } from "@/lib/data/products";
+import {
+  PROJECT_CATEGORY_MAP,
+  isProjectCategory,
+} from "@/lib/constants/project-categories";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -34,7 +38,7 @@ export async function HomePanel() {
       getMarketplaceProducts({ sort: "popular", pageSize: 8 }),
       supabase
         .from("projects")
-        .select("id, title, cover_image_url, building_type, location_city")
+        .select("id, title, cover_image_url, category, location_city")
         .eq("status", "published")
         .not("cover_image_url", "is", null)
         .order("created_at", { ascending: false })
@@ -99,7 +103,12 @@ export async function HomePanel() {
       id: project.id,
       title: project.title,
       coverUrl: project.cover_image_url,
-      buildingType: project.building_type,
+      // The category, not the building type. A wardrobe or a kitchen has no
+      // building_type at all, so the feed's "types" count and its caption
+      // fallback both went blank for exactly the projects this change adds.
+      category: isProjectCategory(project.category)
+        ? PROJECT_CATEGORY_MAP[project.category]
+        : null,
       city: project.location_city,
     })),
 

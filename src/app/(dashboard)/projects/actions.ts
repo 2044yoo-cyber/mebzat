@@ -3,9 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { type ProjectCategory } from "@/lib/constants/project-categories";
+import { buildingColumnsFor, pickCover } from "@/lib/projects/columns";
 import { createClient } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
-import { projectSchema, type ProjectFormValues } from "@/lib/validations/project";
+import {
+  parseMetadata,
+  parseTags,
+  projectSchema,
+  type ProjectFormValues,
+} from "@/lib/validations/project";
 import type { BuildingType, ProjectStatus } from "@/types/database.types";
 
 export type ProjectFormState = {
@@ -29,6 +36,7 @@ function parseImageUrls(raw: FormDataEntryValue | null): string[] {
 function buildValues(formData: FormData) {
   return projectSchema.safeParse({
     title: formData.get("title"),
+    category: formData.get("category"),
     description: formData.get("description"),
     locationCity: formData.get("locationCity"),
     locationCountry: formData.get("locationCountry"),
@@ -55,6 +63,9 @@ function collectFieldErrors(issues: { path: PropertyKey[]; message: string }[]) 
 
 type ProjectColumns = {
   title: string;
+  category: ProjectCategory;
+  metadata: Record<string, unknown>;
+  tags: string[];
   description: string | null;
   location_city: string | null;
   location_country: string | null;
@@ -70,16 +81,30 @@ type ProjectColumns = {
   status: ProjectStatus;
 };
 
-function toColumns(data: ProjectFormValues): ProjectColumns {
+function toColumns(
+  data: ProjectFormValues,
+  formData: FormData,
+): ProjectColumns {
+  const category = data.category as ProjectCategory;
+
+  const building = buildingColumnsFor(category, {
+    buildingType: data.buildingType,
+    bedrooms: data.bedrooms,
+    floors: data.floors,
+  });
+
   return {
     title: data.title,
+    category,
+    metadata: parseMetadata(category, formData),
+    tags: parseTags(formData.get("tags")),
     description: data.description || null,
     location_city: data.locationCity || null,
     location_country: data.locationCountry || null,
-    building_type: (data.buildingType || null) as BuildingType | null,
+    building_type: building.building_type,
     style: data.style || null,
-    bedrooms: data.bedrooms ?? null,
-    floors: data.floors ?? null,
+    bedrooms: building.bedrooms,
+    floors: building.floors,
     budget: data.budget ?? null,
     budget_currency: data.budgetCurrency || "USD",
     materials: data.materials
@@ -108,7 +133,7 @@ export async function createProject(
     return { error: "Your session expired. Log in again." };
   }
 
-  const columns = toColumns(parsed.data);
+  const columns = toColumns(parsed.data, formData);
   const images = parseImageUrls(formData.get("images"));
   const baseSlug = slugify(columns.title) || "project";
 
@@ -125,7 +150,7 @@ export async function createProject(
         ...columns,
         owner_id: user.id,
         slug,
-        cover_image_url: images[0] ?? null,
+        cover_image_url: pickCover(images, formData.get("primaryImage")),
       })
       .select("id")
       .single();
@@ -177,12 +202,15 @@ export async function updateProject(
     return { error: "Your session expired. Log in again." };
   }
 
-  const columns = toColumns(parsed.data);
+  const columns = toColumns(parsed.data, formData);
   const images = parseImageUrls(formData.get("images"));
 
   const { error } = await supabase
     .from("projects")
-    .update({ ...columns, cover_image_url: images[0] ?? null })
+    .update({
+      ...columns,
+      cover_image_url: pickCover(images, formData.get("primaryImage")),
+    })
     .eq("id", projectId)
     .eq("owner_id", user.id);
 

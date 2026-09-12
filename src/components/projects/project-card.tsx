@@ -3,7 +3,10 @@ import Link from "next/link";
 import { ImageOff, MapPin } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { BUILDING_TYPE_MAP } from "@/lib/constants/building-types";
+import {
+  PROJECT_CATEGORY_MAP,
+  isProjectCategory,
+} from "@/lib/constants/project-categories";
 import type { Project } from "@/types/database.types";
 
 export type ProjectCardData = Pick<
@@ -11,19 +14,30 @@ export type ProjectCardData = Pick<
   | "id"
   | "title"
   | "cover_image_url"
-  | "building_type"
+  | "category"
+  | "description"
   | "location_city"
   | "location_country"
   | "status"
 >;
 
+/** Everything that is not "published" is only ever seen by its owner. */
+const HIDDEN_LABELS: Record<string, string> = {
+  draft: "Draft",
+  private: "Private",
+  archived: "Archived",
+};
+
 export function ProjectCard({ project }: { project: ProjectCardData }) {
-  const buildingType = project.building_type
-    ? BUILDING_TYPE_MAP[project.building_type]
+  // The category, not the building type. A wardrobe used to be labelled by a
+  // column meant for houses, so it was either "Interior" or nothing at all.
+  const category = isProjectCategory(project.category)
+    ? PROJECT_CATEGORY_MAP[project.category]
     : null;
   const location = [project.location_city, project.location_country]
     .filter(Boolean)
     .join(", ");
+  const hidden = HIDDEN_LABELS[project.status];
 
   return (
     <Link
@@ -44,24 +58,27 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
             <ImageOff className="size-8" />
           </div>
         )}
-        {project.status === "draft" && (
+        {hidden && (
           <span className="absolute left-3 top-3 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium">
-            Draft
+            {hidden}
           </span>
         )}
       </div>
       <div className="space-y-2 p-4">
         <h3 className="truncate font-medium">{project.title}</h3>
         <div className="flex flex-wrap items-center gap-2">
-          {buildingType && (
-            <Badge variant="secondary">{buildingType.label}</Badge>
-          )}
+          {category && <Badge variant="secondary">{category}</Badge>}
           {location && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="size-3" /> {location}
             </span>
           )}
         </div>
+        {project.description && (
+          <p className="line-clamp-2 text-xs text-muted-foreground">
+            {project.description}
+          </p>
+        )}
       </div>
     </Link>
   );
