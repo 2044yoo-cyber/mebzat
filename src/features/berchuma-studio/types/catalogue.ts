@@ -23,7 +23,8 @@ export const BOARDS: Board[] = [
     grain: "none",
     appearance: { colour: "White", hex: "#f2f0ec", sheen: "satin" },
     priceKey: "MDF 18mm melamine",
-    fallbackRate: 2450,
+    // Owner-supplied Addis market estimate, ETB per sheet (2026-09-12).
+    fallbackRate: 5700,
   },
   {
     id: "mdf-18-walnut",
