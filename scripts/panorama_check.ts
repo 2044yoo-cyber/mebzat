@@ -1134,6 +1134,43 @@ async function endToEnd() {
     "section 4: manual capture remains as a backup",
   );
 
+  // --- the permission ordering, which is the whole of a dead capture -------
+  const starting = blockAfter(capture, "async function start()");
+  check("starting the camera is findable", starting.length > 0);
+  check(
+    "orientation is asked for before the camera, not after it",
+    starting.indexOf("requestPermission") <
+      starting.indexOf("navigator.mediaDevices.getUserMedia"),
+    "iOS grants deviceorientation only from a user gesture, and a gesture is spent by the first await — asking for the camera first means the orientation prompt arrives one await too late and is refused without ever being shown, which is a camera screen with no targets on it",
+  );
+  check(
+    "and a refusal is admitted rather than waited out",
+    /} else \{[\s\S]{0,200}?setSensorMissing\(true\)/.test(starting),
+  );
+  check(
+    "a sensor that never reports is given a moment and then given up on",
+    /setTimeout\(\(\) => setSensorMissing\(true\), 3000\)/.test(capture),
+    "permission can be granted and readings still never arrive — a desktop, a locked-down webview",
+  );
+  check(
+    "and the screen then says so instead of showing a camera that cannot photograph",
+    /won&apos;t say which way the phone is pointing/.test(capture) &&
+      /Upload a 360 photo/.test(capture),
+    "every target is a direction; with nothing reporting where the phone points there is nothing to compare them against, so this is a dead end and not a degraded mode",
+  );
+  check(
+    "the shutter is not offered without a pose to file the photograph under",
+    (() => {
+      // The guard and the button are a long onClick apart, so this asks
+      // whether the nearest thing above the shutter is that guard rather than
+      // matching them inside a fixed window.
+      const shutter = capture.indexOf("Take it now");
+      const guard = capture.lastIndexOf("{hasSensor && (", shutter);
+      return shutter > 0 && guard > 0 && !capture.slice(guard, shutter).includes("</Button>");
+    })(),
+    "a frame recorded at no direction is a frame the stitcher throws away",
+  );
+
   check(
     "the capture screen sits above the app's own bottom navigation",
     /fixed inset-0 z-\[60\]/.test(capture) && /h-\[100dvh\]/.test(capture),

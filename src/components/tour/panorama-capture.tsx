@@ -168,6 +168,16 @@ export function PanoramaCapture({
   /** Where the server says it has got to. Null until it says. */
   const [stage, setStage] = useState<Step | null>(null);
   const [hasSensor, setHasSensor] = useState(false);
+  /**
+   * True once it is clear no orientation readings are coming.
+   *
+   * A spherical capture cannot be done without them: every target is a
+   * direction, and with nothing reporting which way the phone is pointing
+   * there is no direction to compare them against. So this is not a degraded
+   * mode to fall back into — it is a dead end, and the screen says so and
+   * offers the way out rather than showing a camera that cannot photograph.
+   */
+  const [sensorMissing, setSensorMissing] = useState(false);
 
   /**
    * Everything the overlay draws, refreshed on every animation frame.
@@ -590,7 +600,38 @@ export function PanoramaCapture({
 
   async function start() {
     setProblem(null);
+    setSensorMissing(false);
 
+    // ---- orientation first, and that ordering is the whole of it ----------
+    //
+    // iOS will only grant `deviceorientation` from a user gesture, and a
+    // gesture is spent by the first await. Asking for the camera first — which
+    // is what this used to do, under a comment claiming the gesture was still
+    // in hand — meant the orientation prompt arrived one await too late and
+    // was refused without ever being shown. No readings, so no pose, so no
+    // circles: a camera screen that could not photograph anything.
+    type Requestable = { requestPermission?: () => Promise<string> };
+    const orientation = window.DeviceOrientationEvent as unknown as Requestable | undefined;
+
+    let allowed = typeof window.DeviceOrientationEvent !== "undefined";
+    if (orientation?.requestPermission) {
+      try {
+        allowed = (await orientation.requestPermission()) === "granted";
+      } catch {
+        allowed = false;
+      }
+    }
+
+    if (allowed) {
+      window.addEventListener("deviceorientationabsolute", onOrientation, true);
+      window.addEventListener("deviceorientation", onOrientation, true);
+    } else {
+      // Nothing below will work without it, so say so now rather than after a
+      // minute of turning around in front of a camera that is not recording.
+      setSensorMissing(true);
+    }
+
+    // ---- then the camera ---------------------------------------------------
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -611,24 +652,6 @@ export function PanoramaCapture({
     // Held, not attached: the <video> does not exist until the phase changes.
     streamRef.current = stream;
 
-    // iOS requires the permission to be asked for from a gesture, which this
-    // is. Everywhere else the listener simply starts producing readings.
-    type Requestable = { requestPermission?: () => Promise<string> };
-    const orientation = window.DeviceOrientationEvent as unknown as Requestable | undefined;
-    let allowed = typeof window.DeviceOrientationEvent !== "undefined";
-    if (orientation?.requestPermission) {
-      try {
-        allowed = (await orientation.requestPermission()) === "granted";
-      } catch {
-        allowed = false;
-      }
-    }
-
-    if (allowed) {
-      window.addEventListener("deviceorientationabsolute", onOrientation, true);
-      window.addEventListener("deviceorientation", onOrientation, true);
-    }
-
     framesRef.current = [];
     // A new capture starts wherever the person is standing now, not where they
     // were standing for the one they abandoned.
@@ -640,6 +663,20 @@ export function PanoramaCapture({
     setPhase("capturing");
   }
 
+  /**
+   * Give the sensor a moment, then stop waiting.
+   *
+   * Permission can be granted and readings still never arrive — a browser
+   * without the hardware, a desktop, a locked-down webview. Three seconds is
+   * long past the point where a working sensor would have fired; below that a
+   * slow first event would be reported as a broken phone.
+   */
+  useEffect(() => {
+    if (phase !== "capturing" || hasSensor || sensorMissing) return;
+    const timer = window.setTimeout(() => setSensorMissing(true), 3000);
+    return () => window.clearTimeout(timer);
+  }, [phase, hasSensor, sensorMissing]);
+
   function restart() {
     // Restart is reached from mid-capture as well as from the two end screens,
     // and from mid-capture the camera is still running.
@@ -647,6 +684,7 @@ export function PanoramaCapture({
     framesRef.current = [];
     setUploadedJob(null);
     setStage(null);
+    setSensorMissing(false);
     setResult(null);
     setProblem(null);
     applyState(startCapture());
@@ -746,61 +784,100 @@ export function PanoramaCapture({
             </button>
           </div>
 
-          <div className="flex flex-col items-center gap-3">
-            <p className="text-lg font-medium text-white drop-shadow">
-              {hasSensor ? hint : "Hold the phone upright to begin"}
-            </p>
-
-            {/* Section 8: this cannot be pressed into existence. Until every
-                required direction has been photographed there is a hole in the
-                sphere, and the only thing that fills it is pointing the camera
-                at it. */}
-            {!covered.complete && (
-              <p className="text-sm text-white/70">
-                {covered.missing.length} left — look for the open circles
+          {/* ---- No orientation, no capture ------------------------------
+              Every target is a direction, so with nothing reporting which way
+              the phone is pointing there is nothing to compare them against.
+              This is a dead end rather than a degraded mode, and a camera
+              screen with controls that quietly do nothing is worse than
+              saying so. */}
+          {sensorMissing && !hasSensor ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl bg-black/80 p-4 text-center">
+              <p className="text-base font-medium text-white">
+                This browser won&apos;t say which way the phone is pointing.
               </p>
-            )}
-
-            <div className="flex w-full items-center justify-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (busyRef.current) return;
-                  if (!videoRef.current?.videoWidth) return;
-                  const pose = poseRef.current;
-                  if (!pose) return;
-                  const decision = decide(stateRef.current, forwardOf(pose), 0, STEADY_MS);
-                  if (decision.action !== "aim") return;
-                  const manual = captureManually(stateRef.current, decision.target);
-                  if (manual.action !== "capture") return;
-                  applyState(manual.state);
-                  void take(manual.target, stateRef.current.plan.length);
-                }}
-                className="min-h-12 bg-black/50 text-white"
-              >
-                <Camera className="size-4" /> Take it now
-              </Button>
-
-              <Button
-                onClick={() => {
-                  stopCamera();
-                  void upload();
-                }}
-                disabled={!covered.complete}
-                className="min-h-12"
-              >
-                <Check className="size-4" /> Create 360°
-              </Button>
-
-              <Button
-                variant="outline"
-                onClick={restart}
-                className="min-h-12 bg-black/50 text-white"
-              >
-                <RotateCcw className="size-4" />
-              </Button>
+              <p className="text-sm text-white/80">
+                A 360 photo needs that to know where each shot belongs. On
+                iPhone, check Settings → Safari → Motion &amp; Orientation
+                Access, then try again.
+              </p>
+              <div className="grid w-full grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    teardown();
+                    onCancel();
+                  }}
+                  className="min-h-12 bg-black/50 text-white"
+                >
+                  Upload a 360 photo
+                </Button>
+                <Button onClick={restart} className="min-h-12">
+                  <RotateCcw className="size-4" /> Try again
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-lg font-medium text-white drop-shadow">
+                {hasSensor ? hint : "Hold the phone upright to begin"}
+              </p>
+
+              {/* Section 8: this cannot be pressed into existence. Until every
+                  required direction has been photographed there is a hole in
+                  the sphere, and the only thing that fills it is pointing the
+                  camera at it. */}
+              {!covered.complete && (
+                <p className="text-sm text-white/70">
+                  {covered.missing.length} left — look for the open circles
+                </p>
+              )}
+
+              <div className="flex w-full items-center justify-center gap-3">
+                {/* Only offered once there is a pose to record with it. A
+                    shutter that files the photograph under "nowhere" is a
+                    frame the stitcher has to throw away. */}
+                {hasSensor && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (busyRef.current) return;
+                      if (!videoRef.current?.videoWidth) return;
+                      const pose = poseRef.current;
+                      if (!pose) return;
+                      const decision = decide(stateRef.current, forwardOf(pose), 0, STEADY_MS);
+                      if (decision.action !== "aim") return;
+                      const manual = captureManually(stateRef.current, decision.target);
+                      if (manual.action !== "capture") return;
+                      applyState(manual.state);
+                      void take(manual.target, stateRef.current.plan.length);
+                    }}
+                    className="min-h-12 bg-black/50 text-white"
+                  >
+                    <Camera className="size-4" /> Take it now
+                  </Button>
+                )}
+
+                <Button
+                  onClick={() => {
+                    stopCamera();
+                    void upload();
+                  }}
+                  disabled={!covered.complete}
+                  className="min-h-12"
+                >
+                  <Check className="size-4" /> Create 360°
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={restart}
+                  className="min-h-12 bg-black/50 text-white"
+                >
+                  <RotateCcw className="size-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
