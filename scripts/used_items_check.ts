@@ -908,8 +908,13 @@ for (const [path, expected, what] of [
   const upload = code("src/app/moderation/upload-actions.ts");
   check(
     "only a refusal stops a seller",
-    /if \(outcome\.status === "blocked" \|\| !outcome\.itemId\) \{/.test(upload),
-    'it was `!== "safe"`, so an uncertain classifier held the listing back',
+    // Literally only a refusal now. This also required `!outcome.itemId`,
+    // which made a moderation row a precondition for publishing: a seller
+    // whose photograph nothing objected to was refused because the audit
+    // record could not be written.
+    /if \(outcome\.status === "blocked"\) \{/.test(upload) &&
+      !/!outcome\.itemId/.test(upload),
+    'it was `!== "safe"`, and then it still demanded a moderation record',
   );
   check(
     "and the caller is told what actually happened",

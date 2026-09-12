@@ -4,6 +4,10 @@ import { AlertTriangle, Flag, ShieldAlert } from "lucide-react";
 
 import { QueueRow } from "@/components/moderation/queue-row";
 import { canAdmin } from "@/lib/auth/admin-areas";
+import {
+  isModerationConfigured,
+  moderationSetupHelp,
+} from "@/lib/moderation/provider";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Moderation" };
@@ -67,9 +71,20 @@ export default async function ModerationQueuePage(props: {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Moderation</h1>
         <p className="text-sm text-muted-foreground">
-          Content held back from public view, and the decisions taken on it.
+          Flagged and reported content, and the decisions taken on it.
         </p>
       </header>
+
+      {/* An empty queue means one of two very different things: nothing has
+          been flagged, or nothing is being checked. Until now there was no way
+          to tell them apart from this page, and with unchecked uploads
+          publishing rather than queueing, an empty queue is exactly what a
+          missing classifier key looks like. */}
+      {!isModerationConfigured() && (
+        <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          {moderationSetupHelp()}
+        </p>
+      )}
 
       {/* Scrolls horizontally on a phone rather than wrapping into two rows
           that push the queue below the fold. */}

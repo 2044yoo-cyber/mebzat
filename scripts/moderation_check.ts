@@ -52,45 +52,160 @@ const code = (source: string) =>
   source.replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1").replace(/^\s*\/\/.*$/gm, "");
 
 /* -------------------------------------------------------------------------- */
-/* It fails closed                                                            */
+/* Not having looked is not a finding                                         */
 /* -------------------------------------------------------------------------- */
 
-// The one unforgivable failure. A checker that is missing, broken or slow must
-// never result in content going public.
+// This section asserted the opposite until now, and the opposite was wrong in
+// a way that made the product unusable: with no classifier key set, every
+// upload on the platform resolved to `review`, and the setup help said so —
+// "every upload goes to review rather than being published".
+//
+// Nothing is loosened by the change. With no provider there is no verdict, so
+// nothing was being blocked before either; the difference is only whether
+// ordinary work is held in front of a moderator first. What must still hold is
+// that a *positive* finding is acted on, and that is the section below.
 check(
-  "no provider configured means review, not safe",
-  /provider: "none"[\s\S]{0,80}|status: "review",[\s\S]{0,120}provider: "none"/.test(
-    code(service),
-  ) && /if \(!provider\) \{[\s\S]{0,200}status: "review"/.test(code(service)),
+  "no provider configured publishes rather than queueing",
+  /if \(!provider\) \{[\s\S]{0,900}status: "safe"/.test(code(service)),
+  "an install with no key sent every photograph to a queue nobody was going to empty",
 );
 check(
-  "a text check that throws goes to review",
-  /catch[\s\S]{0,200}status: "review"[\s\S]{0,120}text check unavailable/.test(
+  "and records why it was not checked",
+  /status: "safe",[\s\S]{0,160}reason: "no moderation provider configured"/.test(
+    code(service),
+  ),
+  "a row that does not say it was unchecked cannot be found and re-checked later",
+);
+check(
+  "a text check that throws does not hold the upload",
+  /catch[\s\S]{0,400}status: "safe"[\s\S]{0,160}text check unavailable/.test(
+    code(service),
+  ),
+  "an outage is not evidence about the content",
+);
+check(
+  "an image check that throws does not hold the upload",
+  /catch[\s\S]{0,400}status: "safe"[\s\S]{0,160}image check unavailable/.test(
     code(service),
   ),
 );
 check(
-  "an image check that throws goes to review",
-  /catch[\s\S]{0,200}status: "review"[\s\S]{0,120}image check unavailable/.test(
+  "nothing checkable publishes, with the reason recorded",
+  /verdicts\.length === 0[\s\S]{0,400}status: "safe"[\s\S]{0,200}nothing checkable/.test(
     code(service),
   ),
-);
-check(
-  "nothing checkable still means review",
-  /verdicts\.length === 0[\s\S]{0,200}status: "review"/.test(code(service)),
-);
-check(
-  "a failed record write blocks publication",
-  /could not record decision[\s\S]{0,120}status: "review"/.test(code(service)),
-  "with no record there is nothing to review, appeal or audit",
 );
 
-// Nowhere in the service may a failure path produce "safe".
-const failurePaths = code(service).match(/catch[\s\S]{0,260}?\}/g) ?? [];
+// The regression the brief names. A moderation record is an audit trail, not a
+// permission slip: when it cannot be written, ordinary content still goes out.
 check(
-  "no catch block resolves to safe",
-  !failurePaths.some((block) => /status: "safe"/.test(block)),
-  "failing open is the only unforgivable way for this to fail",
+  "a failed record write returns the real verdict",
+  // The whole statement, in a short window. `status: verdict.status` alone
+  // also appears in the *success* return a few lines below, inside 200
+  // characters of this one — so the loose version of this check passed with
+  // the failure branch mutated straight back to a flat "review".
+  /could not record decision[\s\S]{0,120}return \{ status: verdict\.status, category: verdict\.category \};/.test(
+    code(service),
+  ),
+  "returning a flat 'review' with no id made the upload path refuse every image",
+);
+check(
+  "so a blocked image is still refused when its record fails",
+  // Asserted through the caller, because that is where the decision is: the
+  // service hands back the verdict and `upload-actions` is what acts on it.
+  /outcome\.status === "blocked"/.test(
+    code(readFileSync("src/app/moderation/upload-actions.ts", "utf8")),
+  ),
+  "refusing is the safety-critical direction and it still fails closed",
+);
+check(
+  "and publication no longer requires an id at all",
+  !/!\s*outcome\.itemId/.test(
+    code(readFileSync("src/app/moderation/upload-actions.ts", "utf8")),
+  ),
+);
+check(
+  "publishApproved runs without a record",
+  // Both scoped. `itemId: string | null` is also `audit()`'s second parameter,
+  // and `if (itemId) {` guards the record *update* further down as well, so
+  // either loose match survived a mutation of the one that matters.
+  /itemId: string \| null,\n  quarantinePath: string,/.test(code(service)) &&
+    /if \(itemId\) \{\s*const \{ data: item \} = await client/.test(code(service)),
+  "otherwise the fix stops at the caller and the publish step refuses anyway",
+);
+check(
+  "and still watermarks when there is no record to read the author from",
+  /fallback\?: \{ userId: string \| null; contentType: ContentKind \}/.test(
+    code(service),
+  ),
+  "a published image with no mark is the watermark feature silently off",
+);
+
+// The setup help is read by an operator deciding whether anything is wrong.
+check(
+  "the setup help describes what actually happens now",
+  !/every upload goes to review/.test(provider),
+  "it told operators the opposite of what the code does",
+);
+check(
+  "and the console says so where an operator will see it",
+  /isModerationConfigured\(\)/.test(
+    readFileSync("src/app/admin/moderation/page.tsx", "utf8"),
+  ),
+  "an empty queue looks the same whether nothing was flagged or nothing was checked",
+);
+
+/* -------------------------------------------------------------------------- */
+/* The three flows the product has                                            */
+/* -------------------------------------------------------------------------- */
+
+// Normal, suspicious, reported. The section above is about the first one; this
+// is about the other two still working, because a change that makes everything
+// publish is trivially achieved by breaking the classifier entirely.
+check(
+  "a positive finding above the block threshold still blocks",
+  /if \(confidence >= blockThreshold\(\)\) return "blocked";/.test(code(provider)),
+  "the whole point of publishing the unchecked is that the checked is still acted on",
+);
+check(
+  "a finding between the thresholds still flags for a person",
+  /if \(confidence >= reviewThreshold\(\)\) return "review";/.test(code(provider)),
+);
+check(
+  "and the worst verdict still wins when several checks ran",
+  /RANK\[candidate\.status\] > RANK\[worstSoFar\.status\]/.test(code(service)),
+  "a clean photograph with a solicitation in the caption is not clean",
+);
+check(
+  "safe still ranks below every other verdict",
+  /safe: 0,/.test(code(service)),
+  "if safe outranked anything, a single clean check would override a finding",
+);
+
+// The reported flow, which the brief splits into low-risk and high-risk. This
+// is 0076's behaviour and it already matches; these assert it stays that way.
+check(
+  "one report does not hide anything",
+  /moderation_hide_threshold\(\)\s*\n?returns integer language sql immutable as \$\$ select 3 \$\$/.test(
+    later,
+  ),
+  "a single person must not be able to take somebody's work down",
+);
+check(
+  "unless it names something that cannot wait",
+  /moderation_hides_on_first\([\s\S]{0,200}'sexual_minors', 'sexual_explicit', 'illegal', 'threats'/.test(
+    later,
+  ),
+);
+check(
+  "hiding is reversible, not a delete",
+  /set hidden_at = now\(\),/.test(later) && !/delete from public\.moderation_items/.test(later),
+  "nothing is destroyed on the say-so of a report",
+);
+check(
+  "and the file goes back to quarantine rather than staying fetchable",
+  /hideReported\(/.test(readFileSync("src/app/moderation/actions.ts", "utf8")),
+  "a page holds the URL, not a join, so clearing a flag hides nothing on its own",
 );
 
 /* -------------------------------------------------------------------------- */

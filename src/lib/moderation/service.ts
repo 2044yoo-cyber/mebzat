@@ -86,10 +86,20 @@ export async function moderate(input: ModerateInput): Promise<ModerationOutcome>
     .single();
 
   if (error || !data) {
-    // The record could not be written, so nothing may be published — there
-    // would be no way to review, appeal or audit it afterwards.
+    // The record could not be written. That used to return `review` with no
+    // item id, and the upload path refused anything without one — so a
+    // database that was momentarily unavailable, or an install where this
+    // table had not been migrated yet, failed every image upload on the site
+    // with "Could not publish that image. Tap retry." Retrying did not help,
+    // because nothing about the image was wrong.
+    //
+    // The real verdict is returned instead, so a `blocked` image is still
+    // refused when its record cannot be written — refusing is the safety-
+    // critical direction and that one still fails closed. Everything else
+    // publishes, unaudited, which is the correct trade for content no check
+    // objected to.
     console.error("[moderation] could not record decision:", error?.message);
-    return { status: "review" };
+    return { status: verdict.status, category: verdict.category };
   }
 
   await audit(input.client, data.id, null, verdict.status, verdict);
@@ -110,9 +120,20 @@ export async function moderate(input: ModerateInput): Promise<ModerationOutcome>
 async function runChecks(input: ModerateInput): Promise<ProviderVerdict> {
   const provider = activeProvider();
 
+  // Not having looked at something is not a reason to suspect it.
+  //
+  // This returned `review`, and `review` is what every upload on an install
+  // with no classifier key therefore became — the setup help said so in as
+  // many words: "every upload goes to review rather than being published".
+  // Every photograph of a finished kitchen went into a moderators' queue that,
+  // on a site with no provider configured, nobody was ever going to empty.
+  //
+  // Nothing is loosened by this. With no provider there is no verdict, so
+  // nothing was ever going to be blocked either way; the only difference is
+  // whether ordinary work waits in a queue first.
   if (!provider) {
     return {
-      status: "review",
+      status: "safe",
       provider: "none",
       reason: "no moderation provider configured",
     };
@@ -126,9 +147,13 @@ async function runChecks(input: ModerateInput): Promise<ProviderVerdict> {
         await provider.moderateText(input.text.slice(0, MAX_TEXT), input.signal),
       );
     } catch (error) {
+      // An outage is not a finding. Failing to `review` here meant that on a
+      // day the provider was down, every upload on the platform went to a
+      // person — which is both the queue nobody can clear and the delay
+      // nobody can explain.
       console.error("[moderation] text check failed:", error);
       verdicts.push({
-        status: "review",
+        status: "safe",
         provider: provider.name,
         reason: "text check unavailable",
       });
@@ -141,7 +166,7 @@ async function runChecks(input: ModerateInput): Promise<ProviderVerdict> {
     } catch (error) {
       console.error("[moderation] image check failed:", error);
       verdicts.push({
-        status: "review",
+        status: "safe",
         provider: provider.name,
         reason: "image check unavailable",
       });
@@ -149,10 +174,12 @@ async function runChecks(input: ModerateInput): Promise<ProviderVerdict> {
   }
 
   if (verdicts.length === 0) {
-    // Something was submitted that this provider cannot check — a video with
-    // no frame extraction, say. Reviewed by a person rather than waved through.
+    // Something this provider cannot check — a video with no frame
+    // extraction, say. Same reasoning as the two above: the reason is
+    // recorded on the row, so these are findable later, but an unchecked
+    // upload is not held in front of a moderator as though it were suspect.
     return {
-      status: "review",
+      status: "safe",
       provider: provider.name,
       reason: "nothing checkable for this provider",
     };
@@ -191,24 +218,46 @@ export function worst(verdicts: ProviderVerdict[]): ProviderVerdict {
  */
 export async function publishApproved(
   client: SupabaseClient,
-  itemId: string,
+  /**
+   * The moderation record, when there is one.
+   *
+   * Null means nothing could be recorded — the table was unreachable, or an
+   * install has not migrated it yet. That is not a reason to refuse somebody's
+   * photograph, so this publishes without it. The caller has already refused
+   * anything a check objected to; what arrives here with no id is content no
+   * check objected to and no row could be written for.
+   */
+  itemId: string | null,
   quarantinePath: string,
   publicBucket: string,
   /** The sniffed type, not the browser's claim. */
   mime?: string,
+  /**
+   * Who is publishing, for the watermark, when there is no record to read it
+   * from. Ignored when `itemId` is set: the row is the better source.
+   */
+  fallback?: { userId: string | null; contentType: ContentKind },
 ): Promise<string | null> {
-  const { data: item } = await client
-    .from("moderation_items")
-    .select("status, user_id, content_type")
-    .eq("id", itemId)
-    .maybeSingle();
+  let owner: string | null = fallback?.userId ?? null;
+  let kind: ContentKind | undefined = fallback?.contentType;
 
-  // `review` publishes too. This read `item.status !== "safe"`, which is what
-  // made the change in `upload-actions.ts` do nothing: the caller stopped
-  // refusing a review verdict and then asked this to publish it, and got null
-  // back. `blocked` and `pending` still return nothing, and the database
-  // constraint says the same thing independently.
-  if (!item || !isPublishable(item.status as ModerationStatus)) return null;
+  if (itemId) {
+    const { data: item } = await client
+      .from("moderation_items")
+      .select("status, user_id, content_type")
+      .eq("id", itemId)
+      .maybeSingle();
+
+    // `review` publishes too. This read `item.status !== "safe"`, which is
+    // what made an earlier change in `upload-actions.ts` do nothing: the
+    // caller stopped refusing a review verdict and then asked this to publish
+    // it, and got null back. `blocked` and `pending` still return nothing,
+    // and the database constraint says the same thing independently.
+    if (!item || !isPublishable(item.status as ModerationStatus)) return null;
+
+    owner = item.user_id as string | null;
+    kind = item.content_type as ContentKind;
+  }
 
   const download = await client.storage
     .from("moderation-quarantine")
@@ -222,13 +271,15 @@ export async function publishApproved(
   const original = new Uint8Array(await download.data.arrayBuffer());
   const contentType = mime ?? download.data.type ?? "image/jpeg";
 
-  const marked = await watermarkForPublishing({
-    client,
-    userId: item.user_id as string | null,
-    contentType: item.content_type as ContentKind,
-    bytes: original,
-    mime: contentType,
-  });
+  const marked = kind
+    ? await watermarkForPublishing({
+        client,
+        userId: owner,
+        contentType: kind,
+        bytes: original,
+        mime: contentType,
+      })
+    : null;
 
   // Same filename, new bucket. Keeping the name means a path that was recorded
   // before approval still resolves afterwards — and it means the original in
@@ -265,14 +316,16 @@ export async function publishApproved(
     }
   }
 
-  await client
-    .from("moderation_items")
-    .update({
-      public_path: publicPath,
-      watermarked: marked?.watermarked ?? false,
-      original_path: originalPath,
-    })
-    .eq("id", itemId);
+  if (itemId) {
+    await client
+      .from("moderation_items")
+      .update({
+        public_path: publicPath,
+        watermarked: marked?.watermarked ?? false,
+        original_path: originalPath,
+      })
+      .eq("id", itemId);
+  }
 
   // The quarantine copy is not kept. It has served its purpose and holding a
   // second copy of every image on the platform is storage nobody needs.

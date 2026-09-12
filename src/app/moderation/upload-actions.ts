@@ -126,7 +126,11 @@ export async function moderateQuarantinedImage(input: {
   //
   // So `review` publishes and stays in the moderator's queue. `blocked` does
   // not, and `sexual_minors` cannot be marked safe by anything.
-  if (outcome.status === "blocked" || !outcome.itemId) {
+  // `blocked` is the only refusal — and now it really is the only one. This
+  // also read `|| !outcome.itemId`, which made a moderation record a
+  // precondition for publishing an ordinary photograph: if the row could not
+  // be written the image was refused, however clean it was.
+  if (outcome.status === "blocked") {
     return {
       status: outcome.status,
       itemId: outcome.itemId,
@@ -136,12 +140,17 @@ export async function moderateQuarantinedImage(input: {
 
   const publicUrl = await publishApproved(
     supabase,
-    outcome.itemId,
+    // May be absent: the record is best-effort for content nothing objected
+    // to. Publishing does not depend on it.
+    outcome.itemId ?? null,
     input.quarantinePath,
     input.publicBucket,
     // The sniffed type, so the published copy is encoded and served as what
     // the bytes actually are rather than as whatever the filename claimed.
     actual,
+    // So the watermark is still applied when there is no record to read the
+    // author and the kind of content from.
+    { userId: user.id, contentType: input.contentType },
   );
 
   if (!publicUrl) {

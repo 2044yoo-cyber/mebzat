@@ -453,10 +453,18 @@ async function main() {
     );
     check(
       "the sniffed type is passed through, not the filename's claim",
-      /publishApproved\(\s*supabase,\s*outcome\.itemId,\s*input\.quarantinePath,\s*input\.publicBucket,\s*actual,/.test(
+      // Still positional and still scoped to the call, but the record is now
+      // optional (`?? null`) and a watermark fallback follows, because an
+      // ordinary upload no longer depends on a moderation row existing.
+      /publishApproved\(\s*supabase,\s*outcome\.itemId \?\? null,\s*input\.quarantinePath,\s*input\.publicBucket,\s*actual,/.test(
         call,
       ),
       "publishing a PNG named .jpg would encode and serve it wrongly",
+    );
+    check(
+      "and the author is passed through for the mark when there is no record",
+      /\{ userId: user\.id, contentType: input\.contentType \}/.test(call),
+      "publishApproved reads the author off the moderation row; with none there is nothing to read, and an unmarked image is the watermark silently off",
     );
   }
 

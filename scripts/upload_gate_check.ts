@@ -7,6 +7,18 @@
  * straight to a public bucket, the file is fetchable by URL the instant it
  * lands, and every moderation decision afterwards is about content the world
  * has already seen. Nothing errors. Nothing logs.
+ *
+ * What "checked" means has changed twice, and this file described the first
+ * version until now. It is not "a moderator approved it" and it is not "a
+ * classifier said safe". It is: the bytes passed through the server, which
+ * looked at what they actually are, refused a clear violation, and applied the
+ * author's watermark. Anything short of a refusal publishes — including an
+ * image nothing could check, because not having looked at something is not a
+ * reason to hold it.
+ *
+ * So the assertions below are about the URL. A component must render only a
+ * URL the server handed back, because that is the one that cannot exist for
+ * content the server refused.
  */
 
 import { readFileSync, existsSync } from "node:fs";
@@ -51,6 +63,7 @@ const INTEGRATED = [
   "src/components/profile/avatar-upload.tsx",
   "src/components/profile/cover-upload.tsx",
   "src/components/products/product-images-input.tsx",
+  "src/components/projects/project-images-input.tsx",
 ];
 
 for (const file of INTEGRATED) {
@@ -81,12 +94,17 @@ for (const file of INTEGRATED) {
   );
 
   // The gate is the condition, not the call. Calling the server and then
-  // writing the row regardless is the mistake this catches.
+  // using the file regardless is the mistake this catches.
+  //
+  // This asked for the literal `verdict.status !== "safe"`, which is the rule
+  // as it stood before `review` started publishing. No component has said that
+  // for two changes now — they gate on the URL, which is stricter, because a
+  // refused upload has no URL to render whatever its status says. The check
+  // was failing while the code was right.
   check(
-    `${file} writes the record only when safe`,
-    /verdict\.status\s*!==\s*["'`]safe["'`]/.test(source) &&
-      /verdict\.publicUrl/.test(source),
-    "the public URL must come from the verdict, not from getPublicUrl",
+    `${file} acts only on a URL the server returned`,
+    /!\s*verdict\.publicUrl/.test(source) && /verdict\.publicUrl/.test(source),
+    "a component that proceeds without one is using a file nothing cleared",
   );
 
   check(
@@ -104,7 +122,12 @@ const action = code(readFileSync("src/app/moderation/upload-actions.ts", "utf8")
 
 check(
   "the action verifies the caller owns the quarantine folder",
-  /split\(["'`]\/["'`]\)\[0\]/.test(action) && /!==\s*user\.id/.test(action),
+  // Scoped to the publish path. `signQuarantinePreview` further down the same
+  // file makes the identical comparison for its own reasons, so the loose
+  // match kept passing with the gate on the publish path removed entirely.
+  /const owner = input\.quarantinePath\.split\(["'`]\/["'`]\)\[0\];[\s\S]{0,160}if \(owner !== user\.id\)/.test(
+    action,
+  ),
   "otherwise a caller can name somebody else's path and publish their file",
 );
 // The SIGNATURES table outlives the call that uses it, so matching the
@@ -116,10 +139,23 @@ check(
   "an accept= attribute is a picker hint, not a check",
 );
 check(
-  "publishing happens only after a safe verdict",
-  /outcome\.status\s*!==\s*["'`]safe["'`]/.test(action) &&
+  "a clear violation is refused before anything is copied",
+  /outcome\.status\s*===\s*["'`]blocked["'`]/.test(action) &&
     /publishApproved\(/.test(action),
   "the copy into the public bucket is the irreversible step",
+);
+// The regression this file exists to catch now runs the other way too: a
+// pipeline that refuses ordinary photographs is as broken as one that
+// publishes unchecked ones, and it is the failure people actually hit.
+check(
+  "and nothing else is",
+  !/!\s*outcome\.itemId/.test(action),
+  "requiring a moderation record made every upload fail when the table was unreachable",
+);
+check(
+  "publishing does not depend on a record existing",
+  /outcome\.itemId \?\? null/.test(action),
+  "an ordinary image must publish whether or not its audit row could be written",
 );
 check(
   "a rejected file stays in quarantine",
@@ -132,7 +168,6 @@ check(
 /* -------------------------------------------------------------------------- */
 
 const REMAINING = [
-  "src/components/projects/project-images-input.tsx",
   "src/components/companies/single-image-input.tsx",
   "src/components/property/property-form.tsx",
 ];
