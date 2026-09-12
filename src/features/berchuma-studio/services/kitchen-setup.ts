@@ -1,4 +1,5 @@
 import { startingDesign } from "./starting-designs";
+import { createDetailedKitchen } from "./kitchen-detail";
 import { placeOnRun, solveLayout } from "./layout";
 import { validateSpec, type Cabinet, type DesignSpec } from "../types/spec";
 import { layoutLabel, type RunSpec } from "../types/layout";
@@ -8,6 +9,7 @@ import { kitchenSetupError, type KitchenSetup } from "../types/kitchen";
 export function createKitchenDesign(options: KitchenSetup): DesignSpec {
   const error = kitchenSetupError(options);
   if (error) throw new Error(error);
+  if (options.details) return createDetailedKitchen(options);
   const spec = startingDesign("kitchen");
   spec.kitchenSetup = { ...options };
   spec.layout = options.shape;
@@ -78,11 +80,24 @@ export function addKitchenUpper(spec: DesignSpec, lowerId: string): DesignSpec {
   const lower = spec.cabinets.find((c) => c.id === lowerId);
   if (spec.furnitureType !== "kitchen" || !lower || lower.kind !== "base") return spec;
   const height = spec.kitchenSetup?.wallHeight ?? 720;
-  const y = Math.max(1450, lower.position.y + lower.size.height + (spec.worktop?.board.thickness ?? 38) + 500);
+  const y = Math.max(spec.kitchenSetup?.details?.upperBottom ?? 1450, lower.position.y + lower.size.height + (spec.worktop?.board.thickness ?? 38) + 500);
   if (spec.kitchenSetup && y + height > spec.kitchenSetup.roomHeight) return spec;
-  const occupied = spec.cabinets.some((c) => c.kind === "wall" && c.runId === lower.runId && Math.abs(c.position.y - y) < 100 && (c.offset ?? c.position.x) < (lower.offset ?? lower.position.x) + lower.size.width && (c.offset ?? c.position.x) + c.size.width > (lower.offset ?? lower.position.x));
+  const target = { ...lower };
+  if (spec.kitchenSetup?.details) {
+    const layout = solveLayout(spec.layout, spec.runs, { kitchenFacing: true });
+    const baseRun = layout.placements.find((r) => r.runId === lower.runId);
+    const upperRun = layout.placements.find((r) => r.runId === `upper-${lower.runId}`);
+    if (!baseRun || !upperRun) return spec;
+    const point = placeOnRun(baseRun, lower.offset ?? 0);
+    const radians = upperRun.rotation * Math.PI / 180;
+    target.runId = upperRun.runId;
+    target.offset = Math.round((point.x - upperRun.origin.x) * Math.cos(radians) + (point.z - upperRun.origin.z) * Math.sin(radians));
+  }
+  const occupied = spec.cabinets.some((c) => c.kind === "wall" && c.runId === target.runId && c.position.y < y + height && c.position.y + c.size.height > y && (c.offset ?? c.position.x) < (target.offset ?? target.position.x) + target.size.width && (c.offset ?? c.position.x) + c.size.width > (target.offset ?? target.position.x));
   if (occupied) return spec;
   const draft = structuredClone(spec);
-  draft.cabinets.push(upperCabinet(lower, `${lower.id}-upper-${Date.now()}`, y, height));
+  const upper = upperCabinet(target, `${lower.id}-upper-${Date.now()}`, y, height);
+  if (spec.kitchenSetup?.details) upper.size.depth = spec.kitchenSetup.details.upperDepth;
+  draft.cabinets.push(upper);
   return validateSpec(draft).spec;
 }

@@ -141,7 +141,7 @@ export function ControlPanel({
         {spec.furnitureType === "kitchen" ? <Section title="Kitchen layout" icon={Layers}>
           <p className="text-xs text-muted-foreground">Replacing the layout rearranges all cabinets. Your material selections are kept.</p>
           <KitchenSetup key={JSON.stringify(spec.kitchenSetup)} initial={spec.kitchenSetup} submitLabel="Replace kitchen layout" onStart={(next) => {
-            onChange({ ...next, carcass: spec.carcass, finish: spec.finish, hardware: spec.hardware, worktop: spec.worktop });
+            onChange({ ...next, carcass: { ...spec.carcass, plinthHeight: next.carcass.plinthHeight, doorGap: next.carcass.doorGap }, finish: spec.finish, hardware: spec.hardware, worktop: spec.worktop });
             onSelect(null);
           }} />
         </Section> : null}

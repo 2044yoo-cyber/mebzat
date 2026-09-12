@@ -19,6 +19,7 @@ import {
 import { splitSpanAtSupports } from "./panel-segmentation";
 import { transformPlanPoint } from "./part-transform";
 import { resolveDesign } from "./resolve";
+import { kitchenConstruction } from "./kitchen-construction";
 import { ledHardwareLine } from "./lighting";
 import {
   constructionMaterials,
@@ -108,7 +109,7 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
   for (const placed of resolved.cabinets) {
     const { cabinet, rotation } = placed;
 
-    for (const part of cabinetParts(spec, cabinet)) {
+    for (const part of kitchenConstruction(spec, cabinet, cabinetParts(spec, cabinet))) {
       parts.push({
         ...part,
         // Ids must be unique across the design — two base units both containing
@@ -1536,7 +1537,7 @@ function hardwareFor(
      * the geometry draws is a rail the quote pays for, wherever it came from.
      */
     const metres = parts
-      .filter((part) => part.role === "rail")
+      .filter((part) => part.role === "rail" && part.manufacture !== "cut")
       .reduce((total, part) => total + (part.length / 1000) * part.quantity, 0);
 
     if (metres > 0) {

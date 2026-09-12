@@ -7,6 +7,7 @@ import {
   edgeBandForConstructionBoard,
 } from "./wardrobe-materials";
 import { recessedWardrobePlinthParts } from "./wardrobe-plinth";
+import { kitchenConstruction } from "./kitchen-construction";
 
 /**
  * The carcass that fills a corner.
@@ -55,6 +56,13 @@ export function cornerParts(
 
   for (const corner of resolved.layout.corners) {
     parts.push(...partsForCorner(spec, corner));
+    if (spec.kitchenSetup?.details) {
+      const template = spec.cabinets.find((c) => c.kind === "base" || c.kind === "island");
+      if (template) for (const p of kitchenConstruction(spec, { ...template, kitchenRole: undefined,
+        size: { width: corner.size, height: corner.height, depth: corner.size }, plinthHeight: spec.carcass.plinthHeight }, [])) {
+        if (p.role === "plinth") parts.push({ ...p, id: `${corner.id}/${p.id}`, placements: p.placements.map((at) => ({ ...at, x: at.x + corner.x, z: at.z + corner.z })) });
+      }
+    }
   }
 
   return parts;

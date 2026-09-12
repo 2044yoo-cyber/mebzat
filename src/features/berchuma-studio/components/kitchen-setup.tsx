@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createKitchenDesign } from "../services/kitchen-setup";
-import { DEFAULT_KITCHEN_SETUP, kitchenSetupError, type KitchenSetup as Settings } from "../types/kitchen";
+import { DEFAULT_KITCHEN_SETUP, REFERENCE_KITCHEN_DETAILS, kitchenRunChoices, kitchenSetupError, type KitchenSetup as Settings } from "../types/kitchen";
 import type { DesignSpec } from "../types/spec";
 
 const SHAPES: { value: Settings["shape"]; label: string; path: string }[] = [
@@ -16,8 +16,10 @@ const SHAPES: { value: Settings["shape"]; label: string; path: string }[] = [
 export function KitchenSetup({ initial, onStart, submitLabel = "Create my kitchen" }: {
   initial?: Partial<Settings>; onStart: (spec: DesignSpec) => void; submitLabel?: string;
 }) {
-  const [settings, setSettings] = useState<Settings>({ ...DEFAULT_KITCHEN_SETUP, ...initial });
+  const [settings, setSettings] = useState<Settings>({ ...DEFAULT_KITCHEN_SETUP, wallHeight: 1000, topHeight: 0, ...initial, details: structuredClone(initial?.details ?? REFERENCE_KITCHEN_DETAILS) });
   const error = kitchenSetupError(settings);
+  const runs = kitchenRunChoices(settings);
+  const detail = settings.details!;
   function dimension(key: "roomWidth" | "roomDepth" | "roomHeight" | "wallHeight" | "islandWidth", label: string) {
     return <label className="block space-y-1 text-xs">
       <span>{label} (cm)</span>
@@ -42,6 +44,26 @@ export function KitchenSetup({ initial, onStart, submitLabel = "Create my kitche
         {shape.label}
       </button>)}
     </div>
+    <fieldset className="space-y-3 border-t pt-3">
+      <legend className="text-sm font-medium">Appliance positions</legend>
+      <p className="text-[11px] text-muted-foreground">Choose the wall or island first. Position is measured from the start of its usable cabinet run, after the corner. Back wall: right to left; left wall: back to front; right wall: front to back; island/peninsula: left to right.</p>
+      {(["fridge", "sink", "stove"] as const).map((role) => <div key={role} className="space-y-2 rounded-lg border p-2">
+        <label className="block text-xs font-medium">{role === "fridge" ? "Fridge" : role === "sink" ? "Sink" : "Stove / oven"}
+          <select aria-label={`${role} wall`} className="mt-1 w-full rounded-md border bg-background p-2" value={detail[role].runId}
+            onChange={(event) => setSettings({ ...settings, details: { ...detail, [role]: { ...detail[role], runId: event.target.value } } })}>
+            {!runs.some((r) => r.id === detail[role].runId) ? <option value={detail[role].runId}>Choose a wall</option> : null}
+            {runs.filter((r) => role !== "fridge" || !/island|peninsula/.test(r.id)).map((run) => <option key={run.id} value={run.id}>{run.label} · {run.length / 10} cm usable</option>)}
+          </select>
+        </label>
+        <div className="grid grid-cols-2 gap-2">{(["offset", "width"] as const).map((key) => <label key={key} className="text-xs">
+          {key === "offset" ? "Position" : "Bay width"} (cm)
+          <input aria-label={`${role} ${key} in cm`} type="number" required min={key === "offset" ? 0 : 45} max={key === "offset" ? 1200 : 120} step={1}
+            className="mt-1 w-full rounded-md border bg-background p-2" value={detail[role][key] / 10}
+            onChange={(event) => setSettings({ ...settings, details: { ...detail, [role]: { ...detail[role], [key]: Number(event.target.value) * 10 } } })} />
+        </label>)}</div>
+        {role === "fridge" ? <label className="block text-xs">Fridge clear height including ventilation (cm)<input type="number" required min={140} max={220} step={1} value={detail.fridgeHeight / 10} className="mt-1 w-full rounded-md border bg-background p-2" onChange={(event) => setSettings({ ...settings, details: { ...detail, fridgeHeight: Number(event.target.value) * 10 } })} /><span className="text-muted-foreground">Clear width: {(detail.fridge.width - 36) / 10} cm after the two side boards.</span></label> : null}
+      </div>)}
+    </fieldset>
     <div className="grid grid-cols-2 gap-3">
       {dimension("roomWidth", "Back wall length")}
       {dimension("roomDepth", "Room width / side wall")}
@@ -57,7 +79,7 @@ export function KitchenSetup({ initial, onStart, submitLabel = "Create my kitche
         <option value={0}>No extra row</option>{[300, 400, 500, 700, 1000].map((height) => <option key={height} value={height}>{height / 10} cm high</option>)}
       </select></label>
     </div> : null}
-    <p className="text-[11px] text-muted-foreground">Base cabinets are 60 cm deep; upper cabinets are 35 cm deep. Island and peninsula layouts reserve at least 90 cm access. You can edit individual cabinets afterwards.</p>
+    <p className="text-[11px] text-muted-foreground">Reference construction: {detail.baseDepth / 10} cm base depth, {detail.upperDepth / 10} cm upper depth and {detail.plinthHeight / 10} cm recessed Zekolo. Upper cabinets connect around corners. The countertop starts hidden so you can inspect the cutting parts.</p>
     {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
     <button type="submit" disabled={!!error} className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">{submitLabel}</button>
   </form>;

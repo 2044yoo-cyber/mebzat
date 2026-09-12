@@ -109,7 +109,7 @@ export function solveLayout(
   if (!options.kitchenFacing) return solved;
   // The legacy frame is useful for general joinery. A kitchen's back and
   // right runs must face into the room, while keeping the same footprints.
-  return { ...solved, placements: solved.placements.map((placement, index) => {
+  const placements = solved.placements.map((placement, index) => {
     const flip = kind === "straight" || kind === "island" ? index === 0
       : kind === "l_shaped" ? true : index === 1 || index === 2;
     if (!flip) return placement;
@@ -117,7 +117,12 @@ export function solveLayout(
     const radians = placement.rotation * Math.PI / 180;
     return { ...placement, rotation: (placement.rotation + 180) % 360,
       origin: { x: end.x - placement.depth * Math.sin(radians), z: end.z + placement.depth * Math.cos(radians) } };
-  }) };
+  });
+  for (const run of runs.filter((r) => r.id.startsWith("upper-") && r.origin && !placements.some((p) => p.runId === r.id))) {
+    placements.push({ runId: run.id, label: run.label, origin: run.origin!, rotation: run.rotation ?? 0,
+      wallLength: run.length, usableLength: run.length, depth: run.depth, height: run.height });
+  }
+  return { ...solved, placements };
 }
 
 function solveLayoutFrame(

@@ -60,3 +60,33 @@ function checkWiring(transform = (s) => s) {
 checkWiring();
 assert.throws(() => checkWiring((s) => s.replace('onStart={onStart}', 'onStart={() => {}}')));
 console.log('PASS: setup fields, invalid submission, entry points and editor controls; nine deliberate mutations rejected.');
+
+await load('scripts/kitchen-detail-check.ts');
+for (const mutation of [
+  ['/services/kitchen-detail.ts', 'options.roomDepth - d.upperDepth', 'options.roomDepth - d.baseDepth'],
+  ['/services/kitchen-detail.ts', 'offset: segment.offset,', 'offset: 0,'],
+  ['/services/kitchen-detail.ts', 'const cornerFront = d.upperDepth + (spec.carcass.frontBoard ?? spec.carcass.board).thickness;', 'const cornerFront = 0;'],
+  ['/services/kitchen-construction.ts', 'const opening = detail.fridgeHeight;', 'const opening = 100;'],
+  ['/services/kitchen-construction.ts', 'const leafWidth = (frontWidth - leaves * gap) / leaves;', 'const leafWidth = frontWidth / leaves;'],
+  ['/services/kitchen-construction.ts', 'const recess = 40;', 'const recess = 0;'],
+  ['/services/kitchen-construction.ts', 'return hideCountertop ?', 'return false ?'],
+  ['/services/geometry.ts', 'part.role === "rail" && part.manufacture !== "cut"', 'part.role === "rail"'],
+  ['/types/spec.ts', 'spec.kitchenSetup?.details ? 200 : LIMITS.minWidth', 'LIMITS.minWidth'],
+  ['/types/kitchen.ts', 'appliance.offset < other.offset + other.width', 'false'],
+]) await assert.rejects(load('scripts/kitchen-detail-check.ts', mutation), undefined, `Detailed kitchen rejects broken ${mutation[0]}`);
+async function checkApplianceForm(mutation) {
+  const { KitchenSetup } = await load('src/features/berchuma-studio/components/kitchen-setup.tsx', mutation);
+  const html = renderToStaticMarkup(createElement(KitchenSetup, { onStart() {} }));
+  for (const role of ['fridge', 'sink', 'stove']) {
+    assert.ok(html.includes(`aria-label="${role} wall"`));
+    assert.ok(html.includes(`aria-label="${role} offset in cm"`));
+    assert.ok(html.includes(`aria-label="${role} width in cm"`));
+  }
+  assert.ok(html.includes('Fridge clear height including ventilation'));
+  const editor = clean('src/features/berchuma-studio/components/editor/design-editor.tsx');
+  assert.match(editor, /const \[showCountertop, setShowCountertop\] = useState\(false\)/);
+  assert.match(editor, /hideCountertop=\{spec.furnitureType === "kitchen" && !showCountertop\}/);
+}
+await checkApplianceForm();
+await assert.rejects(checkApplianceForm(['/components/kitchen-setup.tsx', 'aria-label={`${role} ${key} in cm`}', 'aria-label="removed"']));
+console.log('PASS: appliance setup and detailed construction; deliberate connection, placement, opening, alignment, plinth, visibility, pricing and validation mutations rejected.');

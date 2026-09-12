@@ -42,6 +42,7 @@ export function DesignEditor({
   const [view, setView] = useState<View>("solid");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hideFronts, setHideFronts] = useState(false);
+  const [showCountertop, setShowCountertop] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
 
   const selected =
@@ -56,6 +57,7 @@ export function DesignEditor({
             <Model
               spec={spec}
               hideFronts={hideFronts}
+              hideCountertop={spec.furnitureType === "kitchen" && !showCountertop}
               selectedCabinetId={selectedId}
               onSelectCabinet={setSelectedId}
               onResize={(id, change) => {
@@ -142,6 +144,9 @@ export function DesignEditor({
               Show inside
             </label>
           ) : null}
+          {view === "solid" && spec.furnitureType === "kitchen" ? <label className="pointer-events-auto flex items-center gap-1.5 rounded-lg border bg-background/80 px-2 py-1.5 text-[11px]">
+            <input type="checkbox" checked={showCountertop} onChange={(event) => setShowCountertop(event.target.checked)} />Show countertop
+          </label> : null}
         </div>
 
         {/* Bottom left: what is selected, and how big everything is. */}

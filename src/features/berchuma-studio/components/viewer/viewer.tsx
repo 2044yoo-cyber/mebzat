@@ -35,6 +35,7 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
   // Closed doors are what the unit looks like; open ones are what the customer
   // is actually buying. The first thing anyone does to a wardrobe is open it.
   const [hideFronts, setHideFronts] = useState(false);
+  const [showCountertop, setShowCountertop] = useState(false);
   // Once loaded, three.js stays loaded — but the canvas is only mounted while
   // it is being looked at, so switching back to the elevation releases the
   // WebGL context rather than leaving it running behind a hidden div.
@@ -75,6 +76,7 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
         ) : null}
       </div>
 
+      {view === "solid" && spec.furnitureType === "kitchen" ? <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showCountertop} onChange={(event) => setShowCountertop(event.target.checked)} />Show countertop</label> : null}
       <div className="aspect-[4/3] w-full @lg/ws:aspect-[16/10]">
         {view === "flat" ? (
           <Elevation spec={spec} />
@@ -82,6 +84,7 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
           <Model
             spec={spec}
             hideFronts={hideFronts}
+            hideCountertop={spec.furnitureType === "kitchen" && !showCountertop}
             onReady={() => setReady(true)}
           />
         )}

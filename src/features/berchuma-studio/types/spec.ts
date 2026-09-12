@@ -327,6 +327,8 @@ export type CabinetKind = (typeof cabinetKinds)[number];
  * by adding two vectors and nothing has to be reasoned about twice.
  */
 export const cabinetSchema = z.object({
+  kitchenRole: z.enum(["fridge", "sink", "stove", "hood"]).optional(),
+  frontInsets: z.object({ start: z.number().nonnegative(), end: z.number().nonnegative() }).optional(),
   id: z.string().min(1),
   /** What a person calls it: "Sink unit", "Oven housing", "Left wardrobe". */
   label: z.string().min(1).max(80),
@@ -505,7 +507,7 @@ export const designSpecSchema = z.object({
    *
    * One entry for a wardrobe; a dozen or more for a kitchen.
    */
-  cabinets: z.array(cabinetSchema).min(1).max(40),
+  cabinets: z.array(cabinetSchema).min(1).max(160),
 
   /**
    * The overall bounding box.
@@ -1335,14 +1337,15 @@ function validateCabinet(
     cabinet.size.height = maximumHeight;
   }
 
-  if (cabinet.size.width < LIMITS.minWidth) {
+  const minimumWidth = spec.kitchenSetup?.details ? 200 : LIMITS.minWidth;
+  if (cabinet.size.width < minimumWidth) {
     issues.push({
       severity: "error",
       path: `${at}.size.width`,
       message: `${named} is ${Math.round(cabinet.size.width)} mm wide, narrower than a single bay.`,
-      correction: `${named} set to ${LIMITS.minWidth} mm.`,
+      correction: `${named} set to ${minimumWidth} mm.`,
     });
-    cabinet.size.width = LIMITS.minWidth;
+    cabinet.size.width = minimumWidth;
   }
 
   if (furnitureType === "wardrobe") {

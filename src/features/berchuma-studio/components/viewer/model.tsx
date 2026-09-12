@@ -9,6 +9,7 @@ import * as THREE from "three";
 
 import { CabinetHandles, DimensionLabel, type DragChange } from "./handles";
 import { buildParts } from "../../services/geometry";
+import { visibleKitchenParts } from "../../services/kitchen-construction";
 import { partCentre, partRotationRadians } from "../../services/part-transform";
 import {
   designWorldBounds,
@@ -42,6 +43,7 @@ const MM = 0.001;
 export default function Model({
   spec,
   hideFronts = false,
+  hideCountertop = spec.furnitureType === "kitchen",
   onReady,
   selectedCabinetId = null,
   onSelectCabinet,
@@ -50,6 +52,7 @@ export default function Model({
   spec: DesignSpec;
   /** Takes the doors and drawer fronts off, to show what is inside. */
   hideFronts?: boolean;
+  hideCountertop?: boolean;
   /** Fired once the first frame is on screen, so the skeleton can go. */
   onReady?: () => void;
   /** Drawn lit, with its dimensions beside it. */
@@ -60,12 +63,12 @@ export default function Model({
   onResize?: (id: string, change: DragChange) => void;
 }) {
   const parts = useMemo(() => {
-    const all = buildParts(spec).parts;
+    const all = visibleKitchenParts(buildParts(spec).parts, hideCountertop);
     if (!hideFronts) return all;
     return all.filter(
       (part) => part.role !== "door" && part.role !== "drawer_front",
     );
-  }, [spec, hideFronts]);
+  }, [spec, hideFronts, hideCountertop]);
 
   const resolved = useMemo(() => resolveDesign(spec), [spec]);
   const bounds = useMemo(() => designWorldBounds(spec), [spec]);
