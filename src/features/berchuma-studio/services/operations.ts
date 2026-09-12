@@ -33,6 +33,7 @@ function change(
 ): DesignSpec {
   const draft = structuredClone(spec);
   mutate(draft);
+  syncStackedCabinets(draft);
   // `position.x`/`position.z` are snapshots for run-bound cabinets. Keep them
   // in sync after an operation so legacy readers and the derived envelope see
   // the same layout as the resolver; the operation arithmetic itself still
@@ -43,6 +44,19 @@ function change(
   // is falling apart.
   draft.meta.corrections = [];
   return validateSpec(draft).spec;
+}
+
+function syncStackedCabinets(spec: DesignSpec): void {
+  for (const top of spec.cabinets) {
+    if (!top.stackedOn) continue;
+    const lower = find(spec, top.stackedOn);
+    if (!lower) continue;
+    top.position.x = lower.position.x;
+    top.position.y = lower.position.y + lower.size.height;
+    top.position.z = lower.position.z;
+    top.runId = lower.runId;
+    top.offset = lower.offset;
+  }
 }
 
 /**
@@ -373,7 +387,9 @@ export function removeCabinet(spec: DesignSpec, id: string): DesignSpec {
 
     const targetRow = rowOf(target);
     const targetStart = along(target);
-    draft.cabinets = draft.cabinets.filter((cabinet) => cabinet.id !== id);
+    draft.cabinets = draft.cabinets.filter(
+      (cabinet) => cabinet.id !== id && cabinet.stackedOn !== id,
+    );
     shiftAfter(draft, targetRow, targetStart, -target.size.width);
   });
 }
@@ -441,6 +457,41 @@ export function resizeCabinet(
         target.size.width - before,
       );
     }
+  });
+}
+
+/** Add a separate overhead wardrobe carcass without changing the lower one. */
+export function addTopCabinet(spec: DesignSpec, lowerId: string, height = 700): DesignSpec {
+  return change(spec, (draft) => {
+    const lower = find(draft, lowerId);
+    if (!lower || lower.stackedOn || draft.cabinets.some((cabinet) => cabinet.stackedOn === lower.id)) return;
+    const t = draft.carcass.board.thickness;
+    const width = lower.size.width;
+    draft.cabinets.push({
+      id: freshId("top-cabinet"),
+      label: "Top cabinet",
+      kind: lower.kind,
+      position: { x: lower.position.x, y: lower.position.y + lower.size.height, z: lower.position.z },
+      runId: lower.runId,
+      offset: lower.offset,
+      size: { width, height: clamp(height, 200, LIMITS.maxHeight), depth: lower.size.depth },
+      bays: [{
+        id: freshId("bay"),
+        width: width - 2 * t,
+        fitting: { kind: "shelves", count: 1, adjustable: true },
+        door: "hinged",
+        doorLeaves: width - 2 * t > LIMITS.hingedLeafWidth ? 2 : 1,
+      }],
+      plinthHeight: 0,
+      stackedOn: lower.id,
+    });
+  });
+}
+
+/** Remove only the independently built overhead cabinet. */
+export function removeTopCabinet(spec: DesignSpec, lowerId: string): DesignSpec {
+  return change(spec, (draft) => {
+    draft.cabinets = draft.cabinets.filter((cabinet) => cabinet.stackedOn !== lowerId);
   });
 }
 

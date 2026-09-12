@@ -370,6 +370,8 @@ export const cabinetSchema = z.object({
    * global number cannot say that.
    */
   plinthHeight: z.number().nonnegative().default(0),
+  /** The lower wardrobe cabinet this separate overhead carcass sits on. */
+  stackedOn: z.string().min(1).optional(),
 });
 
 export type Cabinet = z.infer<typeof cabinetSchema>;

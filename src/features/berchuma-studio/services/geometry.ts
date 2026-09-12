@@ -182,6 +182,7 @@ function standParts(
   // is the starting preset; the type remains wardrobe after an edit or an
   // upgrade of an older saved design.
   if (spec.furnitureType === "wardrobe") {
+    if (plinth <= 0) return [];
     return recessedWardrobePlinthParts(
       {
         width: envelope.width,

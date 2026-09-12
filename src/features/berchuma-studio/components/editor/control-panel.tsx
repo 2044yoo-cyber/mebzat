@@ -51,6 +51,8 @@ import {
   setBayDoor,
   setBayFitting,
   setCabinetKind,
+  addTopCabinet,
+  removeTopCabinet,
 } from "../../services/operations";
 import {
   LIMITS,
@@ -113,6 +115,12 @@ export function ControlPanel({
               cabinet={selected}
               onChange={onChange}
             />
+            {spec.furnitureType === "wardrobe" ? <TopCabinet
+              spec={spec}
+              cabinet={selected}
+              onSelect={onSelect}
+              onChange={onChange}
+            /> : null}
             <Structure spec={spec} cabinet={selected} onChange={onChange} />
             <Components
               spec={spec}
@@ -131,6 +139,30 @@ export function ControlPanel({
       </div>
     </div>
   );
+}
+
+function TopCabinet({ spec, cabinet, onSelect, onChange }: {
+  spec: DesignSpec; cabinet: Cabinet; onSelect: (id: string | null) => void; onChange: (next: DesignSpec) => void;
+}) {
+  const lower = cabinet.stackedOn
+    ? spec.cabinets.find((candidate) => candidate.id === cabinet.stackedOn) ?? null
+    : cabinet;
+  const top = spec.cabinets.find((candidate) => candidate.stackedOn === lower?.id) ?? null;
+  if (!lower) return null;
+  const combined = lower.size.height + (top?.size.height ?? 0);
+  return <Section title="Top cabinet" icon={Layers} defaultOpen>
+    <p className="text-[11px] text-muted-foreground">Lower: {lower.size.height} mm{top ? ` · Top: ${top.size.height} mm · Total: ${combined} mm` : ""}</p>
+    {top ? <div className="flex flex-wrap gap-1.5">
+      <SmallButton icon={Trash2} label="Remove top cabinet" tone="danger" onClick={() => { onChange(removeTopCabinet(spec, lower.id)); onSelect(lower.id); }} />
+      <SmallButton icon={Layers} label="Edit top cabinet" onClick={() => onSelect(top.id)} />
+    </div> : <div className="flex flex-wrap gap-1.5">
+      {[400, 500, 700, 1000].map((height) => <button key={height} type="button" className="rounded-md border px-2 py-1 text-[11px] hover:border-brand" onClick={() => {
+        const next = addTopCabinet(spec, lower.id, height);
+        onChange(next);
+        onSelect(next.cabinets.find((candidate) => candidate.stackedOn === lower.id)?.id ?? lower.id);
+      }}>Add {height} mm</button>)}
+    </div>}
+  </Section>;
 }
 
 // ---------------------------------------------------------------------------
