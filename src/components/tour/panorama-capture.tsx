@@ -335,6 +335,27 @@ export function PanoramaCapture({
   );
 
   /**
+   * Put the camera on the screen, once there is a screen to put it on.
+   *
+   * `start()` cannot do this. It runs from the intro, where the <video> has
+   * not been rendered yet, so `videoRef.current` is null and the assignment
+   * goes nowhere — which is not a black preview and nothing else, but a
+   * capture that quietly produces no photographs at all: `grab()` returns null
+   * for a video with no dimensions, the ring fills on the sensor readings
+   * regardless, and a full turn around the room ends in "That didn't work".
+   */
+  useEffect(() => {
+    if (phase !== "capturing" && phase !== "paused") return;
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+    if (video.srcObject === stream) return;
+
+    video.srcObject = stream;
+    void video.play().catch(() => undefined);
+  }, [phase]);
+
+  /**
    * While the server is stitching, ask it where it has got to.
    *
    * Three or four requests over a couple of seconds. The alternative was to
@@ -387,6 +408,11 @@ export function PanoramaCapture({
       // advance the plan past an angle whose photograph `take` then drops,
       // leaving a hole in the ring that nothing downstream can fill.
       if (busyRef.current) return;
+      // And the camera has to be delivering pixels. `videoWidth` is 0 between
+      // the element mounting and the first frame arriving; capturing in that
+      // window advances the plan and photographs nothing, which is how a ring
+      // reaches 9 of 9 with an empty frame list.
+      if (!videoRef.current?.videoWidth) return;
       const heading = headingRef.current;
       if (heading === null) return;
 
@@ -418,11 +444,10 @@ export function PanoramaCapture({
       return;
     }
 
+    // Held, not attached. The <video> does not exist yet — this screen is
+    // still showing the intro, and the camera is only mounted once the phase
+    // changes below. The effect that watches for it does the attaching.
     streamRef.current = stream;
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play().catch(() => undefined);
-    }
 
     // iOS requires the permission to be asked for from a gesture, which this
     // is. Everywhere else the listener simply starts producing readings.
@@ -448,6 +473,11 @@ export function PanoramaCapture({
   }
 
   function restart() {
+    // Restart is reached from mid-capture as well as from the two end screens,
+    // and from mid-capture the camera is still running. Without this, going
+    // round again asks for a second stream and leaves the first one live —
+    // which on a phone is a camera light that stays on.
+    teardown();
     framesRef.current = [];
     setUploadedJob(null);
     setStage(null);
@@ -509,9 +539,14 @@ export function PanoramaCapture({
   // ---- capture -------------------------------------------------------------
   if (phase === "capturing" || phase === "paused") {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col bg-black">
+      // The bottom navigation is `fixed … z-50` and renders after the page, so
+      // at z-50 it wins the tie and sits on top of the capture controls — which
+      // is what hides Pause and Restart behind Home/Market/Property. z-[60] is
+      // what the city explorer's full-screen sheet already uses to get over it.
+      <div className="fixed inset-0 z-[60] flex h-[100dvh] flex-col bg-black">
         <video
           ref={videoRef}
+          autoPlay
           playsInline
           muted
           className="absolute inset-0 size-full object-cover"
@@ -550,6 +585,7 @@ export function PanoramaCapture({
                 <Button
                   onClick={() => {
                     if (busyRef.current) return;
+                    if (!videoRef.current?.videoWidth) return;
                     const decision = captureManually(stateRef.current);
                     applyState(decision.state);
                     if (decision.action === "capture") {

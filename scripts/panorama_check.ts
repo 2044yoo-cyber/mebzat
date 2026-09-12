@@ -689,6 +689,18 @@ async function endToEnd() {
  * callbacks that all read the same refs, and a check against the whole file
  * passes because a sibling still has the line the mutation removed.
  */
+/**
+ * The `chars` characters following `marker`.
+ *
+ * For a region with no nested braces of its own, which `blockAfter` cannot
+ * scope — it would run past the end and find the next function's body, and the
+ * check would then pass on a line belonging to something else entirely.
+ */
+function windowAfter(src: string, marker: string, chars = 400): string {
+  const at = src.indexOf(marker);
+  return at < 0 ? "" : src.slice(at, at + chars);
+}
+
 function blockAfter(src: string, marker: string): string {
   const start = src.indexOf(marker);
   if (start < 0) return "";
@@ -817,6 +829,69 @@ function blockAfter(src: string, marker: string): string {
   check(
     "and it exits as well as enters",
     /exitFullscreen\(\)/.test(viewer),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The camera is actually on the screen — section 18, and a reported bug
+// ---------------------------------------------------------------------------
+
+{
+  const capture = code("src/components/tour/panorama-capture.tsx");
+
+  const starter = blockAfter(capture, "async function start()");
+  check("starting the camera is findable", starter.length > 0);
+  check(
+    "start() holds the stream rather than attaching it",
+    /streamRef\.current = stream/.test(starter)
+      && !/videoRef\.current\.srcObject/.test(starter),
+    "start() runs from the intro, where the <video> has not rendered — assigning there goes nowhere and the preview is black",
+  );
+
+  const attach = windowAfter(
+    capture,
+    'if (phase !== "capturing" && phase !== "paused") return;',
+  );
+  check("something attaches the camera once its element exists", attach.length > 0);
+  check(
+    "and it attaches the held stream to the video",
+    /video\.srcObject = stream/.test(attach) && /video\.play\(\)/.test(attach),
+  );
+  check(
+    "without re-attaching the stream it already has",
+    /if \(video\.srcObject === stream\) return/.test(attach),
+    "re-assigning srcObject restarts the preview, which flickers on every pause",
+  );
+
+  // The half of this that is not cosmetic.
+  const tick = blockAfter(capture, "tick = window.setInterval(");
+  check(
+    "the ring does not advance before the camera delivers pixels",
+    /if \(!videoRef\.current\?\.videoWidth\) return/.test(tick),
+    "videoWidth is 0 until the first frame arrives; capturing in that window advances the plan and photographs nothing, which is how a ring reaches 9 of 9 with an empty frame list",
+  );
+  check(
+    "and neither does the manual button",
+    (capture.match(/if \(!videoRef\.current\?\.videoWidth\) return/g) ?? []).length >= 2,
+    "the tap route reaches the same state machine by the same door",
+  );
+
+  // Section 18: the capture screen is the whole screen.
+  check(
+    "the capture screen sits above the app's own bottom navigation",
+    /fixed inset-0 z-\[60\]/.test(capture),
+    "the nav is fixed at z-50 and renders after the page, so at z-50 it wins the tie and covers Pause and Restart",
+  );
+  check(
+    "and it is measured against the visible viewport",
+    /h-\[100dvh\]/.test(capture),
+    "100vh on a phone is taller than the window the browser chrome leaves, so the controls sit below the fold",
+  );
+
+  check(
+    "going round again releases the camera first",
+    /teardown\(\);/.test(blockAfter(capture, "function restart(")),
+    "restart is reached from mid-capture, where a second getUserMedia would leave the first stream live and the camera light on",
   );
 }
 
