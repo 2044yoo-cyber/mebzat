@@ -18,6 +18,8 @@ export const STITCH_ERRORS = {
     "There were not enough photos to build the room. Try again and keep going until every circle is filled in.",
   incomplete_sphere:
     "Part of the room was never photographed, so there would be a hole in it. Try again and fill in the circles above and below you as well as around.",
+  poor_alignment:
+    "Some areas could not be aligned correctly. Please retake the 360 photo while keeping the phone in the same position and rotating around one point.",
   no_overlap:
     "We couldn't join these photos because they did not overlap enough. Please try again and move more slowly between the circles.",
   frames_missing:

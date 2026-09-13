@@ -64,11 +64,46 @@ export type StitchOutcome =
       covered: number;
       /** Frames the refinement could not settle against their neighbours. */
       weakSeams: number;
+      /**
+       * How well the frames could be brought into agreement, -1 to 1.
+       *
+       * The median correlation between each frame and the mosaic its
+       * neighbours had already built, which is a direct measure of whether one
+       * rotation can explain them all. Around 0.4 is a phone turned about
+       * itself; it falls off a cliff as the lens moves away from the point the
+       * person is turning about, because no rotation can account for the
+       * camera having travelled.
+       */
+      alignment: number;
     }
   | { ok: false; code: string };
 
 /** Below this the panorama has holes worth refusing rather than publishing. */
 export const MIN_COVERAGE = 0.9;
+
+/**
+ * How well the frames have to agree before the result is worth showing.
+ *
+ * This is the quality check, and what it is really measuring is parallax. A
+ * phone turned about roughly its own position photographs a room that one
+ * rotation explains, and each frame correlates strongly with the mosaic its
+ * neighbours have already built. A phone held out at arm's length travels
+ * through an arc as its owner turns, so every frame sees the room from
+ * somewhere slightly different, and nothing — no rotation, no refinement —
+ * can bring them into register. That is the melting.
+ *
+ * Calibrated on the synthetic room, varying only how far the lens sits from
+ * the point it turns about:
+ *
+ *     at the axis   0.41      15cm   0.21
+ *     5cm           0.43      20cm   0.15
+ *     10cm          0.31      30cm   0.05      40cm   0.06
+ *
+ * 0.12 sits in the collapse: a phone held against the chest passes, one held
+ * out at arm's length does not — which is the difference the instructions have
+ * been asking for since the beginning and nothing has ever checked.
+ */
+export const MIN_ALIGNMENT = 0.12;
 
 /** The widest output worth making from phone frames. */
 const MAX_OUTPUT_WIDTH = 4096;
@@ -99,6 +134,24 @@ const REFINE_STEP = 1;
  * frames — enough to hide the join, too narrow to double anything.
  */
 const SEAM_SHARE = 0.9;
+
+/**
+ * How far the low-frequency blend is spread, as a fraction of the image width.
+ *
+ * The seam fixes doubling and creates a different problem: two frames metered
+ * a moment apart differ in brightness, and choosing one of them per pixel puts
+ * that difference on a line. The eye finds a straight edge in a flat wall
+ * immediately, however small the step.
+ *
+ * So the picture is built twice. Detail comes from the seamed composite, where
+ * each pixel has one frame and nothing is doubled. Colour and brightness come
+ * from a widely feathered one, where two frames fade into each other across
+ * the whole overlap so no step can form — and where the doubling that
+ * feathering causes lives entirely in detail that is then thrown away. Adding
+ * the first's detail to the second's colour is two-band blending, which is
+ * what section 10 asks for.
+ */
+const BAND_SIGMA = 0.006;
 
 /** Below this correlation the refinement did not find anything to lock onto. */
 const WEAK_SEAM = 0.25;
@@ -181,17 +234,14 @@ export async function composePanorama(
     }
   }
 
-  // ---- exposure compensation ----------------------------------------------
-  //
-  // A phone re-meters between a window and a dark corner, so two frames of the
-  // same wall differ by a stop. Scaling each towards the middle of the set
-  // makes the seams stop showing as bands; it cannot and does not try to
-  // rescue a frame that was actually blown out.
-  const means = decoded.map(meanLuma);
-  const target = median(means);
-  decoded.forEach((frame, i) => {
-    frame.gain = means[i] > 4 ? clamp(target / means[i], 0.72, 1.4) : 1;
-  });
+  // Exposure is compensated during refinement, where each frame can be
+  // compared with its neighbours over the ground they actually share. It used
+  // to be done here, from whole-frame averages against the median of the set,
+  // and that is wrong for a reason worth writing down: a frame pointed at a
+  // window is legitimately brighter than one pointed at a dark corner, and
+  // scaling them towards a common average flattens the room. On the synthetic
+  // room with frames that were already evenly exposed it made the result four
+  // times further from the truth than leaving them alone.
 
   // ---- order: the horizon first, then outwards ----------------------------
   //
@@ -207,24 +257,44 @@ export async function composePanorama(
     .map((entry) => entry.frame);
 
   // ---- refine the poses against the pixels --------------------------------
-  const weakSeams = refinePoses(order);
+  const { weak: weakSeams, alignment } = refinePoses(order);
+
+  // Checked before a pixel is painted, so a capture that did not come together
+  // costs nothing further and is never shown as a panorama.
+  if (alignment < MIN_ALIGNMENT) return { ok: false, code: "poor_alignment" };
 
   // ---- paint the sphere ----------------------------------------------------
   const outWidth = outputWidth(order);
-  const canvas = blankCanvas(outWidth, outWidth / 2);
-  const table = yawTable(canvas.width);
+  const height = outWidth / 2;
+  const table = yawTable(outWidth);
 
   // Who owns what, before anything is drawn.
-  const best = new Float32Array(canvas.width * canvas.height);
-  for (const frame of order) survey(best, canvas, frame, table);
-  for (const frame of order) paint(canvas, frame, table, best);
+  const best = new Float32Array(outWidth * height);
+  {
+    const probe = blankCanvas(outWidth, height);
+    for (const frame of order) survey(best, probe, frame, table);
+  }
 
-  const { rgb, covered } = resolve(canvas);
+  // The detail: one frame per pixel, so nothing is doubled.
+  const seamed = blankCanvas(outWidth, height);
+  for (const frame of order) paint(seamed, frame, table, best, "seam");
+  const { rgb, covered } = resolve(seamed);
+  release(seamed);
+
   if (covered < MIN_COVERAGE) return { ok: false, code: "incomplete_sphere" };
 
+  // The colour: every frame that can see a pixel, faded across the whole
+  // overlap, so brightness changes gradually and no step can form.
+  const wide = blankCanvas(outWidth, height);
+  for (const frame of order) paint(wide, frame, table, best, "wide");
+  const spread = resolve(wide).rgb;
+  release(wide);
+
   try {
-    const jpeg = await sharp(Buffer.from(rgb), {
-      raw: { width: canvas.width, height: canvas.height, channels: 3 },
+    const blended = await blendBands(rgb, spread, outWidth, height);
+
+    const jpeg = await sharp(Buffer.from(blended), {
+      raw: { width: outWidth, height, channels: 3 },
     })
       .jpeg({ quality: 86, mozjpeg: true })
       .toBuffer();
@@ -232,14 +302,52 @@ export async function composePanorama(
     return {
       ok: true,
       jpeg,
-      width: canvas.width,
-      height: canvas.height,
+      width: outWidth,
+      height,
       covered,
       weakSeams,
+      alignment,
     };
   } catch {
     return { ok: false, code: "unknown" };
   }
+}
+
+/** Let a canvas go before the next one is allocated. Both at once is 270MB. */
+function release(canvas: Canvas): void {
+  canvas.sum = new Float32Array(0);
+  canvas.weight = new Float32Array(0);
+}
+
+/**
+ * Detail from the first, colour from the second.
+ *
+ * Both are blurred by the same amount. What that removes from the seamed
+ * picture is its colour, and what it leaves in the feathered one is only
+ * colour — so the seamed picture minus its own blur is pure detail, and adding
+ * it to the feathered one's blur gives a picture that is sharp where the
+ * seamed one is sharp and smooth where the feathered one is smooth.
+ */
+async function blendBands(
+  detail: Uint8Array,
+  colour: Uint8Array,
+  width: number,
+  height: number,
+): Promise<Uint8Array> {
+  const sigma = Math.max(2, Math.round(width * BAND_SIGMA));
+  const raw = { width, height, channels: 3 as const };
+
+  const [detailLow, colourLow] = await Promise.all([
+    sharp(Buffer.from(detail), { raw }).blur(sigma).raw().toBuffer(),
+    sharp(Buffer.from(colour), { raw }).blur(sigma).raw().toBuffer(),
+  ]);
+
+  const out = new Uint8Array(width * height * 3);
+  for (let i = 0; i < out.length; i += 1) {
+    const value = detail[i] - detailLow[i] + colourLow[i];
+    out[i] = value < 0 ? 0 : value > 255 ? 255 : value;
+  }
+  return out;
 }
 
 /**
@@ -267,7 +375,8 @@ function outputWidth(frames: Decoded[]): number {
  * placements per frame, which at full size would be the whole stitch over
  * again for each one.
  */
-function refinePoses(order: Decoded[]): number {
+function refinePoses(order: Decoded[]): { weak: number; alignment: number } {
+  const scores: number[] = [];
   const canvas = blankCanvas(REFINE_WIDTH, REFINE_WIDTH / 2);
   const table = yawTable(canvas.width);
   // The refinement lays frames down one at a time and matches each against
@@ -283,14 +392,19 @@ function refinePoses(order: Decoded[]): number {
       return;
     }
 
-    // What staying put is worth. Every other placement is measured against it.
-    const staying = agreement(canvas, frame, 0, 0);
+    // What staying put is worth. Every other placement is measured against it,
+    // and it is also the evidence for whether this capture worked at all.
+    const staying = agreement(canvas, frame, 0, 0).score;
+    // -1 is `agreement` saying it could not tell — too little shared ground,
+    // or a wall so blank there is no pattern to match. That is not a frame
+    // that disagrees, so it is not counted as one.
+    if (staying > -1) scores.push(staying);
 
     let best = { score: staying, dYaw: 0, dPitch: 0 };
     for (let dy = -REFINE_RANGE; dy <= REFINE_RANGE; dy += REFINE_STEP) {
       for (let dp = -REFINE_RANGE; dp <= REFINE_RANGE; dp += REFINE_STEP) {
         if (dy === 0 && dp === 0) continue;
-        const score = agreement(canvas, frame, dy, dp);
+        const score = agreement(canvas, frame, dy, dp).score;
         if (score > best.score) best = { score, dYaw: dy, dPitch: dp };
       }
     }
@@ -305,10 +419,25 @@ function refinePoses(order: Decoded[]): number {
       frame.pose.pitch = clamp(frame.pose.pitch + best.dPitch, -90, 90);
     }
 
+    // Now that it is in the right place, how bright is it against what is
+    // already there? Sequential, so the correction travels round the room from
+    // the first frame rather than every frame being pulled towards an average
+    // none of them should match.
+    const settled = agreement(canvas, frame, 0, 0);
+    if (settled.score > WEAK_SEAM) {
+      frame.gain = clamp(settled.ratio, 0.7, 1.45);
+    }
+
     paint(canvas, frame, table, flat);
   });
 
-  return weak;
+  // The median rather than the mean: one frame pointed at a blank ceiling
+  // should not condemn a capture, and one lucky frame should not rescue one.
+  const sorted = [...scores].sort((a, b) => a - b);
+  const alignment =
+    sorted.length === 0 ? 1 : sorted[Math.floor(sorted.length / 2)];
+
+  return { weak, alignment };
 }
 
 /**
@@ -323,7 +452,7 @@ function agreement(
   frame: Decoded,
   dYaw: number,
   dPitch: number,
-): number {
+): { score: number; ratio: number } {
   const basis = basisFrom(
     frame.pose.yaw + dYaw,
     clamp(frame.pose.pitch + dPitch, -90, 90),
@@ -368,12 +497,22 @@ function agreement(
   }
 
   // Too little shared ground to be evidence of anything.
-  if (n < 60) return -1;
+  if (n < 60) return { score: -1, ratio: 1 };
+
+  // How much brighter the neighbours are than this frame, over the ground they
+  // share. That — and not a comparison of whole-frame averages — is exposure
+  // compensation: it asks whether the same wall came out the same brightness
+  // twice, which is answerable, rather than whether two different walls did,
+  // which is not.
+  const ratio = sumB > 1 ? sumA / sumB : 1;
 
   const varA = sumAA - (sumA * sumA) / n;
   const varB = sumBB - (sumB * sumB) / n;
-  if (varA <= 1e-6 || varB <= 1e-6) return -1;
-  return (sumAB - (sumA * sumB) / n) / Math.sqrt(varA * varB);
+  if (varA <= 1e-6 || varB <= 1e-6) return { score: -1, ratio };
+  return {
+    score: (sumAB - (sumA * sumB) / n) / Math.sqrt(varA * varB),
+    ratio,
+  };
 }
 
 /** Which output pixels one frame could possibly touch. */
@@ -543,6 +682,8 @@ function paint(
   frame: Decoded,
   table: ReturnType<typeof yawTable>,
   best: Float32Array,
+  /** Seam: one frame per pixel. Wide: everything that can see it. */
+  mode: "seam" | "wide" = "seam",
 ): void {
   const basis = basisFrom(frame.pose.yaw, frame.pose.pitch, frame.pose.roll);
   const tanH = Math.tan((frame.hfov / 2) * (Math.PI / 180));
@@ -597,10 +738,15 @@ function paint(
       // it; everywhere else another frame is looking more directly at the
       // same wall and this one would only be a second copy of it.
       const q = (1 - (sx < 0 ? -sx : sx)) * (1 - (sy < 0 ? -sy : sy));
-      const over = q - best[row + x] * SEAM_SHARE;
-      if (over <= 0) continue;
 
-      const w = over * over;
+      let w: number;
+      if (mode === "wide") {
+        w = q * q + 1e-4;
+      } else {
+        const over = q - best[row + x] * SEAM_SHARE;
+        if (over <= 0) continue;
+        w = over * over;
+      }
       const gw = gain * w;
 
       const out = (row + x) * 3;
@@ -688,23 +834,7 @@ function resolve(canvas: Canvas): { rgb: Uint8Array; covered: number } {
   return { rgb, covered: covered / (width * height) };
 }
 
-function meanLuma(frame: Decoded): number {
-  let total = 0;
-  let n = 0;
-  for (let i = 0; i < frame.pixels.length; i += 3 * 37) {
-    total +=
-      0.2126 * frame.pixels[i] +
-      0.7152 * frame.pixels[i + 1] +
-      0.0722 * frame.pixels[i + 2];
-    n += 1;
-  }
-  return n === 0 ? 0 : total / n;
-}
 
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)] ?? 0;
-}
 
 function clamp(value: number, low: number, high: number): number {
   return value < low ? low : value > high ? high : value;

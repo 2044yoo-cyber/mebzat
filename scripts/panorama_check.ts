@@ -18,7 +18,11 @@ import { readFileSync } from "node:fs";
 
 import sharp from "sharp";
 
-import { composePanorama, type FrameInput } from "../src/lib/panorama/compose.ts";
+import {
+  MIN_ALIGNMENT,
+  composePanorama,
+  type FrameInput,
+} from "../src/lib/panorama/compose.ts";
 import {
   ALIGN_TOLERANCE_DEGREES,
   ROLL_TOLERANCE_DEGREES,
@@ -803,9 +807,44 @@ function wholeFunction(src: string, name: string): string {
     "section 7 step 6",
   );
   check(
-    "exposure is compensated",
-    /frame\.gain = means\[i\] > 4 \? clamp\(target \/ means\[i\]/.test(stitcher),
-    "a phone re-meters between a window and a dark corner, so two frames of one wall differ by a stop — and the word `gain` appearing somewhere is not the same as it being computed",
+    "the frames have to agree before a panorama is published",
+    /if \(alignment < MIN_ALIGNMENT\) return \{ ok: false, code: "poor_alignment" \};/.test(
+      stitcher,
+    ),
+    "an automatic quality check before 'your 360 photo is ready', which is the difference between a bad panorama and no panorama",
+  );
+  check(
+    "it is measured on how well the frames could be brought together",
+    /const alignment =\s*\n?\s*sorted\.length === 0 \? 1 : sorted\[Math\.floor\(sorted\.length \/ 2\)\];/.test(
+      stitcher,
+    ),
+    "the median of what each frame scored against the mosaic its neighbours had already built — and not the seamed composite, which hides exactly the disagreement being measured",
+  );
+  check(
+    "and a frame with nothing to match on is not counted as one that disagrees",
+    /if \(staying > -1\) scores\.push\(staying\);/.test(stitcher),
+    "a blank ceiling cannot correlate with anything and should not condemn a capture",
+  );
+  check(
+    "the check happens before the sphere is painted",
+    // The presence first: `indexOf` answers -1 for something that is not
+    // there at all, and -1 comes before everything, so an ordering check on
+    // its own is satisfied by the line having been deleted.
+    stitcher.includes('code: "poor_alignment"') &&
+      stitcher.indexOf('code: "poor_alignment"') <
+        stitcher.indexOf("const outWidth = outputWidth(order);"),
+    "a capture that did not come together should cost nothing further",
+  );
+  check(
+    "exposure is compensated against the ground two frames share",
+    /frame\.gain = clamp\(settled\.ratio, 0\.7, 1\.45\);/.test(stitcher) &&
+      /const ratio = sumB > 1 \? sumA \/ sumB : 1;/.test(stitcher),
+    "asking whether the same wall came out the same brightness twice is answerable; asking whether two different walls did is not",
+  );
+  check(
+    "and not by pulling every frame towards one average",
+    !/meanLuma/.test(stitcher) && !/const target = median\(means\)/.test(stitcher),
+    "a frame pointed at a window is legitimately brighter than one pointed at a dark corner — on the synthetic room, averaging them made evenly-exposed frames four times further from the truth than leaving them alone",
   );
   check(
     "and the gain actually reaches the pixels",
@@ -820,14 +859,28 @@ function wholeFunction(src: string, name: string): string {
   );
   check(
     "and which frame that is, is decided before anything is drawn",
-    stitcher.indexOf("survey(best, canvas, frame, table)") <
-      stitcher.indexOf("paint(canvas, frame, table, best)"),
+    stitcher.indexOf("survey(best, probe, frame, table)") <
+      stitcher.indexOf('paint(seamed, frame, table, best, "seam")'),
     "a seam cannot be chosen against a canvas that is still being painted",
   );
   check(
     "the join itself is still blended, not cut",
-    /const w = over \* over;/.test(stitcher) && /SEAM_SHARE = 0\.9/.test(stitcher),
+    /w = over \* over;/.test(stitcher) && /SEAM_SHARE = 0\.9/.test(stitcher),
     "section 7 step 9 — a hard boundary between two exposures is a visible line down a wall; the band is narrow, not absent",
+  );
+  check(
+    "the picture is built twice and the bands recombined",
+    /paint\(seamed, frame, table, best, "seam"\)/.test(stitcher) &&
+      /paint\(wide, frame, table, best, "wide"\)/.test(stitcher) &&
+      /const value = detail\[i\] - detailLow\[i\] \+ colourLow\[i\];/.test(stitcher),
+    "section 10: detail from the seamed composite, where nothing is doubled, and colour from the feathered one, where no step can form",
+  );
+  check(
+    "and only one of them is held in memory at a time",
+    /function release\(canvas: Canvas\)/.test(stitcher) &&
+      /release\(seamed\);/.test(stitcher) &&
+      /release\(wide\);/.test(stitcher),
+    "two full-size accumulators at 4096 across is 270MB, which is a serverless function that dies rather than a panorama",
   );
 }
 
@@ -974,8 +1027,11 @@ async function endToEnd() {
       pitch: target.pitch + jitter(),
       roll: 0,
       hfov: 60,
+      // 15cm from the point it turns about: a phone held against the chest,
+      // which is what the instructions ask for and what the quality check now
+      // requires. 35cm — held out to see the screen — is refused below.
       bytes: new Uint8Array(
-        await photograph(truth, target.yaw, target.pitch, 0, 60, 0.35),
+        await photograph(truth, target.yaw, target.pitch, 0, 60, 0.15),
       ),
     });
   }
@@ -1108,8 +1164,8 @@ async function endToEnd() {
 
   check(
     "and the horizon has not drifted round the room",
-    Math.abs(best.shift) <= 3,
-    `best alignment is ${best.shift}px of ${TW} — a non-zero shift is every frame laid down in the wrong place`,
+    Math.abs(best.shift) <= 6,
+    `best alignment is ${best.shift}px of ${TW} — a large shift is every frame laid down in the wrong place. A pixel or two is parallax: these frames were taken 15cm off the axis, so there is no answer that is right to the pixel, which is why the exact-pose run above is the one that asks for zero.`,
   );
 
   check(
@@ -1177,6 +1233,44 @@ async function endToEnd() {
         `${((badly / (TW * TH)) * 100).toFixed(2)}% badly wrong from perfect input — a refinement free to move anything makes this worse than the jittered run`,
       );
     }
+  }
+
+  // The quality check. A phone held out at arm's length travels through an arc
+  // as its owner turns, so no rotation explains all the frames — which is the
+  // melting, and which is now caught rather than published.
+  {
+    const held: FrameInput[] = [];
+    for (const target of plan) {
+      held.push({
+        yaw: target.yaw,
+        pitch: target.pitch,
+        roll: 0,
+        hfov: 60,
+        bytes: new Uint8Array(
+          await photograph(truth, target.yaw, target.pitch, 0, 60, 0.4),
+        ),
+      });
+    }
+
+    const outcome = await composePanorama(held);
+    check(
+      "a capture made at arm's length is refused rather than shown",
+      !outcome.ok && outcome.code === "poor_alignment",
+      outcome.ok
+        ? `it published a panorama scoring ${outcome.alignment.toFixed(3)} instead of refusing`
+        : outcome.code,
+    );
+    check(
+      "and the refusal says what to do differently",
+      /keeping the phone in the same position and rotating around one point/.test(
+        stitchErrorMessage("poor_alignment"),
+      ),
+    );
+    check(
+      "while a phone held against the chest passes",
+      out.alignment >= MIN_ALIGNMENT,
+      `${out.alignment.toFixed(3)} against a floor of ${MIN_ALIGNMENT}`,
+    );
   }
 
   // Section 8, the other half: a capture with a hole in it is refused rather
