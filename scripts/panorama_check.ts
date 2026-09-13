@@ -746,9 +746,21 @@ function wholeFunction(src: string, name: string): string {
     "a compensation computed and not applied is a variable, not a correction",
   );
   check(
-    "overlaps are blended rather than cut",
-    /edge \* edge/.test(stitcher),
-    "section 7 steps 8 and 9 — a hard boundary between two exposures is a visible line down a wall",
+    "each pixel is taken from the frame looking most directly at it",
+    /const over = q - best\[row \+ x\] \* SEAM_SHARE;/.test(stitcher) &&
+      /if \(over <= 0\) continue;/.test(stitcher),
+    "section 7 step 8: feathering across the whole overlap averages two photographs of one wall over a third of every frame, and wherever they disagree the result is both at half strength — a sofa with a second sofa inside it",
+  );
+  check(
+    "and which frame that is, is decided before anything is drawn",
+    stitcher.indexOf("survey(best, canvas, frame, table)") <
+      stitcher.indexOf("paint(canvas, frame, table, best)"),
+    "a seam cannot be chosen against a canvas that is still being painted",
+  );
+  check(
+    "the join itself is still blended, not cut",
+    /const w = over \* over;/.test(stitcher) && /SEAM_SHARE = 0\.9/.test(stitcher),
+    "section 7 step 9 — a hard boundary between two exposures is a visible line down a wall; the band is narrow, not absent",
   );
 }
 
@@ -799,13 +811,26 @@ function readRoom(p: Uint8Array, yaw: number, pitch: number): number[] {
   return [p[i], p[i + 1], p[i + 2]];
 }
 
-/** What a camera at this pose would photograph of that room. */
+/**
+ * What a camera at this pose would photograph of that room.
+ *
+ * `arm` is how far the lens sits in front of the point the person turns
+ * about, in metres, with the room a sphere `ROOM_RADIUS` across. That is
+ * parallax, and it is the thing that makes real panoramas ghost: the camera is
+ * not where the rotation is, so two frames see the same sofa from two
+ * different places and no rotation can bring them into agreement. A stitcher
+ * checked only against frames from a perfect nodal point is a stitcher checked
+ * against input nobody can produce holding a phone.
+ */
+const ROOM_RADIUS = 2.5;
+
 async function photograph(
   p: Uint8Array,
   yaw: number,
   pitch: number,
   roll: number,
   hfov: number,
+  arm = 0,
 ): Promise<Buffer> {
   const w = 640;
   const h = 480;
@@ -814,6 +839,13 @@ async function photograph(
   const tanH = Math.tan(((hfov / 2) * Math.PI) / 180);
   const tanV = Math.tan(((vfov / 2) * Math.PI) / 180);
   const px = Buffer.alloc(w * h * 3);
+
+  const eye: Vector3 = [
+    b.forward[0] * arm,
+    b.forward[1] * arm,
+    b.forward[2] * arm,
+  ];
+  const eyeEye = eye[0] * eye[0] + eye[1] * eye[1] + eye[2] * eye[2];
 
   for (let j = 0; j < h; j += 1) {
     const sy = 1 - (2 * j) / (h - 1);
@@ -825,10 +857,23 @@ async function photograph(
         b.forward[2] + b.right[2] * sx * tanH + b.up[2] * sy * tanV,
       ];
       const len = Math.hypot(d[0], d[1], d[2]);
+      const ray: Vector3 = [d[0] / len, d[1] / len, d[2] / len];
+
+      // Where the ray meets the wall, and then the direction of that point
+      // from the turning point — which is the direction the stitcher will
+      // assume it came from. With `arm` at zero the two are the same.
+      const along = eye[0] * ray[0] + eye[1] * ray[1] + eye[2] * ray[2];
+      const hit =
+        -along + Math.sqrt(along * along + ROOM_RADIUS * ROOM_RADIUS - eyeEye);
+      const wx = eye[0] + hit * ray[0];
+      const wy = eye[1] + hit * ray[1];
+      const wz = eye[2] + hit * ray[2];
+      const far = Math.hypot(wx, wy, wz);
+
       const c = readRoom(
         p,
-        (Math.atan2(d[0] / len, d[1] / len) * 180) / Math.PI,
-        (Math.asin(d[2] / len) * 180) / Math.PI,
+        (Math.atan2(wx / far, wy / far) * 180) / Math.PI,
+        (Math.asin(wz / far) * 180) / Math.PI,
       );
       const o = (j * w + i) * 3;
       px[o] = c[0];
@@ -862,7 +907,9 @@ async function endToEnd() {
       pitch: target.pitch + jitter(),
       roll: 0,
       hfov: 60,
-      bytes: new Uint8Array(await photograph(truth, target.yaw, target.pitch, 0, 60)),
+      bytes: new Uint8Array(
+        await photograph(truth, target.yaw, target.pitch, 0, 60, 0.35),
+      ),
     });
   }
 
@@ -968,6 +1015,30 @@ async function endToEnd() {
     }
     if (error < best.error) best = { shift, error };
   }
+  // Ghosting, measured. A doubled edge is two soft edges where there was one
+  // hard one, so an image full of them carries less edge energy than the room
+  // it was taken from — even while looking, at a glance, like the right room.
+  {
+    const energy = (img: Uint8Array) => {
+      let total = 0;
+      let n = 0;
+      for (let y = 1; y < TH - 1; y += 1) {
+        for (let x = 1; x < TW - 1; x += 1) {
+          const i = (y * TW + x) * 3;
+          total += Math.abs(img[i] - img[i + 3]) + Math.abs(img[i] - img[i + TW * 3]);
+          n += 1;
+        }
+      }
+      return total / n;
+    };
+    const ratio = energy(got) / energy(truth);
+    check(
+      "edges come through as edges, not as two of themselves",
+      ratio > 1.34,
+      `edge energy ${ratio.toFixed(3)} of the room's — averaging the whole overlap instead of seaming it scores about 1.29 on this same input, because every doubled edge is two soft ones where there was a hard one`,
+    );
+  }
+
   check(
     "and the horizon has not drifted round the room",
     Math.abs(best.shift) <= 3,
@@ -1072,64 +1143,67 @@ async function endToEnd() {
     "section 9: 18 / 39",
   );
 
-  const overlay = wholeFunction(capture, "Sphere");
+  const overlay = capture.slice(
+    capture.indexOf("const Sphere = memo("),
+    capture.indexOf("function round2("),
+  );
   check("the overlay is findable", overlay.length > 0);
   check(
-    "every target is drawn where the projection puts it",
-    /\{targets\.map\(\(target\) => \(/.test(overlay) &&
-      /left: `calc\(\$\{\(\(target\.x \+ 1\) \/ 2\) \* 100\}%/.test(overlay) &&
-      /top: `calc\(\$\{\(\(1 - target\.y\) \/ 2\) \* 100\}%/.test(overlay),
+    "it is laid out once and never re-rendered by the phone moving",
+    /memo\(function Sphere/.test(capture) &&
+      !/\bstyle=\{\{[^}]*transform:/.test(overlay),
+    "setting a marker's position in React state renders the whole screen — the buttons, the counter, the instructions — sixty times a second, which on a phone is the flicker",
+  );
+  check(
+    "and the loop writes the positions straight to the elements",
+    /element\.style\.transform =\s*\n?\s*`translate3d\(\$\{\(at\.x \* halfW\)/.test(capture),
     "acceptance 11 and section 5: the position comes from the projection, so it moves when and only when the phone does",
   );
   check(
-    "and nothing in the overlay animates itself",
-    !/animate-|transition|keyframes/.test(overlay),
-    "acceptance 11: a transform on a timer would keep moving with the phone held still — that is the faked gyroscope the brief forbids",
-  );
-  check(
-    "the aim does not move",
-    /top-1\/2 left-1\/2[\s\S]{0,120}?-translate-x-1\/2 -translate-y-1\/2/.test(overlay) &&
-      !/translateX\(\$\{/.test(overlay),
-    "section 1: the aim is the middle of the frame that will be taken, so it cannot be anywhere else",
-  );
-  check(
-    "a captured target is shown as captured",
-    /target\.taken[\s\S]{0,90}?emerald/.test(overlay),
-    "section 9: ✓ rather than ○",
+    "a marker with nowhere to be is hidden rather than left where it was",
+    /element\.style\.visibility = "hidden"/.test(capture),
   );
   check(
     "the markers lean when the phone is rolled",
-    /transform: `rotate\(\$\{-roll\}deg\)`/.test(overlay),
+    /rotate\(\$\{-roll\.toFixed\(1\)\}deg\)/.test(capture),
     "a marker that stands upright in the room leans on a rolled phone, which is the only thing on the screen that shows the phone is not square",
+  );
+  check(
+    "a captured target is shown as captured",
+    /markerTaken\.current\.get\(target\.id\) !== done/.test(capture) &&
+      /rgba\(52, 211, 153/.test(capture),
+    "section 9: ✓ rather than ○ — and written only when it changes, not on every frame",
   );
   check(
     "there is a frame to bring one into, and it does not move",
     /-translate-x-1\/2 -translate-y-1\/2 rounded-xl border-4/.test(overlay),
   );
   check(
+    "landing on one is visible without reading anything",
+    /aligned && level \? "rgb\(52, 211, 153\)"/.test(capture),
+  );
+  check(
     "holding shows how much of the hold is left",
-    /conic-gradient\(rgb\(52 211 153\) \$\{hold \* 360\}deg/.test(overlay) &&
+    /conic-gradient\(rgb\(52 211 153\) \$\{done\.toFixed\(0\)\}deg/.test(capture) &&
       /HOLD/.test(overlay),
     "a ring that visibly fills is the difference between keeping still and assuming it has jammed",
   );
   check(
     "an arrow says which way the next one is",
-    /bearing !== null && !aligned/.test(overlay) && /rotate\(\$\{\(bearing \* 180\) \/ Math\.PI\}deg\)/.test(overlay),
+    /steerBearing\(decision\.target, yawPitchOf\(facing\), roll\)/.test(capture),
     "section 9 and the reference: the next point has to be findable when it is not on the screen",
   );
   check(
-    "and a target behind you still has a direction, even though it has no position",
-    /function offScreenBearing/.test(capture) &&
-      /Math\.atan2\(x, y\)/.test(wholeFunction(capture, "offScreenBearing")),
-    "`project` refuses anything outside the frame, rightly — but the direction is still known and is the whole of what somebody needs",
+    "and it points at the turn, not along the shortest line to the target",
+    (() => {
+      const fn = wholeFunction(capture, "steerBearing");
+      return /Math\.atan2\(turn, tilt\)/.test(fn) && /- roll/.test(fn);
+    })(),
+    "for a target behind and above you the shortest line goes over the top of your head, so the arrow pointed straight up when what you had to do was turn around",
   );
   check(
     "a phone held crooked is told so on the camera, not only in the hint",
     /Hold the phone square/.test(overlay),
-  );
-  check(
-    "landing on one is visible without reading anything",
-    /aligned && level\s*\n?\s*\? "border-emerald/.test(overlay),
   );
   check(
     "the overlay never eats a touch meant for the controls",
@@ -1152,8 +1226,14 @@ async function endToEnd() {
     /project\(target\.direction, pose/.test(loop),
   );
   check(
+    "and the hint is only set when it changes",
+    /sayHint\(guidance\(decision, facing\)\)/.test(loop) &&
+      /if \(next === hintRef\.current\) return;/.test(capture),
+    "a setState per frame is a render per frame whatever it sets",
+  );
+  check(
     "the hold clock resets the moment the phone leaves a target",
-    /const settled =\s*\n?\s*decision\.aligned && decision\.steady && decision\.level;[\s\S]{0,140}?: null;/.test(loop),
+    /heldSinceRef\.current = settled \? \(heldSinceRef\.current \?\? Date\.now\(\)\) : null;/.test(loop),
     "without the reset a phone swinging past a target twice accumulates enough held time to fire while moving",
   );
 

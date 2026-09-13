@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   Camera,
   Check,
@@ -22,15 +22,13 @@ import {
   guidance,
   progress,
   startCapture,
+  takenSet,
   type CaptureState,
   type Target,
 } from "@/lib/panorama/capture";
 import {
-  dot,
   forwardOf,
   project,
-  rightOf,
-  upOf,
   rollOf,
   rotationMatrix,
   unsteadiness,
@@ -191,26 +189,40 @@ export function PanoramaCapture({
    * where it is, and updating them separately would draw a frame in which the
    * two disagree.
    */
-  const [view, setView] = useState<{
-    targets: { id: string; x: number; y: number; taken: boolean }[];
-    aligned: boolean;
-    level: boolean;
-    /** How far the phone is rolled off square, in degrees. */
-    roll: number;
-    /** How much of the hold has elapsed, 0–1. */
-    hold: number;
-    /** Which way the next target lies, in radians from straight up. */
-    bearing: number | null;
-    flash: string | null;
-  }>({
-    targets: [],
-    aligned: false,
-    level: true,
-    roll: 0,
-    hold: 0,
-    bearing: null,
-    flash: null,
-  });
+  /**
+   * The overlay's moving parts, written to directly.
+   *
+   * Every one of these used to be React state set on each animation frame,
+   * which re-rendered the whole screen sixty times a second — the buttons, the
+   * counter, the instructions, all of it — and on a phone that is the flicker.
+   * `panorama-viewer.tsx` already makes this point about its hotspots: putting
+   * coordinates in state means a render per frame, which costs more than the
+   * thing being rendered. The markers are ordinary DOM, laid out once, and the
+   * loop moves them.
+   */
+  const markerRefs = useRef(new Map<string, HTMLSpanElement>());
+  const markerTaken = useRef(new Map<string, boolean>());
+  const aimRef = useRef<HTMLSpanElement>(null);
+  const holdRef = useRef<HTMLSpanElement>(null);
+  const holdRingRef = useRef<HTMLSpanElement>(null);
+  const arrowRef = useRef<HTMLSpanElement>(null);
+  const crookedRef = useRef<HTMLSpanElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  /** The overlay's size, read on resize rather than on every frame. */
+  const sizeRef = useRef({ w: 0, h: 0 });
+
+  const registerMarker = useCallback((id: string, element: HTMLSpanElement | null) => {
+    if (element) markerRefs.current.set(id, element);
+    else markerRefs.current.delete(id);
+  }, []);
+
+  /** The hint, which changes a few times per target rather than per frame. */
+  const hintRef = useRef(hint);
+  const sayHint = useCallback((next: string) => {
+    if (next === hintRef.current) return;
+    hintRef.current = next;
+    setHint(next);
+  }, []);
 
   /**
    * The capture state, mirrored where the animation loop can read it.
@@ -509,7 +521,6 @@ export function PanoramaCapture({
 
       const hfov = ASSUMED_HFOV;
       const vfov = verticalFov(hfov, video.videoWidth, video.videoHeight);
-
       const roll = rollError(rollOf(pose));
       const heldMs =
         heldSinceRef.current === null ? 0 : Date.now() - heldSinceRef.current;
@@ -521,16 +532,41 @@ export function PanoramaCapture({
         heldMs,
       });
 
-      // Where every target sits on the screen right now. This is the whole of
-      // the gyroscope interaction: a projection of a fixed direction through
-      // the live rotation. Nothing here is animated — a target moves because
-      // the phone moved, and if the phone is still so is the target.
-      const taken = new Set(stateRef.current.taken);
-      const targets: { id: string; x: number; y: number; taken: boolean }[] = [];
+      // ---- move the markers -------------------------------------------
+      //
+      // This is the whole of the gyroscope interaction: a projection of a
+      // fixed direction through the live rotation. Nothing is animated — a
+      // marker moves because the phone moved, and if the phone is still so is
+      // the marker.
+      const { w: halfW, h: halfH } = sizeRef.current;
+      const taken = takenSet(stateRef.current);
       for (const target of stateRef.current.plan) {
+        const element = markerRefs.current.get(target.id);
+        if (!element) continue;
+
         const at = project(target.direction, pose, hfov, vfov);
-        if (at) {
-          targets.push({ id: target.id, x: at.x, y: at.y, taken: taken.has(target.id) });
+        if (!at) {
+          if (element.style.visibility !== "hidden") {
+            element.style.visibility = "hidden";
+          }
+          continue;
+        }
+
+        if (element.style.visibility === "hidden") element.style.visibility = "";
+        element.style.transform =
+          `translate3d(${(at.x * halfW).toFixed(1)}px, ${(-at.y * halfH).toFixed(1)}px, 0)` +
+          ` translate(-50%, -50%) rotate(${-roll.toFixed(1)}deg)`;
+
+        // Colour changes once per target, so it is only written when it does.
+        const done = taken.has(target.id);
+        if (markerTaken.current.get(target.id) !== done) {
+          markerTaken.current.set(target.id, done);
+          element.style.borderColor = done
+            ? "rgba(52, 211, 153, 0.6)"
+            : "rgba(255, 255, 255, 0.85)";
+          element.style.backgroundColor = done
+            ? "rgba(52, 211, 153, 0.22)"
+            : "rgba(255, 255, 255, 0.14)";
         }
       }
 
@@ -542,35 +578,48 @@ export function PanoramaCapture({
         return;
       }
 
+      const aligned = decision.action === "aim" ? decision.aligned : true;
+      const level = decision.action === "aim" ? decision.level : true;
+
+      // ---- the aim, the hold ring and the arrow ------------------------
+      if (aimRef.current) {
+        aimRef.current.style.borderColor =
+          aligned && level ? "rgb(52, 211, 153)" : level ? "white" : "rgb(252, 211, 77)";
+      }
+      if (crookedRef.current) {
+        crookedRef.current.style.display = level ? "none" : "block";
+      }
+
+      const settled =
+        decision.action === "aim" && decision.aligned && decision.steady && decision.level;
+
+      if (holdRef.current) holdRef.current.style.display = settled ? "flex" : "none";
+      if (settled && holdRingRef.current) {
+        const done = Math.min(1, heldMs / STEADY_MS) * 360;
+        holdRingRef.current.style.background =
+          `conic-gradient(rgb(52 211 153) ${done.toFixed(0)}deg, transparent 0deg)`;
+      }
+
+      if (arrowRef.current) {
+        const bearing =
+          decision.action === "aim" && !decision.aligned
+            ? steerBearing(decision.target, yawPitchOf(facing), roll)
+            : null;
+        if (bearing === null) {
+          arrowRef.current.style.display = "none";
+        } else {
+          arrowRef.current.style.display = "block";
+          arrowRef.current.style.transform =
+            `translate(-50%, -50%) rotate(${bearing.toFixed(1)}deg)`;
+        }
+      }
+
       if (decision.action === "aim") {
         // Start the clock when the phone first settles on a target, and reset
         // it the moment it leaves. Without the reset, a phone swinging past a
         // target twice accumulates enough "held" time to fire while moving.
-        const settled = decision.aligned && decision.steady && decision.level;
-        heldSinceRef.current = settled
-          ? (heldSinceRef.current ?? Date.now())
-          : null;
-
-        // Which way to swing the phone to reach the target. Measured from
-        // straight up so the arrow can be a single rotation.
-        const to = project(decision.target.direction, pose, hfov, vfov);
-        const bearing =
-          decision.aligned || !to ? null : Math.atan2(to.x, to.y);
-
-        setHint(guidance(decision, facing));
-        setView({
-          targets,
-          aligned: decision.aligned,
-          level: decision.level,
-          roll,
-          hold: settled ? Math.min(1, heldMs / STEADY_MS) : 0,
-          bearing:
-            bearing ??
-            (decision.aligned
-              ? null
-              : offScreenBearing(decision.target.direction, pose)),
-          flash: null,
-        });
+        heldSinceRef.current = settled ? (heldSinceRef.current ?? Date.now()) : null;
+        sayHint(guidance(decision, facing));
         return;
       }
 
@@ -578,16 +627,7 @@ export function PanoramaCapture({
       // twice: `decision.state` already has it, and the next tick reads that.
       heldSinceRef.current = null;
       applyState(decision.state);
-      setHint("Captured");
-      setView({
-        targets,
-        aligned: true,
-        level: true,
-        roll,
-        hold: 1,
-        bearing: null,
-        flash: decision.target.id,
-      });
+      sayHint("Captured");
       void take(decision.target, stateRef.current.plan.length);
     };
 
@@ -596,7 +636,23 @@ export function PanoramaCapture({
       running = false;
       window.cancelAnimationFrame(frameId);
     };
-  }, [phase, hasSensor, take, applyState, upload, stopCamera]);
+  }, [phase, hasSensor, take, applyState, upload, stopCamera, sayHint]);
+
+  /** The overlay's half-size, which the loop needs and must not measure itself. */
+  useEffect(() => {
+    if (phase !== "capturing") return;
+    const measure = () => {
+      const box = overlayRef.current;
+      if (box) sizeRef.current = { w: box.clientWidth / 2, h: box.clientHeight / 2 };
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+    };
+  }, [phase]);
 
   /**
    * Put the camera on the screen, once there is a screen to put it on.
@@ -812,13 +868,14 @@ export function PanoramaCapture({
 
         {hasSensor && phase === "capturing" && (
           <Sphere
-            targets={view.targets}
-            aligned={view.aligned}
-            level={view.level}
-            roll={view.roll}
-            hold={view.hold}
-            bearing={view.bearing}
-            flash={view.flash}
+            plan={state.plan}
+            register={registerMarker}
+            overlayRef={overlayRef}
+            aimRef={aimRef}
+            holdRef={holdRef}
+            holdRingRef={holdRingRef}
+            arrowRef={arrowRef}
+            crookedRef={crookedRef}
           />
         )}
 
@@ -1080,46 +1137,77 @@ export function PanoramaCapture({
  * mechanic, and it is why none of this is a CSS animation: a transform that
  * ran on a timer would keep moving with the phone held still.
  */
-function Sphere({
-  targets,
-  aligned,
-  level,
-  roll,
-  hold,
-  bearing,
-  flash,
+/**
+ * Which way to swing the phone to reach a target, in degrees clockwise from
+ * straight up the screen.
+ *
+ * Not the direction the target lies on screen. That is what this used to be,
+ * and for anything in front of you it is the same answer — but for a target
+ * behind and above, the shortest line to it goes over the top of your head, so
+ * the arrow pointed straight up when what you had to do was turn around. It
+ * was pointing along a great circle nobody can walk.
+ *
+ * This is the turn instead: how much yaw and how much pitch, which is the same
+ * decomposition the written instruction uses, so the arrow and the words can
+ * no longer disagree. A target 170° behind gives a yaw error of 170 and an
+ * arrow that says "that way, keep going".
+ *
+ * The roll is taken back off because the screen is what the arrow is drawn on,
+ * and a rolled phone has rolled that with it.
+ */
+function steerBearing(
+  target: { yaw: number; pitch: number },
+  facing: { yaw: number; pitch: number },
+  roll: number,
+): number | null {
+  const turn = ((target.yaw - facing.yaw + 540) % 360) - 180;
+  const tilt = target.pitch - facing.pitch;
+  if (Math.abs(turn) < 0.01 && Math.abs(tilt) < 0.01) return null;
+  return (Math.atan2(turn, tilt) * 180) / Math.PI - roll;
+}
+
+/**
+ * The targets, floating in the room, and the aim that does not move.
+ *
+ * Laid out once and never re-rendered: every position, colour and rotation
+ * here is written by the capture loop through a ref. React renders this when
+ * the plan changes — which is once per capture — and not when the phone moves,
+ * which is sixty times a second.
+ */
+const Sphere = memo(function Sphere({
+  plan,
+  register,
+  overlayRef,
+  aimRef,
+  holdRef,
+  holdRingRef,
+  arrowRef,
+  crookedRef,
 }: {
-  targets: { id: string; x: number; y: number; taken: boolean }[];
-  aligned: boolean;
-  level: boolean;
-  roll: number;
-  hold: number;
-  bearing: number | null;
-  flash: string | null;
+  plan: readonly Target[];
+  register: (id: string, element: HTMLSpanElement | null) => void;
+  overlayRef: React.RefObject<HTMLDivElement | null>;
+  aimRef: React.RefObject<HTMLSpanElement | null>;
+  holdRef: React.RefObject<HTMLSpanElement | null>;
+  holdRingRef: React.RefObject<HTMLSpanElement | null>;
+  arrowRef: React.RefObject<HTMLSpanElement | null>;
+  crookedRef: React.RefObject<HTMLSpanElement | null>;
 }) {
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      {targets.map((target) => (
+    <div
+      ref={overlayRef}
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      aria-hidden
+    >
+      {plan.map((target) => (
         <span
           key={target.id}
-          className={cn(
-            "absolute h-28 w-20 rounded-lg border-[3px]",
-            target.id === flash
-              ? "border-emerald-200 bg-emerald-300/70"
-              : target.taken
-                ? "border-emerald-400/60 bg-emerald-400/25"
-                : "border-white/85 bg-white/15",
-          )}
+          ref={(element) => register(target.id, element)}
+          className="absolute top-1/2 left-1/2 h-28 w-20 rounded-lg border-[3px]"
           style={{
-            // -1…+1 across the view becomes 0…100% of it, and the y axis flips
-            // because a screen counts downwards and the sky is up.
-            left: `calc(${((target.x + 1) / 2) * 100}% - 2.5rem)`,
-            top: `calc(${((1 - target.y) / 2) * 100}% - 3.5rem)`,
-            // The marker stands upright in the room, so on a rolled phone it
-            // leans — which is the only thing on the screen that shows the
-            // phone is not square, and the reason the last set of photographs
-            // came out soft.
-            transform: `rotate(${-roll}deg)`,
+            visibility: "hidden",
+            borderColor: "rgba(255, 255, 255, 0.85)",
+            backgroundColor: "rgba(255, 255, 255, 0.14)",
           }}
         />
       ))}
@@ -1127,77 +1215,55 @@ function Sphere({
       {/* The frame to bring a marker into. Fixed, because it is the middle of
           the photograph that will be taken — it cannot be anywhere else. */}
       <span
-        className={cn(
-          "absolute top-1/2 left-1/2 h-36 w-24 -translate-x-1/2 -translate-y-1/2 rounded-xl border-4",
-          aligned && level
-            ? "border-emerald-400 bg-emerald-400/15"
-            : !level
-              ? "border-amber-300"
-              : "border-white",
-        )}
+        ref={aimRef}
+        className="absolute top-1/2 left-1/2 h-36 w-24 -translate-x-1/2 -translate-y-1/2 rounded-xl border-4"
+        style={{ borderColor: "white" }}
       />
 
       {/* Hold, and how much of it is left. A ring that visibly fills is the
           difference between somebody keeping still and somebody assuming it
           has jammed and moving on. */}
-      {aligned && level && (
-        <span className="absolute top-1/2 left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/45">
-          <span
-            className="absolute inset-0 rounded-full"
-            style={{
-              background: `conic-gradient(rgb(52 211 153) ${hold * 360}deg, transparent 0deg)`,
-              mask: "radial-gradient(circle, transparent 58%, black 60%)",
-              WebkitMask: "radial-gradient(circle, transparent 58%, black 60%)",
-            }}
-          />
-          <span className="text-sm font-semibold tracking-wide text-white">
-            HOLD
-          </span>
-        </span>
-      )}
-
-      {/* Which way the next one is. Drawn from the middle outwards, so it
-          points off the screen when the target is behind you and at the marker
-          when it is merely off to one side. */}
-      {bearing !== null && !aligned && (
+      <span
+        ref={holdRef}
+        className="absolute top-1/2 left-1/2 hidden size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/45"
+      >
         <span
-          className="absolute top-1/2 left-1/2 size-40 -translate-x-1/2 -translate-y-1/2"
-          style={{ transform: `translate(-50%, -50%) rotate(${(bearing * 180) / Math.PI}deg)` }}
-        >
-          <svg viewBox="0 0 40 40" className="size-full">
-            <path
-              d="M20 2 L26 14 L20 11 L14 14 Z"
-              fill="white"
-              stroke="rgba(0,0,0,0.35)"
-              strokeWidth="1"
-            />
-          </svg>
-        </span>
-      )}
+          ref={holdRingRef}
+          className="absolute inset-0 rounded-full"
+          style={{
+            mask: "radial-gradient(circle, transparent 58%, black 60%)",
+            WebkitMask: "radial-gradient(circle, transparent 58%, black 60%)",
+          }}
+        />
+        <span className="text-sm font-semibold tracking-wide text-white">HOLD</span>
+      </span>
 
-      {!level && (
-        <span className="absolute top-[58%] left-1/2 -translate-x-1/2 rounded-full bg-amber-400/95 px-3 py-1 text-sm font-medium text-black">
-          Hold the phone square
-        </span>
-      )}
+      {/* Which way the next one is. */}
+      <span
+        ref={arrowRef}
+        className="absolute top-1/2 left-1/2 size-40"
+        style={{ display: "none" }}
+      >
+        <svg viewBox="0 0 40 40" className="size-full">
+          <path
+            d="M20 2 L26 14 L20 11 L14 14 Z"
+            fill="white"
+            stroke="rgba(0,0,0,0.35)"
+            strokeWidth="1"
+          />
+        </svg>
+      </span>
+
+      <span
+        ref={crookedRef}
+        className="absolute top-[58%] left-1/2 -translate-x-1/2 rounded-full bg-amber-400/95 px-3 py-1 text-sm font-medium text-black"
+        style={{ display: "none" }}
+      >
+        Hold the phone square
+      </span>
     </div>
   );
-}
-
-/**
- * Which way to swing towards a target that is not on the screen.
- *
- * `project` refuses anything outside the frame, and rightly — a marker pinned
- * to the edge would say "here" about something that is not. But the direction
- * is still known, and an arrow is the whole of what somebody needs when the
- * next photograph is behind them.
- */
-function offScreenBearing(direction: Vector3, pose: Matrix3): number | null {
-  const x = dot(direction, rightOf(pose));
-  const y = dot(direction, upOf(pose));
-  if (x === 0 && y === 0) return null;
-  return Math.atan2(x, y);
-}
+});
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;

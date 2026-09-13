@@ -83,6 +83,23 @@ const REFINE_WIDTH = 512;
 const REFINE_RANGE = 3;
 const REFINE_STEP = 1;
 
+/**
+ * How close to the best frame another has to be before it is blended in.
+ *
+ * This is the seam. Feathering across the whole overlap — which is what this
+ * used to do — averages two photographs of the same wall over a third of every
+ * frame, and wherever they do not agree to the pixel the result is both of
+ * them at half strength: a sofa with a second sofa inside it, a person you can
+ * see through. Alignment is never that good, because the phone is not rotating
+ * about its own lens.
+ *
+ * So each pixel is taken from whichever frame is looking most directly at it,
+ * and the others are mixed in only where they are within a tenth of being the
+ * best themselves. That is a narrow band along the line midway between two
+ * frames — enough to hide the join, too narrow to double anything.
+ */
+const SEAM_SHARE = 0.9;
+
 /** Below this correlation the refinement did not find anything to lock onto. */
 const WEAK_SEAM = 0.25;
 
@@ -196,7 +213,11 @@ export async function composePanorama(
   const outWidth = outputWidth(order);
   const canvas = blankCanvas(outWidth, outWidth / 2);
   const table = yawTable(canvas.width);
-  for (const frame of order) paint(canvas, frame, table);
+
+  // Who owns what, before anything is drawn.
+  const best = new Float32Array(canvas.width * canvas.height);
+  for (const frame of order) survey(best, canvas, frame, table);
+  for (const frame of order) paint(canvas, frame, table, best);
 
   const { rgb, covered } = resolve(canvas);
   if (covered < MIN_COVERAGE) return { ok: false, code: "incomplete_sphere" };
@@ -249,11 +270,16 @@ function outputWidth(frames: Decoded[]): number {
 function refinePoses(order: Decoded[]): number {
   const canvas = blankCanvas(REFINE_WIDTH, REFINE_WIDTH / 2);
   const table = yawTable(canvas.width);
+  // The refinement lays frames down one at a time and matches each against
+  // what is already there, so there is no complete survey to seam against.
+  // Every frame is its own best view here, which is what a flat allowance of
+  // zero means.
+  const flat = new Float32Array(canvas.width * canvas.height);
   let weak = 0;
 
   order.forEach((frame, index) => {
     if (index === 0) {
-      paint(canvas, frame, table);
+      paint(canvas, frame, table, flat);
       return;
     }
 
@@ -279,7 +305,7 @@ function refinePoses(order: Decoded[]): number {
       frame.pose.pitch = clamp(frame.pose.pitch + best.dPitch, -90, 90);
     }
 
-    paint(canvas, frame, table);
+    paint(canvas, frame, table, flat);
   });
 
   return weak;
@@ -458,6 +484,52 @@ function yawTable(width: number): { sin: Float64Array; cos: Float64Array } {
 }
 
 /**
+ * How well each frame can see each pixel, keeping only the best.
+ *
+ * The first of two passes: nothing is sampled and no colour is read, because
+ * the question is only which frame owns which part of the sphere. `paint` then
+ * asks each frame again and takes it only where it is at or near the best.
+ */
+function survey(
+  best: Float32Array,
+  canvas: Canvas,
+  frame: Decoded,
+  table: ReturnType<typeof yawTable>,
+): void {
+  const basis = basisFrom(frame.pose.yaw, frame.pose.pitch, frame.pose.roll);
+  const tanH = Math.tan((frame.hfov / 2) * (Math.PI / 180));
+  const tanV = Math.tan((frame.vfov / 2) * (Math.PI / 180));
+  const box = footprint(canvas, frame);
+
+  const [fx0, fy0, fz0] = basis.forward;
+  const [rx, ry, rz] = basis.right;
+  const [ux, uy, uz] = basis.up;
+
+  for (let y = box.top; y <= box.bottom; y += 1) {
+    const pitch = ((90 - (y / (canvas.height - 1)) * 180) * Math.PI) / 180;
+    const flat = Math.cos(pitch);
+    const dz = Math.sin(pitch);
+    const row = y * canvas.width;
+
+    for (const x of box.columns) {
+      const dx = flat * table.sin[x];
+      const dy = flat * table.cos[x];
+
+      const depth = dx * fx0 + dy * fy0 + dz * fz0;
+      if (depth <= 1e-6) continue;
+
+      const sx = (dx * rx + dy * ry + dz * rz) / depth / tanH;
+      if (sx < -1 || sx > 1) continue;
+      const sy = (dx * ux + dy * uy + dz * uz) / depth / tanV;
+      if (sy < -1 || sy > 1) continue;
+
+      const q = (1 - (sx < 0 ? -sx : sx)) * (1 - (sy < 0 ? -sy : sy));
+      if (q > best[row + x]) best[row + x] = q;
+    }
+  }
+}
+
+/**
  * Add one frame's contribution to the canvas.
  *
  * Written flat — no per-pixel objects, the projection inlined — because this
@@ -466,7 +538,12 @@ function yawTable(width: number): { sin: Float64Array; cos: Float64Array } {
  * canvas a seventh the width and legibility is worth more than the
  * microseconds.
  */
-function paint(canvas: Canvas, frame: Decoded, table: ReturnType<typeof yawTable>): void {
+function paint(
+  canvas: Canvas,
+  frame: Decoded,
+  table: ReturnType<typeof yawTable>,
+  best: Float32Array,
+): void {
   const basis = basisFrom(frame.pose.yaw, frame.pose.pitch, frame.pose.roll);
   const tanH = Math.tan((frame.hfov / 2) * (Math.PI / 180));
   const tanV = Math.tan((frame.vfov / 2) * (Math.PI / 180));
@@ -515,11 +592,15 @@ function paint(canvas: Canvas, frame: Decoded, table: ReturnType<typeof yawTable
       const i01 = (y1 * fw + x0) * 3;
       const i11 = (y1 * fw + x1) * 3;
 
-      // 1 in the middle of the frame, 0 at its edge, squared so the frame
-      // looking most directly at this bit of wall dominates decisively rather
-      // than being averaged with its neighbour into a soft double image.
-      const edge = (1 - (sx < 0 ? -sx : sx)) * (1 - (sy < 0 ? -sy : sy));
-      const w = edge * edge + 1e-4;
+      // 1 in the middle of the frame, 0 at its edge. A frame is used only
+      // where it is the best view of this pixel, or within a tenth of being
+      // it; everywhere else another frame is looking more directly at the
+      // same wall and this one would only be a second copy of it.
+      const q = (1 - (sx < 0 ? -sx : sx)) * (1 - (sy < 0 ? -sy : sy));
+      const over = q - best[row + x] * SEAM_SHARE;
+      if (over <= 0) continue;
+
+      const w = over * over;
       const gw = gain * w;
 
       const out = (row + x) * 3;
