@@ -18,6 +18,7 @@ import {
   decide,
   nextInOrder,
   rollError,
+  unrecord,
   frameName,
   frameWidthFor,
   guidance,
@@ -39,6 +40,13 @@ import {
   type Vector3,
 } from "@/lib/panorama/orientation";
 import { ASSUMED_HFOV } from "@/lib/panorama/sphere";
+import {
+  accumulateDrift,
+  focusScore,
+  hasDrifted,
+  isSharpEnough,
+  medianOf,
+} from "@/lib/panorama/sharpness";
 import { stitchErrorMessage } from "@/lib/panorama/stitch";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -180,6 +188,10 @@ export function PanoramaCapture({
    * offers the way out rather than showing a camera that cannot photograph.
    */
   const [sensorMissing, setSensorMissing] = useState(false);
+  /** True while the phone has been moving about rather than turning on a spot. */
+  const [drifting, setDrifting] = useState(false);
+  /** Set when a frame was thrown away for being blurred, so the screen can say. */
+  const [refused, setRefused] = useState(0);
 
   /**
    * Everything the overlay draws, refreshed on every animation frame.
@@ -204,6 +216,13 @@ export function PanoramaCapture({
   const markerTaken = useRef(new Map<string, string>());
   /** The captured ids, rebuilt when one is captured rather than per frame. */
   const takenRef = useRef<Set<string>>(new Set());
+  /** What the frames of this capture have scored for sharpness so far. */
+  const focusRef = useRef<number[]>([]);
+  /** Accumulated movement that turning does not account for. */
+  const driftRef = useRef(0);
+  const driftAtRef = useRef(0);
+  /** The canvas frames are drawn on, kept rather than made forty times. */
+  const scratchRef = useRef<HTMLCanvasElement | null>(null);
   const aimRef = useRef<HTMLSpanElement>(null);
   const holdRef = useRef<HTMLSpanElement>(null);
   const holdRingRef = useRef<HTMLSpanElement>(null);
@@ -283,24 +302,66 @@ export function PanoramaCapture({
    * preview, which would carry the overlay with it and be the size of the
    * phone's screen rather than the size of its sensor.
    */
-  const grab = useCallback(async (frameCount: number): Promise<Blob | null> => {
-    const video = videoRef.current;
-    if (!video || !video.videoWidth) return null;
+  /**
+   * Pull one frame off the video element as a JPEG, if it is sharp enough.
+   *
+   * Section 6: this is the camera's own image at the resolution the stream is
+   * running at, scaled once to the upload width — not a screenshot of the
+   * preview, which would carry the overlay with it and be the size of the
+   * phone's screen rather than the size of its sensor.
+   *
+   * Focus is measured before anything is encoded. A blurred frame is not a
+   * slightly worse frame: it is the one the matcher cannot place, so it drags
+   * its neighbours out of position too, and one of them is enough to fail the
+   * quality check for the whole room.
+   */
+  const grab = useCallback(
+    async (frameCount: number): Promise<Blob | null> => {
+      const video = videoRef.current;
+      if (!video || !video.videoWidth) return null;
 
-    const width = frameWidthFor(frameCount);
-    const scale = Math.min(1, width / video.videoWidth);
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(video.videoWidth * scale);
-    canvas.height = Math.round(video.videoHeight * scale);
+      const width = frameWidthFor(frameCount);
+      const scale = Math.min(1, width / video.videoWidth);
 
-    const context = canvas.getContext("2d");
-    if (!context) return null;
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const canvas = scratchRef.current ?? document.createElement("canvas");
+      scratchRef.current = canvas;
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
 
-    return new Promise((resolve) =>
-      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.88),
-    );
-  }, []);
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) return null;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Measured on a small greyscale copy: the question is whether the edges
+      // in the room survived, and that is answerable at a fraction of the size
+      // for a fraction of the time.
+      const probeW = 160;
+      const probeH = Math.max(1, Math.round((canvas.height / canvas.width) * probeW));
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      const grey = new Uint8Array(probeW * probeH);
+      for (let y = 0; y < probeH; y += 1) {
+        const sy = Math.floor((y * canvas.height) / probeH);
+        for (let x = 0; x < probeW; x += 1) {
+          const sx = Math.floor((x * canvas.width) / probeW);
+          const i = (sy * canvas.width + sx) * 4;
+          grey[y * probeW + x] =
+            (pixels.data[i] * 77 + pixels.data[i + 1] * 150 + pixels.data[i + 2] * 29) >> 8;
+        }
+      }
+
+      const score = focusScore(grey, probeW, probeH);
+      if (!isSharpEnough(score, medianOf(focusRef.current))) {
+        setRefused((n) => n + 1);
+        return null;
+      }
+      focusRef.current.push(score);
+
+      return new Promise((resolve) =>
+        canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.9),
+      );
+    },
+    [],
+  );
 
   /**
    * Photograph the target the camera is on, and record where it was pointing.
@@ -319,7 +380,17 @@ export function PanoramaCapture({
       const blob = await grab(planned);
       const video = videoRef.current;
 
-      if (blob && pose && video) {
+      // The shutter fired and nothing came back — the frame was blurred and
+      // refused. The target goes back on the list, because a target marked
+      // done with no photograph behind it is a hole in the sphere that the
+      // coverage gate will never notice.
+      if (!blob) {
+        applyState(unrecord(stateRef.current, target.id));
+        busyRef.current = false;
+        return;
+      }
+
+      if (pose && video) {
         const facing = yawPitchOf(forwardOf(pose));
         framesRef.current.push({
           blob,
@@ -336,7 +407,7 @@ export function PanoramaCapture({
 
       busyRef.current = false;
     },
-    [grab],
+    [grab, applyState],
   );
 
   const stitch = useCallback(async (jobId: string) => {
@@ -805,11 +876,27 @@ export function PanoramaCapture({
     // Held, not attached: the <video> does not exist until the phase changes.
     streamRef.current = stream;
 
+    // Pin the exposure and the white balance where the camera has settled.
+    //
+    // Left to itself a phone re-meters between a window and a dark corner, so
+    // two frames of the same wall come back a stop apart and the same wall two
+    // different colours. The stitcher can level brightness across a seam; it
+    // cannot un-shift a white balance that moved halfway round the room. Not
+    // every browser offers this — it is newer than the camera API itself — so
+    // it is attempted and the failure ignored, because a capture with
+    // automatic exposure is worse but still a capture.
+    await lockCamera(stream);
+
     framesRef.current = [];
     // A new capture starts wherever the person is standing now, not where they
     // were standing for the one they abandoned.
     zeroRef.current = null;
     poseRef.current = null;
+    focusRef.current = [];
+    driftRef.current = 0;
+    driftAtRef.current = 0;
+    setDrifting(false);
+    setRefused(0);
     recentRef.current = [];
     heldSinceRef.current = null;
     takenRef.current = new Set();
@@ -817,6 +904,37 @@ export function PanoramaCapture({
     applyState(startCapture());
     setPhase("capturing");
   }
+
+  /**
+   * Watch for the phone being carried rather than turned.
+   *
+   * Nothing on a phone measures position, and integrating acceleration twice
+   * to find it turns a small constant error into a large growing one — a phone
+   * on a table would "walk" metres in a minute. So this does not track where
+   * the phone is. It accumulates movement that turning does not account for,
+   * which stays near zero for somebody rotating on the spot and climbs for
+   * somebody walking, and it decays so that standing still clears it.
+   */
+  useEffect(() => {
+    if (phase !== "capturing") return;
+
+    const onMotion = (event: DeviceMotionEvent) => {
+      const a = event.acceleration;
+      if (!a || (a.x === null && a.y === null && a.z === null)) return;
+
+      const now = Date.now();
+      const seconds = driftAtRef.current === 0 ? 0 : (now - driftAtRef.current) / 1000;
+      driftAtRef.current = now;
+      if (seconds <= 0 || seconds > 0.5) return;
+
+      const magnitude = Math.hypot(a.x ?? 0, a.y ?? 0, a.z ?? 0);
+      driftRef.current = accumulateDrift(driftRef.current, magnitude, seconds);
+      setDrifting(hasDrifted(driftRef.current));
+    };
+
+    window.addEventListener("devicemotion", onMotion);
+    return () => window.removeEventListener("devicemotion", onMotion);
+  }, [phase]);
 
   /**
    * Give the sensor a moment, then stop waiting.
@@ -993,6 +1111,20 @@ export function PanoramaCapture({
                   required direction has been photographed there is a hole in
                   the sphere, and the only thing that fills it is pointing the
                   camera at it. */}
+              {drifting && (
+                <p className="rounded-full bg-amber-400/95 px-3 py-1 text-sm font-medium text-black">
+                  Come back to where you started and turn on the spot
+                </p>
+              )}
+
+              {refused > 0 && !drifting && (
+                <p className="text-sm text-white/70">
+                  {refused === 1
+                    ? "One photo was too blurred and was retaken"
+                    : `${refused} photos were too blurred and were retaken`}
+                </p>
+              )}
+
               {!covered.complete && (
                 <p className="text-sm text-white/70">
                   {nextNumber === null
@@ -1322,6 +1454,52 @@ const Sphere = memo(function Sphere({
     </div>
   );
 });
+
+/**
+ * Hold the exposure and the white balance still for the length of a capture.
+ *
+ * `applyConstraints` is the only way to ask, the capabilities differ between
+ * every phone and browser, and asking for something unsupported throws. So
+ * each is asked for on its own and each failure is swallowed: a capture with
+ * the camera metering as it pleases is worse, not impossible.
+ */
+async function lockCamera(stream: MediaStream): Promise<void> {
+  const track = stream.getVideoTracks()[0];
+  if (!track) return;
+
+  type Extended = MediaTrackCapabilities & {
+    exposureMode?: string[];
+    whiteBalanceMode?: string[];
+    focusMode?: string[];
+  };
+
+  let able: Extended = {};
+  try {
+    able = (track.getCapabilities?.() ?? {}) as Extended;
+  } catch {
+    return;
+  }
+
+  // A moment of automatic metering first, so what gets pinned is the room
+  // rather than whatever the sensor happened to read as it woke up.
+  await new Promise((resolve) => setTimeout(resolve, 450));
+
+  for (const [key, wanted] of [
+    ["exposureMode", "manual"],
+    ["whiteBalanceMode", "manual"],
+    ["focusMode", "continuous"],
+  ] as const) {
+    const offered = able[key];
+    if (!Array.isArray(offered) || !offered.includes(wanted)) continue;
+    try {
+      await track.applyConstraints({
+        advanced: [{ [key]: wanted }],
+      } as MediaTrackConstraints);
+    } catch {
+      // This phone will not hold it. The stitcher levels what it can.
+    }
+  }
+}
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;

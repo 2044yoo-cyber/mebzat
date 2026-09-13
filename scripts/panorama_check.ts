@@ -39,6 +39,7 @@ import {
   record,
   rollError,
   startCapture,
+  unrecord,
 } from "../src/lib/panorama/capture.ts";
 import {
   ASSUMED_HFOV,
@@ -66,6 +67,13 @@ import {
   type Vector3,
 } from "../src/lib/panorama/orientation.ts";
 import { stitchErrorMessage } from "../src/lib/panorama/stitch.ts";
+import {
+  accumulateDrift,
+  focusScore,
+  hasDrifted,
+  isSharpEnough,
+  medianOf,
+} from "../src/lib/panorama/sharpness.ts";
 
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
@@ -695,6 +703,155 @@ function wholeFunction(src: string, name: string): string {
     "coverage counts what was taken against what was planned",
     coverage(fresh.plan, new Set([first.id])).taken === 1 &&
       coverage(fresh.plan, new Set()).total === fresh.plan.length,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Image quality at capture, and staying on the spot
+// ---------------------------------------------------------------------------
+
+{
+  // A pattern of hard edges, and the same pattern smeared sideways the way a
+  // phone smears one when it fires mid-swing.
+  const W = 64;
+  const H = 64;
+  const crisp = new Uint8Array(W * H);
+  const smeared = new Uint8Array(W * H);
+  for (let y = 0; y < H; y += 1) {
+    for (let x = 0; x < W; x += 1) crisp[y * W + x] = Math.floor(x / 8) % 2 === 0 ? 40 : 210;
+  }
+  for (let y = 0; y < H; y += 1) {
+    for (let x = 0; x < W; x += 1) {
+      let total = 0;
+      for (let d = -3; d <= 3; d += 1) {
+        total += crisp[y * W + Math.min(W - 1, Math.max(0, x + d))];
+      }
+      smeared[y * W + x] = total / 7;
+    }
+  }
+
+  const sharpScore = focusScore(crisp, W, H);
+  const blurScore = focusScore(smeared, W, H);
+
+  check(
+    "a smeared frame scores far below a sharp one",
+    blurScore < sharpScore * 0.1,
+    `${blurScore.toFixed(0)} against ${sharpScore.toFixed(0)} — motion blur destroys the second derivative while leaving the average brightness alone, which is why it is measured this way and not by brightness`,
+  );
+  check(
+    "and is refused",
+    !isSharpEnough(blurScore, sharpScore),
+    "a blurred frame is not a slightly worse frame: it is the one the matcher cannot place, and it drags its neighbours out of position with it",
+  );
+  check("while a sharp one is kept", isSharpEnough(sharpScore, sharpScore));
+  check(
+    "the first frame of a capture is always kept",
+    isSharpEnough(0, 0),
+    "there is nothing to compare it against yet, and it becomes the thing the rest are compared against",
+  );
+  check(
+    "the bar is the room's own sharpness, not a constant",
+    isSharpEnough(200, 300) && !isSharpEnough(200, 3000),
+    "patterned wallpaper scores an order of magnitude above a white corridor; a fixed threshold rejects everything in one room and nothing in the other",
+  );
+  check("the reference is the middle frame", medianOf([5, 1, 9, 3, 7]) === 5);
+  check("and an empty capture has no reference", medianOf([]) === 0);
+
+  // Movement that turning does not account for.
+  {
+    let walking = 0;
+    for (let i = 0; i < 20; i += 1) walking = accumulateDrift(walking, 2.5, 0.05);
+    check(
+      "a second of walking is noticed",
+      hasDrifted(walking),
+      `${walking.toFixed(2)} — parallax is the one thing no rotation can reconcile, so it is worth interrupting somebody for`,
+    );
+
+    // 1.5 m/s² is a hand adjusting its grip, not somebody walking. It is
+    // chosen because the decay alone does not hold it under the warning —
+    // without the deadband this settles at 1.25 and warns — so the check
+    // exercises the deadband rather than passing with or without it.
+    let steady = 0;
+    for (let i = 0; i < 80; i += 1) steady = accumulateDrift(steady, 1.5, 0.05);
+    check(
+      "a hand that is merely not perfectly still is not",
+      !hasDrifted(steady),
+      `${steady.toFixed(2)} — a warning everybody sees is a warning nobody reads`,
+    );
+
+    let recovering = walking;
+    for (let i = 0; i < 60; i += 1) recovering = accumulateDrift(recovering, 0.2, 0.05);
+    check(
+      "and standing still again clears it",
+      !hasDrifted(recovering),
+      `${recovering.toFixed(2)} — a warning that never goes away cannot be obeyed`,
+    );
+    check(
+      "with nothing happening the total only falls",
+      accumulateDrift(5, 0, 0.05) < 5 && accumulateDrift(5, 0, 0.05) > 0,
+      "without the decay a capture that started with one stumble would carry the warning to the end of the room",
+    );
+  }
+
+  // The screen, and the state machine behind it.
+  {
+    const fresh = startCapture();
+    const taken = record(fresh, fresh.plan[0].id);
+    check(
+      "a target can be put back on the list",
+      unrecord(taken, fresh.plan[0].id).taken.length === 0,
+      "the shutter and the photograph are different events: the decision comes from the sensors and the frame is read a moment later and may be thrown away",
+    );
+    check(
+      "and putting back one that was never taken changes nothing",
+      unrecord(fresh, fresh.plan[0].id) === fresh,
+    );
+  }
+
+  const capture = code("src/components/tour/panorama-capture.tsx");
+  check(
+    "a refused frame does not leave its target marked done",
+    /if \(!blob\) \{[\s\S]{0,200}?unrecord\(stateRef\.current, target\.id\)/.test(capture),
+    "a target marked done with no photograph behind it is a hole in the sphere that the coverage gate cannot see, because the gate counts intentions",
+  );
+  check(
+    "focus is measured before anything is encoded",
+    /const score = focusScore\(grey, probeW, probeH\);/.test(capture) &&
+      capture.indexOf("focusScore(grey") < capture.indexOf("canvas.toBlob"),
+  );
+  check(
+    "exposure and white balance are pinned for the length of a capture",
+    /\["exposureMode", "manual"\]/.test(capture) &&
+      /\["whiteBalanceMode", "manual"\]/.test(capture),
+    "the stitcher can level brightness across a seam; it cannot un-shift a white balance that moved halfway round the room",
+  );
+  check(
+    "and a phone that will not hold them still captures anyway",
+    // The structure, not the comment explaining it: `code()` strips comments,
+    // so a check written against the explanation is a check against nothing.
+    /try \{\s*await track\.applyConstraints\([\s\S]{0,140}?\} catch \{/.test(capture) &&
+      /able = \(track\.getCapabilities\?\.\(\) \?\? \{\}\)[\s\S]{0,80}?\} catch \{\s*return;/.test(
+        capture,
+      ),
+    "a capture with the camera metering as it pleases is worse, not impossible",
+  );
+  check(
+    "the camera is given a moment to settle before it is pinned",
+    /await new Promise\(\(resolve\) => setTimeout\(resolve, 450\)\);/.test(capture),
+    "pinning the first reading pins whatever the sensor saw as it woke up",
+  );
+  check(
+    "somebody who walks off is asked to come back",
+    /Come back to where you started and turn on the spot/.test(capture),
+  );
+  check(
+    "and the movement is read from the accelerometer, not guessed at",
+    /window\.addEventListener\("devicemotion", onMotion\)/.test(capture) &&
+      /accumulateDrift\(driftRef\.current, magnitude, seconds\)/.test(capture),
+  );
+  check(
+    "a frame thrown away for blur is admitted to, not hidden",
+    /were too blurred and were retaken/.test(capture),
   );
 }
 

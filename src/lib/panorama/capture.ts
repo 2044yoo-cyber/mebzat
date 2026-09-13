@@ -95,6 +95,21 @@ export function record(state: CaptureState, id: string): CaptureState {
     : { ...state, taken: [...state.taken, id] };
 }
 
+/**
+ * Put a target back on the list.
+ *
+ * The shutter and the photograph are not the same event: the decision to
+ * capture is made from the sensors, and the frame is read off the video a
+ * moment later and can be thrown away for being blurred. A target left marked
+ * as done with no photograph behind it is a hole in the sphere that the
+ * coverage gate cannot see, because the gate counts intentions.
+ */
+export function unrecord(state: CaptureState, id: string): CaptureState {
+  return state.taken.includes(id)
+    ? { ...state, taken: state.taken.filter((taken) => taken !== id) }
+    : state;
+}
+
 export type Decision =
   | { action: "capture"; target: Target; state: CaptureState }
   | {
