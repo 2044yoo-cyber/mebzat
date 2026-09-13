@@ -44,28 +44,38 @@ export function focusScore(
 }
 
 /**
- * How much sharper than its fellows a frame has to be to be kept.
+ * Below this a frame is not soft, it is smeared past use.
  *
- * Against the running median of the capture rather than a constant, because
- * the number depends on the room: a bedroom with patterned wallpaper scores an
- * order of magnitude above a white corridor, and a fixed threshold would
- * either reject everything in the corridor or nothing in the bedroom.
+ * An absolute floor, and deliberately a low one. This used to be a fraction of
+ * the median of the frames already accepted, which was wrong in a way that
+ * made the capture unusable: the score depends on what is in front of the
+ * camera, not only on how still it was held. A wall with a picture rail scores
+ * an order of magnitude above a plain painted one. So a target facing a blank
+ * wall could never reach half of what a bookcase had scored, and was refused
+ * over and over — a hundred and forty photographs to finish three points,
+ * every one of them perfectly sharp.
+ *
+ * Comparing across scenes cannot work. What can be said absolutely is that a
+ * frame with almost no second derivative anywhere has no edges at all, and a
+ * room always has some. That is what this catches, and nothing else: slight
+ * handheld softness passes, because this is a property tour and not tripod
+ * work, and because stillness is enforced before the shutter rather than
+ * judged after it.
  */
-export const BLUR_FRACTION = 0.45;
+export const CLEARLY_BAD = 28;
 
-/** Whether a frame is sharp enough to keep, given what this room scores. */
-export function isSharpEnough(score: number, reference: number): boolean {
-  // Nothing to compare against yet — the first frame of a capture is kept, and
-  // becomes the reference the rest are judged by.
-  if (reference <= 0) return true;
-  return score >= reference * BLUR_FRACTION;
-}
+/**
+ * How many goes one target gets.
+ *
+ * Two. The first is almost always kept; a clearly smeared one buys a second,
+ * and whichever of the two is sharper is then used whatever it scores. Nothing
+ * about this loop can repeat.
+ */
+export const MAX_ATTEMPTS_PER_TARGET = 2;
 
-/** The middle value, which is what the reference should be. */
-export function medianOf(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
+/** Whether this frame is worth one more go, given how many it has had. */
+export function shouldRetake(score: number, attempt: number): boolean {
+  return score < CLEARLY_BAD && attempt < MAX_ATTEMPTS_PER_TARGET;
 }
 
 /**

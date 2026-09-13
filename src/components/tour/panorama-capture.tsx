@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { CaptureRules } from "@/components/tour/capture-rules";
 import { PanoramaViewer } from "@/components/tour/panorama-viewer";
 import {
+  CAPTURE_COOLDOWN_MS,
   STEADY_MS,
   captureManually,
   decide,
@@ -44,8 +45,7 @@ import {
   accumulateDrift,
   focusScore,
   hasDrifted,
-  isSharpEnough,
-  medianOf,
+  shouldRetake,
 } from "@/lib/panorama/sharpness";
 import { stitchErrorMessage } from "@/lib/panorama/stitch";
 import { createClient } from "@/lib/supabase/client";
@@ -216,8 +216,11 @@ export function PanoramaCapture({
   const markerTaken = useRef(new Map<string, string>());
   /** The captured ids, rebuilt when one is captured rather than per frame. */
   const takenRef = useRef<Set<string>>(new Set());
-  /** What the frames of this capture have scored for sharpness so far. */
-  const focusRef = useRef<number[]>([]);
+  /** How many goes each target has had, and the best frame it produced. */
+  const attemptsRef = useRef(new Map<string, number>());
+  const bestShotRef = useRef(new Map<string, { blob: Blob; score: number }>());
+  /** Nothing fires before this, so one target cannot become two. */
+  const cooldownRef = useRef(0);
   /** Accumulated movement that turning does not account for. */
   const driftRef = useRef(0);
   const driftAtRef = useRef(0);
@@ -310,13 +313,12 @@ export function PanoramaCapture({
    * preview, which would carry the overlay with it and be the size of the
    * phone's screen rather than the size of its sensor.
    *
-   * Focus is measured before anything is encoded. A blurred frame is not a
-   * slightly worse frame: it is the one the matcher cannot place, so it drags
-   * its neighbours out of position too, and one of them is enough to fail the
-   * quality check for the whole room.
+   * The focus measurement comes back with the frame rather than deciding its
+   * fate here: whether it is worth keeping depends on which go this is and on
+   * what the previous go scored, and neither is this function's business.
    */
   const grab = useCallback(
-    async (frameCount: number): Promise<Blob | null> => {
+    async (frameCount: number): Promise<{ blob: Blob; score: number } | null> => {
       const video = videoRef.current;
       if (!video || !video.videoWidth) return null;
 
@@ -350,15 +352,10 @@ export function PanoramaCapture({
       }
 
       const score = focusScore(grey, probeW, probeH);
-      if (!isSharpEnough(score, medianOf(focusRef.current))) {
-        setRefused((n) => n + 1);
-        return null;
-      }
-      focusRef.current.push(score);
-
-      return new Promise((resolve) =>
-        canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.9),
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((made) => resolve(made), "image/jpeg", 0.9),
       );
+      return blob ? { blob, score } : null;
     },
     [],
   );
@@ -377,34 +374,55 @@ export function PanoramaCapture({
       busyRef.current = true;
 
       const pose = poseRef.current;
-      const blob = await grab(planned);
+      const shot = await grab(planned);
       const video = videoRef.current;
 
-      // The shutter fired and nothing came back — the frame was blurred and
-      // refused. The target goes back on the list, because a target marked
-      // done with no photograph behind it is a hole in the sphere that the
-      // coverage gate will never notice.
-      if (!blob) {
+      if (!shot || !pose || !video) {
+        // No frame at all — the camera is not delivering. The target goes back
+        // on the list, because one marked done with no photograph behind it is
+        // a hole in the sphere that the coverage gate cannot see: the gate
+        // counts intentions.
         applyState(unrecord(stateRef.current, target.id));
         busyRef.current = false;
         return;
       }
 
-      if (pose && video) {
-        const facing = yawPitchOf(forwardOf(pose));
-        framesRef.current.push({
-          blob,
-          targetId: target.id,
-          yaw: facing.yaw,
-          pitch: facing.pitch,
-          roll: rollOf(pose),
-          fov: ASSUMED_HFOV,
-          width: video.videoWidth,
-          height: video.videoHeight,
-          at: Date.now(),
-        });
+      const attempt = (attemptsRef.current.get(target.id) ?? 0) + 1;
+      attemptsRef.current.set(target.id, attempt);
+
+      // The best go at *this* target, which is the only fair comparison: a
+      // score means nothing against a frame of somewhere else.
+      const previous = bestShotRef.current.get(target.id);
+      const best = !previous || shot.score > previous.score ? shot : previous;
+      bestShotRef.current.set(target.id, best);
+
+      if (shouldRetake(shot.score, attempt)) {
+        // One more go, and only one. The target goes back on the list and the
+        // cooldown keeps the shutter shut long enough for a hand to settle.
+        applyState(unrecord(stateRef.current, target.id));
+        setRefused((n) => n + 1);
+        cooldownRef.current = Date.now() + CAPTURE_COOLDOWN_MS;
+        busyRef.current = false;
+        return;
       }
 
+      const facing = yawPitchOf(forwardOf(pose));
+      framesRef.current.push({
+        blob: best.blob,
+        targetId: target.id,
+        yaw: facing.yaw,
+        pitch: facing.pitch,
+        roll: rollOf(pose),
+        fov: ASSUMED_HFOV,
+        width: video.videoWidth,
+        height: video.videoHeight,
+        at: Date.now(),
+      });
+
+      // Taken, and done with. Nothing fires again until the phone has had time
+      // to leave this direction.
+      bestShotRef.current.delete(target.id);
+      cooldownRef.current = Date.now() + CAPTURE_COOLDOWN_MS;
       busyRef.current = false;
     },
     [grab, applyState],
@@ -581,6 +599,10 @@ export function PanoramaCapture({
       const pose = poseRef.current;
       const video = videoRef.current;
       if (!pose || !video?.videoWidth) return;
+
+      // A frame is being read, or one was just taken. Deciding now is how one
+      // target becomes two photographs, or forty.
+      if (busyRef.current || Date.now() < cooldownRef.current) return;
 
       const facing = forwardOf(pose);
 
@@ -892,7 +914,9 @@ export function PanoramaCapture({
     // were standing for the one they abandoned.
     zeroRef.current = null;
     poseRef.current = null;
-    focusRef.current = [];
+    attemptsRef.current = new Map();
+    bestShotRef.current = new Map();
+    cooldownRef.current = 0;
     driftRef.current = 0;
     driftAtRef.current = 0;
     setDrifting(false);
@@ -1120,8 +1144,8 @@ export function PanoramaCapture({
               {refused > 0 && !drifting && (
                 <p className="text-sm text-white/70">
                   {refused === 1
-                    ? "One photo was too blurred and was retaken"
-                    : `${refused} photos were too blurred and were retaken`}
+                    ? "One photo was retaken"
+                    : `${refused} photos were retaken`}
                 </p>
               )}
 

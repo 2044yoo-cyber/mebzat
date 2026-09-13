@@ -25,6 +25,7 @@ import {
 } from "../src/lib/panorama/compose.ts";
 import {
   ALIGN_TOLERANCE_DEGREES,
+  CAPTURE_COOLDOWN_MS,
   ROLL_TOLERANCE_DEGREES,
   STEADY_DEGREES,
   STEADY_MS,
@@ -68,11 +69,12 @@ import {
 } from "../src/lib/panorama/orientation.ts";
 import { stitchErrorMessage } from "../src/lib/panorama/stitch.ts";
 import {
+  CLEARLY_BAD,
+  MAX_ATTEMPTS_PER_TARGET,
   accumulateDrift,
   focusScore,
   hasDrifted,
-  isSharpEnough,
-  medianOf,
+  shouldRetake,
 } from "../src/lib/panorama/sharpness.ts";
 
 const GREEN = "\x1b[32m";
@@ -738,24 +740,46 @@ function wholeFunction(src: string, name: string): string {
     blurScore < sharpScore * 0.1,
     `${blurScore.toFixed(0)} against ${sharpScore.toFixed(0)} — motion blur destroys the second derivative while leaving the average brightness alone, which is why it is measured this way and not by brightness`,
   );
+
+  // What a frame is judged against, which is where this went wrong before.
   check(
-    "and is refused",
-    !isSharpEnough(blurScore, sharpScore),
-    "a blurred frame is not a slightly worse frame: it is the one the matcher cannot place, and it drags its neighbours out of position with it",
-  );
-  check("while a sharp one is kept", isSharpEnough(sharpScore, sharpScore));
-  check(
-    "the first frame of a capture is always kept",
-    isSharpEnough(0, 0),
-    "there is nothing to compare it against yet, and it becomes the thing the rest are compared against",
+    "sharpness is judged against a floor, not against other frames",
+    !/isSharpEnough|medianOf|BLUR_FRACTION/.test(code("src/lib/panorama/sharpness.ts")),
+    "the score depends on what is in front of the camera as much as on how still it was held: a wall with a picture rail scores an order of magnitude above a plain one, so a target facing a blank wall could never reach half of what a bookcase scored and was refused forever",
   );
   check(
-    "the bar is the room's own sharpness, not a constant",
-    isSharpEnough(200, 300) && !isSharpEnough(200, 3000),
-    "patterned wallpaper scores an order of magnitude above a white corridor; a fixed threshold rejects everything in one room and nothing in the other",
+    "and the floor is low enough that ordinary handheld softness passes",
+    CLEARLY_BAD < sharpScore * 0.02,
+    `${CLEARLY_BAD} against ${sharpScore.toFixed(0)} for a sharp frame — this is a property tour, not tripod work`,
   );
-  check("the reference is the middle frame", medianOf([5, 1, 9, 3, 7]) === 5);
-  check("and an empty capture has no reference", medianOf([]) === 0);
+  check(
+    "a frame with almost no edges anywhere is still caught",
+    shouldRetake(CLEARLY_BAD - 1, 1),
+  );
+
+  // The acceptance test: how many photographs one target can cost.
+  {
+    check(
+      "a normal frame is kept first time",
+      !shouldRetake(sharpScore, 1),
+      "one aligned target, one photograph",
+    );
+    check(
+      "a clearly unusable one buys exactly one more go",
+      shouldRetake(1, 1) && !shouldRetake(1, 2),
+      "after the second, the better of the two is used whatever it scored — nothing here can repeat",
+    );
+    check(
+      "so no target can ever cost more than two",
+      [1, 2, 3, 10, 40].every((attempt) => attempt < MAX_ATTEMPTS_PER_TARGET || !shouldRetake(0, attempt)),
+      "the runaway was a hundred and forty photographs for three points",
+    );
+    check(
+      "and thirty-eight targets cannot cost more than seventy-six",
+      MAX_ATTEMPTS_PER_TARGET === 2,
+      `${MAX_ATTEMPTS_PER_TARGET} attempts each — typically 38 to 42, never 100+`,
+    );
+  }
 
   // Movement that turning does not account for.
   {
@@ -810,8 +834,46 @@ function wholeFunction(src: string, name: string): string {
 
   const capture = code("src/components/tour/panorama-capture.tsx");
   check(
+    "nothing is decided while a frame is being read, or just after one was",
+    /if \(busyRef\.current \|\| Date\.now\(\) < cooldownRef\.current\) return;/.test(capture),
+    "the loop ran at sixty frames a second with no idea that a capture was in progress, which is how one target became forty photographs",
+  );
+  check(
+    "a successful capture shuts the shutter for the best part of a second",
+    /cooldownRef\.current = Date\.now\(\) \+ CAPTURE_COOLDOWN_MS;/.test(capture) &&
+      CAPTURE_COOLDOWN_MS >= 700 &&
+      CAPTURE_COOLDOWN_MS <= 1200,
+    `${CAPTURE_COOLDOWN_MS}ms — nobody swings away the instant it fires, so without this the phone is still pointing at the same place when the next decision is made`,
+  );
+  check(
+    "each target's attempts are counted against itself",
+    /attemptsRef\.current\.get\(target\.id\)/.test(capture) &&
+      /bestShotRef\.current\.get\(target\.id\)/.test(capture),
+    "a score means nothing against a frame of somewhere else",
+  );
+  check(
+    "and after the last go the better of the two is kept",
+    /const best = !previous \|\| shot\.score > previous\.score \? shot : previous;/.test(capture) &&
+      /blob: best\.blob,/.test(capture),
+    "keeping neither, and going round again, is the loop this is fixing",
+  );
+  check(
+    "the stillness asked for is a hand, not a tripod",
+    STEADY_MS >= 250 && STEADY_MS <= 400 && STEADY_DEGREES >= 2,
+    `${STEADY_MS}ms and ${STEADY_DEGREES}° between readings`,
+  );
+  check(
+    "stillness is required before the shutter rather than judged after it",
+    /const settled =\s*\n?\s*decision\.action === "aim" && decision\.aligned && decision\.steady && decision\.level;/.test(
+      capture,
+    ),
+    "waiting for a steady phone and taking one photograph beats taking many and throwing most away",
+  );
+  check(
     "a refused frame does not leave its target marked done",
-    /if \(!blob\) \{[\s\S]{0,200}?unrecord\(stateRef\.current, target\.id\)/.test(capture),
+    /if \(!shot \|\| !pose \|\| !video\) \{[\s\S]{0,260}?unrecord\(stateRef\.current, target\.id\)/.test(
+      capture,
+    ),
     "a target marked done with no photograph behind it is a hole in the sphere that the coverage gate cannot see, because the gate counts intentions",
   );
   check(
@@ -851,7 +913,7 @@ function wholeFunction(src: string, name: string): string {
   );
   check(
     "a frame thrown away for blur is admitted to, not hidden",
-    /were too blurred and were retaken/.test(capture),
+    /photos were retaken/.test(capture),
   );
 }
 
@@ -952,6 +1014,22 @@ function wholeFunction(src: string, name: string): string {
     "it is refined against the pixels rather than trusted",
     /function refinePoses/.test(stitcher) && /function agreement/.test(stitcher),
     "section 7 steps 3–5: sensors drift, and a degree of drift puts a doorway two hundred pixels from itself",
+  );
+  check(
+    "and every frame is refined again against all the others",
+    /if \(rough >= POLISH_ABOVE\) \{/.test(stitcher) &&
+      /if \(other !== frame\) paint\(without, other, table, flat\);/.test(stitcher),
+    "the first pass refines each frame against those already placed, so the first is never refined at all and the plan starts at the horizon — the most visible part of the room gets the least correction, and that is what bends a ceiling line where two frames meet",
+  );
+  check(
+    "with the frame itself left out of what it is compared against",
+    /for \(const other of order\) \{\s*\n?\s*if \(other !== frame\)/.test(stitcher),
+    "a frame compared against a picture that already contains it is being asked to agree with itself, which it does best by not moving",
+  );
+  check(
+    "and only when the frames admit a single rotation at all",
+    /const POLISH_ABOVE = 0\.45;/.test(stitcher),
+    "where one exists the second pass finds it — 0.947 to 0.953 on the synthetic room, and half the badly-placed pixels. Where parallax means none does, the same pass chases it and makes things worse: 0.904 down to 0.897. The first pass's own score says which case this is",
   );
   check(
     "a refinement has to beat leaving the frame alone before it is taken",
@@ -1623,10 +1701,9 @@ async function endToEnd() {
     "section 6: by the time the stitcher sees the image there is nothing in the pixels that says which way the camera was facing",
   );
 
-  const grabbing = blockAfter(capture, "const grab = useCallback(");
   check(
     "the camera's own image is captured, not the screen",
-    /drawImage\(video, 0, 0/.test(grabbing) && /video\.videoWidth/.test(grabbing),
+    /drawImage\(video, 0, 0/.test(capture) && /video\.videoWidth/.test(capture),
     "section 6: a screenshot of the preview carries the overlay with it and is the size of the phone's screen",
   );
 

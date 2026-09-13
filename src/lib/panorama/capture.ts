@@ -30,10 +30,10 @@ export const ALIGN_TOLERANCE_DEGREES = 9;
  * mid-swing, and a smeared frame is worse than no frame: it is the one the
  * matcher cannot align, so it takes its neighbours with it.
  */
-export const STEADY_DEGREES = 1.6;
+export const STEADY_DEGREES = 2.6;
 
 /** How long it has to stay that still. Section 4 asks for 300–600ms. */
-export const STEADY_MS = 500;
+export const STEADY_MS = 350;
 
 /**
  * How far the phone may be rolled about its own line of sight.
@@ -46,6 +46,17 @@ export const STEADY_MS = 500;
  * asked for.
  */
 export const ROLL_TOLERANCE_DEGREES = 12;
+
+/**
+ * How long the shutter stays shut after a target is taken.
+ *
+ * Nobody swings away from a target the instant it fires, so for the best part
+ * of a second afterwards the phone is still pointing at roughly the same
+ * place — near enough to whatever target is next in that direction to start
+ * capturing it from a position nobody chose. Waiting is also what makes the
+ * green marker and the number readable as a confirmation rather than a flicker.
+ */
+export const CAPTURE_COOLDOWN_MS = 900;
 
 export type CaptureState = {
   plan: Target[];
