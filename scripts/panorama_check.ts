@@ -1156,7 +1156,7 @@ async function endToEnd() {
   );
   check(
     "and the loop writes the positions straight to the elements",
-    /element\.style\.transform =\s*\n?\s*`translate3d\(\$\{\(at\.x \* halfW\)/.test(capture),
+    /element\.style\.transform =\s*\n?\s*`translate3d\(\$\{\(sx \* halfW\)/.test(capture),
     "acceptance 11 and section 5: the position comes from the projection, so it moves when and only when the phone does",
   );
   check(
@@ -1165,7 +1165,7 @@ async function endToEnd() {
   );
   check(
     "the markers lean when the phone is rolled",
-    /rotate\(\$\{-roll\.toFixed\(1\)\}deg\)/.test(capture),
+    /const lean = -roll;/.test(capture) && /rotate\(\$\{lean\.toFixed\(1\)\}deg\)/.test(capture),
     "a marker that stands upright in the room leans on a rolled phone, which is the only thing on the screen that shows the phone is not square",
   );
   check(
@@ -1222,8 +1222,26 @@ async function endToEnd() {
     /forwardOf\(pose\)/.test(loop) && /decide\(\s*stateRef\.current/.test(loop),
   );
   check(
-    "every target is projected through it",
-    /project\(target\.direction, pose/.test(loop),
+    "every target is projected through the live rotation",
+    // The axes and their signs, because the shape of the arithmetic is the
+    // same whichever way the camera is facing — and a forward vector with the
+    // sign flipped projects every target to the opposite side of the room
+    // while this expression still reads correctly.
+    /const fx = -pose\[2\];/.test(loop) &&
+      /const fy = -pose\[5\];/.test(loop) &&
+      /const fz = -pose\[8\];/.test(loop) &&
+      /const depth = d\[0\] \* fx \+ d\[1\] \* fy \+ d\[2\] \* fz;/.test(loop) &&
+      /d\[0\] \* rx \+ d\[1\] \* ry \+ d\[2\] \* rz\) \/ depth \/ tanH/.test(loop),
+    "the same pinhole projection `project` does, written out flat — it runs forty times a frame and every call of the tidy version allocates a vector and an object",
+  );
+  check(
+    "the camera's axes are read once a frame, not once a target",
+    loop.indexOf("const fx = -pose[2];") < loop.indexOf("for (const target of stateRef.current.plan)"),
+  );
+  check(
+    "and the captured set is rebuilt when one is captured, not every frame",
+    /takenRef\.current\.size !== stateRef\.current\.taken\.length/.test(loop),
+    "a Set of forty strings per frame is forty allocations for an answer that changes forty times in a capture",
   );
   check(
     "and the hint is only set when it changes",

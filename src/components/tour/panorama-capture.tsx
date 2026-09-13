@@ -28,7 +28,6 @@ import {
 } from "@/lib/panorama/capture";
 import {
   forwardOf,
-  project,
   rollOf,
   rotationMatrix,
   unsteadiness,
@@ -202,6 +201,8 @@ export function PanoramaCapture({
    */
   const markerRefs = useRef(new Map<string, HTMLSpanElement>());
   const markerTaken = useRef(new Map<string, boolean>());
+  /** The captured ids, rebuilt when one is captured rather than per frame. */
+  const takenRef = useRef<Set<string>>(new Set());
   const aimRef = useRef<HTMLSpanElement>(null);
   const holdRef = useRef<HTMLSpanElement>(null);
   const holdRingRef = useRef<HTMLSpanElement>(null);
@@ -539,13 +540,49 @@ export function PanoramaCapture({
       // marker moves because the phone moved, and if the phone is still so is
       // the marker.
       const { w: halfW, h: halfH } = sizeRef.current;
-      const taken = takenSet(stateRef.current);
+
+      // Rebuilt when a photograph is taken, not sixty times a second. A Set of
+      // forty strings per frame is forty allocations for an answer that
+      // changes about forty times in a capture.
+      if (takenRef.current.size !== stateRef.current.taken.length) {
+        takenRef.current = takenSet(stateRef.current);
+      }
+      const taken = takenRef.current;
+
+      // The camera's axes, pulled out of the matrix once rather than per
+      // target, and the projection written out flat. `project` allocates a
+      // vector and an object for every call; at forty targets a frame that is
+      // most of the work on this loop and all of the rubbish it leaves behind.
+      const fx = -pose[2];
+      const fy = -pose[5];
+      const fz = -pose[8];
+      const rx = pose[0];
+      const ry = pose[3];
+      const rz = pose[6];
+      const ux = pose[1];
+      const uy = pose[4];
+      const uz = pose[7];
+      const tanH = Math.tan(((hfov / 2) * Math.PI) / 180);
+      const tanV = Math.tan(((vfov / 2) * Math.PI) / 180);
+      const lean = -roll;
+
       for (const target of stateRef.current.plan) {
         const element = markerRefs.current.get(target.id);
         if (!element) continue;
 
-        const at = project(target.direction, pose, hfov, vfov);
-        if (!at) {
+        const d = target.direction;
+        const depth = d[0] * fx + d[1] * fy + d[2] * fz;
+
+        // Behind the camera, or so far to the side that nothing need be drawn.
+        // One multiply-add decides it for most of the sphere on most frames.
+        let sx = 0;
+        let sy = 0;
+        const visible =
+          depth > 1e-6 &&
+          Math.abs((sx = (d[0] * rx + d[1] * ry + d[2] * rz) / depth / tanH)) <= 1.6 &&
+          Math.abs((sy = (d[0] * ux + d[1] * uy + d[2] * uz) / depth / tanV)) <= 1.6;
+
+        if (!visible) {
           if (element.style.visibility !== "hidden") {
             element.style.visibility = "hidden";
           }
@@ -554,8 +591,8 @@ export function PanoramaCapture({
 
         if (element.style.visibility === "hidden") element.style.visibility = "";
         element.style.transform =
-          `translate3d(${(at.x * halfW).toFixed(1)}px, ${(-at.y * halfH).toFixed(1)}px, 0)` +
-          ` translate(-50%, -50%) rotate(${-roll.toFixed(1)}deg)`;
+          `translate3d(${(sx * halfW).toFixed(1)}px, ${(-sy * halfH).toFixed(1)}px, 0)` +
+          ` translate(-50%, -50%) rotate(${lean.toFixed(1)}deg)`;
 
         // Colour changes once per target, so it is only written when it does.
         const done = taken.has(target.id);
@@ -764,6 +801,8 @@ export function PanoramaCapture({
     poseRef.current = null;
     recentRef.current = [];
     heldSinceRef.current = null;
+    takenRef.current = new Set();
+    markerTaken.current = new Map();
     applyState(startCapture());
     setPhase("capturing");
   }

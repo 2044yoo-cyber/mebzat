@@ -1,4 +1,4 @@
-import { angleBetween, directionOf, type Vector3 } from "./orientation";
+import { directionOf, type Vector3 } from "./orientation";
 
 /**
  * Where to point the camera, to photograph a whole sphere.
@@ -96,15 +96,32 @@ export function nearestTarget(
   taken: ReadonlySet<string>,
   facing: Vector3,
 ): { target: Target; error: number } | null {
-  let best: { target: Target; error: number } | null = null;
+  // Compared by cosine rather than by angle, and only the winner is converted.
+  //
+  // This runs on every animation frame against every target, and `angleBetween`
+  // normalises both vectors and takes an arccosine — three allocations and a
+  // transcendental function, forty times, sixty times a second. Both vectors
+  // here are already unit length: a target's direction is built that way and
+  // the camera's comes out of a rotation matrix. Cosine decreases as the angle
+  // grows, so the nearest target is simply the largest dot product.
+  let bestTarget: Target | null = null;
+  let bestCos = -2;
 
   for (const target of plan) {
     if (taken.has(target.id)) continue;
-    const error = angleBetween(facing, target.direction);
-    if (!best || error < best.error) best = { target, error };
+    const d = target.direction;
+    const cos = facing[0] * d[0] + facing[1] * d[1] + facing[2] * d[2];
+    if (cos > bestCos) {
+      bestCos = cos;
+      bestTarget = target;
+    }
   }
 
-  return best;
+  if (!bestTarget) return null;
+  return {
+    target: bestTarget,
+    error: (Math.acos(Math.max(-1, Math.min(1, bestCos))) * 180) / Math.PI,
+  };
 }
 
 export type Coverage = {
