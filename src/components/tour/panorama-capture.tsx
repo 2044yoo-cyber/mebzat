@@ -14,6 +14,7 @@ import { CaptureRules } from "@/components/tour/capture-rules";
 import { PanoramaViewer } from "@/components/tour/panorama-viewer";
 import {
   CAPTURE_COOLDOWN_MS,
+  EMPTY_HOLD,
   STEADY_MS,
   captureManually,
   decide,
@@ -23,9 +24,11 @@ import {
   frameName,
   frameWidthFor,
   guidance,
+  heldFor,
   progress,
   startCapture,
   takenSet,
+  updateHold,
   type CaptureState,
   type Target,
 } from "@/lib/panorama/capture";
@@ -145,7 +148,8 @@ export function PanoramaCapture({
   /** The last few forward vectors, for deciding whether the phone is still. */
   const recentRef = useRef<Vector3[]>([]);
   /** When the phone first became both aligned and steady on the current target. */
-  const heldSinceRef = useRef<number | null>(null);
+  /** A single noisy gyro event gets a grace period instead of resetting the ring. */
+  const holdStateRef = useRef({ ...EMPTY_HOLD });
   const busyRef = useRef(false);
   /**
    * The photographs taken so far, each with the pose it was taken at.
@@ -402,6 +406,8 @@ export function PanoramaCapture({
         applyState(unrecord(stateRef.current, target.id));
         setRefused((n) => n + 1);
         cooldownRef.current = Date.now() + CAPTURE_COOLDOWN_MS;
+        recentRef.current = [];
+        holdStateRef.current = { ...EMPTY_HOLD };
         busyRef.current = false;
         return;
       }
@@ -423,6 +429,8 @@ export function PanoramaCapture({
       // to leave this direction.
       bestShotRef.current.delete(target.id);
       cooldownRef.current = Date.now() + CAPTURE_COOLDOWN_MS;
+      recentRef.current = [];
+      holdStateRef.current = { ...EMPTY_HOLD };
       busyRef.current = false;
     },
     [grab, applyState],
@@ -617,15 +625,23 @@ export function PanoramaCapture({
       const hfov = ASSUMED_HFOV;
       const vfov = verticalFov(hfov, video.videoWidth, video.videoHeight);
       const roll = rollError(rollOf(pose));
-      const heldMs =
-        heldSinceRef.current === null ? 0 : Date.now() - heldSinceRef.current;
-
-      const decision = decide(stateRef.current, {
+      const now = Date.now();
+      const reading = {
         facing,
         roll,
         unsteady: unsteadiness(recent),
-        heldMs,
-      });
+        heldMs: 0,
+      };
+      const firstDecision = decide(stateRef.current, reading);
+      const valid =
+        firstDecision.action === "aim" &&
+        firstDecision.aligned &&
+        firstDecision.steady &&
+        firstDecision.level;
+      const candidateId = firstDecision.action === "aim" ? firstDecision.nearest.id : null;
+      holdStateRef.current = updateHold(holdStateRef.current, candidateId, valid, now);
+      const heldMs = heldFor(holdStateRef.current, now);
+      const decision = decide(stateRef.current, { ...reading, heldMs });
 
       // ---- move the markers -------------------------------------------
       //
@@ -756,17 +772,13 @@ export function PanoramaCapture({
       }
 
       if (decision.action === "aim") {
-        // Start the clock when the phone first settles on a target, and reset
-        // it the moment it leaves. Without the reset, a phone swinging past a
-        // target twice accumulates enough "held" time to fire while moving.
-        heldSinceRef.current = settled ? (heldSinceRef.current ?? Date.now()) : null;
         sayHint(guidance(decision, facing));
         return;
       }
 
       // Captured. Recording it first is what stops the same target firing
       // twice: `decision.state` already has it, and the next tick reads that.
-      heldSinceRef.current = null;
+      holdStateRef.current = { ...EMPTY_HOLD };
       applyState(decision.state);
       sayHint("Captured");
       void take(decision.target, stateRef.current.plan.length);
@@ -922,7 +934,7 @@ export function PanoramaCapture({
     setDrifting(false);
     setRefused(0);
     recentRef.current = [];
-    heldSinceRef.current = null;
+    holdStateRef.current = { ...EMPTY_HOLD };
     takenRef.current = new Set();
     markerTaken.current = new Map();
     applyState(startCapture());
@@ -1176,7 +1188,7 @@ export function PanoramaCapture({
                         heldMs: STEADY_MS,
                       });
                       if (decision.action !== "aim") return;
-                      const manual = captureManually(stateRef.current, decision.target);
+                      const manual = captureManually(stateRef.current, decision.nearest);
                       if (manual.action !== "capture") return;
                       applyState(manual.state);
                       void take(manual.target, stateRef.current.plan.length);

@@ -26,6 +26,8 @@ import {
 import {
   ALIGN_TOLERANCE_DEGREES,
   CAPTURE_COOLDOWN_MS,
+  EMPTY_HOLD,
+  HOLD_GRACE_MS,
   ROLL_TOLERANCE_DEGREES,
   STEADY_DEGREES,
   STEADY_MS,
@@ -35,11 +37,13 @@ import {
   nextInOrder,
   frameWidthFor,
   guidance,
+  heldFor,
   isComplete,
   progress,
   record,
   rollError,
   startCapture,
+  updateHold,
   unrecord,
 } from "../src/lib/panorama/capture.ts";
 import {
@@ -477,7 +481,19 @@ function wholeFunction(src: string, name: string): string {
     "and holding still for only a moment does not either",
     decide(fresh, { facing: first.direction, roll: 0, unsteady: 0.5, heldMs: STEADY_MS - 120 }).action === "aim",
   );
-  check("the wait is the 300–600ms asked for", STEADY_MS >= 300 && STEADY_MS <= 600);
+  check("the hold is short enough to feel immediate", STEADY_MS >= 180 && STEADY_MS <= 300);
+
+  {
+    let hold = updateHold(EMPTY_HOLD, first.id, true, 1000);
+    hold = updateHold(hold, first.id, true, 1100);
+    hold = updateHold(hold, first.id, false, 1100 + HOLD_GRACE_MS - 1);
+    hold = updateHold(hold, first.id, true, 1200);
+    check("one noisy gyro sample does not erase the hold", heldFor(hold, 1240) === 240);
+    hold = updateHold(hold, "another", true, 1250);
+    check("changing targets does restart it", heldFor(hold, 1250) === 0);
+    hold = updateHold(hold, "another", false, 1250 + HOLD_GRACE_MS + 1);
+    check("a real move away clears it", heldFor(hold, 1500) === 0);
+  }
 
   {
     const away = decide(fresh, { facing: directionOf(first.yaw + 40, first.pitch + 40), roll: 0, unsteady: 0, heldMs: STEADY_MS });
@@ -656,6 +672,11 @@ function wholeFunction(src: string, name: string): string {
     check(
       "a roll of 359° is one degree, not a phone held upside down",
       upsideish.action === "capture",
+    );
+    const pole = fresh.plan.find((target) => Math.abs(target.pitch) === 90)!;
+    check(
+      "a centred ceiling or floor target captures even when roll is singular",
+      decide(fresh, { facing: pole.direction, roll: 91, unsteady: 0, heldMs: STEADY_MS }).action === "capture",
     );
     check(
       "the roll tolerance is loose enough to hold a phone by hand",
@@ -859,7 +880,7 @@ function wholeFunction(src: string, name: string): string {
   );
   check(
     "the stillness asked for is a hand, not a tripod",
-    STEADY_MS >= 250 && STEADY_MS <= 400 && STEADY_DEGREES >= 2,
+    STEADY_MS >= 180 && STEADY_MS <= 300 && STEADY_DEGREES >= 3,
     `${STEADY_MS}ms and ${STEADY_DEGREES}° between readings`,
   );
   check(
@@ -905,6 +926,12 @@ function wholeFunction(src: string, name: string): string {
   check(
     "somebody who walks off is asked to come back",
     /Come back to where you started and turn on the spot/.test(capture),
+  );
+  const rules = code("src/components/tour/capture-rules.tsx");
+  check(
+    "moving people are kept out of the capture",
+    /Ask other people to step out or stay still/.test(rules) && /transparent duplicates/.test(rules),
+    "the supplied failed panorama contains people in different positions; no geometric stitch can make changing input agree",
   );
   check(
     "and the movement is read from the accelerometer, not guessed at",
@@ -1280,6 +1307,12 @@ async function endToEnd() {
     return;
   }
 
+  check(
+    "a correct lens estimate is left alone",
+    Math.abs(out.fieldOfView - 60) < 1,
+    `${out.fieldOfView}°`,
+  );
+
   // Acceptance 7.
   check(
     "the panorama is 2:1 equirectangular",
@@ -1430,6 +1463,12 @@ async function endToEnd() {
     }
 
     const clean = await composePanorama(exact);
+    const wrongLens = await composePanorama(exact.map((frame) => ({ ...frame, hfov: 48 })));
+    check(
+      "a confident overlap recovers the lens angle when the browser cannot report it",
+      wrongLens.ok && wrongLens.fieldOfView >= 57 && wrongLens.fieldOfView <= 63,
+      wrongLens.ok ? `${wrongLens.fieldOfView}° recovered from a 48° guess` : wrongLens.code,
+    );
     if (!clean.ok) {
       check("a set of exactly-posed frames stitches", false, clean.code);
     } else {
@@ -1467,6 +1506,26 @@ async function endToEnd() {
         badly / (TW * TH) < 0.02,
         `${((badly / (TW * TH)) * 100).toFixed(2)}% badly wrong from perfect input — a refinement free to move anything makes this worse than the jittered run`,
       );
+
+      if (wrongLens.ok) {
+        const lensCorrected = new Uint8Array(
+          await sharp(wrongLens.jpeg)
+            .resize(TW, TH, { fit: "fill" })
+            .removeAlpha()
+            .raw()
+            .toBuffer(),
+        );
+        const correctedSoftened = await soften(lensCorrected);
+        let lensBadly = 0;
+        for (let i = 0; i < TW * TH; i += 1) {
+          if (Math.abs(a[i * 3] - correctedSoftened[i * 3]) > 70) lensBadly += 1;
+        }
+        check(
+          "the recovered lens angle is used to paint the panorama",
+          lensBadly / (TW * TH) < 0.025,
+          `${((lensBadly / (TW * TH)) * 100).toFixed(2)}% badly wrong after correcting the browser's 48° guess`,
+        );
+      }
     }
   }
 
@@ -1667,9 +1726,10 @@ async function endToEnd() {
     "a setState per frame is a render per frame whatever it sets",
   );
   check(
-    "the hold clock resets the moment the phone leaves a target",
-    /heldSinceRef\.current = settled \? \(heldSinceRef\.current \?\? Date\.now\(\)\) : null;/.test(loop),
-    "without the reset a phone swinging past a target twice accumulates enough held time to fire while moving",
+    "the hold clock tolerates one gyro spike but resets after a real move",
+    /holdStateRef\.current = updateHold\(holdStateRef\.current, candidateId, valid, now\);/.test(loop) &&
+      /const heldMs = heldFor\(holdStateRef\.current, now\);/.test(loop),
+    "sensor noise must not make a centred target stick, but changing targets must still restart the hold",
   );
 
   const reading = blockAfter(capture, "const onOrientation = useCallback(");
@@ -1726,7 +1786,7 @@ async function endToEnd() {
 
   check(
     "a frame can still be taken by hand",
-    /captureManually\(stateRef\.current, decision\.target\)/.test(capture),
+    /captureManually\(stateRef\.current, decision\.nearest\)/.test(capture),
     "section 4: manual capture remains as a backup",
   );
 

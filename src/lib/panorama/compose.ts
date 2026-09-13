@@ -75,6 +75,8 @@ export type StitchOutcome =
        * camera having travelled.
        */
       alignment: number;
+      /** Horizontal camera angle recovered from the overlapping photographs. */
+      fieldOfView: number;
     }
   | { ok: false; code: string };
 
@@ -103,7 +105,7 @@ export const MIN_COVERAGE = 0.9;
  * out at arm's length does not — which is the difference the instructions have
  * been asking for since the beginning and nothing has ever checked.
  */
-export const MIN_ALIGNMENT = 0.12;
+export const MIN_ALIGNMENT = 0.18;
 
 /** The widest output worth making from phone frames. */
 const MAX_OUTPUT_WIDTH = 4096;
@@ -207,6 +209,11 @@ const WEAK_SEAM = 0.25;
  */
 const ACCEPT_MARGIN = 0.05;
 
+/** Phones do not expose lens angle through getUserMedia; recover it from overlaps. */
+const FOV_SEARCH = [-12, -9, -6, -3, 0, 3, 6, 9, 12] as const;
+const FOV_ACCEPT_MARGIN = 0.025;
+const FOV_MIN_CONFIDENCE = 0.55;
+
 type Decoded = {
   pose: { yaw: number; pitch: number; roll: number };
   hfov: number;
@@ -294,6 +301,12 @@ export async function composePanorama(
     })
     .map((entry) => entry.frame);
 
+  // `getUserMedia` reports pixels but not focal length. Treating every rear
+  // phone camera as 60° changes the scale of every overlap and bends doors and
+  // sofas at their joins. The horizon has the strongest vertical edges, so use
+  // those overlaps to recover one lens angle for the entire capture.
+  const fieldOfView = calibrateFieldOfView(order);
+
   // ---- refine the poses against the pixels --------------------------------
   const { weak: weakSeams, alignment } = refinePoses(order);
 
@@ -345,10 +358,81 @@ export async function composePanorama(
       covered,
       weakSeams,
       alignment,
+      fieldOfView,
     };
   } catch {
     return { ok: false, code: "unknown" };
   }
+}
+
+function calibrateFieldOfView(order: Decoded[]): number {
+  const horizon = order.filter((frame) => Math.abs(frame.pose.pitch) <= 35);
+  if (horizon.length < 4) return order[0]?.hfov ?? ASSUMED_HFOV;
+  const base = fovAgreement(horizon, 0);
+  let best = { delta: 0, score: base };
+  for (const delta of FOV_SEARCH) {
+    if (delta === 0) continue;
+    const score = fovAgreement(horizon, delta);
+    if (score > best.score) best = { delta, score };
+  }
+  const accepted =
+    best.score >= FOV_MIN_CONFIDENCE && best.score > base + FOV_ACCEPT_MARGIN
+      ? best.delta
+      : 0;
+  if (accepted !== 0) {
+    for (const frame of order) {
+      frame.hfov = clamp(frame.hfov + accepted, 40, 95);
+      frame.vfov = verticalFov(frame.hfov, frame.width, frame.height);
+    }
+  }
+  const values = order.map((frame) => frame.hfov).sort((a, b) => a - b);
+  return values[Math.floor(values.length / 2)] ?? ASSUMED_HFOV;
+}
+
+/** Median direct overlap agreement at one candidate lens angle. */
+function fovAgreement(order: Decoded[], delta: number): number {
+  const scores: number[] = [];
+  const frames = order.map((original) => {
+    const hfov = clamp(original.hfov + delta, 40, 95);
+    return { ...original, hfov, vfov: verticalFov(hfov, original.width, original.height) };
+  }).sort((a, b) => a.pose.yaw - b.pose.yaw);
+  for (let index = 0; index < frames.length; index += 1) {
+    const a = frames[index];
+    const b = frames[(index + 1) % frames.length];
+    let best = -1;
+    // Sensor yaw can be a few degrees wrong; lens scale cannot be judged by
+    // forcing that unrelated error into the score.
+    for (let correction = -3; correction <= 3; correction += 1) {
+      const aa = basisFrom(a.pose.yaw, a.pose.pitch, a.pose.roll);
+      const bb = basisFrom(b.pose.yaw + correction, b.pose.pitch, b.pose.roll);
+      const tanAH = Math.tan((a.hfov / 2) * Math.PI / 180);
+      const tanAV = Math.tan((a.vfov / 2) * Math.PI / 180);
+      const tanBH = Math.tan((b.hfov / 2) * Math.PI / 180);
+      const tanBV = Math.tan((b.vfov / 2) * Math.PI / 180);
+      let n = 0, sumA = 0, sumB = 0, sumAA = 0, sumBB = 0, sumAB = 0;
+      for (let yaw = 0; yaw < 360; yaw += 3) {
+        for (let pitch = -24; pitch <= 24; pitch += 6) {
+          const direction = directionOf(yaw, pitch);
+          const pa = sample(a, direction, aa, tanAH, tanAV);
+          const pb = sample(b, direction, bb, tanBH, tanBV);
+          if (!pa || !pb) continue;
+          const la = 0.2126 * pa.r + 0.7152 * pa.g + 0.0722 * pa.b;
+          const lb = 0.2126 * pb.r + 0.7152 * pb.g + 0.0722 * pb.b;
+          n += 1; sumA += la; sumB += lb; sumAA += la * la; sumBB += lb * lb; sumAB += la * lb;
+        }
+      }
+      const va = sumAA - sumA * sumA / Math.max(1, n);
+      const vb = sumBB - sumB * sumB / Math.max(1, n);
+      // A narrow candidate can manufacture a perfect score from one plain
+      // strip because it says the frames barely overlap. That is not evidence
+      // of a lens angle; require roughly eight shared longitude samples.
+      const score = n < 60 || va <= 1e-6 || vb <= 1e-6 ? -1 : (sumAB - sumA * sumB / n) / Math.sqrt(va * vb);
+      best = Math.max(best, score);
+    }
+    if (best > -1) scores.push(best);
+  }
+  scores.sort((a, b) => a - b);
+  return scores.length === 0 ? -1 : scores[Math.floor(scores.length / 2)];
 }
 
 /** Let a canvas go before the next one is allocated. Both at once is 270MB. */

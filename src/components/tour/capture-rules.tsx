@@ -33,9 +33,9 @@ type Rule = {
 export const CAPTURE_RULES: Rule[] = [
   {
     title: "Stand in one place",
-    detail: "Turn on the spot. Don't walk while you shoot.",
+    detail: "Turn on the spot. Ask other people to step out or stay still.",
     because:
-      "Every photo has to be taken from the same point. A step between two of them and the wall arrives twice, at two different sizes.",
+      "Every photo needs the same viewpoint and scene. If you walk—or somebody moves—the wall or person arrives twice, which creates the transparent duplicates in a bad stitch.",
     icon: ArrowLeftRight,
   },
   {

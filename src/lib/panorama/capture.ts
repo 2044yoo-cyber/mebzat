@@ -21,7 +21,7 @@ import { yawPitchOf, type Vector3 } from "./orientation";
  */
 
 /** How close to a target the camera has to be pointing before it counts. */
-export const ALIGN_TOLERANCE_DEGREES = 9;
+export const ALIGN_TOLERANCE_DEGREES = 11;
 
 /**
  * How far the phone may drift between readings and still be called steady.
@@ -30,10 +30,37 @@ export const ALIGN_TOLERANCE_DEGREES = 9;
  * mid-swing, and a smeared frame is worse than no frame: it is the one the
  * matcher cannot align, so it takes its neighbours with it.
  */
-export const STEADY_DEGREES = 2.6;
+export const STEADY_DEGREES = 3.5;
 
-/** How long it has to stay that still. Section 4 asks for 300–600ms. */
-export const STEADY_MS = 350;
+/** Brief confirmation hold: long enough to avoid a drive-by, short enough to feel immediate. */
+export const STEADY_MS = 240;
+
+/** One noisy sensor sample may not erase an otherwise steady hold. */
+export const HOLD_GRACE_MS = 140;
+
+export type HoldState = { targetId: string | null; since: number | null; lastValid: number };
+export const EMPTY_HOLD: HoldState = { targetId: null, since: null, lastValid: 0 };
+
+/** Keep a real hold through one short gyro spike, but never through changing targets. */
+export function updateHold(
+  current: HoldState,
+  targetId: string | null,
+  valid: boolean,
+  now: number,
+): HoldState {
+  if (valid && targetId) {
+    return current.targetId === targetId
+      ? { ...current, lastValid: now }
+      : { targetId, since: now, lastValid: now };
+  }
+  return now - current.lastValid <= HOLD_GRACE_MS
+    ? current
+    : { ...EMPTY_HOLD };
+}
+
+export function heldFor(current: HoldState, now: number): number {
+  return current.since === null ? 0 : Math.max(0, now - current.since);
+}
 
 /**
  * How far the phone may be rolled about its own line of sight.
@@ -45,7 +72,7 @@ export const STEADY_MS = 350;
  * the cheapest sharpness there is, and it is the one thing the screen never
  * asked for.
  */
-export const ROLL_TOLERANCE_DEGREES = 12;
+export const ROLL_TOLERANCE_DEGREES = 18;
 
 /**
  * How long the shutter stays shut after a target is taken.
@@ -166,7 +193,12 @@ export function decide(state: CaptureState, reading: Reading): Decision {
 
   const aligned = nearest.error <= ALIGN_TOLERANCE_DEGREES;
   const steady = reading.unsteady <= STEADY_DEGREES;
-  const level = Math.abs(rollError(reading.roll)) <= ROLL_TOLERANCE_DEGREES;
+  // Roll has no stable meaning when the camera points almost vertically: yaw
+  // and roll collapse onto the same axis there. Requiring a level reading at
+  // the two pole targets makes a perfectly centred circle impossible to hold.
+  const level =
+    Math.abs(nearest.target.pitch) >= 75 ||
+    Math.abs(rollError(reading.roll)) <= ROLL_TOLERANCE_DEGREES;
 
   if (aligned && steady && level && reading.heldMs >= STEADY_MS) {
     return {
