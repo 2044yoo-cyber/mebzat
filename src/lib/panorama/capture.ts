@@ -30,10 +30,22 @@ export const ALIGN_TOLERANCE_DEGREES = 9;
  * mid-swing, and a smeared frame is worse than no frame: it is the one the
  * matcher cannot align, so it takes its neighbours with it.
  */
-export const STEADY_DEGREES = 2.2;
+export const STEADY_DEGREES = 1.6;
 
 /** How long it has to stay that still. Section 4 asks for 300–600ms. */
-export const STEADY_MS = 400;
+export const STEADY_MS = 500;
+
+/**
+ * How far the phone may be rolled about its own line of sight.
+ *
+ * A rolled frame is not merely untidy. The stitcher places it by its recorded
+ * roll, so a wrong one puts the whole photograph at an angle to its
+ * neighbours, and the seam between them has to blend two different rotations
+ * of the same wall — which it cannot, so it blurs. Holding the phone square is
+ * the cheapest sharpness there is, and it is the one thing the screen never
+ * asked for.
+ */
+export const ROLL_TOLERANCE_DEGREES = 12;
 
 export type CaptureState = {
   plan: Target[];
@@ -73,11 +85,27 @@ export type Decision =
       target: Target;
       /** How far off, in degrees. */
       error: number;
+      /** Pointing at it. */
       aligned: boolean;
+      /** Not moving. */
       steady: boolean;
+      /** Held square, rather than rolled over to one side. */
+      level: boolean;
       state: CaptureState;
     }
   | { action: "done"; state: CaptureState };
+
+/** One reading of where the phone is and what it has been doing. */
+export type Reading = {
+  /** Where the camera is pointing. */
+  facing: Vector3;
+  /** How far it is rolled about that line of sight, in degrees. */
+  roll: number;
+  /** The most it has moved between recent readings, in degrees. */
+  unsteady: number;
+  /** How long it has been aligned, steady and level together. */
+  heldMs: number;
+};
 
 /**
  * What to do with this reading.
@@ -86,19 +114,15 @@ export type Decision =
  * screen tracks because it is the only part that needs a clock. Everything
  * else is a function of where the camera is pointing.
  */
-export function decide(
-  state: CaptureState,
-  facing: Vector3,
-  unsteady: number,
-  heldMs: number,
-): Decision {
-  const nearest = nearestTarget(state.plan, takenSet(state), facing);
+export function decide(state: CaptureState, reading: Reading): Decision {
+  const nearest = nearestTarget(state.plan, takenSet(state), reading.facing);
   if (!nearest) return { action: "done", state };
 
   const aligned = nearest.error <= ALIGN_TOLERANCE_DEGREES;
-  const steady = unsteady <= STEADY_DEGREES;
+  const steady = reading.unsteady <= STEADY_DEGREES;
+  const level = Math.abs(rollError(reading.roll)) <= ROLL_TOLERANCE_DEGREES;
 
-  if (aligned && steady && heldMs >= STEADY_MS) {
+  if (aligned && steady && level && reading.heldMs >= STEADY_MS) {
     return {
       action: "capture",
       target: nearest.target,
@@ -112,8 +136,19 @@ export function decide(
     error: nearest.error,
     aligned,
     steady,
+    level,
     state,
   };
+}
+
+/**
+ * How far from square the phone is, as a signed number between -180 and 180.
+ *
+ * Wrapped, because a roll of 359° is one degree the other way and not a phone
+ * held upside down.
+ */
+export function rollError(roll: number): number {
+  return ((roll + 540) % 360) - 180;
 }
 
 /** A frame taken by hand, for the target being aimed at. Section 4's backup. */
@@ -132,8 +167,10 @@ export function captureManually(
 export function guidance(decision: Decision, facing: Vector3): string {
   if (decision.action === "done") return "That's the whole room";
   if (decision.action === "capture") return "Captured";
-  if (decision.aligned && !decision.steady) return "Hold steady…";
-  if (decision.aligned) return "Hold steady…";
+  // Said before "hold steady", because somebody holding a tilted phone
+  // perfectly still will never be told why nothing is happening.
+  if (!decision.level) return "Straighten the phone";
+  if (decision.aligned) return "Hold still";
   return steer(decision.target, yawPitchOf(facing), false, false);
 }
 

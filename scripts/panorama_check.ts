@@ -21,6 +21,7 @@ import sharp from "sharp";
 import { composePanorama, type FrameInput } from "../src/lib/panorama/compose.ts";
 import {
   ALIGN_TOLERANCE_DEGREES,
+  ROLL_TOLERANCE_DEGREES,
   STEADY_DEGREES,
   STEADY_MS,
   captureManually,
@@ -31,6 +32,7 @@ import {
   isComplete,
   progress,
   record,
+  rollError,
   startCapture,
 } from "../src/lib/panorama/capture.ts";
 import {
@@ -443,7 +445,7 @@ function wholeFunction(src: string, name: string): string {
 
   // Acceptance 3.
   {
-    const aimed = decide(fresh, first.direction, 0.5, STEADY_MS);
+    const aimed = decide(fresh, { facing: first.direction, roll: 0, unsteady: 0.5, heldMs: STEADY_MS });
     check(
       "pointing at a target and holding still takes the photograph",
       aimed.action === "capture" && aimed.target.id === first.id,
@@ -453,17 +455,17 @@ function wholeFunction(src: string, name: string): string {
 
   check(
     "pointing at it and still moving does not",
-    decide(fresh, first.direction, STEADY_DEGREES + 3, STEADY_MS).action === "aim",
+    decide(fresh, { facing: first.direction, roll: 0, unsteady: STEADY_DEGREES + 3, heldMs: STEADY_MS }).action === "aim",
     "section 4: steady for 300–600ms, because a frame taken mid-swing is the one the matcher cannot place",
   );
   check(
     "and holding still for only a moment does not either",
-    decide(fresh, first.direction, 0.5, STEADY_MS - 120).action === "aim",
+    decide(fresh, { facing: first.direction, roll: 0, unsteady: 0.5, heldMs: STEADY_MS - 120 }).action === "aim",
   );
   check("the wait is the 300–600ms asked for", STEADY_MS >= 300 && STEADY_MS <= 600);
 
   {
-    const away = decide(fresh, directionOf(first.yaw + 40, first.pitch + 40), 0, STEADY_MS);
+    const away = decide(fresh, { facing: directionOf(first.yaw + 40, first.pitch + 40), roll: 0, unsteady: 0, heldMs: STEADY_MS });
     check(
       "pointing somewhere else does not take a photograph of somewhere else",
       away.action === "aim" && !away.aligned,
@@ -476,7 +478,7 @@ function wholeFunction(src: string, name: string): string {
 
   // Acceptance 4.
   {
-    const after = decide(fresh, first.direction, 0.5, STEADY_MS);
+    const after = decide(fresh, { facing: first.direction, roll: 0, unsteady: 0.5, heldMs: STEADY_MS });
     if (after.action !== "capture") {
       check("acceptance 4 needs a capture to work from", false);
     } else {
@@ -484,7 +486,7 @@ function wholeFunction(src: string, name: string): string {
         "a captured target is recorded",
         after.state.taken.includes(first.id),
       );
-      const again = decide(after.state, first.direction, 0.5, STEADY_MS);
+      const again = decide(after.state, { facing: first.direction, roll: 0, unsteady: 0.5, heldMs: STEADY_MS });
       check(
         "and cannot be captured a second time",
         again.action !== "capture" || again.target.id !== first.id,
@@ -536,6 +538,56 @@ function wholeFunction(src: string, name: string): string {
     );
   }
 
+  // --- roll: the reason the last set came out soft ------------------------
+  {
+    const square = decide(fresh, {
+      facing: first.direction,
+      roll: 0,
+      unsteady: 0.2,
+      heldMs: STEADY_MS,
+    });
+    check("a phone held square captures", square.action === "capture");
+
+    const tipped = decide(fresh, {
+      facing: first.direction,
+      roll: ROLL_TOLERANCE_DEGREES + 10,
+      unsteady: 0.2,
+      heldMs: STEADY_MS,
+    });
+    check(
+      "the same phone rolled over to one side does not",
+      tipped.action === "aim" && !tipped.level,
+      "the stitcher places a frame by its recorded roll, so a rolled one sits at an angle to its neighbours and the seam has to blend two rotations of one wall — which it cannot, so it blurs",
+    );
+
+    check(
+      "and it is told to straighten up rather than to hold still",
+      /straighten/i.test(guidance(tipped, first.direction)),
+      "somebody holding a tilted phone perfectly still would otherwise never learn why nothing is happening",
+    );
+
+    const upsideish = decide(fresh, {
+      facing: first.direction,
+      roll: 359,
+      unsteady: 0.2,
+      heldMs: STEADY_MS,
+    });
+    check(
+      "a roll of 359° is one degree, not a phone held upside down",
+      upsideish.action === "capture",
+    );
+    check(
+      "the roll tolerance is loose enough to hold a phone by hand",
+      ROLL_TOLERANCE_DEGREES >= 8 && ROLL_TOLERANCE_DEGREES <= 20,
+    );
+    check(
+      "and roll error is signed both ways, with half a turn either sign",
+      rollError(10) === 10 &&
+        rollError(350) === -10 &&
+        Math.abs(rollError(180)) === 180,
+    );
+  }
+
   check(
     "the tolerance is tight enough to mean something",
     ALIGN_TOLERANCE_DEGREES > 3 && ALIGN_TOLERANCE_DEGREES < 15,
@@ -555,7 +607,7 @@ function wholeFunction(src: string, name: string): string {
     (() => {
       let all = fresh;
       for (const t of fresh.plan) all = record(all, t.id);
-      return decide(all, first.direction, 0, STEADY_MS).action === "done";
+      return decide(all, { facing: first.direction, roll: 0, unsteady: 0, heldMs: STEADY_MS }).action === "done";
     })(),
   );
 
@@ -611,7 +663,7 @@ function wholeFunction(src: string, name: string): string {
   check(
     "the guidance never says to turn 40 degrees",
     !/40°|about 40/i.test(
-      guidance(decide(fresh, directionOf(200, 40), 9, 0), directionOf(200, 40)),
+      guidance(decide(fresh, { facing: directionOf(200, 40), roll: 0, unsteady: 9, heldMs: 0 }), directionOf(200, 40)),
     ),
     "section 9: a number of degrees tells somebody holding a phone nothing about where to point it",
   );
@@ -1046,8 +1098,38 @@ async function endToEnd() {
     "section 9: ✓ rather than ○",
   );
   check(
+    "the markers lean when the phone is rolled",
+    /transform: `rotate\(\$\{-roll\}deg\)`/.test(overlay),
+    "a marker that stands upright in the room leans on a rolled phone, which is the only thing on the screen that shows the phone is not square",
+  );
+  check(
+    "there is a frame to bring one into, and it does not move",
+    /-translate-x-1\/2 -translate-y-1\/2 rounded-xl border-4/.test(overlay),
+  );
+  check(
+    "holding shows how much of the hold is left",
+    /conic-gradient\(rgb\(52 211 153\) \$\{hold \* 360\}deg/.test(overlay) &&
+      /HOLD/.test(overlay),
+    "a ring that visibly fills is the difference between keeping still and assuming it has jammed",
+  );
+  check(
+    "an arrow says which way the next one is",
+    /bearing !== null && !aligned/.test(overlay) && /rotate\(\$\{\(bearing \* 180\) \/ Math\.PI\}deg\)/.test(overlay),
+    "section 9 and the reference: the next point has to be findable when it is not on the screen",
+  );
+  check(
+    "and a target behind you still has a direction, even though it has no position",
+    /function offScreenBearing/.test(capture) &&
+      /Math\.atan2\(x, y\)/.test(wholeFunction(capture, "offScreenBearing")),
+    "`project` refuses anything outside the frame, rightly — but the direction is still known and is the whole of what somebody needs",
+  );
+  check(
+    "a phone held crooked is told so on the camera, not only in the hint",
+    /Hold the phone square/.test(overlay),
+  );
+  check(
     "landing on one is visible without reading anything",
-    /aligned \? "border-emerald/.test(overlay),
+    /aligned && level\s*\n?\s*\? "border-emerald/.test(overlay),
   );
   check(
     "the overlay never eats a touch meant for the controls",
@@ -1071,7 +1153,7 @@ async function endToEnd() {
   );
   check(
     "the hold clock resets the moment the phone leaves a target",
-    /decision\.aligned && decision\.steady\s*\?[\s\S]{0,80}?: null/.test(loop),
+    /const settled =\s*\n?\s*decision\.aligned && decision\.steady && decision\.level;[\s\S]{0,140}?: null;/.test(loop),
     "without the reset a phone swinging past a target twice accumulates enough held time to fire while moving",
   );
 

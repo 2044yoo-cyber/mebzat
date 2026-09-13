@@ -16,6 +16,7 @@ import {
   STEADY_MS,
   captureManually,
   decide,
+  rollError,
   frameName,
   frameWidthFor,
   guidance,
@@ -25,8 +26,11 @@ import {
   type Target,
 } from "@/lib/panorama/capture";
 import {
+  dot,
   forwardOf,
   project,
+  rightOf,
+  upOf,
   rollOf,
   rotationMatrix,
   unsteadiness,
@@ -190,8 +194,23 @@ export function PanoramaCapture({
   const [view, setView] = useState<{
     targets: { id: string; x: number; y: number; taken: boolean }[];
     aligned: boolean;
+    level: boolean;
+    /** How far the phone is rolled off square, in degrees. */
+    roll: number;
+    /** How much of the hold has elapsed, 0–1. */
+    hold: number;
+    /** Which way the next target lies, in radians from straight up. */
+    bearing: number | null;
     flash: string | null;
-  }>({ targets: [], aligned: false, flash: null });
+  }>({
+    targets: [],
+    aligned: false,
+    level: true,
+    roll: 0,
+    hold: 0,
+    bearing: null,
+    flash: null,
+  });
 
   /**
    * The capture state, mirrored where the animation loop can read it.
@@ -491,12 +510,16 @@ export function PanoramaCapture({
       const hfov = ASSUMED_HFOV;
       const vfov = verticalFov(hfov, video.videoWidth, video.videoHeight);
 
-      const decision = decide(
-        stateRef.current,
+      const roll = rollError(rollOf(pose));
+      const heldMs =
+        heldSinceRef.current === null ? 0 : Date.now() - heldSinceRef.current;
+
+      const decision = decide(stateRef.current, {
         facing,
-        unsteadiness(recent),
-        heldSinceRef.current === null ? 0 : Date.now() - heldSinceRef.current,
-      );
+        roll,
+        unsteady: unsteadiness(recent),
+        heldMs,
+      });
 
       // Where every target sits on the screen right now. This is the whole of
       // the gyroscope interaction: a projection of a fixed direction through
@@ -523,13 +546,31 @@ export function PanoramaCapture({
         // Start the clock when the phone first settles on a target, and reset
         // it the moment it leaves. Without the reset, a phone swinging past a
         // target twice accumulates enough "held" time to fire while moving.
-        heldSinceRef.current =
-          decision.aligned && decision.steady
-            ? (heldSinceRef.current ?? Date.now())
-            : null;
+        const settled = decision.aligned && decision.steady && decision.level;
+        heldSinceRef.current = settled
+          ? (heldSinceRef.current ?? Date.now())
+          : null;
+
+        // Which way to swing the phone to reach the target. Measured from
+        // straight up so the arrow can be a single rotation.
+        const to = project(decision.target.direction, pose, hfov, vfov);
+        const bearing =
+          decision.aligned || !to ? null : Math.atan2(to.x, to.y);
 
         setHint(guidance(decision, facing));
-        setView({ targets, aligned: decision.aligned, flash: null });
+        setView({
+          targets,
+          aligned: decision.aligned,
+          level: decision.level,
+          roll,
+          hold: settled ? Math.min(1, heldMs / STEADY_MS) : 0,
+          bearing:
+            bearing ??
+            (decision.aligned
+              ? null
+              : offScreenBearing(decision.target.direction, pose)),
+          flash: null,
+        });
         return;
       }
 
@@ -538,7 +579,15 @@ export function PanoramaCapture({
       heldSinceRef.current = null;
       applyState(decision.state);
       setHint("Captured");
-      setView({ targets, aligned: true, flash: decision.target.id });
+      setView({
+        targets,
+        aligned: true,
+        level: true,
+        roll,
+        hold: 1,
+        bearing: null,
+        flash: decision.target.id,
+      });
       void take(decision.target, stateRef.current.plan.length);
     };
 
@@ -762,7 +811,15 @@ export function PanoramaCapture({
         />
 
         {hasSensor && phase === "capturing" && (
-          <Sphere targets={view.targets} aligned={view.aligned} flash={view.flash} />
+          <Sphere
+            targets={view.targets}
+            aligned={view.aligned}
+            level={view.level}
+            roll={view.roll}
+            hold={view.hold}
+            bearing={view.bearing}
+            flash={view.flash}
+          />
         )}
 
         {/* Nothing over the camera but what is needed to look around. */}
@@ -844,7 +901,12 @@ export function PanoramaCapture({
                       if (!videoRef.current?.videoWidth) return;
                       const pose = poseRef.current;
                       if (!pose) return;
-                      const decision = decide(stateRef.current, forwardOf(pose), 0, STEADY_MS);
+                      const decision = decide(stateRef.current, {
+                        facing: forwardOf(pose),
+                        roll: 0,
+                        unsteady: 0,
+                        heldMs: STEADY_MS,
+                      });
                       if (decision.action !== "aim") return;
                       const manual = captureManually(stateRef.current, decision.target);
                       if (manual.action !== "capture") return;
@@ -1021,10 +1083,18 @@ export function PanoramaCapture({
 function Sphere({
   targets,
   aligned,
+  level,
+  roll,
+  hold,
+  bearing,
   flash,
 }: {
   targets: { id: string; x: number; y: number; taken: boolean }[];
   aligned: boolean;
+  level: boolean;
+  roll: number;
+  hold: number;
+  bearing: number | null;
   flash: string | null;
 }) {
   return (
@@ -1033,33 +1103,100 @@ function Sphere({
         <span
           key={target.id}
           className={cn(
-            "absolute size-14 rounded-full border-4",
+            "absolute h-28 w-20 rounded-lg border-[3px]",
             target.id === flash
-              ? "border-emerald-300 bg-emerald-300/60"
+              ? "border-emerald-200 bg-emerald-300/70"
               : target.taken
-                ? "border-emerald-400/70 bg-emerald-400/20"
-                : "border-white/80 bg-white/10",
+                ? "border-emerald-400/60 bg-emerald-400/25"
+                : "border-white/85 bg-white/15",
           )}
           style={{
-            // -1…+1 across the view becomes 0…100% of it, and the y axis
-            // flips because a screen counts downwards and the sky is up.
-            left: `calc(${((target.x + 1) / 2) * 100}% - 1.75rem)`,
-            top: `calc(${((1 - target.y) / 2) * 100}% - 1.75rem)`,
+            // -1…+1 across the view becomes 0…100% of it, and the y axis flips
+            // because a screen counts downwards and the sky is up.
+            left: `calc(${((target.x + 1) / 2) * 100}% - 2.5rem)`,
+            top: `calc(${((1 - target.y) / 2) * 100}% - 3.5rem)`,
+            // The marker stands upright in the room, so on a rolled phone it
+            // leans — which is the only thing on the screen that shows the
+            // phone is not square, and the reason the last set of photographs
+            // came out soft.
+            transform: `rotate(${-roll}deg)`,
           }}
         />
       ))}
 
-      {/* The aim. Fixed, because it is the middle of the frame that will be
-          taken — it cannot be anywhere else. */}
+      {/* The frame to bring a marker into. Fixed, because it is the middle of
+          the photograph that will be taken — it cannot be anywhere else. */}
       <span
         className={cn(
-          "absolute top-1/2 left-1/2 size-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px]",
-          aligned ? "border-emerald-400 bg-emerald-400/25" : "border-white",
+          "absolute top-1/2 left-1/2 h-36 w-24 -translate-x-1/2 -translate-y-1/2 rounded-xl border-4",
+          aligned && level
+            ? "border-emerald-400 bg-emerald-400/15"
+            : !level
+              ? "border-amber-300"
+              : "border-white",
         )}
       />
-      <span className="absolute top-1/2 left-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+
+      {/* Hold, and how much of it is left. A ring that visibly fills is the
+          difference between somebody keeping still and somebody assuming it
+          has jammed and moving on. */}
+      {aligned && level && (
+        <span className="absolute top-1/2 left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/45">
+          <span
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: `conic-gradient(rgb(52 211 153) ${hold * 360}deg, transparent 0deg)`,
+              mask: "radial-gradient(circle, transparent 58%, black 60%)",
+              WebkitMask: "radial-gradient(circle, transparent 58%, black 60%)",
+            }}
+          />
+          <span className="text-sm font-semibold tracking-wide text-white">
+            HOLD
+          </span>
+        </span>
+      )}
+
+      {/* Which way the next one is. Drawn from the middle outwards, so it
+          points off the screen when the target is behind you and at the marker
+          when it is merely off to one side. */}
+      {bearing !== null && !aligned && (
+        <span
+          className="absolute top-1/2 left-1/2 size-40 -translate-x-1/2 -translate-y-1/2"
+          style={{ transform: `translate(-50%, -50%) rotate(${(bearing * 180) / Math.PI}deg)` }}
+        >
+          <svg viewBox="0 0 40 40" className="size-full">
+            <path
+              d="M20 2 L26 14 L20 11 L14 14 Z"
+              fill="white"
+              stroke="rgba(0,0,0,0.35)"
+              strokeWidth="1"
+            />
+          </svg>
+        </span>
+      )}
+
+      {!level && (
+        <span className="absolute top-[58%] left-1/2 -translate-x-1/2 rounded-full bg-amber-400/95 px-3 py-1 text-sm font-medium text-black">
+          Hold the phone square
+        </span>
+      )}
     </div>
   );
+}
+
+/**
+ * Which way to swing towards a target that is not on the screen.
+ *
+ * `project` refuses anything outside the frame, and rightly — a marker pinned
+ * to the edge would say "here" about something that is not. But the direction
+ * is still known, and an arrow is the whole of what somebody needs when the
+ * next photograph is behind them.
+ */
+function offScreenBearing(direction: Vector3, pose: Matrix3): number | null {
+  const x = dot(direction, rightOf(pose));
+  const y = dot(direction, upOf(pose));
+  if (x === 0 && y === 0) return null;
+  return Math.atan2(x, y);
 }
 
 function round2(value: number): number {
