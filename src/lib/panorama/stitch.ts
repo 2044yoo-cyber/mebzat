@@ -20,6 +20,8 @@ export const STITCH_ERRORS = {
     "Part of the room was never photographed, so there would be a hole in it. Try again and fill in the circles above and below you as well as around.",
   poor_alignment:
     "Some areas could not be aligned correctly. Please retake the 360 photo while keeping the phone in the same position and rotating around one point.",
+  retake_required:
+    "One or more directions did not align with their neighbours. Retake only the highlighted photo while keeping the phone in the same position.",
   no_overlap:
     "We couldn't join these photos because they did not overlap enough. Please try again and move more slowly between the circles.",
   frames_missing:

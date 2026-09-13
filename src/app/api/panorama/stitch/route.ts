@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { composePanorama, type FrameInput } from "@/lib/panorama/compose";
+import { type CameraIntrinsics } from "@/lib/panorama/camera";
+import { isRotationMatrix, type Matrix3 } from "@/lib/panorama/orientation";
+import { ASSUMED_HFOV } from "@/lib/panorama/sphere";
 import { moderate, publishApproved } from "@/lib/moderation/service";
 import { createClient } from "@/lib/supabase/server";
 
@@ -149,19 +152,34 @@ export async function POST(request: Request) {
       return fail(supabase, jobId, "frames_missing");
     }
     frames.push({
+      targetId: entry.pose.targetId,
+      imageNumber: entry.pose.imageNumber,
+      captureOrder: entry.pose.captureOrder,
       yaw: entry.pose.yaw,
       pitch: entry.pose.pitch,
       roll: entry.pose.roll,
+      rotation: entry.pose.rotation,
+      intrinsics: entry.pose.intrinsics,
       hfov: entry.pose.fov,
+      vfov: entry.pose.vfov,
+      calibrationSource: entry.pose.calibrationSource,
       bytes: new Uint8Array(await data.arrayBuffer()),
     });
   }
 
   // ---- stitch ------------------------------------------------------------
   stage(supabase, jobId, "stitching");
-  const outcome = await composePanorama(frames);
+  const debugEnabled = process.env.PANORAMA_DEBUG === "1";
+  const outcome = await composePanorama(frames, { debug: debugEnabled });
   if (!outcome.ok) {
-    return fail(supabase, jobId, outcome.code);
+    if (debugEnabled && outcome.debug) {
+      await uploadDebugArtifacts(supabase, prefix, outcome.debug);
+    }
+    return fail(supabase, jobId, outcome.code, outcome.rejectedTargetIds);
+  }
+
+  if (debugEnabled && outcome.debug) {
+    await uploadDebugArtifacts(supabase, prefix, outcome.debug, outcome.jpeg);
   }
 
   // ---- publish it the way every other image is published ------------------
@@ -228,6 +246,7 @@ export async function POST(request: Request) {
     height: outcome.height,
     weakSeams: outcome.weakSeams,
     covered: outcome.covered,
+    rejectedTargetIds: outcome.rejectedTargetIds,
   });
 }
 
@@ -235,7 +254,19 @@ export async function POST(request: Request) {
 const MIN_SPHERE_FRAMES = 20;
 const MAX_SPHERE_FRAMES = 60;
 
-type Pose = { yaw: number; pitch: number; roll: number; fov: number };
+type Pose = {
+  targetId?: string;
+  imageNumber?: number;
+  captureOrder?: number;
+  yaw: number;
+  pitch: number;
+  roll: number;
+  rotation?: Matrix3;
+  intrinsics?: CameraIntrinsics;
+  fov: number;
+  vfov?: number;
+  calibrationSource?: "device" | "intrinsics" | "estimated";
+};
 
 /**
  * The recorded poses, by frame name, with anything malformed left out.
@@ -264,11 +295,26 @@ function readPoses(value: unknown): Map<string, Pose> {
     if (pitch < -90 || pitch > 90) continue;
 
     const fov = finite(row.fov);
+    const intrinsics = readIntrinsics(row.intrinsics);
+    const rotation = isRotationMatrix(row.rotation) ? row.rotation : undefined;
+    const calibrationSource =
+      row.calibrationSource === "device" ||
+      row.calibrationSource === "intrinsics" ||
+      row.calibrationSource === "estimated"
+        ? row.calibrationSource
+        : undefined;
     poses.set(name, {
+      targetId: typeof row.targetId === "string" ? row.targetId : undefined,
+      imageNumber: integer(row.imageNumber),
+      captureOrder: integer(row.captureOrder),
       yaw: ((yaw % 360) + 360) % 360,
       pitch,
       roll,
-      fov: fov !== null && fov >= 20 && fov <= 120 ? fov : 60,
+      rotation,
+      intrinsics,
+      fov: fov !== null && fov >= 20 && fov <= 120 ? fov : ASSUMED_HFOV,
+      vfov: finite(row.vfov) ?? undefined,
+      calibrationSource,
     });
   }
 
@@ -279,10 +325,67 @@ function finite(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function integer(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : undefined;
+}
+
+function readIntrinsics(value: unknown): CameraIntrinsics | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const row = value as Record<string, unknown>;
+  const fx = finite(row.fx);
+  const fy = finite(row.fy);
+  const cx = finite(row.cx);
+  const cy = finite(row.cy);
+  const width = finite(row.width);
+  const height = finite(row.height);
+  if (
+    fx === null ||
+    fy === null ||
+    cx === null ||
+    cy === null ||
+    width === null ||
+    height === null ||
+    fx <= 0 ||
+    fy <= 0 ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return undefined;
+  }
+  return { fx, fy, cx, cy, width, height };
+}
+
+async function uploadDebugArtifacts(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  prefix: string,
+  debug: { gyroOnly: Buffer; refined: Buffer; noBlending: Buffer },
+  final?: Buffer,
+): Promise<void> {
+  const artifacts: Array<readonly [string, Buffer]> = [
+    ["gyro-only.jpg", debug.gyroOnly],
+    ["gyro-feature-refined.jpg", debug.refined],
+    ["no-blending-footprints.jpg", debug.noBlending],
+  ];
+  if (final) artifacts.push(["final-blended.jpg", final]);
+  await Promise.all(
+    artifacts.map(([name, bytes]) =>
+      supabase.storage
+        .from("panorama-frames")
+        .upload(`${prefix}/debug/${name}`, bytes, {
+          contentType: "image/jpeg",
+          upsert: true,
+        }),
+    ),
+  );
+}
+
 async function fail(
   supabase: Awaited<ReturnType<typeof createClient>>,
   jobId: string,
   code: string,
+  rejectedTargetIds: string[] = [],
 ) {
   // The frames are kept for a day when a stitch fails, so the person can retry
   // without turning around the room again.
@@ -300,5 +403,5 @@ async function fail(
   // that the stitch did not work. A 500 would be retried by a proxy, and
   // retrying a stitch that failed for want of overlap produces the same
   // failure at the same cost.
-  return NextResponse.json({ status: "failed", code });
+  return NextResponse.json({ status: "failed", code, rejectedTargetIds });
 }

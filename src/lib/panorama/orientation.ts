@@ -69,6 +69,58 @@ export function rotationMatrix(
   ];
 }
 
+/**
+ * Rotate the portrait-native device axes into the screen/camera axes currently
+ * shown to the user. Screen angle changes roll/right/up, not the rear camera's
+ * optical axis. This is the missing transform that otherwise turns a
+ * landscape frame sideways while its yaw and pitch still look plausible.
+ */
+export function withScreenOrientation(r: Matrix3, screenAngle: number): Matrix3 {
+  const a = screenAngle * RAD;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return [
+    r[0] * c + r[1] * s, -r[0] * s + r[1] * c, r[2],
+    r[3] * c + r[4] * s, -r[3] * s + r[4] * c, r[5],
+    r[6] * c + r[7] * s, -r[6] * s + r[7] * c, r[8],
+  ];
+}
+
+export function cameraRotationMatrix(
+  alpha: number,
+  beta: number,
+  gamma: number,
+  screenAngle: number,
+): Matrix3 {
+  return withScreenOrientation(rotationMatrix(alpha, beta, gamma), screenAngle);
+}
+
+/** A client-supplied matrix is usable only if its axes are unit and orthogonal. */
+export function isRotationMatrix(value: unknown): value is Matrix3 {
+  if (!Array.isArray(value) || value.length !== 9) return false;
+  if (!value.every((entry) => typeof entry === "number" && Number.isFinite(entry))) {
+    return false;
+  }
+  const x: Vector3 = [value[0], value[3], value[6]];
+  const y: Vector3 = [value[1], value[4], value[7]];
+  const z: Vector3 = [value[2], value[5], value[8]];
+  const unit = (axis: Vector3) => Math.abs(dot(axis, axis) - 1) < 0.02;
+  const determinant = dot(x, [
+    y[1] * z[2] - y[2] * z[1],
+    y[2] * z[0] - y[0] * z[2],
+    y[0] * z[1] - y[1] * z[0],
+  ]);
+  return (
+    unit(x) &&
+    unit(y) &&
+    unit(z) &&
+    Math.abs(dot(x, y)) < 0.02 &&
+    Math.abs(dot(x, z)) < 0.02 &&
+    Math.abs(dot(y, z)) < 0.02 &&
+    determinant > 0.98
+  );
+}
+
 /** Multiply a direction in the device frame into the world frame. */
 export function apply(r: Matrix3, v: Vector3): Vector3 {
   return [

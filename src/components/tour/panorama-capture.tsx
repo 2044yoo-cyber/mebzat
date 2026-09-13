@@ -13,6 +13,13 @@ import { Button } from "@/components/ui/button";
 import { CaptureRules } from "@/components/tour/capture-rules";
 import { PanoramaViewer } from "@/components/tour/panorama-viewer";
 import {
+  calibrationForSize,
+  cameraCalibration,
+  intrinsicsFromFov,
+  type CameraCalibration,
+  type CameraIntrinsics,
+} from "@/lib/panorama/camera";
+import {
   CAPTURE_COOLDOWN_MS,
   EMPTY_HOLD,
   STEADY_MS,
@@ -35,7 +42,7 @@ import {
 import {
   forwardOf,
   rollOf,
-  rotationMatrix,
+  cameraRotationMatrix,
   unsteadiness,
   verticalFov,
   withLocalZero,
@@ -93,7 +100,29 @@ type Phase =
   | "ready"
   | "failed";
 
-type RetryMode = "upload" | "stitch" | null;
+type RetryMode = "upload" | "stitch" | "retake" | null;
+
+type CapturedFrame = {
+  blob: Blob;
+  targetId: string;
+  imageNumber: number;
+  captureOrder: number;
+  yaw: number;
+  pitch: number;
+  roll: number;
+  rotation: Matrix3;
+  screenOrientation: number;
+  exifOrientation: 1;
+  focalLength: number | null;
+  intrinsics: CameraIntrinsics;
+  hfov: number;
+  vfov: number;
+  calibrationSource: CameraCalibration["source"];
+  cameraLabel: string | null;
+  width: number;
+  height: number;
+  at: number;
+};
 
 /**
  * The five steps of section 10, in order.
@@ -145,6 +174,10 @@ export function PanoramaCapture({
   const streamRef = useRef<MediaStream | null>(null);
   /** The live rotation, in the capture's own frame. Read every animation frame. */
   const poseRef = useRef<Matrix3 | null>(null);
+  /** Screen angle used to turn device axes into the camera axes in poseRef. */
+  const screenAngleRef = useRef(0);
+  /** Lens geometry for the exact rear-camera track selected by the browser. */
+  const calibrationRef = useRef<CameraCalibration | null>(null);
   /** The yaw the capture began at, which becomes this capture's zero. */
   const zeroRef = useRef<number | null>(null);
   /** The last few forward vectors, for deciding whether the phone is still. */
@@ -160,19 +193,7 @@ export function PanoramaCapture({
    * stitcher sees it there is nothing in the pixels that says which way the
    * camera was facing.
    */
-  const framesRef = useRef<
-    {
-      blob: Blob;
-      targetId: string;
-      yaw: number;
-      pitch: number;
-      roll: number;
-      fov: number;
-      width: number;
-      height: number;
-      at: number;
-    }[]
-  >([]);
+  const framesRef = useRef<CapturedFrame[]>([]);
   const [phase, setPhase] = useState<Phase>("intro");
   const [state, setState] = useState<CaptureState>(() => startCapture());
   const [hint, setHint] = useState("Find the first circle");
@@ -226,7 +247,9 @@ export function PanoramaCapture({
   const takenRef = useRef<Set<string>>(new Set());
   /** How many goes each target has had, and the best frame it produced. */
   const attemptsRef = useRef(new Map<string, number>());
-  const bestShotRef = useRef(new Map<string, { blob: Blob; score: number }>());
+  const bestShotRef = useRef(
+    new Map<string, { blob: Blob; score: number; width: number; height: number }>(),
+  );
   /** Nothing fires before this, so one target cannot become two. */
   const cooldownRef = useRef(0);
   /** Accumulated movement that turning does not account for. */
@@ -290,11 +313,18 @@ export function PanoramaCapture({
       return;
     }
 
-    const world = rotationMatrix(event.alpha, event.beta, event.gamma);
+    const screenAngle = currentScreenAngle();
+    const world = cameraRotationMatrix(
+      event.alpha,
+      event.beta,
+      event.gamma,
+      screenAngle,
+    );
     if (zeroRef.current === null) {
       zeroRef.current = yawPitchOf(forwardOf(world)).yaw;
     }
 
+    screenAngleRef.current = screenAngle;
     poseRef.current = withLocalZero(world, zeroRef.current);
     setHasSensor(true);
   }, []);
@@ -326,7 +356,9 @@ export function PanoramaCapture({
    * what the previous go scored, and neither is this function's business.
    */
   const grab = useCallback(
-    async (frameCount: number): Promise<{ blob: Blob; score: number } | null> => {
+    async (
+      frameCount: number,
+    ): Promise<{ blob: Blob; score: number; width: number; height: number } | null> => {
       const video = videoRef.current;
       if (!video || !video.videoWidth) return null;
 
@@ -363,7 +395,7 @@ export function PanoramaCapture({
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob((made) => resolve(made), "image/jpeg", 0.9),
       );
-      return blob ? { blob, score } : null;
+      return blob ? { blob, score, width: canvas.width, height: canvas.height } : null;
     },
     [],
   );
@@ -417,15 +449,36 @@ export function PanoramaCapture({
       }
 
       const facing = yawPitchOf(forwardOf(pose));
+      const baseCalibration = calibrationRef.current;
+      const calibration = baseCalibration
+        ? calibrationForSize(baseCalibration, best.width, best.height)
+        : {
+            hfov: ASSUMED_HFOV,
+            vfov: verticalFov(ASSUMED_HFOV, best.width, best.height),
+            intrinsics: intrinsicsFromFov(best.width, best.height, ASSUMED_HFOV),
+            focalLength: null,
+            source: "estimated" as const,
+            cameraLabel: null,
+          };
       framesRef.current.push({
         blob: best.blob,
         targetId: target.id,
+        imageNumber: target.index,
+        captureOrder: framesRef.current.length + 1,
         yaw: facing.yaw,
         pitch: facing.pitch,
         roll: rollOf(pose),
-        fov: ASSUMED_HFOV,
-        width: video.videoWidth,
-        height: video.videoHeight,
+        rotation: pose,
+        screenOrientation: screenAngleRef.current,
+        exifOrientation: 1,
+        focalLength: calibration.focalLength,
+        intrinsics: calibration.intrinsics,
+        hfov: calibration.hfov,
+        vfov: calibration.vfov,
+        calibrationSource: calibration.source,
+        cameraLabel: calibration.cameraLabel,
+        width: best.width,
+        height: best.height,
         at: Date.now(),
       });
 
@@ -458,6 +511,7 @@ export function PanoramaCapture({
         panoramaUrl?: string;
         width?: number;
         height?: number;
+        rejectedTargetIds?: string[];
       };
 
       if (body.status === "ready" && body.panoramaUrl) {
@@ -470,8 +524,30 @@ export function PanoramaCapture({
         return;
       }
 
-      setProblem(stitchErrorMessage(body.code));
-      setRetryMode(body.code === "unknown" ? "stitch" : null);
+      if (
+        body.code === "retake_required" &&
+        Array.isArray(body.rejectedTargetIds) &&
+        body.rejectedTargetIds.length > 0
+      ) {
+        const rejected = new Set(body.rejectedTargetIds);
+        framesRef.current = framesRef.current.filter(
+          (frame) => !rejected.has(frame.targetId),
+        );
+        const next = {
+          ...stateRef.current,
+          taken: stateRef.current.taken.filter((id) => !rejected.has(id)),
+        };
+        takenRef.current = new Set(next.taken);
+        for (const id of rejected) markerTaken.current.delete(id);
+        applyState(next);
+        setProblem(
+          `${stitchErrorMessage(body.code)} ${rejected.size} photo${rejected.size === 1 ? "" : "s"} need retaking.`,
+        );
+        setRetryMode("retake");
+      } else {
+        setProblem(stitchErrorMessage(body.code));
+        setRetryMode(body.code === "unknown" ? "stitch" : null);
+      }
       setPhase("failed");
     } catch {
       // The request did not come back — a tab closed, a connection dropped.
@@ -483,7 +559,7 @@ export function PanoramaCapture({
       setRetryMode("stitch");
       setPhase("failed");
     }
-  }, []);
+  }, [applyState]);
 
   const upload = useCallback(async () => {
     teardown();
@@ -531,10 +607,20 @@ export function PanoramaCapture({
     const poses: {
       name: string;
       targetId: string;
+      imageNumber: number;
+      captureOrder: number;
       yaw: number;
       pitch: number;
       roll: number;
+      rotation: number[];
+      screenOrientation: number;
+      exifOrientation: number;
+      focalLength: number | null;
+      intrinsics: CameraIntrinsics;
       fov: number;
+      vfov: number;
+      calibrationSource: CameraCalibration["source"];
+      cameraLabel: string | null;
       width: number;
       height: number;
       at: number;
@@ -556,12 +642,29 @@ export function PanoramaCapture({
       poses.push({
         name,
         targetId: frame.targetId,
+        imageNumber: frame.imageNumber,
+        captureOrder: frame.captureOrder,
         // Rounded to a hundredth of a degree: further than that is below what
         // any phone's sensors resolve, and the column has a size limit.
         yaw: round2(frame.yaw),
         pitch: round2(frame.pitch),
         roll: round2(frame.roll),
-        fov: frame.fov,
+        rotation: frame.rotation.map(round4),
+        screenOrientation: frame.screenOrientation,
+        exifOrientation: frame.exifOrientation,
+        focalLength: frame.focalLength,
+        intrinsics: {
+          fx: round2(frame.intrinsics.fx),
+          fy: round2(frame.intrinsics.fy),
+          cx: round2(frame.intrinsics.cx),
+          cy: round2(frame.intrinsics.cy),
+          width: frame.intrinsics.width,
+          height: frame.intrinsics.height,
+        },
+        fov: round2(frame.hfov),
+        vfov: round2(frame.vfov),
+        calibrationSource: frame.calibrationSource,
+        cameraLabel: frame.cameraLabel,
         width: frame.width,
         height: frame.height,
         at: frame.at,
@@ -875,9 +978,10 @@ export function PanoramaCapture({
     };
   }, [phase, uploadedJob]);
 
-  async function start() {
+  async function start(preserveCaptured = false) {
     setProblem(null);
     setSensorMissing(false);
+    setHasSensor(false);
 
     // ---- orientation first, and that ordering is the whole of it ----------
     //
@@ -928,6 +1032,8 @@ export function PanoramaCapture({
 
     // Held, not attached: the <video> does not exist until the phase changes.
     streamRef.current = stream;
+    const track = stream.getVideoTracks()[0];
+    calibrationRef.current = track ? cameraCalibration(track) : null;
 
     // Pin the exposure and the white balance where the camera has settled.
     //
@@ -940,13 +1046,17 @@ export function PanoramaCapture({
     // automatic exposure is worse but still a capture.
     await lockCamera(stream);
 
-    framesRef.current = [];
-    // A new capture starts wherever the person is standing now, not where they
-    // were standing for the one they abandoned.
-    zeroRef.current = null;
+    if (!preserveCaptured) {
+      framesRef.current = [];
+      // A new capture starts wherever the person is standing now, not where
+      // they were standing for the one they abandoned.
+      zeroRef.current = null;
+    }
     poseRef.current = null;
-    attemptsRef.current = new Map();
-    bestShotRef.current = new Map();
+    if (!preserveCaptured) {
+      attemptsRef.current = new Map();
+      bestShotRef.current = new Map();
+    }
     cooldownRef.current = 0;
     driftRef.current = 0;
     driftAtRef.current = 0;
@@ -954,9 +1064,11 @@ export function PanoramaCapture({
     setRefused(0);
     recentRef.current = [];
     holdStateRef.current = { ...EMPTY_HOLD };
-    takenRef.current = new Set();
-    markerTaken.current = new Map();
-    applyState(startCapture());
+    if (!preserveCaptured) {
+      takenRef.current = new Set();
+      markerTaken.current = new Map();
+      applyState(startCapture(calibrationRef.current?.hfov ?? ASSUMED_HFOV));
+    }
     setPhase("capturing");
   }
 
@@ -1317,6 +1429,11 @@ export function PanoramaCapture({
               <RotateCcw className="size-4" /> Try saving again
             </Button>
           )}
+          {retryMode === "retake" && (
+            <Button onClick={() => void start(true)} className="min-h-12 w-full">
+              <Camera className="size-4" /> Retake highlighted photos
+            </Button>
+          )}
           <Button variant="outline" onClick={restart} className="min-h-11 w-full">
             Shoot the room again
           </Button>
@@ -1554,4 +1671,15 @@ async function lockCamera(stream: MediaStream): Promise<void> {
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function round4(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+function currentScreenAngle(): number {
+  const modern = window.screen.orientation?.angle;
+  if (typeof modern === "number") return modern;
+  const legacy = (window as typeof window & { orientation?: number }).orientation;
+  return typeof legacy === "number" ? legacy : 0;
 }

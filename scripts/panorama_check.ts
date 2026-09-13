@@ -71,6 +71,7 @@ import {
   yawPitchOf,
   type Vector3,
 } from "../src/lib/panorama/orientation.ts";
+import { intrinsicsFromFov } from "../src/lib/panorama/camera.ts";
 import { stitchErrorMessage } from "../src/lib/panorama/stitch.ts";
 import {
   CLEARLY_BAD,
@@ -412,7 +413,10 @@ function wholeFunction(src: string, name: string): string {
     })(),
     "too little and there is nothing to match on; too much and it is forty photographs of the same wall",
   );
-  check("the compact route retains a quarter-frame overlap", OVERLAP === 0.25);
+  check(
+    "the normal route retains 35–50% overlap",
+    OVERLAP >= 0.35 && OVERLAP <= 0.5,
+  );
 
   check(
     "a wider lens needs fewer photographs",
@@ -1020,7 +1024,10 @@ function wholeFunction(src: string, name: string): string {
     !/openai|anthropic|replicate|fetch\(/i.test(stitcher),
     "section 7 of the first brief and section 20 of this one: conventional stitching only",
   );
-  check("and reaches no network at all", !/https?:\/\//i.test(stitcher));
+  check(
+    "and reaches no network at all",
+    !/https?:\/\//i.test(stitcher.replace(/xmlns="http:\/\/www\.w3\.org\/2000\/svg"/, "")),
+  );
 
   check(
     "the old single-row capture plan is gone",
@@ -1045,14 +1052,14 @@ function wholeFunction(src: string, name: string): string {
     "section 7 steps 3–5: sensors drift, and a degree of drift puts a doorway two hundred pixels from itself",
   );
   check(
-    "and every frame is refined again against all the others",
+    "and every frame is refined only against angular neighbours",
     /if \(rough >= POLISH_ABOVE\) \{/.test(stitcher) &&
-      /if \(other !== frame\) paint\(without, other, table, flat\);/.test(stitcher),
-    "the first pass refines each frame against those already placed, so the first is never refined at all and the plan starts at the horizon — the most visible part of the room gets the least correction, and that is what bends a ceiling line where two frames meet",
+      /other !== frame && areAngularNeighbours\(frame, other\)/.test(stitcher),
+    "repeated lights and cabinets on the opposite wall must never enter a local pose solve",
   );
   check(
     "with the frame itself left out of what it is compared against",
-    /for \(const other of order\) \{\s*\n?\s*if \(other !== frame\)/.test(stitcher),
+    /other !== frame && areAngularNeighbours\(frame, other\)/.test(stitcher),
     "a frame compared against a picture that already contains it is being asked to agree with itself, which it does best by not moving",
   );
   check(
@@ -1072,21 +1079,19 @@ function wholeFunction(src: string, name: string): string {
   );
   check(
     "the frames have to agree before a panorama is published",
-    /if \(alignment < MIN_ALIGNMENT\) return \{ ok: false, code: "poor_alignment" \};/.test(
-      stitcher,
-    ),
+    /if \(alignment < MIN_ALIGNMENT\)/.test(stitcher),
     "an automatic quality check before 'your 360 photo is ready', which is the difference between a bad panorama and no panorama",
   );
   check(
     "it is measured on how well the frames could be brought together",
-    /const alignment =\s*\n?\s*sorted\.length === 0 \? 1 : sorted\[Math\.floor\(sorted\.length \/ 2\)\];/.test(
+    /sorted\[Math\.floor\(sorted\.length \* 0\.25\)\]/.test(
       stitcher,
     ),
-    "the median of what each frame scored against the mosaic its neighbours had already built — and not the seamed composite, which hides exactly the disagreement being measured",
+    "the lower quartile of each frame against its nearby spherical neighbours — not the seamed composite, which hides exactly the disagreement being measured",
   );
   check(
     "and a frame with nothing to match on is not counted as one that disagrees",
-    /if \(staying > -1\) scores\.push\(staying\);/.test(stitcher),
+    /if \(result\.score <= -1\) \{\s*weak \+= 1;\s*continue;/.test(stitcher),
     "a blank ceiling cannot correlate with anything and should not condemn a capture",
   );
   check(
@@ -1096,7 +1101,7 @@ function wholeFunction(src: string, name: string): string {
     // its own is satisfied by the line having been deleted.
     stitcher.includes('code: "poor_alignment"') &&
       stitcher.indexOf('code: "poor_alignment"') <
-        stitcher.indexOf("const outWidth = outputWidth(order);"),
+        stitcher.indexOf("const accepted = order.filter"),
     "a capture that did not come together should cost nothing further",
   );
   check(
@@ -1456,6 +1461,7 @@ async function endToEnd() {
     const exact: FrameInput[] = [];
     for (const target of plan) {
       exact.push({
+        targetId: target.id,
         yaw: target.yaw,
         pitch: target.pitch,
         roll: 0,
@@ -1464,7 +1470,7 @@ async function endToEnd() {
       });
     }
 
-    const clean = await composePanorama(exact);
+    const clean = await composePanorama(exact, { debug: true });
     const denseWrongLens: FrameInput[] = [];
     const denseRings = [
       { pitch: 0, count: 10, stagger: 18 },
@@ -1483,19 +1489,34 @@ async function endToEnd() {
           pitch: ring.pitch,
           roll: 0,
           hfov: 48,
+          intrinsics: intrinsicsFromFov(640, 480, 60),
+          calibrationSource: "intrinsics",
           bytes: new Uint8Array(await photograph(truth, yaw, ring.pitch, 0, 60)),
         });
       }
     }
     const wrongLens = await composePanorama(denseWrongLens);
     check(
-      "a confident overlap recovers the lens angle when the browser cannot report it",
+      "reported camera intrinsics override an incorrect FOV hint",
       wrongLens.ok && wrongLens.fieldOfView >= 57 && wrongLens.fieldOfView <= 63,
-      wrongLens.ok ? `${wrongLens.fieldOfView}° recovered from a 48° guess` : wrongLens.code,
+      wrongLens.ok ? `${wrongLens.fieldOfView}° read from camera intrinsics` : wrongLens.code,
     );
     if (!clean.ok) {
       check("a set of exactly-posed frames stitches", false, clean.code);
     } else {
+      for (const [name, bytes] of Object.entries(clean.debug ?? {})) {
+        const metadata = await sharp(bytes).metadata();
+        check(
+          `the ${name} debug output is a 2:1 equirectangular image`,
+          Boolean(metadata.width && metadata.height && metadata.width === metadata.height * 2),
+          `${metadata.width ?? 0}x${metadata.height ?? 0}`,
+        );
+      }
+      check(
+        "developer mode emits gyro-only, refined and visible-footprint panoramas",
+        Boolean(clean.debug?.gyroOnly && clean.debug.refined && clean.debug.noBlending),
+      );
+
       const shown = new Uint8Array(
         await sharp(clean.jpeg)
           .resize(TW, TH, { fit: "fill" })
@@ -1547,10 +1568,33 @@ async function endToEnd() {
         check(
           "the recovered lens angle is used to paint the panorama",
           lensBadly / (TW * TH) < 0.025,
-          `${((lensBadly / (TW * TH)) * 100).toFixed(2)}% badly wrong after correcting the browser's 48° guess`,
+          `${((lensBadly / (TW * TH)) * 100).toFixed(2)}% badly wrong using the camera's 60° intrinsics`,
         );
       }
     }
+
+    const misplaced = exact.map((frame) => ({ ...frame }));
+    const corruptPixels = Buffer.alloc(640 * 480 * 3);
+    let corruptSeed = 19;
+    for (let i = 0; i < corruptPixels.length; i += 1) {
+      corruptSeed = (corruptSeed * 1664525 + 1013904223) >>> 0;
+      corruptPixels[i] = corruptSeed & 255;
+    }
+    misplaced[3] = {
+      ...misplaced[3],
+      targetId: "deliberately-wrong-target",
+      bytes: new Uint8Array(
+        await sharp(corruptPixels, {
+          raw: { width: 640, height: 480, channels: 3 },
+        }).jpeg({ quality: 92 }).toBuffer(),
+      ),
+    };
+    const rejected = await composePanorama(misplaced);
+    check(
+      "one source frame placed in the wrong direction is rejected by target id",
+      rejected.rejectedTargetIds?.includes("deliberately-wrong-target") === true,
+      rejected.ok ? rejected.rejectedTargetIds.join(", ") : `${rejected.code}: ${rejected.rejectedTargetIds?.join(", ") ?? "none"}`,
+    );
   }
 
   // The quality check. A phone held out at arm's length travels through an arc
@@ -1759,7 +1803,7 @@ async function endToEnd() {
   const reading = blockAfter(capture, "const onOrientation = useCallback(");
   check(
     "the rotation is built from all three angles, not a heading",
-    /rotationMatrix\(event\.alpha, event\.beta, event\.gamma\)/.test(reading),
+    /cameraRotationMatrix\([\s\S]{0,100}?event\.alpha,[\s\S]{0,100}?event\.beta,[\s\S]{0,100}?event\.gamma,[\s\S]{0,100}?screenAngle/.test(reading),
     "section 2: yaw, pitch and roll — a compass bearing on its own cannot say which way is up",
   );
   check(
@@ -1780,8 +1824,10 @@ async function endToEnd() {
     /yaw: facing\.yaw/.test(taking) &&
       /pitch: facing\.pitch/.test(taking) &&
       /roll: rollOf\(pose\)/.test(taking) &&
-      /fov: ASSUMED_HFOV/.test(taking) &&
-      /width: video\.videoWidth/.test(taking),
+      /rotation: pose/.test(taking) &&
+      /intrinsics: calibration\.intrinsics/.test(taking) &&
+      /screenOrientation: screenAngleRef\.current/.test(taking) &&
+      /width: best\.width/.test(taking),
     "section 6: by the time the stitcher sees the image there is nothing in the pixels that says which way the camera was facing",
   );
 
@@ -1815,7 +1861,7 @@ async function endToEnd() {
   );
 
   // --- the permission ordering, which is the whole of a dead capture -------
-  const starting = blockAfter(capture, "async function start()");
+  const starting = blockAfter(capture, "async function start(preserveCaptured = false)");
   check("starting the camera is findable", starting.length > 0);
   check(
     "orientation is asked for before the camera, not after it",

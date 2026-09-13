@@ -15,10 +15,10 @@ import { directionOf, type Vector3 } from "./orientation";
  */
 
 /** How much of each frame should also appear in its neighbour. */
-export const OVERLAP = 0.25;
+export const OVERLAP = 0.35;
 
 /** What a phone's rear camera sees across, in degrees, when it will not say. */
-export const ASSUMED_HFOV = 60;
+export const ASSUMED_HFOV = 70;
 
 /** The pitches photographed, top to bottom. */
 export const RING_PITCHES = [90, 45, 0, -45, -90] as const;

@@ -3,14 +3,23 @@ import "server-only";
 import sharp from "sharp";
 
 import {
-  ASSUMED_HFOV,
-} from "./sphere";
+  horizontalFovFromFx,
+  intrinsicsFromFov,
+  type CameraIntrinsics,
+} from "./camera";
+import { ASSUMED_HFOV } from "./sphere";
 import {
+  angleBetween,
   basisFrom,
   directionOf,
   dot,
+  forwardOf,
+  isRotationMatrix,
+  rollOf,
   verticalFov,
+  yawPitchOf,
   type Basis,
+  type Matrix3,
   type Vector3,
 } from "./orientation";
 
@@ -45,12 +54,20 @@ import {
  */
 
 export type FrameInput = {
+  targetId?: string;
+  imageNumber?: number;
+  captureOrder?: number;
   /** Where the phone said it was pointing, in the capture's local frame. */
   yaw: number;
   pitch: number;
   roll: number;
+  /** Full camera-to-world rotation after screen-orientation correction. */
+  rotation?: Matrix3 | number[];
+  intrinsics?: CameraIntrinsics;
   /** What the camera sees across, in degrees. */
   hfov?: number;
+  vfov?: number;
+  calibrationSource?: "device" | "intrinsics" | "estimated";
   bytes: Uint8Array;
 };
 
@@ -67,8 +84,8 @@ export type StitchOutcome =
       /**
        * How well the frames could be brought into agreement, -1 to 1.
        *
-       * The median correlation between each frame and the mosaic its
-       * neighbours had already built, which is a direct measure of whether one
+       * The lower-quartile correlation between each frame and a mosaic of its
+       * angular neighbours, which directly measures whether one
        * rotation can explain them all. Around 0.4 is a phone turned about
        * itself; it falls off a cliff as the lens moves away from the point the
        * person is turning about, because no rotation can account for the
@@ -77,8 +94,20 @@ export type StitchOutcome =
       alignment: number;
       /** Horizontal camera angle recovered from the overlapping photographs. */
       fieldOfView: number;
+      /** Capture targets excluded because their pixels contradicted their pose. */
+      rejectedTargetIds: string[];
+      debug?: {
+        gyroOnly: Buffer;
+        refined: Buffer;
+        noBlending: Buffer;
+      };
     }
-  | { ok: false; code: string };
+  | {
+      ok: false;
+      code: string;
+      rejectedTargetIds?: string[];
+      debug?: { gyroOnly: Buffer; refined: Buffer; noBlending: Buffer };
+    };
 
 /** Below this the panorama has holes worth refusing rather than publishing. */
 export const MIN_COVERAGE = 0.9;
@@ -121,8 +150,8 @@ const REFINE_RANGE = 3;
 const REFINE_STEP = 1;
 
 /**
- * The second pass: finer, and against everything rather than against what
- * happened to come first.
+ * The second pass: finer, and against nearby spherical neighbours rather than
+ * only the neighbours that happened to come first.
  *
  * The first pass lays frames down one at a time and matches each against those
  * already placed, which has a weakness that shows in exactly the wrong place.
@@ -132,10 +161,9 @@ const REFINE_STEP = 1;
  * error those first few kept. That is what bends a ceiling line where two
  * frames meet.
  *
- * So every frame is then refined again against a mosaic of all the others,
- * itself left out. Leaving it out matters: a frame compared against a picture
- * that already contains it is being asked to agree with itself, which it does
- * best by not moving.
+ * So every frame is then refined again against a mosaic of only the frames
+ * whose gyro footprints can overlap it, with itself left out. Leaving it out
+ * matters: a frame compared against itself always prefers not to move.
  */
 const POLISH_RANGE = 1.5;
 const POLISH_STEP = 0.5;
@@ -209,19 +237,32 @@ const WEAK_SEAM = 0.25;
  */
 const ACCEPT_MARGIN = 0.05;
 
-/** Phones do not expose lens angle through getUserMedia; recover it from overlaps. */
+/** Visual evidence may fine-tune a gyro pose, never replace it. */
+export const MAX_GYRO_CORRECTION = 3.5;
+
+/** A measurable neighbour match below this is actively contradictory. */
+export const FRAME_REJECT_BELOW = 0.2;
+
+/** Recover an estimated lens angle only when overlap evidence is already sound. */
 const FOV_SEARCH = [-12, -9, -6, -3, 0, 3, 6, 9, 12] as const;
 const FOV_ACCEPT_MARGIN = 0.025;
 const FOV_MIN_CONFIDENCE = 0.55;
 
 type Decoded = {
+  id: string;
+  captureOrder: number;
   pose: { yaw: number; pitch: number; roll: number };
+  gyro: { yaw: number; pitch: number; roll: number };
   hfov: number;
   vfov: number;
+  intrinsics: CameraIntrinsics;
+  calibrationSource: "device" | "intrinsics" | "estimated";
   width: number;
   height: number;
   pixels: Uint8Array;
   gain: number;
+  confidence: number;
+  accepted: boolean;
 };
 
 /** A sphere's worth of accumulated colour, waiting to be divided by its weight. */
@@ -243,12 +284,13 @@ function blankCanvas(width: number, height: number): Canvas {
 
 export async function composePanorama(
   frames: FrameInput[],
+  options: { debug?: boolean } = {},
 ): Promise<StitchOutcome> {
   if (frames.length < 4) return { ok: false, code: "too_few_frames" };
 
   // ---- decode, at a size worth sampling -----------------------------------
   const decoded: Decoded[] = [];
-  for (const frame of frames) {
+  for (const [frameIndex, frame] of frames.entries()) {
     try {
       const image = sharp(Buffer.from(frame.bytes), { failOn: "none" }).rotate();
       const meta = await image.metadata();
@@ -264,15 +306,42 @@ export async function composePanorama(
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      const hfov = frame.hfov && frame.hfov > 20 ? frame.hfov : ASSUMED_HFOV;
+      const inputIntrinsics = validIntrinsics(frame.intrinsics)
+        ? scaleIntrinsics(frame.intrinsics, width, height)
+        : null;
+      const hfov = inputIntrinsics
+        ? horizontalFovFromFx(width, inputIntrinsics.fx)
+        : frame.hfov && frame.hfov > 20
+          ? frame.hfov
+          : ASSUMED_HFOV;
+      const vfov = inputIntrinsics
+        ? (2 * Math.atan(height / (2 * inputIntrinsics.fy)) * 180) / Math.PI
+        : frame.vfov && frame.vfov > 15
+          ? frame.vfov
+          : verticalFov(hfov, width, height);
+      const intrinsics = inputIntrinsics ?? intrinsicsFromFov(width, height, hfov, vfov);
+      const rotation = isRotationMatrix(frame.rotation) ? frame.rotation : null;
+      const fromMatrix = rotation ? yawPitchOf(forwardOf(rotation)) : null;
+      const pose = {
+        yaw: fromMatrix?.yaw ?? frame.yaw,
+        pitch: fromMatrix?.pitch ?? frame.pitch,
+        roll: rotation ? rollOf(rotation) : frame.roll,
+      };
       decoded.push({
-        pose: { yaw: frame.yaw, pitch: frame.pitch, roll: frame.roll },
+        id: frame.targetId ?? `frame_${frameIndex + 1}`,
+        captureOrder: frame.captureOrder ?? frameIndex + 1,
+        pose,
+        gyro: { ...pose },
         hfov,
-        vfov: verticalFov(hfov, width, height),
+        vfov,
+        intrinsics,
+        calibrationSource: frame.calibrationSource ?? "estimated",
         width,
         height,
         pixels: new Uint8Array(data),
         gain: 1,
+        confidence: -1,
+        accepted: true,
       });
     } catch {
       return { ok: false, code: "unreadable" };
@@ -301,21 +370,43 @@ export async function composePanorama(
     })
     .map((entry) => entry.frame);
 
-  // `getUserMedia` reports pixels but not focal length. Treating every rear
-  // phone camera as 60° changes the scale of every overlap and bends doors and
-  // sofas at their joins. The horizon has the strongest vertical edges, so use
-  // those overlaps to recover one lens angle for the entire capture.
+  // Most browsers report pixels but not focal length. Treating every rear
+  // camera as one fixed angle changes every overlap and bends doors at joins.
+  // Device-reported intrinsics win; visual calibration is allowed only from a
+  // well-correlated horizon, because a weak guess must never fold the room.
   const fieldOfView = calibrateFieldOfView(order);
+  const gyroOrder = order.map((frame) => ({
+    ...frame,
+    pose: { ...frame.gyro },
+    gyro: { ...frame.gyro },
+    accepted: true,
+    gain: 1,
+  }));
 
   // ---- refine the poses against the pixels --------------------------------
-  const { weak: weakSeams, alignment } = refinePoses(order);
+  const { weak: weakSeams, alignment, rejectedTargetIds } = refinePoses(order);
+  const debug = options.debug
+    ? await createDebugOutputs(
+        gyroOrder,
+        order,
+        outputWidth(order),
+        outputWidth(order) / 2,
+      ).catch(() => undefined)
+    : undefined;
 
   // Checked before a pixel is painted, so a capture that did not come together
   // costs nothing further and is never shown as a panorama.
-  if (alignment < MIN_ALIGNMENT) return { ok: false, code: "poor_alignment" };
+  if (alignment < MIN_ALIGNMENT) {
+    return { ok: false, code: "poor_alignment", rejectedTargetIds, debug };
+  }
+
+  const accepted = order.filter((frame) => frame.accepted);
+  if (accepted.length < 4) {
+    return { ok: false, code: "retake_required", rejectedTargetIds, debug };
+  }
 
   // ---- paint the sphere ----------------------------------------------------
-  const outWidth = outputWidth(order);
+  const outWidth = outputWidth(accepted);
   const height = outWidth / 2;
   const table = yawTable(outWidth);
 
@@ -323,21 +414,28 @@ export async function composePanorama(
   const best = new Float32Array(outWidth * height);
   {
     const probe = blankCanvas(outWidth, height);
-    for (const frame of order) survey(best, probe, frame, table);
+    for (const frame of accepted) survey(best, probe, frame, table);
   }
 
   // The detail: one frame per pixel, so nothing is doubled.
   const seamed = blankCanvas(outWidth, height);
-  for (const frame of order) paint(seamed, frame, table, best, "seam");
+  for (const frame of accepted) paint(seamed, frame, table, best, "seam");
   const { rgb, covered } = resolve(seamed);
   release(seamed);
 
-  if (covered < MIN_COVERAGE) return { ok: false, code: "incomplete_sphere" };
+  if (covered < MIN_COVERAGE) {
+    return {
+      ok: false,
+      code: rejectedTargetIds.length > 0 ? "retake_required" : "incomplete_sphere",
+      rejectedTargetIds,
+      debug,
+    };
+  }
 
   // The colour: every frame that can see a pixel, faded across the whole
   // overlap, so brightness changes gradually and no step can form.
   const wide = blankCanvas(outWidth, height);
-  for (const frame of order) paint(wide, frame, table, best, "wide");
+  for (const frame of accepted) paint(wide, frame, table, best, "wide");
   const spread = resolve(wide).rgb;
   release(wide);
 
@@ -359,6 +457,8 @@ export async function composePanorama(
       weakSeams,
       alignment,
       fieldOfView,
+      rejectedTargetIds,
+      debug,
     };
   } catch {
     return { ok: false, code: "unknown" };
@@ -366,12 +466,11 @@ export async function composePanorama(
 }
 
 function calibrateFieldOfView(order: Decoded[]): number {
+  if (order.some((frame) => frame.calibrationSource !== "estimated")) {
+    return median(order.map((frame) => frame.hfov));
+  }
   const horizon = order.filter((frame) => Math.abs(frame.pose.pitch) <= 35);
-  // The compact 22-shot route has only eight horizon frames. At that spacing
-  // there is not enough repeated detail to distinguish lens scale from a yaw
-  // correction reliably, so keep the conservative phone estimate. Denser
-  // imported captures still have enough overlap to calibrate themselves.
-  if (horizon.length < 10) return order[0]?.hfov ?? ASSUMED_HFOV;
+  if (horizon.length < 6) return order[0]?.hfov ?? ASSUMED_HFOV;
   const base = fovAgreement(horizon, 0);
   let best = { delta: 0, score: base };
   for (const delta of FOV_SEARCH) {
@@ -380,13 +479,21 @@ function calibrateFieldOfView(order: Decoded[]): number {
     if (score > best.score) best = { delta, score };
   }
   const accepted =
-    best.score >= FOV_MIN_CONFIDENCE && best.score > base + FOV_ACCEPT_MARGIN
+    base >= 0.35 &&
+    best.score >= FOV_MIN_CONFIDENCE &&
+    best.score > base + FOV_ACCEPT_MARGIN
       ? best.delta
       : 0;
   if (accepted !== 0) {
     for (const frame of order) {
       frame.hfov = clamp(frame.hfov + accepted, 40, 95);
       frame.vfov = verticalFov(frame.hfov, frame.width, frame.height);
+      frame.intrinsics = intrinsicsFromFov(
+        frame.width,
+        frame.height,
+        frame.hfov,
+        frame.vfov,
+      );
     }
   }
   const values = order.map((frame) => frame.hfov).sort((a, b) => a - b);
@@ -398,27 +505,40 @@ function fovAgreement(order: Decoded[], delta: number): number {
   const scores: number[] = [];
   const frames = order.map((original) => {
     const hfov = clamp(original.hfov + delta, 40, 95);
-    return { ...original, hfov, vfov: verticalFov(hfov, original.width, original.height) };
+    const vfov = verticalFov(hfov, original.width, original.height);
+    return {
+      ...original,
+      hfov,
+      vfov,
+      intrinsics: intrinsicsFromFov(original.width, original.height, hfov, vfov),
+    };
   }).sort((a, b) => a.pose.yaw - b.pose.yaw);
   for (let index = 0; index < frames.length; index += 1) {
     const a = frames[index];
     const b = frames[(index + 1) % frames.length];
+    const spacing = angleBetween(
+      directionOf(a.pose.yaw, a.pose.pitch),
+      directionOf(b.pose.yaw, b.pose.pitch),
+    );
+    // A candidate that claims only a sliver overlaps can get an impressive
+    // correlation from one repeated light or one plain strip. It is not a
+    // usable calibration and it is exactly how a room gets folded.
+    if ((Math.min(a.hfov, b.hfov) - spacing) / Math.min(a.hfov, b.hfov) < 0.2) {
+      scores.push(-1);
+      continue;
+    }
     let best = -1;
     // Sensor yaw can be a few degrees wrong; lens scale cannot be judged by
     // forcing that unrelated error into the score.
-    for (let correction = -3; correction <= 3; correction += 1) {
+    for (let correction = -6; correction <= 6; correction += 1) {
       const aa = basisFrom(a.pose.yaw, a.pose.pitch, a.pose.roll);
       const bb = basisFrom(b.pose.yaw + correction, b.pose.pitch, b.pose.roll);
-      const tanAH = Math.tan((a.hfov / 2) * Math.PI / 180);
-      const tanAV = Math.tan((a.vfov / 2) * Math.PI / 180);
-      const tanBH = Math.tan((b.hfov / 2) * Math.PI / 180);
-      const tanBV = Math.tan((b.vfov / 2) * Math.PI / 180);
       let n = 0, sumA = 0, sumB = 0, sumAA = 0, sumBB = 0, sumAB = 0;
-      for (let yaw = 0; yaw < 360; yaw += 3) {
-        for (let pitch = -24; pitch <= 24; pitch += 6) {
+      for (let yaw = 0; yaw < 360; yaw += 2) {
+        for (let pitch = -28; pitch <= 28; pitch += 4) {
           const direction = directionOf(yaw, pitch);
-          const pa = sample(a, direction, aa, tanAH, tanAV);
-          const pb = sample(b, direction, bb, tanBH, tanBV);
+          const pa = sample(a, direction, aa);
+          const pb = sample(b, direction, bb);
           if (!pa || !pb) continue;
           const la = 0.2126 * pa.r + 0.7152 * pa.g + 0.0722 * pa.b;
           const lb = 0.2126 * pb.r + 0.7152 * pb.g + 0.0722 * pb.b;
@@ -430,19 +550,113 @@ function fovAgreement(order: Decoded[], delta: number): number {
       // A narrow candidate can manufacture a perfect score from one plain
       // strip because it says the frames barely overlap. That is not evidence
       // of a lens angle; require roughly eight shared longitude samples.
-      const score = n < 60 || va <= 1e-6 || vb <= 1e-6 ? -1 : (sumAB - sumA * sumB / n) / Math.sqrt(va * vb);
+      const score = n < 80 || va <= 1e-6 || vb <= 1e-6 ? -1 : (sumAB - sumA * sumB / n) / Math.sqrt(va * vb);
       best = Math.max(best, score);
     }
-    if (best > -1) scores.push(best);
+    scores.push(best);
   }
   scores.sort((a, b) => a - b);
-  return scores.length === 0 ? -1 : scores[Math.floor(scores.length / 2)];
+  return scores.length === 0 ? -1 : scores[Math.floor(scores.length * 0.25)];
 }
 
 /** Let a canvas go before the next one is allocated. Both at once is 270MB. */
 function release(canvas: Canvas): void {
   canvas.sum = new Float32Array(0);
   canvas.weight = new Float32Array(0);
+}
+
+async function createDebugOutputs(
+  gyro: Decoded[],
+  refined: Decoded[],
+  width: number,
+  height: number,
+): Promise<{ gyroOnly: Buffer; refined: Buffer; noBlending: Buffer }> {
+  const [gyroOnly, refinedImage, noBlending] = await Promise.all([
+    renderProjection(gyro, width, height),
+    renderProjection(refined.filter((frame) => frame.accepted), width, height),
+    renderDiagnostic(refined, width, height),
+  ]);
+  return { gyroOnly, refined: refinedImage, noBlending };
+}
+
+async function renderProjection(
+  frames: Decoded[],
+  width: number,
+  height: number,
+): Promise<Buffer> {
+  const table = yawTable(width);
+  const best = new Float32Array(width * height);
+  const probe = blankCanvas(width, height);
+  for (const frame of frames) survey(best, probe, frame, table);
+  const canvas = blankCanvas(width, height);
+  for (const frame of frames) paint(canvas, frame, table, best, "seam");
+  const { rgb } = resolve(canvas);
+  release(canvas);
+  return sharp(Buffer.from(rgb), { raw: { width, height, channels: 3 } })
+    .jpeg({ quality: 84 })
+    .toBuffer();
+}
+
+async function renderDiagnostic(
+  frames: Decoded[],
+  width: number,
+  height: number,
+): Promise<Buffer> {
+  const best = new Float32Array(width * height);
+  const owner = new Int16Array(width * height);
+  owner.fill(-1);
+  const probe = blankCanvas(width, height);
+  const table = yawTable(width);
+  frames.forEach((frame, index) => survey(best, probe, frame, table, owner, index));
+
+  const canvas = blankCanvas(width, height);
+  for (const frame of frames) paint(canvas, frame, table, best, "seam");
+  const rgb = resolve(canvas).rgb;
+  release(canvas);
+  const colours = [
+    [255, 80, 80], [70, 170, 255], [80, 220, 130], [255, 190, 60],
+    [190, 100, 255], [40, 220, 220], [255, 110, 190], [180, 210, 50],
+  ];
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const at = y * width + x;
+      const frameIndex = owner[at];
+      if (frameIndex < 0) continue;
+      const colour = colours[frameIndex % colours.length];
+      const pixel = at * 3;
+      rgb[pixel] = rgb[pixel] * 0.78 + colour[0] * 0.22;
+      rgb[pixel + 1] = rgb[pixel + 1] * 0.78 + colour[1] * 0.22;
+      rgb[pixel + 2] = rgb[pixel + 2] * 0.78 + colour[2] * 0.22;
+      const right = x + 1 < width ? owner[at + 1] : owner[y * width];
+      const below = y + 1 < height ? owner[at + width] : frameIndex;
+      if (right !== frameIndex || below !== frameIndex) {
+        rgb[pixel] = 255;
+        rgb[pixel + 1] = 255;
+        rgb[pixel + 2] = 255;
+      }
+    }
+  }
+
+  const labels = frames.map((frame) => {
+    const x = ((frame.pose.yaw % 360 + 360) % 360) / 360 * width;
+    const y = (90 - frame.pose.pitch) / 180 * height;
+    const confidence = frame.confidence < -0.99 ? "n/a" : frame.confidence.toFixed(2);
+    const text = `#${frame.captureOrder} ${frame.id} yaw ${frame.pose.yaw.toFixed(1)} pitch ${frame.pose.pitch.toFixed(1)} roll ${frame.pose.roll.toFixed(1)} FOV ${frame.hfov.toFixed(1)} confidence ${confidence} ${frame.accepted ? "accepted" : "REJECTED"}`;
+    return `<text x="${x.toFixed(0)}" y="${Math.max(18, y).toFixed(0)}" fill="white" stroke="black" stroke-width="3" paint-order="stroke" font-size="14">${escapeXml(text)}</text>`;
+  }).join("");
+  const svg = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${labels}</svg>`,
+  );
+  return sharp(Buffer.from(rgb), { raw: { width, height, channels: 3 } })
+    .composite([{ input: svg }])
+    .jpeg({ quality: 88 })
+    .toBuffer();
+}
+
+function escapeXml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;",
+  })[character] ?? character);
 }
 
 /**
@@ -501,91 +715,66 @@ function outputWidth(frames: Decoded[]): number {
  * placements per frame, which at full size would be the whole stitch over
  * again for each one.
  */
-function refinePoses(order: Decoded[]): { weak: number; alignment: number } {
-  const scores: number[] = [];
+function refinePoses(
+  order: Decoded[],
+): { weak: number; alignment: number; rejectedTargetIds: string[] } {
+  const roughScores: number[] = [];
   const canvas = blankCanvas(REFINE_WIDTH, REFINE_WIDTH / 2);
   const table = yawTable(canvas.width);
-  // The refinement lays frames down one at a time and matches each against
-  // what is already there, so there is no complete survey to seam against.
-  // Every frame is its own best view here, which is what a flat allowance of
-  // zero means.
   const flat = new Float32Array(canvas.width * canvas.height);
-  let weak = 0;
+  const placed: Decoded[] = [];
 
-  order.forEach((frame, index) => {
-    if (index === 0) {
-      paint(canvas, frame, table, flat);
-      return;
-    }
-
-    // What staying put is worth. Every other placement is measured against it,
-    // and it is also the evidence for whether this capture worked at all.
+  // First pass: only frames whose gyro directions are close enough to overlap
+  // may influence one another. A repeated light on the opposite wall is not a
+  // neighbour, no matter how attractive its pixel correlation looks.
+  for (const frame of order) {
+    fillNeighbourCanvas(canvas, placed, frame, table, flat);
     const staying = agreement(canvas, frame, 0, 0).score;
-    // -1 is `agreement` saying it could not tell — too little shared ground,
-    // or a wall so blank there is no pattern to match. That is not a frame
-    // that disagrees, so it is not counted as one.
-    if (staying > -1) scores.push(staying);
+    if (staying > -1) roughScores.push(staying);
 
     let best = { score: staying, dYaw: 0, dPitch: 0 };
     for (let dy = -REFINE_RANGE; dy <= REFINE_RANGE; dy += REFINE_STEP) {
       for (let dp = -REFINE_RANGE; dp <= REFINE_RANGE; dp += REFINE_STEP) {
         if (dy === 0 && dp === 0) continue;
+        if (!withinGyroLimit(frame, dy, dp)) continue;
         const score = agreement(canvas, frame, dy, dp).score;
         if (score > best.score) best = { score, dYaw: dy, dPitch: dp };
       }
     }
 
-    // Nothing to lock onto — a blank wall, or no overlap at all. The phone's
-    // own reading is then the best answer available, so it is kept rather than
-    // replaced by whichever offset happened to score highest on noise.
-    if (best.score < WEAK_SEAM) {
-      weak += 1;
-    } else if (best.score > staying + ACCEPT_MARGIN) {
+    if (best.score > WEAK_SEAM && best.score > staying + ACCEPT_MARGIN) {
       frame.pose.yaw += best.dYaw;
       frame.pose.pitch = clamp(frame.pose.pitch + best.dPitch, -90, 90);
     }
 
-    // Now that it is in the right place, how bright is it against what is
-    // already there? Sequential, so the correction travels round the room from
-    // the first frame rather than every frame being pulled towards an average
-    // none of them should match.
     const settled = agreement(canvas, frame, 0, 0);
     if (settled.score > WEAK_SEAM) {
       frame.gain = clamp(settled.ratio, 0.7, 1.45);
     }
+    placed.push(frame);
+  }
 
-    paint(canvas, frame, table, flat);
-  });
-
-  // The first pass's verdict, which decides whether a second is worth running.
-  const roughSorted = [...scores].sort((a, b) => a - b);
+  const roughSorted = [...roughScores].sort((a, b) => a - b);
   const rough =
-    roughSorted.length === 0 ? 1 : roughSorted[Math.floor(roughSorted.length / 2)];
+    roughSorted.length === 0
+      ? 1
+      : roughSorted[Math.floor(roughSorted.length / 2)];
 
-  // ---- second pass: each frame against all the others ---------------------
-  //
-  // Costed deliberately: rebuilding the mosaic without one frame is
-  // thirty-seven paints of a canvas an eighth of the output's width, and doing
-  // that once per frame is about eight million pixel operations — a second,
-  // against a stitch that takes six.
+  // Rotation-only coordinate descent. This is deliberately not an unrestricted
+  // homography or an all-pairs solve: nearby spherical neighbours contribute,
+  // and every candidate remains inside the gyro trust region.
   if (rough >= POLISH_ABOVE) {
-    const without = blankCanvas(REFINE_WIDTH, REFINE_WIDTH / 2);
-
     for (const frame of order) {
-      without.sum.fill(0);
-      without.weight.fill(0);
-      for (const other of order) {
-        if (other !== frame) paint(without, other, table, flat);
-      }
-
-      const staying = agreement(without, frame, 0, 0).score;
+      fillNeighbourCanvas(canvas, order, frame, table, flat);
+      const staying = agreement(canvas, frame, 0, 0).score;
       if (staying <= -1) continue;
 
       let best = { score: staying, dYaw: 0, dPitch: 0 };
       for (let dy = -POLISH_RANGE; dy <= POLISH_RANGE; dy += POLISH_STEP) {
         for (let dp = -POLISH_RANGE; dp <= POLISH_RANGE; dp += POLISH_STEP) {
           if (dy === 0 && dp === 0) continue;
-          const score = agreement(without, frame, dy, dp).score;
+          if (!withinGyroLimit(frame, dy, dp)) continue;
+          const score = agreement(canvas, frame, dy, dp).score;
           if (score > best.score) best = { score, dYaw: dy, dPitch: dp };
         }
       }
@@ -597,13 +786,74 @@ function refinePoses(order: Decoded[]): { weak: number; alignment: number } {
     }
   }
 
-  // The median rather than the mean: one frame pointed at a blank ceiling
-  // should not condemn a capture, and one lucky frame should not rescue one.
-  const sorted = [...scores].sort((a, b) => a - b);
-  const alignment =
-    sorted.length === 0 ? 1 : sorted[Math.floor(sorted.length / 2)];
+  // Judge each frame against a mosaic that does not contain itself. A blank
+  // overlap is inconclusive and keeps the gyro placement; a measurable,
+  // strongly negative overlap is contradictory and the frame is excluded.
+  const scores: number[] = [];
+  let weak = 0;
+  for (const frame of order) {
+    fillNeighbourCanvas(canvas, order, frame, table, flat);
+    const result = agreement(canvas, frame, 0, 0);
+    frame.confidence = result.score;
+    if (result.score <= -1) {
+      weak += 1;
+      continue;
+    }
+    scores.push(result.score);
+    if (
+      result.score < FRAME_REJECT_BELOW ||
+      !withinGyroLimit(frame, 0, 0)
+    ) {
+      frame.accepted = false;
+    }
+  }
 
-  return { weak, alignment };
+  // A lower quartile catches a bad region without letting one blank ceiling
+  // frame condemn an otherwise sound capture or one lucky seam rescue it.
+  const sorted = scores.sort((a, b) => a - b);
+  const alignment =
+    sorted.length === 0 ? 1 : sorted[Math.floor(sorted.length * 0.25)];
+  const rejectedTargetIds = order
+    .filter((frame) => !frame.accepted)
+    .map((frame) => frame.id);
+
+  return { weak, alignment, rejectedTargetIds };
+}
+
+function fillNeighbourCanvas(
+  canvas: Canvas,
+  candidates: Decoded[],
+  frame: Decoded,
+  table: ReturnType<typeof yawTable>,
+  flat: Float32Array,
+): void {
+  canvas.sum.fill(0);
+  canvas.weight.fill(0);
+  for (const other of candidates) {
+    if (other !== frame && areAngularNeighbours(frame, other)) {
+      paint(canvas, other, table, flat);
+    }
+  }
+}
+
+function areAngularNeighbours(a: Decoded, b: Decoded): boolean {
+  const distance = angleBetween(
+    directionOf(a.gyro.yaw, a.gyro.pitch),
+    directionOf(b.gyro.yaw, b.gyro.pitch),
+  );
+  const reach = Math.max(a.hfov, a.vfov, b.hfov, b.vfov) * 1.25;
+  return distance <= Math.min(105, reach);
+}
+
+function withinGyroLimit(frame: Decoded, dYaw: number, dPitch: number): boolean {
+  const candidate = directionOf(
+    frame.pose.yaw + dYaw,
+    clamp(frame.pose.pitch + dPitch, -90, 90),
+  );
+  return (
+    angleBetween(candidate, directionOf(frame.gyro.yaw, frame.gyro.pitch)) <=
+    MAX_GYRO_CORRECTION
+  );
 }
 
 /**
@@ -624,8 +874,6 @@ function agreement(
     clamp(frame.pose.pitch + dPitch, -90, 90),
     frame.pose.roll,
   );
-  const tanH = Math.tan((frame.hfov / 2) * (Math.PI / 180));
-  const tanV = Math.tan((frame.vfov / 2) * (Math.PI / 180));
 
   let n = 0;
   let sumA = 0;
@@ -643,7 +891,7 @@ function agreement(
       if (canvas.weight[index] <= 0) continue;
 
       const yaw = (x / canvas.width) * 360;
-      const hit = sample(frame, directionOf(yaw, pitch), basis, tanH, tanV);
+      const hit = sample(frame, directionOf(yaw, pitch), basis);
       if (!hit) continue;
 
       const w = canvas.weight[index];
@@ -732,24 +980,20 @@ function sample(
   frame: Decoded,
   direction: Vector3,
   basis: Basis,
-  tanH: number,
-  tanV: number,
 ): { r: number; g: number; b: number; edge: number } | null {
   const depth = dot(direction, basis.forward);
   if (depth <= 1e-6) return null;
 
-  const sx = dot(direction, basis.right) / depth / tanH;
-  const sy = dot(direction, basis.up) / depth / tanV;
-  if (sx < -1 || sx > 1 || sy < -1 || sy > 1) return null;
+  const px = frame.intrinsics.fx * (dot(direction, basis.right) / depth) + frame.intrinsics.cx;
+  const py = frame.intrinsics.cy - frame.intrinsics.fy * (dot(direction, basis.up) / depth);
+  if (px < 0 || px > frame.width - 1 || py < 0 || py > frame.height - 1) return null;
 
-  const fx = ((sx + 1) / 2) * (frame.width - 1);
-  const fy = ((1 - sy) / 2) * (frame.height - 1);
-  const x0 = Math.floor(fx);
-  const y0 = Math.floor(fy);
+  const x0 = Math.floor(px);
+  const y0 = Math.floor(py);
   const x1 = Math.min(frame.width - 1, x0 + 1);
   const y1 = Math.min(frame.height - 1, y0 + 1);
-  const tx = fx - x0;
-  const ty = fy - y0;
+  const tx = px - x0;
+  const ty = py - y0;
 
   const at = (x: number, y: number, c: number) =>
     frame.pixels[(y * frame.width + x) * 3 + c];
@@ -765,8 +1009,16 @@ function sample(
     // 1 in the middle of the frame, 0 at its edge. This is the feathering:
     // where two frames overlap, the one looking more directly at the wall
     // contributes more, and neither arrives as a hard line.
-    edge: (1 - Math.abs(sx)) * (1 - Math.abs(sy)),
+    edge: edgeWeight(frame, px, py),
   };
+}
+
+function edgeWeight(frame: Decoded, px: number, py: number): number {
+  const halfX = Math.max(1, frame.width / 2);
+  const halfY = Math.max(1, frame.height / 2);
+  const x = Math.abs(px - frame.intrinsics.cx) / halfX;
+  const y = Math.abs(py - frame.intrinsics.cy) / halfY;
+  return Math.max(0, 1 - x) * Math.max(0, 1 - y);
 }
 
 /**
@@ -800,10 +1052,10 @@ function survey(
   canvas: Canvas,
   frame: Decoded,
   table: ReturnType<typeof yawTable>,
+  owner?: Int16Array,
+  frameIndex = -1,
 ): void {
   const basis = basisFrom(frame.pose.yaw, frame.pose.pitch, frame.pose.roll);
-  const tanH = Math.tan((frame.hfov / 2) * (Math.PI / 180));
-  const tanV = Math.tan((frame.vfov / 2) * (Math.PI / 180));
   const box = footprint(canvas, frame);
 
   const [fx0, fy0, fz0] = basis.forward;
@@ -823,13 +1075,16 @@ function survey(
       const depth = dx * fx0 + dy * fy0 + dz * fz0;
       if (depth <= 1e-6) continue;
 
-      const sx = (dx * rx + dy * ry + dz * rz) / depth / tanH;
-      if (sx < -1 || sx > 1) continue;
-      const sy = (dx * ux + dy * uy + dz * uz) / depth / tanV;
-      if (sy < -1 || sy > 1) continue;
+      const px = frame.intrinsics.fx * ((dx * rx + dy * ry + dz * rz) / depth) + frame.intrinsics.cx;
+      if (px < 0 || px > frame.width - 1) continue;
+      const py = frame.intrinsics.cy - frame.intrinsics.fy * ((dx * ux + dy * uy + dz * uz) / depth);
+      if (py < 0 || py > frame.height - 1) continue;
 
-      const q = (1 - (sx < 0 ? -sx : sx)) * (1 - (sy < 0 ? -sy : sy));
-      if (q > best[row + x]) best[row + x] = q;
+      const q = edgeWeight(frame, px, py);
+      if (q > best[row + x]) {
+        best[row + x] = q;
+        if (owner) owner[row + x] = frameIndex;
+      }
     }
   }
 }
@@ -852,8 +1107,6 @@ function paint(
   mode: "seam" | "wide" = "seam",
 ): void {
   const basis = basisFrom(frame.pose.yaw, frame.pose.pitch, frame.pose.roll);
-  const tanH = Math.tan((frame.hfov / 2) * (Math.PI / 180));
-  const tanV = Math.tan((frame.vfov / 2) * (Math.PI / 180));
   const box = footprint(canvas, frame);
 
   const [fx0, fy0, fz0] = basis.forward;
@@ -876,13 +1129,10 @@ function paint(
       const depth = dx * fx0 + dy * fy0 + dz * fz0;
       if (depth <= 1e-6) continue;
 
-      const sx = (dx * rx + dy * ry + dz * rz) / depth / tanH;
-      if (sx < -1 || sx > 1) continue;
-      const sy = (dx * ux + dy * uy + dz * uz) / depth / tanV;
-      if (sy < -1 || sy > 1) continue;
-
-      const px = ((sx + 1) / 2) * lastX;
-      const py = ((1 - sy) / 2) * lastY;
+      const px = frame.intrinsics.fx * ((dx * rx + dy * ry + dz * rz) / depth) + frame.intrinsics.cx;
+      if (px < 0 || px > lastX) continue;
+      const py = frame.intrinsics.cy - frame.intrinsics.fy * ((dx * ux + dy * uy + dz * uz) / depth);
+      if (py < 0 || py > lastY) continue;
       const x0 = px | 0;
       const y0 = py | 0;
       const x1 = x0 < lastX ? x0 + 1 : lastX;
@@ -903,7 +1153,7 @@ function paint(
       // where it is the best view of this pixel, or within a tenth of being
       // it; everywhere else another frame is looking more directly at the
       // same wall and this one would only be a second copy of it.
-      const q = (1 - (sx < 0 ? -sx : sx)) * (1 - (sy < 0 ? -sy : sy));
+      const q = edgeWeight(frame, px, py);
 
       let w: number;
       if (mode === "wide") {
@@ -1004,4 +1254,45 @@ function resolve(canvas: Canvas): { rgb: Uint8Array; covered: number } {
 
 function clamp(value: number, low: number, high: number): number {
   return value < low ? low : value > high ? high : value;
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
+function validIntrinsics(value: unknown): value is CameraIntrinsics {
+  if (!value || typeof value !== "object") return false;
+  const k = value as CameraIntrinsics;
+  return (
+    [k.fx, k.fy, k.cx, k.cy, k.width, k.height].every(
+      (entry) => typeof entry === "number" && Number.isFinite(entry),
+    ) &&
+    k.fx > 0 &&
+    k.fy > 0 &&
+    k.width > 0 &&
+    k.height > 0 &&
+    k.cx >= 0 &&
+    k.cx <= k.width &&
+    k.cy >= 0 &&
+    k.cy <= k.height
+  );
+}
+
+function scaleIntrinsics(
+  intrinsics: CameraIntrinsics,
+  width: number,
+  height: number,
+): CameraIntrinsics {
+  const sx = width / intrinsics.width;
+  const sy = height / intrinsics.height;
+  return {
+    fx: intrinsics.fx * sx,
+    fy: intrinsics.fy * sy,
+    cx: intrinsics.cx * sx,
+    cy: intrinsics.cy * sy,
+    width,
+    height,
+  };
 }
