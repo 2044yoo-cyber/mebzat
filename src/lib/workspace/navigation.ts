@@ -387,6 +387,32 @@ export const NAV_SECTIONS: NavSection[] = [
         hint: "Suppliers, contractors and consultancies",
       },
       {
+        id: "projects",
+        label: "Projects",
+        icon: HardHat,
+        href: "/projects",
+        private: true,
+        hint: "Work in progress and completed builds",
+      },
+    ],
+  },
+
+  // Professionals next, because the question after "what can I buy" is "who
+  // can fit it".
+  //
+  // These three used to be scattered: finding a person sat under Marketplace
+  // with the products, and the two job entries under Construction with the
+  // drawings — so the two halves of one market were in two different sections.
+  // They are moved here rather than copied. A duplicate Professionals entry
+  // was removed from this file once already, and two menu rows that go to the
+  // same page is worse than one in the wrong place.
+  {
+    id: "professionals",
+    label: "Professionals",
+    emoji: "👷",
+    icon: HardHat,
+    items: [
+      {
         id: "professionals",
         label: "Professionals",
         icon: HardHat,
@@ -404,12 +430,21 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
-        id: "projects",
-        label: "Projects",
+        id: "post-job",
+        label: "Post a Job",
         icon: HardHat,
-        href: "/projects",
+        href: "/jobs/new",
         private: true,
-        hint: "Work in progress and completed builds",
+        hint: "Hire an engineer, a foreman, a trade",
+        keywords: ["hire", "recruit", "vacancy", "advertise"],
+      },
+      {
+        id: "jobs",
+        label: "Jobs",
+        icon: Briefcase,
+        href: "/jobs",
+        hint: "Site and office roles",
+        keywords: ["vacancy", "hiring", "careers", "work", "apply"],
       },
     ],
   },
@@ -508,23 +543,6 @@ export const NAV_SECTIONS: NavSection[] = [
         private: true,
         hint: "Drawing sets, specs and what they should contain",
         keywords: ["drawings", "specification", "tender", "contract"],
-      },
-      {
-        id: "jobs",
-        label: "Jobs",
-        icon: Briefcase,
-        href: "/jobs",
-        hint: "Site and office roles",
-        keywords: ["vacancy", "hiring", "careers", "work", "apply"],
-      },
-      {
-        id: "post-job",
-        label: "Post a Job",
-        icon: HardHat,
-        href: "/jobs/new",
-        private: true,
-        hint: "Hire an engineer, a foreman, a trade",
-        keywords: ["hire", "recruit", "vacancy", "advertise"],
       },
       {
         id: "methods",

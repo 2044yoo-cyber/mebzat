@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
+  Briefcase,
   FileSpreadsheet,
   HardHat,
   Home,
+  MessageSquare,
   Package,
   Plus,
+  Rotate3d,
   Sparkles,
+  Tag,
   TrendingUp,
   Wrench,
   type LucideIcon,
@@ -41,12 +45,36 @@ export type QuickCreate = {
 
 export const QUICK_CREATE: (QuickCreate & { href: string })[] = [
   {
+    id: "property",
+    label: "Create Property",
+    icon: Home,
+    href: "/property/new",
+    hint: "List a property on the city map",
+    keywords: "new property listing house land sell rent apartment",
+  },
+  {
+    id: "tour",
+    label: "Create 360° Tour",
+    icon: Rotate3d,
+    href: "/tours/new",
+    hint: "Photograph a room and walk people through it",
+    keywords: "360 panorama tour virtual walkthrough room sphere",
+  },
+  {
     id: "product",
     label: "Create Product",
     icon: Package,
     href: "/products/new",
     hint: "List something for sale",
-    keywords: "new product listing sell item",
+    keywords: "new product listing sell item stock",
+  },
+  {
+    id: "used",
+    label: "Sell Used Item",
+    icon: Tag,
+    href: "/products/new?condition=used",
+    hint: "Second-hand materials, tools, fittings",
+    keywords: "used second hand salvage surplus reclaimed sell materials",
   },
   {
     id: "project",
@@ -54,15 +82,7 @@ export const QUICK_CREATE: (QuickCreate & { href: string })[] = [
     icon: HardHat,
     href: "/projects/new",
     hint: "Publish a build",
-    keywords: "new project build portfolio",
-  },
-  {
-    id: "property",
-    label: "Create Property",
-    icon: Home,
-    href: "/property/new",
-    hint: "List a property on the city map",
-    keywords: "new property listing house land sell rent",
+    keywords: "new project build portfolio showcase",
   },
   {
     id: "service",
@@ -73,12 +93,28 @@ export const QUICK_CREATE: (QuickCreate & { href: string })[] = [
     keywords: "new service offer trade profession",
   },
   {
+    id: "job",
+    label: "Post a Job",
+    icon: Briefcase,
+    href: "/jobs/new",
+    hint: "Hire an engineer, a foreman, a trade",
+    keywords: "hire recruit vacancy advertise job work",
+  },
+  {
     id: "quote",
     label: "Request Quote",
     icon: FileSpreadsheet,
     href: "/hire/new",
     hint: "Post a brief and collect bids",
     keywords: "rfq tender brief bids hire quotation",
+  },
+  {
+    id: "post",
+    label: "Write a Post",
+    icon: MessageSquare,
+    href: "/community",
+    hint: "Ask the community, or show what you built",
+    keywords: "post community question discussion share write",
   },
 ];
 
@@ -117,7 +153,7 @@ export function QuickActions() {
   return (
     <div ref={root} className="pointer-events-auto relative">
       {open && (
-        <div className="glass absolute right-0 bottom-14 w-64 overflow-hidden rounded-2xl border p-1.5 shadow-2xl">
+        <div className="glass absolute right-0 bottom-14 max-h-[min(70vh,32rem)] w-64 overflow-y-auto overscroll-contain rounded-2xl border p-1.5 shadow-2xl">
           {QUICK_CREATE.map((action) => (
             <Link
               key={action.id}
