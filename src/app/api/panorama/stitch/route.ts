@@ -16,10 +16,9 @@ import { createClient } from "@/lib/supabase/server";
  * fired this off: the work finishes on the server and the row records what
  * happened. Coming back and reading the row is the whole of "resuming".
  *
- * A queue would buy retries across a deploy and nothing else here. Nine frames
- * take around a second of `sharp`; `maxDuration` gives three minutes, which is
- * two orders of magnitude of headroom, and the app already runs routes at this
- * limit for image generation.
+ * A queue would buy retries across a deploy and nothing else here. Twenty-two
+ * frames fit comfortably inside `maxDuration`, and the app already runs routes
+ * at this limit for image generation.
  *
  * ## The stitched image is moderated like any other upload
  *
@@ -30,8 +29,8 @@ import { createClient } from "@/lib/supabase/server";
  */
 
 export const runtime = "nodejs";
-// Nine frames is about a second. This is the ceiling for a slow upload of
-// twelve large frames on a cold start, not the expected time.
+// This is the ceiling for a slow storage download on a cold start, not the
+// expected processing time.
 export const maxDuration = 180;
 
 type Body = { jobId?: unknown };
@@ -83,7 +82,9 @@ export async function POST(request: Request) {
   // message that confirms it exists.
   const { data: job } = await supabase
     .from("panorama_jobs")
-    .select("id, owner_id, frames_prefix, expected_frames, status, frames")
+    .select(
+      "id, owner_id, frames_prefix, expected_frames, status, frames, panorama_url, width, height",
+    )
     .eq("id", jobId)
     .maybeSingle();
 
@@ -92,7 +93,12 @@ export async function POST(request: Request) {
   }
 
   if (job.status === "ready") {
-    return NextResponse.json({ status: "ready" });
+    return NextResponse.json({
+      status: "ready",
+      panoramaUrl: job.panorama_url,
+      width: job.width,
+      height: job.height,
+    });
   }
 
   const prefix = job.frames_prefix as string | null;

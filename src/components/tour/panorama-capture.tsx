@@ -93,6 +93,8 @@ type Phase =
   | "ready"
   | "failed";
 
+type RetryMode = "upload" | "stitch" | null;
+
 /**
  * The five steps of section 10, in order.
  *
@@ -179,6 +181,8 @@ export function PanoramaCapture({
   const [sent, setSent] = useState(0);
   /** The job whose frames are in storage, once they all are. Null before that. */
   const [uploadedJob, setUploadedJob] = useState<string | null>(null);
+  /** Which completed work can safely be repeated without clearing the photos. */
+  const [retryMode, setRetryMode] = useState<RetryMode>(null);
   /** Where the server says it has got to. Null until it says. */
   const [stage, setStage] = useState<Step | null>(null);
   const [hasSensor, setHasSensor] = useState(false);
@@ -439,6 +443,7 @@ export function PanoramaCapture({
   const stitch = useCallback(async (jobId: string) => {
     setProblem(null);
     setStage(null);
+    setRetryMode(null);
     setPhase("processing");
 
     try {
@@ -466,6 +471,7 @@ export function PanoramaCapture({
       }
 
       setProblem(stitchErrorMessage(body.code));
+      setRetryMode(body.code === "unknown" ? "stitch" : null);
       setPhase("failed");
     } catch {
       // The request did not come back — a tab closed, a connection dropped.
@@ -474,6 +480,7 @@ export function PanoramaCapture({
       setProblem(
         "We lost the connection while making your 360 photo. Your photos are saved — try again in a moment.",
       );
+      setRetryMode("stitch");
       setPhase("failed");
     }
   }, []);
@@ -482,6 +489,8 @@ export function PanoramaCapture({
     teardown();
     setPhase("uploading");
     setSent(0);
+    setUploadedJob(null);
+    setRetryMode(null);
 
     const supabase = createClient();
     const frames = framesRef.current;
@@ -493,6 +502,7 @@ export function PanoramaCapture({
     }
     if (!owner) {
       setProblem("Sign in again to save your 360 photo.");
+      setRetryMode("upload");
       setPhase("failed");
       return;
     }
@@ -511,6 +521,7 @@ export function PanoramaCapture({
 
     if (error || !job) {
       setProblem(stitchErrorMessage("unknown"));
+      setRetryMode("upload");
       setPhase("failed");
       return;
     }
@@ -537,6 +548,7 @@ export function PanoramaCapture({
 
       if (put.error) {
         setProblem(stitchErrorMessage("frames_missing"));
+        setRetryMode("upload");
         setPhase("failed");
         return;
       }
@@ -560,7 +572,7 @@ export function PanoramaCapture({
     // The poses go up with the last frame rather than one at a time: a row
     // that lists frames which are not in storage yet is a row the stitcher
     // would act on and then fail to find anything for.
-    await supabase
+    const { error: finalizeError } = await supabase
       .from("panorama_jobs")
       .update({
         frames_prefix: prefix,
@@ -569,6 +581,13 @@ export function PanoramaCapture({
         status: "processing",
       })
       .eq("id", job.id);
+
+    if (finalizeError) {
+      setProblem(stitchErrorMessage("unknown"));
+      setRetryMode("upload");
+      setPhase("failed");
+      return;
+    }
 
     setUploadedJob(job.id);
     await stitch(job.id);
@@ -992,6 +1011,7 @@ export function PanoramaCapture({
     teardown();
     framesRef.current = [];
     setUploadedJob(null);
+    setRetryMode(null);
     setStage(null);
     setSensorMissing(false);
     setResult(null);
@@ -1284,27 +1304,22 @@ export function PanoramaCapture({
         <p className="font-medium">That didn&apos;t work</p>
         <p className="text-sm text-muted-foreground">{problem}</p>
         <div className="flex flex-col gap-2">
-          {uploadedJob ? (
-            <>
-              <Button
-                onClick={() => void stitch(uploadedJob)}
-                className="min-h-12 w-full"
-              >
-                <RotateCcw className="size-4" /> Try again
-              </Button>
-              <Button
-                variant="outline"
-                onClick={restart}
-                className="min-h-11 w-full"
-              >
-                Shoot the room again
-              </Button>
-            </>
-          ) : (
-            <Button onClick={restart} className="min-h-12 w-full">
-              <RotateCcw className="size-4" /> Try again
+          {retryMode === "stitch" && uploadedJob && (
+            <Button
+              onClick={() => void stitch(uploadedJob)}
+              className="min-h-12 w-full"
+            >
+              <RotateCcw className="size-4" /> Try saving again
             </Button>
           )}
+          {retryMode === "upload" && (
+            <Button onClick={() => void upload()} className="min-h-12 w-full">
+              <RotateCcw className="size-4" /> Try saving again
+            </Button>
+          )}
+          <Button variant="outline" onClick={restart} className="min-h-11 w-full">
+            Shoot the room again
+          </Button>
           <Button variant="outline" onClick={onCancel} className="min-h-11 w-full">
             Cancel
           </Button>

@@ -367,7 +367,11 @@ export async function composePanorama(
 
 function calibrateFieldOfView(order: Decoded[]): number {
   const horizon = order.filter((frame) => Math.abs(frame.pose.pitch) <= 35);
-  if (horizon.length < 4) return order[0]?.hfov ?? ASSUMED_HFOV;
+  // The compact 22-shot route has only eight horizon frames. At that spacing
+  // there is not enough repeated detail to distinguish lens scale from a yaw
+  // correction reliably, so keep the conservative phone estimate. Denser
+  // imported captures still have enough overlap to calibrate themselves.
+  if (horizon.length < 10) return order[0]?.hfov ?? ASSUMED_HFOV;
   const base = fovAgreement(horizon, 0);
   let best = { delta: 0, score: base };
   for (const delta of FOV_SEARCH) {

@@ -9,20 +9,19 @@ import { directionOf, type Vector3 } from "./orientation";
  * nearest row of pixels smeared to the pole, is the funnel collapsing to a
  * point that this replaces.
  *
- * So: rings at several pitches, each with as many frames as that ring needs.
- * A ring at 60° up is half the circumference of the one at the horizon, so it
- * needs about half as many photographs to be covered to the same standard, and
- * the poles need exactly one each.
+ * The compact phone route uses a horizon ring, one ring at 45° on each side,
+ * and the two poles. Eight + six + six + one + one gives the requested 22
+ * photographs while still covering the floor and ceiling.
  */
 
 /** How much of each frame should also appear in its neighbour. */
-export const OVERLAP = 0.35;
+export const OVERLAP = 0.25;
 
 /** What a phone's rear camera sees across, in degrees, when it will not say. */
 export const ASSUMED_HFOV = 60;
 
 /** The pitches photographed, top to bottom. */
-export const RING_PITCHES = [90, 60, 30, 0, -30, -60, -90] as const;
+export const RING_PITCHES = [90, 45, 0, -45, -90] as const;
 
 /**
  * Rings this far from the horizon may be left out and the capture still
@@ -58,7 +57,7 @@ export type Target = {
  * How many frames one ring needs.
  *
  * The ring at pitch p has cos(p) of the horizon's circumference, so it needs
- * cos(p) of its frames. Three is the floor: two photographs of a ring meet
+ * roughly cos(p) of its frames. Three is the floor: two photographs of a ring meet
  * themselves at both ends with no overlap to spare, and one is a pole.
  */
 export function ringCount(pitch: number, hfov: number): number {

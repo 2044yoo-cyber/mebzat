@@ -21,7 +21,7 @@ import { yawPitchOf, type Vector3 } from "./orientation";
  */
 
 /** How close to a target the camera has to be pointing before it counts. */
-export const ALIGN_TOLERANCE_DEGREES = 11;
+export const ALIGN_TOLERANCE_DEGREES = 8;
 
 /**
  * How far the phone may drift between readings and still be called steady.
@@ -30,10 +30,10 @@ export const ALIGN_TOLERANCE_DEGREES = 11;
  * mid-swing, and a smeared frame is worse than no frame: it is the one the
  * matcher cannot align, so it takes its neighbours with it.
  */
-export const STEADY_DEGREES = 3.5;
+export const STEADY_DEGREES = 3;
 
 /** Brief confirmation hold: long enough to avoid a drive-by, short enough to feel immediate. */
-export const STEADY_MS = 240;
+export const STEADY_MS = 450;
 
 /** One noisy sensor sample may not erase an otherwise steady hold. */
 export const HOLD_GRACE_MS = 140;
@@ -276,7 +276,7 @@ export function frameName(index: number): string {
  */
 export function frameWidthFor(frameCount: number): number {
   if (frameCount >= 36) return 1280;
-  if (frameCount >= 24) return 1440;
+  if (frameCount >= 20) return 1440;
   return 1600;
 }
 

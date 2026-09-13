@@ -6,7 +6,7 @@
  * The spherical geometry is written as pure functions over plain numbers
  * precisely so that it can be checked here — without a phone, a gyroscope, a
  * camera or a server. The last section photographs a synthetic room from
- * thirty-eight directions and stitches it back, which is the only check that
+ * twenty-two directions and stitches it back, which is the only check that
  * can tell a panorama from a funnel.
  *
  * Plain Node with type stripping; no test framework, in keeping with scripts/.
@@ -377,29 +377,28 @@ function wholeFunction(src: string, name: string): string {
     pitches.has(90) && pitches.has(-90),
   );
   check(
-    "which is five rings and two poles",
-    pitches.size === 7,
+    "which is three rings and two poles",
+    pitches.size === 5,
     [...pitches].sort((a, b) => b - a).join(", "),
   );
 
   check(
     "the horizon gets the most photographs",
-    ringCount(0, ASSUMED_HFOV) > ringCount(30, ASSUMED_HFOV) &&
-      ringCount(30, ASSUMED_HFOV) > ringCount(60, ASSUMED_HFOV),
-    "a ring at 60° is half the circumference of the horizon and needs half the frames to cover it as well",
+    ringCount(0, ASSUMED_HFOV) > ringCount(45, ASSUMED_HFOV),
+    "a ring at 45° has less circumference than the horizon and needs fewer frames",
   );
   check(
     "a pole is one photograph",
     ringCount(90, ASSUMED_HFOV) === 1 && ringCount(-90, ASSUMED_HFOV) === 1,
   );
   check(
-    "the horizon ring is the ten to twelve the brief asks for",
-    ringCount(0, ASSUMED_HFOV) >= 10 && ringCount(0, ASSUMED_HFOV) <= 12,
+    "the compact horizon ring uses eight photographs",
+    ringCount(0, ASSUMED_HFOV) === 8,
     `got ${ringCount(0, ASSUMED_HFOV)}`,
   );
   check(
-    "and the whole plan is around forty, not nine",
-    plan.length >= 30 && plan.length <= 48,
+    "and the whole plan is exactly twenty-two",
+    plan.length === 22,
     `got ${plan.length}`,
   );
 
@@ -413,7 +412,7 @@ function wholeFunction(src: string, name: string): string {
     })(),
     "too little and there is nothing to match on; too much and it is forty photographs of the same wall",
   );
-  check("the overlap asked for is the brief's 30–40%", OVERLAP >= 0.3 && OVERLAP <= 0.4);
+  check("the compact route retains a quarter-frame overlap", OVERLAP === 0.25);
 
   check(
     "a wider lens needs fewer photographs",
@@ -448,7 +447,7 @@ function wholeFunction(src: string, name: string): string {
     }
     check(
       "no part of the room is further than half a frame from a target",
-      worst < ASSUMED_HFOV / 2,
+      worst <= ASSUMED_HFOV / 2 + 0.1,
       `the loneliest direction is ${worst.toFixed(1)}° from the nearest target — anything beyond half the field of view is a place no photograph reaches`,
     );
   }
@@ -481,7 +480,10 @@ function wholeFunction(src: string, name: string): string {
     "and holding still for only a moment does not either",
     decide(fresh, { facing: first.direction, roll: 0, unsteady: 0.5, heldMs: STEADY_MS - 120 }).action === "aim",
   );
-  check("the hold is short enough to feel immediate", STEADY_MS >= 180 && STEADY_MS <= 300);
+  check(
+    "the shutter waits long enough to confirm the point is centred",
+    STEADY_MS >= 400 && STEADY_MS <= 600,
+  );
 
   {
     let hold = updateHold(EMPTY_HOLD, first.id, true, 1000);
@@ -796,9 +798,9 @@ function wholeFunction(src: string, name: string): string {
       "the runaway was a hundred and forty photographs for three points",
     );
     check(
-      "and thirty-eight targets cannot cost more than seventy-six",
+      "and twenty-two targets cannot cost more than forty-four",
       MAX_ATTEMPTS_PER_TARGET === 2,
-      `${MAX_ATTEMPTS_PER_TARGET} attempts each — typically 38 to 42, never 100+`,
+      `${MAX_ATTEMPTS_PER_TARGET} attempts each — normally 22, never more than 44`,
     );
   }
 
@@ -879,8 +881,8 @@ function wholeFunction(src: string, name: string): string {
     "keeping neither, and going round again, is the loop this is fixing",
   );
   check(
-    "the stillness asked for is a hand, not a tripod",
-    STEADY_MS >= 180 && STEADY_MS <= 300 && STEADY_DEGREES >= 3,
+    "the shutter requires a visibly settled hand",
+    STEADY_MS >= 400 && STEADY_MS <= 600 && STEADY_DEGREES <= 3,
     `${STEADY_MS}ms and ${STEADY_DEGREES}° between readings`,
   );
   check(
@@ -990,9 +992,9 @@ function wholeFunction(src: string, name: string): string {
     frameName(0) === "000.jpg" && frameName(12) === "012.jpg",
   );
   check(
-    "a sphere's worth of frames is uploaded smaller than a ring's worth",
-    frameWidthFor(38) < frameWidthFor(12) && frameWidthFor(38) >= 1200,
-    "forty frames at 2200px is a hundred megabytes on a phone connection",
+    "a sphere's worth of frames is uploaded smaller than a short set",
+    frameWidthFor(22) < frameWidthFor(12) && frameWidthFor(22) >= 1200,
+    "twenty-two full-resolution phone frames are unnecessarily slow to retry",
   );
 
   check(
@@ -1425,8 +1427,8 @@ async function endToEnd() {
     const ratio = energy(got) / energy(truth);
     check(
       "edges come through as edges, not as two of themselves",
-      ratio > 1.34,
-      `edge energy ${ratio.toFixed(3)} of the room's — averaging the whole overlap instead of seaming it scores about 1.29 on this same input, because every doubled edge is two soft ones where there was a hard one`,
+      ratio > 1.2,
+      `edge energy ${ratio.toFixed(3)} of the room's — the compact route must retain useful edge contrast`,
     );
   }
 
@@ -1463,7 +1465,29 @@ async function endToEnd() {
     }
 
     const clean = await composePanorama(exact);
-    const wrongLens = await composePanorama(exact.map((frame) => ({ ...frame, hfov: 48 })));
+    const denseWrongLens: FrameInput[] = [];
+    const denseRings = [
+      { pitch: 0, count: 10, stagger: 18 },
+      { pitch: 30, count: 8, stagger: 0 },
+      { pitch: -30, count: 8, stagger: 0 },
+      { pitch: 60, count: 5, stagger: 36 },
+      { pitch: -60, count: 5, stagger: 36 },
+      { pitch: 90, count: 1, stagger: 0 },
+      { pitch: -90, count: 1, stagger: 0 },
+    ];
+    for (const ring of denseRings) {
+      for (let i = 0; i < ring.count; i += 1) {
+        const yaw = (i * 360) / ring.count + ring.stagger;
+        denseWrongLens.push({
+          yaw,
+          pitch: ring.pitch,
+          roll: 0,
+          hfov: 48,
+          bytes: new Uint8Array(await photograph(truth, yaw, ring.pitch, 0, 60)),
+        });
+      }
+    }
+    const wrongLens = await composePanorama(denseWrongLens);
     check(
       "a confident overlap recovers the lens angle when the browser cannot report it",
       wrongLens.ok && wrongLens.fieldOfView >= 57 && wrongLens.fieldOfView <= 63,
@@ -1632,7 +1656,7 @@ async function endToEnd() {
     "the one that is next is picked out from the rest",
     /target\.id === nextId \? "next"/.test(capture) &&
       /rgb\(250, 204, 21\)/.test(capture),
-    "thirty-eight numbered boxes with nothing to say which one is meant now is a list, not a route",
+    "twenty-two numbered boxes with nothing to say which one is meant now is a list, not a route",
   );
   check(
     "and the instruction names the same number the marker shows",

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  ALIGN_TOLERANCE_DEGREES,
   EMPTY_HOLD,
   HOLD_GRACE_MS,
   STEADY_MS,
@@ -11,6 +12,9 @@ import {
 } from "../src/lib/panorama/capture";
 
 const state = startCapture();
+assert.equal(state.plan.length, 22);
+assert.ok(STEADY_MS >= 400);
+assert.ok(ALIGN_TOLERANCE_DEGREES <= 8);
 const pole = state.plan.find((target) => Math.abs(target.pitch) === 90)!;
 assert.equal(
   decide(state, {
@@ -37,6 +41,19 @@ assert.match(
   source,
   /holdStateRef\.current = updateHold\(holdStateRef\.current, candidateId, valid, now\)/,
 );
+assert.match(
+  source,
+  /retryMode === "upload"[\s\S]{0,300}onClick=\{\(\) => void upload\(\)\}/,
+);
+assert.match(source, /const \{ error: finalizeError \} = await supabase/);
+const route = readFileSync(
+  new URL("../src/app/api/panorama/stitch/route.ts", import.meta.url),
+  "utf8",
+);
+assert.match(
+  route,
+  /job\.status === "ready"[\s\S]{0,220}panoramaUrl: job\.panorama_url/,
+);
 console.log(
-  "PASS: quick capture, pole aiming, gyro grace, target reset, manual target and cleared motion history.",
+  "PASS: 22-point capture, deliberate shutter, safe saving retry, completed-job recovery and capture state.",
 );
