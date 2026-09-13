@@ -20,9 +20,12 @@ import { BoardSheets } from "@/features/berchuma-studio/components/manufacturing
 import { PrintButton } from "@/features/berchuma-studio/components/public/print-button";
 import { QuoteRequest } from "@/features/berchuma-studio/components/public/quote-request";
 import { getDesign } from "@/features/berchuma-studio/services/designs";
+import { buildCutList } from "@/features/berchuma-studio/services/cutlist";
 import { buildExport } from "@/features/berchuma-studio/services/exports";
+import { buildParts } from "@/features/berchuma-studio/services/geometry";
 import { marketRates } from "@/features/berchuma-studio/services/rates";
 import { allBays } from "@/features/berchuma-studio/types/spec";
+import type { CutList } from "@/features/berchuma-studio/services/cutlist";
 
 /**
  * The shop sheet.
@@ -62,6 +65,22 @@ export default async function CutListPage({
   const { slug } = await params;
   const design = await getDesign(slug);
   if (!design) notFound();
+
+  // Whether it can be cut at all, before anything is priced.
+  //
+  // `buildExport` throws for a design with a panel too big for any stocked
+  // sheet, and this page used to call it and nothing else — so the whole page
+  // returned a 500 and the reader got "Something went wrong" with a reference
+  // number. The information needed to explain it was already computed and
+  // thrown away with the exception: `buildCutList` records exactly which
+  // pieces will not fit and why, and the sheet diagram has known how to show
+  // that for as long as it has existed. Asking first is the whole fix.
+  const parts = buildParts(design.spec);
+  const draft = buildCutList(design.spec, parts);
+
+  if (!draft.buildable) {
+    return <CannotBeCut design={design} cutList={draft} />;
+  }
 
   const rates = await marketRates();
   const { cutList, cost } = buildExport({
@@ -245,6 +264,81 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border p-2.5 print:rounded-none">
       <p className="text-lg font-semibold tabular-nums">{value}</p>
       <p className="text-[11px] text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+/**
+ * What to show when the design cannot be cut.
+ *
+ * Not an error page. Nothing has gone wrong with the software: somebody has
+ * designed a cabinet with a panel bigger than any sheet the yard stocks, which
+ * is a thing a designer is allowed to do and a thing a workshop needs telling
+ * about. So it names the pieces, says why each one will not fit, and sends
+ * them back to the editor to make it smaller — which is the only action that
+ * helps, and was previously behind a reference number and a Try again button
+ * that did the same thing twice.
+ */
+function CannotBeCut({
+  design,
+  cutList,
+}: {
+  design: { slug: string; title: string };
+  cutList: CutList;
+}) {
+  const stuck = cutList.byBoard.flatMap((board) =>
+    board.nesting.unplaced.map((piece) => ({
+      board: board.boardLabel,
+      ...piece,
+    })),
+  );
+
+  return (
+    <div className="mx-auto w-full max-w-2xl space-y-5 p-3 @lg/ws:p-6">
+      <Link
+        href={`/designs/${design.slug}`}
+        className="flex items-center gap-1 text-sm text-muted-foreground hover:underline"
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+        Back to the design
+      </Link>
+
+      <header className="space-y-1">
+        <h1 className="text-xl font-semibold">{design.title}</h1>
+        <p className="text-sm text-muted-foreground">
+          This design cannot be cut from the sheets the yard stocks, so there is
+          no cut list to print yet.
+        </p>
+      </header>
+
+      {stuck.length > 0 && (
+        <section className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
+          <h2 className="text-sm font-medium">
+            {stuck.length === 1
+              ? "One piece will not fit a sheet"
+              : `${stuck.length} pieces will not fit a sheet`}
+          </h2>
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            {stuck.map((piece) => (
+              <li key={`${piece.board}-${piece.index}-${piece.label}`}>
+                · {piece.label} in {piece.board} — {piece.reason}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <p className="text-sm text-muted-foreground">
+        Make the piece smaller, or split the cabinet into two, and the cut list
+        will come back on its own.
+      </p>
+
+      <Link
+        href={`/studio?design=${design.slug}`}
+        className="inline-flex h-10 items-center rounded-md bg-brand px-4 text-sm font-medium text-brand-foreground"
+      >
+        Open in the studio
+      </Link>
     </div>
   );
 }

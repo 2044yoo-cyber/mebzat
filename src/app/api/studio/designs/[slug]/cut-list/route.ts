@@ -35,12 +35,27 @@ export async function GET(
   }
 
   const rates = await marketRates();
-  const bundle = buildExport({
-    spec: design.spec,
-    rates,
-    preparedFor: design.owner.name,
-    url: new URL(`/designs/${design.slug}`, request.url).toString(),
-  });
+
+  // A design with a panel too big for any stocked sheet has no workbook to
+  // download, and `buildExport` says so by throwing. Uncaught, that is a 500
+  // and a browser that offers to retry a download which cannot succeed. 422
+  // with the sentence is the same fact, said once.
+  let bundle: ReturnType<typeof buildExport>;
+  try {
+    bundle = buildExport({
+      spec: design.spec,
+      rates,
+      preparedFor: design.owner.name,
+      url: new URL(`/designs/${design.slug}`, request.url).toString(),
+    });
+  } catch (error) {
+    return new Response(
+      error instanceof Error
+        ? error.message
+        : "This design cannot be exported for manufacture.",
+      { status: 422, headers: { "content-type": "text/plain; charset=utf-8" } },
+    );
+  }
 
   return new Response(bundle.workbook as BodyInit, {
     headers: {
