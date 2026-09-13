@@ -71,6 +71,23 @@ export function isComplete(state: CaptureState): boolean {
   return progress(state).complete;
 }
 
+/**
+ * The lowest-numbered target still wanted — the one the screen points at.
+ *
+ * The route and the shutter are deliberately not the same question. This is
+ * where somebody is being sent; the shutter fires for whichever target they
+ * are actually pointing at. Being steered to 7 and landing on 12 photographs
+ * 12, because refusing a photograph of somewhere that needs photographing,
+ * for being out of order, is a rule with nothing behind it.
+ */
+export function nextInOrder(state: CaptureState): Target | null {
+  const taken = takenSet(state);
+  for (const target of state.plan) {
+    if (!taken.has(target.id)) return target;
+  }
+  return null;
+}
+
 /** Record one target as photographed. Doing it twice changes nothing. */
 export function record(state: CaptureState, id: string): CaptureState {
   return state.taken.includes(id)
@@ -82,8 +99,11 @@ export type Decision =
   | { action: "capture"; target: Target; state: CaptureState }
   | {
       action: "aim";
+      /** Where the person is being sent: the lowest number still wanted. */
       target: Target;
-      /** How far off, in degrees. */
+      /** The one the shutter would fire for, which may not be the same. */
+      nearest: Target;
+      /** How far off `nearest` is, in degrees. */
       error: number;
       /** Pointing at it. */
       aligned: boolean;
@@ -132,7 +152,8 @@ export function decide(state: CaptureState, reading: Reading): Decision {
 
   return {
     action: "aim",
-    target: nearest.target,
+    target: nextInOrder(state) ?? nearest.target,
+    nearest: nearest.target,
     error: nearest.error,
     aligned,
     steady,
@@ -171,7 +192,7 @@ export function guidance(decision: Decision, facing: Vector3): string {
   // perfectly still will never be told why nothing is happening.
   if (!decision.level) return "Straighten the phone";
   if (decision.aligned) return "Hold still";
-  return steer(decision.target, yawPitchOf(facing), false, false);
+  return `${steer(decision.target, yawPitchOf(facing), false, false)} to ${decision.target.index}`;
 }
 
 /**

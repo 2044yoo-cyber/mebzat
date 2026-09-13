@@ -16,6 +16,7 @@ import {
   STEADY_MS,
   captureManually,
   decide,
+  nextInOrder,
   rollError,
   frameName,
   frameWidthFor,
@@ -200,7 +201,7 @@ export function PanoramaCapture({
    * loop moves them.
    */
   const markerRefs = useRef(new Map<string, HTMLSpanElement>());
-  const markerTaken = useRef(new Map<string, boolean>());
+  const markerTaken = useRef(new Map<string, string>());
   /** The captured ids, rebuilt when one is captured rather than per frame. */
   const takenRef = useRef<Set<string>>(new Set());
   const aimRef = useRef<HTMLSpanElement>(null);
@@ -548,6 +549,7 @@ export function PanoramaCapture({
         takenRef.current = takenSet(stateRef.current);
       }
       const taken = takenRef.current;
+      const nextId = nextInOrder(stateRef.current)?.id ?? null;
 
       // The camera's axes, pulled out of the matrix once rather than per
       // target, and the projection written out flat. `project` allocates a
@@ -594,16 +596,25 @@ export function PanoramaCapture({
           `translate3d(${(sx * halfW).toFixed(1)}px, ${(-sy * halfH).toFixed(1)}px, 0)` +
           ` translate(-50%, -50%) rotate(${lean.toFixed(1)}deg)`;
 
-        // Colour changes once per target, so it is only written when it does.
+        // Colour changes when a target is captured, or when it becomes the
+        // next one wanted — twice in a capture, not sixty times a second.
         const done = taken.has(target.id);
-        if (markerTaken.current.get(target.id) !== done) {
-          markerTaken.current.set(target.id, done);
-          element.style.borderColor = done
-            ? "rgba(52, 211, 153, 0.6)"
-            : "rgba(255, 255, 255, 0.85)";
-          element.style.backgroundColor = done
-            ? "rgba(52, 211, 153, 0.22)"
-            : "rgba(255, 255, 255, 0.14)";
+        const look = done ? "done" : target.id === nextId ? "next" : "waiting";
+        if (markerTaken.current.get(target.id) !== look) {
+          markerTaken.current.set(target.id, look);
+          element.style.borderColor =
+            look === "done"
+              ? "rgba(52, 211, 153, 0.6)"
+              : look === "next"
+                ? "rgb(250, 204, 21)"
+                : "rgba(255, 255, 255, 0.85)";
+          element.style.backgroundColor =
+            look === "done"
+              ? "rgba(52, 211, 153, 0.22)"
+              : look === "next"
+                ? "rgba(250, 204, 21, 0.25)"
+                : "rgba(255, 255, 255, 0.14)";
+          element.style.opacity = look === "done" ? "0.45" : "1";
         }
       }
 
@@ -836,6 +847,9 @@ export function PanoramaCapture({
   }
 
   const covered = progress(state);
+  // Which number the yellow marker is showing, so the instruction and the
+  // thing on the screen name the same target.
+  const nextNumber = nextInOrder(state)?.index ?? null;
 
   // ---- intro ---------------------------------------------------------------
   if (phase === "intro") {
@@ -981,7 +995,9 @@ export function PanoramaCapture({
                   camera at it. */}
               {!covered.complete && (
                 <p className="text-sm text-white/70">
-                  {covered.missing.length} left — look for the open circles
+                  {nextNumber === null
+                    ? `${covered.missing.length} left`
+                    : `Next is ${nextNumber} — ${covered.missing.length} left`}
                 </p>
               )}
 
@@ -1242,13 +1258,16 @@ const Sphere = memo(function Sphere({
         <span
           key={target.id}
           ref={(element) => register(target.id, element)}
-          className="absolute top-1/2 left-1/2 h-28 w-20 rounded-lg border-[3px]"
+          className="absolute top-1/2 left-1/2 flex h-28 w-20 items-center justify-center rounded-lg border-[3px] text-2xl font-semibold text-white tabular-nums"
           style={{
             visibility: "hidden",
             borderColor: "rgba(255, 255, 255, 0.85)",
             backgroundColor: "rgba(255, 255, 255, 0.14)",
+            textShadow: "0 1px 3px rgba(0,0,0,0.6)",
           }}
-        />
+        >
+          {target.index}
+        </span>
       ))}
 
       {/* The frame to bring a marker into. Fixed, because it is the middle of

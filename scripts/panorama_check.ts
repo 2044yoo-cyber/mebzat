@@ -27,6 +27,7 @@ import {
   captureManually,
   decide,
   frameName,
+  nextInOrder,
   frameWidthFor,
   guidance,
   isComplete,
@@ -535,6 +536,72 @@ function wholeFunction(src: string, name: string): string {
       fresh.plan.some((t) => !t.required) &&
         fresh.plan.filter((t) => !t.required).every((t) => Math.abs(t.pitch) === 90),
       "the nadir is a photograph of your own shoes; everything between the poles is required",
+    );
+  }
+
+  // --- the route is numbered, and the numbers are the order ---------------
+  {
+    check(
+      "every target is numbered, from one",
+      fresh.plan.every((t, i) => t.index === i + 1),
+      "so that the route can be read off the screen, and so that a capture that stopped at 23 can be talked about",
+    );
+    check(
+      "and the numbers run in the order the targets are meant to be taken",
+      fresh.plan[0].index === 1 &&
+        fresh.plan[0].pitch === 0 &&
+        fresh.plan[fresh.plan.length - 1].index === fresh.plan.length,
+      "numbering before the sort would print the order they were generated in, which is not the order anybody should walk",
+    );
+
+    check("the first one wanted is the first one", nextInOrder(fresh)?.index === 1);
+    {
+      const after = record(fresh, fresh.plan[0].id);
+      check("and taking it moves the route on", nextInOrder(after)?.index === 2);
+      check(
+        "the screen is sent to that one",
+        (() => {
+          const away = decide(after, {
+            facing: directionOf(after.plan[1].yaw + 50, after.plan[1].pitch + 20),
+            roll: 0,
+            unsteady: 0,
+            heldMs: 0,
+          });
+          return away.action === "aim" && away.target.index === 2;
+        })(),
+      );
+      check(
+        "and told which number it is going to",
+        (() => {
+          const facing = directionOf(after.plan[1].yaw + 50, after.plan[1].pitch + 20);
+          const away = decide(after, { facing, roll: 0, unsteady: 0, heldMs: 0 });
+          return away.action === "aim" && /\b2\b/.test(guidance(away, facing));
+        })(),
+        "an arrow and a number name the same target; an arrow alone names nothing",
+      );
+
+      // The route is where you are sent, not a rule about what counts.
+      const ninth = after.plan[8];
+      const opportunist = decide(after, {
+        facing: ninth.direction,
+        roll: 0,
+        unsteady: 0,
+        heldMs: STEADY_MS,
+      });
+      check(
+        "pointing at a later number still photographs it",
+        opportunist.action === "capture" && opportunist.target.index === 9,
+        "refusing a photograph of somewhere that needs photographing, for being out of order, is a rule with nothing behind it",
+      );
+    }
+
+    check(
+      "and when everything is taken there is nowhere left to be sent",
+      (() => {
+        let all = fresh;
+        for (const t of fresh.plan) all = record(all, t.id);
+        return nextInOrder(all) === null;
+      })(),
     );
   }
 
@@ -1169,9 +1236,30 @@ async function endToEnd() {
     "a marker that stands upright in the room leans on a rolled phone, which is the only thing on the screen that shows the phone is not square",
   );
   check(
+    "the number is on the marker",
+    /\{target\.index\}/.test(overlay) && /tabular-nums/.test(overlay),
+    "the route has to be readable off the screen, not merely implied by the order the code happens to visit",
+  );
+  check(
+    "the one that is next is picked out from the rest",
+    /target\.id === nextId \? "next"/.test(capture) &&
+      /rgb\(250, 204, 21\)/.test(capture),
+    "thirty-eight numbered boxes with nothing to say which one is meant now is a list, not a route",
+  );
+  check(
+    "and the instruction names the same number the marker shows",
+    /Next is \$\{nextNumber\}/.test(capture) &&
+      /nextInOrder\(state\)\?\.index/.test(capture),
+  );
+  check(
+    "a captured target steps back rather than competing for attention",
+    /element\.style\.opacity = look === "done" \? "0\.45" : "1";/.test(capture),
+    "a green box at full strength sitting on the aim reads as somewhere to go, which is why the counter looked stuck",
+  );
+  check(
     "a captured target is shown as captured",
-    /markerTaken\.current\.get\(target\.id\) !== done/.test(capture) &&
-      /rgba\(52, 211, 153/.test(capture),
+    /markerTaken\.current\.get\(target\.id\) !== look/.test(capture) &&
+      /look === "done"\s*\n?\s*\? "rgba\(52, 211, 153/.test(capture),
     "section 9: ✓ rather than ○ — and written only when it changes, not on every frame",
   );
   check(

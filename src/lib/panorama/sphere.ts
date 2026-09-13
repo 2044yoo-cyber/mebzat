@@ -38,6 +38,15 @@ export const OPTIONAL_PITCH = 90;
 
 export type Target = {
   id: string;
+  /**
+   * Where this one comes in the intended order, counting from 1.
+   *
+   * The plan has an order — the horizon first, then outwards — and until now
+   * it was only implied. Putting the number on the marker means the route is
+   * something the person can read off the screen and follow, and something
+   * that can be talked about afterwards: "it stopped at 23" says where.
+   */
+  index: number;
   yaw: number;
   pitch: number;
   direction: Vector3;
@@ -77,6 +86,7 @@ export function spherePlan(hfov: number = ASSUMED_HFOV): Target[] {
       const yaw = count === 1 ? 0 : ((i * 360) / count + stagger) % 360;
       targets.push({
         id: `${pitch}_${Math.round(yaw)}`,
+        index: 0,
         yaw,
         pitch,
         direction: directionOf(yaw, pitch),
@@ -87,7 +97,11 @@ export function spherePlan(hfov: number = ASSUMED_HFOV): Target[] {
 
   // The horizon first, then outwards: it is the part of a room people look at,
   // and a capture abandoned halfway should have got the useful half.
-  return targets.sort((a, b) => Math.abs(a.pitch) - Math.abs(b.pitch));
+  const ordered = targets.sort((a, b) => Math.abs(a.pitch) - Math.abs(b.pitch));
+
+  // Numbered after sorting, so the numbers run in the order they are meant to
+  // be photographed rather than the order they were generated in.
+  return ordered.map((target, i) => ({ ...target, index: i + 1 }));
 }
 
 /** The target nearest to where the camera is pointing, of those still wanted. */
