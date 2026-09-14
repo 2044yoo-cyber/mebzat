@@ -123,16 +123,38 @@ export const MIN_COVERAGE = 0.9;
  * somewhere slightly different, and nothing — no rotation, no refinement —
  * can bring them into register. That is the melting.
  *
- * Calibrated on the synthetic room, varying only how far the lens sits from
- * the point it turns about:
+ * Calibrated on the synthetic room, 22 frames at 1440x1080, three degrees of
+ * pose error, varying only how far the lens sits from the point it turns
+ * about:
  *
- *     at the axis   0.41      15cm   0.21
- *     5cm           0.43      20cm   0.15
- *     10cm          0.31      30cm   0.05      40cm   0.06
+ *     at the axis   0.625     20cm   0.434, and only 91% covered
+ *     5cm           0.718     30cm   refused
+ *     10cm          0.713     40cm   refused
+ *     15cm          0.731     60cm   refused
  *
- * 0.12 sits in the collapse: a phone held against the chest passes, one held
- * out at arm's length does not — which is the difference the instructions have
- * been asking for since the beginning and nothing has ever checked.
+ * A phone held against the chest passes at about four times the floor; one
+ * held out at arm's length is refused. That is the difference the instructions
+ * have been asking for since the beginning.
+ *
+ * ## Why this table replaces one that read 0.41 / 0.21 / 0.05
+ *
+ * The old numbers were measured against a plan whose rings did not meet. The
+ * app asked the camera for a 16:9 frame, which at 70 degrees across is 43
+ * degrees tall, and the plan spaced its rings 45 degrees apart — so between
+ * every pair of rings ran a band nobody photographed, and the frames on either
+ * side of it had nothing to correlate against. Every score on that table was
+ * depressed by a geometry defect rather than by parallax, and a correct
+ * capture came back at 0.21 with the floor at 0.18.
+ *
+ * That is what produced "Some areas could not be aligned correctly" for
+ * somebody who had held the phone exactly as asked. The fix is in sphere.ts:
+ * the ring spacing is derived from how tall a frame is, and the capture asks
+ * for the 4:3 frame the plan is sized for.
+ *
+ * Near the collapse the score moves about with the particular pose errors — a
+ * different draw of the same three degrees puts 30cm either side of the line.
+ * That is the reason for a floor well under a good capture rather than just
+ * under one: the number being separated is 0.7 from 0.4, not 0.21 from 0.18.
  */
 export const MIN_ALIGNMENT = 0.18;
 

@@ -47,7 +47,10 @@ import {
   unrecord,
 } from "../src/lib/panorama/capture.ts";
 import {
-  ASSUMED_HFOV,
+  ASSUMED_LONG_AXIS_FOV,
+  VERTICAL_OVERLAP,
+  fieldsOfView,
+  ringPitches,
   OVERLAP,
   coverage,
   nearestTarget,
@@ -363,7 +366,12 @@ function wholeFunction(src: string, name: string): string {
 // ---------------------------------------------------------------------------
 
 {
-  const plan = spherePlan(ASSUMED_HFOV);
+  // Built from the frame the capture asks the camera for, not from a bare
+  // field-of-view number. The plan's rings are spaced by how tall a frame is,
+  // and a check that does not say what shape the frame is cannot see whether
+  // they meet.
+  const SHAPE = fieldsOfView(1440, 1080);
+  const plan = spherePlan(SHAPE.hfov, SHAPE.vfov);
   const pitches = new Set(plan.map((t) => t.pitch));
 
   check(
@@ -385,17 +393,17 @@ function wholeFunction(src: string, name: string): string {
 
   check(
     "the horizon gets the most photographs",
-    ringCount(0, ASSUMED_HFOV) > ringCount(45, ASSUMED_HFOV),
+    ringCount(0, SHAPE.hfov) > ringCount(45, SHAPE.hfov),
     "a ring at 45° has less circumference than the horizon and needs fewer frames",
   );
   check(
     "a pole is one photograph",
-    ringCount(90, ASSUMED_HFOV) === 1 && ringCount(-90, ASSUMED_HFOV) === 1,
+    ringCount(90, SHAPE.hfov) === 1 && ringCount(-90, SHAPE.hfov) === 1,
   );
   check(
     "the compact horizon ring uses eight photographs",
-    ringCount(0, ASSUMED_HFOV) === 8,
-    `got ${ringCount(0, ASSUMED_HFOV)}`,
+    ringCount(0, SHAPE.hfov) === 8,
+    `got ${ringCount(0, SHAPE.hfov)}`,
   );
   check(
     "and the whole plan is exactly twenty-two",
@@ -406,9 +414,9 @@ function wholeFunction(src: string, name: string): string {
   check(
     "neighbours on a ring overlap by the third the stitcher needs",
     (() => {
-      const n = ringCount(0, ASSUMED_HFOV);
+      const n = ringCount(0, SHAPE.hfov);
       const spacing = 360 / n;
-      const shared = (ASSUMED_HFOV - spacing) / ASSUMED_HFOV;
+      const shared = (SHAPE.hfov - spacing) / SHAPE.hfov;
       return shared >= 0.25 && shared <= 0.55;
     })(),
     "too little and there is nothing to match on; too much and it is forty photographs of the same wall",
@@ -417,6 +425,118 @@ function wholeFunction(src: string, name: string): string {
     "the normal route retains 35–50% overlap",
     OVERLAP >= 0.35 && OVERLAP <= 0.5,
   );
+
+  // ---- the check that was missing -----------------------------------------
+  //
+  // Everything above measures the plan across a ring. Nothing measured it
+  // between rings, and the ring pitches were a hardcoded constant while the
+  // ring counts were computed -- so the plan could ask for photographs 45
+  // degrees apart from a camera that sees 43, leaving a band round the room
+  // that nobody photographs and no overlap at all for the stitcher to match
+  // on.
+  //
+  // That is what "Some areas could not be aligned correctly" was, on captures
+  // that had nothing wrong with them.
+  for (const [w, h, label] of [
+    [1440, 1080, "4:3, which is what the capture asks for"],
+    [1920, 1080, "16:9, if the camera gives that instead"],
+    [1080, 1440, "3:4, if it arrives on its side"],
+    [1080, 1920, "9:16, the same"],
+  ] as [number, number, string][]) {
+    const shape = fieldsOfView(w, h);
+    const pitchList = ringPitches(shape.vfov);
+    const spacing = pitchList[0] - pitchList[1];
+    const shared = (shape.vfov - spacing) / shape.vfov;
+    check(
+      `rings overlap vertically, at ${label}`,
+      shared >= 0.12,
+      `frames are ${shape.vfov.toFixed(1)} degrees tall and the rings are ${spacing.toFixed(1)} apart: ${(shared * 100).toFixed(0)}% overlap`,
+    );
+    check(
+      `and the rings reach both poles, at ${label}`,
+      pitchList[0] === 90 && pitchList[pitchList.length - 1] === -90,
+      pitchList.join(", "),
+    );
+  }
+
+  check(
+    "the vertical overlap asked for is the measured floor, not below it",
+    VERTICAL_OVERLAP >= 0.18 && VERTICAL_OVERLAP < OVERLAP,
+    "0.18 is where the synthetic room was measured to still stitch; less has never been tested",
+  );
+  check(
+    "a shorter frame is given more rings rather than wider gaps",
+    ringPitches(fieldsOfView(1920, 1080).vfov).length >
+      ringPitches(fieldsOfView(1440, 1080).vfov).length,
+    "the alternative is a plan asking for photographs the camera cannot join up",
+  );
+
+  // ---- which axis the assumed field belongs to -----------------------------
+  check(
+    "a wide frame is told the assumed field is its width",
+    Math.abs(fieldsOfView(1920, 1080).hfov - ASSUMED_LONG_AXIS_FOV) < 0.01,
+  );
+  check(
+    "and a tall frame is told it is its height",
+    Math.abs(fieldsOfView(1080, 1920).vfov - ASSUMED_LONG_AXIS_FOV) < 0.01,
+    "70 degrees applied to the narrow side of a tall frame overstates it by about 1.6x, and the stitcher refuses the result",
+  );
+  check(
+    "so a frame and the same frame on its side describe the same lens",
+    Math.abs(fieldsOfView(1440, 1080).hfov - fieldsOfView(1080, 1440).vfov) < 0.01 &&
+      Math.abs(fieldsOfView(1440, 1080).vfov - fieldsOfView(1080, 1440).hfov) < 0.01,
+  );
+  check(
+    "and a frame of no size does not produce a plan of infinite rings",
+    Number.isFinite(fieldsOfView(0, 0).hfov) &&
+      ringPitches(fieldsOfView(0, 0).vfov).length > 0,
+    "guaranteed by verticalFov, which returns the angle it was given when a dimension is zero",
+  );
+
+  // ---- the wiring ---------------------------------------------------------
+  //
+  // Everything above tests the geometry. None of it tests that the app hands
+  // the geometry the frame it is actually holding, and that is the half of
+  // this bug that reached a phone: `spherePlan` would happily have produced a
+  // correct plan the whole time if anybody had told it how tall a frame was.
+  //
+  // Deleting the second argument at either of these two call sites puts the
+  // hole straight back, silently, because the plan still comes out valid --
+  // just valid for a frame shape nobody is holding.
+  {
+    const captureLib = code("src/lib/panorama/capture.ts");
+    const ui = code("src/components/tour/panorama-capture.tsx");
+
+    check(
+      "startCapture passes the frame's height through to the plan",
+      /spherePlan\(hfov, vfov\)/.test(captureLib),
+      "spherePlan(hfov) alone falls back to an assumed shape and the rings stop matching the camera",
+    );
+    check(
+      "and the screen gives it both fields when the capture begins",
+      /startCapture\(shape\.hfov, shape\.vfov\)/.test(ui),
+    );
+    check(
+      "the shape comes from the calibration, or from the video if there is none",
+      /calibrationRef\.current \?\?\s*\n?\s*fieldsOfView\(/.test(ui),
+      "a plan built before the camera has reported its size is a plan for the wrong camera",
+    );
+
+    // The constraint itself. A 16:9 frame at 70 degrees is 43 degrees tall and
+    // the 4:3 plan's rings are 45 apart, which is the gap this began as.
+    check(
+      "the camera is asked for a 4:3 frame, which is the shape the plan is sized for",
+      /aspectRatio: \{ ideal: 4 \/ 3 \}/.test(ui) &&
+        /width: \{ ideal: 1440 \}/.test(ui) &&
+        /height: \{ ideal: 1080 \}/.test(ui),
+      "asking for width alone gets 16:9, which is four degrees too short for the rings to meet",
+    );
+    check(
+      "and asked, not required, so a camera that cannot is still usable",
+      !/aspectRatio: \{ exact:/.test(ui) && !/width: \{ exact:/.test(ui),
+      "the plan grows extra rings for whatever shape arrives; refusing the camera helps nobody",
+    );
+  }
 
   check(
     "a wider lens needs fewer photographs",
@@ -438,21 +558,58 @@ function wholeFunction(src: string, name: string): string {
     "reversing the list satisfies 'no further out than the last one' while putting the nadir first",
   );
 
-  // Every direction on the sphere is within reach of some target.
-  {
-    let worst = 0;
-    for (let yaw = 0; yaw < 360; yaw += 7) {
-      for (let pitch = -85; pitch <= 85; pitch += 7) {
+  // Every direction on the sphere actually falls inside some photograph.
+  //
+  // This used to measure the angle to the nearest target and compare it with
+  // half the horizontal field, which treats a frame as a circle. A frame is a
+  // rectangle, and it was a rectangle 70 degrees one way and 43 the other --
+  // so a direction 30 degrees from a target counted as covered when it was 30
+  // degrees *above* it and the frame only reached 21.5.
+  //
+  // That generous measure is why a plan with an unphotographed band running
+  // round the whole room passed every check in this file. So the test is now
+  // the real frustum -- is this direction inside the rectangle -- for every
+  // frame shape the app can be handed.
+  for (const [w, h, label] of [
+    [1440, 1080, "4:3"],
+    [1920, 1080, "16:9"],
+    [1080, 1920, "9:16"],
+  ] as [number, number, string][]) {
+    const shape = fieldsOfView(w, h);
+    const shapePlan = spherePlan(shape.hfov, shape.vfov);
+    const bases = shapePlan.map((t) => basisFrom(t.yaw, t.pitch, 0));
+    const tanH = Math.tan(((shape.hfov / 2) * Math.PI) / 180);
+    const tanV = Math.tan(((shape.vfov / 2) * Math.PI) / 180);
+
+    let uncovered = 0;
+    let total = 0;
+    let firstGap: { yaw: number; pitch: number } | null = null;
+    for (let yaw = 0; yaw < 360; yaw += 5) {
+      for (let pitch = -88; pitch <= 88; pitch += 4) {
+        total += 1;
         const d = directionOf(yaw, pitch);
-        let nearest = 180;
-        for (const t of plan) nearest = Math.min(nearest, angleBetween(d, t.direction));
-        worst = Math.max(worst, nearest);
+        const seen = bases.some((b) => {
+          const along =
+            d[0] * b.forward[0] + d[1] * b.forward[1] + d[2] * b.forward[2];
+          if (along <= 1e-6) return false;
+          const x =
+            (d[0] * b.right[0] + d[1] * b.right[1] + d[2] * b.right[2]) / along;
+          const y = (d[0] * b.up[0] + d[1] * b.up[1] + d[2] * b.up[2]) / along;
+          return Math.abs(x) <= tanH && Math.abs(y) <= tanV;
+        });
+        if (!seen) {
+          uncovered += 1;
+          if (!firstGap) firstGap = { yaw, pitch };
+        }
       }
     }
+
     check(
-      "no part of the room is further than half a frame from a target",
-      worst <= ASSUMED_HFOV / 2 + 0.1,
-      `the loneliest direction is ${worst.toFixed(1)}° from the nearest target — anything beyond half the field of view is a place no photograph reaches`,
+      `every direction falls inside some photograph, at ${label}`,
+      uncovered === 0,
+      firstGap
+        ? `${uncovered} of ${total} directions are in no frame at all; the first is yaw ${firstGap.yaw}, pitch ${firstGap.pitch}`
+        : `all ${total} covered`,
     );
   }
 }
@@ -1173,6 +1330,17 @@ function wholeFunction(src: string, name: string): string {
 const TW = 1024;
 const TH = 512;
 
+/**
+ * The frame the capture asks the camera for, in `panorama-capture.tsx`.
+ *
+ * Written here so the end-to-end check photographs the shape the app actually
+ * captures. If that constraint changes, this is the line that has to change
+ * with it -- and the frustum check above covers the other shapes a camera
+ * might hand back instead.
+ */
+const CAPTURE_WIDTH = 1440;
+const CAPTURE_HEIGHT = 1080;
+
 /** A room with four coloured walls, straight rails, and a patterned ceiling. */
 function room(): Uint8Array {
   const p = new Uint8Array(TW * TH * 3);
@@ -1232,9 +1400,19 @@ async function photograph(
   roll: number,
   hfov: number,
   arm = 0,
+  /**
+   * The frame's shape.
+   *
+   * It defaulted to 640x480 with the field of view passed as 60, and the app
+   * has never produced a frame like that. That is not a detail: the plan's
+   * rings are spaced by how tall a frame is, and 640x480 at 60 degrees is 47
+   * degrees tall where the app's frame was 43 -- just enough that a plan whose
+   * rings did not meet on a real phone still met here. The whole defect lived
+   * in the four degrees between the tested frame and the shipped one.
+   */
+  w = CAPTURE_WIDTH,
+  h = CAPTURE_HEIGHT,
 ): Promise<Buffer> {
-  const w = 640;
-  const h = 480;
   const vfov = verticalFov(hfov, w, h);
   const b = basisFrom(yaw, pitch, roll);
   const tanH = Math.tan(((hfov / 2) * Math.PI) / 180);
@@ -1290,7 +1468,8 @@ async function photograph(
 
 async function endToEnd() {
   const truth = room();
-  const plan = spherePlan(60);
+  const shape = fieldsOfView(CAPTURE_WIDTH, CAPTURE_HEIGHT);
+  const plan = spherePlan(shape.hfov, shape.vfov);
   const frames: FrameInput[] = [];
 
   // Three degrees of error on every frame, which is roughly what a phone's
@@ -1307,12 +1486,12 @@ async function endToEnd() {
       yaw: target.yaw + jitter(),
       pitch: target.pitch + jitter(),
       roll: 0,
-      hfov: 60,
+      hfov: shape.hfov,
       // 15cm from the point it turns about: a phone held against the chest,
       // which is what the instructions ask for and what the quality check now
       // requires. 35cm — held out to see the screen — is refused below.
       bytes: new Uint8Array(
-        await photograph(truth, target.yaw, target.pitch, 0, 60, 0.15),
+        await photograph(truth, target.yaw, target.pitch, 0, shape.hfov, 0.15),
       ),
     });
   }
@@ -1326,10 +1505,32 @@ async function endToEnd() {
     return;
   }
 
+  // The lens estimate absorbs parallax, and this says how much.
+  //
+  // It used to assert the estimate landed within a degree of the truth, which
+  // held for the 60-degree 640x480 frames this harness used to photograph and
+  // does not hold for the frames the app captures. Measured on this room at
+  // 70 degrees, the recovered angle against how far the lens is from the
+  // turning point:
+  //
+  //     0cm  -3.0      15cm  -6.0
+  //     5cm   0.0      25cm  -9.0
+  //
+  // It is always an underestimate, and it grows with the parallax, because a
+  // slightly narrower lens partly explains what parallax did to the pixels.
+  // That is the estimator working, not drifting: the stitch is unharmed
+  // (alignment 0.73, the sphere fully covered). What would be a defect is the
+  // estimate running away, so that is what is bounded -- at eight degrees on a
+  // capture from 15cm, which is two degrees of room over the measurement.
   check(
-    "a correct lens estimate is left alone",
-    Math.abs(out.fieldOfView - 60) < 1,
-    `${out.fieldOfView}°`,
+    "the lens estimate absorbs parallax without running away",
+    Math.abs(out.fieldOfView - shape.hfov) <= 8,
+    `${out.fieldOfView}° against a true ${shape.hfov.toFixed(1)}°`,
+  );
+  check(
+    "and it errs narrow rather than wide",
+    out.fieldOfView <= shape.hfov + 1,
+    "a lens estimated wider than it is spreads every frame past its neighbours",
   );
 
   // Acceptance 7.

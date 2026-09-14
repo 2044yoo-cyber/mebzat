@@ -51,13 +51,12 @@ import {
   rollOf,
   cameraRotationMatrix,
   unsteadiness,
-  verticalFov,
   withLocalZero,
   yawPitchOf,
   type Matrix3,
   type Vector3,
 } from "@/lib/panorama/orientation";
-import { ASSUMED_HFOV } from "@/lib/panorama/sphere";
+import { fieldsOfView } from "@/lib/panorama/sphere";
 import {
   accumulateDrift,
   focusScore,
@@ -460,14 +459,19 @@ export function PanoramaCapture({
       const baseCalibration = calibrationRef.current;
       const calibration = baseCalibration
         ? calibrationForSize(baseCalibration, best.width, best.height)
-        : {
-            hfov: ASSUMED_HFOV,
-            vfov: verticalFov(ASSUMED_HFOV, best.width, best.height),
-            intrinsics: intrinsicsFromFov(best.width, best.height, ASSUMED_HFOV),
-            focalLength: null,
-            source: "estimated" as const,
-            cameraLabel: null,
-          };
+        : (() => {
+            // The assumed field belongs to the frame's long axis, so which of
+            // hfov and vfov it is depends on the frame that arrived.
+            const { hfov, vfov } = fieldsOfView(best.width, best.height);
+            return {
+              hfov,
+              vfov,
+              intrinsics: intrinsicsFromFov(best.width, best.height, hfov, vfov),
+              focalLength: null,
+              source: "estimated" as const,
+              cameraLabel: null,
+            };
+          })();
       framesRef.current.push({
         blob: best.blob,
         targetId: target.id,
@@ -752,8 +756,9 @@ export function PanoramaCapture({
       recent.push(facing);
       if (recent.length > 4) recent.shift();
 
-      const hfov = ASSUMED_HFOV;
-      const vfov = verticalFov(hfov, video.videoWidth, video.videoHeight);
+      const { hfov, vfov } =
+        calibrationRef.current ??
+        fieldsOfView(video.videoWidth, video.videoHeight);
       const roll = rollError(rollOf(pose));
       const now = Date.now();
       const reading = {
@@ -1026,7 +1031,30 @@ export function PanoramaCapture({
       stream = await navigator.mediaDevices.getUserMedia({
         // The rear camera. `ideal` rather than `exact` so a laptop with only a
         // front camera still works rather than throwing.
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 } },
+        //
+        // And a 4:3 frame, which is the shape of this whole feature.
+        //
+        // `width: { ideal: 1920 }` alone asked for a 16:9 frame, because that
+        // is what a phone gives you when you ask for width and say nothing
+        // about height. A 16:9 frame at 70° across is 43° tall, and the plan's
+        // rings were 45° apart: every capture had a two-degree band between
+        // each pair of rings that nobody photographed, and no vertical overlap
+        // for the stitcher to match on. It refused captures that had nothing
+        // wrong with them.
+        //
+        // 4:3 is 55° tall, which the rings do overlap, and it is also the most
+        // efficient shape to tile a sphere with — squarer than 16:9, so fewer
+        // photographs cover it. It is what makes the plan twenty-two.
+        //
+        // All `ideal`: a camera that will not give 4:3 gives something else,
+        // `fieldsOfView` reads the shape it actually gave, and the plan grows
+        // the rings it needs rather than leaving holes between them.
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1440 },
+          height: { ideal: 1080 },
+          aspectRatio: { ideal: 4 / 3 },
+        },
         audio: false,
       });
     } catch {
@@ -1077,7 +1105,16 @@ export function PanoramaCapture({
     if (!preserveCaptured) {
       takenRef.current = new Set();
       markerTaken.current = new Map();
-      applyState(startCapture(calibrationRef.current?.hfov ?? ASSUMED_HFOV));
+      // Both fields, because the plan's rings are spaced by how tall a frame
+      // is. Passing only the horizontal one is what left a band between every
+      // pair of rings that nobody photographed.
+      const shape =
+        calibrationRef.current ??
+        fieldsOfView(
+          videoRef.current?.videoWidth ?? 0,
+          videoRef.current?.videoHeight ?? 0,
+        );
+      applyState(startCapture(shape.hfov, shape.vfov));
     }
     setPhase("capturing");
   }

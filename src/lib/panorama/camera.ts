@@ -1,5 +1,5 @@
 import { verticalFov } from "./orientation";
-import { ASSUMED_HFOV } from "./sphere";
+import { fieldsOfView } from "./sphere";
 
 export type CameraIntrinsics = {
   fx: number;
@@ -80,9 +80,14 @@ export function cameraCalibration(
     plausible(settings.fieldOfView, 20, 120);
   const reportedFx = plausible(settings.focalLengthX, width * 0.2, width * 10);
 
+  // The estimate is resolved against the frame's own shape. A camera that says
+  // nothing about its optics used to be told its frame was 70° across
+  // whichever way round it came, which is right for a landscape frame and
+  // overstates a tall one by about 1.6x — and a frame that claims to be wider
+  // than it is gets stretched across the sphere by exactly that factor.
   const hfov = reportedFx
     ? horizontalFovFromFx(width, reportedFx)
-    : reportedFov ?? ASSUMED_HFOV;
+    : reportedFov ?? fieldsOfView(width, height).hfov;
   let vfov = verticalFov(hfov, width, height);
   const intrinsics = intrinsicsFromFov(width, height, hfov, vfov);
 

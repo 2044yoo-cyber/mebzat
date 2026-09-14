@@ -1,5 +1,4 @@
 import {
-  ASSUMED_HFOV,
   coverage,
   nearestTarget,
   spherePlan,
@@ -98,8 +97,12 @@ export type CaptureState = {
   taken: string[];
 };
 
-export function startCapture(hfov: number = ASSUMED_HFOV): CaptureState {
-  return { plan: spherePlan(hfov), taken: [] };
+export function startCapture(
+  hfov?: number,
+  /** How tall a frame is. The rings are spaced by it. */
+  vfov?: number,
+): CaptureState {
+  return { plan: spherePlan(hfov, vfov), taken: [] };
 }
 
 export function takenSet(state: CaptureState): Set<string> {
