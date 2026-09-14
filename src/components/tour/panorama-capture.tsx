@@ -22,6 +22,11 @@ import {
   type CameraIntrinsics,
 } from "@/lib/panorama/camera";
 import {
+  CAMERA_METERING_SETTLE_MS,
+  safeCameraControlPlan,
+  type CameraControlCapabilities,
+} from "@/lib/panorama/camera-controls";
+import {
   CAPTURE_COOLDOWN_MS,
   EMPTY_HOLD,
   STEADY_MS,
@@ -1038,15 +1043,17 @@ export function PanoramaCapture({
     const track = stream.getVideoTracks()[0];
     calibrationRef.current = track ? cameraCalibration(track) : null;
 
-    // Pin the exposure and the white balance where the camera has settled.
+    // Let the camera meter, then safely hold what the camera chose where the
+    // browser supports single-shot metering.
     //
     // Left to itself a phone re-meters between a window and a dark corner, so
     // two frames of the same wall come back a stop apart and the same wall two
     // different colours. The stitcher can level brightness across a seam; it
     // cannot un-shift a white balance that moved halfway round the room. Not
     // every browser offers this — it is newer than the camera API itself — so
-    // it is attempted and the failure ignored, because a capture with
-    // automatic exposure is worse but still a capture.
+    // Android cameras can advertise manual modes without exposing the sensor
+    // values required to use them. Requesting just `manual` made Samsung
+    // previews dark and unstable, so lockCamera never guesses those values.
     await lockCamera(stream);
 
     if (!preserveCaptured) {
@@ -1639,48 +1646,36 @@ const Sphere = memo(function Sphere({
 });
 
 /**
- * Hold the exposure and the white balance still for the length of a capture.
+ * Let the camera meter the room, then request only controls that are safe
+ * without guessing ISO, exposure time or colour temperature.
  *
- * `applyConstraints` is the only way to ask, the capabilities differ between
- * every phone and browser, and asking for something unsupported throws. So
- * each is asked for on its own and each failure is swallowed: a capture with
- * the camera metering as it pleases is worse, not impossible.
+ * One complete constraint update is used because each `applyConstraints`
+ * call replaces the previous constraint set. Three separate calls made the
+ * Samsung camera jump between exposure modes. Unsupported controls are left
+ * alone and the phone keeps its automatic metering.
  */
 async function lockCamera(stream: MediaStream): Promise<void> {
   const track = stream.getVideoTracks()[0];
   if (!track) return;
 
-  type Extended = MediaTrackCapabilities & {
-    exposureMode?: string[];
-    whiteBalanceMode?: string[];
-    focusMode?: string[];
-  };
-
-  let able: Extended = {};
+  let able: CameraControlCapabilities = {};
   try {
-    able = (track.getCapabilities?.() ?? {}) as Extended;
+    able = (track.getCapabilities?.() ?? {}) as CameraControlCapabilities;
   } catch {
     return;
   }
 
-  // A moment of automatic metering first, so what gets pinned is the room
-  // rather than whatever the sensor happened to read as it woke up.
-  await new Promise((resolve) => setTimeout(resolve, 450));
+  // The stream is already live even though the preview has not mounted yet.
+  // Give Samsung's metering enough time to leave its dark startup exposure.
+  await new Promise((resolve) => setTimeout(resolve, CAMERA_METERING_SETTLE_MS));
 
-  for (const [key, wanted] of [
-    ["exposureMode", "manual"],
-    ["whiteBalanceMode", "manual"],
-    ["focusMode", "continuous"],
-  ] as const) {
-    const offered = able[key];
-    if (!Array.isArray(offered) || !offered.includes(wanted)) continue;
-    try {
-      await track.applyConstraints({
-        advanced: [{ [key]: wanted }],
-      } as MediaTrackConstraints);
-    } catch {
-      // This phone will not hold it. The stitcher levels what it can.
-    }
+  const plan = safeCameraControlPlan(able);
+  if (Object.keys(plan).length === 0) return;
+
+  try {
+    await track.applyConstraints({ advanced: [plan] } as MediaTrackConstraints);
+  } catch {
+    // Keep the phone's automatic camera settings when a driver rejects this.
   }
 }
 

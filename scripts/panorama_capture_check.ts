@@ -16,6 +16,10 @@ import {
   horizontalFovFromFx,
 } from "../src/lib/panorama/camera";
 import {
+  CAMERA_METERING_SETTLE_MS,
+  safeCameraControlPlan,
+} from "../src/lib/panorama/camera-controls";
+import {
   cameraRotationMatrix,
   forwardOf,
   isRotationMatrix,
@@ -26,6 +30,27 @@ assert.equal(state.plan.length, 22);
 assert.equal(startCapture(60).plan.length, 26);
 assert.ok(STEADY_MS >= 900 && STEADY_MS <= 1200);
 assert.ok(ALIGN_TOLERANCE_DEGREES >= 5 && ALIGN_TOLERANCE_DEGREES <= 6);
+assert.ok(CAMERA_METERING_SETTLE_MS >= 1000);
+assert.deepEqual(
+  safeCameraControlPlan({
+    exposureMode: ["continuous", "manual"],
+    whiteBalanceMode: ["continuous", "manual"],
+    focusMode: ["continuous"],
+  }),
+  { focusMode: "continuous" },
+);
+assert.deepEqual(
+  safeCameraControlPlan({
+    exposureMode: ["continuous", "single-shot", "manual"],
+    whiteBalanceMode: ["single-shot", "manual"],
+    focusMode: ["continuous"],
+  }),
+  {
+    exposureMode: "single-shot",
+    whiteBalanceMode: "single-shot",
+    focusMode: "continuous",
+  },
+);
 const pole = state.plan.find((target) => Math.abs(target.pitch) === 90)!;
 assert.equal(
   decide(state, {

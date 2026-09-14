@@ -911,16 +911,17 @@ function wholeFunction(src: string, name: string): string {
       capture.indexOf("focusScore(grey") < capture.indexOf("canvas.toBlob"),
   );
   check(
-    "exposure and white balance are pinned for the length of a capture",
-    /\["exposureMode", "manual"\]/.test(capture) &&
-      /\["whiteBalanceMode", "manual"\]/.test(capture),
-    "the stitcher can level brightness across a seam; it cannot un-shift a white balance that moved halfway round the room",
+    "camera metering is held only through a safe automatic single shot",
+    /safeCameraControlPlan\(able\)/.test(capture) &&
+      !/\["exposureMode", "manual"\]/.test(capture) &&
+      !/\["whiteBalanceMode", "manual"\]/.test(capture),
+    "manual mode without ISO and exposure time made Samsung previews dark and unstable",
   );
   check(
     "and a phone that will not hold them still captures anyway",
     // The structure, not the comment explaining it: `code()` strips comments,
     // so a check written against the explanation is a check against nothing.
-    /try \{\s*await track\.applyConstraints\([\s\S]{0,140}?\} catch \{/.test(capture) &&
+    /try \{\s*await track\.applyConstraints\(\{ advanced: \[plan\] \}/.test(capture) &&
       /able = \(track\.getCapabilities\?\.\(\) \?\? \{\}\)[\s\S]{0,80}?\} catch \{\s*return;/.test(
         capture,
       ),
@@ -928,7 +929,10 @@ function wholeFunction(src: string, name: string): string {
   );
   check(
     "the camera is given a moment to settle before it is pinned",
-    /await new Promise\(\(resolve\) => setTimeout\(resolve, 450\)\);/.test(capture),
+    /setTimeout\(resolve, CAMERA_METERING_SETTLE_MS\)/.test(capture) &&
+      /CAMERA_METERING_SETTLE_MS = 1200/.test(
+        code("src/lib/panorama/camera-controls.ts"),
+      ),
     "pinning the first reading pins whatever the sensor saw as it woke up",
   );
   check(
