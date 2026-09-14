@@ -20,7 +20,9 @@ import sharp from "sharp";
 
 import {
   MIN_ALIGNMENT,
+  applyVignette,
   composePanorama,
+  estimateVignette,
   type FrameInput,
 } from "../src/lib/panorama/compose.ts";
 import {
@@ -725,10 +727,23 @@ function wholeFunction(src: string, name: string): string {
       isComplete(required),
     );
     check(
-      "and the poles are not held against somebody",
-      fresh.plan.some((t) => !t.required) &&
-        fresh.plan.filter((t) => !t.required).every((t) => Math.abs(t.pitch) === 90),
-      "the nadir is a photograph of your own shoes; everything between the poles is required",
+      "the poles are required too, because a skipped pole is a hole",
+      fresh.plan.every((t) => t.required),
+      "the stitcher leaves an unphotographed region at rgb(28,28,30) rather than inventing it, so a skipped zenith is a dark patch in the middle of the finished ceiling",
+    );
+    check(
+      "so a capture missing only the zenith does not count as finished",
+      (() => {
+        const zenith = fresh.plan.find((t) => t.pitch === 90);
+        if (!zenith) return false;
+        let all = startCapture();
+        for (const target of fresh.plan) {
+          if (target.id === zenith.id) continue;
+          all = record(all, target.id);
+        }
+        return !isComplete(all);
+      })(),
+      "twenty-one of twenty-two, and the one left out is the part of the room somebody looking up will look at",
     );
   }
 
@@ -1301,10 +1316,276 @@ function wholeFunction(src: string, name: string): string {
       stitcher.indexOf('paint(seamed, frame, table, best, "seam")'),
     "a seam cannot be chosen against a canvas that is still being painted",
   );
+  // -------------------------------------------------------------------------
+  // The lens's own falloff
+  //
+  // The artefact this exists for: photograph a plain white ceiling with five
+  // frames, each darker at its corners than its middle, and lay them side by
+  // side. You get a row of bright middles with dark boundaries between them --
+  // a lattice of scallops across a surface that is one flat colour, which in a
+  // viewer reads as wedges or diamonds.
+  //
+  // No blending setting fixes it. Where two frames meet, both are at their
+  // dark edge, and averaging two dark corners gives a dark corner: on the
+  // synthetic room with a 22% falloff, a plain ceiling spanned 26 grey levels
+  // with the seam cut hard and 22 with it feathered all the way.
+  // -------------------------------------------------------------------------
+  {
+    const W = 240;
+    const H = 180;
+    const TRUE_FALLOFF = 0.22;
+
+    const lensFrames = (falloff: number) => {
+      let seed = 3;
+      const rnd = () => {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return seed / 2147483648;
+      };
+      const frames: { pixels: Uint8Array; width: number; height: number }[] = [];
+      for (let f = 0; f < 22; f += 1) {
+        const px = new Uint8Array(W * H * 3);
+        const base = 40 + rnd() * 150;
+        const cx = (W - 1) / 2;
+        const cy = (H - 1) / 2;
+        const maxR2 = cx * cx + cy * cy;
+        // A different ramp across each frame, so the *room* has plenty of
+        // structure the average has to cancel out before the lens is left.
+        const gx = (rnd() - 0.5) * 0.5;
+        const gy = (rnd() - 0.5) * 0.5;
+        for (let y = 0; y < H; y += 1) {
+          for (let x = 0; x < W; x += 1) {
+            const t = ((x - cx) * (x - cx) + (y - cy) * (y - cy)) / maxR2;
+            const scene = base * (1 + gx * (x / W - 0.5) + gy * (y / H - 0.5));
+            const v = Math.max(0, Math.min(255, scene * (1 - falloff * t)));
+            const i = (y * W + x) * 3;
+            px[i] = v;
+            px[i + 1] = v;
+            px[i + 2] = v;
+          }
+        }
+        frames.push({ pixels: px, width: W, height: H });
+      }
+      return frames;
+    };
+
+    const gains = estimateVignette(lensFrames(TRUE_FALLOFF));
+    check(
+      "a lens that darkens its corners is noticed",
+      gains !== null,
+      "twenty-two frames pointing everywhere: the room averages out and the lens is what is left",
+    );
+
+    if (gains) {
+      // Accurate, not merely present. A correction that is the right shape and
+      // the wrong size trades one uneven ceiling for another.
+      let worst = 0;
+      for (let b = 0; b < gains.length; b += 1) {
+        const t = (b + 0.5) / gains.length;
+        const truth = 1 / (1 - TRUE_FALLOFF * t);
+        worst = Math.max(worst, Math.abs(gains[b] - truth));
+      }
+      check(
+        "and measured close to the falloff it actually has",
+        worst < 0.03,
+        `worst error ${worst.toFixed(4)} across the profile; measured 0.021 on this fixture, against a corner gain of about 1.28 -- a residual of under two per cent where the uncorrected lens was twenty-two`,
+      );
+      check(
+        "the middle of the frame is left alone",
+        Math.abs(gains[0] - 1) < 0.02,
+        "the lens does not darken its own centre, so nothing there needs lifting",
+      );
+      check(
+        "and the correction only ever brightens",
+        [...gains].every((g) => g >= 1),
+        "a profile that reads brighter at the edge is the room, not the lens; dimming the middle to match would be inventing a shadow",
+      );
+    }
+
+    // A room that reads BRIGHTER at the frame edge than the middle.
+    //
+    // Nothing about a lens does that, so it is the room failing to average
+    // out -- and the correction must refuse it rather than dim the middle,
+    // which would be painting a shadow into every frame.
+    {
+      let seed = 5;
+      const rnd = () => {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return seed / 2147483648;
+      };
+      const inverted: { pixels: Uint8Array; width: number; height: number }[] = [];
+      for (let f = 0; f < 22; f += 1) {
+        const px = new Uint8Array(W * H * 3);
+        const cx = (W - 1) / 2;
+        const cy = (H - 1) / 2;
+        const maxR2 = cx * cx + cy * cy;
+        const base = 60 + rnd() * 60;
+        for (let y = 0; y < H; y += 1) {
+          for (let x = 0; x < W; x += 1) {
+            const t = ((x - cx) * (x - cx) + (y - cy) * (y - cy)) / maxR2;
+            const v = Math.min(255, base * (1 + 0.5 * t));
+            const i = (y * W + x) * 3;
+            px[i] = v;
+            px[i + 1] = v;
+            px[i + 2] = v;
+          }
+        }
+        inverted.push({ pixels: px, width: W, height: H });
+      }
+      const wrongWay = estimateVignette(inverted);
+      check(
+        "a room that is brighter at the edges never dims the middle",
+        wrongWay === null || [...wrongWay].every((g) => g >= 1),
+        "clamping at 1 is what makes this a correction rather than a second vignette applied upside down",
+      );
+    }
+
+    // The identity, isolated.
+    //
+    // "the middle pixel is unchanged" passed even with the gain-1 shortcut
+    // deleted, because the middle bin's gain is 1.003 and the difference
+    // rounds away. This hands it a profile of exactly ones, where any change
+    // at all is a change that should not have happened.
+    {
+      const flatGains = new Float32Array(24).fill(1);
+      const untouched = {
+        pixels: new Uint8Array(W * H * 3),
+        width: W,
+        height: H,
+      };
+      for (let i = 0; i < untouched.pixels.length; i += 1) {
+        untouched.pixels[i] = (i * 7) % 256;
+      }
+      const copy = untouched.pixels.slice();
+      applyVignette(untouched, flatGains);
+      let changed = 0;
+      for (let i = 0; i < copy.length; i += 1) {
+        if (copy[i] !== untouched.pixels[i]) changed += 1;
+      }
+      check(
+        "a profile of ones changes not one pixel",
+        changed === 0,
+        `${changed} pixels moved; an even lens must be a no-op to the bit, or every frame centre is quietly altered`,
+      );
+    }
+
+    // Smoothing, tested where it matters: a handful of frames, so the room
+    // does not average out and the raw profile is lumpy.
+    {
+      // No randomness here on purpose: every frame is the same concentric
+      // banding, so the room cannot average out at all. That is the worst case
+      // for an estimator that assumes it will.
+      const few: { pixels: Uint8Array; width: number; height: number }[] = [];
+      for (let f = 0; f < 4; f += 1) {
+        const px = new Uint8Array(W * H * 3);
+        const cx = (W - 1) / 2;
+        const cy = (H - 1) / 2;
+        const maxR2 = cx * cx + cy * cy;
+        for (let y = 0; y < H; y += 1) {
+          for (let x = 0; x < W; x += 1) {
+            const t = ((x - cx) * (x - cx) + (y - cy) * (y - cy)) / maxR2;
+            // Concentric bands: a room that happens to be structured the way
+            // the estimator bins, which is the worst case for it.
+            const band = Math.sin(t * 18) * 40;
+            const v = Math.max(0, Math.min(255, (140 + band) * (1 - 0.22 * t)));
+            const i = (y * W + x) * 3;
+            px[i] = v;
+            px[i + 1] = v;
+            px[i + 2] = v;
+          }
+        }
+        few.push({ pixels: px, width: W, height: H });
+      }
+      const lumpy = estimateVignette(few);
+      check(
+        "a lumpy profile is smoothed before it is used as a correction",
+        (() => {
+          if (!lumpy) return true;
+          // The biggest step between neighbouring bins. A lens's falloff is a
+          // smooth curve; anything sharp here is the room, and applying it
+          // draws that room's rings onto every frame.
+          let jump = 0;
+          for (let b = 1; b < lumpy.length; b += 1) {
+            jump = Math.max(jump, Math.abs(lumpy[b] - lumpy[b - 1]));
+          }
+          return jump < 0.1;
+        })(),
+        "24 bins applied as 24 steps would replace one visible artefact with concentric rings",
+      );
+    }
+
+    check(
+      "a lens that is already even is left alone entirely",
+      estimateVignette(lensFrames(0)) === null,
+      "correcting an even lens means dividing by whatever the room happened to look like",
+    );
+
+    // Applying it must not clip, and must not touch what it is not correcting.
+    if (gains) {
+      const bright = {
+        pixels: new Uint8Array(W * H * 3).fill(230),
+        width: W,
+        height: H,
+      };
+      const before = bright.pixels.slice();
+      applyVignette(bright, gains);
+      check(
+        "a white ceiling is lifted rather than pushed into the top of the range",
+        [...bright.pixels].every((v) => v < 255),
+        "230 times a corner gain of 1.28 is 294, and a clipped region is flat -- which puts a new artefact exactly where the old one was",
+      );
+      check(
+        "and it is still brighter than it was",
+        bright.pixels[(Math.round(H / 2) * W + 2) * 3] > before[0],
+      );
+
+      const centre = (Math.round((H - 1) / 2) * W + Math.round((W - 1) / 2)) * 3;
+      check(
+        "the middle pixel is unchanged to the bit",
+        bright.pixels[centre] === before[centre],
+        "the first attempt compressed everything above a threshold, which darkened every frame centre and grew a dark blob on every panel",
+      );
+    }
+  }
+
+  // The wiring.
+  //
+  // Everything above tests the correction as a function. None of it tests that
+  // the stitcher calls it, and deleting the call is exactly the regression that
+  // brings the scalloped ceiling back -- silently, because every pure-function
+  // check stays green.
   check(
-    "the join itself is still blended, not cut",
-    /w = over \* over;/.test(stitcher) && /SEAM_SHARE = 0\.9/.test(stitcher),
-    "section 7 step 9 — a hard boundary between two exposures is a visible line down a wall; the band is narrow, not absent",
+    "the lens falloff is estimated from the frames and divided out of them",
+    /const vignette = estimateVignette\(decoded\);/.test(stitcher) &&
+      /for \(const frame of decoded\) applyVignette\(frame, vignette\);/.test(stitcher),
+    "without this a flat ceiling comes out as a lattice of bright frame middles and dark joins",
+  );
+  check(
+    "and it happens before anything reads a pixel",
+    stitcher.indexOf("applyVignette(frame, vignette)") <
+      stitcher.indexOf("refinePoses(order)"),
+    "the pose refinement correlates these buffers and the exposure ratio is measured across them; correcting afterwards leaves both working from uneven frames",
+  );
+  check(
+    "and only when the frames show a falloff worth correcting",
+    /if \(vignette\) \{/.test(stitcher),
+    "a lens that is already even must not be divided by whatever the room happened to look like",
+  );
+
+  check(
+    "the join itself is blended across most of the overlap, not cut",
+    (() => {
+      const m = /const SEAM_SHARE = ([0-9.]+);/.exec(stitcher);
+      if (!m) return false;
+      const share = Number(m[1]);
+      return /w = over \* over;/.test(stitcher) && share > 0 && share <= 0.5;
+    })(),
+    "0.9 meant a frame contributed only where it was within a tenth of being the best view, which is a cut in all but name, and a cut puts the whole of two photographs' disagreement on one line",
+  );
+  check(
+    "but the best-placed frame still leads",
+    /const over = q - best\[row \+ x\] \* SEAM_SHARE;/.test(stitcher) &&
+      /SEAM_SHARE = 0(\.[0-9]+)?;/.test(stitcher),
+    "at zero every frame that can see a pixel gets equal say, including one looking across the wall at a glancing angle",
   );
   check(
     "the picture is built twice and the bands recombined",

@@ -218,12 +218,31 @@ const POLISH_ABOVE = 0.45;
  * see through. Alignment is never that good, because the phone is not rotating
  * about its own lens.
  *
- * So each pixel is taken from whichever frame is looking most directly at it,
- * and the others are mixed in only where they are within a tenth of being the
- * best themselves. That is a narrow band along the line midway between two
- * frames — enough to hide the join, too narrow to double anything.
+ * So each pixel leans towards whichever frame is looking most directly at it,
+ * and the others are mixed in across a wide band either side of the line
+ * midway between them.
+ *
+ * ## Why this moved from 0.9 back towards feathering
+ *
+ * 0.9 meant a frame contributed only where it was within a tenth of being the
+ * best view of a pixel — a narrow band, and effectively a cut. That was the
+ * right call when it was made and the wrong one to leave: it was chosen while
+ * the plan's rings did not overlap at all, when alignment was around 0.63 and
+ * feathering genuinely doubled furniture. With the geometry fixed, alignment
+ * on the same room is 0.82, and two frames that agree that well can be faded
+ * into each other without doubling anything.
+ *
+ * What a cut costs, on the other hand, is visible at every join, because two
+ * photographs of one wall never agree exactly and a cut puts the whole of that
+ * disagreement on one line. Measured on the synthetic room, going from 0.9 to
+ * fully feathered costs 0.8 of a percentage point of edge crispness (82.3% to
+ * 81.5%) and visibly evens out the flat walls.
+ *
+ * 0.25 keeps a little of the preference — enough that a badly placed frame
+ * does not get equal say in a region another frame is looking straight at —
+ * while blending across most of the overlap.
  */
-const SEAM_SHARE = 0.9;
+const SEAM_SHARE = 0.25;
 
 /**
  * How far the low-frequency blend is spread, as a fraction of the image width.
@@ -368,6 +387,22 @@ export async function composePanorama(
     } catch {
       return { ok: false, code: "unreadable" };
     }
+  }
+
+  // The lens's own falloff, divided out before anything looks at a pixel.
+  //
+  // First, because everything downstream reads these buffers: the pose
+  // refinement correlates them, the exposure ratio is measured across them,
+  // and the sphere is painted from them. Correcting here means all three see
+  // an evenly lit frame, and nothing else in the file has to know this
+  // happened.
+  //
+  // Null when the frames show no meaningful falloff, and then nothing is
+  // touched — a lens that is already even must not be "corrected" by a profile
+  // made of whatever the room happened to look like.
+  const vignette = estimateVignette(decoded);
+  if (vignette) {
+    for (const frame of decoded) applyVignette(frame, vignette);
   }
 
   // Exposure is compensated during refinement, where each frame can be
@@ -1195,6 +1230,252 @@ function paint(
       canvas.sum[out + 2] +=
         (pixels[i00 + 2] * w00 + pixels[i10 + 2] * w10 + pixels[i01 + 2] * w01 + pixels[i11 + 2] * w11) * gw;
       canvas.weight[row + x] += w;
+    }
+  }
+}
+
+/**
+ * How much darker the lens is away from the middle, measured from the frames.
+ *
+ * ## What this fixes
+ *
+ * Every phone lens is darker at the corners of its frame than at the centre —
+ * commonly ten to twenty-five per cent. Photograph a plain white ceiling with
+ * five frames and lay them side by side and you get a row of bright middles
+ * with dark boundaries between them: a lattice of scallops across a surface
+ * that is one flat colour. On a real ceiling, seen through a viewer that shows
+ * a chunk of the sphere at once, that lattice reads as wedges — the "diamond
+ * shapes" a panorama gets described by.
+ *
+ * It is worth being precise about why no amount of blending fixes it. Blending
+ * decides *which* frames a pixel comes from and in what proportion. Where two
+ * frames meet, both of them are at their dark edge; averaging two dark corners
+ * gives a dark corner. Measured on the synthetic room with a 22% falloff, a
+ * plain white ceiling came out spanning 26 grey levels with the seam cut hard,
+ * and 22 with it feathered all the way. The step is not in the join. It is in
+ * the photographs.
+ *
+ * ## Why it is measured rather than assumed
+ *
+ * Falloff varies by phone, by lens, and with the aperture — there is no
+ * constant to write down. But a capture is twenty-odd frames pointing in every
+ * direction, so whatever the *room* looks like averages out across them, and
+ * what survives at a given distance from the frame centre is the lens.
+ *
+ * So: bin every frame's pixels by how far they sit from the centre, average
+ * across all frames, and normalise to the middle. What comes back is the
+ * lens's own radial response.
+ *
+ * Returned as a lookup over r², so applying it needs no square root.
+ */
+const VIGNETTE_BINS = 24;
+
+/** Below this the lens is even enough that correcting it is only noise. */
+const VIGNETTE_MIN_FALLOFF = 0.04;
+
+/** No pixel is brightened by more than this, however dark the corner read. */
+const VIGNETTE_MAX_GAIN = 1.8;
+
+export function estimateVignette(
+  frames: readonly { pixels: Uint8Array; width: number; height: number }[],
+): Float32Array | null {
+  const sums = new Float64Array(VIGNETTE_BINS);
+  const counts = new Float64Array(VIGNETTE_BINS);
+
+  for (const frame of frames) {
+    const { width, height, pixels } = frame;
+    if (width < 8 || height < 8) continue;
+    const cx = (width - 1) / 2;
+    const cy = (height - 1) / 2;
+    const maxR2 = cx * cx + cy * cy;
+    if (maxR2 <= 0) continue;
+
+    // Every fourth pixel each way. The profile is 24 numbers averaged over
+    // millions of samples; reading all of them buys nothing.
+    for (let y = 0; y < height; y += 4) {
+      const dy = y - cy;
+      for (let x = 0; x < width; x += 4) {
+        const dx = x - cx;
+        const t = (dx * dx + dy * dy) / maxR2;
+        const bin = Math.min(VIGNETTE_BINS - 1, (t * VIGNETTE_BINS) | 0);
+        const i = (y * width + x) * 3;
+        sums[bin] += pixels[i] + pixels[i + 1] + pixels[i + 2];
+        counts[bin] += 3;
+      }
+    }
+  }
+
+  if (counts[0] === 0) return null;
+
+  const profile = new Float32Array(VIGNETTE_BINS);
+  for (let b = 0; b < VIGNETTE_BINS; b += 1) {
+    profile[b] = counts[b] > 0 ? sums[b] / counts[b] : 0;
+  }
+
+  // Fill any empty bin from the one before it, so the curve has no holes.
+  for (let b = 1; b < VIGNETTE_BINS; b += 1) {
+    if (profile[b] <= 0) profile[b] = profile[b - 1];
+  }
+  const centre = profile[0];
+  if (centre <= 1) return null;
+
+  // Fitted, not filtered.
+  //
+  // A lens's falloff is a smooth, near-quadratic function of distance from the
+  // centre — cos-to-the-fourth, in the textbook idealisation. Anything sharp in
+  // the binned profile is the *room* failing to average out, and applying it
+  // would draw that room's structure onto every frame as concentric rings.
+  //
+  // This started as a three-tap average over the bins, which turned out to do
+  // almost nothing: on a deliberately awful fixture — four frames of a room
+  // made of concentric bands — it took the largest step between neighbouring
+  // bins from 0.307 to 0.249, a fifth of the way. Fitting a quadratic in t
+  // instead takes it to a curve with no steps in it at all, because the thing
+  // being applied is a quadratic rather than 24 numbers.
+  //
+  // Least squares on [1, t, t²], solved directly: three unknowns, and a 3x3
+  // normal-equations solve is less code than pulling in a matrix library.
+  const smooth = fitQuadratic(profile);
+
+  const falloff = 1 - smooth[VIGNETTE_BINS - 1] / centre;
+  if (!Number.isFinite(falloff) || falloff < VIGNETTE_MIN_FALLOFF) return null;
+
+  // The correction is the reciprocal of the response, and it only ever
+  // brightens: a profile that comes back brighter at the edge than the middle
+  // is the room, not the lens, and dimming the middle to match it would be
+  // inventing a shadow.
+  const gains = new Float32Array(VIGNETTE_BINS);
+  for (let b = 0; b < VIGNETTE_BINS; b += 1) {
+    const g = smooth[b] > 1 ? centre / smooth[b] : 1;
+    gains[b] = Math.min(VIGNETTE_MAX_GAIN, Math.max(1, g));
+  }
+  return gains;
+}
+
+/**
+ * The gain, applied so that it cannot clip and cannot darken.
+ *
+ * ## Why not simply multiply
+ *
+ * A white ceiling photographed by a phone sits around 230, and a corner gain of
+ * 1.28 takes that to 294 — which clips at 255, and a clipped region is flat.
+ * Correcting the vignette by multiplication alone *creates* an artefact at
+ * exactly the place the vignette was most visible: a plain ceiling on the
+ * synthetic room went from 26 grey levels of variation to 36, because the
+ * bright half of every frame had been pushed to the top of the range and stuck
+ * there.
+ *
+ * ## Why not a knee either
+ *
+ * The first attempt compressed everything above a threshold. That fixed the
+ * clipping and introduced a worse fault: it is not the identity when the gain
+ * is 1. A pixel at 230 in the middle of a frame — where the lens needs no
+ * correction at all — came out at 220. Every frame centre was darkened, the
+ * render grew a dark blob in the middle of every panel, and it looked worse
+ * than doing nothing. The metrics said it was better, which is what metrics do
+ * when they are not measuring the thing you are looking at.
+ *
+ * ## What this is
+ *
+ * `1 - (1 - u)^g` on the unit interval. At g = 1 it is exactly u, so an
+ * uncorrected pixel is untouched to the last bit. Above 1 it brightens, with
+ * most of the lift in the shadows where the eye wants it, and it approaches
+ * white asymptotically so nothing clips.
+ */
+function lift(value: number, gain: number): number {
+  if (gain <= 1.0001) return value;
+  const u = value / 255;
+  if (u <= 0) return 0;
+  if (u >= 1) return 255;
+  return 255 * (1 - Math.pow(1 - u, gain));
+}
+
+/**
+ * A quadratic through the binned profile, evaluated back at each bin.
+ *
+ * Weighted by nothing: every bin covers an equal slice of t by construction,
+ * so every bin is an equally good sample of the curve. Falls back to the input
+ * if the system is degenerate, which it cannot be for 24 distinct t but which
+ * costs one line to be sure of.
+ */
+function fitQuadratic(profile: Float32Array): Float32Array {
+  const n = profile.length;
+  let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0;
+  let y0 = 0, y1 = 0, y2 = 0;
+  for (let b = 0; b < n; b += 1) {
+    const t = (b + 0.5) / n;
+    const t2 = t * t;
+    const y = profile[b];
+    s0 += 1;
+    s1 += t;
+    s2 += t2;
+    s3 += t2 * t;
+    s4 += t2 * t2;
+    y0 += y;
+    y1 += y * t;
+    y2 += y * t2;
+  }
+
+  // [s0 s1 s2][a]   [y0]
+  // [s1 s2 s3][b] = [y1]
+  // [s2 s3 s4][c]   [y2]
+  const m = [
+    [s0, s1, s2, y0],
+    [s1, s2, s3, y1],
+    [s2, s3, s4, y2],
+  ];
+  for (let col = 0; col < 3; col += 1) {
+    let pivot = col;
+    for (let r = col + 1; r < 3; r += 1) {
+      if (Math.abs(m[r][col]) > Math.abs(m[pivot][col])) pivot = r;
+    }
+    if (Math.abs(m[pivot][col]) < 1e-12) return profile;
+    [m[col], m[pivot]] = [m[pivot], m[col]];
+    for (let r = 0; r < 3; r += 1) {
+      if (r === col) continue;
+      const f = m[r][col] / m[col][col];
+      for (let c = col; c < 4; c += 1) m[r][c] -= f * m[col][c];
+    }
+  }
+  const a = m[0][3] / m[0][0];
+  const b2 = m[1][3] / m[1][1];
+  const c2 = m[2][3] / m[2][2];
+
+  const out = new Float32Array(n);
+  for (let b = 0; b < n; b += 1) {
+    const t = (b + 0.5) / n;
+    out[b] = a + b2 * t + c2 * t * t;
+  }
+  return out;
+}
+
+/** Divides the lens's falloff out of a frame, in place. */
+export function applyVignette(
+  frame: { pixels: Uint8Array; width: number; height: number },
+  gains: Float32Array,
+): void {
+  const { width, height, pixels } = frame;
+  const cx = (width - 1) / 2;
+  const cy = (height - 1) / 2;
+  const maxR2 = cx * cx + cy * cy;
+  if (maxR2 <= 0) return;
+
+  for (let y = 0; y < height; y += 1) {
+    const dy = y - cy;
+    const dy2 = dy * dy;
+    for (let x = 0; x < width; x += 1) {
+      const dx = x - cx;
+      const t = (dx * dx + dy2) / maxR2;
+      // Interpolated between bins, because 24 steps applied as steps would
+      // replace one visible artefact with 24 concentric rings.
+      const f = Math.min(VIGNETTE_BINS - 1.0001, t * VIGNETTE_BINS);
+      const b0 = f | 0;
+      const frac = f - b0;
+      const g = gains[b0] + (gains[b0 + 1] - gains[b0]) * frac;
+      const i = (y * width + x) * 3;
+      pixels[i] = lift(pixels[i], g);
+      pixels[i + 1] = lift(pixels[i + 1], g);
+      pixels[i + 2] = lift(pixels[i + 2], g);
     }
   }
 }

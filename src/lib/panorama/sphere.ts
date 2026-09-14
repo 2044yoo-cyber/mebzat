@@ -141,13 +141,24 @@ export function ringPitches(vfov: number): number[] {
  * Rings this far from the horizon may be left out and the capture still
  * counted as complete.
  *
- * The zenith and the nadir are one frame each and they are the two most
- * awkward to reach — the nadir in particular is a photograph of your own
- * shoes. Everything between is required, because a gap there is a hole in a
- * wall at eye level, which is the part anybody looking at the room will look
- * at.
+ * Nothing, now. It used to be the poles: the zenith and the nadir are one
+ * frame each and the two most awkward to reach, the nadir in particular being
+ * a photograph of your own shoes.
+ *
+ * But a pole that is not photographed is not a missing photograph, it is a
+ * **hole**. The stitcher fills small gaps from their neighbours and leaves
+ * anything larger at rgb(28, 28, 30), deliberately, because inventing a
+ * ceiling nobody photographed is worse than showing that one is missing. A
+ * skipped zenith is therefore a dark navy patch in the middle of the ceiling
+ * of the finished panorama — and the ceiling is what somebody looking at a
+ * room photographed from the middle of it is looking at.
+ *
+ * So both poles are required. It is two more photographs out of twenty-two,
+ * the capture screen already points at each one by number, and the alternative
+ * is a finished tour with a hole in it that the person who made it cannot fix
+ * without shooting the room again.
  */
-export const OPTIONAL_PITCH = 90;
+export const OPTIONAL_PITCH = 91;
 
 export type Target = {
   id: string;
