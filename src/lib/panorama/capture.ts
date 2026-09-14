@@ -21,7 +21,7 @@ import { yawPitchOf, type Vector3 } from "./orientation";
  */
 
 /** How close to a target the camera has to be pointing before it counts. */
-export const ALIGN_TOLERANCE_DEGREES = 8;
+export const ALIGN_TOLERANCE_DEGREES = 6;
 
 /**
  * How far the phone may drift between readings and still be called steady.
@@ -32,8 +32,15 @@ export const ALIGN_TOLERANCE_DEGREES = 8;
  */
 export const STEADY_DEGREES = 3;
 
-/** Brief confirmation hold: long enough to avoid a drive-by, short enough to feel immediate. */
-export const STEADY_MS = 450;
+/**
+ * Deliberate confirmation hold after the target turns green.
+ *
+ * 450ms still caught the phone while the person was settling onto the point.
+ * A full second makes the ring meaningful: centred first, then steady, then
+ * capture. It adds about twelve seconds over the original setting for a
+ * normal 22-photo room, which is cheaper than rebuilding a broken panorama.
+ */
+export const STEADY_MS = 1000;
 
 /** One noisy sensor sample may not erase an otherwise steady hold. */
 export const HOLD_GRACE_MS = 140;

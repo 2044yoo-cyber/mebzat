@@ -478,7 +478,7 @@ function wholeFunction(src: string, name: string): string {
   check(
     "pointing at it and still moving does not",
     decide(fresh, { facing: first.direction, roll: 0, unsteady: STEADY_DEGREES + 3, heldMs: STEADY_MS }).action === "aim",
-    "section 4: steady for 300–600ms, because a frame taken mid-swing is the one the matcher cannot place",
+    "the phone must settle on the target for a full second, because a frame taken mid-swing is the one the matcher cannot place",
   );
   check(
     "and holding still for only a moment does not either",
@@ -486,7 +486,7 @@ function wholeFunction(src: string, name: string): string {
   );
   check(
     "the shutter waits long enough to confirm the point is centred",
-    STEADY_MS >= 400 && STEADY_MS <= 600,
+    STEADY_MS >= 900 && STEADY_MS <= 1200,
   );
 
   {
@@ -886,7 +886,9 @@ function wholeFunction(src: string, name: string): string {
   );
   check(
     "the shutter requires a visibly settled hand",
-    STEADY_MS >= 400 && STEADY_MS <= 600 && STEADY_DEGREES <= 3,
+    STEADY_MS >= 900 && STEADY_MS <= 1200 &&
+      ALIGN_TOLERANCE_DEGREES >= 5 && ALIGN_TOLERANCE_DEGREES <= 6 &&
+      STEADY_DEGREES <= 3,
     `${STEADY_MS}ms and ${STEADY_DEGREES}° between readings`,
   );
   check(

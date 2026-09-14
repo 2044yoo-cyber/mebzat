@@ -24,8 +24,8 @@ import {
 const state = startCapture();
 assert.equal(state.plan.length, 22);
 assert.equal(startCapture(60).plan.length, 26);
-assert.ok(STEADY_MS >= 400);
-assert.ok(ALIGN_TOLERANCE_DEGREES <= 8);
+assert.ok(STEADY_MS >= 900 && STEADY_MS <= 1200);
+assert.ok(ALIGN_TOLERANCE_DEGREES >= 5 && ALIGN_TOLERANCE_DEGREES <= 6);
 const pole = state.plan.find((target) => Math.abs(target.pitch) === 90)!;
 assert.equal(
   decide(state, {
