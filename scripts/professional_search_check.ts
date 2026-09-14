@@ -37,12 +37,14 @@ import { whatsappNumber } from "../src/lib/contact/phone.ts";
 import { boundsOf, mapPoints } from "../src/lib/professionals/map-points.ts";
 import {
   MAX_PIN_CHARACTERS,
+  TRADE_ICON_CATEGORIES,
   availabilityLabel,
   isTakingWork,
   markerDescription,
   pinLabel,
   placeLabel,
   tradeColour,
+  tradeIconCategory,
 } from "../src/lib/professionals/trade-markers.ts";
 import { listingBadges } from "../src/lib/property/listing.ts";
 
@@ -70,6 +72,28 @@ function check(name: string, condition: boolean, detail = "") {
  * `accept="image/\*"` — opens a comment that runs to the next real `*\/`,
  * silently deleting real code that no assertion can then see.
  */
+/**
+ * The file with one brace-delimited block cut out of it.
+ *
+ * For checks that have to say "this rule is not only inside that media query".
+ * Counts braces rather than matching to the next `}`, because a media query
+ * contains rules, which contain braces of their own.
+ */
+function withoutBlock(source: string, opener: string): string {
+  const start = source.indexOf(opener);
+  if (start < 0) return source;
+
+  let depth = 0;
+  for (let i = start + opener.length - 1; i < source.length; i += 1) {
+    if (source[i] === "{") depth += 1;
+    else if (source[i] === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(0, start) + source.slice(i + 1);
+    }
+  }
+  return source.slice(0, start);
+}
+
 function code(path: string): string {
   return readFileSync(path, "utf8")
     .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
@@ -1221,9 +1245,9 @@ check(
   };
 
   check(
-    "the pin says the trade, because that is what a map of workers is scanned for",
+    "the hover card names the trade",
     pinLabel(point.trade).startsWith("Rebar Bender"),
-    "a map of twenty pins reading people's names answers nobody's question",
+    "the marker is an icon; the words are in the card that opens over it",
   );
   check(
     "a long trade is shortened rather than allowed to cover three streets",
@@ -1232,9 +1256,37 @@ check(
     pinLabel("Mechanical Engineer"),
   );
   check(
-    "somebody who has not said what they do still gets a word on the pin",
+    "somebody who has not said what they do still gets a word for it",
     pinLabel(null) === "Professional",
-    "an empty pill is a pin nobody can tell from a map artefact",
+    "a blank line in the card reads as a bug",
+  );
+
+  check(
+    "a trade takes the icon of the category it is already filed under",
+    tradeIconCategory("Electrician") === "electrical" &&
+      tradeIconCategory("Carpenter") === "joinery",
+    "an electrician with a plug on the category chip and something else on the map is a difference to learn for nothing",
+  );
+  check(
+    "and a trade nobody recognises gets the fallback rather than a wrong icon",
+    tradeIconCategory("Astronaut") === "unknown" &&
+      tradeIconCategory(null) === "unknown",
+  );
+  check(
+    "every trade in the list resolves to an icon category",
+    PROFESSIONS.every((entry) => tradeIconCategory(entry.value) !== "unknown"),
+    PROFESSIONS.filter((entry) => tradeIconCategory(entry.value) === "unknown")
+      .map((entry) => entry.value)
+      .join(", ") || "none missing",
+  );
+  check(
+    "and every category the professions use is one the icon list has",
+    CATEGORY_SLUGS.every((slug) =>
+      (TRADE_ICON_CATEGORIES as readonly string[]).includes(slug),
+    ),
+    CATEGORY_SLUGS.filter(
+      (slug) => !(TRADE_ICON_CATEGORIES as readonly string[]).includes(slug),
+    ).join(", ") || "none missing",
   );
 
   check(
@@ -1338,10 +1390,71 @@ check(
   );
 
   check(
-    "a marker carries the trade, the fill and the dot",
-    /textContent = pinLabel\(point\.trade\)/.test(map) &&
-      /dataset\.kind = point\.kind/.test(map) &&
+    "a marker is an icon, not a pill with a trade written across it",
+    /data-trade-icon="\$\{tradeIconCategory\(point\.trade\)\}/.test(map) &&
+      /cloneNode\(true\) as SVGElement/.test(map) &&
+      !/button\.textContent =/.test(map),
+    "fifty pills reading 'Construction Labourer' cover the city they describe",
+  );
+  check(
+    "and it still carries the fill and the dot",
+    /dataset\.kind = point\.kind/.test(map) &&
       /isTakingWork\(point\.availability\)/.test(map),
+  );
+  check(
+    "the icon is about a tenth the area the pill was",
+    /width:18px; height:18px/.test(map),
+    "a 110x24 pill is 2640 square pixels; an 18px circle is 254",
+  );
+  check(
+    "but the thing you tap is bigger than the thing you see",
+    /\.medosha-pro \{[^}]*padding:11px; margin:-11px;/.test(map),
+    "eighteen pixels is a good marker and a bad target",
+  );
+
+  check(
+    "the words move to a card that opens on hover",
+    /\.medosha-pro__card \{/.test(map) &&
+      /tradeWord\.textContent = pinLabel\(point\.trade\)/.test(map) &&
+      /where\.textContent = placeLabel\(point\)/.test(map) &&
+      /free\.textContent = availabilityLabel\(point\.availability\)/.test(map),
+  );
+  check(
+    "and the name is on it, which the pill never had room for",
+    /name\.textContent = point\.name/.test(map),
+  );
+  check(
+    "the card is hidden until it is hovered, not merely transparent",
+    /opacity:0; visibility:hidden;/.test(map),
+    "an invisible card that still takes pointer events eats every tap near it",
+  );
+  // Scoped to the rules OUTSIDE the hover media query, and that is the whole
+  // point of the check. The selector appears twice: once beside `:hover`
+  // inside `@media (hover: hover)`, and once on its own. A regex for the
+  // selector matches the first and says nothing about the second — so it went
+  // green with the standalone rule deleted, because the copy in the media
+  // query satisfied it. A phone reports no hover, so a rule that lives only in
+  // there is a rule a keyboard on a touch device never gets.
+  const outsideHover = withoutBlock(map, "@media (hover: hover) {");
+  check(
+    "the hover media query was actually found and removed",
+    outsideHover.length < map.length && !outsideHover.includes("@media (hover: hover)"),
+    "if this fails the check below is looking at the whole file and proves nothing",
+  );
+  check(
+    "a keyboard reaches the card as well as a pointer, on any device",
+    /\.medosha-pro:focus-within \.medosha-pro__card \{/.test(outsideHover),
+    "focus is the only way to reach a marker without a pointer",
+  );
+  check(
+    "and a phone, which cannot hover, is given the panel under the map instead",
+    /@media \(hover: hover\)/.test(map) && /selected && \(/.test(map),
+  );
+  check(
+    "the icons are rendered once and cloned, not once per marker",
+    /TRADE_ICON_CATEGORIES\.map\(\(category\)/.test(map) &&
+      /ref=\{iconsRef\} hidden/.test(map),
+    "sixty React roots for markup that never changes after it is built",
   );
   check(
     "and its accessible label is the whole marker in words",
@@ -1352,7 +1465,7 @@ check(
     "base and service are drawn differently, not only coloured differently",
     /\.medosha-pro\[data-kind="base"\]/.test(map) &&
       /\.medosha-pro\[data-kind="service"\]/.test(map) &&
-      /border:2px dashed/.test(map),
+      /border:1\.5px dashed/.test(map),
     "fill survives sunlight, printing and colour blindness; hue does not",
   );
   check(

@@ -47,6 +47,45 @@ const CATEGORY_COLOURS: Record<string, { base: string; dark: string }> = {
 /** Somebody who has not said what they do. Grey, and deliberately dull. */
 const UNKNOWN_TRADE = { base: "#64748b", dark: "#475569" };
 
+/**
+ * Which icon a trade gets: the one its category already has.
+ *
+ * `service_categories` has carried an icon name since 0011 — HardHat for
+ * general contracting, Zap for electrical, Hammer for joinery — and those are
+ * the icons the rest of the app already draws for those categories. Inventing
+ * a second set here would mean an electrician had a plug on the category chip
+ * and something else on the map, which is a difference somebody has to learn
+ * for no reason.
+ *
+ * This returns the category slug rather than a component, so the module stays
+ * free of React and can be checked without a renderer. The map turns the slug
+ * into an icon.
+ */
+export const TRADE_ICON_CATEGORIES = [
+  "architecture",
+  "structural",
+  "mep",
+  "surveying",
+  "general-contracting",
+  "interior",
+  "landscaping",
+  "electrical",
+  "plumbing",
+  "finishing",
+  "joinery",
+  "project-management",
+  "unknown",
+] as const;
+
+export type TradeIconCategory = (typeof TRADE_ICON_CATEGORIES)[number];
+
+export function tradeIconCategory(trade: string | null): TradeIconCategory {
+  const category = findProfession(trade)?.category;
+  return (TRADE_ICON_CATEGORIES as readonly string[]).includes(category ?? "")
+    ? (category as TradeIconCategory)
+    : "unknown";
+}
+
 export function tradeColour(trade: string | null): { base: string; dark: string } {
   const profession = findProfession(trade);
   if (!profession) return UNKNOWN_TRADE;
@@ -54,11 +93,13 @@ export function tradeColour(trade: string | null): { base: string; dark: string 
 }
 
 /**
- * The words on the pin.
+ * The words in the tooltip that opens on hover.
  *
- * Truncated hard, because the pin is a pill on a map and "Mechanical Engineer"
- * at full length covers three streets. The full trade is on the card and in the
- * accessible label, so nothing is lost — only shortened where there is no room.
+ * The marker itself is an icon and carries no text: a map of Addis Ababa at
+ * city zoom has fifty of these on it, and fifty pills reading "Construction
+ * Labourer" cover the city they are supposed to describe. The name of the
+ * trade belongs where there is room for it — the hover card and the panel
+ * under the map — and this is still where it is shortened when there is not.
  */
 export const MAX_PIN_CHARACTERS = 18;
 

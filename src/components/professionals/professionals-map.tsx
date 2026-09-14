@@ -4,7 +4,22 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { MapPin } from "lucide-react";
+import {
+  ClipboardList,
+  DraftingCompass,
+  Droplets,
+  Frame,
+  Hammer,
+  HardHat,
+  MapPin,
+  PaintRoller,
+  Plug,
+  Ruler,
+  Sofa,
+  Trees,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 
 import { BASE_STYLE } from "@/lib/map/style";
 import {
@@ -12,12 +27,15 @@ import {
   type ProfessionalPoint,
 } from "@/lib/professionals/map-points";
 import {
+  TRADE_ICON_CATEGORIES,
   availabilityLabel,
   isTakingWork,
   markerDescription,
   pinLabel,
   placeLabel,
   tradeColour,
+  tradeIconCategory,
+  type TradeIconCategory,
 } from "@/lib/professionals/trade-markers";
 
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -35,10 +53,22 @@ import "maplibre-gl/dist/maplibre-gl.css";
  *
  * ## The markers
  *
- * Built the same way the property map builds its price pins — a labelled pill
- * on a stem, as a DOM element rather than a symbol layer — because the label
- * is the whole point of the marker and a sprite cannot set text at an
- * arbitrary length.
+ * An icon, and nothing else. The first version printed the trade on a pill the
+ * way the property map prints a price, and on a real search that was fifty
+ * pills reading "Construction Labourer" and "Interior Designer" stacked over
+ * central Addis Ababa — a map whose markers covered the map. A price is four
+ * characters; a trade is twenty, and twenty characters do not fit on a city at
+ * city zoom however well they are set.
+ *
+ * So the marker is a circle about a tenth the area of that pill, carrying the
+ * icon its trade's category already uses elsewhere in the app, and the words
+ * move to a card that opens when a pointer rests on it. Nothing is lost: the
+ * trade, the name, the area and the availability are all in the card, all in
+ * the panel under the map, and all in the accessible label.
+ *
+ * The hit area is deliberately larger than the circle — a transparent ring
+ * around it — because eighteen pixels is a good marker and a bad target, and
+ * a marker that cannot be tapped on a phone is not a marker.
  *
  * Two things are drawn that a single colour could not carry:
  *
@@ -74,6 +104,7 @@ export function ProfessionalsMap({
   height?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const iconsRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<ProfessionalPoint | null>(null);
@@ -107,7 +138,10 @@ export function ProfessionalsMap({
     const markers: maplibregl.Marker[] = [];
     for (const point of points) {
       markers.push(
-        new maplibregl.Marker({ element: buildMarker(point, setSelected), anchor: "bottom" })
+        new maplibregl.Marker({
+          element: buildMarker(point, setSelected, iconsRef.current),
+          anchor: "bottom",
+        })
           .setLngLat([point.longitude, point.latitude])
           .addTo(map),
       );
@@ -139,6 +173,34 @@ export function ProfessionalsMap({
 
   return (
     <div className="space-y-2">
+      {/*
+        The icons, drawn once and then cloned.
+
+        MapLibre wants a DOM element per marker, and a Lucide icon is a React
+        component — so one of the two has to give. Mounting a React root per
+        marker would be sixty roots for markup that never changes after it is
+        built; hand-copying twelve sets of SVG path data into this file would
+        be twelve things to keep in step with the icon library.
+
+        Rendering them once, hidden, and cloning the nodes is neither. React
+        renders children before effects run, so these are in the document by
+        the time the markers are built.
+      */}
+      <div ref={iconsRef} hidden aria-hidden="true">
+        {TRADE_ICON_CATEGORIES.map((category) => {
+          const Icon = TRADE_ICONS[category];
+          return (
+            <Icon
+              key={category}
+              data-trade-icon={category}
+              width={11}
+              height={11}
+              strokeWidth={2.5}
+            />
+          );
+        })}
+      </div>
+
       <div className="relative">
         <div
           ref={containerRef}
@@ -198,45 +260,119 @@ export function ProfessionalsMap({
       </p>
 
       <style>{`
-        .medosha-pro { display:flex; flex-direction:column; align-items:center; }
+        /* The marker is the circle. The wrapper is bigger than the circle on
+           purpose: the transparent ring around it is the tap target, because
+           eighteen pixels is a good marker and a bad target. */
+        .medosha-pro {
+          display:flex; flex-direction:column; align-items:center;
+          padding:11px; margin:-11px;
+        }
         .medosha-pro__body {
-          display:inline-flex; align-items:center; gap:5px;
-          border-radius:999px; padding:4px 10px;
-          font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer;
-          box-shadow:0 3px 10px rgb(0 0 0 / .3), inset 0 1px 0 rgb(255 255 255 / .28);
+          position:relative;
+          display:flex; align-items:center; justify-content:center;
+          width:18px; height:18px; padding:0;
+          border-radius:999px; cursor:pointer;
+          box-shadow:0 2px 5px rgb(0 0 0 / .35);
           transition:transform .12s ease, box-shadow .12s ease;
         }
         /* Their workplace: solid, standing on the map. */
         .medosha-pro[data-kind="base"] .medosha-pro__body {
           background:linear-gradient(180deg, var(--pro) 0%, var(--pro-dark) 100%);
-          color:#fff; border:2px solid rgba(255,255,255,.95);
+          color:#fff; border:1.5px solid rgba(255,255,255,.95);
         }
         /* Somewhere they travel to: outlined, and dashed so the difference is
            visible in one colour as well as two. */
         .medosha-pro[data-kind="service"] .medosha-pro__body {
           background:#fff; color:var(--pro-dark);
-          border:2px dashed var(--pro);
-          box-shadow:0 2px 6px rgb(0 0 0 / .22);
+          border:1.5px dashed var(--pro);
         }
+        .medosha-pro__body svg { display:block; }
         .medosha-pro__stem {
-          width:2px; height:9px; margin-top:-1px;
+          width:1.5px; height:6px; margin-top:-1px;
           background:linear-gradient(180deg, var(--pro-dark), transparent);
         }
+        /* Taking work now. Overlapping the circle rather than beside it,
+           because there is no beside at this size. */
         .medosha-pro__free {
-          width:7px; height:7px; border-radius:999px;
-          background:#10b981; box-shadow:0 0 0 1.5px rgb(255 255 255 / .9);
+          position:absolute; top:-2px; right:-2px;
+          width:6px; height:6px; border-radius:999px;
+          background:#10b981; box-shadow:0 0 0 1.5px rgb(255 255 255 / .95);
         }
-        .medosha-pro:hover .medosha-pro__body {
-          transform:translateY(-3px) scale(1.06);
-          box-shadow:0 8px 18px rgb(0 0 0 / .34);
+
+        /* ---- the card that opens on hover ---------------------------------
+           Everything the pill used to print, and more than it had room for.
+           The hover query is there so a phone -- where there is no hover, and
+           a tap would open this and leave it open -- gets the panel under the
+           map instead. (No backticks in here: this block is a template
+           literal, and one inside a CSS comment ends it.) */
+        .medosha-pro__card {
+          position:absolute; bottom:calc(100% + 8px); left:50%;
+          transform:translateX(-50%) translateY(4px);
+          min-width:150px; max-width:220px; padding:7px 9px;
+          border-radius:10px; border:1px solid rgb(0 0 0 / .08);
+          background:#fff; color:#0f172a;
+          box-shadow:0 10px 24px rgb(0 0 0 / .22);
+          text-align:left; pointer-events:none;
+          opacity:0; visibility:hidden;
+          transition:opacity .12s ease, transform .12s ease;
         }
+        .medosha-pro__card b { display:block; font-size:12px; font-weight:700; }
+        .medosha-pro__card span {
+          display:block; font-size:11px; line-height:1.45; color:#475569;
+        }
+        .medosha-pro__card em {
+          font-style:normal; font-weight:600; color:var(--pro-dark);
+        }
+        @media (hover: hover) {
+          .medosha-pro:hover { z-index:5; }
+          .medosha-pro:hover .medosha-pro__body {
+            transform:scale(1.35);
+            box-shadow:0 6px 14px rgb(0 0 0 / .38);
+          }
+          .medosha-pro:hover .medosha-pro__card,
+          .medosha-pro:focus-within .medosha-pro__card {
+            opacity:1; visibility:visible;
+            transform:translateX(-50%) translateY(0);
+          }
+        }
+        /* Keyboard users get the card too, on every device: focus is the one
+           way to reach a marker without a pointer. */
+        .medosha-pro:focus-within { z-index:5; }
+        .medosha-pro:focus-within .medosha-pro__card {
+          opacity:1; visibility:visible;
+          transform:translateX(-50%) translateY(0);
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .medosha-pro__body { transition:none; }
+          .medosha-pro__body, .medosha-pro__card { transition:none; }
         }
       `}</style>
     </div>
   );
 }
+
+/**
+ * The icon for each category, as the categories themselves declare it.
+ *
+ * The names are the ones in `service_categories` since 0011 — changing one
+ * here without changing it there would give a trade one icon on the map and a
+ * different one on its own category chip.
+ */
+const TRADE_ICONS: Record<TradeIconCategory, LucideIcon> = {
+  architecture: DraftingCompass,
+  structural: Frame,
+  mep: Zap,
+  surveying: Ruler,
+  "general-contracting": HardHat,
+  interior: Sofa,
+  landscaping: Trees,
+  electrical: Plug,
+  plumbing: Droplets,
+  finishing: PaintRoller,
+  joinery: Hammer,
+  "project-management": ClipboardList,
+  unknown: MapPin,
+};
 
 /**
  * One marker.
@@ -248,20 +384,32 @@ export function ProfessionalsMap({
 function buildMarker(
   point: ProfessionalPoint,
   onSelect: (point: ProfessionalPoint) => void,
+  icons: HTMLElement | null,
 ): HTMLElement {
   const colours = tradeColour(point.trade);
 
   const wrapper = document.createElement("div");
   wrapper.className = "medosha-pro";
   wrapper.dataset.kind = point.kind;
+  wrapper.style.setProperty("--pro", colours.base);
+  wrapper.style.setProperty("--pro-dark", colours.dark);
 
   const button = document.createElement("button");
   button.type = "button";
   button.className = "medosha-pro__body";
-  button.style.setProperty("--pro", colours.base);
-  button.style.setProperty("--pro-dark", colours.dark);
-  button.textContent = pinLabel(point.trade);
   button.setAttribute("aria-label", markerDescription(point));
+
+  // Cloned from the hidden sheet the component rendered. A marker with no icon
+  // would be a plain coloured dot, which still reads as a marker — so a
+  // missing clone degrades rather than throwing.
+  const source = icons?.querySelector(
+    `[data-trade-icon="${tradeIconCategory(point.trade)}"]`,
+  );
+  if (source) {
+    const icon = source.cloneNode(true) as SVGElement;
+    icon.setAttribute("aria-hidden", "true");
+    button.append(icon);
+  }
 
   if (isTakingWork(point.availability)) {
     const free = document.createElement("span");
@@ -275,6 +423,29 @@ function buildMarker(
     event.stopPropagation();
     onSelect(point);
   });
+
+  // The card that opens on hover. Built here rather than shown from React
+  // state so that resting a pointer on a marker does not re-render the map.
+  const card = document.createElement("div");
+  card.className = "medosha-pro__card";
+  card.setAttribute("aria-hidden", "true");
+
+  const name = document.createElement("b");
+  name.textContent = point.name;
+
+  const trade = document.createElement("span");
+  const tradeWord = document.createElement("em");
+  tradeWord.textContent = pinLabel(point.trade);
+  trade.append(tradeWord);
+
+  const where = document.createElement("span");
+  where.textContent = placeLabel(point);
+
+  const free = document.createElement("span");
+  free.textContent = availabilityLabel(point.availability);
+
+  card.append(name, trade, where, free);
+  wrapper.append(card);
 
   const stem = document.createElement("span");
   stem.className = "medosha-pro__stem";
