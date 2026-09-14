@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "check:i18n": "node --experimental-strip-types scripts/i18n_check.ts",
     "seed": "tsx --env-file=.env.local scripts/seed.ts",
     "import:businesses": "tsx --env-file=.env.local scripts/import-businesses.ts"
   },

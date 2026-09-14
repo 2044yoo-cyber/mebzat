@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { AiChat } from "@/components/ai/ai-chat";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { PropertyPanel } from "@/components/property/property-panel";
 import { MARKER_COLOURS } from "@/lib/map/markers";
 import { DEMO_NOTICE_SHORT } from "@/lib/constants/invest";
@@ -55,6 +56,7 @@ export function ContextPanel({
   const searchParams = useSearchParams();
   const { aiOpen } = useShell();
   const [chosen, setChosen] = useState<Tab>("context");
+  const { t } = useLanguage();
 
   // Derived, not synchronised. Opening the dock from anywhere — the launcher,
   // the palette, the + menu — flips one flag in the store and the panel simply
@@ -73,13 +75,13 @@ export function ContextPanel({
 
   return (
     <aside
-      aria-label="Context"
+      aria-label={t("common.context")}
       className="flex h-full w-full flex-col overflow-hidden bg-background"
     >
       <div className="flex h-14 shrink-0 items-center gap-1 border-b px-2">
         <TabButton active={tab === "context"} onClick={() => show("context")}>
           <Info className="size-3.5" />
-          Context
+          {t("common.context")}
         </TabButton>
         <TabButton active={tab === "ai"} onClick={() => show("ai")}>
           <Sparkles className="size-3.5" />
@@ -89,8 +91,8 @@ export function ContextPanel({
         <button
           type="button"
           onClick={closePanel}
-          aria-label="Collapse context panel"
-          title="Collapse panel"
+          aria-label={t("common.collapsePanel")}
+          title={t("common.collapsePanel")}
           className="ml-auto flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <PanelRightClose className="size-4" />

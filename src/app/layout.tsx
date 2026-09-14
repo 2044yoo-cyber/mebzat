@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { LanguageProvider } from "@/components/i18n/language-provider";
+import { LegacyTranslationBridge } from "@/components/i18n/legacy-translation-bridge";
 import { HomePanel } from "@/components/home/home-panel";
 import { AppShell } from "@/components/shell/app-shell";
 import { Toaster } from "@/components/ui/sonner";
@@ -10,6 +13,7 @@ import { getUnreadCount as getUnreadMessages } from "@/lib/data/messages";
 import { getUnreadCount as getUnreadNotifications } from "@/lib/data/notifications";
 import { getNavProfile } from "@/lib/nav-profile";
 import { SITE_DESCRIPTION, SITE_NAME, siteUrl } from "@/lib/site";
+import { normalizeLanguage } from "@/lib/i18n/translations";
 
 import "./globals.css";
 
@@ -81,6 +85,7 @@ export default async function RootLayout({
   // inside it. That is what keeps the map's camera, the AI conversation and
   // the sidebar's scroll position alive from one page to the next.
   const profile = await getNavProfile();
+  const language = normalizeLanguage((await cookies()).get("medosha_language")?.value);
 
   // Signed out there is nothing to count, and both calls would be a wasted
   // round trip on every cold render.
@@ -90,41 +95,44 @@ export default async function RootLayout({
 
   return (
     <html
-      lang="en"
+      lang={language}
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <ThemeProvider
-          attribute="class"
-          // The workspace is designed dark first — that is what a tool people
-          // sit in front of all day should be. The toggle still works, and a
-          // returning visitor keeps whatever they last chose.
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {/* The shell reads the query string, which a statically rendered
-              route may not do outside a boundary. */}
-          <Suspense fallback={<div className="min-h-screen">{children}</div>}>
-            <AppShell
-              profile={profile}
-              counts={{ messages, notifications }}
-              // The context panel is the homepage's right sidebar. Passed as
-              // a slot because the panel is a client component and this is
-              // not; Suspense keeps its queries off the critical path of
-              // every route.
-              homeWidget={
-                <Suspense fallback={null}>
-                  <HomePanel />
-                </Suspense>
-              }
-            >
-              {children}
-            </AppShell>
-          </Suspense>
-          <Toaster />
-        </ThemeProvider>
+        <LanguageProvider initialLanguage={language}>
+          <LegacyTranslationBridge />
+          <ThemeProvider
+            attribute="class"
+            // The workspace is designed dark first — that is what a tool people
+            // sit in front of all day should be. The toggle still works, and a
+            // returning visitor keeps whatever they last chose.
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {/* The shell reads the query string, which a statically rendered
+                route may not do outside a boundary. */}
+            <Suspense fallback={<div className="min-h-screen">{children}</div>}>
+              <AppShell
+                profile={profile}
+                counts={{ messages, notifications }}
+                // The context panel is the homepage's right sidebar. Passed as
+                // a slot because the panel is a client component and this is
+                // not; Suspense keeps its queries off the critical path of
+                // every route.
+                homeWidget={
+                  <Suspense fallback={null}>
+                    <HomePanel />
+                  </Suspense>
+                }
+              >
+                {children}
+              </AppShell>
+            </Suspense>
+            <Toaster />
+          </ThemeProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

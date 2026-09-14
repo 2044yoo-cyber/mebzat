@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Bell, Menu, PanelLeft, PanelRight, Search, Sparkles } from "lucide-react";
 
 import { Breadcrumbs } from "@/components/shell/breadcrumbs";
+import { LanguageSelector } from "@/components/i18n/language-selector";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { UserNav } from "@/components/layout/user-nav";
 import { GlobalSearch } from "@/components/search/global-search";
@@ -33,13 +35,14 @@ export function Topbar({
   onOpenMobileNav: () => void;
 }) {
   const { navCollapsed, aiOpen } = useShell();
+  const { t } = useLanguage();
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b px-2 sm:px-3 print:hidden">
       <button
         type="button"
         onClick={onOpenMobileNav}
-        aria-label="Open navigation"
+        aria-label={t("common.openNavigation")}
         className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
       >
         <Menu className="size-4.5" />
@@ -48,9 +51,9 @@ export function Topbar({
       <button
         type="button"
         onClick={() => update({ navCollapsed: !navCollapsed })}
-        aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
+        aria-label={navCollapsed ? t("common.expandNavigation") : t("common.collapseNavigation")}
         aria-pressed={navCollapsed}
-        title={navCollapsed ? "Expand navigation" : "Collapse navigation"}
+        title={navCollapsed ? t("common.expandNavigation") : t("common.collapseNavigation")}
         className="hidden size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:flex"
       >
         <PanelLeft className="size-4.5" />
@@ -63,13 +66,13 @@ export function Topbar({
       {/* One search box for the whole platform. Below sm it gives way to the
           icon beside it — a 200px field is worse than a link to /search. */}
       <div className="hidden flex-1 sm:block md:max-w-md">
-        <GlobalSearch placeholder="Search everything…  ⌘K" />
+        <GlobalSearch placeholder={t("common.searchEverything")} />
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-0.5">
         <Link
           href="/search"
-          aria-label="Search"
+          aria-label={t("navigation.search")}
           className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:hidden"
         >
           <Search className="size-4.5" />
@@ -86,8 +89,8 @@ export function Topbar({
             update({ aiOpen: true });
           }}
           aria-pressed={aiOpen}
-          aria-label="Medosha AI"
-          title="Ask Medosha AI"
+          aria-label={t("navigation.ai-home")}
+          title={t("ai.ask")}
           className={cn(
             "flex size-8 items-center justify-center rounded-lg transition-colors",
             aiOpen
@@ -103,8 +106,8 @@ export function Topbar({
             href="/notifications"
             aria-label={
               notifications > 0
-                ? `Notifications, ${notifications} unread`
-                : "Notifications"
+                ? t("common.notificationsUnread").replace("{count}", String(notifications))
+                : t("navigation.notifications")
             }
             className="relative flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
@@ -117,15 +120,17 @@ export function Topbar({
           </Link>
         )}
 
+        <LanguageSelector />
+
         <ThemeToggle />
         <UserNav initialProfile={profile} />
 
         <button
           type="button"
           onClick={onTogglePanel}
-          aria-label={panelOpen ? "Hide context panel" : "Show context panel"}
+          aria-label={panelOpen ? t("common.hidePanel") : t("common.showPanel")}
           aria-pressed={panelOpen}
-          title={panelOpen ? "Hide context panel" : "Show context panel"}
+          title={panelOpen ? t("common.hidePanel") : t("common.showPanel")}
           className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <PanelRight className="size-4.5" />

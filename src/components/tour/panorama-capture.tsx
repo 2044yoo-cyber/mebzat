@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { I18nText } from "@/components/i18n/i18n-text";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { CaptureRules } from "@/components/tour/capture-rules";
 import { PanoramaViewer } from "@/components/tour/panorama-viewer";
 import {
@@ -136,12 +138,12 @@ type CapturedFrame = {
 const STEPS = ["uploading", "aligning", "stitching", "optimizing", "ready"] as const;
 type Step = (typeof STEPS)[number];
 
-const STEP_LABEL: Record<Step, string> = {
-  uploading: "Uploading",
-  aligning: "Aligning photos",
-  stitching: "Stitching panorama",
-  optimizing: "Optimizing",
-  ready: "Ready",
+const STEP_KEY: Record<Step, string> = {
+  uploading: "tours.uploading",
+  aligning: "tours.aligning",
+  stitching: "tours.stitching",
+  optimizing: "tours.optimizing",
+  ready: "tours.ready",
 };
 
 /** The stage names 0082 allows, mapped onto the steps shown. */
@@ -170,6 +172,7 @@ export function PanoramaCapture({
   /** What backing out of the intro is called, where it is not just "Cancel". */
   cancelLabel?: string;
 }) {
+  const { language, phrase, t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   /** The live rotation, in the capture's own frame. Read every animation frame. */
@@ -541,7 +544,7 @@ export function PanoramaCapture({
         for (const id of rejected) markerTaken.current.delete(id);
         applyState(next);
         setProblem(
-          `${stitchErrorMessage(body.code)} ${rejected.size} photo${rejected.size === 1 ? "" : "s"} need retaking.`,
+          `${phrase(stitchErrorMessage(body.code))} ${t("tours.photosNeedRetaking").replace("{count}", String(rejected.size))}`,
         );
         setRetryMode("retake");
       } else {
@@ -554,12 +557,12 @@ export function PanoramaCapture({
       // The job row carries the outcome either way, so this is not the end of
       // the upload, only of this screen's knowledge of it.
       setProblem(
-        "We lost the connection while making your 360 photo. Your photos are saved — try again in a moment.",
+        t("tours.connectionLost"),
       );
       setRetryMode("stitch");
       setPhase("failed");
     }
-  }, [applyState]);
+  }, [applyState, phrase, t]);
 
   const upload = useCallback(async () => {
     teardown();
@@ -577,7 +580,7 @@ export function PanoramaCapture({
       owner = data.user?.id ?? null;
     }
     if (!owner) {
-      setProblem("Sign in again to save your 360 photo.");
+      setProblem(t("tours.signInAgain"));
       setRetryMode("upload");
       setPhase("failed");
       return;
@@ -694,7 +697,7 @@ export function PanoramaCapture({
 
     setUploadedJob(job.id);
     await stitch(job.id);
-  }, [stitch, teardown, userId]);
+  }, [stitch, t, teardown, userId]);
 
   /**
    * The ring closed, so stop and upload.
@@ -1022,7 +1025,7 @@ export function PanoramaCapture({
         audio: false,
       });
     } catch {
-      setProblem("Camera access is required to create a 360 photo.");
+      setProblem(t("tours.cameraRequired"));
       // Back to the intro, because that is the screen the message is on — and
       // the one carrying the upload fallback, which is the only route still
       // open to somebody whose browser will not give up the camera.
@@ -1143,16 +1146,15 @@ export function PanoramaCapture({
       <div className="space-y-4 rounded-2xl border p-4 text-center">
         <Camera className="mx-auto size-8 text-muted-foreground" />
         <div className="space-y-1">
-          <p className="font-medium">Stand in one place and look around.</p>
+          <p className="font-medium"><I18nText textKey="tours.standStill" secondary /></p>
           <p className="text-sm text-muted-foreground">
-            Circles appear around you. Put the middle of the screen on each one
-            and it takes the photo itself — above and below as well as around.
+            {t("tours.introGuide")}
           </p>
         </div>
 
         {problem && (
           <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-            {problem}
+            {phrase(problem)}
           </p>
         )}
 
@@ -1164,16 +1166,16 @@ export function PanoramaCapture({
             onClick={() => setPhase("rules")}
             className="min-h-12 w-full text-base"
           >
-            Start 360 Capture
+            <I18nText textKey="tours.startCapture" secondary />
           </Button>
 
           {problem ? (
             <Button variant="outline" onClick={onCancel} className="min-h-11 w-full">
-              Upload Existing 360 Photo
+              <I18nText textKey="tours.uploadExisting" secondary />
             </Button>
           ) : (
             <Button variant="outline" onClick={onCancel} className="min-h-11 w-full">
-              {cancelLabel}
+              {cancelLabel === "Cancel" ? t("common.cancel") : phrase(cancelLabel)}
             </Button>
           )}
         </div>
@@ -1230,7 +1232,7 @@ export function PanoramaCapture({
                 teardown();
                 onCancel();
               }}
-              aria-label="Cancel capture"
+              aria-label={t("tours.cancelCapture")}
               className="flex size-11 items-center justify-center rounded-full bg-black/60 text-white"
             >
               <X className="size-5" />
@@ -1246,12 +1248,10 @@ export function PanoramaCapture({
           {sensorMissing && !hasSensor ? (
             <div className="flex flex-col items-center gap-3 rounded-2xl bg-black/80 p-4 text-center">
               <p className="text-base font-medium text-white">
-                This browser won&apos;t say which way the phone is pointing.
+                {t("tours.sensorMissing")}
               </p>
               <p className="text-sm text-white/80">
-                A 360 photo needs that to know where each shot belongs. On
-                iPhone, check Settings → Safari → Motion &amp; Orientation
-                Access, then try again.
+                {t("tours.sensorExplain")}
               </p>
               <div className="grid w-full grid-cols-2 gap-2">
                 <Button
@@ -1262,17 +1262,17 @@ export function PanoramaCapture({
                   }}
                   className="min-h-12 bg-black/50 text-white"
                 >
-                  Upload a 360 photo
+                  {t("tours.uploadFallback")}
                 </Button>
                 <Button onClick={restart} className="min-h-12">
-                  <RotateCcw className="size-4" /> Try again
+                  <RotateCcw className="size-4" /> {t("common.retry")}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3">
               <p className="text-lg font-medium text-white drop-shadow">
-                {hasSensor ? hint : "Hold the phone upright to begin"}
+                {hasSensor ? localizeHint(hint, language, phrase) : t("tours.upright")}
               </p>
 
               {/* Section 8: this cannot be pressed into existence. Until every
@@ -1281,23 +1281,25 @@ export function PanoramaCapture({
                   camera at it. */}
               {drifting && (
                 <p className="rounded-full bg-amber-400/95 px-3 py-1 text-sm font-medium text-black">
-                  Come back to where you started and turn on the spot
+                  {t("tours.turnOnSpot")}
                 </p>
               )}
 
               {refused > 0 && !drifting && (
                 <p className="text-sm text-white/70">
                   {refused === 1
-                    ? "One photo was retaken"
-                    : `${refused} photos were retaken`}
+                    ? t("tours.oneRetaken")
+                    : t("tours.photosRetaken").replace("{count}", String(refused))}
                 </p>
               )}
 
               {!covered.complete && (
                 <p className="text-sm text-white/70">
                   {nextNumber === null
-                    ? `${covered.missing.length} left`
-                    : `Next is ${nextNumber} — ${covered.missing.length} left`}
+                    ? t("tours.left").replace("{count}", String(covered.missing.length))
+                    : t("tours.nextLeft")
+                        .replace("{next}", String(nextNumber))
+                        .replace("{count}", String(covered.missing.length))}
                 </p>
               )}
 
@@ -1327,7 +1329,7 @@ export function PanoramaCapture({
                     }}
                     className="min-h-12 bg-black/50 text-white"
                   >
-                    <Camera className="size-4" /> Take it now
+                    <Camera className="size-4" /> {t("tours.takeNow")}
                   </Button>
                 )}
 
@@ -1339,7 +1341,7 @@ export function PanoramaCapture({
                   disabled={!covered.complete}
                   className="min-h-12"
                 >
-                  <Check className="size-4" /> Create 360°
+                  <Check className="size-4" /> <I18nText textKey="tours.create360" secondary />
                 </Button>
 
                 <Button
@@ -1369,7 +1371,7 @@ export function PanoramaCapture({
     return (
       <div className="space-y-4 rounded-2xl border p-6 text-center">
         <Loader2 className="mx-auto size-8 animate-spin text-muted-foreground" />
-        <p className="font-medium">Creating your 360 photo…</p>
+        <p className="font-medium"><I18nText textKey="tours.creating" secondary /></p>
 
         {/* Steps, not a percentage: the server cannot say how far through a
             composite it is, and a bar that sits at 70% is worse than a word. */}
@@ -1392,10 +1394,12 @@ export function PanoramaCapture({
               ) : (
                 <span className="size-3.5" />
               )}
-              {STEP_LABEL[step]}
+              {t(STEP_KEY[step])}
               {step === "uploading" && phase === "uploading" && (
                 <span className="text-muted-foreground">
-                  {sent} of {state.plan.length}
+                  {t("tours.of")
+                    .replace("{current}", String(sent))
+                    .replace("{total}", String(state.plan.length))}
                 </span>
               )}
             </li>
@@ -1403,7 +1407,7 @@ export function PanoramaCapture({
         </ol>
 
         <p className="text-xs text-muted-foreground">
-          You can leave this screen. Your photos are saved.
+          {t("tours.savedPhotos")}
         </p>
       </div>
     );
@@ -1413,32 +1417,32 @@ export function PanoramaCapture({
   if (phase === "failed") {
     return (
       <div className="space-y-4 rounded-2xl border p-6 text-center">
-        <p className="font-medium">That didn&apos;t work</p>
-        <p className="text-sm text-muted-foreground">{problem}</p>
+        <p className="font-medium">{t("tours.failed")}</p>
+        <p className="text-sm text-muted-foreground">{problem ? phrase(problem) : null}</p>
         <div className="flex flex-col gap-2">
           {retryMode === "stitch" && uploadedJob && (
             <Button
               onClick={() => void stitch(uploadedJob)}
               className="min-h-12 w-full"
             >
-              <RotateCcw className="size-4" /> Try saving again
+              <RotateCcw className="size-4" /> {t("tours.trySaving")}
             </Button>
           )}
           {retryMode === "upload" && (
             <Button onClick={() => void upload()} className="min-h-12 w-full">
-              <RotateCcw className="size-4" /> Try saving again
+              <RotateCcw className="size-4" /> {t("tours.trySaving")}
             </Button>
           )}
           {retryMode === "retake" && (
             <Button onClick={() => void start(true)} className="min-h-12 w-full">
-              <Camera className="size-4" /> Retake highlighted photos
+              <Camera className="size-4" /> {t("tours.retakeHighlighted")}
             </Button>
           )}
           <Button variant="outline" onClick={restart} className="min-h-11 w-full">
-            Shoot the room again
+            {t("tours.shootAgain")}
           </Button>
           <Button variant="outline" onClick={onCancel} className="min-h-11 w-full">
-            Cancel
+            {t("common.cancel")}
           </Button>
         </div>
       </div>
@@ -1454,7 +1458,7 @@ export function PanoramaCapture({
   // Retake is only a real choice if you can see what you would be retaking.
   return (
     <div className="space-y-3">
-      <p className="text-sm font-medium">Your 360 photo is ready</p>
+      <p className="text-sm font-medium"><I18nText textKey="tours.ready" secondary /></p>
       {result && (
         <PanoramaViewer
           src={result.url}
@@ -1464,23 +1468,32 @@ export function PanoramaCapture({
         />
       )}
       <p className="text-xs text-muted-foreground">
-        Drag to look around, pinch to zoom. Check the whole room is there
-        before saving.
+        <I18nText textKey="tours.drag" secondary />
       </p>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={restart} className="min-h-11">
-          Retake
+          <I18nText textKey="tours.retake" secondary />
         </Button>
         <Button
           onClick={() => result && onSaved(result)}
           className="min-h-11"
           disabled={!result}
         >
-          Save 360
+          <I18nText textKey="tours.save360" secondary />
         </Button>
       </div>
     </div>
   );
+}
+
+function localizeHint(
+  hint: string,
+  language: "en" | "am" | "om",
+  phrase: (value: string) => string,
+): string {
+  if (language === "en") return hint;
+  const numbered = hint.match(/^(.*) to (\d+)$/);
+  return numbered ? `${phrase(numbered[1])} ${numbered[2]}` : phrase(hint);
 }
 /**
  * The targets, floating in the room, and the aim that does not move.
@@ -1593,7 +1606,9 @@ const Sphere = memo(function Sphere({
             WebkitMask: "radial-gradient(circle, transparent 58%, black 60%)",
           }}
         />
-        <span className="text-sm font-semibold tracking-wide text-white">HOLD</span>
+        <span className="text-sm font-semibold tracking-wide text-white uppercase">
+          <I18nText textKey="tours.holdSteady" />
+        </span>
       </span>
 
       {/* Which way the next one is. */}

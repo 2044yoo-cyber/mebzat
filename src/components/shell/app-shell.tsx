@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { PanelRight } from "lucide-react";
 
 import { AiLauncher } from "@/components/ai/ai-launcher";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { BottomNav } from "@/components/shell/bottom-nav";
 import { CommandPalette } from "@/components/shell/command-palette";
 import { ContextPanel } from "@/components/shell/context-panel";
@@ -60,6 +61,7 @@ export function AppShell({
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
   const shell = useShell();
+  const { t } = useLanguage();
   // The route the navigation drawer was opened on, or null. See the note by
   // the pathname effect below for why this is not a plain boolean.
   const [navOpenedAt, setNavOpenedAt] = useState<string | null>(null);
@@ -151,7 +153,7 @@ export function AppShell({
       {!shell.navCollapsed && (
         <div className="hidden lg:block">
           <ResizeHandle
-            label="Resize navigation"
+            label={t("common.resizeNavigation")}
             value={shell.navWidth}
             min={NAV_WIDTH.min}
             max={NAV_WIDTH.max}
@@ -166,7 +168,7 @@ export function AppShell({
         <div className="fixed inset-0 z-60 lg:hidden">
           <button
             type="button"
-            aria-label="Close navigation"
+            aria-label={t("common.closeNavigation")}
             onClick={() => {
               setNavOpenedAt(null);
               setOpenSection(null);
@@ -360,8 +362,8 @@ export function AppShell({
         <button
           type="button"
           onClick={openPanel}
-          aria-label="Show context panel"
-          title="Show context panel"
+          aria-label={t("common.showPanel")}
+          title={t("common.showPanel")}
           className="fixed top-1/2 right-0 z-40 flex h-16 w-6 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground print:hidden"
         >
           <PanelRight className="size-3.5" />

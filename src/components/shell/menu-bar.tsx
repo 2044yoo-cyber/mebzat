@@ -6,6 +6,9 @@ import { usePathname } from "next/navigation";
 import { Armchair, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { I18nText } from "@/components/i18n/i18n-text";
+import { useLanguage } from "@/components/i18n/language-provider";
+import { navigationKey } from "@/lib/i18n/translations";
 import { NAV_SECTIONS, type NavItem, type NavSection } from "@/lib/workspace/navigation";
 
 /**
@@ -41,6 +44,7 @@ export function MenuBar({ signedIn }: { signedIn: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const closeTimer = useRef<number | null>(null);
   const bar = useRef<HTMLDivElement>(null);
+  const { t } = useLanguage();
 
   const cancelClose = useCallback(() => {
     if (closeTimer.current !== null) {
@@ -113,7 +117,7 @@ export function MenuBar({ signedIn }: { signedIn: boolean }) {
       {/* Not "Sections" — the sidebar already claims that label, and two
           landmarks with the same name is a screen reader announcing the same
           thing twice with no way to tell them apart. */}
-      <nav aria-label="Main menu" className="flex items-center gap-0.5">
+      <nav aria-label={t("navigation.allMedosha")} className="flex items-center gap-0.5">
         {/* Berchuma has its own place on the bar rather than only a row inside
             the Medosha AI menu. It is the thing on this platform that exists
             nowhere else, and two hovers deep is where features go to be never
@@ -130,7 +134,7 @@ export function MenuBar({ signedIn }: { signedIn: boolean }) {
           onMouseEnter={() => setOpen(null)}
         >
           <Armchair className="size-3.5" aria-hidden />
-          Berchuma Studio
+          <I18nText textKey="navigation.berchuma" secondary />
         </Link>
 
         <span className="mr-1 h-4 w-px shrink-0 bg-border" aria-hidden />
@@ -214,7 +218,7 @@ function Section({
         onMouseEnter={onClose}
       >
         <span aria-hidden>{section.emoji}</span>
-        {section.label}
+        <I18nText textKey={navigationKey(section.id)} secondary={section.id === "home"} />
       </Link>
     );
   }
@@ -261,6 +265,7 @@ function SectionMenu({
   onStep: (direction: 1 | -1) => void;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const trigger = useRef<HTMLButtonElement>(null);
 
   // Measured when the menu opens, not during render: reading a DOM rectangle
@@ -340,7 +345,7 @@ function SectionMenu({
         }}
       >
         <span aria-hidden>{section.emoji}</span>
-        {section.label}
+        <I18nText textKey={navigationKey(section.id)} />
         <ChevronDown
           className={cn("size-3 transition-transform", open && "rotate-180")}
           aria-hidden
@@ -350,7 +355,7 @@ function SectionMenu({
       {open ? (
         <div
           role="menu"
-          aria-label={section.label}
+          aria-label={t(navigationKey(section.id))}
           onMouseEnter={onOpen}
           onMouseLeave={onLeave}
           style={anchor}
@@ -403,6 +408,7 @@ function MenuLink({
   // Signed out, a members-only destination still shows — it is part of what
   // this platform is — but dimmed, and the login page it lands on says why.
   const gated = item.private && !signedIn;
+  const { language } = useLanguage();
 
   return (
     <Link
@@ -418,8 +424,8 @@ function MenuLink({
     >
       <item.icon className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="block truncate">{item.label}</span>
-        {item.hint ? (
+        <I18nText textKey={navigationKey(item.id)} className="block truncate" />
+        {item.hint && language === "en" ? (
           <span className="block truncate text-xs text-muted-foreground">
             {item.hint}
           </span>
@@ -431,16 +437,18 @@ function MenuLink({
 
 /** Specified but not built. Plainly disabled beats a link that goes nowhere. */
 function SoonItem({ item }: { item: NavItem }) {
+  const { t } = useLanguage();
+  const label = t(navigationKey(item.id));
   return (
     <div
       aria-disabled
-      title={`${item.label} — not built yet`}
+      title={`${label} — ${t("navigation.soon")}`}
       className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground/50"
     >
       <item.icon className="size-4 shrink-0" aria-hidden />
-      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      <I18nText textKey={navigationKey(item.id)} className="min-w-0 flex-1 truncate" />
       <span className="shrink-0 rounded-full border px-1.5 text-[10px] leading-4">
-        Soon
+        {t("navigation.soon")}
       </span>
     </div>
   );

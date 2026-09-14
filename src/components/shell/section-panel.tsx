@@ -6,6 +6,9 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { NAV_SECTIONS } from "@/lib/workspace/navigation";
+import { I18nText } from "@/components/i18n/i18n-text";
+import { useLanguage } from "@/components/i18n/language-provider";
+import { navigationKey } from "@/lib/i18n/translations";
 
 /**
  * What is inside one section, named.
@@ -33,6 +36,7 @@ export function SectionPanel({
   onBack: () => void;
   onNavigate: () => void;
 }) {
+  const { language, t } = useLanguage();
   const section = NAV_SECTIONS.find((one) => one.id === sectionId);
   if (!section) return null;
 
@@ -47,7 +51,7 @@ export function SectionPanel({
         <span aria-hidden className="text-base leading-none">
           {section.emoji}
         </span>
-        <span className="min-w-0 flex-1 truncate">{section.label}</span>
+        <I18nText textKey={navigationKey(section.id)} className="min-w-0 flex-1 truncate" />
       </button>
 
       <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
@@ -64,9 +68,9 @@ export function SectionPanel({
               <li key={item.id}>
                 <span className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground/60">
                   <item.icon className="size-4 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <I18nText textKey={navigationKey(item.id)} className="min-w-0 flex-1 truncate" />
                   <span className="shrink-0 rounded-full border px-1.5 text-[10px] leading-4">
-                    Soon
+                    {t("navigation.soon")}
                   </span>
                 </span>
               </li>
@@ -91,11 +95,11 @@ export function SectionPanel({
               >
                 <item.icon className="size-4 shrink-0" />
                 <span className="min-w-0 flex-1">
-                  <span className="block leading-tight">{item.label}</span>
+                  <I18nText textKey={navigationKey(item.id)} className="block leading-tight" />
                   {/* The one line the manifest already carries about each
                       page. On a site nobody has used, the name alone is
                       often not enough to pick by. */}
-                  {item.hint && (
+                  {item.hint && language === "en" && (
                     <span className="mt-0.5 block text-[10px] leading-tight text-muted-foreground">
                       {item.hint}
                     </span>

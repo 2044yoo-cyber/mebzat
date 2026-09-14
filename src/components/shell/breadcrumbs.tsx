@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { ChevronRight } from "lucide-react";
 
 import { breadcrumbsFor } from "@/lib/workspace/navigation";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 /**
  * The trail across the top of the workspace.
@@ -18,6 +19,7 @@ import { breadcrumbsFor } from "@/lib/workspace/navigation";
 export function Breadcrumbs() {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
+  const { phrase, t } = useLanguage();
 
   const crumbs = useMemo(
     () => breadcrumbsFor(pathname, searchParams),
@@ -25,7 +27,7 @@ export function Breadcrumbs() {
   );
 
   return (
-    <nav aria-label="Breadcrumb" className="min-w-0">
+    <nav aria-label={t("navigation.allMedosha")} className="min-w-0">
       <ol className="flex min-w-0 items-center gap-1 text-sm">
         {crumbs.map((crumb, index) => {
           const last = index === crumbs.length - 1;
@@ -46,7 +48,7 @@ export function Breadcrumbs() {
                   href={crumb.href}
                   className="truncate text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  {crumb.label}
+                  {phrase(crumb.label)}
                 </Link>
               ) : (
                 <span
@@ -57,7 +59,7 @@ export function Breadcrumbs() {
                       : "truncate text-muted-foreground"
                   }
                 >
-                  {crumb.label}
+                  {phrase(crumb.label)}
                 </span>
               )}
             </li>

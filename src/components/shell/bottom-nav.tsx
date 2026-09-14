@@ -20,6 +20,9 @@ import {
 } from "lucide-react";
 
 import { NAV_SECTIONS } from "@/lib/workspace/navigation";
+import { navigationKey } from "@/lib/i18n/translations";
+import { I18nText } from "@/components/i18n/i18n-text";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
 import { NavPending, NavPendingTint } from "@/components/shell/nav-pending";
 
@@ -38,33 +41,34 @@ import { NavPending, NavPendingTint } from "@/components/shell/nav-pending";
  */
 
 type Destination = {
+  id: string;
   href: string;
-  label: string;
   icon: LucideIcon;
   /** Also active for URLs beneath this one. */
   prefix?: string;
 };
 
 const PRIMARY: Destination[] = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/ai", label: "AI", icon: Bot, prefix: "/ai" },
-  { href: "/marketplace", label: "Market", icon: Store, prefix: "/marketplace" },
-  { href: "/city", label: "Property", icon: Building2, prefix: "/city" },
-  { href: "/community", label: "Community", icon: MessagesSquare, prefix: "/community" },
+  { id: "home", href: "/", icon: Home },
+  { id: "ai", href: "/ai", icon: Bot, prefix: "/ai" },
+  { id: "market", href: "/marketplace", icon: Store, prefix: "/marketplace" },
+  { id: "property", href: "/city", icon: Building2, prefix: "/city" },
+  { id: "community", href: "/community", icon: MessagesSquare, prefix: "/community" },
 ];
 
 /** Shown in the sheet above the full module list, because they are the ones
  *  people look for first and would otherwise be four scrolls down. */
 const QUICK: Destination[] = [
-  { href: "/profile", label: "Profile", icon: User },
-  { href: "/price-exchange", label: "Price Exchange", icon: TrendingUp },
-  { href: "/equipment", label: "Equipment", icon: Truck },
-  { href: "/events", label: "Events", icon: CalendarDays },
+  { id: "profile", href: "/profile", icon: User },
+  { id: "price-exchange", href: "/price-exchange", icon: TrendingUp },
+  { id: "equipment", href: "/equipment", icon: Truck },
+  { id: "events", href: "/events", icon: CalendarDays },
 ];
 
 export function BottomNav({ signedIn }: { signedIn: boolean }) {
   const pathname = usePathname() ?? "/";
   const [moreOpen, setMoreOpen] = useState(false);
+  const { t } = useLanguage();
 
   function isActive(item: Destination): boolean {
     if (item.href === "/") return pathname === "/";
@@ -82,7 +86,7 @@ export function BottomNav({ signedIn }: { signedIn: boolean }) {
       )}
 
       <nav
-        aria-label="Main"
+        aria-label={t("common.mainNavigation")}
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur lg:hidden print:hidden",
           // Clears the home indicator on an iPhone. Without it the bar's
@@ -117,7 +121,7 @@ export function BottomNav({ signedIn }: { signedIn: boolean }) {
                     <NavPending className="size-3" />
                   </span>
                 </span>
-                {item.label}
+                <I18nText textKey={navigationKey(item.id)} secondary />
               </Link>
             </li>
           ))}
@@ -127,11 +131,11 @@ export function BottomNav({ signedIn }: { signedIn: boolean }) {
               type="button"
               onClick={() => setMoreOpen(true)}
               aria-expanded={moreOpen}
-              aria-label="More sections"
-              className="flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground transition-colors active:bg-muted active:text-foreground"
+              aria-label={t("navigation.more")}
+              className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 py-1 text-[10px] font-medium text-muted-foreground transition-colors active:bg-muted active:text-foreground"
             >
               <LayoutGrid className="size-5" />
-              More
+              <I18nText textKey="navigation.more" secondary />
             </button>
           </li>
         </ul>
@@ -149,11 +153,12 @@ function MoreSheet({
   pathname: string;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="fixed inset-0 z-60 lg:hidden">
       <button
         type="button"
-        aria-label="Close"
+        aria-label={t("common.close")}
         onClick={onClose}
         className="absolute inset-0 cursor-default bg-black/50"
       />
@@ -162,13 +167,11 @@ function MoreSheet({
         {/* The grab handle. Nothing drags it — it is the affordance that says
             this panel came from the bottom and closes downwards. */}
         <div className="sticky top-0 z-10 flex items-center justify-between bg-background px-4 pt-3 pb-2">
-          <span className="text-sm font-semibold text-foreground">
-            All of Medosha
-          </span>
+          <I18nText textKey="navigation.allMedosha" secondary className="text-sm font-semibold text-foreground" />
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("common.close")}
             className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
           >
             <X className="size-5" />
@@ -190,7 +193,7 @@ function MoreSheet({
                   <NavPending className="size-3" />
                 </span>
               </span>
-              <span className="line-clamp-2 leading-tight">{item.label}</span>
+              <I18nText textKey={navigationKey(item.id)} className="line-clamp-2 leading-tight" />
             </Link>
           ))}
         </div>
@@ -200,7 +203,7 @@ function MoreSheet({
             <section key={section.id} className="px-3 pb-2">
               <h3 className="flex items-center gap-1.5 px-1 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                 <span aria-hidden>{section.emoji}</span>
-                {section.label}
+                <I18nText textKey={navigationKey(section.id)} />
               </h3>
               <ul>
                 {section.items.map((item) => {
@@ -217,9 +220,9 @@ function MoreSheet({
                       <li key={item.id}>
                         <span className="flex h-11 items-center gap-2.5 rounded-lg px-2 text-sm text-muted-foreground/60">
                           <item.icon className="size-4.5 shrink-0" />
-                          <span className="flex-1 truncate">{item.label}</span>
+                          <I18nText textKey={navigationKey(item.id)} className="flex-1 truncate" />
                           <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px]">
-                            Soon
+                            {t("navigation.soon")}
                           </span>
                         </span>
                       </li>
@@ -245,7 +248,7 @@ function MoreSheet({
                       >
                         <NavPendingTint />
                         <item.icon className="size-4.5 shrink-0" />
-                        <span className="flex-1 truncate">{item.label}</span>
+                        <I18nText textKey={navigationKey(item.id)} className="flex-1 truncate" />
                         <NavPending />
                         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                       </Link>

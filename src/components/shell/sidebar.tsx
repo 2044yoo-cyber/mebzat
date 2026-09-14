@@ -6,6 +6,9 @@ import { useMemo } from "react";
 import { ChevronRight, Pin, PinOff, Star } from "lucide-react";
 
 import { Logo } from "@/components/layout/logo";
+import { I18nText } from "@/components/i18n/i18n-text";
+import { useLanguage } from "@/components/i18n/language-provider";
+import { navigationKey } from "@/lib/i18n/translations";
 import {
   NAV_SECTIONS,
   findItem,
@@ -58,6 +61,7 @@ export function Sidebar({
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
   const { navCollapsed: storedCollapsed, collapsedSections, pins } = useShell();
+  const { t } = useLanguage();
   const navCollapsed = collapsed ?? storedCollapsed;
 
   const active = useMemo(
@@ -83,12 +87,12 @@ export function Sidebar({
   if (navCollapsed) {
     return (
       <nav
-        aria-label="Sections"
+        aria-label={t("navigation.allMedosha")}
         className="flex h-full w-full flex-col items-center gap-1 overflow-y-auto py-3"
       >
         <Link
           href="/"
-          aria-label="Medosha home"
+          aria-label={`${t("navigation.home")} — Medosha`}
           className="mb-2 flex size-11 items-center justify-center rounded-lg bg-brand text-sm font-bold text-brand-foreground"
         >
           M
@@ -109,7 +113,7 @@ export function Sidebar({
             <>
               <section.icon className="size-4.5" />
               <span className="line-clamp-2 text-center text-[9px] leading-[1.15] font-medium">
-                {section.label}
+                <I18nText textKey={navigationKey(section.id)} />
               </span>
             </>
           );
@@ -130,7 +134,7 @@ export function Sidebar({
                 key={section.id}
                 type="button"
                 onClick={() => onPickSection(section.id)}
-                aria-label={`${section.label} — ${section.items.length} pages`}
+                aria-label={`${t(navigationKey(section.id))} — ${section.items.length}`}
                 className={shellClass}
               >
                 {body}
@@ -142,8 +146,8 @@ export function Sidebar({
             <Link
               key={section.id}
               href={target}
-              title={section.label}
-              aria-label={section.label}
+              title={t(navigationKey(section.id))}
+              aria-label={t(navigationKey(section.id))}
               aria-current={isActive ? "page" : undefined}
               className={shellClass}
             >
@@ -157,7 +161,7 @@ export function Sidebar({
 
   return (
     <nav
-      aria-label="Sections"
+      aria-label={t("navigation.allMedosha")}
       className="flex h-full flex-col overflow-hidden"
     >
       <div className="flex h-14 shrink-0 items-center px-4">
@@ -169,7 +173,7 @@ export function Sidebar({
           <section className="mb-1">
             <p className="flex items-center gap-1.5 px-3 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               <Star className="size-3" />
-              My Workspace
+              <I18nText textKey="navigation.myWorkspace" secondary />
             </p>
             <ul>
               {pinned.map((item) => (
@@ -206,7 +210,7 @@ export function Sidebar({
                 <span aria-hidden className="text-base leading-none">
                   {section.emoji}
                 </span>
-                {section.label}
+                <I18nText textKey={navigationKey(section.id)} secondary={section.id === "home"} />
               </Link>
             );
           }
@@ -236,7 +240,7 @@ export function Sidebar({
                 <span aria-hidden className="text-sm leading-none">
                   {section.emoji}
                 </span>
-                {section.label}
+                <I18nText textKey={navigationKey(section.id)} />
               </button>
 
               {!folded && (
@@ -282,6 +286,8 @@ function Row({
   pinned: boolean;
   signedIn: boolean;
 }) {
+  const { t } = useLanguage();
+  const label = t(navigationKey(item.id));
   return (
     <div className="group/row relative">
       <Link
@@ -306,7 +312,7 @@ function Row({
             active ? "text-brand" : "text-muted-foreground",
           )}
         />
-        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        <I18nText textKey={navigationKey(item.id)} className="min-w-0 flex-1 truncate" />
 
         <NavPending />
 
@@ -324,8 +330,8 @@ function Row({
         onClick={() => togglePin(item.id)}
         aria-label={
           pinned
-            ? `Unpin ${item.label} from My Workspace`
-            : `Pin ${item.label} to My Workspace`
+            ? `Unpin ${label}`
+            : `Pin ${label}`
         }
         className={cn(
           "absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-md",
@@ -347,16 +353,18 @@ function Row({
  * live and does nothing is worse than one that says it is not ready.
  */
 function SoonRow({ item }: { item: NavItem }) {
+  const { t } = useLanguage();
+  const label = t(navigationKey(item.id));
   return (
     <div
       aria-disabled
-      title={`${item.label} — not built yet`}
+      title={`${label} — ${t("navigation.soon")}`}
       className="flex cursor-not-allowed items-center gap-2.5 rounded-lg py-1.5 pr-3 pl-8 text-sm text-muted-foreground/50"
     >
       <item.icon className="size-4 shrink-0" />
-      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      <I18nText textKey={navigationKey(item.id)} className="min-w-0 flex-1 truncate" />
       <span className="shrink-0 rounded-full border px-1.5 text-[10px] leading-4">
-        Soon
+        {t("navigation.soon")}
       </span>
     </div>
   );

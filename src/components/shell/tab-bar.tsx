@@ -9,6 +9,7 @@ import { matchNavItem } from "@/lib/workspace/navigation";
 import { closeTab, openTab, update } from "@/lib/workspace/store";
 import { useShell } from "@/lib/workspace/use-shell";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 /**
  * Open workspaces, as tabs.
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
  * the set of things you were working on.
  */
 export function TabBar() {
+  const { phrase, t } = useLanguage();
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -80,7 +82,7 @@ export function TabBar() {
                 tabs.length > 1 ? "pr-1" : "pr-2.5",
               )}
             >
-              {tab.label}
+              {phrase(tab.label)}
             </Link>
             {/* Closing the only tab would leave the workspace with nothing to
                 show, so the control is not offered. */}
@@ -88,7 +90,7 @@ export function TabBar() {
               <button
                 type="button"
                 onClick={(event) => onClose(event, tab.href)}
-                aria-label={`Close ${tab.label}`}
+                aria-label={`${t("common.close")} ${phrase(tab.label)}`}
                 className="mr-1 flex size-4.5 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-background hover:text-foreground group-hover/tab:opacity-100 focus-visible:opacity-100"
               >
                 <X className="size-3" />

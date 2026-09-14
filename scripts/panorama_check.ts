@@ -931,12 +931,18 @@ function wholeFunction(src: string, name: string): string {
   );
   check(
     "somebody who walks off is asked to come back",
-    /Come back to where you started and turn on the spot/.test(capture),
+    /tours\.turnOnSpot/.test(capture) &&
+      /Come back to where you started and turn on the spot/.test(
+        code("src/lib/i18n/translations.ts"),
+      ),
   );
   const rules = code("src/components/tour/capture-rules.tsx");
+  const translations = code("src/lib/i18n/translations.ts");
   check(
     "moving people are kept out of the capture",
-    /Ask other people to step out or stay still/.test(rules) && /transparent duplicates/.test(rules),
+    /rulePlaceDetail/.test(rules) &&
+      /Ask other people to step out or stay still/.test(translations) &&
+      /transparent duplicates/.test(translations),
     "the supplied failed panorama contains people in different positions; no geometric stitch can make changing input agree",
   );
   check(
@@ -946,7 +952,7 @@ function wholeFunction(src: string, name: string): string {
   );
   check(
     "a frame thrown away for blur is admitted to, not hidden",
-    /photos were retaken/.test(capture),
+    /tours\.photosRetaken/.test(capture) && /String\(refused\)/.test(capture),
   );
 }
 
@@ -1704,7 +1710,8 @@ async function endToEnd() {
   );
   check(
     "and the instruction names the same number the marker shows",
-    /Next is \$\{nextNumber\}/.test(capture) &&
+    /tours\.nextLeft/.test(capture) &&
+      /replace\("\{next\}", String\(nextNumber\)\)/.test(capture) &&
       /nextInOrder\(state\)\?\.index/.test(capture),
   );
   check(
@@ -1729,7 +1736,7 @@ async function endToEnd() {
   check(
     "holding shows how much of the hold is left",
     /conic-gradient\(rgb\(52 211 153\) \$\{done\.toFixed\(0\)\}deg/.test(capture) &&
-      /HOLD/.test(overlay),
+      /tours\.holdSteady/.test(overlay),
     "a ring that visibly fills is the difference between keeping still and assuming it has jammed",
   );
   check(
@@ -1851,7 +1858,7 @@ async function endToEnd() {
   );
   check(
     "and the screen says how many are left",
-    /\{covered\.missing\.length\} left/.test(capture),
+    /tours\.left/.test(capture) && /String\(covered\.missing\.length\)/.test(capture),
   );
 
   check(
@@ -1880,8 +1887,9 @@ async function endToEnd() {
   );
   check(
     "and the screen then says so instead of showing a camera that cannot photograph",
-    /won&apos;t say which way the phone is pointing/.test(capture) &&
-      /Upload a 360 photo/.test(capture),
+    /tours\.sensorMissing/.test(capture) &&
+      /tours\.uploadFallback/.test(capture) &&
+      /phone is pointing/.test(code("src/lib/i18n/translations.ts")),
     "every target is a direction; with nothing reporting where the phone points there is nothing to compare them against, so this is a dead end and not a degraded mode",
   );
   check(
@@ -1890,7 +1898,7 @@ async function endToEnd() {
       // The guard and the button are a long onClick apart, so this asks
       // whether the nearest thing above the shutter is that guard rather than
       // matching them inside a fixed window.
-      const shutter = capture.indexOf("Take it now");
+      const shutter = capture.indexOf('t("tours.takeNow")');
       const guard = capture.lastIndexOf("{hasSensor && (", shutter);
       return shutter > 0 && guard > 0 && !capture.slice(guard, shutter).includes("</Button>");
     })(),
@@ -1939,6 +1947,7 @@ async function endToEnd() {
   );
 
   const rules = code("src/components/tour/capture-rules.tsx");
+  const translations = code("src/lib/i18n/translations.ts");
   check(
     "the rules still come before the camera",
     /CAPTURE_RULES/.test(rules) && /<CaptureRules/.test(code("src/components/tour/panorama-capture.tsx")),
@@ -1946,7 +1955,10 @@ async function endToEnd() {
   );
   check(
     "and they say to stand in one place",
-    /Stand in one place/.test(rules) && /chest/i.test(rules),
+    /rulePlaceTitle/.test(rules) &&
+      /ruleChestTitle/.test(rules) &&
+      /Stand in one place/.test(translations) &&
+      /phone close to your chest/i.test(translations),
     "section 10: plant your feet and rotate on the spot, which is what keeps parallax out",
   );
 }

@@ -2,36 +2,37 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
 import { Logo } from "@/components/layout/logo";
+import { I18nText } from "@/components/i18n/i18n-text";
 
-const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
+const COLUMNS: { headingKey: string; links: { textKey: string; href: string }[] }[] =
   [
     {
-      heading: "Explore",
+      headingKey: "footer.explore",
       links: [
-        { label: "Marketplace", href: "/marketplace" },
-        { label: "Used Items", href: "/marketplace/used" },
-        { label: "Rental", href: "/marketplace/rental" },
-        { label: "Digital", href: "/marketplace/digital" },
-        { label: "Companies", href: "/companies" },
-        { label: "Professionals", href: "/professionals" },
-        { label: "Find suppliers", href: "/directory/supplier" },
-        { label: "Find contractors", href: "/directory/contractor" },
-        { label: "Join Medosha", href: "/signup" },
+        { textKey: "navigation.marketplace", href: "/marketplace" },
+        { textKey: "navigation.used-items", href: "/marketplace/used" },
+        { textKey: "navigation.rental-items", href: "/marketplace/rental" },
+        { textKey: "navigation.digital-marketplace", href: "/marketplace/digital" },
+        { textKey: "navigation.companies", href: "/companies" },
+        { textKey: "navigation.professionals", href: "/professionals" },
+        { textKey: "navigation.supplier-finder", href: "/directory/supplier" },
+        { textKey: "navigation.construction", href: "/directory/contractor" },
+        { textKey: "common.signUp", href: "/signup" },
       ],
     },
     {
-      heading: "Company",
+      headingKey: "footer.company",
       links: [
-        { label: "About", href: "/about" },
-        { label: "Careers", href: "/careers" },
-        { label: "Contact", href: "/contact" },
+        { textKey: "footer.about", href: "/about" },
+        { textKey: "footer.careers", href: "/careers" },
+        { textKey: "footer.contact", href: "/contact" },
       ],
     },
     {
-      heading: "Legal",
+      headingKey: "footer.legal",
       links: [
-        { label: "Privacy", href: "/privacy" },
-        { label: "Terms", href: "/terms" },
+        { textKey: "footer.privacy", href: "/privacy" },
+        { textKey: "footer.terms", href: "/terms" },
       ],
     },
   ];
@@ -51,7 +52,7 @@ export function SiteFooter() {
           <div className="space-y-3">
             <Logo />
             <p className="max-w-xs text-sm text-muted-foreground">
-              The professional network and marketplace for construction.
+              <I18nText textKey="footer.description" secondary />
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {SOCIAL.map(({ label, href }) => (
@@ -70,8 +71,8 @@ export function SiteFooter() {
           </div>
 
           {COLUMNS.map((column) => (
-            <div key={column.heading} className="space-y-3">
-              <h3 className="text-sm font-semibold">{column.heading}</h3>
+            <div key={column.headingKey} className="space-y-3">
+              <h3 className="text-sm font-semibold"><I18nText textKey={column.headingKey} /></h3>
               <ul className="space-y-2 text-sm">
                 {column.links.map((link) => (
                   <li key={link.href}>
@@ -79,7 +80,7 @@ export function SiteFooter() {
                       href={link.href}
                       className="text-muted-foreground transition-colors hover:text-foreground"
                     >
-                      {link.label}
+                      <I18nText textKey={link.textKey} />
                     </Link>
                   </li>
                 ))}
@@ -89,8 +90,8 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-2 border-t pt-6 text-sm text-muted-foreground sm:flex-row">
-          <p>&copy; {new Date().getFullYear()} Medosha. All rights reserved.</p>
-          <p>Building the construction industry&apos;s digital ecosystem.</p>
+          <p>&copy; {new Date().getFullYear()} Medosha. <I18nText textKey="footer.rights" /></p>
+          <p><I18nText textKey="footer.ecosystem" /></p>
         </div>
       </div>
     </footer>

@@ -2,6 +2,22 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+html[lang="am"] body,
+html[lang="om"] body {
+  font-family: "Noto Sans Ethiopic", "Abyssinica SIL", "Nyala", var(--font-geist-sans), sans-serif;
+}
+
+[data-i18n-managed] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+html[lang="am"] :where(button, a, label, [role="button"]),
+html[lang="om"] :where(button, a, label, [role="button"]) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

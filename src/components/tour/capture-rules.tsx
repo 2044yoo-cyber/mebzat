@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowLeftRight, MoveHorizontal, Ruler, Target } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
 
 /**
@@ -23,40 +24,36 @@ import { cn } from "@/lib/utils";
  */
 
 type Rule = {
-  title: string;
-  detail: string;
+  titleKey: string;
+  detailKey: string;
   /** Why it matters, in the terms of what goes wrong without it. */
-  because: string;
+  becauseKey: string;
   icon: typeof Target;
 };
 
 export const CAPTURE_RULES: Rule[] = [
   {
-    title: "Stand in one place",
-    detail: "Turn on the spot. Ask other people to step out or stay still.",
-    because:
-      "Every photo needs the same viewpoint and scene. If you walk—or somebody moves—the wall or person arrives twice, which creates the transparent duplicates in a bad stitch.",
+    titleKey: "tours.rulePlaceTitle",
+    detailKey: "tours.rulePlaceDetail",
+    becauseKey: "tours.rulePlaceBecause",
     icon: ArrowLeftRight,
   },
   {
-    title: "Keep the phone close to your chest",
-    detail: "Hold it upright, elbows in, and turn your whole body.",
-    because:
-      "Turning your arm swings the camera through an arc. Turning your body keeps it over one spot, which is what the stitcher is expecting.",
+    titleKey: "tours.ruleChestTitle",
+    detailKey: "tours.ruleChestDetail",
+    becauseKey: "tours.ruleChestBecause",
     icon: Ruler,
   },
   {
-    title: "Line the circle up with the box",
-    detail: "The box is the next photo. Put the circle over it and hold still.",
-    because:
-      "It takes each photo for you when you get there, so you are never pressing a button with the hand holding the phone steady.",
+    titleKey: "tours.ruleTargetTitle",
+    detailKey: "tours.ruleTargetDetail",
+    becauseKey: "tours.ruleTargetBecause",
     icon: Target,
   },
   {
-    title: "Turn slowly, all the way round",
-    detail: "About one full turn over half a minute. Don't stop halfway.",
-    because:
-      "Photos need to overlap to be joined. Turning fast leaves gaps between them, and a gap cannot be filled in — only left as a hole.",
+    titleKey: "tours.ruleSlowTitle",
+    detailKey: "tours.ruleSlowDetail",
+    becauseKey: "tours.ruleSlowBecause",
     icon: MoveHorizontal,
   },
 ];
@@ -69,6 +66,7 @@ export function CaptureRules({
   onCancel: () => void;
 }) {
   const [step, setStep] = useState(0);
+  const { t } = useLanguage();
   const rule = CAPTURE_RULES[step];
   const last = step === CAPTURE_RULES.length - 1;
   const Icon = rule.icon;
@@ -82,28 +80,28 @@ export function CaptureRules({
       </div>
 
       <div className="space-y-1.5">
-        <h3 className="text-lg font-medium">{rule.title}</h3>
-        <p className="text-sm text-muted-foreground">{rule.detail}</p>
+        <h3 className="text-lg font-medium">{t(rule.titleKey)}</h3>
+        <p className="text-sm text-muted-foreground">{t(rule.detailKey)}</p>
       </div>
 
       {/* The reason, not just the rule. Somebody who knows why the photo has
           to come from one spot will hold the phone right in a room this
           screen never anticipated. */}
       <p className="rounded-xl bg-muted/60 p-3 text-left text-xs text-muted-foreground">
-        {rule.because}
+        {t(rule.becauseKey)}
       </p>
 
       <div
         className="flex justify-center gap-1.5"
         role="progressbar"
-        aria-label="Instructions"
+        aria-label={t("tours.instructions")}
         aria-valuemin={1}
         aria-valuemax={CAPTURE_RULES.length}
         aria-valuenow={step + 1}
       >
         {CAPTURE_RULES.map((entry, index) => (
           <span
-            key={entry.title}
+            key={entry.titleKey}
             className={cn(
               "h-1.5 rounded-full transition-all",
               index === step ? "w-6 bg-brand" : "w-1.5 bg-muted-foreground/30",
@@ -118,13 +116,13 @@ export function CaptureRules({
           onClick={() => (step === 0 ? onCancel() : setStep(step - 1))}
           className="min-h-12"
         >
-          {step === 0 ? "Cancel" : "Back"}
+          {step === 0 ? t("common.cancel") : t("common.back")}
         </Button>
         <Button
           onClick={() => (last ? onDone() : setStep(step + 1))}
           className="min-h-12 text-base"
         >
-          {last ? "Start 360 Capture" : "Next"}
+          {last ? t("tours.startCapture") : t("common.next")}
         </Button>
       </div>
 
@@ -135,7 +133,7 @@ export function CaptureRules({
           onClick={onDone}
           className="min-h-9 text-xs text-muted-foreground underline underline-offset-4"
         >
-          Skip and start
+          {t("tours.skipStart")}
         </button>
       )}
     </div>
