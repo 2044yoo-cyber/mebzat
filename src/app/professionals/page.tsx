@@ -10,6 +10,7 @@ import { ViewToggle } from "@/components/professionals/view-toggle";
 import { buttonVariants } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import {
+  MAP_LIMIT,
   PAGE_SIZE,
   listAreas,
   searchProfessionals,
@@ -63,6 +64,11 @@ export default async function ProfessionalsPage(props: {
   const minRating = Number(ratingParam);
   const minExperience = Number(experienceParam);
 
+  // The map draws everybody at once; the list pages. Asking for one page of
+  // twenty-four and drawing that as "the map" is what made a search matching
+  // fifty-six people show a fraction of them with no sign that it had.
+  const onMap = view === "map";
+
   const [result, categories, areas] = await Promise.all([
     searchProfessionals({
       query: q,
@@ -79,7 +85,8 @@ export default async function ProfessionalsPage(props: {
       verifiedOnly: verified,
       availableOnly: available,
       sort,
-      page,
+      page: onMap ? 1 : page,
+      limit: onMap ? MAP_LIMIT : undefined,
     }),
     getServiceCategories(),
     listAreas(),
@@ -183,8 +190,20 @@ export default async function ProfessionalsPage(props: {
               </Suspense>
             </div>
 
-            {view === "map" ? (
-              <MapPanel points={mapPoints(result.professionals)} />
+            {onMap ? (
+              <>
+                <MapPanel
+                  points={mapPoints(result.professionals)}
+                  considered={result.professionals.length}
+                />
+                {result.total > result.professionals.length && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Showing the first {result.professionals.length} of{" "}
+                    {result.total} matches. Narrow the trade or the area to see
+                    the rest on the map.
+                  </p>
+                )}
+              </>
             ) : (
               <>
                 <ul className="grid gap-3 sm:grid-cols-2">

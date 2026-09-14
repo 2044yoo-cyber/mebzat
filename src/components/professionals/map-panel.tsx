@@ -27,6 +27,12 @@ const ProfessionalsMap = dynamic(
   },
 );
 
-export function MapPanel({ points }: { points: ProfessionalPoint[] }) {
-  return <ProfessionalsMap points={points} />;
+export function MapPanel({
+  points,
+  considered,
+}: {
+  points: ProfessionalPoint[];
+  considered: number;
+}) {
+  return <ProfessionalsMap points={points} considered={considered} />;
 }

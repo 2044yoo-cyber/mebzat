@@ -2,6 +2,7 @@ import {
   findNeighbourhood,
   scatterWithin,
 } from "@/lib/location/addis-neighbourhoods";
+import type { WorkStatus } from "@/types/database.types";
 
 /**
  * Where to draw a professional on a map, without knowing where they live.
@@ -41,6 +42,8 @@ export type MappableProfessional = {
   location_city: string | null;
   service_areas: string[];
   serves_entire_city: boolean;
+  profession: string | null;
+  work_status: WorkStatus;
 };
 
 export type ProfessionalPoint = {
@@ -51,8 +54,20 @@ export type ProfessionalPoint = {
   longitude: number;
   /** The area the point stands for, so the popup can name it honestly. */
   areaName: string;
-  /** Whether this is where they are based or one of the places they work. */
+  /**
+   * Whether this is their workplace or one of the places they travel to.
+   *
+   * `base` is the area they gave as theirs — a workshop, a yard, or where they
+   * live if they work out of the house, which for most of a trade like this is
+   * the same address. The map never says which of those it is, because the
+   * profile does not know: it says "based in Gerji", which is true of all
+   * three and locates none of them.
+   */
   kind: "base" | "service";
+  /** The trade, printed on the marker. Null for somebody who has not said. */
+  trade: string | null;
+  /** Drawn on the card, so "who can start now" is a question the map answers. */
+  availability: WorkStatus;
 };
 
 /**
@@ -93,6 +108,8 @@ export function mapPoints(
         longitude: scattered.longitude,
         areaName: place.name,
         kind: candidate.kind,
+        trade: person.profession,
+        availability: person.work_status,
       };
       break;
     }

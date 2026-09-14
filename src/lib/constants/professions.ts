@@ -217,6 +217,121 @@ export const PROFESSIONS: readonly Profession[] = [
     category: "landscaping",
     specialties: ["Gardens", "Paving", "Irrigation", "Planting", "Outdoor lighting"],
   },
+
+  // -------------------------------------------------------------------------
+  // Site labour
+  //
+  // Everything above this line is somebody a customer hires to run a job.
+  // Everything below is somebody a *site* hires by the day, and until now
+  // Medosha had no word for any of them — a rebar bender looking for work had
+  // to file himself under "Welder" or leave the field blank, and a contractor
+  // who needed four helpers on Monday had nothing to search for.
+  //
+  // They are in the same list rather than a separate one because they are hired
+  // through the same page, and a second list would mean a second search box, a
+  // second filter and two places to add the next trade.
+  //
+  // `Ferayo` is in the label because it is the word used on site. Somebody
+  // typing it into the search box should find these people, and "Rebar Bender"
+  // alone is a phrase most of them would not recognise as their own job.
+  // -------------------------------------------------------------------------
+  {
+    value: "Rebar Bender (Ferayo)",
+    label: "Rebar Bender (Ferayo)",
+    category: "general-contracting",
+    specialties: [
+      "Column cages",
+      "Beam reinforcement",
+      "Slab mesh",
+      "Footing bars",
+      "Stirrups",
+      "Bar cutting",
+    ],
+  },
+  {
+    value: "Carpenter's Helper",
+    label: "Carpenter's Helper",
+    category: "joinery",
+    specialties: [
+      "Formwork",
+      "Shuttering",
+      "Sanding",
+      "Carrying and stacking",
+      "Site clean-up",
+    ],
+  },
+  {
+    value: "Mason's Helper",
+    label: "Mason's Helper",
+    category: "general-contracting",
+    specialties: [
+      "Mixing mortar",
+      "Carrying blocks",
+      "Scaffold moving",
+      "Curing",
+      "Site clean-up",
+    ],
+  },
+  {
+    value: "Electrician's Helper",
+    label: "Electrician's Helper",
+    category: "electrical",
+    specialties: ["Conduit chasing", "Pulling cable", "Fixing boxes", "Testing"],
+  },
+  {
+    value: "Plumber's Helper",
+    label: "Plumber's Helper",
+    category: "plumbing",
+    specialties: ["Chasing walls", "Carrying pipe", "Trenching", "Fitting brackets"],
+  },
+  {
+    value: "Construction Labourer",
+    label: "Construction Labourer",
+    category: "general-contracting",
+    specialties: [
+      "Excavation by hand",
+      "Loading and unloading",
+      "Concrete pouring",
+      "Demolition",
+      "Site clean-up",
+    ],
+  },
+  {
+    value: "Scaffolder",
+    label: "Scaffolder",
+    category: "general-contracting",
+    specialties: [
+      "Tube and coupler",
+      "Eucalyptus scaffold",
+      "Erecting",
+      "Dismantling",
+      "Edge protection",
+    ],
+  },
+  {
+    value: "Roofer",
+    label: "Roofer",
+    category: "general-contracting",
+    specialties: [
+      "Corrugated sheet",
+      "Purlins",
+      "Gutters and downpipes",
+      "Leak repair",
+      "Insulation",
+    ],
+  },
+  {
+    value: "Excavator Operator",
+    label: "Excavator Operator",
+    category: "general-contracting",
+    specialties: [
+      "Foundation digging",
+      "Trenching",
+      "Site levelling",
+      "Loading trucks",
+      "Backfilling",
+    ],
+  },
 ] as const;
 
 export const PROFESSION_VALUES = PROFESSIONS.map((p) => p.value);

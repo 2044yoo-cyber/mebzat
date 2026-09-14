@@ -8,9 +8,28 @@ import type { StyleSpecification } from "maplibre-gl";
  * heavy, and any one host can be blocked by a network or a country. So the map
  * carries several keyless providers and picks the first that actually answers.
  *
- * All of these are free and need no API key. None is Mapbox or Google, so
- * there is no key to expire, no quota to exhaust and no domain allowlist to
- * keep in step with the deployment.
+ * All of these are free. None is Mapbox or Google, so there is no key to
+ * expire, no quota to exhaust and no domain allowlist to keep in step with the
+ * deployment.
+ *
+ * ## Why OpenStreetMap leads and CARTO does not
+ *
+ * CARTO led this list for as long as it existed, because it is a CDN with
+ * permissive CORS and it answered faster than anything else. It still answers:
+ * the tiles arrive, HTTP 200, 256 pixels wide, and `probeProvider` passes them
+ * without hesitation. They arrive with **API KEY REQUIRED** printed across
+ * every one of them.
+ *
+ * That is the failure this ordering fixes, and it is worth naming because no
+ * amount of probing would have caught it. A probe asks whether a tile loads.
+ * A watermark is a tile that loads. The only thing that can tell the
+ * difference is a person looking at the map, and by then it is on every map in
+ * the product — the property map, the professionals map and the location
+ * picker all build their style from `allProviders()[0]`.
+ *
+ * So CARTO moves below the keyless providers rather than being deleted: a
+ * deployment that holds a CARTO key can still choose it from the switcher, and
+ * the blurb says what it costs to pick it.
  */
 
 export type TileProvider = {
@@ -27,24 +46,9 @@ export type TileProvider = {
 
 export const TILE_PROVIDERS: TileProvider[] = [
   {
-    id: "carto-voyager",
-    label: "Carto Voyager",
-    blurb: "Colourful streets. Usually the most reliable.",
-    // CDN-backed with permissive CORS, which is why it leads.
-    tiles: [
-      "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{ratio}.png",
-      "https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{ratio}.png",
-      "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{ratio}.png",
-    ],
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    maxzoom: 20,
-    probe: "https://a.basemaps.cartocdn.com/rastertiles/voyager/2/2/1.png",
-  },
-  {
     id: "osm",
     label: "OpenStreetMap",
-    blurb: "The standard OSM map.",
+    blurb: "The standard OSM map. Free, and keyless for real.",
     // The canonical host. The a./b./c. subdomains are deprecated and some
     // networks no longer resolve them.
     tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
@@ -52,19 +56,6 @@ export const TILE_PROVIDERS: TileProvider[] = [
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxzoom: 19,
     probe: "https://tile.openstreetmap.org/2/2/1.png",
-  },
-  {
-    id: "carto-light",
-    label: "Carto Light",
-    blurb: "Muted, so property pins stand out.",
-    tiles: [
-      "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{ratio}.png",
-      "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{ratio}.png",
-    ],
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    maxzoom: 20,
-    probe: "https://a.basemaps.cartocdn.com/light_all/2/2/1.png",
   },
   {
     id: "esri",
@@ -98,6 +89,33 @@ export const TILE_PROVIDERS: TileProvider[] = [
     maxzoom: 19,
     probe:
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/2/1/2",
+  },
+  {
+    id: "carto-voyager",
+    label: "Carto Voyager",
+    blurb: "Colourful streets. Watermarked without a CARTO key.",
+    tiles: [
+      "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{ratio}.png",
+      "https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{ratio}.png",
+      "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{ratio}.png",
+    ],
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxzoom: 20,
+    probe: "https://a.basemaps.cartocdn.com/rastertiles/voyager/2/2/1.png",
+  },
+  {
+    id: "carto-light",
+    label: "Carto Light",
+    blurb: "Muted. Watermarked without a CARTO key.",
+    tiles: [
+      "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{ratio}.png",
+      "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{ratio}.png",
+    ],
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxzoom: 20,
+    probe: "https://a.basemaps.cartocdn.com/light_all/2/2/1.png",
   },
 ];
 
@@ -249,9 +267,25 @@ export function rememberProvider(id: string) {
   }
 }
 
+/**
+ * Providers that answer with a tile nobody wants.
+ *
+ * A remembered choice is normally honoured without question, which is right:
+ * somebody who picked Terrain meant it. But every visitor who loaded a map
+ * before this change has `carto-voyager` in their localStorage, and honouring
+ * that would serve them the watermark for as long as the entry survived —
+ * which is forever, since nothing clears it.
+ *
+ * So the recall refuses exactly these two ids and lets the probe start over.
+ * A deployment with a CARTO key can drop this set; leaving it empty restores
+ * the old behaviour with no other change.
+ */
+const WATERMARKED_WITHOUT_KEY = new Set(["carto-voyager", "carto-light"]);
+
 export function recallProvider(): string | null {
   try {
-    return window.localStorage.getItem(STORAGE_KEY);
+    const id = window.localStorage.getItem(STORAGE_KEY);
+    return id && WATERMARKED_WITHOUT_KEY.has(id) ? null : id;
   } catch {
     return null;
   }

@@ -23,6 +23,7 @@ import "./lib/allow-server-only.ts";
 import { readFileSync } from "node:fs";
 
 import {
+  AVAILABILITY_LABELS,
   MAX_SPECIALTIES,
   PROFESSIONS,
   TRAVEL_RADII,
@@ -34,6 +35,15 @@ import {
 } from "../src/lib/constants/professions.ts";
 import { whatsappNumber } from "../src/lib/contact/phone.ts";
 import { boundsOf, mapPoints } from "../src/lib/professionals/map-points.ts";
+import {
+  MAX_PIN_CHARACTERS,
+  availabilityLabel,
+  isTakingWork,
+  markerDescription,
+  pinLabel,
+  placeLabel,
+  tradeColour,
+} from "../src/lib/professionals/trade-markers.ts";
 import { listingBadges } from "../src/lib/property/listing.ts";
 
 const GREEN = "\x1b[32m";
@@ -858,6 +868,8 @@ for (const [path, what] of [
       location_city: "Addis Ababa",
       service_areas: ["Summit"],
       serves_entire_city: false,
+      profession: "Welder",
+      work_status: "available" as const,
     },
     {
       id: "b",
@@ -868,6 +880,8 @@ for (const [path, what] of [
       location_city: "Addis Ababa",
       service_areas: ["CMC"],
       serves_entire_city: false,
+      profession: "Electrician",
+      work_status: "available" as const,
     },
     {
       id: "c",
@@ -878,6 +892,8 @@ for (const [path, what] of [
       location_city: "Addis Ababa",
       service_areas: [],
       serves_entire_city: true,
+      profession: "Mason",
+      work_status: "available" as const,
     },
   ]);
 
@@ -905,6 +921,8 @@ for (const [path, what] of [
       location_city: "Addis Ababa",
       service_areas: [],
       serves_entire_city: false,
+      profession: "Carpenter",
+      work_status: "available" as const,
     },
     {
       id: "z",
@@ -915,6 +933,8 @@ for (const [path, what] of [
       location_city: "Addis Ababa",
       service_areas: [],
       serves_entire_city: false,
+      profession: "Plumber",
+      work_status: "available" as const,
     },
   ]);
   check(
@@ -1071,19 +1091,310 @@ for (const [path, what] of [
 
 {
   const nav = code("src/lib/workspace/navigation.ts");
-  const entries = [...nav.matchAll(/id: "professionals"/g)];
+
+  // Counted by destination, not by id.
+  //
+  // This check used to count `id: "professionals"` and assert there was one.
+  // Then Professionals was promoted to a top-level section, which gave the
+  // section and the row inside it the same id — two matches, one menu entry,
+  // and a red check for a menu that was correct. An id is a name; what a
+  // person clicks is an href, and the regression worth catching is two rows
+  // going to the same page.
+  const entries = [...nav.matchAll(/href: "\/professionals"/g)];
   check(
-    "there is one Professionals entry in the menu, not two",
+    "there is one Professionals row in the menu, not two",
     entries.length === 1,
-    `found ${entries.length}`,
+    `found ${entries.length} rows pointing at /professionals`,
   );
   check(
-    "and it points at the search page",
-    /href: "\/professionals"/.test(nav) && !/href: "\/directory\/individual"/.test(nav),
+    "and the old directory link it replaced is gone",
+    !/href: "\/directory\/individual"/.test(nav),
+  );
+  check(
+    "Professionals is a section of its own, not filed under something else",
+    /id: "professionals",\s*\n\s*label: "Professionals",\s*\n\s*emoji:/.test(nav),
+    "moved to the main menu, where the owner asked for it",
   );
   check(
     "Companies and Projects are still their own sections",
     /id: "companies"/.test(nav) && /id: "projects"/.test(nav),
+  );
+}
+
+/**
+ * The categories that actually exist, read from the migration that creates
+ * them rather than copied here.
+ *
+ * A copy is a second list to keep in step, and the check it feeds passes for as
+ * long as the copy is self-consistent — which it is, even after somebody
+ * removes a category from 0011.
+ */
+const CATEGORY_SLUGS = (() => {
+  const sql = readFileSync(
+    "supabase/migrations/0011_services_equipment_reviews.sql",
+    "utf8",
+  );
+  const insert = sql.slice(sql.indexOf("insert into public.service_categories"));
+  return [...insert.split(";")[0].matchAll(/\('([a-z-]+)', '/g)].map((m) => m[1]);
+})();
+
+check(
+  "the category list was actually read out of the migration",
+  CATEGORY_SLUGS.length >= 12 && CATEGORY_SLUGS.includes("joinery"),
+  `found ${CATEGORY_SLUGS.length}: ${CATEGORY_SLUGS.join(", ")}`,
+);
+
+// ---------------------------------------------------------------------------
+// The trades a site hires by the day
+//
+// Added because Medosha had no word for any of them: a rebar bender had to
+// file himself under "Welder" or leave the field blank.
+// ---------------------------------------------------------------------------
+
+{
+  const values = PROFESSIONS.map((entry) => entry.value);
+
+  check(
+    "a rebar bender has a trade of his own",
+    values.includes("Rebar Bender (Ferayo)"),
+  );
+  check(
+    "and the word used on site is in the name, not only in a comment",
+    findProfession("Rebar Bender (Ferayo)")?.label.includes("Ferayo") === true,
+    "somebody typing 'ferayo' into the search box should find these people",
+  );
+  check(
+    "a carpenter's helper is not the same trade as a carpenter",
+    values.includes("Carpenter's Helper") &&
+      findProfession("Carpenter's Helper") !== findProfession("Carpenter"),
+  );
+  check(
+    "general labour is a trade somebody can be hired as",
+    values.includes("Construction Labourer"),
+  );
+
+  const labour = [
+    "Rebar Bender (Ferayo)",
+    "Carpenter's Helper",
+    "Mason's Helper",
+    "Electrician's Helper",
+    "Plumber's Helper",
+    "Construction Labourer",
+    "Scaffolder",
+    "Roofer",
+    "Excavator Operator",
+  ];
+  check(
+    "every one of them is a trade the form offers",
+    labour.every((trade) => isProfession(trade)),
+    labour.filter((trade) => !isProfession(trade)).join(", "),
+  );
+  check(
+    "and every one of them files under a category that exists",
+    labour.every((trade) => {
+      const found = findProfession(trade);
+      return found !== null && CATEGORY_SLUGS.includes(found.category);
+    }),
+    "a profession whose category is not in service_categories is unfilterable",
+  );
+  check(
+    "and every one of them offers specialties, so the field is not empty",
+    labour.every((trade) => specialtiesFor(trade).length > 0),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// What a marker on the professionals map says
+// ---------------------------------------------------------------------------
+
+{
+  const point = {
+    id: "a",
+    username: "one",
+    name: "Solomon Desta",
+    latitude: 8.955,
+    longitude: 38.71,
+    areaName: "Lebu",
+    kind: "base" as const,
+    trade: "Rebar Bender (Ferayo)",
+    availability: "available" as const,
+  };
+
+  check(
+    "the pin says the trade, because that is what a map of workers is scanned for",
+    pinLabel(point.trade).startsWith("Rebar Bender"),
+    "a map of twenty pins reading people's names answers nobody's question",
+  );
+  check(
+    "a long trade is shortened rather than allowed to cover three streets",
+    pinLabel("Mechanical Engineer").length <= MAX_PIN_CHARACTERS &&
+      pinLabel("Mechanical Engineer").endsWith("\u2026"),
+    pinLabel("Mechanical Engineer"),
+  );
+  check(
+    "somebody who has not said what they do still gets a word on the pin",
+    pinLabel(null) === "Professional",
+    "an empty pill is a pin nobody can tell from a map artefact",
+  );
+
+  check(
+    "a workplace is labelled as one",
+    placeLabel(point) === "Based in Lebu",
+  );
+  check(
+    "and an area somebody travels to is labelled differently",
+    placeLabel({ kind: "service", areaName: "Sarbet" }) === "Works in Sarbet",
+    "the distinction the owner asked for: workplace or home, against where they go",
+  );
+
+  check(
+    "availability is in the words the rest of the app uses",
+    availabilityLabel("available") === AVAILABILITY_LABELS.available &&
+      availabilityLabel("fully_booked") === AVAILABILITY_LABELS.fully_booked,
+    "two vocabularies for one fact is two things to keep in step",
+  );
+  check(
+    "somebody available this week counts as taking work",
+    isTakingWork("limited") && isTakingWork("available"),
+  );
+  check(
+    "and somebody booked solid does not",
+    !isTakingWork("fully_booked") && !isTakingWork("busy"),
+    "the dot on the marker is the answer to 'who can start', so it has to be true",
+  );
+
+  // Everything the sighted user gets from colour, fill and a dot has to
+  // survive being read aloud, because none of it does on its own.
+  const said = markerDescription(point);
+  check(
+    "the screen reader is told the name, the trade, the place and the availability",
+    said.includes("Solomon Desta") &&
+      said.includes("Rebar Bender (Ferayo)") &&
+      said.includes("Based in Lebu") &&
+      said.includes(AVAILABILITY_LABELS.available),
+    said,
+  );
+
+  check(
+    "two trades in different categories are different colours",
+    tradeColour("Electrician").base !== tradeColour("Plumber").base,
+  );
+  check(
+    "two trades in the same category are the same colour",
+    tradeColour("Carpenter").base === tradeColour("Furniture Maker").base,
+    "twenty-seven colours is a paint chart, not a legend",
+  );
+  check(
+    "and a trade nobody recognises is grey rather than a wrong colour",
+    tradeColour("Astronaut").base === tradeColour(null).base,
+  );
+  check(
+    "every trade in the list has a colour of its own category",
+    PROFESSIONS.every(
+      (entry) => tradeColour(entry.value).base !== tradeColour(null).base,
+    ),
+    PROFESSIONS.filter(
+      (entry) => tradeColour(entry.value).base === tradeColour(null).base,
+    )
+      .map((entry) => entry.value)
+      .join(", ") || "none missing",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The map draws what the search found, and the marker is built from the point
+// ---------------------------------------------------------------------------
+
+{
+  const map = code("src/components/professionals/professionals-map.tsx");
+  const page = code("src/app/professionals/page.tsx");
+  const data = code("src/lib/data/professionals.ts");
+
+  check(
+    "the map asks for more than one page of results",
+    /limit: onMap \? MAP_LIMIT : undefined/.test(page),
+    "a map with a next-page button is not a map",
+  );
+  check(
+    "and starts at the first page when it does",
+    /page: onMap \? 1 : page/.test(page),
+    "page 3 of a map is twenty-four people and no explanation",
+  );
+  check(
+    "the limit the search is given is the one it actually honours",
+    /export const MAP_LIMIT = 60;/.test(data) &&
+      /p_limit: limit,/.test(data) &&
+      /p_offset: \(page - 1\) \* limit,/.test(data),
+    "0078 clamps p_limit to 60; asking for 200 returns 60 and a caller that believes it has them all",
+  );
+  check(
+    "and the page says so when the search found more than the map shows",
+    /result\.total > result\.professionals\.length/.test(page),
+  );
+  check(
+    "the map is told how many people it was given, not how many matched",
+    /considered=\{result\.professionals\.length\}/.test(page),
+    "conflating the two makes the unplaced count lie the moment a search is truncated",
+  );
+
+  check(
+    "a marker carries the trade, the fill and the dot",
+    /textContent = pinLabel\(point\.trade\)/.test(map) &&
+      /dataset\.kind = point\.kind/.test(map) &&
+      /isTakingWork\(point\.availability\)/.test(map),
+  );
+  check(
+    "and its accessible label is the whole marker in words",
+    /setAttribute\("aria-label", markerDescription\(point\)\)/.test(map),
+    "colour, fill and a dot are three things a screen reader gets none of",
+  );
+  check(
+    "base and service are drawn differently, not only coloured differently",
+    /\.medosha-pro\[data-kind="base"\]/.test(map) &&
+      /\.medosha-pro\[data-kind="service"\]/.test(map) &&
+      /border:2px dashed/.test(map),
+    "fill survives sunlight, printing and colour blindness; hue does not",
+  );
+  check(
+    "an empty map explains itself instead of showing a blank city",
+    /points\.length === 0 &&/.test(map) &&
+      /has said which area they work in/.test(map),
+    "fifty-six results and no pins reads as broken unless it says why",
+  );
+  check(
+    "and the note about not showing addresses is still there",
+    /Nobody&apos;s\s*\n?\s*home or exact location is shown/.test(map),
+    "a map of pins is read as a map of addresses unless it is told otherwise",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The basemap under all of it
+// ---------------------------------------------------------------------------
+
+{
+  const tiles = code("src/lib/map/tiles.ts");
+  const order = [...tiles.matchAll(/id: "([a-z-]+)",/g)].map((m) => m[1]);
+  const osm = order.indexOf("osm");
+  const voyager = order.indexOf("carto-voyager");
+  const light = order.indexOf("carto-light");
+
+  check("OpenStreetMap is still in the list", osm >= 0);
+  check("and so is Carto Voyager", voyager >= 0);
+  check("and Carto Light", light >= 0);
+  check(
+    "the keyless provider is the one the map is built from",
+    osm >= 0 && voyager >= 0 && osm < voyager && osm < light,
+    `order: ${order.join(", ")}`,
+  );
+  check(
+    "a remembered Carto choice does not survive the change",
+    /WATERMARKED_WITHOUT_KEY\.has\(id\)/.test(tiles),
+    "every visitor who loaded a map before this has carto-voyager in localStorage, and nothing clears it",
+  );
+  check(
+    "and the set names both of the watermarked ones",
+    /new Set\(\["carto-voyager", "carto-light"\]\)/.test(tiles),
   );
 }
 

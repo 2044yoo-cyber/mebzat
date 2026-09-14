@@ -19,6 +19,22 @@ import type { AccountType, WorkStatus } from "@/types/database.types";
 
 export const PAGE_SIZE = 24;
 
+/**
+ * How many people one map asks for.
+ *
+ * The map view used to be handed `result.professionals` — one page, twenty-four
+ * people — which meant a search matching fifty-six drew at most twenty-four
+ * pins and silently dropped the rest. A map with a "next page" button is not a
+ * map; the whole reason to switch to it is to see the spread at once.
+ *
+ * Sixty rather than something larger because sixty is the ceiling
+ * `search_professionals` clamps `p_limit` to (0078). Asking for two hundred
+ * would return sixty and a caller who believed it had them all — so the number
+ * is written here, once, next to the reason, and the page reports it when a
+ * search finds more than this.
+ */
+export const MAP_LIMIT = 60;
+
 export type ProfessionalRow = {
   id: string;
   username: string | null;
@@ -70,6 +86,8 @@ export type ProfessionalQuery = {
   availableOnly?: boolean;
   sort?: ProfessionalSort;
   page?: number;
+  /** Rows per page. Defaults to PAGE_SIZE; the map asks for MAP_LIMIT. */
+  limit?: number;
 };
 
 export type ProfessionalResult = {
@@ -89,6 +107,7 @@ export async function searchProfessionals(
 ): Promise<ProfessionalResult> {
   const supabase = await createClient();
   const page = Math.max(1, options.page ?? 1);
+  const limit = Math.max(1, options.limit ?? PAGE_SIZE);
 
   const { data, error } = await supabase.rpc("search_professionals", {
     p_query: clean(options.query) ?? null,
@@ -102,8 +121,8 @@ export async function searchProfessionals(
     p_available_only: options.availableOnly ?? false,
     p_min_experience: options.minExperience ?? null,
     p_sort: options.sort ?? "relevance",
-    p_limit: PAGE_SIZE,
-    p_offset: (page - 1) * PAGE_SIZE,
+    p_limit: limit,
+    p_offset: (page - 1) * limit,
   });
 
   if (error) return { professionals: [], total: 0, available: false };
