@@ -7,7 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { ChevronUp, MessageSquare, Ruler, Wallet } from "lucide-react";
+import { ChevronUp, FilePlus2, MessageSquare, Ruler, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -466,6 +466,43 @@ export function StudioWorkspace({
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {/*
+                      Start again.
+                      
+                      There was no way back to the picker once a design was on
+                      screen: the only route to a second wardrobe was the back
+                      button, which is the gesture the draft was written to
+                      survive rather than one to rely on.
+
+                      It asks first, because it throws away whatever is on
+                      screen, and it clears the stored draft as well — leaving
+                      the draft behind would have the restore bar offer the
+                      discarded design back on the next paint, which makes
+                      "New project" look broken.
+                    */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const unsaved = Boolean(design.spec);
+                        if (
+                          unsaved &&
+                          !window.confirm(
+                            "Start a new project? Anything unsaved in this one is discarded.",
+                          )
+                        ) {
+                          return;
+                        }
+                        if (key) clearDraft(window.localStorage, key);
+                        setDismissed(true);
+                        design.clear();
+                        setMessages([]);
+                      }}
+                      className="flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium"
+                    >
+                      <FilePlus2 className="size-3.5" aria-hidden />
+                      New project
+                    </button>
+
                     <SendToCalculator
                       kind={design.spec.kind}
                       width={design.spec.envelope.width}

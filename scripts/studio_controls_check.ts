@@ -1590,6 +1590,119 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
 }
 
 // ---------------------------------------------------------------------------
+// 17. The move pad does not hide what it moves
+// ---------------------------------------------------------------------------
+
+{
+  const editor = code(EDITOR);
+  const pad = functionText(editor, "NudgeButton");
+
+  check(
+    "the pad is not a filled card over the drawing",
+    /<div className="pointer-events-auto flex flex-col gap-1 p-1">/.test(editor),
+    "a filled, blurred panel on a light theme is an opaque slab over the cabinet the buttons move",
+  );
+  // Scoped to the pad. "Show inside" is also an overlay and legitimately keeps
+  // its frosted card — a file-wide search for the blur matched that instead
+  // and failed on correct code.
+  const padStart = editor.indexOf('{view === "solid" && selected ? (');
+  const padEnd = editor.indexOf("{NUDGE_STEP} mm", padStart);
+  const padRegion =
+    padStart === -1 || padEnd === -1 ? "" : editor.slice(padStart, padEnd);
+
+  check(
+    "the pad region is where the check is looking",
+    padRegion.includes("AXES.map") && !padRegion.includes("Show inside"),
+    `${padRegion.length} characters`,
+  );
+  check(
+    "and it no longer frosts the drawing behind it",
+    !/backdrop-blur-xl/.test(padRegion),
+    "backdrop-blur-xl at this size reads as frosted glass, which is another way of saying opaque",
+  );
+  check(
+    "each button is translucent enough to see the carcass through",
+    /bg-background\/40 backdrop-blur-\[2px\]/.test(pad),
+    pad.slice(0, 60),
+  );
+  check(
+    "and firms up under the finger, so a press still reads",
+    /active:bg-background\/85/.test(pad),
+    "at 40 per cent all the time there is nothing to see when it is pressed",
+  );
+  check(
+    "the axis letters get their own backing now they sit on the drawing",
+    /w-4 rounded bg-background\/45[^"]*backdrop-blur-\[2px\]/.test(editor),
+    "a grey glyph on a grey carcass is nothing",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 18. New project, and a way out
+// ---------------------------------------------------------------------------
+
+{
+  const workspace = code(
+    "src/features/berchuma-studio/components/studio-workspace.tsx",
+  );
+  const publish = code("src/features/berchuma-studio/components/publish-bar.tsx");
+
+  check(
+    "there is a way to start again",
+    /New project/.test(workspace) && /design\.clear\(\)/.test(workspace),
+    "the only route to a second design was the back button, which is the gesture the draft exists to survive",
+  );
+  // The whole guard, not the word `confirm`. Replacing the condition with
+  // something false leaves the call in the file and the branch dead, and a
+  // search for the identifier passes on a button that discards without asking.
+  check(
+    "it asks before throwing the current one away",
+    /if \(\s*unsaved &&\s*!window\.confirm\([\s\S]{0,300}?\)\s*\) \{\s*return;\s*\}/.test(
+      workspace,
+    ),
+    "the refusal has to stop it, not merely be present",
+  );
+  check(
+    "and only when there is something to lose",
+    /const unsaved = Boolean\(design\.spec\);/.test(workspace),
+    "asking on an empty studio is a dialogue about nothing",
+  );
+  check(
+    "and clears the stored draft with it",
+    /if \(key\) clearDraft\(window\.localStorage, key\);\s*\n\s*setDismissed\(true\);\s*\n\s*design\.clear\(\);/.test(
+      workspace,
+    ),
+    "a draft left behind has the restore bar offer the discarded design straight back, which looks broken",
+  );
+
+  check(
+    "there is a way out of the studio",
+    /Exit\n/.test(publish) && /const exit = async \(\) => \{/.test(publish),
+  );
+  check(
+    "which saves anything outstanding on the way",
+    /if \(!target \|\| dirty\) \{/.test(publish),
+    "leaving after an edit would otherwise land on a page showing an older wardrobe",
+  );
+  check(
+    "then goes to this design's own page",
+    /router\.push\(`\/designs\/\$\{target\.slug\}`\)/.test(publish),
+  );
+  check(
+    "and does not leave when the save failed",
+    /\} catch \(problem\) \{[\s\S]{0,200}?setBusy\(null\);\s*\n\s*\}\s*\n\s*\};\s*\n\s*const publish/.test(
+      publish,
+    ),
+    "navigating past a failed save is how the work gets lost",
+  );
+  check(
+    "Exit is offered before the design has ever been saved",
+    !/\{saved \? \([\s\S]{0,120}onClick=\{exit\}/.test(publish),
+    "a link that only appears once you have saved is no use at the moment you want to leave",
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);

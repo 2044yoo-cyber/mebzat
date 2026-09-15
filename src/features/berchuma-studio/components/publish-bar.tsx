@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { Check, ExternalLink, Globe, Loader2, Save } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, Globe, Loader2, LogOut, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -42,9 +42,10 @@ export function PublishBar({
    */
   initialSaved?: Saved | null;
 }) {
+  const router = useRouter();
   const [saved, setSaved] = useState<Saved | null>(initialSaved);
   const [published, setPublished] = useState(false);
-  const [busy, setBusy] = useState<"save" | "publish" | null>(null);
+  const [busy, setBusy] = useState<"save" | "publish" | "exit" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Cleared whenever the design changes, so the bar never claims a stale save
@@ -84,6 +85,41 @@ export function PublishBar({
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : "That did not work.");
     } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * Leave the studio for the design's own page.
+   *
+   * It saves on the way out when there is anything unsaved, which is not the
+   * same button as "save and exit" — it is this button refusing to send you to
+   * a page showing an older wardrobe than the one you were just looking at.
+   * Without it, Exit after an edit lands on stale content and reads as having
+   * lost the work.
+   *
+   * Nothing is lost when the save fails: the error shows, the navigation does
+   * not happen, and the draft in this browser still holds the design.
+   */
+  const exit = async () => {
+    setBusy("exit");
+    setError(null);
+    try {
+      let target = saved;
+      if (!target || dirty) {
+        const payload = await post({
+          action: "save",
+          designId: saved?.id,
+          spec,
+          note: lastBrief,
+        });
+        target = { id: String(payload.id), slug: String(payload.slug) };
+        setSaved(target);
+        setSavedSignature(signature);
+      }
+      router.push(`/designs/${target.slug}`);
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : "That did not work.");
       setBusy(null);
     }
   };
@@ -167,15 +203,28 @@ export function PublishBar({
           </Button>
         ) : null}
 
-        {saved ? (
-          <Link
-            href={`/designs/${saved.slug}`}
-            className="ml-auto flex items-center gap-1 text-xs text-muted-foreground underline"
-          >
-            Open the page
-            <ExternalLink className="size-3" aria-hidden />
-          </Link>
-        ) : null}
+        {/*
+          Exit, where "Open the page" used to be — the same destination, as a
+          control rather than a footnote. It is not conditional on having saved:
+          leaving a design you have never saved is exactly when a link that
+          only appears afterwards is no use, so this one saves first and then
+          goes.
+        */}
+        <Button
+          size="sm"
+          variant="outline"
+          className="ml-auto gap-1.5"
+          onClick={exit}
+          disabled={busy !== null}
+          title="Save anything outstanding and open this design's page"
+        >
+          {busy === "exit" ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <LogOut className="size-3.5" aria-hidden />
+          )}
+          Exit
+        </Button>
       </div>
 
       <p className="hidden text-[11px] text-muted-foreground sm:block">

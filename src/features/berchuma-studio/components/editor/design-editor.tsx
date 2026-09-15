@@ -384,7 +384,18 @@ export function DesignEditor({
         */}
         {view === "solid" && selected ? (
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center p-2">
-            <div className="pointer-events-auto flex flex-col gap-1 rounded-lg border border-white/10 bg-background/70 p-1 backdrop-blur-xl">
+            {/*
+              No panel behind the buttons.
+
+              This was a filled, blurred card, and on a light theme that is an
+              opaque white slab over the right-hand third of the drawing —
+              covering the very cabinet the buttons move. The controls have to
+              be on top of the model to be under the thumb, so the answer is
+              not to move them but to stop them being a surface: the container
+              only arranges the buttons now, and each button is translucent
+              enough to see the carcass through and solid enough to aim at.
+            */}
+            <div className="pointer-events-auto flex flex-col gap-1 p-1">
               {AXES.map(({ axis, label, towards }) => (
                 <div key={axis} className="flex items-center gap-0.5">
                   {([-1, 1] as Direction[]).map((direction) => {
@@ -396,7 +407,10 @@ export function DesignEditor({
                         {direction === 1 ? (
                           <span
                             aria-hidden
-                            className="w-3 text-center text-[10px] font-medium text-muted-foreground"
+                            // Its own small backing, because the letter sits
+                            // over the drawing now rather than over a card,
+                            // and a grey glyph on a grey carcass is nothing.
+                            className="w-4 rounded bg-background/45 py-0.5 text-center text-[10px] font-medium text-foreground/80 backdrop-blur-[2px]"
                           >
                             {label}
                           </span>
@@ -422,7 +436,7 @@ export function DesignEditor({
                   })}
                 </div>
               ))}
-              <span className="px-0.5 text-center text-[9px] tabular-nums text-muted-foreground">
+              <span className="mx-auto rounded bg-background/45 px-1 text-center text-[9px] tabular-nums text-foreground/70 backdrop-blur-[2px]">
                 {NUDGE_STEP} mm
               </span>
             </div>
@@ -506,9 +520,15 @@ function NudgeButton({
       aria-label={label}
       title={label}
       className={cn(
-        "flex size-7 items-center justify-center rounded-md border border-white/10",
-        "bg-background/60 transition-opacity active:bg-background",
-        "disabled:opacity-30",
+        "flex size-7 items-center justify-center rounded-md",
+        // Translucent enough to see the cabinet through, opaque enough to aim
+        // at. The blur is small on purpose: `backdrop-blur-xl` at this size
+        // reads as frosted glass, which is another way of saying opaque.
+        "border border-foreground/15 bg-background/40 backdrop-blur-[2px]",
+        // It firms up under the finger, so a press still reads as a press
+        // even though the resting state is mostly the drawing behind it.
+        "transition-colors active:bg-background/85",
+        "disabled:opacity-25",
       )}
     >
       {children}
