@@ -1522,6 +1522,74 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
 }
 
 // ---------------------------------------------------------------------------
+// 16. One scroller in the design column, not two
+//
+// This is the second time the same fault has been reported, and the second
+// time it arrived through a component nobody had thought about. When the
+// design tab became a scrolling page, `ControlPanel` was scoped to scroll only
+// where it is a column of its own — and `StartPanel`, which renders in exactly
+// the same slot, was left as `h-full overflow-y-auto`. In a column that is no
+// longer a fixed height that is a second scroll container inside the first:
+// measured in Chromium, the page ran out after 64 px with 372 px of cards
+// trapped inside the panel and no gesture that reached them.
+//
+// So the rule is checked, not the instance. Everything that renders in the
+// design column scrolls only at `@4xl/ws`, where it really is its own column.
+// The chat and the price are deliberately not in this list: they are
+// fixed-height columns on every screen, and their own scroller is correct.
+// ---------------------------------------------------------------------------
+
+{
+  const inTheDesignColumn = [
+    ["the start panel", "src/features/berchuma-studio/components/start-panel.tsx"],
+    ["the control panel", PANEL],
+    ["the editor", EDITOR],
+  ] as const;
+
+  for (const [label, path] of inTheDesignColumn) {
+    const source = code(path);
+
+    // Every `overflow-y-auto` in the file, with whatever variant prefixes it.
+    const scrollers = source.match(/[\w@/:[\]-]*overflow-y-auto/g) ?? [];
+    const unscoped = scrollers.filter((utility) => !utility.includes("@4xl/ws:"));
+
+    check(
+      `${label} scrolls only where it is a column of its own`,
+      unscoped.length === 0,
+      `${unscoped.join(", ")} — an unscoped scroller inside the scrolling page traps its own content`,
+    );
+  }
+
+  const start = code("src/features/berchuma-studio/components/start-panel.tsx");
+  check(
+    "the start panel is found, and really does have a scroller to scope",
+    /overflow-y-auto/.test(start),
+    "if this file stops having one the check above is vacuous",
+  );
+  check(
+    "and its height is scoped with it",
+    !/(^|\s)h-full/.test(
+      /className=\{cn\(\s*"mx-auto[^)]*\)\}/.exec(start)?.[0] ?? "h-full",
+    ),
+    "a height that survives without the scroll is a box that clips with nothing to scroll it",
+  );
+
+  // The two that are meant to keep their own scroller, so that scoping them by
+  // accident is caught as well. A chat whose column grows with its messages
+  // puts the message box below the fold.
+  for (const [label, path] of [
+    ["the chat", "src/features/berchuma-studio/components/chat/design-chat.tsx"],
+    ["the price column", "src/features/berchuma-studio/components/studio-workspace.tsx"],
+  ] as const) {
+    check(
+      `${label} keeps its own scroller`,
+      /overflow-y-auto/.test(code(path)),
+      path,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);

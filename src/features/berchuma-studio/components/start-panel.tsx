@@ -97,7 +97,22 @@ export function StartPanel({
      * than it when the content demands, so it grows downward and scrolls from
      * the top instead of hiding its own beginning.
      */
-    <div className="mx-auto h-full w-full max-w-2xl overflow-y-auto overscroll-contain">
+    <div
+      className={cn(
+        "mx-auto w-full max-w-2xl",
+        // Its own scrolling column beside the design, an ordinary block under
+        // it — the same rule as the control panel, and missed here.
+        //
+        // When the studio's design tab became a scrolling page, this panel was
+        // left as `h-full overflow-y-auto`. In a column that is no longer a
+        // fixed height that is a second scroll container inside the first: the
+        // panel clips its own content at whatever height it resolved to, the
+        // page has nothing left to scroll, and the last card sits below the
+        // fold with no gesture that reaches it. Which is the fault the panel's
+        // own scroller was added to fix, arriving from the other direction.
+        "@4xl/ws:h-full @4xl/ws:overflow-y-auto @4xl/ws:overscroll-contain",
+      )}
+    >
       <div
         className={cn(
           "flex min-h-full w-full flex-col gap-5 p-4",
