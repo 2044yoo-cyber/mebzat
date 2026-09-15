@@ -18,6 +18,8 @@ import {
 
 import { cn } from "@/lib/utils";
 
+import { LengthField } from "../ui/length-field";
+
 import { BOARDS, EDGE_BANDS, findBoard, findEdgeBand } from "../../types/catalogue";
 import { KITCHEN_MODULES, MODULE_GROUPS } from "../../services/kitchen-modules";
 import {
@@ -46,12 +48,14 @@ import {
   removeDrawer,
   setDrawerHeight,
   duplicateCabinet,
+  interiorWidthOf,
   removeBay,
   removeCabinet,
   renameCabinet,
   resizeCabinet,
   setBayDoor,
   setBayFitting,
+  setBayWidth,
   setCabinetKind,
   addTopCabinet,
   removeTopCabinet,
@@ -282,7 +286,7 @@ function Dimensions({
 }) {
   return (
     <Section title="Dimensions" icon={Ruler} defaultOpen>
-      <Slider
+      <LengthField
         label="Width"
         value={cabinet.size.width}
         min={LIMITS.minWidth}
@@ -290,7 +294,7 @@ function Dimensions({
         step={10}
         onChange={(width) => onChange(resizeCabinet(spec, cabinet.id, { width }))}
       />
-      <Slider
+      <LengthField
         label="Height"
         value={cabinet.size.height}
         min={200}
@@ -298,7 +302,7 @@ function Dimensions({
         step={10}
         onChange={(height) => onChange(resizeCabinet(spec, cabinet.id, { height }))}
       />
-      <Slider
+      <LengthField
         label="Depth"
         value={cabinet.size.depth}
         min={150}
@@ -341,12 +345,7 @@ function Structure({
       {cabinet.bays.map((bay, index) => (
         <div key={bay.id} className="space-y-1.5 rounded-lg border p-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium">
-              Section {index + 1}
-              <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">
-                {Math.round(bay.width)} mm
-              </span>
-            </span>
+            <span className="text-[11px] font-medium">Section {index + 1}</span>
             {cabinet.bays.length > 1 ? (
               <button
                 type="button"
@@ -358,6 +357,42 @@ function Structure({
               </button>
             ) : null}
           </div>
+
+          {/*
+            The width, which used to be printed here as a label.
+
+            No slider: a cabinet can hold twenty-four of these and twenty-four
+            sliders is a wall of them. The number is the point — a 900 mm
+            hanging bay beside a 450 mm drawer bank — and the arrows step it
+            for anybody who wants to feel for it.
+
+            Only where there is a neighbour to take the width from. One section
+            *is* the interior, so a box that could only ever refuse what was
+            typed into it would be a control that does nothing; the cabinet's
+            own width above is the honest one in that case.
+          */}
+          {cabinet.bays.length > 1 ? (
+            <LengthField
+              label="Width"
+              value={bay.width}
+              min={LIMITS.minBayWidth}
+              max={Math.max(
+                LIMITS.minBayWidth,
+                interiorWidthOf(cabinet, spec.carcass.board.thickness) -
+                  (cabinet.bays.length - 1) * LIMITS.minBayWidth,
+              )}
+              step={10}
+              slider={false}
+              onChange={(width) =>
+                onChange(setBayWidth(spec, cabinet.id, bay.id, width))
+              }
+            />
+          ) : (
+            <p className="text-[10px] tabular-nums text-muted-foreground">
+              {Math.round(bay.width)} mm — the whole interior. Add a section, or
+              change the cabinet&apos;s width above.
+            </p>
+          )}
 
           <div className="flex flex-wrap gap-1">
             {FITTINGS.map((entry) => (
@@ -976,41 +1011,6 @@ function Section({
       </button>
       {open ? <div className="space-y-2 px-3 pb-3">{children}</div> : null}
     </section>
-  );
-}
-
-function Slider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <div className="flex items-baseline justify-between">
-        <span className="text-[11px] text-muted-foreground">{label}</span>
-        <span className="text-xs font-medium tabular-nums">{Math.round(value)} mm</span>
-      </div>
-      <input
-        type="range"
-        aria-label={label}
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full accent-brand"
-      />
-    </div>
   );
 }
 

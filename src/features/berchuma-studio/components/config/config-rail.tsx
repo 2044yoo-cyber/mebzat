@@ -1,5 +1,6 @@
 "use client";
 
+import { LengthField } from "../ui/length-field";
 import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -95,7 +96,7 @@ export function ConfigRail({
     <div className="space-y-5">
       <section className="space-y-3">
         <Heading>Size</Heading>
-        <Dimension
+        <LengthField
           label="Width"
           value={cabinet.size.width}
           min={LIMITS.minWidth}
@@ -108,7 +109,7 @@ export function ConfigRail({
             })
           }
         />
-        <Dimension
+        <LengthField
           label="Height"
           value={cabinet.size.height}
           min={300}
@@ -120,7 +121,7 @@ export function ConfigRail({
             })
           }
         />
-        <Dimension
+        <LengthField
           label="Depth"
           value={cabinet.size.depth}
           min={200}
@@ -132,7 +133,7 @@ export function ConfigRail({
             })
           }
         />
-        <Dimension
+        <LengthField
           label="Plinth"
           value={cabinet.plinthHeight}
           min={spec.furnitureType === "wardrobe" ? 50 : 0}
@@ -416,7 +417,7 @@ function BayRow({
           appears with the fitting rather than sitting there disabled. */}
       {bay.fitting.kind === "shelves" || bay.fitting.kind === "drawers" ? (
         <div className="mt-2">
-          <Dimension
+          <LengthField
             label={bay.fitting.kind === "shelves" ? "Shelves" : "Drawers"}
             value={bay.fitting.count}
             min={bay.fitting.kind === "drawers" ? 1 : 0}
@@ -500,69 +501,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1.5">
       <Label className="text-xs font-normal text-muted-foreground">{label}</Label>
       {children}
-    </div>
-  );
-}
-
-/**
- * A slider and a number box over the same value.
- *
- * Both, not one: the slider is how somebody explores and the box is how they
- * type the measurement they took off the wall. A studio with only a slider
- * cannot accept 2437.
- */
-function Dimension({
-  label,
-  value,
-  min,
-  max,
-  step,
-  unit = "mm",
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  unit?: string;
-  onChange: (value: number) => void;
-}) {
-  const clamp = (next: number) => Math.min(max, Math.max(min, next));
-
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <Label className="text-xs font-normal text-muted-foreground">{label}</Label>
-        <div className="flex items-baseline gap-1">
-          <input
-            type="number"
-            aria-label={`${label} in ${unit || "units"}`}
-            value={Math.round(value)}
-            min={min}
-            max={max}
-            step={step}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              if (Number.isFinite(next)) onChange(clamp(next));
-            }}
-            className="h-7 w-20 rounded-md border bg-background px-2 text-right text-xs tabular-nums"
-          />
-          {unit ? (
-            <span className="text-[11px] text-muted-foreground">{unit}</span>
-          ) : null}
-        </div>
-      </div>
-      <input
-        type="range"
-        aria-label={label}
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(event) => onChange(clamp(Number(event.target.value)))}
-        className="mt-1.5 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
-      />
     </div>
   );
 }

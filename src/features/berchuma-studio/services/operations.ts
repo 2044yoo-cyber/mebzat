@@ -657,6 +657,142 @@ export function removeBay(
   });
 }
 
+/**
+ * The clear width a cabinet's sections divide between them, in mm.
+ *
+ * Carcass sides at each end, and one divider between each neighbouring pair.
+ * Exactly what `redivide` shares out, named so a control can show somebody how
+ * much is left rather than making them work it out from the outside width.
+ */
+export function interiorWidthOf(cabinet: Cabinet, boardThickness: number): number {
+  return (
+    cabinet.size.width -
+    2 * boardThickness -
+    Math.max(0, cabinet.bays.length - 1) * boardThickness
+  );
+}
+
+/**
+ * Sets one section's width. The rest give way proportionally.
+ *
+ * ## Why this did not exist
+ *
+ * Every section was the same width, because `redivide` is the only thing that
+ * ever set one and it divides the interior equally. The width was printed in
+ * the panel as a label — "Section 1  443 mm" — and the drawer panel's own
+ * comment pointed at it as "the honest control for that, which is already
+ * above this". It was not above this. It was not anywhere.
+ *
+ * Real furniture is not in equal sections: a wardrobe is a 900 mm hanging bay
+ * beside a 450 mm bank of drawers, and a kitchen run is whatever the sink
+ * needs beside whatever is left.
+ *
+ * ## What "the rest give way" means
+ *
+ * The interior is fixed by the carcass, so widening one section has to take
+ * the width from the others — the same bargain `setDrawerHeight` makes with
+ * drawer fronts, and for the same reason: the parts have to add up to the
+ * opening, and making the person do that arithmetic is making them do the
+ * computer's job.
+ *
+ * Taken proportionally, so a wide neighbour gives more than a narrow one and
+ * the shape of what somebody has already set up survives having one section
+ * changed. Every other section keeps at least `minBayWidth`, and the request
+ * is clamped to whatever that leaves rather than refused: typing 5000 into a
+ * 1400 mm cabinet gives the widest section the cabinet can hold, which is what
+ * the person meant by typing a number bigger than the cabinet.
+ */
+export function setBayWidth(
+  spec: DesignSpec,
+  cabinetId: string,
+  bayId: string,
+  width: number,
+): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, cabinetId);
+    if (!cabinet) return;
+    const index = cabinet.bays.findIndex((entry) => entry.id === bayId);
+    if (index < 0) return;
+
+    const others = cabinet.bays.filter((_, i) => i !== index);
+    if (others.length === 0) return;
+
+    const interior = interiorWidthOf(cabinet, draft.carcass.board.thickness);
+    const floor = LIMITS.minBayWidth;
+
+    // What this section may become: no narrower than the floor, and no wider
+    // than the interior less a floor's worth for each of its neighbours.
+    const ceiling = Math.max(floor, interior - others.length * floor);
+    const target = Math.min(ceiling, Math.max(floor, Math.round(width)));
+
+    const remaining = interior - target;
+
+    // Shared out proportionally, but the floor has to be paid for.
+    //
+    // The first version simply raised any share that came out below the floor,
+    // and took the difference from nowhere — so the widths summed to more than
+    // the interior, and `validateSpec` rescaled all of them proportionally to
+    // fit. That included the one that had just been typed: asking for 300
+    // produced 291, which reads as the box not working.
+    //
+    // So a section pinned at the floor is removed from the pool along with its
+    // width, and what is left is re-shared among the rest. Repeated until
+    // nobody is under, which terminates because `target` is already clamped to
+    // leave a floor's worth for every neighbour.
+    const pinned = new Set<string>();
+    let pool = remaining;
+    let free = others;
+
+    for (;;) {
+      const shared = free.reduce((sum, bay) => sum + bay.width, 0);
+      const under = free.filter((bay) => {
+        const share =
+          shared > 0 ? (bay.width / shared) * pool : pool / free.length;
+        return share < floor;
+      });
+      if (under.length === 0 || free.length === 0) break;
+
+      for (const bay of under) {
+        pinned.add(bay.id);
+        pool -= floor;
+      }
+      free = free.filter((bay) => !pinned.has(bay.id));
+      if (free.length === 0) break;
+    }
+
+    const shared = free.reduce((sum, bay) => sum + bay.width, 0);
+    let handed = 0;
+    free.forEach((bay, i) => {
+      // The last free one takes the rounding, so the sections add up to the
+      // interior exactly rather than to within a millimetre of it — which is
+      // the difference between a silent normalisation and none at all.
+      const next =
+        i === free.length - 1
+          ? Math.max(floor, pool - handed)
+          : Math.max(
+              floor,
+              Math.round(shared > 0 ? (bay.width / shared) * pool : pool / free.length),
+            );
+      handed += next;
+      bay.width = next;
+    });
+    for (const bay of others) {
+      if (pinned.has(bay.id)) bay.width = floor;
+    }
+
+    cabinet.bays[index].width = target;
+
+    // A leaf that has just grown past the practical limit becomes a pair here,
+    // the same way `redivide` does it, rather than being corrected a moment
+    // later by validation.
+    for (const bay of cabinet.bays) {
+      if (bay.door === "hinged" && bay.fitting.kind !== "drawers") {
+        bay.doorLeaves = bay.width > LIMITS.hingedLeafWidth ? 2 : 1;
+      }
+    }
+  });
+}
+
 export function setBayFitting(
   spec: DesignSpec,
   cabinetId: string,

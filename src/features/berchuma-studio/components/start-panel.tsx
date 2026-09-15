@@ -19,6 +19,8 @@ import {
 
 import { cn } from "@/lib/utils";
 
+import { LengthField } from "./ui/length-field";
+
 import { ImageToDesign } from "./image-to-design";
 import { OpeningPanel } from "./openings/opening-panel";
 import { PlanEditor } from "./plan/plan-editor";
@@ -289,15 +291,19 @@ export function StartPanel({
             ))}
           </div>
 
-          <input
-            type="range"
+          {/*
+            The presets above are the common sizes; this is for the wall that
+            is not a common size. It was a slider alone, which meant a room
+            measured at 2437 had to be approximated to the nearest hundred
+            before the design even started.
+          */}
+          <LengthField
+            label="Width"
+            value={width}
             min={600}
             max={6000}
             step={100}
-            value={width}
-            aria-label="Width in millimetres"
-            onChange={(event) => setWidth(Number(event.target.value))}
-            className="w-full accent-brand"
+            onChange={setWidth}
           />
 
           <button

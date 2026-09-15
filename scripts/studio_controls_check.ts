@@ -1,0 +1,380 @@
+/**
+ * Berchuma Studio — the controls somebody actually touches.
+ *
+ *   npx tsx scripts/studio_controls_check.ts
+ *
+ * ## What was wrong
+ *
+ * **Measurements could not be typed.** The cabinet's width, height and depth
+ * were sliders alone; the starting width was a slider alone; and a section's
+ * width was not a control at all, only a label. A studio for joinery that
+ * cannot accept 2437 is a studio that cannot be used for the wall somebody
+ * measured — every number had to be approximated to the nearest step by
+ * dragging, on a phone, with a thumb.
+ *
+ * `config-rail.tsx` already had the right answer and had written down why: a
+ * number box beside the slider, because the slider is how somebody explores
+ * and the box is how they enter a measurement. It just never reached the other
+ * three places.
+ *
+ * **The design was a strip.** The controls sheet was fixed at 70% of the
+ * editor, so the thing the person came to look at got what was left.
+ *
+ * Both halves are checked here: the pure height arithmetic by calling it, and
+ * the wiring by reading the files, because a control that exists and is not
+ * used is the failure mode that has bitten this session repeatedly.
+ */
+
+import { readFileSync } from "node:fs";
+
+import {
+  DEFAULT_SNAP,
+  FULL,
+  OPEN,
+  PEEK,
+  SNAPS,
+  dragOwnsGesture,
+  heightDuringDrag,
+  settle,
+} from "../src/features/berchuma-studio/components/ui/sheet-height.ts";
+
+const GREEN = "\x1b[32m";
+const RED = "\x1b[31m";
+const DIM = "\x1b[2m";
+const RESET = "\x1b[0m";
+
+let passed = 0;
+const failures: string[] = [];
+
+function check(name: string, condition: boolean, detail = "") {
+  if (condition) {
+    passed += 1;
+    return;
+  }
+  failures.push(`${name}${detail ? ` — ${detail}` : ""}`);
+}
+
+/**
+ * A file with its comments stripped.
+ *
+ * Every assertion below is about code. A comment that mentions `LengthField`
+ * satisfies a search for it perfectly well while the control it describes is
+ * not rendered anywhere — which is the trap AGENTS.md names first.
+ */
+function code(path: string): string {
+  return readFileSync(path, "utf8")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+}
+
+const FIELD = "src/features/berchuma-studio/components/ui/length-field.tsx";
+const PANEL = "src/features/berchuma-studio/components/editor/control-panel.tsx";
+const RAIL = "src/features/berchuma-studio/components/config/config-rail.tsx";
+const START = "src/features/berchuma-studio/components/start-panel.tsx";
+const EDITOR = "src/features/berchuma-studio/components/editor/design-editor.tsx";
+
+// ---------------------------------------------------------------------------
+// 1. Every measurement can be typed
+// ---------------------------------------------------------------------------
+
+{
+  const field = code(FIELD);
+
+  check(
+    "the length field has a box to type into",
+    /inputMode="numeric"/.test(field),
+    "a slider alone cannot accept the number somebody took off the wall with a tape",
+  );
+  check(
+    "and a slider to feel for a size with",
+    // The condition as well as the element. `type="range"` is still in the
+    // file when the branch that renders it has been turned off, and a check
+    // that matches the string alone goes green on a field with no slider in
+    // it — which is the identifier outliving the call, exactly.
+    /\{slider \? \(/.test(field) && /type="range"/.test(field),
+    "a box alone makes you guess and retype until it looks right",
+  );
+  check(
+    "the box keeps what is typed until it is committed",
+    /const \[draft, setDraft\] = useState<string \| null>\(null\)/.test(field) &&
+      /onBlur=\{commit\}/.test(field),
+    "clamping on every keystroke rewrites the field under the caret: typing 1400 passes through 1",
+  );
+  check(
+    "Enter commits it",
+    /event\.key === "Enter"/.test(field) && /currentTarget\.blur\(\)/.test(field),
+  );
+  check(
+    "Escape abandons it",
+    /event\.key === "Escape"/.test(field) && /setDraft\(null\)/.test(field),
+  );
+  check(
+    "the arrows step by the same amount the slider does",
+    /event\.key === "ArrowUp" \|\| event\.key === "ArrowDown"/.test(field) &&
+      /event\.key === "ArrowUp" \? step : -step/.test(field),
+  );
+  check(
+    "an outside change is not swallowed by an uncommitted draft",
+    /if \(seen !== rounded\) \{/.test(field) && /setDraft\(null\)/.test(field),
+    "dragging the model's handle has to move the number in the box",
+  );
+  check(
+    "and that reset happens during render, not in an effect",
+    !/useEffect/.test(field),
+    "an effect runs after the browser has painted, so the box would show the stale number for a frame",
+  );
+  check(
+    "the slider is not announced as a second control for one number",
+    /aria-hidden\s*\n?\s*tabIndex=\{-1\}/.test(field) ||
+      (/aria-hidden/.test(field) && /tabIndex=\{-1\}/.test(field)),
+    "two controls over one value are read out as two values",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 2. And it is used everywhere a length is set
+// ---------------------------------------------------------------------------
+
+{
+  const panel = code(PANEL);
+  const rail = code(RAIL);
+  const start = code(START);
+
+  for (const [label, source, path] of [
+    ["the cabinet panel", panel, PANEL],
+    ["the config rail", rail, RAIL],
+    ["the start panel", start, START],
+  ] as [string, string, string][]) {
+    check(
+      `${label} imports the shared field`,
+      /import \{ LengthField \}/.test(source),
+      path,
+    );
+    check(
+      `and ${label} renders it`,
+      /<LengthField/.test(source),
+      path,
+    );
+  }
+
+  check(
+    "width, height and depth are all typeable",
+    (panel.match(/<LengthField/g) ?? []).length >= 4,
+    `${(panel.match(/<LengthField/g) ?? []).length} in the panel`,
+  );
+  check(
+    "there is one length control, not three copies of it",
+    !/function Slider\(/.test(panel) && !/function Dimension\(/.test(rail),
+    "the argument for a box beside a slider was written down once and then not applied twice",
+  );
+  check(
+    "the starting width is no longer a bare slider",
+    !/type="range"/.test(start),
+    "a room measured at 2437 had to be rounded to the nearest hundred before the design began",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 3. A section's width is a control, not a label
+// ---------------------------------------------------------------------------
+
+{
+  const panel = code(PANEL);
+
+  check(
+    "a section's width can be typed",
+    /setBayWidth\(spec, cabinet\.id, bay\.id, width\)/.test(panel),
+    "it used to be printed as text beside the section's name",
+  );
+  check(
+    "with no slider, because a cabinet can hold twenty-four sections",
+    /slider=\{false\}/.test(panel),
+    "twenty-four sliders is a wall of sliders",
+  );
+  check(
+    "its ceiling leaves every neighbour the narrowest width worth building",
+    /interiorWidthOf\(cabinet, spec\.carcass\.board\.thickness\)/.test(panel) &&
+      /\(cabinet\.bays\.length - 1\) \* LIMITS\.minBayWidth/.test(panel),
+  );
+  check(
+    "and a cabinet with one section says so instead of offering a box that refuses",
+    /cabinet\.bays\.length > 1 \?/.test(panel) && /the whole interior/.test(panel),
+    "one section is the interior; a control that can only refuse is not a control",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4. The sheet can be pushed down to see the design
+// ---------------------------------------------------------------------------
+
+{
+  check("the sheet has more than one height", SNAPS.length >= 3);
+  check(
+    "one of them leaves the design most of the screen",
+    PEEK <= 0.3,
+    `${PEEK}`,
+  );
+  check(
+    "one of them covers most of it, for a long list of sections",
+    FULL >= 0.85,
+    `${FULL}`,
+  );
+  check("it opens at the middle one", DEFAULT_SNAP === OPEN);
+  check(
+    "the heights are in order",
+    SNAPS.every((snap, i) => i === 0 || snap > SNAPS[i - 1]),
+    SNAPS.join(", "),
+  );
+
+  // Dragging.
+  check(
+    "dragging down makes the sheet smaller",
+    heightDuringDrag(0.68, 100, 1000) < 0.68,
+  );
+  check(
+    "and dragging up makes it bigger",
+    heightDuringDrag(0.68, -100, 1000) > 0.68,
+  );
+  check(
+    "by the distance the finger moved, as a share of the editor",
+    Math.abs(heightDuringDrag(0.68, 100, 1000) - 0.58) < 1e-9,
+    `${heightDuringDrag(0.68, 100, 1000)}`,
+  );
+  check(
+    "dragging past the bottom does not close it out from under the finger",
+    heightDuringDrag(0.3, 100_000, 1000) === PEEK,
+  );
+  check(
+    "and dragging past the top does not cover the header it hangs from",
+    heightDuringDrag(0.9, -100_000, 1000) === FULL,
+  );
+  check(
+    "an editor of no height leaves it where it was",
+    heightDuringDrag(0.68, 200, 0) === 0.68,
+    "a divide by zero here would set the height to NaN and the sheet would vanish",
+  );
+
+  // Settling.
+  check(
+    "a slow drag settles at the nearest height",
+    settle(0.65, 0) === OPEN && settle(0.3, 0) === PEEK,
+  );
+  check(
+    "a flick down goes a whole step, however short it was",
+    settle(0.9, 3) === OPEN,
+    `${settle(0.9, 3)} — without this a flick from full stops at the nearest, which reads as ignored`,
+  );
+  check(
+    "a flick up goes a whole step too",
+    settle(0.25, -3) === OPEN,
+    `${settle(0.25, -3)}`,
+  );
+  check(
+    "a flick at the bottom stays at the bottom",
+    settle(PEEK, 3) === PEEK,
+  );
+  check(
+    "and one at the top stays at the top",
+    settle(FULL, -3) === FULL,
+  );
+  check(
+    "every height it can settle at is one of the snaps",
+    [0, 0.1, 0.35, 0.5, 0.77, 1].every((h) =>
+      [-4, -0.2, 0, 0.2, 4].every((v) =>
+        (SNAPS as readonly number[]).includes(settle(h, v)),
+      ),
+    ),
+    "a sheet that stops at 37% stays at 37% and has to be fiddled with on every visit",
+  );
+
+  // Who owns the gesture.
+  check(
+    "pulling down on a list that is at its top moves the sheet",
+    dragOwnsGesture(0, 20),
+  );
+  check(
+    "pulling down on a list scrolled into its middle scrolls the list",
+    !dragOwnsGesture(120, 20),
+    "otherwise reading a list of twenty sections drags the sheet shut on every overshoot",
+  );
+  check(
+    "and pushing up never moves the sheet from the list",
+    !dragOwnsGesture(0, -20),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 5. The sheet's wiring
+// ---------------------------------------------------------------------------
+
+{
+  const editor = code(EDITOR);
+
+  check(
+    "the sheet's height comes from the drag, not from a fixed class",
+    /style=\{\{ height: `\$\{height \* 100\}%` \}\}/.test(editor) &&
+      !/max-h-\[70%\]/.test(editor),
+    "70% of the editor left the design a strip",
+  );
+  check(
+    "there is a handle to drag it by",
+    /onPointerDown=\{beginDrag\}/.test(editor),
+  );
+  check(
+    "the list can drag it too, under the rule that decides which",
+    /dragOwnsGesture\(scrollTop, travel\)/.test(editor),
+  );
+  check(
+    "the gesture finishes even when the finger leaves the shrinking sheet",
+    /window\.addEventListener\("pointermove"/.test(editor) &&
+      /window\.addEventListener\("pointerup"/.test(editor),
+    "handlers on the element stop firing the moment the sheet slides out from under the finger",
+  );
+  check(
+    "and a cancelled pointer is cleaned up like a finished one",
+    // Specifically the *adding* of it. `pointercancel` also appears in the
+    // `removeEventListener` line, so a search for the bare word stays green
+    // with the listener never attached — a second copy of the name elsewhere
+    // in the same function.
+    /window\.addEventListener\("pointercancel", finish\)/.test(editor) &&
+      /window\.removeEventListener\("pointercancel", finish\)/.test(editor),
+    "a phone call mid-drag otherwise leaves listeners on the window forever",
+  );
+  check(
+    "the handle works without a pointer at all",
+    /onClick=\{\(\) => setHeight\(nextSnap\(height\)\)\}/.test(editor),
+    "a drag is not available to a keyboard or a switch",
+  );
+  check(
+    "and says which height it is at",
+    /aria-label=\{`Sheet height: \$\{describe\(height\)\}/.test(editor),
+  );
+  check(
+    "the height does not animate while a finger is on it",
+    /dragging \? "" : "transition-\[height\]/.test(editor),
+    "a transition during a drag makes the sheet lag the finger by its duration",
+  );
+  check(
+    "reopening returns it to the height it opens at",
+    /function openPanel\(\) \{/.test(editor) &&
+      /setHeight\(DEFAULT_SNAP\);/.test(editor),
+    "somebody who pushed it down to see the model wants the controls back when they press Edit",
+  );
+  check(
+    "the list still scrolls inside whatever height the sheet is",
+    /min-h-0 flex-1 overflow-y-auto overscroll-contain/.test(editor),
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+if (failures.length > 0) {
+  console.log(`\n${RED}${failures.length} failed${RESET}`);
+  for (const failure of failures) console.log(`  ${RED}✗${RESET} ${failure}`);
+  console.log(`${GREEN}${passed} passed${RESET}`);
+  process.exit(1);
+}
+
+console.log(`${GREEN}${passed} passed, 0 failed${RESET}`);
+console.log(`${DIM}studio: every measurement typed, and the design given room${RESET}`);

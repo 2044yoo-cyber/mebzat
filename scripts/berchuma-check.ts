@@ -62,10 +62,13 @@ import {
   moveDrawer,
   openingHeightOf,
   removeDrawer,
+  setBayWidth,
   setDrawerHeight,
+  interiorWidthOf,
 } from "../src/features/berchuma-studio/services/operations.ts";
 import { buildParts, hingesPerLeaf } from "../src/features/berchuma-studio/services/geometry.ts";
 import {
+  LIMITS,
   allBays,
   boundingBox,
   parseSpec,
@@ -1588,6 +1591,100 @@ function noOverlaps(spec: ReturnType<typeof startingDesign>): boolean {
     split.meta.corrections.length === 0,
     split.meta.corrections.join("; "),
   );
+
+  // --- Typing a section's width ------------------------------------------
+  //
+  // This did not exist. Every section was the width `redivide` gave it, which
+  // is the interior shared equally, and the panel printed that number as a
+  // label. Real furniture is not in equal sections — a wardrobe is a hanging
+  // bay beside a narrower bank of drawers — and the drawer panel's own comment
+  // already pointed at "the bay width, which is already above this" as the
+  // control for it. It was not above this. It was nowhere.
+  {
+    const two = split; // the sink cabinet, now with two sections
+    const twoSink = two.cabinets.find((cabinet) => cabinet.id === sink.id)!;
+    const interior = interiorWidthOf(twoSink, two.carcass.board.thickness);
+    const asked = Math.round(interior * 0.62);
+
+    const typed = setBayWidth(two, sink.id, twoSink.bays[0]!.id, asked);
+    const after = typed.cabinets.find((cabinet) => cabinet.id === sink.id)!;
+
+    check(
+      "a section takes the width that was typed into it",
+      Math.round(after.bays[0]!.width) === asked,
+      `asked ${asked}, got ${Math.round(after.bays[0]!.width)}`,
+    );
+    check(
+      "and the sections still add up to the interior exactly",
+      after.bays.reduce((sum, bay) => sum + bay.width, 0) === Math.round(interior),
+      `${after.bays.map((bay) => Math.round(bay.width)).join(" + ")} against ${Math.round(interior)}`,
+    );
+    check(
+      "so nothing has to be corrected afterwards",
+      typed.meta.corrections.length === 0,
+      typed.meta.corrections.join("; ") ||
+        "a correction here means validateSpec rescaled the number the user typed",
+    );
+
+    // More than fits.
+    const greedy = setBayWidth(two, sink.id, twoSink.bays[0]!.id, 99_999);
+    const greedyCabinet = greedy.cabinets.find((c) => c.id === sink.id)!;
+    check(
+      "a section asked for more than the cabinet holds gets what it holds",
+      Math.round(greedyCabinet.bays[0]!.width) ===
+        Math.round(interior) - (greedyCabinet.bays.length - 1) * LIMITS.minBayWidth,
+      greedyCabinet.bays.map((bay) => Math.round(bay.width)).join(", "),
+    );
+    check(
+      "and its neighbours keep the narrowest width worth building",
+      greedyCabinet.bays
+        .slice(1)
+        .every((bay) => Math.round(bay.width) >= LIMITS.minBayWidth),
+      `floor is ${LIMITS.minBayWidth}`,
+    );
+
+    const slivered = setBayWidth(two, sink.id, twoSink.bays[0]!.id, 5);
+    const sliveredCabinet = slivered.cabinets.find((c) => c.id === sink.id)!;
+    check(
+      "and one asked for a sliver gets the floor, not a sliver",
+      Math.round(sliveredCabinet.bays[0]!.width) === LIMITS.minBayWidth,
+      `${Math.round(sliveredCabinet.bays[0]!.width)} mm`,
+    );
+
+    // Proportionality: the shape of what is already there survives.
+    let three = addBay(two, sink.id);
+    const threeSink = three.cabinets.find((c) => c.id === sink.id)!;
+    three = setBayWidth(three, sink.id, threeSink.bays[1]!.id, 600);
+    const wide = three.cabinets.find((c) => c.id === sink.id)!;
+    three = setBayWidth(three, sink.id, wide.bays[0]!.id, 400);
+    const shared = three.cabinets.find((c) => c.id === sink.id)!;
+    check(
+      "widening one section takes more from the wide neighbour than the narrow one",
+      shared.bays[1]!.width > shared.bays[2]!.width,
+      shared.bays.map((bay) => Math.round(bay.width)).join(", "),
+    );
+
+    // One section is the interior, so there is nothing to take from.
+    const single = start.cabinets.find((cabinet) => cabinet.id === sink.id)!;
+    const alone = setBayWidth(start, sink.id, single.bays[0]!.id, 100);
+    check(
+      "a cabinet with one section is left alone rather than given a hole",
+      Math.round(
+        alone.cabinets.find((c) => c.id === sink.id)!.bays[0]!.width,
+      ) === Math.round(single.bays[0]!.width),
+      "the honest control at that point is the cabinet's own width",
+    );
+
+    check(
+      "the interior is the carcass less its sides and its dividers",
+      Math.round(interiorWidthOf(twoSink, two.carcass.board.thickness)) ===
+        Math.round(
+          twoSink.size.width -
+            2 * two.carcass.board.thickness -
+            (twoSink.bays.length - 1) * two.carcass.board.thickness,
+        ),
+    );
+  }
 
   const doorless = setBayDoor(start, sink.id, sink.bays[0]!.id, "none");
   check(

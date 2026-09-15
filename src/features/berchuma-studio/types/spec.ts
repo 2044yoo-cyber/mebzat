@@ -610,6 +610,16 @@ export const LIMITS = {
   maxDrawerFront: 280,
   /** A divider-supported wardrobe module fits stock board and will not sag. */
   wardrobeBayWidth: 900,
+  /**
+   * The narrowest section worth building, in mm.
+   *
+   * A floor on what somebody can type into a section's width, not a rule about
+   * design: a 150 mm bottle pull-out is a real cabinet and a 40 mm one is a
+   * slot. It also keeps the arithmetic honest — a section cannot be typed so
+   * wide that its neighbours are squeezed below the width of the board that
+   * divides them.
+   */
+  minBayWidth: 150,
 } as const;
 
 export type SpecIssue = {
