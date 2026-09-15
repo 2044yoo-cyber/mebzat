@@ -5,6 +5,98 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
+ * The box on its own, without the label row or the slider around it.
+ *
+ * Pulled out of `LengthField` when the drawer heights needed the same
+ * behaviour in a row that has no room for a label row or a slider. It is the
+ * *behaviour* that had to be shared, not the layout: the drawer heights were a
+ * plain `type="number"` writing through on every keystroke, and because
+ * `Number("")` is 0 and 0 clamps to the minimum, selecting the number and
+ * pressing Delete put the minimum back before the first new digit could be
+ * typed. The field looked editable and could not be edited.
+ */
+export function LengthInput({
+  label,
+  value,
+  min,
+  max,
+  step = 10,
+  unit = "mm",
+  className,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  unit?: string;
+  className?: string;
+  onChange: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const rounded = Math.round(value);
+
+  // See the note in `LengthField`: reset at render, not in an effect.
+  const [seen, setSeen] = useState(rounded);
+  if (seen !== rounded) {
+    setSeen(rounded);
+    setDraft(null);
+  }
+
+  const clamp = (next: number) => Math.min(max, Math.max(min, Math.round(next)));
+
+  const commit = () => {
+    if (draft === null) return;
+    const next = Number(draft);
+    setDraft(null);
+    // An empty box is somebody part-way through typing, not a request for
+    // zero. Committing it puts back what was there, which is also what makes
+    // clearing the field safe enough to be worth allowing.
+    if (draft.trim() !== "" && Number.isFinite(next)) onChange(clamp(next));
+  };
+
+  return (
+    <input
+      // `inputMode` rather than `type="number"`: a number input on a phone
+      // still shows the full keyboard on some Android browsers, and its
+      // spinner steals horizontal room in a 14-character box.
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      aria-label={`${label} in ${unit || "units"}`}
+      value={draft ?? String(rounded)}
+      onChange={(event) => setDraft(event.target.value.replace(/[^0-9]/g, ""))}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+        if (event.key === "Escape") {
+          setDraft(null);
+          event.currentTarget.blur();
+        }
+        // The arrows step by the same amount the slider does, which is what
+        // somebody who has just typed a number expects them to do. The
+        // preventDefault also keeps the keypress off the design behind the
+        // panel, where an arrow moves the selected cabinet.
+        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+          event.preventDefault();
+          const from = draft === null ? rounded : Number(draft) || rounded;
+          onChange(clamp(from + (event.key === "ArrowUp" ? step : -step)));
+        }
+      }}
+      className={cn(
+        "rounded-md border bg-background text-right tabular-nums",
+        "focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/40",
+        className ?? "h-8 w-20 px-2 text-xs",
+      )}
+    />
+  );
+}
+
+/**
  * A measurement: a box to type it in and a slider to feel for it.
  *
  * Both, not one. The slider is how somebody explores — "a bit wider, a bit
@@ -55,72 +147,22 @@ export function LengthField({
   hint?: string;
   onChange: (value: number) => void;
 }) {
-  const [draft, setDraft] = useState<string | null>(null);
   const rounded = Math.round(value);
-
-  // An outside change — the model's drag handle, or a sibling field
-  // redistributing — should not be swallowed by a draft the user has not
-  // committed. Dropping the draft when the incoming value moves keeps the two
-  // in step without fighting the keyboard.
-  //
-  // Adjusted during render rather than in an effect. React's own guidance for
-  // "reset some state when a prop changes", and the reason is not style: an
-  // effect runs *after* the browser has been given a frame to paint, so the
-  // box would show the stale draft for one frame and then correct itself.
-  // Doing it here means the render that brings the new value is the render
-  // that shows it.
-  const [seen, setSeen] = useState(rounded);
-  if (seen !== rounded) {
-    setSeen(rounded);
-    setDraft(null);
-  }
-
   const clamp = (next: number) => Math.min(max, Math.max(min, Math.round(next)));
-
-  const commit = () => {
-    if (draft === null) return;
-    const next = Number(draft);
-    setDraft(null);
-    if (draft.trim() !== "" && Number.isFinite(next)) onChange(clamp(next));
-  };
 
   return (
     <div className="space-y-1">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[11px] text-muted-foreground">{label}</span>
         <div className="flex items-baseline gap-1">
-          <input
-            // `inputMode` rather than `type="number"`: a number input on a
-            // phone still shows the full keyboard on some Android browsers,
-            // and its spinner steals horizontal room in a 14-character box.
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            aria-label={`${label} in ${unit || "units"}`}
-            value={draft ?? String(rounded)}
-            onChange={(event) => setDraft(event.target.value.replace(/[^0-9]/g, ""))}
-            onBlur={commit}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                event.currentTarget.blur();
-              }
-              if (event.key === "Escape") {
-                setDraft(null);
-                event.currentTarget.blur();
-              }
-              // The arrows step by the same amount the slider does, which is
-              // what somebody who has just typed a number expects them to do.
-              if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-                event.preventDefault();
-                const from = draft === null ? rounded : Number(draft) || rounded;
-                onChange(clamp(from + (event.key === "ArrowUp" ? step : -step)));
-              }
-            }}
-            className={cn(
-              "h-8 w-20 rounded-md border bg-background px-2 text-right text-xs tabular-nums",
-              "focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/40",
-            )}
+          <LengthInput
+            label={label}
+            value={value}
+            min={min}
+            max={max}
+            step={step}
+            unit={unit}
+            onChange={onChange}
           />
           {unit ? (
             <span className="text-[11px] text-muted-foreground">{unit}</span>

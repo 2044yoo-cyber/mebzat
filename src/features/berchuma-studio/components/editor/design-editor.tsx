@@ -1,11 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   Box,
   ChevronDown,
   Loader2,
+  Minus,
+  Plus,
   Ruler,
   SlidersHorizontal,
   Undo2,
@@ -22,7 +24,23 @@ import {
   heightDuringDrag,
   settle,
 } from "../ui/sheet-height";
-import { moveCabinet, resizeCabinet } from "../../services/operations";
+import {
+  AXES,
+  NUDGE_STEP,
+  type Axis,
+  type Direction,
+  nudgeBlocked,
+  nudgeStep,
+  nudgeTo,
+  readShortcut,
+  typingInto,
+} from "../../services/nudge";
+import {
+  duplicateCabinet,
+  moveCabinet,
+  removeCabinet,
+  resizeCabinet,
+} from "../../services/operations";
 import { Elevation } from "../viewer/elevation";
 import type { DesignSpec } from "../../types/spec";
 
@@ -153,6 +171,82 @@ export function DesignEditor({
 
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
+
+  /**
+   * One step along an axis, from a button or from a key.
+   *
+   * Refuses the same steps the buttons refuse. A key has no disabled state to
+   * show, so without this a held PageDown on a cabinet whose depth the run
+   * decides would fill the undo history with changes that changed nothing.
+   */
+  function nudge(axis: Axis, direction: Direction, step: number = NUDGE_STEP) {
+    if (!selected) return false;
+    if (nudgeBlocked(selected, axis, direction, step)) return false;
+    onChange(moveCabinet(spec, selected.id, nudgeTo(selected, axis, direction, step)));
+    return true;
+  }
+
+  /**
+   * The keyboard, on a desktop.
+   *
+   * Bound to the window rather than to a focusable wrapper, because the thing
+   * these act on is the *selection*, and the selection is made by clicking the
+   * model — a WebGL canvas that does not take focus. Requiring a Tab into some
+   * container first would mean the shortcuts did nothing at the moment somebody
+   * most expects them to work, which is right after they clicked a cabinet.
+   *
+   * `typingInto` is what keeps that from being rude: any field that wants a key
+   * gets it, so Backspace in a name deletes a letter and not the cabinet.
+   */
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (typingInto(event.target as HTMLElement | null)) return;
+
+      const shortcut = readShortcut(event);
+      if (!shortcut) return;
+
+      // Undo is the one that works with nothing selected: the change being
+      // taken back need not have been made to the selected cabinet, or to a
+      // cabinet at all.
+      if (shortcut.kind === "undo") {
+        if (!onUndo || !canUndo) return;
+        event.preventDefault();
+        onUndo();
+        return;
+      }
+
+      if (!selected) return;
+      event.preventDefault();
+
+      switch (shortcut.kind) {
+        case "move":
+          nudge(shortcut.axis, shortcut.direction, nudgeStep(event));
+          return;
+        case "delete":
+          // The selection is dropped first: leaving it pointing at a cabinet
+          // that no longer exists leaves the panel showing controls for
+          // nothing.
+          setSelectedId(null);
+          onChange(removeCabinet(spec, selected.id));
+          return;
+        case "duplicate":
+          onChange(duplicateCabinet(spec, selected.id));
+          return;
+        case "deselect":
+          setSelectedId(null);
+          return;
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // Deliberately no dependency array. The handler reads the spec, the
+    // selection and whether there is anything to undo, and all three change
+    // often; two of the things it calls are arrow functions the parent makes
+    // fresh every render, so a dependency list would re-run every render
+    // anyway. Swapping one window listener is cheaper than the render that
+    // preceded it.
+  });
 
   return (
     <div className="relative flex h-full min-h-0 w-full">
@@ -301,6 +395,67 @@ export function DesignEditor({
           </label> : null}
         </div>
 
+        {/*
+          Right edge: move the selected cabinet, one step at a time.
+
+          Dragging is the only other way, and it is bad at exactly the job
+          somebody reaches for this to do. A 10 mm shadow gap between two
+          cabinets is not a distance a thumb can land on, and on a phone the
+          drag competes with the orbit gesture — push a cabinet sideways and
+          the camera swings as often as the cabinet moves.
+
+          On the right rather than under the drawing: the bottom already has
+          the selection read-out and the Edit button, and the sheet comes up
+          over it. Vertically centred, so the pad is under the thumb of a hand
+          holding the phone rather than at the top of a reach.
+        */}
+        {view === "solid" && selected ? (
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center p-2">
+            <div className="pointer-events-auto flex flex-col gap-1 rounded-lg border border-white/10 bg-background/70 p-1 backdrop-blur-xl">
+              {AXES.map(({ axis, label, towards }) => (
+                <div key={axis} className="flex items-center gap-0.5">
+                  {([-1, 1] as Direction[]).map((direction) => {
+                    const blocked = nudgeBlocked(selected, axis, direction);
+                    const towardsLabel =
+                      towards[direction === -1 ? 0 : 1];
+                    return (
+                      <Fragment key={direction}>
+                        {direction === 1 ? (
+                          <span
+                            aria-hidden
+                            className="w-3 text-center text-[10px] font-medium text-muted-foreground"
+                          >
+                            {label}
+                          </span>
+                        ) : null}
+                        <NudgeButton
+                          // The reason, not just a dimmed button. A control
+                          // that refuses and will not say why is the thing
+                          // this whole change is about.
+                          label={
+                            blocked ?? `Move ${selected.label} ${towardsLabel}`
+                          }
+                          disabled={blocked !== null}
+                          onClick={() => nudge(axis, direction)}
+                        >
+                          {direction === -1 ? (
+                            <Minus className="size-3" aria-hidden />
+                          ) : (
+                            <Plus className="size-3" aria-hidden />
+                          )}
+                        </NudgeButton>
+                      </Fragment>
+                    );
+                  })}
+                </div>
+              ))}
+              <span className="px-0.5 text-center text-[9px] tabular-nums text-muted-foreground">
+                {NUDGE_STEP} mm
+              </span>
+            </div>
+          </div>
+        ) : null}
+
         {/* Bottom left: what is selected, and how big everything is. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-2 p-2">
           <div className="rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-[11px] backdrop-blur-xl">
@@ -427,6 +582,36 @@ export function DesignEditor({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** One half of an axis pair. Dimmed rather than hidden at the end of its range. */
+function NudgeButton({
+  label,
+  onClick,
+  disabled,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "flex size-7 items-center justify-center rounded-md border border-white/10",
+        "bg-background/60 transition-opacity active:bg-background",
+        "disabled:opacity-30",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

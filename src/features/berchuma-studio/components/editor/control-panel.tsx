@@ -18,7 +18,7 @@ import {
 
 import { cn } from "@/lib/utils";
 
-import { LengthField } from "../ui/length-field";
+import { LengthField, LengthInput } from "../ui/length-field";
 
 import { BOARDS, EDGE_BANDS, findBoard, findEdgeBand } from "../../types/catalogue";
 import { KITCHEN_MODULES, MODULE_GROUPS } from "../../services/kitchen-modules";
@@ -545,22 +545,26 @@ function DrawerList({
             {index + 1}
           </span>
 
-          <input
-            type="number"
+          {/*
+            The same box the rest of the studio's measurements use.
+
+            It was a `type="number"` writing through on every keystroke, which
+            made it look editable and refuse to be edited: `Number("")` is 0,
+            0 clamps to the minimum front height, so selecting the number and
+            pressing Delete put 60 back before the first new digit could be
+            typed — and typing 240 over 120 passed through 2, clamped, and
+            moved the caret.
+          */}
+          <LengthInput
+            label={`Drawer ${index + 1} front height`}
             value={height}
             min={LIMITS.minDrawerFront}
             max={LIMITS.maxDrawerFront}
             step={10}
-            aria-label={`Drawer ${index + 1} front height in millimetres`}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              if (Number.isFinite(next)) {
-                onChange(
-                  setDrawerHeight(spec, cabinet.id, bay.id, index, next),
-                );
-              }
-            }}
-            className="w-14 rounded border bg-background px-1 py-0.5 text-[11px] tabular-nums"
+            onChange={(next) =>
+              onChange(setDrawerHeight(spec, cabinet.id, bay.id, index, next))
+            }
+            className="w-14 px-1 py-0.5 text-[11px]"
           />
           <span className="text-[10px] text-muted-foreground">mm</span>
 

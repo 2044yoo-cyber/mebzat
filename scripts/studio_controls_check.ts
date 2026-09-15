@@ -46,6 +46,24 @@ import {
   tvUnitExample,
 } from "../src/features/berchuma-studio/services/examples.ts";
 import {
+  AXES,
+  NUDGE_COARSE,
+  NUDGE_FINE,
+  NUDGE_STEP,
+  canNudge,
+  nudgeBlocked,
+  nudgeStep,
+  nudgeTo,
+  readShortcut,
+  typingInto,
+} from "../src/features/berchuma-studio/services/nudge.ts";
+import {
+  frontHeightsOf,
+  moveCabinet,
+  openingHeightOf,
+  setDrawerHeight,
+} from "../src/features/berchuma-studio/services/operations.ts";
+import {
   COALESCE_MS,
   DEPTH,
   canRewind,
@@ -92,6 +110,32 @@ function code(path: string): string {
     .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
     .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
     .replace(/^\s*\/\/.*$/gm, "");
+}
+
+/**
+ * One function's text, so a check can be scoped to it.
+ *
+ * The trap AGENTS.md names second: a sibling function in the same file has the
+ * same line, so a check over the whole file passes while the function it is
+ * about has lost the thing.
+ *
+ * Read to the next line that is a closing brace on its own. Two simpler rules
+ * were tried and both stopped inside the signature, because a component in
+ * this codebase is declared as `function DrawerList({ spec, ... }: { ... })`:
+ * counting braces closed at the end of the destructuring pattern, and the
+ * first `}` in column one is that pattern's, which is written `}: {`. A brace
+ * alone on its line is the function's, because every component here is at the
+ * top level and nothing inside one is indented that far. `indent` is for a
+ * function nested inside another, whose closing brace is not in column one.
+ */
+function functionText(source: string, name: string, indent = ""): string {
+  const at = source.indexOf(`function ${name}(`);
+  if (at === -1) return "";
+
+  const end = source.slice(at).search(new RegExp(`\\n${indent}\\}(\\n|$)`));
+  return end === -1
+    ? source.slice(at)
+    : source.slice(at, at + end + 2 + indent.length);
 }
 
 const FIELD = "src/features/berchuma-studio/components/ui/length-field.tsx";
@@ -176,7 +220,12 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   ] as [string, string, string][]) {
     check(
       `${label} imports the shared field`,
-      /import \{ LengthField \}/.test(source),
+      // The named import rather than the whole statement: the drawer heights
+      // added `LengthInput` beside it, and an exact-statement match failed on
+      // a file that had only grown a second name from the same module.
+      /import \{[^}]*\bLengthField\b[^}]*\} from "[^"]*length-field"/.test(
+        source,
+      ),
       path,
     );
     check(
@@ -1009,6 +1058,371 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
     "the way back is labelled for a screen reader",
     /aria-label="Show the title and the save buttons"/.test(editor),
   );
+}
+
+// ---------------------------------------------------------------------------
+// 9. Moving the selection without dragging it
+// ---------------------------------------------------------------------------
+
+{
+  const spec = tvUnitExample();
+  const cabinet = spec.cabinets[0];
+
+  check(
+    "a step is ten millimetres",
+    nudgeStep({}) === NUDGE_STEP && NUDGE_STEP === 10,
+    `got ${nudgeStep({})}`,
+  );
+  check(
+    "Shift takes a bigger bite",
+    nudgeStep({ shiftKey: true }) === NUDGE_COARSE && NUDGE_COARSE > NUDGE_STEP,
+  );
+  check(
+    "Alt takes a smaller one",
+    nudgeStep({ altKey: true }) === NUDGE_FINE && NUDGE_FINE < NUDGE_STEP,
+  );
+  check(
+    "Shift wins when both are held",
+    nudgeStep({ shiftKey: true, altKey: true }) === NUDGE_COARSE,
+    "the coarse step is the one you reach for deliberately",
+  );
+
+  check(
+    "a step right moves it right by the step",
+    nudgeTo(cabinet, "x", 1, 10).x === cabinet.position.x + 10,
+  );
+  check(
+    "a step left moves it left",
+    nudgeTo({ ...cabinet, position: { ...cabinet.position, x: 500 } }, "x", -1, 10)
+      .x === 490,
+  );
+  check(
+    "a cabinet at the end of the run does not go past it",
+    nudgeTo({ ...cabinet, position: { ...cabinet.position, x: 0 } }, "x", -1, 10)
+      .x === 0,
+    "x is measured from the left end, so a negative one is off the drawing",
+  );
+  check(
+    "and one on the floor does not go through it",
+    nudgeTo({ ...cabinet, position: { ...cabinet.position, y: 0 } }, "y", -1, 10)
+      .y === 0,
+  );
+  check(
+    "depth is allowed to be negative",
+    nudgeTo({ ...cabinet, runId: undefined, position: { ...cabinet.position, z: 0 } }, "z", -1, 10)
+      .z === -10,
+    "a wall shelf standing proud of the unit below it is a real thing somebody draws",
+  );
+  check(
+    "one axis at a time",
+    Object.keys(nudgeTo(cabinet, "x", 1, 10)).length === 1,
+    "a move that also writes the other two would undo a drag somebody just made",
+  );
+
+  check(
+    "a step that would move it is offered",
+    canNudge({ ...cabinet, position: { ...cabinet.position, x: 500 } }, "x", -1),
+  );
+  check(
+    "one that would not is refused with a reason",
+    nudgeBlocked({ ...cabinet, position: { ...cabinet.position, y: 0 } }, "y", -1) ===
+      "Already on the floor",
+    `got ${nudgeBlocked({ ...cabinet, position: { ...cabinet.position, y: 0 } }, "y", -1)}`,
+  );
+  check(
+    "depth is refused on a cabinet whose run decides it",
+    Boolean(cabinet.runId) &&
+      nudgeBlocked(cabinet, "z", 1) ===
+        "Depth is set by the run this cabinet stands on",
+    "moveCabinet drops a z for a cabinet on a run, so a Z button that did not know would be dead",
+  );
+  check(
+    "and offered on one that stands free",
+    canNudge({ ...cabinet, runId: undefined }, "z", 1),
+  );
+
+  // The reason the refusal above is not a guess: the operation really does
+  // ignore it. Asserted by calling it rather than by reading moveCabinet,
+  // because that is the behaviour the button is promising to reflect.
+  check(
+    "moveCabinet really does ignore a depth on a run cabinet",
+    moveCabinet(spec, cabinet.id, { z: 40 }).cabinets[0].position.z ===
+      cabinet.position.z,
+  );
+  check(
+    "a step actually lands in the design",
+    moveCabinet(spec, cabinet.id, nudgeTo(cabinet, "x", 1, 10)).cabinets[0]
+      .position.x ===
+      cabinet.position.x + 10,
+    "the reflow used to pack the row, which swallowed the step on its way in",
+  );
+
+  check(
+    "there is a pair of buttons for each of the three axes",
+    AXES.length === 3 &&
+      AXES.map(({ axis }) => axis).join("") === "xyz" &&
+      AXES.every(({ towards }) => towards[0] !== towards[1]),
+  );
+  check(
+    "and each direction is named for the room, not for the sign",
+    AXES.every(({ towards }) =>
+      towards.every((word) => word.length > 1 && !/^[+-]$/.test(word)),
+    ),
+    '"minus" means nothing to somebody looking at a wardrobe',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 10. What a keypress means
+// ---------------------------------------------------------------------------
+
+{
+  const moves: [string, string, number][] = [
+    ["ArrowLeft", "x", -1],
+    ["ArrowRight", "x", 1],
+    ["ArrowUp", "y", 1],
+    ["ArrowDown", "y", -1],
+    ["PageUp", "z", 1],
+    ["PageDown", "z", -1],
+  ];
+
+  for (const [key, axis, direction] of moves) {
+    const shortcut = readShortcut({ key });
+    check(
+      `${key} moves it ${direction > 0 ? "up" : "down"} the ${axis} axis`,
+      shortcut?.kind === "move" &&
+        shortcut.axis === axis &&
+        shortcut.direction === direction,
+      `got ${JSON.stringify(shortcut)}`,
+    );
+  }
+
+  check(
+    "Delete removes the selected cabinet",
+    readShortcut({ key: "Delete" })?.kind === "delete",
+  );
+  check(
+    "and so does Backspace, which is the key a laptop has",
+    readShortcut({ key: "Backspace" })?.kind === "delete",
+  );
+  check(
+    "Escape lets go of the selection",
+    readShortcut({ key: "Escape" })?.kind === "deselect",
+  );
+  check(
+    "Ctrl+Z undoes",
+    readShortcut({ key: "z", ctrlKey: true })?.kind === "undo",
+  );
+  check(
+    "and so does Cmd+Z, on a Mac",
+    readShortcut({ key: "z", metaKey: true })?.kind === "undo",
+  );
+  check(
+    "Ctrl+Shift+Z is left alone",
+    readShortcut({ key: "z", ctrlKey: true, shiftKey: true }) === null,
+    "that is redo everywhere else, and there is no redo here to give it",
+  );
+  check(
+    "Ctrl+D duplicates, whatever case the key arrives in",
+    readShortcut({ key: "d", ctrlKey: true })?.kind === "duplicate" &&
+      readShortcut({ key: "D", metaKey: true })?.kind === "duplicate",
+    "holding Shift-less Ctrl still sends 'd', but a caps-locked keyboard sends 'D'",
+  );
+  check(
+    "Ctrl and an arrow are left to the browser",
+    readShortcut({ key: "ArrowLeft", ctrlKey: true }) === null &&
+      readShortcut({ key: "ArrowRight", metaKey: true }) === null,
+    "that is jump-a-word and go-back-a-page, and they are not ours to take",
+  );
+  check(
+    "anything unclaimed is left alone",
+    readShortcut({ key: "Tab" }) === null &&
+      readShortcut({ key: "a" }) === null &&
+      readShortcut({ key: "Enter" }) === null,
+    "swallowing Tab would trap the keyboard on the drawing",
+  );
+
+  check(
+    "a key going into a text box is not a shortcut",
+    typingInto({ tagName: "INPUT" }) &&
+      typingInto({ tagName: "textarea" }) &&
+      typingInto({ tagName: "SELECT" }),
+    "Backspace in a cabinet's name would otherwise delete the cabinet",
+  );
+  check(
+    "nor one going into something being edited in place",
+    typingInto({ tagName: "DIV", isContentEditable: true }),
+  );
+  check(
+    "a key on the drawing is",
+    !typingInto({ tagName: "CANVAS" }) && !typingInto(null),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 11. The wiring of the pad and the keyboard
+// ---------------------------------------------------------------------------
+
+{
+  const editor = code(EDITOR);
+
+  check(
+    "the pad is on the drawing, and only with something selected",
+    /\{view === "solid" && selected \? \(/.test(editor),
+    "three dimmed pairs of buttons with nothing selected is three controls that do nothing",
+  );
+  check(
+    "it draws a pair for every axis",
+    /\{AXES\.map\(\(\{ axis, label, towards \}\) => \(/.test(editor),
+    "a hardcoded X and Y would be one edit away from disagreeing with the keyboard",
+  );
+  check(
+    "a refused button carries its reason",
+    /const blocked = nudgeBlocked\(selected, axis, direction\);/.test(editor) &&
+      /label=\{\s*\n?\s*blocked \?\? /.test(editor) &&
+      /disabled=\{blocked !== null\}/.test(editor),
+    "a control that refuses and will not say why is what this whole change is about",
+  );
+  check(
+    "the keyboard is listened to on the window",
+    /window\.addEventListener\("keydown", onKeyDown\)/.test(editor) &&
+      /window\.removeEventListener\("keydown", onKeyDown\)/.test(editor),
+    "the model is a canvas that never takes focus, so a focused wrapper would never hear the key",
+  );
+  check(
+    "and a field that wants the key gets it first",
+    /if \(typingInto\(event\.target as HTMLElement \| null\)\) return;/.test(
+      editor,
+    ),
+  );
+  // Scoped to the handler. `preventDefault` appears twice more in this file —
+  // once in the sheet's pointer drag — so a check over the whole of it passed
+  // with the keyboard's own call deleted, which is the second copy trap
+  // AGENTS.md names, caught by mutating the code it is about.
+  const onKeyDown = functionText(editor, "onKeyDown", "    ");
+
+  check(
+    "the handler is where the check is looking",
+    onKeyDown.includes("readShortcut(event)") &&
+      !onKeyDown.includes("pointermove"),
+    `${onKeyDown.length} characters`,
+  );
+  check(
+    "a claimed key does not also reach the browser",
+    /if \(!selected\) return;\s*\n\s*event\.preventDefault\(\);/.test(onKeyDown),
+    "an arrow that moves a cabinet and also scrolls the page is one keypress doing two things",
+  );
+  check(
+    "including the undo, which is claimed before the selection is checked",
+    /if \(!onUndo \|\| !canUndo\) return;\s*\n\s*event\.preventDefault\(\);/.test(
+      onKeyDown,
+    ),
+    "Ctrl+Z would otherwise undo the studio's change and then the browser's",
+  );
+  check(
+    "undo works with nothing selected",
+    /if \(shortcut\.kind === "undo"\) \{/.test(editor) &&
+      /if \(!selected\) return;/.test(editor),
+    "the change being taken back need not have been made to the selected cabinet",
+  );
+  check(
+    "deleting lets go of what it deleted",
+    /setSelectedId\(null\);\s*\n\s*onChange\(removeCabinet\(spec, selected\.id\)\);/.test(
+      editor,
+    ),
+    "a selection pointing at a cabinet that no longer exists leaves the panel editing nothing",
+  );
+  check(
+    "the keyboard refuses the steps the buttons refuse",
+    /if \(nudgeBlocked\(selected, axis, direction, step\)\) return false;/.test(
+      editor,
+    ),
+    "a held PageDown would otherwise fill the undo history with changes that changed nothing",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 12. A drawer height you can clear
+// ---------------------------------------------------------------------------
+
+{
+  const spec = tvUnitExample();
+  const cabinet = spec.cabinets[0];
+  const bay = cabinet.bays.find((entry) => entry.fitting.kind === "drawers");
+
+  if (!bay) {
+    failures.push("the TV unit has no drawer bay to check against");
+  } else {
+    const opening = openingHeightOf(cabinet, spec.carcass.board.thickness);
+    const before =
+      bay.fitting.kind === "drawers"
+        ? frontHeightsOf(bay.fitting, opening)
+        : [];
+
+    // This is the bug, stated as a fact about the operation rather than about
+    // the control: writing what an emptied box produces does not leave the
+    // drawers alone. The control's job is never to write it.
+    const cleared = setDrawerHeight(spec, cabinet.id, bay.id, 0, 0);
+    const clearedBay = cleared.cabinets[0].bays.find(
+      (entry) => entry.id === bay.id,
+    );
+    const after =
+      clearedBay && clearedBay.fitting.kind === "drawers"
+        ? frontHeightsOf(clearedBay.fitting, opening)
+        : [];
+
+    check(
+      "writing the zero an emptied box produces would wreck the stack",
+      after.length > 0 && after.join() !== before.join(),
+      `${before.join("/")} -> ${after.join("/")} — which is why the field must not commit an empty draft`,
+    );
+
+    const field = code(FIELD);
+    const panel = code(PANEL);
+
+    // Scoped to the drawer list. The panel has other handlers that legitimately
+    // write on every event — a checkbox, a select — and a check over the whole
+    // file would be satisfied by any of them.
+    const drawers = functionText(panel, "DrawerList");
+
+    check(
+      "the drawer list is where the check is looking",
+      drawers.includes("setDrawerHeight("),
+      "an empty body would make every assertion below it vacuous",
+    );
+    check(
+      "so the drawer height is the studio's own measurement box",
+      /<LengthInput/.test(drawers) &&
+        /export function LengthInput\(/.test(field),
+      "a plain type=number writing through on every keystroke is what made it look editable and refuse to be edited",
+    );
+    check(
+      "and there is no raw number input left in the panel",
+      !/type="number"/.test(panel),
+      "one of the two would keep the old behaviour and nobody would know which",
+    );
+    check(
+      "an empty box commits nothing",
+      /if \(draft\.trim\(\) !== "" && Number\.isFinite\(next\)\) onChange\(clamp\(next\)\);/.test(
+        field,
+      ),
+      "Number(\"\") is 0, and 0 clamps to the minimum front height",
+    );
+    check(
+      "the drawer height is written on blur, not on every keystroke",
+      /onBlur=\{commit\}/.test(field) && !/onChange=\{\(event\)/.test(drawers),
+    );
+    check(
+      "the label still says which drawer it is",
+      /label=\{`Drawer \$\{index \+ 1\} front height`\}/.test(drawers),
+      "a row of boxes reading only 'height in millimetres' is unusable with a screen reader",
+    );
+    check(
+      "and the one box is used by the labelled field too",
+      /<LengthInput\s/.test(field),
+      "two copies of the draft logic is one edit away from the two behaving differently",
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
