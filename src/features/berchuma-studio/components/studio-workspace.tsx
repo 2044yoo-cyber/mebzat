@@ -286,13 +286,32 @@ export function StudioWorkspace({
     />
   );
 
+  // The design tab is a scrolling page on a phone; the other two are not.
+  //
+  // Chat and price are fixed-height columns that scroll inside themselves,
+  // and they have to be: the chat's message box is pinned to the bottom of
+  // its column, and a column as tall as its messages puts that box below the
+  // fold — which is exactly where it ended up the first time this was built
+  // out of viewport arithmetic.
+  //
+  // The design tab is the opposite. Its chrome — these tabs, the title, the
+  // save buttons — is what was eating the screen, and the only way for it to
+  // scroll away is for this column to be taller than the window and for the
+  // page to scroll it. `min-h-full` asks for at least a screenful and lets it
+  // grow; `h-full` would cap it at one and nothing would ever scroll.
+  //
+  // Both are `h-full` again at `@4xl/ws`, where all three are side by side
+  // and the studio is the fixed-height application it has always been on a
+  // desktop.
+  const flowing = tab === "design";
+
   return (
-    // `h-full`, not viewport arithmetic. The workspace column is already a
-    // definite height, and every attempt to compute this from `100dvh` has to
-    // guess at the header, the tab strip and the phone's bottom navigation —
-    // guess 36 px wrong and the message box sits below the fold, which is
-    // exactly where it ended up the first time.
-    <div className="flex h-full flex-col">
+    <div
+      className={cn(
+        "flex flex-col @4xl/ws:h-full",
+        flowing ? "min-h-full" : "h-full",
+      )}
+    >
       {/* Phone and tablet: one column, three tabs. */}
       <div className="border-b p-2 @4xl/ws:hidden">
         <div
@@ -375,7 +394,17 @@ export function StudioWorkspace({
         under the rail where it scrolls with what it is pricing, and only then
         the price as a column of its own.
       */}
-      <div className="grid min-h-0 flex-1 @4xl/ws:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] @6xl/ws:grid-cols-[minmax(300px,360px)_minmax(0,1fr)_minmax(300px,360px)]">
+      <div
+        className={cn(
+          "grid flex-1 @4xl/ws:min-h-0 @4xl/ws:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] @6xl/ws:grid-cols-[minmax(300px,360px)_minmax(0,1fr)_minmax(300px,360px)]",
+          // `min-h-0` lets a flex child be shorter than its content so the
+          // child can scroll instead. That is right for the two columns that
+          // scroll inside themselves and wrong for the one that is meant to
+          // make the page long — with it, the design column collapses to the
+          // window and the chrome above it has nowhere to scroll to.
+          flowing ? "" : "min-h-0",
+        )}
+      >
         {/* Chat */}
         <div
           className={cn(
@@ -389,7 +418,7 @@ export function StudioWorkspace({
         {/* The design, and the controls over it */}
         <div
           className={cn(
-            "flex min-h-0 flex-col @4xl/ws:flex",
+            "flex flex-col @4xl/ws:flex @4xl/ws:min-h-0",
             tab === "design" ? "flex" : "hidden",
           )}
         >
@@ -452,10 +481,10 @@ export function StudioWorkspace({
                 </div>
               ) : null}
 
-              {/* The editor takes the rest of the column — all of it, when the
-                  header is folded. The panel inside it scrolls on its own, so
-                  the design never scrolls off. */}
-              <div className="min-h-0 flex-1">
+              {/* The editor takes the rest of the column. On a phone that is
+                  as much as it wants — the drawing sticks to the top of the
+                  page and the controls run past it. */}
+              <div className="flex-1 @4xl/ws:min-h-0">
                 <DesignEditor
                   spec={design.spec}
                   onChange={design.set}

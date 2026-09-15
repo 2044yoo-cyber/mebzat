@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import {
   Box,
   ChevronDown,
@@ -9,21 +9,13 @@ import {
   Minus,
   Plus,
   Ruler,
-  SlidersHorizontal,
   Undo2,
-  X,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 import { ControlPanel } from "./control-panel";
-import {
-  DEFAULT_SNAP,
-  SNAPS,
-  dragOwnsGesture,
-  heightDuringDrag,
-  settle,
-} from "../ui/sheet-height";
+import { useViewportHeight } from "../../hooks/use-viewport-height";
 import {
   AXES,
   NUDGE_STEP,
@@ -45,12 +37,31 @@ import { Elevation } from "../viewer/elevation";
 import type { DesignSpec } from "../../types/spec";
 
 /**
- * The design, large, with the controls over it.
+ * The design, large, with the controls beside it or under it.
  *
- * The model occupies the screen and the panel floats on the right, because the
- * thing somebody came here to look at is the furniture. On a phone the panel
- * becomes a sheet that slides up over the bottom half — the same controls, out
- * of the way until they are wanted.
+ * The model occupies the screen because the thing somebody came here to look at
+ * is the furniture. On a wide workspace the panel is a column on the right. On
+ * a phone it is a block underneath, and the drawing sticks to the top of the
+ * page while you scroll through it.
+ *
+ * ## Why the phone layout is the shape it is
+ *
+ * It was a fixed-height column with the controls coming up over the drawing as
+ * a sheet. That made editing and watching two states of one screen: the sheet
+ * covered the model, and pushing it down to see what a change had done put the
+ * controls away. It also meant three scrolling regions inside one screen — the
+ * page, the sheet, the panel in it — and a finger starting in the wrong one
+ * went nowhere.
+ *
+ * Now the whole studio is an ordinary scrolling page. The tabs, the title and
+ * the save buttons scroll off the top like anything else, the viewport sticks
+ * where they were, and the controls scroll underneath it. One scrolling region,
+ * and the model is on screen the whole time you are editing.
+ *
+ * `position: sticky` and not a fixed height is what makes that true: sticky
+ * needs a scrolling ancestor and a parent taller than itself, and it has both —
+ * the app shell's workspace column scrolls, and the controls below give the
+ * drawing something to travel over.
  *
  * 2D and 3D are the same design and the same selection. Switching between them
  * changes nothing but how it is drawn, which is the point: a joiner reads the
@@ -87,87 +98,17 @@ export function DesignEditor({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hideFronts, setHideFronts] = useState(false);
   const [showCountertop, setShowCountertop] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(false);
 
-  // ---- the controls sheet, and how tall it is -----------------------------
-  const sheetRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState<number>(DEFAULT_SNAP);
-  const [dragging, setDragging] = useState(false);
-
-  /**
-   * One pointer gesture on the sheet.
-   *
-   * Bound to the handle *and* to the list, because the two behave differently
-   * and the difference is `dragOwnsGesture`: pulling down on a list that is
-   * already at its top puts the sheet away, and pulling down anywhere else
-   * scrolls the list. Starting from the handle always drags.
-   *
-   * Written with listeners added on the window rather than React handlers on
-   * the element, so a finger that leaves the sheet mid-drag — which it does,
-   * because the sheet is shrinking away from it — still finishes the gesture.
-   */
-  function beginDrag(event: React.PointerEvent) {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-
-    const fromHandle = event.currentTarget === event.currentTarget.closest("button");
-    const editor = sheetRef.current?.parentElement?.clientHeight ?? 0;
-    const startY = event.clientY;
-    const startHeight = height;
-    const startedAt = performance.now();
-
-    let owned = fromHandle;
-    let last = { y: startY, at: startedAt };
-    let current = startHeight;
-
-    const move = (moveEvent: PointerEvent) => {
-      const travel = moveEvent.clientY - startY;
-
-      if (!owned) {
-        const scrollTop = listRef.current?.scrollTop ?? 0;
-        if (!dragOwnsGesture(scrollTop, travel)) return;
-        owned = true;
-        setDragging(true);
-      }
-
-      // Only once the gesture is ours: calling this on a scroll would stop the
-      // list scrolling.
-      moveEvent.preventDefault();
-      current = heightDuringDrag(startHeight, travel, editor);
-      setHeight(current);
-      last = { y: moveEvent.clientY, at: performance.now() };
-    };
-
-    const finish = (upEvent: PointerEvent) => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", finish);
-      window.removeEventListener("pointercancel", finish);
-      if (!owned) return;
-
-      // Measured over the last movement rather than the whole gesture: a slow
-      // drag that ends in a flick is a flick, and averaging over the drag
-      // would call it slow.
-      const seconds = Math.max(0.016, (performance.now() - last.at) / 1000);
-      const velocity =
-        editor > 0 ? (upEvent.clientY - last.y) / editor / seconds : 0;
-
-      setDragging(false);
-      setHeight(settle(current, velocity));
-    };
-
-    if (fromHandle) setDragging(true);
-    window.addEventListener("pointermove", move, { passive: false });
-    window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", finish);
-  }
-
-  // Reopening returns it to where it opens, not to whatever a previous session
-  // left it at. Somebody who pushed it down to look at the model and then
-  // closed it wants the controls back when they press the button again.
-  function openPanel() {
-    setHeight(DEFAULT_SNAP);
-    setPanelOpen(true);
-  }
+  // ---- how tall the drawing is on a phone ---------------------------------
+  //
+  // Measured from the column this is actually scrolling in, and from the
+  // navigation bar that covers the bottom of it, rather than computed from
+  // `100dvh` and a guess at the chrome. Every previous attempt at that
+  // arithmetic in this codebase was wrong by enough to put a control under the
+  // fold. Unused on a wide workspace, where the drawing is simply the height of
+  // the row — the class that sets it is overridden at `@4xl/ws`.
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  const viewportHeight = useViewportHeight(root);
 
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
@@ -249,9 +190,41 @@ export function DesignEditor({
   });
 
   return (
-    <div className="relative flex h-full min-h-0 w-full">
-      {/* The design */}
-      <div className="relative min-h-0 flex-1">
+    <div
+      ref={setRoot}
+      // A phone reads this as an ordinary block in the page's flow, as tall as
+      // the drawing plus the controls under it, so the page scrolls it. A wide
+      // workspace reads the `@4xl/ws` half and gets the row it always had.
+      className="w-full @4xl/ws:flex @4xl/ws:h-full @4xl/ws:min-h-0"
+    >
+      {/*
+        The design, stuck to the top of the page while the controls go past.
+
+        `sticky` rather than `fixed`: fixed is relative to the window and would
+        sit over the top bar and the tab strip, and would still be there on the
+        next page's paint. Sticky travels with the page until it reaches the top
+        of the scrolling column and then stays, which is exactly "the chrome
+        scrolls away and the drawing does not".
+
+        The height comes through a custom property rather than as a plain inline
+        height, because an inline height wins over every stylesheet rule and
+        there would be no way for `@4xl/ws:h-full` to take it back on a wide
+        screen. As a variable, the desktop class simply overrides the utility
+        that reads it. The fallback in the utility is what the first paint uses,
+        before there is a measurement.
+      */}
+      <div
+        style={
+          viewportHeight > 0
+            ? ({ "--studio-viewport": `${viewportHeight}px` } as CSSProperties)
+            : undefined
+        }
+        className={cn(
+          "sticky top-0 z-10 w-full bg-background",
+          "h-[var(--studio-viewport,60dvh)]",
+          "@4xl/ws:relative @4xl/ws:z-auto @4xl/ws:h-full @4xl/ws:min-h-0 @4xl/ws:w-auto @4xl/ws:flex-1",
+        )}
+      >
         <div className="absolute inset-0">
           {view === "solid" ? (
             <Model
@@ -478,20 +451,30 @@ export function DesignEditor({
             )}
           </div>
 
-          {/* The phone's way in to the controls. */}
-          <button
-            type="button"
-            onClick={openPanel}
-            className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-white/10 bg-background/80 px-3 py-2 text-xs font-medium backdrop-blur-xl @3xl/ws:hidden"
-          >
-            <SlidersHorizontal className="size-3.5" aria-hidden />
-            Edit
-          </button>
         </div>
       </div>
 
-      {/* The panel: a column on a wide screen, a sheet on a phone. */}
-      <div className="hidden w-[300px] shrink-0 @3xl/ws:block @6xl/ws:w-[340px]">
+      {/*
+        The controls: beside the drawing on a wide workspace, under it on a
+        phone.
+
+        One instance, not two. There used to be a column for the wide case and
+        a second copy inside the sheet for the narrow one, which is two of
+        everything to keep in step and two React trees holding the same
+        selection.
+
+        Underneath rather than over: this is the half of the change that makes
+        editing and watching the same activity. The drawing above is sticky, so
+        scrolling through these moves them past a model that stays where it is
+        and updates as they are used.
+      */}
+      <div
+        className={cn(
+          "w-full border-t",
+          "@4xl/ws:h-full @4xl/ws:min-h-0 @4xl/ws:w-[300px] @4xl/ws:shrink-0",
+          "@4xl/ws:border-t-0 @6xl/ws:w-[340px]",
+        )}
+      >
         <ControlPanel
           spec={spec}
           selectedId={selectedId}
@@ -499,88 +482,6 @@ export function DesignEditor({
           onChange={onChange}
         />
       </div>
-
-      {panelOpen ? (
-        <div className="absolute inset-0 z-20 flex flex-col justify-end @3xl/ws:hidden">
-          <button
-            type="button"
-            aria-label="Close the controls"
-            onClick={() => setPanelOpen(false)}
-            className="min-h-0 flex-1 bg-black/40"
-          />
-          {/*
-            A flex column, and no viewport units anywhere in it.
-
-            The scrolling half used to be `max-h-[60vh]` inside a sheet capped
-            at 70% of the editor. Those two measure different things: the sheet
-            is a share of the editor, which is the viewport *minus* the topbar,
-            the tab strip and the phone's bottom bar, while 60vh is a share of
-            the whole screen. On a short phone 60vh is taller than the space the
-            sheet actually has, so the parent's `overflow-hidden` cropped the
-            list instead of the child scrolling it — and the last few controls
-            could not be reached by any gesture.
-
-            `min-h-0 flex-1` asks for no number at all. The header takes what it
-            needs, the list takes the rest of whatever the sheet turned out to
-            be, and scrolls inside it.
-
-            The height is now a share the person sets by dragging, rather than a
-            fixed 70%: the design was a strip above a sheet that covered most of
-            the screen, and the thing they came to look at is the design.
-          */}
-          <div
-            ref={sheetRef}
-            style={{ height: `${height * 100}%` }}
-            className={cn(
-              "flex flex-col overflow-hidden rounded-t-2xl border-t border-white/10 bg-background/80 backdrop-blur-xl",
-              dragging ? "" : "transition-[height] duration-200 ease-out",
-            )}
-          >
-            {/*
-              The handle. A button as well as a drag target, because a drag is
-              not available to somebody using a keyboard or a screen reader and
-              cycling the three heights is.
-            */}
-            <button
-              type="button"
-              aria-label={`Sheet height: ${describe(height)}. Activate for the next size.`}
-              onClick={() => setHeight(nextSnap(height))}
-              onPointerDown={beginDrag}
-              className="flex shrink-0 cursor-grab touch-none items-center justify-center py-2 active:cursor-grabbing"
-            >
-              <span
-                aria-hidden
-                className="h-1 w-10 rounded-full bg-foreground/25"
-              />
-            </button>
-
-            <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 pb-2">
-              <span className="text-xs font-medium uppercase tracking-wide">
-                Edit
-              </span>
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={() => setPanelOpen(false)}
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div
-              ref={listRef}
-              onPointerDown={beginDrag}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-            >
-              <ControlPanel
-                spec={spec}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                onChange={onChange}
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -641,18 +542,6 @@ function ViewTab({
       {label}
     </button>
   );
-}
-
-/** The next height a tap on the handle moves to, wrapping at the top. */
-function nextSnap(height: number): number {
-  const index = SNAPS.findIndex((snap) => Math.abs(snap - height) < 0.01);
-  return SNAPS[(index + 1) % SNAPS.length] ?? DEFAULT_SNAP;
-}
-
-/** What the handle's label calls the height it is at. */
-function describe(height: number): string {
-  const index = SNAPS.findIndex((snap) => Math.abs(snap - height) < 0.01);
-  return ["small", "medium", "large"][index] ?? "custom";
 }
 
 function Loading() {

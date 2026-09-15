@@ -87,6 +87,15 @@ export function BottomNav({ signedIn }: { signedIn: boolean }) {
 
       <nav
         aria-label={t("common.mainNavigation")}
+        // Named so a page can measure what this covers.
+        //
+        // It is `fixed`, so it sits on top of the scrolling column rather than
+        // inside it, and the column has no idea its last 3.5rem are behind a
+        // bar. The studio's 3D viewport sticks to the top of that column and
+        // has to know how much of it is actually visible; measuring this
+        // element's box is the only answer that does not involve re-deriving
+        // `--bottom-nav-h` and its `env()` by hand somewhere else.
+        data-bottom-nav=""
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur lg:hidden print:hidden",
           // Clears the home indicator on an iPhone. Without it the bar's

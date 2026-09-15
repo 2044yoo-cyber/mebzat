@@ -219,6 +219,8 @@ export default function Model({
         tone="muted"
       />
 
+      <Reframe />
+
       <Ground reach={reach} />
       <Frame
         width={width * MM}
@@ -560,6 +562,46 @@ function Frame({
  * `frameloop="demand"` exists to avoid, so it starts on the first drag and
  * stops itself once the motion has settled.
  */
+/**
+ * Keeps the camera honest when the box the canvas is in changes size.
+ *
+ * On a phone the drawing is now a sticky block whose height is measured from
+ * the page, and that height moves: the browser's address bar collapses as you
+ * scroll, the device rotates, the keyboard opens over the controls below. Each
+ * of those resizes the canvas.
+ *
+ * React Three Fiber already resizes the renderer and the camera's aspect when
+ * its container changes. This is here because of `frameloop="demand"`: nothing
+ * repaints unless something asks it to, and a resize that is not followed by a
+ * render leaves the last frame — drawn at the old aspect — stretched across the
+ * new box until the next time somebody touches the model. Reasserting the
+ * aspect and calling `updateProjectionMatrix` costs nothing and means this does
+ * not depend on the order two effects happen to run in.
+ */
+function Reframe() {
+  const size = useThree((state) => state.size);
+  // The camera is read out of the store inside the effect rather than
+  // subscribed to as a value. It is the same object either way, but a value
+  // that came back from a hook is one the compiler treats as read-only, and
+  // setting an aspect on a camera is a mutation — which is the whole job here.
+  const store = useStore();
+
+  useEffect(() => {
+    if (size.width === 0 || size.height === 0) return;
+
+    const { camera, invalidate } = store.getState();
+
+    if (camera instanceof THREE.PerspectiveCamera) {
+      camera.aspect = size.width / size.height;
+      camera.updateProjectionMatrix();
+    }
+
+    invalidate();
+  }, [size.width, size.height, store]);
+
+  return null;
+}
+
 function Controls({
   targetY,
   reach,

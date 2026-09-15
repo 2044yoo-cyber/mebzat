@@ -72,15 +72,13 @@ import {
   rewind,
 } from "../src/features/berchuma-studio/services/history.ts";
 import {
-  DEFAULT_SNAP,
-  FULL,
-  OPEN,
-  PEEK,
-  SNAPS,
-  dragOwnsGesture,
-  heightDuringDrag,
-  settle,
-} from "../src/features/berchuma-studio/components/ui/sheet-height.ts";
+  MIN_CONTROLS_PEEK,
+  MIN_VIEWPORT,
+  VIEWPORT_SHARE,
+  coveredAtBottom,
+  stickyViewportHeight,
+  usableHeight,
+} from "../src/features/berchuma-studio/services/mobile-layout.ts";
 
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
@@ -315,106 +313,6 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
       /draft\.carcass\.interiorBoard = board;/.test(carcassPicker) &&
       /draft\.carcass\.plinthBoard = board;/.test(carcassPicker),
     "outside a wardrobe the validator holds the carcass to one thickness, so leaving them behind turns one deliberate choice into three corrections about it",
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 4. The sheet can be pushed down to see the design
-// ---------------------------------------------------------------------------
-
-{
-  check("the sheet has more than one height", SNAPS.length >= 3);
-  check(
-    "one of them leaves the design most of the screen",
-    PEEK <= 0.3,
-    `${PEEK}`,
-  );
-  check(
-    "one of them covers most of it, for a long list of sections",
-    FULL >= 0.85,
-    `${FULL}`,
-  );
-  check("it opens at the middle one", DEFAULT_SNAP === OPEN);
-  check(
-    "the heights are in order",
-    SNAPS.every((snap, i) => i === 0 || snap > SNAPS[i - 1]),
-    SNAPS.join(", "),
-  );
-
-  // Dragging.
-  check(
-    "dragging down makes the sheet smaller",
-    heightDuringDrag(0.68, 100, 1000) < 0.68,
-  );
-  check(
-    "and dragging up makes it bigger",
-    heightDuringDrag(0.68, -100, 1000) > 0.68,
-  );
-  check(
-    "by the distance the finger moved, as a share of the editor",
-    Math.abs(heightDuringDrag(0.68, 100, 1000) - 0.58) < 1e-9,
-    `${heightDuringDrag(0.68, 100, 1000)}`,
-  );
-  check(
-    "dragging past the bottom does not close it out from under the finger",
-    heightDuringDrag(0.3, 100_000, 1000) === PEEK,
-  );
-  check(
-    "and dragging past the top does not cover the header it hangs from",
-    heightDuringDrag(0.9, -100_000, 1000) === FULL,
-  );
-  check(
-    "an editor of no height leaves it where it was",
-    heightDuringDrag(0.68, 200, 0) === 0.68,
-    "a divide by zero here would set the height to NaN and the sheet would vanish",
-  );
-
-  // Settling.
-  check(
-    "a slow drag settles at the nearest height",
-    settle(0.65, 0) === OPEN && settle(0.3, 0) === PEEK,
-  );
-  check(
-    "a flick down goes a whole step, however short it was",
-    settle(0.9, 3) === OPEN,
-    `${settle(0.9, 3)} — without this a flick from full stops at the nearest, which reads as ignored`,
-  );
-  check(
-    "a flick up goes a whole step too",
-    settle(0.25, -3) === OPEN,
-    `${settle(0.25, -3)}`,
-  );
-  check(
-    "a flick at the bottom stays at the bottom",
-    settle(PEEK, 3) === PEEK,
-  );
-  check(
-    "and one at the top stays at the top",
-    settle(FULL, -3) === FULL,
-  );
-  check(
-    "every height it can settle at is one of the snaps",
-    [0, 0.1, 0.35, 0.5, 0.77, 1].every((h) =>
-      [-4, -0.2, 0, 0.2, 4].every((v) =>
-        (SNAPS as readonly number[]).includes(settle(h, v)),
-      ),
-    ),
-    "a sheet that stops at 37% stays at 37% and has to be fiddled with on every visit",
-  );
-
-  // Who owns the gesture.
-  check(
-    "pulling down on a list that is at its top moves the sheet",
-    dragOwnsGesture(0, 20),
-  );
-  check(
-    "pulling down on a list scrolled into its middle scrolls the list",
-    !dragOwnsGesture(120, 20),
-    "otherwise reading a list of twenty sections drags the sheet shut on every overshoot",
-  );
-  check(
-    "and pushing up never moves the sheet from the list",
-    !dragOwnsGesture(0, -20),
   );
 }
 
@@ -821,69 +719,6 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
     /userId \? draftKey\(userId, editing\?\.designId \?\? null\) : null/.test(
       workspace,
     ) && /userId=\{session\.state === "signed-in" \? session\.userId : null\}/.test(studio),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 5. The sheet's wiring
-// ---------------------------------------------------------------------------
-
-{
-  const editor = code(EDITOR);
-
-  check(
-    "the sheet's height comes from the drag, not from a fixed class",
-    /style=\{\{ height: `\$\{height \* 100\}%` \}\}/.test(editor) &&
-      !/max-h-\[70%\]/.test(editor),
-    "70% of the editor left the design a strip",
-  );
-  check(
-    "there is a handle to drag it by",
-    /onPointerDown=\{beginDrag\}/.test(editor),
-  );
-  check(
-    "the list can drag it too, under the rule that decides which",
-    /dragOwnsGesture\(scrollTop, travel\)/.test(editor),
-  );
-  check(
-    "the gesture finishes even when the finger leaves the shrinking sheet",
-    /window\.addEventListener\("pointermove"/.test(editor) &&
-      /window\.addEventListener\("pointerup"/.test(editor),
-    "handlers on the element stop firing the moment the sheet slides out from under the finger",
-  );
-  check(
-    "and a cancelled pointer is cleaned up like a finished one",
-    // Specifically the *adding* of it. `pointercancel` also appears in the
-    // `removeEventListener` line, so a search for the bare word stays green
-    // with the listener never attached — a second copy of the name elsewhere
-    // in the same function.
-    /window\.addEventListener\("pointercancel", finish\)/.test(editor) &&
-      /window\.removeEventListener\("pointercancel", finish\)/.test(editor),
-    "a phone call mid-drag otherwise leaves listeners on the window forever",
-  );
-  check(
-    "the handle works without a pointer at all",
-    /onClick=\{\(\) => setHeight\(nextSnap\(height\)\)\}/.test(editor),
-    "a drag is not available to a keyboard or a switch",
-  );
-  check(
-    "and says which height it is at",
-    /aria-label=\{`Sheet height: \$\{describe\(height\)\}/.test(editor),
-  );
-  check(
-    "the height does not animate while a finger is on it",
-    /dragging \? "" : "transition-\[height\]/.test(editor),
-    "a transition during a drag makes the sheet lag the finger by its duration",
-  );
-  check(
-    "reopening returns it to the height it opens at",
-    /function openPanel\(\) \{/.test(editor) &&
-      /setHeight\(DEFAULT_SNAP\);/.test(editor),
-    "somebody who pushed it down to see the model wants the controls back when they press Edit",
-  );
-  check(
-    "the list still scrolls inside whatever height the sheet is",
-    /min-h-0 flex-1 overflow-y-auto overscroll-contain/.test(editor),
   );
 }
 
@@ -1423,6 +1258,267 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
       "two copies of the draft logic is one edit away from the two behaving differently",
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// 13. How tall the drawing is on a phone
+// ---------------------------------------------------------------------------
+
+{
+  check(
+    "the drawing keeps most of the screen",
+    VIEWPORT_SHARE > 0.5 && VIEWPORT_SHARE < 0.85,
+    `${VIEWPORT_SHARE} — all of it hides the controls, half of it is a band`,
+  );
+
+  // A typical phone: the shell's column is the window less the top bar and the
+  // tab strip, and the navigation bar covers the last 56 of it.
+  const usable = usableHeight(700, 56);
+  check(
+    "what the navigation bar covers is not counted as room",
+    usable === 644,
+    `${usable}`,
+  );
+  check(
+    "and a bar that covers nothing takes nothing",
+    usableHeight(700, 0) === 700,
+  );
+  check(
+    "a bar taller than the column cannot make the room negative",
+    usableHeight(200, 500) === 0,
+  );
+
+  const tall = stickyViewportHeight(usable);
+  check(
+    "the drawing takes its share of what is left",
+    tall === Math.round(644 * VIEWPORT_SHARE),
+    `${tall} of ${usable}`,
+  );
+  check(
+    "and the controls keep the rest",
+    usable - tall >= MIN_CONTROLS_PEEK,
+    `${usable - tall} left for the controls`,
+  );
+
+  // A short screen: the share alone would leave the controls a sliver.
+  //
+  // 132 written out rather than `MIN_CONTROLS_PEEK`, deliberately. Asserting a
+  // constant against itself passes however the constant is set, and this one
+  // was wrong: at 108 the floor below always won first and the rule governed
+  // nothing at all. The literal is what noticed.
+  const short = stickyViewportHeight(400);
+  check(
+    "on a short screen the controls are still visible under it",
+    400 - short >= 132,
+    `${short} of 400 leaves ${400 - short} — a control nobody can see is a control nobody uses`,
+  );
+  check(
+    "and the peek is big enough to take effect before the floor does",
+    // The clamp applies below `PEEK / (1 - SHARE)` and the floor takes over
+    // below `MIN_VIEWPORT + PEEK`. For the clamp to govern anything at all
+    // there has to be room between the two, which rearranges to this.
+    MIN_CONTROLS_PEEK * (VIEWPORT_SHARE / (1 - VIEWPORT_SHARE)) > MIN_VIEWPORT,
+    `${MIN_CONTROLS_PEEK} against a ${MIN_VIEWPORT} floor at a ${VIEWPORT_SHARE} share — below this it is decoration`,
+  );
+  check(
+    "and the drawing is still worth looking at",
+    stickyViewportHeight(330) >= MIN_VIEWPORT,
+    `${stickyViewportHeight(330)} — below this it stops being a drawing`,
+  );
+  check(
+    "nothing is asked for before there is anything to measure",
+    stickyViewportHeight(0) === 0 && stickyViewportHeight(-50) === 0,
+    "a height of zero is what leaves the CSS fallback in place for the first paint",
+  );
+  check(
+    "a taller screen gives the drawing more, not a capped amount",
+    stickyViewportHeight(1200) === Math.round(1200 * VIEWPORT_SHARE),
+    `${stickyViewportHeight(1200)} of 1200 — a fixed pixel cap is what made the drawing a strip in the first place`,
+  );
+
+  check(
+    "the bar's overlap is measured, not assumed",
+    coveredAtBottom({ top: 100, bottom: 800 }, { top: 744, bottom: 800 }) === 56,
+  );
+  check(
+    "a bar that does not reach the column covers none of it",
+    coveredAtBottom({ top: 100, bottom: 700 }, { top: 744, bottom: 800 }) === 0,
+  );
+  check(
+    "and no bar at all covers none of it",
+    coveredAtBottom({ top: 100, bottom: 800 }, null) === 0,
+    "the navigation bar is lg:hidden, so on a desktop there is nothing to find",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 14. The phone scrolls, and the drawing stays
+// ---------------------------------------------------------------------------
+
+{
+  const editor = code(EDITOR);
+  const workspace = code(
+    "src/features/berchuma-studio/components/studio-workspace.tsx",
+  );
+  const panel = code(PANEL);
+  const model = code(MODEL);
+
+  check(
+    "the design column is allowed to be taller than the window",
+    /flowing \? "min-h-full" : "h-full"/.test(workspace),
+    "capped at h-full there is nothing for the chrome above it to scroll away into",
+  );
+  check(
+    "and only on the design tab",
+    /const flowing = tab === "design";/.test(workspace),
+    "the chat's message box is pinned to the bottom of a fixed-height column and needs to stay that way",
+  );
+  check(
+    "the column stops being allowed to collapse to the window",
+    /flowing \? "" : "min-h-0"/.test(workspace),
+    "min-h-0 lets a flex child be shorter than its content, which is the opposite of what makes a page long",
+  );
+  check(
+    "the studio is a fixed-height application again on a wide screen",
+    /"flex flex-col @4xl\/ws:h-full"/.test(workspace),
+  );
+
+  check(
+    "the drawing sticks to the top of the page",
+    /"sticky top-0 z-10 w-full bg-background"/.test(editor),
+    "this is the whole request: the chrome scrolls away and the model does not",
+  );
+  check(
+    "it is sticky, not fixed",
+    !/\bfixed inset-0\b/.test(editor),
+    "fixed is relative to the window and would sit over the top bar and the tab strip",
+  );
+  check(
+    "its height comes through a custom property",
+    /"--studio-viewport": `\$\{viewportHeight\}px`/.test(editor) &&
+      /h-\[var\(--studio-viewport,60dvh\)\]/.test(editor),
+    "a plain inline height beats every stylesheet rule, so the desktop class could never take it back",
+  );
+  check(
+    "which the wide layout overrides",
+    /@4xl\/ws:relative @4xl\/ws:z-auto @4xl\/ws:h-full/.test(editor),
+    "the desktop row is unchanged and must stay unchanged",
+  );
+  check(
+    "the height is measured rather than calculated from the screen",
+    /const viewportHeight = useViewportHeight\(root\);/.test(editor) &&
+      /ref=\{setRoot\}/.test(editor),
+  );
+  check(
+    "the fallback before the first measurement is a viewport unit that tracks the phone",
+    /60dvh/.test(editor) && !/60vh/.test(editor),
+    "100vh on a phone is the viewport with the address bar hidden — the largest it ever gets",
+  );
+
+  check(
+    "the controls are one panel, under the drawing or beside it",
+    (editor.match(/<ControlPanel/g) ?? []).length === 1,
+    `${(editor.match(/<ControlPanel/g) ?? []).length} — there used to be a column and a second copy in the sheet`,
+  );
+  check(
+    "the sheet that used to cover the model is gone",
+    !/panelOpen/.test(editor) && !/sheet-height/.test(editor),
+    "editing and watching were two states of one screen while the controls came up over the drawing",
+  );
+  check(
+    "and nothing still imports the module it was built on",
+    !/sheet-height/.test(workspace) && !/sheet-height/.test(panel),
+  );
+  check(
+    "the controls do not scroll inside the page that is scrolling them",
+    /"@4xl\/ws:h-full @4xl\/ws:overflow-y-auto @4xl\/ws:overscroll-contain"/.test(
+      panel,
+    ) && !/^\s*"flex h-full flex-col overflow-y-auto/m.test(panel),
+    "a second scrolling region inside the first is the nested trap: the finger moves the controls and the page stays put",
+  );
+  check(
+    "the bottom navigation is still cleared",
+    /@4xl\/ws:pb-content-safe lg:pb-0/.test(panel),
+    "the column that scrolls reserves it; on a phone that is the page, which already does",
+  );
+
+  // Scoped to the component. `updateProjectionMatrix` is also called by the
+  // camera rig further up the file, so a check over the whole of it stayed
+  // green with this one deleted — the second copy trap, again.
+  const reframe = functionText(model, "Reframe");
+
+  check(
+    "the resize component is where the check is looking",
+    reframe.includes("size.width") &&
+      reframe.includes("store.getState()") &&
+      !reframe.includes("OrbitControls"),
+    `${reframe.length} characters`,
+  );
+  check(
+    "the camera follows the box when the box changes size",
+    /<Reframe \/>/.test(model) &&
+      /camera\.aspect = size\.width \/ size\.height;/.test(reframe) &&
+      /camera\.updateProjectionMatrix\(\);/.test(reframe),
+    "the drawing's height moves every time the phone's address bar does",
+  );
+  check(
+    "and something repaints after it",
+    /invalidate\(\);\s*\n\s*\}, \[size\.width, size\.height, store\]\);/.test(
+      reframe,
+    ),
+    "frameloop is demand, so a resize with no render leaves the last frame stretched across the new box",
+  );
+  check(
+    "a canvas of no size is not divided by",
+    /if \(size\.width === 0 \|\| size\.height === 0\) return;/.test(reframe),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 15. The measuring itself
+// ---------------------------------------------------------------------------
+
+{
+  const hook = code(
+    "src/features/berchuma-studio/hooks/use-viewport-height.ts",
+  );
+
+  check(
+    "the column that actually scrolls is the one measured",
+    /element\.closest\("main"\) \?\? document\.documentElement/.test(hook),
+    "the studio is inside the shell's workspace column on this route and could be somewhere else on the next",
+  );
+  check(
+    "the navigation bar is found by a name it publishes",
+    /querySelector<HTMLElement>\("\[data-bottom-nav\]"\)/.test(hook) &&
+      /data-bottom-nav=""/.test(
+        code("src/components/shell/bottom-nav.tsx"),
+      ),
+    "re-deriving --bottom-nav-h and its env() by hand somewhere else is how the two get out of step",
+  );
+  check(
+    "it is re-found on every measurement",
+    /function measure\(\) \{[\s\S]*?querySelector/.test(hook),
+    "the bar is mounted by a different part of the tree and may not exist when this effect first runs",
+  );
+  check(
+    "the column is watched for resizing",
+    /new ResizeObserver\(measure\)/.test(hook) &&
+      /observer\.observe\(scrollport\)/.test(hook),
+  );
+  check(
+    "so is the phone's own viewport",
+    /window\.visualViewport\?\.addEventListener\("resize", measure\)/.test(hook),
+    "on iOS the address bar collapsing fires only there, and window resize does not report it",
+  );
+  check(
+    "and everything it listened to is let go of",
+    /observer\.disconnect\(\)/.test(hook) &&
+      /window\.removeEventListener\("resize", measure\)/.test(hook) &&
+      /window\.visualViewport\?\.removeEventListener\("resize", measure\)/.test(
+        hook,
+      ),
+  );
 }
 
 // ---------------------------------------------------------------------------

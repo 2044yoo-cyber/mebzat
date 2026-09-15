@@ -100,14 +100,30 @@ export function ControlPanel({
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto overscroll-contain pb-content-safe lg:pb-0">
+    /*
+      Its own scrolling column beside the drawing, an ordinary block under it.
+
+      On a phone these now sit in the page's flow below a sticky viewport, and
+      the page is what scrolls. Keeping `overflow-y-auto` there would make a
+      second scrolling region inside the first — a finger that started on the
+      controls would move them and not the page, and the model above would
+      never reach the top. So the scroll, the height and the bottom reservation
+      are all `@4xl/ws:`, where this really is a column of its own.
+    */
+    <div
+      className={cn(
+        "flex flex-col",
+        "@4xl/ws:h-full @4xl/ws:overflow-y-auto @4xl/ws:overscroll-contain",
+        "@4xl/ws:pb-content-safe lg:pb-0",
+      )}
+    >
       {/*
         The glass. `backdrop-blur` over a translucent card rather than an opaque
         one, so the design stays visible behind the panel — which is the whole
         argument for putting the controls on top of the scene instead of beside
         it on a screen this size.
       */}
-      <div className="space-y-3 border-l border-white/10 bg-background/70 p-3 backdrop-blur-xl">
+      <div className="space-y-3 bg-background/70 p-3 backdrop-blur-xl @4xl/ws:border-l @4xl/ws:border-white/10">
         <CabinetPicker
           spec={spec}
           selectedId={selectedId}
