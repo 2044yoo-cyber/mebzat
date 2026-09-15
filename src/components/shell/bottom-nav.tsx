@@ -169,6 +169,7 @@ function MoreSheet({
         type="button"
         aria-label={t("common.close")}
         onClick={onClose}
+        data-no-press
         className="absolute inset-0 cursor-default bg-black/50"
       />
 

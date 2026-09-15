@@ -8,6 +8,7 @@ import { LanguageProvider } from "@/components/i18n/language-provider";
 import { LegacyTranslationBridge } from "@/components/i18n/legacy-translation-bridge";
 import { HomePanel } from "@/components/home/home-panel";
 import { AppShell } from "@/components/shell/app-shell";
+import { TouchPress } from "@/components/shell/touch-press";
 import { Toaster } from "@/components/ui/sonner";
 import { getUnreadCount as getUnreadMessages } from "@/lib/data/messages";
 import { getUnreadCount as getUnreadNotifications } from "@/lib/data/notifications";
@@ -131,6 +132,10 @@ export default async function RootLayout({
               </AppShell>
             </Suspense>
             <Toaster />
+            {/* Not a control and renders nothing. See the component: without a
+                touch listener on the document, Safari never applies `:active`
+                to anything that is not an anchor. */}
+            <TouchPress />
           </ThemeProvider>
         </LanguageProvider>
       </body>

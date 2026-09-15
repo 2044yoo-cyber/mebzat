@@ -173,6 +173,7 @@ export function AppShell({
               setNavOpenedAt(null);
               setOpenSection(null);
             }}
+            data-no-press
             className="absolute inset-0 cursor-default bg-black/50"
           />
           {/* A compact icon rail, always, at about a centimetre across.

@@ -398,3 +398,178 @@ html[lang="om"] :where(button, a, label, [role="button"]) {
  * inside them is what avoids counting the same gap twice — the shell's scroll
  * container already reserves it.
  * ------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+ * The press
+ *
+ * Touching anything on Medosha changed nothing you could see. The shared
+ * `Button` had gained an `active:` colour per variant, but a colour change is
+ * where the work stopped — and most of what a thumb lands on is not a `Button`.
+ * Tabs, navigation rows, icon buttons over the 3D model, the plus and minus on
+ * a measurement, the language picker, a card that is really a link: all of them
+ * answered a tap with nothing at all until the next paint arrived. People
+ * pressed twice, which on anything that submits is two submissions.
+ *
+ * This is the whole system, in one place. Nothing was added to a call site: the
+ * rules below match what is already there — the elements and the ARIA roles
+ * that mean "this does something" — so a button written next week is covered by
+ * having been written as a button.
+ *
+ * ## Why it sits in the utilities layer, at zero specificity
+ *
+ * Both halves are deliberate and together they are what makes the effect
+ * subordinate rather than uniform.
+ *
+ * Layer order beats specificity across layers, so a rule in `components` could
+ * never show on an element carrying `bg-*`. In `utilities`, ordinary
+ * specificity decides — and every selector below is wrapped in `:where()`,
+ * including the ones inside `:not()`, so the whole thing weighs exactly as much
+ * as the `:active` on the end of it: one pseudo-class. The `:where()` around
+ * the exclusions is not tidiness. `:not()` takes the weight of its argument, so
+ * three bare exclusions would have made this rule heavier than
+ * `active:bg-primary/70` and painted the blue Save button white.
+ *
+ * As written, a call site that has an opinion keeps it: two classes beat one,
+ * so a primary button presses to its own darker blue.
+ *
+ * ## Why the tint is a background *image*
+ *
+ * `background-image` layers over `background-color` instead of replacing it, so
+ * a tinted element keeps its own colour underneath and takes a few per cent of
+ * ink on top — including the blue button, which ends up slightly brightened as
+ * well as darkened, which is what was wanted. Using `background-color` would
+ * swap the colour out, and a glass button would appear to lose its glass.
+ * Nothing interactive in this codebase carries a gradient, so there is nothing
+ * for it to overwrite; that was checked rather than assumed.
+ *
+ * The ink is white in the dark theme and black in the light one. A white wash
+ * over a white button is not feedback, and this application has both themes.
+ *
+ * ## What is deliberately not touched
+ *
+ * `:hover` is left alone. Tailwind v4 already emits every `hover:` utility
+ * inside `@media (hover: hover)`, so a phone never applies one and a hover
+ * style cannot stick to the last thing tapped — the usual mobile complaint is
+ * already handled here, and a second guard would only be a second thing to keep
+ * in step. `:focus-visible` is untouched for the same reason: the ring is how a
+ * keyboard says where it is, and nothing below competes with it.
+ * ------------------------------------------------------------------------- */
+
+@layer utilities {
+  :root {
+    /* Black on a light background, white on a dark one — see above. */
+    --press-ink: 0 0 0;
+    --press-tint: 0.07;
+    --press-scale: 0.97;
+    --press-ms: 120ms;
+  }
+
+  .dark {
+    --press-ink: 255 255 255;
+    --press-tint: 0.1;
+  }
+
+  /*
+   * Everything a finger can press.
+   *
+   * `a[href]` rather than `a`: an anchor with no target is a name, not a
+   * control. An inline link inside a paragraph is in this list and is not a
+   * problem — a scale has no effect on a non-replaced inline box by definition,
+   * so a link in prose takes the tint and stays exactly where it is, while a
+   * card that happens to be an anchor scales like the button it is.
+   *
+   * The two `label:has(…)` lines are the checkbox and radio toggles — "Show
+   * inside" over the 3D model, and every filter in the application — which are
+   * built as a `label` with the input inside it and are otherwise matched by
+   * nothing here. Deliberately not `label` on its own: a label wrapping a text
+   * field would scale the field when you pressed its name.
+   *
+   * The press state is nested rather than written as a second rule, and that is
+   * not house style. The list was three copies — one for the transition, one
+   * for `:active`, one for reduced motion — and deleting a line from one of
+   * them left the other two agreeing, so tabs and menu items could stop
+   * responding while every check still passed. Mutating the code is what
+   * found it. One list is one thing to get wrong.
+   */
+  :where(
+    button,
+    summary,
+    a[href],
+    [role="button"],
+    [role="tab"],
+    [role="link"],
+    [role="menuitem"],
+    [role="menuitemradio"],
+    [role="menuitemcheckbox"],
+    [role="option"],
+    [role="switch"],
+    label:has(> input[type="checkbox"]),
+    label:has(> input[type="radio"]),
+    .press
+  ):not(:where(:disabled, [aria-disabled="true"], [data-no-press])) {
+    -webkit-tap-highlight-color: transparent;
+
+    /* Kills the 300 ms the browser waits to see whether a tap was the first
+       half of a double-tap-to-zoom. Without it the feedback is correct and
+       late, which reads as the same fault it was written to fix. */
+    touch-action: manipulation;
+
+    /* `scale` and `translate` by name, not `transform`: Tailwind v4 writes
+       those as separate properties, and a transition on `transform` alone
+       would leave both of them snapping. */
+    transition-property: scale, translate, background-color, background-image,
+      opacity, color, border-color;
+    transition-duration: var(--press-ms);
+    transition-timing-function: ease;
+
+    /* `&` carries the weight of the list above it, which is nothing, so this
+       comes out at exactly one pseudo-class — light enough for a call site's
+       own `active:bg-*` to win. */
+    &:active {
+      background-image: linear-gradient(
+        rgb(var(--press-ink) / var(--press-tint)),
+        rgb(var(--press-ink) / var(--press-tint))
+      );
+      scale: var(--press-scale);
+    }
+
+    /*
+     * Reduced motion keeps the feedback and drops the movement.
+     *
+     * Somebody who has asked for less animation still needs to know their tap
+     * landed, so the tint stays and only the scale goes. The usual mistake is
+     * to turn the whole thing off, which leaves them with the problem this
+     * exists to fix.
+     */
+    @media (prefers-reduced-motion: reduce) {
+      &:active {
+        scale: none;
+      }
+    }
+  }
+
+  /*
+   * An opt-out, for the few places a press effect is a bug.
+   *
+   * A full-screen scrim is a button so it can be dismissed from the keyboard,
+   * and scaling the whole screen by three per cent when a finger lands on it is
+   * not feedback, it is a fault. A drag handle is worse: the scale fights the
+   * thing being dragged for as long as the drag lasts.
+   */
+  [data-no-press]:active {
+    scale: none;
+    background-image: none;
+  }
+
+  /*
+   * The same press, for something that is none of the above.
+   *
+   * A clickable card is usually a `div` with an `onClick`, which is neither a
+   * button nor a link and cannot be matched by anything structural. `.press`
+   * opts it in. An informational card is left alone, which is why this is not
+   * simply applied to every card.
+   */
+  .press {
+    cursor: pointer;
+  }
+}

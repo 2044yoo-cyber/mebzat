@@ -215,6 +215,7 @@ export function CommandPalette() {
         type="button"
         aria-label="Close command palette"
         onClick={() => setOpen(false)}
+        data-no-press
         className="absolute inset-0 cursor-default bg-black/45 backdrop-blur-sm"
       />
 

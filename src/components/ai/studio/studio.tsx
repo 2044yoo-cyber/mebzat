@@ -110,6 +110,7 @@ export function AiStudio({
             type="button"
             aria-label="Close tools"
             onClick={() => setRailOpen(false)}
+            data-no-press
             className="absolute inset-0 cursor-default bg-black/50"
           />
           <div className="relative h-full w-64 border-r bg-background">
@@ -188,6 +189,7 @@ export function AiStudio({
             type="button"
             aria-label="Close history"
             onClick={() => setHistoryOpen(false)}
+            data-no-press
             className="absolute inset-0 cursor-default bg-black/50"
           />
           <div className="absolute inset-y-0 right-0 w-80 max-w-[90vw] border-l bg-background">

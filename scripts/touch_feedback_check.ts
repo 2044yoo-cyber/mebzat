@@ -274,6 +274,405 @@ check("and is hidden from assistive technology", /aria-hidden data-nav-pending/.
   check("closing the drawer forgets the open section", /setOpenSection\(null\)/.test(shell));
 }
 
+// ---------------------------------------------------------------------------
+// The global press layer
+//
+// Everything above is per-component: a variant here, a navigation row there.
+// This is the system that covers what is left, which is most of what a thumb
+// lands on. It lives entirely in `globals.css`, so it is read from there.
+// ---------------------------------------------------------------------------
+
+const css = readFileSync("src/app/globals.css", "utf8");
+
+/** The press block alone, so a rule elsewhere in the file cannot satisfy this. */
+function pressLayer(): string {
+  const at = css.indexOf(" * The press\n");
+  if (at === -1) return "";
+  return css.slice(at);
+}
+
+const press = pressLayer();
+
+/**
+ * How much a selector weighs, as [ids, classes, types].
+ *
+ * Written out rather than matched for, because the load-bearing property of
+ * this whole layer is a number: the press rule has to weigh *less* than a
+ * call site's own `active:bg-*`, or every blue button in the application
+ * presses to white. A regex can tell you `:where(` appears; it cannot tell you
+ * the selector that resulted is light enough, and the difference between those
+ * two is the bug.
+ *
+ * `:where()` contributes nothing, including where it is nested inside `:not()`
+ * — which is the subtle half. `:not()` otherwise takes the weight of its
+ * argument, so three bare exclusions would have made this rule heavier than
+ * the two-class utility it must lose to.
+ */
+function specificity(selector: string): [number, number, number] {
+  // CSS escapes first. Tailwind writes `active:bg-primary/70` as the class
+  // `.active\:bg-primary\/70`, where the colon and the slash are escaped
+  // literals inside one name. Counted raw, that colon reads as a second
+  // pseudo-class and the utility comes out heavier than it is — which is the
+  // direction that would have hidden the fault rather than reported it.
+  let flat = selector.replace(/\\./g, "x");
+
+  // Drop every `:where(...)` with its contents, innermost first.
+  for (;;) {
+    const at = flat.indexOf(":where(");
+    if (at === -1) break;
+    let depth = 0;
+    let end = -1;
+    for (let i = at + ":where".length; i < flat.length; i += 1) {
+      if (flat[i] === "(") depth += 1;
+      if (flat[i] === ")") {
+        depth -= 1;
+        if (depth === 0) { end = i; break; }
+      }
+    }
+    if (end === -1) break;
+    flat = flat.slice(0, at) + flat.slice(end + 1);
+  }
+
+  // `:not(...)` keeps its argument's weight, so unwrap rather than drop.
+  flat = flat.replace(/:not\(/g, "(");
+
+  const ids = (flat.match(/#[\w-]+/g) ?? []).length;
+  const classes =
+    (flat.match(/\.[\w-]+/g) ?? []).length +
+    (flat.match(/\[[^\]]+\]/g) ?? []).length +
+    (flat.match(/:(?!:)[a-z-]+(?:\([^)]*\))?/g) ?? []).length;
+  const types = (flat.match(/(?:^|[\s,>+~(])([a-z][\w-]*)/g) ?? []).length;
+  return [ids, classes, types];
+}
+
+{
+  // The calculator itself, against selectors whose weight is not in doubt.
+  // A check built on a broken measure passes on broken code.
+  check(
+    "the specificity calculator agrees about a plain class",
+    specificity(".bg-primary").join() === "0,1,0",
+    specificity(".bg-primary").join(),
+  );
+  check(
+    "and about a class with a pseudo-class on it",
+    specificity(".active\\:bg-primary\\/70:active").join() === "0,2,0",
+    specificity(".active\\:bg-primary\\/70:active").join(),
+  );
+  check(
+    "and that :where weighs nothing",
+    specificity(":where(button, a[href]):active").join() === "0,1,0",
+    specificity(":where(button, a[href]):active").join(),
+  );
+  check(
+    "and that a bare :not weighs what is inside it",
+    specificity("button:not([disabled]):active").join() === "0,2,1",
+    specificity("button:not([disabled]):active").join(),
+  );
+}
+
+{
+  /**
+   * The selector of the rule enclosing an offset, `up` levels out.
+   *
+   * Two earlier attempts could not do this. A regex cannot: `:not(:where(…))`
+   * nests its parentheses, so `\)` stops at the inner one, the match
+   * backtracks, and what came back was several rules run together weighing
+   * 0,11,417. Walking back one `{` cannot either, now that the press state is
+   * nested — that finds `&:active` and not the list it belongs to.
+   *
+   * Braces are counted backwards, which is exact, and the selector is whatever
+   * sits between the end of the last comment or rule and the `{`.
+   */
+  function enclosing(index: number, up: number): string {
+    let from = index;
+    for (let level = 0; level <= up; level += 1) {
+      let depth = 0;
+      let open = -1;
+      for (let j = from - 1; j >= 0; j -= 1) {
+        if (press[j] === "}") depth += 1;
+        else if (press[j] === "{") {
+          if (depth === 0) { open = j; break; }
+          depth -= 1;
+        }
+      }
+      if (open === -1) return "";
+      if (level === up) {
+        const before = press.slice(0, open);
+        // Each candidate is the offset *past* its delimiter, so a comment's
+        // closing `*/` does not leave its slash on the front of the selector —
+        // which it did, and turned `&:active` into `/\n    &:active`.
+        const after = (index: number, length: number) =>
+          index === -1 ? 0 : index + length;
+        const cut = Math.max(
+          after(before.lastIndexOf("}"), 1),
+          after(before.lastIndexOf("{"), 1),
+          after(before.lastIndexOf("*/"), 2),
+        );
+        return press.slice(cut, open).trim();
+      }
+      from = open;
+    }
+    return "";
+  }
+
+  const at = press.indexOf("scale: var(--press-scale);");
+  check("the press rule is in the stylesheet", at !== -1);
+
+  const nested = enclosing(at, 0);
+  const parent = enclosing(at, 1);
+  const layer = enclosing(at, 2);
+
+  check(
+    "the press state is nested inside the list, so the list is written once",
+    nested === "&:active",
+    `${nested} — three copies of it is what let tabs stop responding silently`,
+  );
+  check(
+    "and the list is the one that carries the transition",
+    parent.includes(":where(") && parent.includes(":not(:where(:disabled"),
+    parent.slice(0, 40),
+  );
+
+  // `&` carries the weight of the list it is nested in, so the effective
+  // selector is that list with `:active` on the end of it.
+  const weight = specificity(`${parent}:active`);
+
+  check(
+    "the press rule weighs one pseudo-class, no more",
+    weight.join() === "0,1,0",
+    `${weight.join()} — anything heavier paints the blue Save button white`,
+  );
+  check(
+    "so a call site's own active colour still wins",
+    weight[1] < specificity(".active\\:bg-primary\\/70:active")[1],
+    "two classes must beat one, or every variant's press colour is overridden",
+  );
+  check(
+    "and it is in the utilities layer, where specificity is allowed to decide",
+    layer === "@layer utilities",
+    `${layer} — in components it would lose to every bg-* utility and never show at all`,
+  );
+}
+
+{
+  check(
+    "the tint is layered over the background, not swapped for it",
+    /:active\s*\{[^}]*background-image:\s*linear-gradient\(/.test(press) &&
+      !/:active\s*\{[^}]*background-color:/.test(press),
+    "background-color would replace a glass button's glass instead of tinting it",
+  );
+  check(
+    "the ink is white in the dark theme and black in the light one",
+    /--press-ink:\s*0 0 0;/.test(press) &&
+      /\.dark\s*\{[^}]*--press-ink:\s*255 255 255;/.test(press),
+    "a white wash over a white button is not feedback, and this application has both themes",
+  );
+
+  const tint = Number(/--press-tint:\s*([\d.]+)/.exec(press)?.[1] ?? 0);
+  check(
+    "the tint is subtle rather than a wash",
+    tint >= 0.05 && tint <= 0.14,
+    `${tint}`,
+  );
+
+  const scale = Number(/--press-scale:\s*([\d.]+)/.exec(press)?.[1] ?? 0);
+  check(
+    "the press shrinks the element, slightly",
+    scale >= 0.94 && scale < 1,
+    `${scale} — below this it lurches, at 1 it does nothing`,
+  );
+
+  const ms = Number(/--press-ms:\s*(\d+)ms/.exec(press)?.[1] ?? 0);
+  check(
+    "and answers within the window a tap still feels connected in",
+    ms >= 80 && ms <= 150,
+    `${ms}ms`,
+  );
+
+  check(
+    "the transition names scale, not transform",
+    /transition-property:[^;]*\bscale\b/.test(press),
+    "Tailwind v4 writes scale as its own property, so a transition on transform leaves it snapping",
+  );
+  check(
+    "the browser's own grey flash is turned off",
+    /-webkit-tap-highlight-color:\s*transparent/.test(press),
+    "otherwise the platform paints its own rectangle over the effect",
+  );
+  check(
+    "and the double-tap delay with it",
+    /touch-action:\s*manipulation/.test(press),
+    "feedback that is correct and 300ms late reads as the same fault",
+  );
+}
+
+{
+  // Every surface the request named has to be matched by something. Checked as
+  // a list because the selector is long and losing one line of it is silent.
+  for (const selector of [
+    "button",
+    "summary",
+    "a[href]",
+    '[role="button"]',
+    '[role="tab"]',
+    '[role="menuitem"]',
+    '[role="option"]',
+    '[role="switch"]',
+    'label:has(> input[type="checkbox"])',
+    'label:has(> input[type="radio"])',
+    ".press",
+  ]) {
+    check(
+      `the press reaches ${selector}`,
+      new RegExp(`^\\s*${selector.replace(/[[\]"$^*+?.()|{}\\]/g, "\\$&")},?\\s*$`, "m").test(press),
+    );
+  }
+
+  check(
+    "a label wrapping a text field is left alone",
+    !/^\s*label,\s*$/m.test(press),
+    "pressing a field's name would scale the field",
+  );
+  check(
+    "an anchor with no target is left alone",
+    !/^\s*a,\s*$/m.test(press),
+    "an anchor without an href is a name, not a control",
+  );
+  check(
+    "a disabled control does not answer a press",
+    /:not\(:where\(:disabled, \[aria-disabled="true"\], \[data-no-press\]\)\)/.test(
+      press,
+    ),
+  );
+}
+
+{
+  /**
+   * The balanced `{ … }` that follows a marker.
+   *
+   * The reduced-motion assertion was a regex with `[\s\S]*?` in it, and that
+   * skipped straight past a mutated block to the next `scale: none` in the
+   * file — the opt-out rule, thirty lines below. It reported the feature as
+   * present while the feature had been replaced by `display: none`.
+   */
+  function blockAfter(marker: string): string {
+    const at = press.indexOf(marker);
+    if (at === -1) return "";
+    const open = press.indexOf("{", at);
+    if (open === -1) return "";
+    let depth = 0;
+    for (let i = open; i < press.length; i += 1) {
+      if (press[i] === "{") depth += 1;
+      if (press[i] === "}") {
+        depth -= 1;
+        if (depth === 0) return press.slice(open, i + 1);
+      }
+    }
+    return "";
+  }
+
+  const reduced = blockAfter("@media (prefers-reduced-motion: reduce)");
+
+  check(
+    "there is a reduced-motion block to look at",
+    reduced.length > 0 && reduced.includes(":active"),
+  );
+  check(
+    "reduced motion keeps the feedback and drops only the movement",
+    /scale: none;/.test(reduced) &&
+      !/display:/.test(reduced) &&
+      !/background-image:\s*none/.test(reduced),
+    "turning the whole thing off leaves that reader with the problem this fixes",
+  );
+  check(
+    "nothing here removes the keyboard's focus ring",
+    !/focus-visible[^{]*\{[^}]*outline:\s*none/.test(press) &&
+      !/:focus-visible[^{]*\{[^}]*box-shadow:\s*none/.test(press),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Safari only applies :active when the document is listening for touches
+// ---------------------------------------------------------------------------
+
+{
+  const touch = code("src/components/shell/touch-press.tsx");
+  const layout = code("src/app/layout.tsx");
+
+  check(
+    "a touch listener is registered on the document",
+    /document\.addEventListener\("touchstart", noop, \{ passive: true \}\)/.test(
+      touch,
+    ),
+    "without one, iOS applies :active to anchors and to nothing else",
+  );
+  check(
+    "passively, so it cannot make a scroll feel heavy",
+    /\{ passive: true \}/.test(touch),
+  );
+  check(
+    "and taken off again",
+    /return \(\) => document\.removeEventListener\("touchstart", noop\)/.test(
+      touch,
+    ),
+  );
+  check(
+    "it renders nothing",
+    /return null;/.test(touch),
+  );
+  check(
+    "and it is actually mounted, once, at the root",
+    /<TouchPress \/>/.test(layout) &&
+      /from "@\/components\/shell\/touch-press"/.test(layout),
+    "a fix that is not in the tree is a fix that runs nowhere",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Where a press effect would be a fault
+// ---------------------------------------------------------------------------
+
+{
+  // A dimmed backdrop is a button so it can be dismissed from a keyboard.
+  // Scaling the whole screen by three per cent when a finger lands on it is
+  // not feedback. Counted, so that losing the attribute on one of the five
+  // scrims is not hidden by the other four.
+  const scrims = [
+    "src/components/ai/studio/studio.tsx",
+    "src/components/shell/bottom-nav.tsx",
+    "src/components/shell/command-palette.tsx",
+    "src/components/shell/app-shell.tsx",
+  ];
+
+  let backdrops = 0;
+  let optedOut = 0;
+  for (const path of scrims) {
+    const source = code(path);
+    backdrops += (source.match(/className="absolute inset-0 cursor-default bg-black\//g) ?? []).length;
+    optedOut += (
+      source.match(/data-no-press\s*\n\s*className="absolute inset-0 cursor-default bg-black\//g) ?? []
+    ).length;
+  }
+
+  check(
+    "there are backdrops to find",
+    backdrops >= 5,
+    `${backdrops} — if this is zero the check below is vacuous`,
+  );
+  check(
+    "every dimmed backdrop opts out of the press",
+    optedOut === backdrops,
+    `${optedOut} of ${backdrops}`,
+  );
+
+  check(
+    "and the opt-out actually turns it off",
+    /\[data-no-press\]:active \{\s*scale: none;\s*background-image: none;/.test(
+      press,
+    ),
+  );
+}
+
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
   for (const failure of failures) console.log(`  ${RED}✗${RESET} ${failure}`);
