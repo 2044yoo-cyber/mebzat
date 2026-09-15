@@ -36,3 +36,26 @@ export function layOutBays(cabinet: Cabinet, board: number): BayPlacement[] {
 export function bayDimensionsWorthDrawing(cabinet: Cabinet): boolean {
   return cabinet.bays.length > 1;
 }
+
+/**
+ * What a part made inside this bay calls it.
+ *
+ * Every part label used to end in the bay's internal id, so a cabinet with one
+ * opening produced "Back panel — bay-1" and a wardrobe whose wide bay had been
+ * split by validation produced "Drawer 1 sides — bay-1-module-2". Neither is a
+ * thing a joiner can look for on a drawing: the first names a bay that is the
+ * whole cabinet, and the second exposes a repair the reader never asked for.
+ *
+ * So the bay is named only when there is more than one to tell apart, and it is
+ * named by where it is rather than by what it is called internally — bay 2 of
+ * three is "bay 2" whatever its id says. The id stays on the part, where the
+ * editor uses it to match a part to a selection; it just stops being the label.
+ */
+export function bayLabelSuffix(cabinet: Cabinet, bayId: string): string {
+  if (cabinet.bays.length <= 1) return "";
+
+  const index = cabinet.bays.findIndex((bay) => bay.id === bayId);
+  if (index === -1) return "";
+
+  return ` — bay ${index + 1}`;
+}

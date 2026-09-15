@@ -11,6 +11,7 @@ import {
   hingesPerLeaf as hingesForLeaf,
 } from "./corners";
 export { hingesPerLeaf } from "./corners";
+import { bayLabelSuffix } from "./bay-layout";
 import { resolveDrawerConstruction } from "./drawer-construction";
 import {
   distributeDimension,
@@ -23,6 +24,7 @@ import { kitchenConstruction } from "./kitchen-construction";
 import { ledHardwareLine } from "./lighting";
 import {
   constructionMaterials,
+  constructionMethods,
   edgeBandForConstructionBoard,
 } from "./wardrobe-materials";
 import {
@@ -511,6 +513,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   const carcassHeight = envelope.height - plinth;
   const interiorHeight = carcassHeight - 2 * t;
   const depth = envelope.depth;
+  const methods = constructionMethods(spec);
   const backBoard = materials.back;
   const backThickness = backBoard.thickness;
   // The 6 mm back is applied at the rear of the shell. Carcass boards stop at
@@ -608,28 +611,56 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     for (const [index, bay] of bays.entries()) {
       const first = index === 0;
       const last = index === bays.length - 1;
-      // Half a divider at each internal edge, a full gable at each outer edge.
-      const width = bay.width + (first ? t : t / 2) + (last ? t : t / 2);
+      /*
+       * How wide this piece of back is, which depends on how it is fixed.
+       *
+       * `bay.width` is already the clear opening, so both constructions start
+       * from it and differ only in what they add at an outer edge. Overlaid,
+       * the panel is pinned across the back edges and covers the gable, so it
+       * gains the whole board and the pieces add up to the cabinet's own
+       * width. Inset, it drops into a groove machined in that gable, so it
+       * gains only the depth it sits in.
+       *
+       * An internal edge is the same either way: the piece lands on a divider
+       * and takes half of it, and its neighbour takes the other half.
+       *
+       * The same distinction applies to the height below, and to the drawer
+       * bottoms. One formula for both constructions makes a panel that either
+       * cannot reach its groove or cannot enter it, and the cut list says
+       * nothing about which.
+       */
+      const inset = methods.backFixing === "inset";
+      const outerEdge = (isOuter: boolean) =>
+        isOuter ? (inset ? methods.backGrooveDepth : t) : t / 2;
+      const width = bay.width + outerEdge(first) + outerEdge(last);
 
       // The usual 2440 mm sheet cannot make a full back for the tallest
       // valid wardrobe. Split it horizontally when necessary, keeping every
       // emitted panel a real part that can be nested and installed on the
       // carcass. Default 2400 mm wardrobes remain one piece per bay.
       const maximumLength = Math.max(backBoard.sheet.length, backBoard.sheet.width);
-      const pieceCount = Math.max(1, Math.ceil(carcassHeight / maximumLength));
-      const nominalLength = Math.ceil(carcassHeight / pieceCount);
+      // An inset back is the clear height between the top and bottom, plus
+      // what it sits into each of them; an overlaid one covers both.
+      const backHeight = inset
+        ? carcassHeight - 2 * t + 2 * methods.backGrooveDepth
+        : carcassHeight;
+      const pieceCount = Math.max(1, Math.ceil(backHeight / maximumLength));
+      const nominalLength = Math.ceil(backHeight / pieceCount);
 
       for (let piece = 0; piece < pieceCount; piece += 1) {
-        const pieceY = plinth + piece * nominalLength;
-        const length = Math.min(nominalLength, plinth + carcassHeight - pieceY);
+        const backFloor = plinth + (inset ? t - methods.backGrooveDepth : 0);
+        const pieceY = backFloor + piece * nominalLength;
+        const length = Math.min(nominalLength, backFloor + backHeight - pieceY);
 
         parts.push({
           id: `back-${bay.id}-${piece}`,
           role: "back",
           label:
             pieceCount === 1
-              ? `Back panel — ${bay.id}`
-              : `Back panel — ${bay.id}, ${piece === 0 ? "lower" : "upper"}`,
+              ? `Back panel${bayLabelSuffix(cabinet, bay.id)}`
+              : `Back panel${bayLabelSuffix(cabinet, bay.id)}${
+                  bayLabelSuffix(cabinet, bay.id) ? "," : " —"
+                } ${piece === 0 ? "lower" : "upper"}`,
           bayId: bay.id,
           board: backBoard,
           length,
@@ -692,6 +723,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       ...bayParts({
         spec,
         bay,
+        bayName: bayLabelSuffix(cabinet, bay.id),
         x: bayX,
         y: plinth + t,
         interiorHeight,
@@ -767,12 +799,20 @@ function cabinetDividerCentres(cabinet: Cabinet, thickness: number): number[] {
 function bayParts(input: {
   spec: DesignSpec;
   bay: Bay;
+  /**
+   * What this bay is called on a label, or "" when the cabinet has one bay.
+   *
+   * Passed in rather than derived here, because a bay built as one band of a
+   * stack is still a part of the bay the stack is in, and only the caller
+   * knows which that is.
+   */
+  bayName: string;
   x: number;
   y: number;
   interiorHeight: number;
   interiorDepth: number;
 }): Part[] {
-  const { spec, bay, x, y, interiorHeight, interiorDepth } = input;
+  const { spec, bay, bayName, x, y, interiorHeight, interiorDepth } = input;
   const materials = constructionMaterials(spec);
   const board = materials.interior;
   const interiorBand = edgeBandForConstructionBoard(
@@ -831,7 +871,7 @@ function bayParts(input: {
               { length: bay.fitting.count },
               (_, index) => y + step * (index + 1),
             ),
-            `Shelf — ${bay.id}${bay.fitting.adjustable ? "" : " (fixed)"}`,
+            `Shelf${bayName}${bay.fitting.adjustable ? "" : " (fixed)"}`,
             bay.fitting.adjustable,
           ),
         );
@@ -889,7 +929,7 @@ function bayParts(input: {
         parts.push({
           id: `${bay.id}-rail`,
           role: "rail",
-          label: `Hanging rail — ${bay.id}`,
+          label: `Hanging rail${bayName}`,
           bayId: bay.id,
           board,
           manufacture: "purchased",
@@ -932,7 +972,7 @@ function bayParts(input: {
         parts.push({
           id: `${bay.id}-drawer-${i}-sides`,
           role: "drawer_side",
-          label: `Drawer ${i + 1} sides — ${bay.id}`,
+          label: `Drawer ${i + 1} sides${bayName}`,
           bayId: bay.id,
           board,
           length: construction.boxDepth,
@@ -960,7 +1000,7 @@ function bayParts(input: {
         parts.push({
           id: `${bay.id}-drawer-${i}-endpanels`,
           role: "drawer_back",
-          label: `Drawer ${i + 1} front and back — ${bay.id}`,
+          label: `Drawer ${i + 1} front and back${bayName}`,
           bayId: bay.id,
           board,
           length: construction.boxWidth - 2 * board.thickness,
@@ -995,11 +1035,11 @@ function bayParts(input: {
         parts.push({
           id: `${bay.id}-drawer-${i}-base`,
           role: "drawer_base",
-          label: `Drawer ${i + 1} base — ${bay.id}`,
+          label: `Drawer ${i + 1} base${bayName}`,
           bayId: bay.id,
           board: materials.back,
-          length: construction.boxWidth,
-          width: construction.boxDepth,
+          length: construction.bottomWidth,
+          width: construction.bottomDepth,
           quantity: 1,
           edges: { ...NO_EDGES },
           edgeBand: backBand,
@@ -1011,9 +1051,9 @@ function bayParts(input: {
             },
           ],
           size: {
-            x: construction.boxWidth,
+            x: construction.bottomWidth,
             y: materials.back.thickness,
-            z: construction.boxDepth,
+            z: construction.bottomDepth,
           },
           axis: "y",
         });
@@ -1054,6 +1094,11 @@ function bayParts(input: {
               id: `${bay.id}-${section.id}`,
               fitting: sectionFitting(section),
             },
+            // The enclosing bay's name, carried down unchanged: a drawer in
+            // the lower half of bay 2 is still in bay 2. The synthetic id
+            // above exists so two sections cannot collide in the viewer's
+            // keys, and is deliberately not what the label says.
+            bayName,
             x,
             y: bottom,
             interiorHeight: band.height,
@@ -1069,7 +1114,7 @@ function bayParts(input: {
           parts.push({
             id: `${bay.id}-${section.id}-divider`,
             role: "shelf",
-            label: `Fixed shelf — ${bay.id}`,
+            label: `Fixed shelf${bayName}`,
             bayId: bay.id,
             board,
             length: Math.round(bay.width),
@@ -1204,6 +1249,7 @@ function drawerConstructionFor(
   frontHeights?: number[],
 ) {
   const materials = constructionMaterials(spec);
+  const methods = constructionMethods(spec);
   const selectedRunner = spec.hardware.find(
     (item) => item.kind === "drawer_runner",
   );
@@ -1224,6 +1270,8 @@ function drawerConstructionFor(
     drawerSideThickness: materials.interior.thickness,
     drawerBottomThickness: materials.back.thickness,
     runner,
+    bottomFixing: methods.drawerBottomFixing,
+    bottomGrooveDepth: methods.drawerBottomGrooveDepth,
   });
 }
 
@@ -1284,7 +1332,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         parts.push({
           id: `${idPrefix}-front-${face.index}`,
           role: "drawer_front",
-          label: `Drawer front ${face.index + 1} — ${idPrefix}`,
+          label: `Drawer front ${face.index + 1}${bayLabelSuffix(cabinet, bay.id)}`,
           bayId: bay.id,
           board,
           length: face.height,
@@ -1318,7 +1366,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       parts.push({
         id: `${bay.id}-door${idSuffix}`,
         role: "door",
-        label: `Door — ${bay.id}${leaves > 1 ? ` (pair)` : ""}`,
+        label: `Door${bayLabelSuffix(cabinet, bay.id)}${leaves > 1 ? ` (pair)` : ""}`,
         bayId: bay.id,
         board,
         length: leafHeight,

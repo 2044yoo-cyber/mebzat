@@ -152,7 +152,8 @@ export type HardwareKind = (typeof hardwareKinds)[number];
  */
 export const drawerRunnerSchema = z.object({
   nominalLengths: z.array(z.number().positive()).min(1),
-  sideClearance: z.number().nonnegative().max(50).default(13),
+  /** See DEFAULT_DRAWER_RUNNER in drawer-construction.ts for why 12. */
+  sideClearance: z.number().nonnegative().max(50).default(12),
   frontSetback: z.number().nonnegative().max(100).default(20),
   rearClearance: z.number().nonnegative().max(100).default(20),
   boxLengthAllowance: z.number().nonnegative().max(100).default(20),
@@ -552,6 +553,42 @@ export const designSpecSchema = z.object({
     doorGap: z.number().nonnegative().default(2),
     /** How far a shelf is set back from the front edge. */
     shelfSetback: z.number().nonnegative().default(10),
+
+    /**
+     * How the back is fixed to the carcass.
+     *
+     * `overlay` is a panel the size of the carcass, pinned to the back edges:
+     * it is what Medosha's shops do, it is what every existing design was
+     * cut as, and it is the default for that reason. `inset` drops the panel
+     * into a groove machined in the gables, top and bottom, so the panel is
+     * *smaller* than the carcass by two board thicknesses less twice the depth
+     * it sits in the groove.
+     *
+     * Two constructions, two formulas. One formula applied to both produces a
+     * back that is either too small to reach its groove or too big to enter
+     * it, and nothing on the drawing says which.
+     *
+     * Optional, so that every design saved before this existed still parses
+     * and still cuts exactly as it did. `constructionMethods` supplies the
+     * default in one place rather than each caller guessing.
+     */
+    backFixing: z.enum(["overlay", "inset"]).optional(),
+
+    /** How deep an inset back sits into its groove. Ignored when overlaid. */
+    backGrooveDepth: z.number().nonnegative().max(30).optional(),
+
+    /**
+     * How the drawer bottom is fixed into the box.
+     *
+     * `under` is a sheet pinned beneath the assembled box, so it is the box's
+     * own outside size. `grooved` runs in a groove ploughed in the sides,
+     * front and back, so it is measured between them and gains what it sits
+     * in on each of the four edges.
+     */
+    drawerBottomFixing: z.enum(["under", "grooved"]).optional(),
+
+    /** How deep a grooved drawer bottom sits in. Ignored when fixed under. */
+    drawerBottomGrooveDepth: z.number().nonnegative().max(20).optional(),
   }),
 
   hardware: z.array(hardwareSchema),

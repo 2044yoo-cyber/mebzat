@@ -88,6 +88,39 @@ export function constructionMaterials(spec: DesignSpec): ConstructionMaterials {
 }
 
 /**
+ * How this design is put together, with every default supplied once.
+ *
+ * The construction settings are optional on the spec so that a design saved
+ * before they existed still parses and still cuts exactly as it did. That
+ * leaves somebody to decide what an absent setting means, and it has to be one
+ * somebody: a back panel sized as an overlay by the cut list and as an inset by
+ * the 3D view is two different cabinets wearing one drawing.
+ *
+ * The defaults are what Medosha's shops already do and what every existing
+ * design was already cut as, so reading an old spec through this changes
+ * nothing about it.
+ */
+export function constructionMethods(spec: DesignSpec): ConstructionMethods {
+  const carcass = spec.carcass;
+
+  return {
+    backFixing: carcass.backFixing ?? "overlay",
+    backGrooveDepth: carcass.backGrooveDepth ?? 8,
+    drawerBottomFixing: carcass.drawerBottomFixing ?? "under",
+    drawerBottomGrooveDepth: carcass.drawerBottomGrooveDepth ?? 6,
+  };
+}
+
+export type ConstructionMethods = {
+  backFixing: "overlay" | "inset";
+  /** How far an inset back sits into its groove, per edge. */
+  backGrooveDepth: number;
+  drawerBottomFixing: "under" | "grooved";
+  /** How far a grooved drawer bottom sits into its groove, per edge. */
+  drawerBottomGrooveDepth: number;
+};
+
+/**
  * Uses a stocked matching PVC edge for a coloured board when one exists.
  *
  * Edge banding is a physical manufacturing finish, not a viewer tint: an oak

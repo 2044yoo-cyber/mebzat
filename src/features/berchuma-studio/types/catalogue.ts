@@ -298,7 +298,7 @@ export const HARDWARE: Hardware[] = [
     fallbackRate: 620,
     drawerRunner: {
       nominalLengths: [300, 350, 400, 450, 500, 550, 600],
-      sideClearance: 13,
+      sideClearance: 12,
       frontSetback: 20,
       rearClearance: 20,
       boxLengthAllowance: 20,
@@ -313,7 +313,7 @@ export const HARDWARE: Hardware[] = [
     fallbackRate: 280,
     drawerRunner: {
       nominalLengths: [300, 350, 400, 450, 500],
-      sideClearance: 13,
+      sideClearance: 12,
       frontSetback: 20,
       rearClearance: 20,
       boxLengthAllowance: 20,

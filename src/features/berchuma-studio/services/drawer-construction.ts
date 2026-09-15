@@ -13,10 +13,19 @@ const DRAWER_SIDE_RATIO = 0.75;
  * A generic full-extension runner profile used when a legacy design has no
  * runner selected. A 500 mm runner creates a 480 mm box side, matching the
  * measured OBJ while still leaving real clearance to the 6 mm back.
+ *
+ * `sideClearance` is 12 mm per side: the standard side-mounted runner Medosha's
+ * joiners buy, and what the shop measures. It read 13 here and in both
+ * catalogue products, which is not a rounding — it takes 2 mm off the box in
+ * every drawer in every design, and 2 mm off the front and back panels behind
+ * it, so a box cut from this list came out narrow in the opening it was made
+ * for. It stays a property of the purchased runner rather than a constant in
+ * the geometry, because that is what it is: another system needs another
+ * number, and the cut list has to follow it.
  */
 export const DEFAULT_DRAWER_RUNNER: DrawerRunner = {
   nominalLengths: [300, 350, 400, 450, 500, 550, 600],
-  sideClearance: 13,
+  sideClearance: 12,
   frontSetback: 20,
   rearClearance: 20,
   boxLengthAllowance: 20,
@@ -70,7 +79,13 @@ export type DrawerConstruction = {
   sideHeights: number[];
   bottomThickness: number;
   sideThickness: number;
+  /** How the bottom is fixed, and the size that follows from it. */
+  bottomFixing: DrawerBottomFixing;
+  bottomWidth: number;
+  bottomDepth: number;
 };
+
+export type DrawerBottomFixing = "under" | "grooved";
 
 export type DrawerConstructionInput = {
   openingWidth: number;
@@ -82,6 +97,10 @@ export type DrawerConstructionInput = {
   drawerSideThickness: number;
   drawerBottomThickness: number;
   runner?: DrawerRunner;
+  /** Defaults to `under`, which is how every design before this was cut. */
+  bottomFixing?: DrawerBottomFixing;
+  /** How far a grooved bottom sits into its groove, per edge. */
+  bottomGrooveDepth?: number;
 };
 
 /**
@@ -192,6 +211,15 @@ export function resolveDrawerConstruction(
   );
   const boxWidth = Math.max(0, input.openingWidth - 2 * runner.sideClearance);
 
+  const bottomFixing = input.bottomFixing ?? "under";
+  const { width: bottomWidth, depth: bottomDepth } = bottomSize(
+    bottomFixing,
+    boxWidth,
+    boxDepth,
+    input.drawerSideThickness,
+    input.bottomGrooveDepth ?? 6,
+  );
+
   return {
     faces,
     runner,
@@ -217,7 +245,40 @@ export function resolveDrawerConstruction(
     ),
     bottomThickness: input.drawerBottomThickness,
     sideThickness: input.drawerSideThickness,
+    bottomFixing,
+    bottomWidth,
+    bottomDepth,
   };
+}
+
+/**
+ * How big the bottom is, which depends entirely on how it is fixed.
+ *
+ * Pinned underneath, it is a sheet the size of the assembled box and covers
+ * the bottom edges of all four members — so it is the box's outside size, and
+ * the box's outside size is what it is.
+ *
+ * Grooved, it runs in a plough cut in the sides, front and back, so it is
+ * measured *between* them and then gains back the depth it sits into each
+ * groove. A bottom cut to the outside size will not go into a grooved box, and
+ * one cut between the members without the groove allowance rattles and falls
+ * out. This is why the request asks for two formulas: there are two parts.
+ */
+function bottomSize(
+  fixing: DrawerBottomFixing,
+  boxWidth: number,
+  boxDepth: number,
+  sideThickness: number,
+  grooveDepth: number,
+): { width: number; depth: number } {
+  if (fixing === "under") {
+    return { width: boxWidth, depth: boxDepth };
+  }
+
+  const between = (outside: number) =>
+    Math.max(0, outside - 2 * sideThickness + 2 * grooveDepth);
+
+  return { width: between(boxWidth), depth: between(boxDepth) };
 }
 
 function proportionalHeights(
