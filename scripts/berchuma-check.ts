@@ -2008,23 +2008,70 @@ function noOverlaps(spec: ReturnType<typeof startingDesign>): boolean {
     order.indexOf("Sink unit") > 0,
     order.join(" → "),
   );
+  // What a move must never do, and what it is now allowed to do.
+  //
+  // This used to assert the opposite — that the run had no gaps left in it,
+  // because the reflow packed every row end to end on every move. That made a
+  // gap between two cabinets something the studio could not express: dragging
+  // one aside to leave 200 mm of air put it straight back.
+  //
+  // It was also at odds with the rest of the code. `shiftAfter` says "a gap
+  // somebody left on purpose stays where they left it", and the worktop
+  // treats a gap as a doorway or a fridge space and cuts two tops rather than
+  // one. Packing was the only thing that disagreed.
+  //
+  // What had to survive is the overlap rule: a cabinet may be moved anywhere
+  // except inside another one.
+  const spread = moved.cabinets
+    .filter((cabinet) => cabinet.kind === "base")
+    .sort((a, b) => a.position.x - b.position.x);
+
   check(
-    "and the run has no gaps left in it",
-    (() => {
-      const bases = moved.cabinets
-        .filter((cabinet) => cabinet.kind === "base")
-        .sort((a, b) => a.position.x - b.position.x);
-      return bases.every(
-        (cabinet, index) =>
-          index === 0 ||
-          Math.abs(
-            bases[index - 1]!.position.x +
-              bases[index - 1]!.size.width -
-              cabinet.position.x,
-          ) < 1,
-      );
-    })(),
+    "and no cabinet ends up standing inside another",
+    spread.every(
+      (cabinet, index) =>
+        index === 0 ||
+        cabinet.position.x >=
+          spread[index - 1]!.position.x + spread[index - 1]!.size.width - 1,
+    ),
+    spread
+      .map((cabinet) => `${cabinet.label}@${Math.round(cabinet.position.x)}`)
+      .join(" "),
   );
+
+  // And the point of the change: a cabinet dragged to a spot leaves the space
+  // it came from rather than having the row close over it.
+  {
+    const start = startingDesign("kitchen", { width: 3600 });
+    const first = start.cabinets
+      .filter((cabinet) => cabinet.kind === "base")
+      .sort((a, b) => (a.offset ?? a.position.x) - (b.offset ?? b.position.x))[1]!;
+    const before = first.offset ?? first.position.x;
+    const aside = moveCabinet(start, first.id, { x: before + 300 });
+    const after = aside.cabinets.find((cabinet) => cabinet.id === first.id)!;
+    check(
+      "a cabinet dragged aside stays where it was put",
+      Math.abs((after.offset ?? after.position.x) - (before + 300)) < 1,
+      `asked for ${before + 300}, sits at ${Math.round(after.offset ?? after.position.x)}`,
+    );
+    check(
+      "and the space it left is still there",
+      (() => {
+        const bases = aside.cabinets
+          .filter((cabinet) => cabinet.kind === "base")
+          .sort((a, b) => (a.offset ?? a.position.x) - (b.offset ?? b.position.x));
+        return bases.some(
+          (cabinet, index) =>
+            index > 0 &&
+            (cabinet.offset ?? cabinet.position.x) -
+              ((bases[index - 1]!.offset ?? bases[index - 1]!.position.x) +
+                bases[index - 1]!.size.width) >
+              100,
+        );
+      })(),
+      "the row used to close up behind it on every move",
+    );
+  }
   check(
     "and changes none of its dimensions",
     after.size.width === sink.size.width &&
@@ -2048,11 +2095,71 @@ function noOverlaps(spec: ReturnType<typeof startingDesign>): boolean {
       ),
   );
 
-  // And because the row closed up, the worktop over it stays one piece.
-  check(
-    "and the worktop over it stays in one piece",
-    buildParts(moved).parts.filter((part) => part.role === "worktop").length === 1,
-  );
+  // The row keeps its own left edge.
+  //
+  // A kitchen whose base run starts at 600 because two tall units stand to the
+  // left of it must not slide to the wall because somebody dragged a cupboard
+  // at the other end.
+  {
+    const start = startingDesign("kitchen", { width: 3600 });
+    const ordered = start.cabinets
+      .filter((cabinet) => cabinet.kind === "base")
+      .sort((a, b) => (a.offset ?? a.position.x) - (b.offset ?? b.position.x));
+
+    const shifted = moveCabinet(start, ordered[0]!.id, { x: 600 });
+    const leftEdge = (spec: typeof start) =>
+      Math.min(
+        ...spec.cabinets
+          .filter((cabinet) => cabinet.kind === "base")
+          .map((cabinet) => cabinet.offset ?? cabinet.position.x),
+      );
+    check(
+      "a row can start away from the wall",
+      leftEdge(shifted) === 600,
+      `${leftEdge(shifted)}`,
+    );
+
+    const last = shifted.cabinets
+      .filter((cabinet) => cabinet.kind === "base")
+      .sort((a, b) => (a.offset ?? a.position.x) - (b.offset ?? b.position.x))
+      .at(-1)!;
+    const nudged = moveCabinet(shifted, last.id, {
+      x: (last.offset ?? last.position.x) + 200,
+    });
+    check(
+      "and dragging a cabinet at the far end does not pull it back to the wall",
+      leftEdge(nudged) === 600,
+      `${leftEdge(nudged)}`,
+    );
+  }
+
+  // And the worktop follows the row rather than the other way round.
+  //
+  // This asserted one piece, which was true only because the row closed up.
+  // Now that a gap can be left, the top does what `straightWorktopParts` has
+  // always said it does — "a gap of more than a millimetre means something
+  // stands between them, and the top does not bridge it" — and cuts one piece
+  // per stretch of touching cabinets. A kitchen left flush still gets one.
+  {
+    const flush = startingDesign("kitchen", { width: 3600 });
+    check(
+      "a flush run is still topped by a single worktop",
+      buildParts(flush).parts.filter((part) => part.role === "worktop").length === 1,
+      "nothing has moved, so nothing should have changed",
+    );
+
+    const bases = flush.cabinets
+      .filter((cabinet) => cabinet.kind === "base")
+      .sort((a, b) => (a.offset ?? a.position.x) - (b.offset ?? b.position.x));
+    const opened = moveCabinet(flush, bases[1]!.id, {
+      x: (bases[1]!.offset ?? bases[1]!.position.x) + 400,
+    });
+    check(
+      "and a run with a gap left in it is topped by more than one",
+      buildParts(opened).parts.filter((part) => part.role === "worktop").length > 1,
+      "a doorway or a fridge space in the middle of a run is two worktops, which is how a shop cuts it",
+    );
+  }
 
   // Moving without the reflow is the deliberate-gap case, and it does split
   // the top — which is what a doorway or an island in the middle of a run

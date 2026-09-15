@@ -586,20 +586,58 @@ function moveOffsetOnRun(
 }
 
 /**
- * Packs a row end to end, in whatever order the cabinets now stand.
+ * Separates a row, in whatever order the cabinets now stand.
  *
  * The row keeps its own left edge — a kitchen whose base run starts at 600
  * because two tall units stand to the left of it does not slide to the wall
  * because somebody dragged a cupboard.
+ *
+ * ## It used to pack them end to end, and that was the bug
+ *
+ * `cursor += cabinet.size.width` with nothing between: every cabinet was
+ * dragged up against its neighbour on every move, so a gap between two
+ * cabinets could not be made and could not survive being made. Dragging one
+ * aside to leave 200 mm of air put it straight back.
+ *
+ * Which was at odds with the rest of the file and with the geometry. Two
+ * doors down, `shiftAfter` says "a gap somebody left on purpose at the other
+ * end of the kitchen stays where they left it". And `straightWorktopParts`
+ * treats a gap as meaningful in as many words — "a gap of more than a
+ * millimetre means something stands between them: a tall unit, a fridge
+ * space, a doorway — and the top does not bridge it", and it cuts two
+ * worktops rather than one. Every part of the design understood gaps except
+ * the one function that could create them.
+ *
+ * ## What it does instead
+ *
+ * Each cabinet keeps where it was put, unless that would put it inside the
+ * one before it — in which case it is pushed just clear. So:
+ *
+ * - Dragging a cabinet aside leaves the space, and it stays.
+ * - Dragging one *past* another still swaps them, because `row` hands them
+ *   back sorted by position and the one now on the left is walked first.
+ * - A kitchen built flush stays flush: every cabinet already clears the
+ *   previous one, so nothing moves.
+ *
+ * Overlaps are still impossible, which is the part that had to be kept: two
+ * cabinets occupying the same 400 mm is not a design, it is a drawing.
  */
 function reflowRow(spec: DesignSpec, target: CabinetRow): void {
   const cabinets = row(spec, target);
   if (cabinets.length === 0) return;
 
-  let cursor = Math.min(...cabinets.map((cabinet) => along(cabinet)));
+  // Starting at zero rather than at the row's left edge, and it comes to the
+  // same thing: `row` sorts by position, `setAlong` never writes a negative
+  // one, so the leftmost cabinet's own position always wins the `Math.max`
+  // below and the row keeps its left edge by itself. Seeding the cursor with
+  // `Math.min(...)` of the same numbers was left over from the packing version,
+  // where the cursor was assigned rather than compared and the seed did the
+  // work.
+  let cursor = 0;
   for (const cabinet of cabinets) {
-    setAlong(cabinet, cursor);
-    cursor += cabinet.size.width;
+    const at = Math.max(cursor, along(cabinet));
+    setAlong(cabinet, at);
+    cursor = at + cabinet.size.width;
   }
 }
 

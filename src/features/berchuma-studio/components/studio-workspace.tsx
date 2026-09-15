@@ -254,6 +254,8 @@ export function StudioWorkspace({
                 <DesignEditor
                   spec={design.spec}
                   onChange={design.set}
+                  onUndo={design.undo}
+                  canUndo={design.canUndo}
                 />
               </div>
             </>

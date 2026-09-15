@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
-import { Box, Loader2, Ruler, SlidersHorizontal, X } from "lucide-react";
+import { Box, Loader2, Ruler, SlidersHorizontal, Undo2, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -42,9 +42,14 @@ type View = "solid" | "flat";
 export function DesignEditor({
   spec,
   onChange,
+  onUndo,
+  canUndo = false,
 }: {
   spec: DesignSpec;
   onChange: (next: DesignSpec) => void;
+  /** Absent where there is no history to offer — the public read-only view. */
+  onUndo?: () => void;
+  canUndo?: boolean;
 }) {
   const [view, setView] = useState<View>("solid");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -205,19 +210,45 @@ export function DesignEditor({
 
         {/* Top left: how it is drawn. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
-          <div className="pointer-events-auto flex gap-1 rounded-lg border border-white/10 bg-background/70 p-0.5 backdrop-blur-xl">
-            <ViewTab
-              active={view === "solid"}
-              onClick={() => setView("solid")}
-              icon={Box}
-              label="3D"
-            />
-            <ViewTab
-              active={view === "flat"}
-              onClick={() => setView("flat")}
-              icon={Ruler}
-              label="Elevation"
-            />
+          <div className="pointer-events-auto flex items-center gap-1">
+            <div className="flex gap-1 rounded-lg border border-white/10 bg-background/70 p-0.5 backdrop-blur-xl">
+              <ViewTab
+                active={view === "solid"}
+                onClick={() => setView("solid")}
+                icon={Box}
+                label="3D"
+              />
+              <ViewTab
+                active={view === "flat"}
+                onClick={() => setView("flat")}
+                icon={Ruler}
+                label="Elevation"
+              />
+            </div>
+
+            {/*
+              Undo, over the drawing rather than in the controls sheet.
+
+              Because the edit somebody most wants to take back is a drag they
+              did *here* — a cabinet pushed too far, a handle pulled the wrong
+              way — and the sheet is shut while they are doing it.
+
+              Disabled rather than hidden when there is nothing to undo, so the
+              button does not appear and disappear under the thumb that is
+              reaching for it.
+            */}
+            {onUndo ? (
+              <button
+                type="button"
+                onClick={onUndo}
+                disabled={!canUndo}
+                aria-label="Undo the last change"
+                title="Undo the last change"
+                className="flex size-8 items-center justify-center rounded-lg border border-white/10 bg-background/70 backdrop-blur-xl transition-opacity disabled:opacity-35"
+              >
+                <Undo2 className="size-4" aria-hidden />
+              </button>
+            ) : null}
           </div>
 
           {view === "solid" ? (

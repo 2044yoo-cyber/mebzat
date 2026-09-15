@@ -28,6 +28,14 @@
 import { readFileSync } from "node:fs";
 
 import {
+  COALESCE_MS,
+  DEPTH,
+  canRewind,
+  continuesStep,
+  remember,
+  rewind,
+} from "../src/features/berchuma-studio/services/history.ts";
+import {
   DEFAULT_SNAP,
   FULL,
   OPEN,
@@ -338,6 +346,144 @@ const EDITOR = "src/features/berchuma-studio/components/editor/design-editor.tsx
   check(
     "and pushing up never moves the sheet from the list",
     !dragOwnsGesture(0, -20),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4b. Undo
+// ---------------------------------------------------------------------------
+
+{
+  // The case the whole design turns on: a drag is one step, not two hundred.
+  //
+  // Dragging a cabinet calls the setter on every animation frame, each with a
+  // complete new design. Pushed one per frame, a single drag fills the whole
+  // history and pressing undo steps back one sixtieth of a second — which
+  // looks, to the person pressing it, exactly like a button that does nothing.
+  let past: ReturnType<typeof remember<string>> = [];
+  let clock = 1000;
+  for (let frame = 0; frame < 60; frame += 1) {
+    past = remember(past, `frame-${frame}`, clock);
+    clock += 16;
+  }
+
+  check(
+    "a second of dragging is one thing to undo",
+    past.length === 1,
+    `${past.length} steps for 60 frames`,
+  );
+  check(
+    "and it goes back to before the drag started, not to the frame before",
+    rewind(past)?.state === "frame-0",
+    `${rewind(past)?.state}`,
+  );
+
+  // A drag that runs longer than the window is still one drag.
+  let long: ReturnType<typeof remember<string>> = [];
+  let slow = 1000;
+  for (let frame = 0; frame < 300; frame += 1) {
+    long = remember(long, `f${frame}`, slow);
+    slow += 16;
+  }
+  check(
+    "a five-second drag does not split into several",
+    long.length === 1,
+    `${long.length} steps — the window has to move with the gesture, not sit at its start`,
+  );
+
+  // A deliberate second action is its own step.
+  clock += COALESCE_MS * 3;
+  past = remember(past, "after-the-drag", clock);
+  check("a separate edit is a separate step", past.length === 2);
+  check(
+    "undo walks back one step at a time",
+    (() => {
+      const first = rewind(past);
+      if (!first || first.state !== "after-the-drag") return false;
+      const second = rewind(first.past);
+      return second?.state === "frame-0" && second.past.length === 0;
+    })(),
+  );
+
+  check(
+    "the very first edit on a design is undoable",
+    continuesStep(null, 1000) === false,
+    "with no history yet there is nothing to continue, so it has to open a step",
+  );
+  check(
+    "two edits far apart are separate steps",
+    !continuesStep(1000, 1000 + COALESCE_MS + 1),
+  );
+  check(
+    "and two within the window are one",
+    continuesStep(1000, 1000 + COALESCE_MS - 1),
+  );
+
+  // Bounded, because a design is a few hundred kilobytes.
+  let deep: ReturnType<typeof remember<number>> = [];
+  let far = 0;
+  for (let i = 0; i < DEPTH + 25; i += 1) {
+    deep = remember(deep, i, far);
+    far += COALESCE_MS * 2;
+  }
+  check("the history is bounded", deep.length === DEPTH, `${deep.length}`);
+  check(
+    "and it is the oldest that falls off, not the newest",
+    deep[deep.length - 1]?.state === DEPTH + 24,
+    `top is ${deep[deep.length - 1]?.state}`,
+  );
+
+  check("an empty history offers nothing to go back to", rewind([]) === null);
+  check("and says so", !canRewind([]));
+  check("a history with something in it says so too", canRewind(deep));
+}
+
+// ---------------------------------------------------------------------------
+// 4c. Undo's wiring
+// ---------------------------------------------------------------------------
+
+{
+  const editor = code(EDITOR);
+  const hook = code("src/features/berchuma-studio/hooks/use-design.ts");
+  const workspace = code(
+    "src/features/berchuma-studio/components/studio-workspace.tsx",
+  );
+
+  check(
+    "there is an undo button over the drawing",
+    /aria-label="Undo the last change"/.test(editor),
+    "the edit somebody most wants back is a drag they did on the model, and the controls sheet is shut while they are doing it",
+  );
+  check(
+    "it is disabled rather than hidden when there is nothing to undo",
+    /disabled=\{!canUndo\}/.test(editor),
+    "a button that appears and disappears moves under the thumb reaching for it",
+  );
+  check(
+    "the editor is given the undo and whether it is available",
+    /onUndo=\{design\.undo\}/.test(workspace) &&
+      /canUndo=\{design\.canUndo\}/.test(workspace),
+  );
+
+  check(
+    "every writer records the state it is replacing",
+    (hook.match(/record\(previous\)/g) ?? []).length >= 3,
+    `${(hook.match(/record\(previous\)/g) ?? []).length} of the three writers — a writer that does not record is an edit that cannot be undone`,
+  );
+  check(
+    "and it records from inside the updater, not from the render's copy",
+    !/record\(held\)/.test(hook),
+    "`held` inside an updater is the render's copy and may already be an edit behind",
+  );
+  check(
+    "undoing does not re-run the validator over an already-repaired design",
+    /setHeld\(step\.state\)/.test(hook) && !/validateSpec\(step/.test(hook),
+    "the second pass appends its corrections to the first pass's, so undoing five times prints the same warning five times",
+  );
+  check(
+    "starting a new design clears the history",
+    /past\.current = \[\];/.test(hook),
+    "otherwise undo walks back out of the design that is open and into the one before it",
   );
 }
 

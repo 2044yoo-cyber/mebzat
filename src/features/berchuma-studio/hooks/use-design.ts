@@ -1,10 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { calculateCost } from "../services/costing";
 import { buildCutList, sheetCountsOf } from "../services/cutlist";
 import { buildParts } from "../services/geometry";
+import {
+  canRewind,
+  remember,
+  rewind,
+  type Step,
+} from "../services/history";
 import type { CostBreakdown, MarketRate } from "../types/cost";
 import type { PartsBreakdown } from "../types/parts";
 import { validateSpec, type DesignSpec, type SpecIssue } from "../types/spec";
@@ -46,6 +52,10 @@ export type DesignController = DesignState & {
    */
   set: (spec: DesignSpec) => void;
   clear: () => void;
+  /** Puts back the design as it was before the last edit. */
+  undo: () => void;
+  /** Whether there is anything to go back to, for the button's disabled state. */
+  canUndo: boolean;
 };
 
 /**
@@ -77,6 +87,45 @@ export function useDesign(
     return spec ? { spec, issues: [] } : EMPTY;
   });
 
+  /**
+   * What to go back to.
+   *
+   * A ref rather than state, and that is deliberate. Every writer here is
+   * inside a `setHeld` updater, which React is entitled to call twice — and a
+   * `setPast` from inside one would either be dropped or applied twice. The
+   * ref is written once per committed state change, and the only thing render
+   * needs from it is whether it is empty, which is held separately.
+   */
+  const past = useRef<Step<Held>[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+
+  /**
+   * Records the state being replaced, unless this edit continues the last one.
+   *
+   * Called from each writer just before it hands React the new state. It reads
+   * the state it is replacing from its own argument rather than from `held`,
+   * because inside an updater `held` is the render's copy and may already be
+   * one edit behind.
+   */
+  const record = useCallback((replacing: Held) => {
+    if (!replacing.spec) return;
+    past.current = remember(past.current, replacing, Date.now());
+    setCanUndo(canRewind(past.current));
+  }, []);
+
+  const undo = useCallback(() => {
+    const step = rewind(past.current);
+    if (!step) return;
+    past.current = step.past;
+    setCanUndo(canRewind(past.current));
+    // Not revalidated. This state was produced by the validator on its way in,
+    // so running it through again would be a second pass over an already
+    // repaired design — and the second pass appends its corrections to the
+    // first pass's, which is how undoing five times fills the panel with the
+    // same warning five times.
+    setHeld(step.state);
+  }, []);
+
   const derived = useMemo(() => {
     if (!held.spec) return { parts: null, cost: null };
     const parts = buildParts(held.spec);
@@ -103,11 +152,11 @@ export function useDesign(
     const draft = structuredClone(spec);
     draft.meta.corrections = [];
     const result = validateSpec(draft);
-    setHeld({
-      spec: result.spec,
-      issues: [...issues, ...result.issues],
+    setHeld((previous) => {
+      record(previous);
+      return { spec: result.spec, issues: [...issues, ...result.issues] };
     });
-  }, []);
+  }, [record]);
 
   const edit = useCallback((mutate: (draft: DesignSpec) => void) => {
     setHeld((previous) => {
@@ -124,18 +173,29 @@ export function useDesign(
       draft.meta.corrections = [];
 
       const result = validateSpec(draft);
+      record(previous);
       return { spec: result.spec, issues: result.issues };
     });
-  }, []);
+  }, [record]);
 
-  const set = useCallback((spec: DesignSpec) => {
-    const draft = structuredClone(spec);
-    draft.meta.corrections = [];
-    const result = validateSpec(draft);
-    setHeld({ spec: result.spec, issues: result.issues });
-  }, []);
+  const set = useCallback(
+    (spec: DesignSpec) => {
+      const draft = structuredClone(spec);
+      draft.meta.corrections = [];
+      const result = validateSpec(draft);
+      setHeld((previous) => {
+        record(previous);
+        return { spec: result.spec, issues: result.issues };
+      });
+    },
+    [record],
+  );
 
-  const clear = useCallback(() => setHeld(EMPTY), []);
+  const clear = useCallback(() => {
+    past.current = [];
+    setCanUndo(false);
+    setHeld(EMPTY);
+  }, []);
 
   return {
     spec: held.spec,
@@ -145,5 +205,7 @@ export function useDesign(
     edit,
     set,
     clear,
+    undo,
+    canUndo,
   };
 }
