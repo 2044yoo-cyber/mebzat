@@ -27,12 +27,22 @@ type Saved = { id: string; slug: string };
 export function PublishBar({
   spec,
   lastBrief,
+  initialSaved = null,
 }: {
   spec: DesignSpec;
   /** The message that produced the current design, kept as the version note. */
   lastBrief: string | null;
+  /**
+   * The design this already is, when the studio was opened on a saved one.
+   *
+   * Without it the bar starts as though nothing had ever been saved, and Save
+   * posts with no `designId` — which creates a second design rather than a new
+   * version of the one on screen. Somebody editing their wardrobe would end up
+   * with two wardrobes and no idea which one the link they shared points at.
+   */
+  initialSaved?: Saved | null;
 }) {
-  const [saved, setSaved] = useState<Saved | null>(null);
+  const [saved, setSaved] = useState<Saved | null>(initialSaved);
   const [published, setPublished] = useState(false);
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [error, setError] = useState<string | null>(null);

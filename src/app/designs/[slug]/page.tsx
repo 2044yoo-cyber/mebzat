@@ -248,7 +248,7 @@ export default async function DesignPage({
             <RemixButton designId={design.id} title={design.title} />
             {design.isOwner ? (
               <Link
-                href="/studio"
+                href={`/studio?design=${encodeURIComponent(design.slug)}`}
                 className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md border px-4 text-sm font-medium hover:bg-muted"
               >
                 <Pencil className="size-4" aria-hidden />

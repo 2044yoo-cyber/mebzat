@@ -28,6 +28,17 @@
 import { readFileSync } from "node:fs";
 
 import {
+  DRAFT_TTL_MS,
+  DRAFT_VERSION,
+  differsFrom,
+  draftKey,
+  readDraft,
+  savedAgo,
+  writeDraft,
+  clearDraft,
+} from "../src/features/berchuma-studio/services/draft.ts";
+import { tvUnitExample } from "../src/features/berchuma-studio/services/examples.ts";
+import {
   COALESCE_MS,
   DEPTH,
   canRewind,
@@ -484,6 +495,274 @@ const EDITOR = "src/features/berchuma-studio/components/editor/design-editor.tsx
     "starting a new design clears the history",
     /past\.current = \[\];/.test(hook),
     "otherwise undo walks back out of the design that is open and into the one before it",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4d. Open in Studio actually opens the design
+// ---------------------------------------------------------------------------
+
+{
+  const page = code("src/app/designs/[slug]/page.tsx");
+  const studio = code("src/app/studio/page.tsx");
+  const workspace = code(
+    "src/features/berchuma-studio/components/studio-workspace.tsx",
+  );
+  const bar = code("src/features/berchuma-studio/components/publish-bar.tsx");
+
+  check(
+    "the button carries the design it was pressed on",
+    /href=\{`\/studio\?design=\$\{encodeURIComponent\(design\.slug\)\}`\}/.test(page),
+    'it was `href="/studio"`, which opens the picker — so pressing it on a design gave you an empty studio',
+  );
+  check(
+    "and the old bare link is gone",
+    !/href="\/studio"/.test(page),
+  );
+
+  check(
+    "the studio loads the design named in the URL",
+    /const record = await getDesign\(design\)/.test(studio),
+  );
+  check(
+    "on the server, under the viewer's own session",
+    /await getDesign\(design\)\.catch/.test(studio) &&
+      !/use client/.test(studio),
+    "a slug typed by hand has to meet the same row-level rules as the page it came from",
+  );
+  check(
+    "and only opens it for its owner",
+    /if \(record\?\.isOwner\)/.test(studio),
+    "editing somebody else's design in place would fail on save or overwrite their work; Remix is the route for that",
+  );
+  check(
+    "a design that cannot be read falls back to the ordinary studio",
+    /\.catch\(\(\) => null\)/.test(studio),
+    "a hand-edited slug should get the picker, not a crash",
+  );
+
+  check(
+    "the workspace opens holding that design rather than the picker",
+    /if \(editing\) return editing\.spec;/.test(workspace),
+  );
+  check(
+    "and lands on the Design tab, not the chat",
+    /editing \|\| opening\?\.kind === "kitchen" \? "design" : "chat"/.test(workspace),
+    "somebody who pressed Open in Studio is looking at a design, not starting a conversation",
+  );
+  check(
+    "the publish bar is told which design this is",
+    /initialSaved=\{\s*\n?\s*editing \? \{ id: editing\.designId, slug: editing\.slug \} : null\s*\n?\s*\}/.test(
+      workspace,
+    ) || /initialSaved=\{/.test(workspace),
+  );
+  check(
+    "and starts from it rather than from nothing",
+    /useState<Saved \| null>\(initialSaved\)/.test(bar),
+    "without it Save posts with no designId and writes a second design rather than a new version of this one",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4e. A draft that survives the back button
+// ---------------------------------------------------------------------------
+
+{
+  // A tiny stand-in for localStorage, so the module can be exercised without a
+  // browser — and so the throwing case can be tested, which a real one will
+  // not do on demand.
+  const makeStore = (throwing = false): Storage => {
+    const map = new Map<string, string>();
+    return {
+      get length() {
+        return map.size;
+      },
+      clear: () => map.clear(),
+      key: (i: number) => [...map.keys()][i] ?? null,
+      getItem: (k: string) => {
+        if (throwing) throw new Error("private mode");
+        return map.get(k) ?? null;
+      },
+      setItem: (k: string, v: string) => {
+        if (throwing) throw new Error("quota");
+        map.set(k, v);
+      },
+      removeItem: (k: string) => {
+        if (throwing) throw new Error("private mode");
+        map.delete(k);
+      },
+    } as Storage;
+  };
+
+  const spec = tvUnitExample();
+
+  check(
+    "a draft belongs to one person",
+    draftKey("alice") !== draftKey("bob"),
+    "a shared phone must not show one owner's unfinished work to the next",
+  );
+  check(
+    "and to one design",
+    draftKey("alice", "design-1") !== draftKey("alice", "design-2") &&
+      draftKey("alice") !== draftKey("alice", "design-1"),
+    "editing a saved wardrobe and starting a new bookshelf are two pieces of work",
+  );
+
+  {
+    const store = makeStore();
+    const key = draftKey("alice", null);
+    check("a design can be written down", writeDraft(store, key, spec, null));
+
+    const back = readDraft(store, key);
+    check("and read back", back !== null);
+    check(
+      "as the same design",
+      back?.spec.title === spec.title &&
+        back?.spec.cabinets.length === spec.cabinets.length,
+    );
+    check(
+      "with a time on it, so it can say how old it is",
+      (back?.savedAt ?? 0) > 0,
+    );
+
+    clearDraft(store, key);
+    check("and discarded", readDraft(store, key) === null);
+  }
+
+  // Untrusted input. It is JSON from a store anybody with the browser open can
+  // edit, and it becomes a drawing and a price.
+  {
+    const store = makeStore();
+    const key = draftKey("alice", null);
+
+    store.setItem(key, "not json at all");
+    check("a draft that is not JSON is ignored", readDraft(store, key) === null);
+
+    store.setItem(key, JSON.stringify({ version: 999, savedAt: Date.now(), spec }));
+    check(
+      "a draft from an older shape is discarded rather than half-restored",
+      readDraft(store, key) === null,
+      "putting back three fields of eight is worse than asking again, because it looks like it worked",
+    );
+
+    store.setItem(
+      key,
+      JSON.stringify({ version: DRAFT_VERSION, savedAt: Date.now(), spec: { title: "nonsense" } }),
+    );
+    check(
+      "and one that is not a design cannot become one",
+      readDraft(store, key) === null,
+      "the same gate the API uses, for the same reason",
+    );
+
+    store.setItem(
+      key,
+      JSON.stringify({
+        version: DRAFT_VERSION,
+        savedAt: Date.now() - DRAFT_TTL_MS - 1000,
+        spec,
+      }),
+    );
+    check(
+      "a draft older than a fortnight is not offered back",
+      readDraft(store, key) === null,
+      "a design abandoned a month ago reappearing over a fresh start gets mistaken for it",
+    );
+  }
+
+  // A browser that refuses storage must not take the studio down with it.
+  {
+    const hostile = makeStore(true);
+    const key = draftKey("alice", null);
+    check(
+      "a browser that refuses to store does not throw on write",
+      writeDraft(hostile, key, spec, null) === false,
+    );
+    check("nor on read", readDraft(hostile, key) === null);
+    check("nor on discard", (() => {
+      clearDraft(hostile, key);
+      return true;
+    })());
+  }
+
+  // What is worth offering back.
+  {
+    const store = makeStore();
+    const key = draftKey("alice", "design-1");
+    writeDraft(store, key, spec, "design-1");
+    const found = readDraft(store, key)!;
+
+    check(
+      "a draft of the design already on screen is not offered back",
+      !differsFrom(found, spec),
+      "opening a saved design writes a draft of it within a second; offering that back is offering somebody their own unchanged work",
+    );
+    check(
+      "a draft of something else is",
+      differsFrom(found, { ...spec, title: "Something different" }),
+    );
+    check(
+      "and so is one when nothing is open",
+      differsFrom(found, null),
+    );
+  }
+
+  check(
+    "how long ago is said in words",
+    savedAgo(Date.now() - 30_000) === "a moment ago" &&
+      savedAgo(Date.now() - 20 * 60_000) === "20 minutes ago" &&
+      savedAgo(Date.now() - 3 * 3_600_000) === "3 hours ago" &&
+      savedAgo(Date.now() - 26 * 3_600_000) === "yesterday",
+    `${savedAgo(Date.now() - 30_000)} / ${savedAgo(Date.now() - 20 * 60_000)} / ${savedAgo(Date.now() - 3 * 3_600_000)} / ${savedAgo(Date.now() - 26 * 3_600_000)}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4f. The draft's wiring
+// ---------------------------------------------------------------------------
+
+{
+  const workspace = code(
+    "src/features/berchuma-studio/components/studio-workspace.tsx",
+  );
+  const studio = code("src/app/studio/page.tsx");
+
+  check(
+    "the design is written down as it changes",
+    /writeDraft\(window\.localStorage, key, spec, editing\?\.designId \?\? null\)/.test(
+      workspace,
+    ),
+  );
+  check(
+    "on a debounce, not on every frame of a drag",
+    /setTimeout\(\s*\n?\s*\(\) => \{/.test(workspace) &&
+      /DRAFT_WRITE_MS/.test(workspace),
+    "serialising a whole design sixty times a second would make the drag it is protecting stutter",
+  );
+  check(
+    "and the pending write is cancelled when the design changes again",
+    /return \(\) => clearTimeout\(timer\);/.test(workspace),
+  );
+  check(
+    "the draft is read without breaking server rendering",
+    /useSyncExternalStore\(/.test(workspace) && /\(\) => null,/.test(workspace),
+    "a useState initialiser would run on the server, where there is no localStorage to read",
+  );
+  check(
+    "it is offered back rather than put back",
+    /Put it back/.test(workspace) && /Discard/.test(workspace),
+    "restoring silently leaves somebody who meant to start again with no obvious way out of it",
+  );
+  check(
+    "discarding actually removes it",
+    /clearDraft\(window\.localStorage, key\)/.test(workspace),
+    "a Discard that only hides the bar offers the same draft again on the next visit",
+  );
+  check(
+    "the draft is keyed to who is signed in",
+    /userId \? draftKey\(userId, editing\?\.designId \?\? null\) : null/.test(
+      workspace,
+    ) && /userId=\{session\.state === "signed-in" \? session\.userId : null\}/.test(studio),
   );
 }
 

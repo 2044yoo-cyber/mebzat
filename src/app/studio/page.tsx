@@ -5,7 +5,12 @@ import { redirect } from "next/navigation";
 import { StudioWorkspace } from "@/features/berchuma-studio/components/studio-workspace";
 import { marketRates } from "@/features/berchuma-studio/services/rates";
 import type { MarketRate } from "@/features/berchuma-studio/types/cost";
-import { designKinds, type DesignKind } from "@/features/berchuma-studio/types/spec";
+import { getDesign } from "@/features/berchuma-studio/services/designs";
+import {
+  designKinds,
+  type DesignKind,
+  type DesignSpec,
+} from "@/features/berchuma-studio/types/spec";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -30,7 +35,7 @@ export const metadata: Metadata = {
  * you are, and that failing is worth saying out loud rather than crashing.
  */
 export default async function StudioPage(props: {
-  searchParams: Promise<{ kind?: string; width?: string }>;
+  searchParams: Promise<{ kind?: string; width?: string; design?: string }>;
 }) {
   const session = await currentUser();
 
@@ -51,24 +56,59 @@ export default async function StudioPage(props: {
     rates = [];
   }
 
+  const { kind, width, design } = await props.searchParams;
+
+  /**
+   * Opened from a saved design: /studio?design=<slug>.
+   *
+   * This is what "Open in Studio" on a design page does. It used to be a bare
+   * link to `/studio`, which opened the picker — so pressing it on a design
+   * you had spent an hour on gave you an empty studio, and the design was
+   * still only on its own page.
+   *
+   * Loaded here rather than in the browser for the reason everything else on
+   * this page is: `getDesign` runs under the viewer's own session, so a slug
+   * somebody types by hand is subject to the same row-level rules as the page
+   * it came from, and an unreadable design is simply not found.
+   *
+   * Only for the owner. Somebody else's design opens through Remix, which
+   * makes them their own copy and credits the original — editing it in place
+   * would either fail on save or quietly overwrite another person's work.
+   */
+  let editing: { spec: DesignSpec; designId: string; slug: string } | null = null;
+  if (design) {
+    const record = await getDesign(design).catch(() => null);
+    if (record?.isOwner) {
+      editing = { spec: record.spec, designId: record.id, slug: record.slug };
+    }
+  }
+
   // Opened from a furniture calculator: /studio?kind=wardrobe&width=2400.
   // Anything that is not a real design kind is ignored rather than trusted, so
   // a hand-edited URL gets the ordinary start panel instead of a crash.
-  const { kind, width } = await props.searchParams;
   const parsedWidth = Number(width);
   const opening =
-    kind && (designKinds as readonly string[]).includes(kind)
+    !editing && kind && (designKinds as readonly string[]).includes(kind)
       ? {
           kind: kind as DesignKind,
           width: Number.isFinite(parsedWidth) && parsedWidth > 0 ? parsedWidth : undefined,
         }
       : null;
 
-  return <StudioWorkspace rates={rates} opening={opening} />;
+  return (
+    <StudioWorkspace
+      rates={rates}
+      opening={opening}
+      editing={editing}
+      // The draft is keyed by who is looking, so a shared phone never shows
+      // one owner's unfinished work to the next person to sign in.
+      userId={session.state === "signed-in" ? session.userId : null}
+    />
+  );
 }
 
 type Session =
-  | { state: "signed-in" }
+  | { state: "signed-in"; userId: string }
   | { state: "anonymous" }
   | { state: "unreachable"; detail: string };
 
@@ -99,7 +139,9 @@ async function currentUser(): Promise<Session> {
         : { state: "unreachable", detail: error.message };
     }
 
-    return data.user ? { state: "signed-in" } : { state: "anonymous" };
+    return data.user
+      ? { state: "signed-in", userId: data.user.id }
+      : { state: "anonymous" };
   } catch (problem) {
     return {
       state: "unreachable",

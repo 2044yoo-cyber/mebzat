@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { MessageSquare, Ruler, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -13,7 +19,16 @@ import { SendToCalculator } from "./send-to-calculator";
 import { StartPanel } from "./start-panel";
 import { useDesign } from "../hooks/use-design";
 import { startingDesign } from "../services/starting-designs";
-import type { DesignKind } from "../types/spec";
+import {
+  differsFrom,
+  draftKey,
+  readDraft,
+  savedAgo,
+  writeDraft,
+  clearDraft,
+  type StudioDraft,
+} from "../services/draft";
+import type { DesignKind, DesignSpec } from "../types/spec";
 import type { MarketRate } from "../types/cost";
 import type {
   DesignErrorResponse,
@@ -38,6 +53,30 @@ import type {
 
 type Tab = "chat" | "design" | "cost";
 
+/**
+ * How long the design has to stand still before it is written down.
+ *
+ * Long enough that a drag writes once at the end of it rather than on every
+ * frame, short enough that a back gesture a second after an edit still finds
+ * the edit. Serialising a whole design is not free, and doing it sixty times a
+ * second would make the drag it is protecting stutter.
+ */
+const DRAFT_WRITE_MS = 800;
+
+/** A draft does not change under this tab: this tab is what writes it. */
+function noSubscription(): () => void {
+  return () => {};
+}
+
+/** localStorage throws on access in Safari's private mode, not only on write. */
+function safeRead(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 const TABS: { id: Tab; label: string; icon: typeof MessageSquare }[] = [
   { id: "chat", label: "Berchuma", icon: MessageSquare },
   { id: "design", label: "Design", icon: Ruler },
@@ -47,6 +86,8 @@ const TABS: { id: Tab; label: string; icon: typeof MessageSquare }[] = [
 export function StudioWorkspace({
   rates,
   opening,
+  editing,
+  userId,
 }: {
   rates: MarketRate[];
   /**
@@ -58,6 +99,17 @@ export function StudioWorkspace({
    * plain visit, which still gets the start panel.
    */
   opening?: { kind: DesignKind; width?: number } | null;
+  /**
+   * A saved design to open for editing, from `/studio?design=<slug>`.
+   *
+   * Carries the design's id as well as its spec, because the two are one fact:
+   * without the id the publish bar starts as though nothing had ever been
+   * saved, and pressing Save would write a *second* design rather than a new
+   * version of this one.
+   */
+  editing?: { spec: DesignSpec; designId: string; slug: string } | null;
+  /** Who is looking, for the draft key. Null keeps the draft turned off. */
+  userId?: string | null;
 }) {
   // `rates` arrives from a server component and never changes for the life of
   // the page, but it is an array literal in props — memoised so the cost
@@ -67,13 +119,80 @@ export function StudioWorkspace({
   // Built once, on the first render, from the URL. `startingDesign` validates
   // as it builds, so a design arriving this way is held to the same carpentry
   // rules as one the model wrote.
-  const design = useDesign(stableRates, () =>
-    opening && opening.kind !== "kitchen" ? startingDesign(opening.kind, opening.width ? { width: opening.width } : {}) : null,
-  );
+  const design = useDesign(stableRates, () => {
+    // A saved design wins: somebody who pressed "Open in Studio" is looking at
+    // a particular design and means that one.
+    if (editing) return editing.spec;
+    return opening && opening.kind !== "kitchen"
+      ? startingDesign(opening.kind, opening.width ? { width: opening.width } : {})
+      : null;
+  });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>(opening?.kind === "kitchen" ? "design" : "chat");
+  const [tab, setTab] = useState<Tab>(
+    editing || opening?.kind === "kitchen" ? "design" : "chat",
+  );
+
+  // ---- the draft ---------------------------------------------------------
+  //
+  // An accidental back gesture used to take the whole design with it: the
+  // studio held it in React state and nothing else had a copy until Save was
+  // pressed. This keeps one in localStorage as the design changes, and offers
+  // it back on the next visit.
+  const key = userId ? draftKey(userId, editing?.designId ?? null) : null;
+  const [dismissed, setDismissed] = useState(false);
+
+  /**
+   * The stored draft, read through `useSyncExternalStore`.
+   *
+   * localStorage is an external store that this component does not own, and
+   * this is the API for reading one. The alternatives are both worse: a
+   * `useState` initialiser runs during server rendering, where there is no
+   * `localStorage` and the client would then hydrate to a different answer;
+   * and an effect that calls `setState` is a render triggered by a render,
+   * which is what the rule against it is guarding against.
+   *
+   * Nothing subscribes, because a draft does not change under this tab while
+   * it is open — this tab is the only thing that writes it.
+   */
+  const stored = useSyncExternalStore(
+    noSubscription,
+    () => (key ? safeRead(key) : null),
+    () => null,
+  );
+
+  /**
+   * The design as it was when the page opened.
+   *
+   * Compared against, rather than the live one, so that the offer does not
+   * evaporate the moment somebody touches a slider — and so that a draft of
+   * the design already on screen is recognised as the same thing rather than
+   * offered back as unsaved progress.
+   *
+   * Held in state rather than a ref because it *is* read during render, which
+   * is what a ref is not for. A `useState` initialiser captures the first
+   * value and never runs again, which is exactly the meaning wanted here.
+   */
+  const [openedWith] = useState(design.spec);
+
+  const recovered = useMemo<StudioDraft | null>(() => {
+    if (!stored || !key) return null;
+    const found = readDraft(window.localStorage, key);
+    return found && differsFrom(found, openedWith) ? found : null;
+  }, [stored, key, openedWith]);
+
+  // Written on a debounce. A drag produces a spec per animation frame, and
+  // serialising a whole design sixty times a second would make the drag itself
+  // stutter — which is a worse bug than the one this fixes.
+  useEffect(() => {
+    if (!key || !design.spec) return;
+    const spec = design.spec;
+    const timer = setTimeout(() => {
+      writeDraft(window.localStorage, key, spec, editing?.designId ?? null);
+    }, DRAFT_WRITE_MS);
+    return () => clearTimeout(timer);
+  }, [key, design.spec, editing?.designId]);
 
   // The last thing the user actually asked for. Saved as the version note, so
   // the history reads "make it wider" rather than "version 4".
@@ -199,6 +318,49 @@ export function StudioWorkspace({
       </div>
 
       {/*
+        The draft, offered back rather than put back.
+
+        Restoring silently would be wrong in the case that is hardest to
+        recover from: somebody who deliberately started again would find their
+        old design in front of them and no obvious way to be rid of it. So it
+        says what it has and lets them choose, and "Discard" is a real button
+        rather than a link that does nothing until the page is reloaded.
+      */}
+      {recovered && !dismissed ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {recovered.spec.title}
+            </span>{" "}
+            was left unsaved {savedAgo(recovered.savedAt)}.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                replace(recovered.spec, []);
+                setDismissed(true);
+                setTab("design");
+              }}
+              className="h-7 rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground"
+            >
+              Put it back
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (key) clearDraft(window.localStorage, key);
+                setDismissed(true);
+              }}
+              className="h-7 rounded-md border px-2.5 text-xs"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/*
         Two thresholds, not one.
 
         Three columns need about 1150 px of workspace to be worth having. Below
@@ -244,7 +406,13 @@ export function StudioWorkspace({
                     kind={design.spec.kind}
                     width={design.spec.envelope.width}
                   />
-                  <PublishBar spec={design.spec} lastBrief={lastBrief} />
+                  <PublishBar
+                    spec={design.spec}
+                    lastBrief={lastBrief}
+                    initialSaved={
+                      editing ? { id: editing.designId, slug: editing.slug } : null
+                    }
+                  />
                 </div>
               </div>
 
