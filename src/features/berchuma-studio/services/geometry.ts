@@ -907,7 +907,7 @@ function bayParts(input: {
           shelf(
             `${bay.id}-rail-shelf`,
             shelfHeights,
-            `Rail shelf — ${bay.id}`,
+            `Rail shelf${bayName}`,
           ),
         );
       }

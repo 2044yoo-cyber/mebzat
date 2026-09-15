@@ -26,6 +26,7 @@ import { OpeningPanel } from "./openings/opening-panel";
 import { PlanEditor } from "./plan/plan-editor";
 import { runsFromRoom } from "../services/room-geometry";
 import { startingDesign } from "../services/starting-designs";
+import { WardrobeShapeSetup } from "./wardrobe-shape-setup";
 import { validateSpec, type DesignKind, type DesignSpec } from "../types/spec";
 
 /**
@@ -276,7 +277,13 @@ export function StartPanel({
         ))}
       </div>
 
-      {chosen?.kind === "kitchen" ? <KitchenSetup initial={initialWidth ? { roomWidth: initialWidth } : undefined} onStart={onStart} /> : chosen ? (
+      {chosen?.kind === "kitchen" ? <KitchenSetup initial={initialWidth ? { roomWidth: initialWidth } : undefined} onStart={onStart} />
+      : chosen?.kind === "wardrobe" ? (
+        // A wardrobe can turn a corner, so it asks about walls rather than
+        // about one width. Straight is still one wall and still produces the
+        // wardrobe the card behind it always did.
+        <WardrobeShapeSetup initialWidth={initialWidth} onStart={onStart} />
+      ) : chosen ? (
         <div className="space-y-3 rounded-xl border p-4">
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-sm font-medium">

@@ -14,6 +14,8 @@ import {
   type DesignKind,
   type DesignSpec,
 } from "../types/spec";
+import type { RunSpec } from "../types/layout";
+import { solveLayout } from "./layout";
 
 /**
  * A finished design, the moment somebody picks a category.
@@ -194,12 +196,19 @@ function shell(
 
   const envelope = boundingBox(cabinets);
 
-  // Every starting design is one straight run, and its cabinets are bound to
-  // that run at the offset their x already implies. Binding them here rather
-  // than leaving the stored positions is what makes a starting design
+  // A starting design is usually one straight run, and its cabinets are bound
+  // to that run at the offset their x already implies. Binding them here
+  // rather than leaving the stored positions is what makes a starting design
   // parametric the moment it opens: widen the wall and the modules follow.
+  //
+  // A cabinet that already names a run keeps it. This used to be
+  // unconditional, which was correct while every starter was one run and
+  // silently wrong the moment one was not: an L-shaped wardrobe came back with
+  // all three of its carcasses bound to `run-1`, stacked along one wall, and
+  // the solver reported the wall as over-filled by exactly the cabinets that
+  // should have been on the other two.
   const bound = cabinets.map((cabinet) =>
-    cabinet.kind === "island"
+    cabinet.kind === "island" || cabinet.runId
       ? cabinet
       : { ...cabinet, runId: "run-1", offset: Math.max(0, cabinet.position.x) },
   );
@@ -440,9 +449,19 @@ function baseModules(
 // Everything else
 // ---------------------------------------------------------------------------
 
-function wardrobe(options: StartingDesignOptions): DesignSpec {
-  const width = clamp(options.width ?? 2400, 900, 6000);
-  const t = 18;
+/**
+ * The bays one wardrobe carcass of this width gets.
+ *
+ * Pulled out of `wardrobe` so an L or a U fits out each of its runs by exactly
+ * the rule a straight one uses. A second copy of this, written for corners,
+ * would be a wardrobe whose left leg is laid out differently from its back —
+ * and the difference would only show up in the cut list.
+ *
+ * `nextId` gives every bay and section a unique identifier, which is what lets
+ * the same function be called three times for one design without two runs
+ * claiming the same bay.
+ */
+function wardrobeBays(width: number, t = 18): Bay[] {
   // Keep every bay below a practical 850 mm-ish working width. A 900 mm
   // wardrobe therefore gets two useful bays rather than three 288 mm slivers;
   // a wide wall gains dividers instead of shelves that sag.
@@ -452,21 +471,21 @@ function wardrobe(options: StartingDesignOptions): DesignSpec {
   );
   const leaves: 1 | 2 = bayWidth > LIMITS.hingedLeafWidth ? 2 : 1;
 
-  const mixedModule: Bay["fitting"] = {
+  const mixedModule = (): Bay["fitting"] => ({
     kind: "stack",
     sections: [
       // Reference-informed proportions: compact upper storage, a full-length
       // hanging zone, then a practical two-drawer bank at the bottom.
-      { id: "top-storage", kind: "open", share: 3 },
-      { id: "hanging", kind: "hanging", share: 9, rails: 1 },
-      { id: "drawers", kind: "drawers", share: 3, drawers: 2 },
+      { id: nextId("section"), kind: "open", share: 3 },
+      { id: nextId("section"), kind: "hanging", share: 9, rails: 1 },
+      { id: nextId("section"), kind: "drawers", share: 3, drawers: 2 },
     ],
-  };
+  });
 
   const mixedIndex = bayCount === 2 ? 0 : Math.floor(bayCount / 2);
-  const bays = Array.from({ length: bayCount }, (_, index) => {
+  return Array.from({ length: bayCount }, (_, index) => {
     if (index === mixedIndex) {
-      return bay(bayWidth, structuredClone(mixedModule), "hinged", leaves);
+      return bay(bayWidth, mixedModule(), "hinged", leaves);
     }
     if (index === bayCount - 1) {
       return bay(
@@ -483,6 +502,11 @@ function wardrobe(options: StartingDesignOptions): DesignSpec {
       leaves,
     );
   });
+}
+
+function wardrobe(options: StartingDesignOptions): DesignSpec {
+  const width = clamp(options.width ?? 2400, 900, 6000);
+  const bays = wardrobeBays(width);
 
   const cabinets = [
     unit(
@@ -711,4 +735,156 @@ function furnitureTypeFor(
   if (kind === "wardrobe") return "wardrobe";
   if (kind === "custom") return "custom";
   return "cabinet";
+}
+
+// ---------------------------------------------------------------------------
+// Wardrobe shapes
+// ---------------------------------------------------------------------------
+
+/** The three shapes a wardrobe can be created as. */
+export const wardrobeShapes = ["straight", "l_shaped", "u_shaped"] as const;
+
+export type WardrobeShape = (typeof wardrobeShapes)[number];
+
+/**
+ * The walls a shape asks for, in the order the solver wants them.
+ *
+ * The order is not presentational. `solveU` reads its runs as left, back,
+ * right and anchors each one from that — hand it back, left, right and it
+ * builds a U with the back wall down one side. Naming the walls here, once,
+ * is what keeps the form that collects them and the solver that places them
+ * from disagreeing about which is which.
+ */
+export function wardrobeWalls(
+  shape: WardrobeShape,
+): { id: string; label: string }[] {
+  switch (shape) {
+    case "straight":
+      return [{ id: "run-1", label: "Wall" }];
+    case "l_shaped":
+      return [
+        { id: "run-1", label: "Wall A" },
+        { id: "run-2", label: "Wall B" },
+      ];
+    case "u_shaped":
+      return [
+        { id: "run-1", label: "Left wall" },
+        { id: "run-2", label: "Back wall" },
+        { id: "run-3", label: "Right wall" },
+      ];
+  }
+}
+
+export type WardrobeShapeOptions = {
+  shape: WardrobeShape;
+  /** Wall lengths in millimetres, in `wardrobeWalls` order. */
+  walls: number[];
+  depth?: number;
+  height?: number;
+};
+
+/**
+ * A wardrobe that turns a corner.
+ *
+ * ## Walls in, cabinets out
+ *
+ * What somebody measures is a wall. What the shop cuts is a carcass, and the
+ * two are not the same length: two runs meeting at a right angle share a
+ * `depth × depth` square, and a carcass drawn to the full wall length puts two
+ * of them in it — two side panels that cannot both exist, doors that foul, and
+ * a cut list that charges for both.
+ *
+ * So the order is the one the brief sets out and it is not negotiable: the
+ * layout is solved *first*, the corner square is carved out of it, and only
+ * then is each run filled with bays — out of `usableLength`, which is what is
+ * left of the wall once its corners are taken. Laying out bays first and
+ * subtracting the corner afterwards is the same arithmetic in the wrong order
+ * and it produces a wardrobe that is a cabinet too long.
+ *
+ * Nothing here computes a corner. `solveLayout` already does, for kitchens,
+ * and `cornerParts` already cuts one — this hands a wardrobe to them rather
+ * than growing a second implementation with its own idea of a right angle.
+ *
+ * ## What it does not do
+ *
+ * It does not build the corner's contents. A corner module is generated by the
+ * geometry from the solved block, and the fittings inside a run are the
+ * ordinary ones — which is why a drawer in an L is cut by the formula a drawer
+ * in a straight wardrobe is cut by, and why there is no L-shaped cut list.
+ */
+export function wardrobeShapeDesign(
+  options: WardrobeShapeOptions,
+): DesignSpec {
+  const depth = clamp(options.depth ?? 600, 300, 900);
+  const height = clamp(options.height ?? 2400, 1200, LIMITS.maxHeight);
+  const walls = wardrobeWalls(options.shape);
+
+  const runs: RunSpec[] = walls.map((wall, index) => ({
+    id: wall.id,
+    label: wall.label,
+    length: clamp(options.walls[index] ?? 2400, 600, 8000),
+    depth,
+    height,
+  }));
+
+  if (options.shape === "straight") {
+    // Deliberately the existing starter, not a second path through this
+    // function. A straight wardrobe made by the shape picker and one made by
+    // the card behind it have to be the same wardrobe.
+    return startingDesign("wardrobe", { width: runs[0]!.length });
+  }
+
+  const solved = solveLayout(options.shape, runs, { cornerKind: "l_corner" });
+
+  const cabinets = solved.placements.map((placement) =>
+    unit(
+      placement.label,
+      "tall",
+      0,
+      0,
+      {
+        // The wall less its corners. Taking it from the solver rather than
+        // subtracting here is what stops this file and `layout.ts` disagreeing
+        // about how much of a wall a corner eats.
+        width: Math.round(placement.usableLength),
+        height: placement.height,
+        depth: placement.depth,
+      },
+      wardrobeBays(Math.round(placement.usableLength)),
+      PLINTH,
+    ),
+  );
+
+  for (const [index, cabinet] of cabinets.entries()) {
+    // The run it belongs to, and where along it. `resolveDesign` derives the
+    // plan position from these, so nothing here sets x or z.
+    cabinet.runId = solved.placements[index]!.runId;
+    cabinet.offset = 0;
+  }
+
+  const title =
+    options.shape === "l_shaped"
+      ? `L-shaped wardrobe, ${runs[0]!.length} × ${runs[1]!.length} mm`
+      : `U-shaped wardrobe, ${runs.map((run) => run.length).join(" × ")} mm`;
+
+  return shell("wardrobe", title, cabinets, { width: solved.extent.width }, {
+    layout: options.shape,
+    cornerKind: "l_corner",
+    runs,
+    envelope: {
+      width: Math.round(solved.extent.width),
+      height,
+      depth: Math.round(solved.extent.depth),
+    },
+    meta: {
+      style: "modern",
+      prompt: "",
+      assumptions: [
+        `Walls of ${runs.map((run) => `${run.length} mm`).join(", ")}, ${depth} mm deep.`,
+        "Each corner is a module of its own, so no two runs share a panel.",
+        ...solved.notes,
+      ],
+      corrections: [],
+    },
+  });
 }
