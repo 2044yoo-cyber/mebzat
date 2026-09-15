@@ -108,6 +108,45 @@ export const BOARDS: Board[] = [
     priceKey: "MDF 6mm",
     fallbackRate: 2000,
   },
+  {
+    /**
+     * Rigid PVC foam board — Forex, Komatex, and the unbranded sheet the
+     * Merkato importers sell as "foam board".
+     *
+     * Worth having because it is what a lot of Addis shopfitting and bathroom
+     * joinery is actually made of: it does not swell, it takes a screw, and it
+     * cuts on the same saw as MDF. Worth being careful with because it is
+     * about four tenths of MDF's stiffness — see `stiffness` below and
+     * `practicalShelfSpan` in spec.ts, which is why that rule stopped being a
+     * constant.
+     *
+     * A wardrobe will refuse it. `normaliseWardrobeBoards` resets any carcass
+     * that is not 18 mm back to MDF, and for this material that is the right
+     * answer rather than an oversight: a full-height wardrobe gable in 15 mm
+     * foam board is not a wardrobe gable.
+     */
+    id: "pvc-foam-15-white",
+    label: "15 mm PVC foam board, white",
+    thickness: 15,
+    sheet: { length: 2440, width: 1220 },
+    grain: "none",
+    appearance: { colour: "White", hex: "#f7f7f5", sheen: "matt" },
+    /**
+     * Four tenths of MDF.
+     *
+     * Rigid PVC foam board at the densities sold here runs about 1.0–1.6 GPa
+     * in flexure against MDF's 2.7–3.6. 0.4 is the middle of that ratio. It
+     * takes the practical shelf span from 900 mm to 550, which is the number a
+     * joiner would give you for this board and the reason it is recorded here
+     * rather than left at the default of 1.
+     */
+    stiffness: 0.4,
+    priceKey: "PVC foam board 15mm",
+    // Owner-supplied Addis market estimate, ETB per 2440x1220 sheet
+    // (2026-09-15). Imported and volatile; worth replacing with a live
+    // `price_listings` row against the key above before quoting from it.
+    fallbackRate: 5200,
+  },
   // Worktops. Thicker, sold in narrower sheets, and priced separately —
   // a kitchen top is the single most expensive board on the job and quoting it
   // at carcass rates understates a kitchen by tens of thousands of birr.

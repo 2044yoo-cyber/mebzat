@@ -195,8 +195,10 @@ wardrobe. A kitchen is eight or ten.
 
 - A hinged leaf wider than ${LIMITS.hingedLeafWidth} mm sags and fouls. Use
   "doorLeaves": 2 on a wide bay.
-- An unsupported shelf longer than ${LIMITS.shelfSpan} mm in 18 mm board will
-  bow. Split the bay instead.
+- An unsupported shelf longer than ${LIMITS.shelfSpan} mm in 18 mm MDF will
+  bow. Split the bay instead. That figure is for 18 mm MDF and scales with the
+  board: a thinner or softer sheet spans less, and 15 mm PVC foam board spans
+  about 550 mm.
 - Hanging needs at least ${LIMITS.hangingDepth} mm of depth. Wardrobes are
   600 mm deep unless told otherwise; kitchen bases 600; wall units 350;
   TV units 400; vanities 500.

@@ -72,8 +72,14 @@ import {
   allBays,
   boundingBox,
   parseSpec,
+  practicalShelfSpan,
   validateSpec,
 } from "../src/features/berchuma-studio/types/spec.ts";
+import {
+  carcassBoards,
+  wardrobeStructuralBoards,
+} from "../src/features/berchuma-studio/services/wardrobe-materials.ts";
+import { findBoard } from "../src/features/berchuma-studio/types/catalogue.ts";
 import type { Bay, DesignSpec } from "../src/features/berchuma-studio/types/spec.ts";
 
 const GREEN = "[32m";
@@ -1591,6 +1597,223 @@ function noOverlaps(spec: ReturnType<typeof startingDesign>): boolean {
     split.meta.corrections.length === 0,
     split.meta.corrections.join("; "),
   );
+
+  // --- A board that is not 18 mm -----------------------------------------
+  //
+  // Every carcass in the studio was 18 mm MDF, and enough of the code assumed
+  // it that adding a board at any other thickness needed three separate
+  // things fixed. These are those three.
+  {
+    const foam = findBoard("pvc-foam-15-white");
+    check("there is a 15 mm foam board to choose", foam !== undefined);
+
+    if (foam) {
+      check("it is 15 mm", foam.thickness === 15, `${foam.thickness}`);
+      check(
+        "sold as a full sheet, like every other carcass board",
+        Math.min(foam.sheet.length, foam.sheet.width) >= 900,
+        `${foam.sheet.length}x${foam.sheet.width}`,
+      );
+      check(
+        "and it records how stiff it is, because it is not MDF",
+        (foam.stiffness ?? 1) < 1,
+        `${foam.stiffness}`,
+      );
+
+      // The span rule.
+      check(
+        "18 mm MDF still spans the 900 mm it always did",
+        practicalShelfSpan(findBoard("mdf-18-white")!) === LIMITS.shelfSpan,
+        "every design made before this change has to behave exactly as it did",
+      );
+      check(
+        "a 15 mm foam shelf is held to a much shorter span",
+        practicalShelfSpan(foam) <= 600,
+        `${practicalShelfSpan(foam)} mm — sag goes with the cube of the span and inversely with the cube of the thickness, so the 900 figure is not transferable`,
+      );
+      check(
+        "and it is not so short as to be useless",
+        practicalShelfSpan(foam) >= 450,
+        `${practicalShelfSpan(foam)} mm`,
+      );
+      check(
+        "a thinner board of the same material spans less",
+        practicalShelfSpan({ ...foam, thickness: 10 }) <
+          practicalShelfSpan(foam),
+      );
+      check(
+        "and a stiffer one of the same thickness spans more",
+        practicalShelfSpan({ ...foam, stiffness: 2 }) >
+          practicalShelfSpan(foam),
+      );
+      check(
+        "a board that never said how stiff it is is treated as MDF",
+        practicalShelfSpan({ ...findBoard("mdf-18-white")!, stiffness: undefined }) ===
+          LIMITS.shelfSpan,
+        "designs saved before stiffness existed keep the behaviour they were designed under",
+      );
+
+      // The picker.
+      const general = carcassBoards();
+      const wardrobeOnly = wardrobeStructuralBoards();
+      check(
+        "the foam board is offered for furniture that is not a wardrobe",
+        general.some((board) => board.id === foam.id),
+        "the picker called the wardrobe's list, which filters to exactly 18 mm, so no other thickness could be chosen for anything",
+      );
+      check(
+        "but not for a wardrobe, which the validator would reset anyway",
+        !wardrobeOnly.some((board) => board.id === foam.id),
+      );
+      check(
+        "no back panel is offered as a carcass",
+        !general.some((board) => board.thickness < 12),
+        general.map((board) => board.thickness).join(", "),
+      );
+      check(
+        "and no worktop either, however ordinary its thickness",
+        !general.some(
+          (board) => Math.min(board.sheet.length, board.sheet.width) < 900,
+        ),
+        "a 20 mm quartz worktop is inside any sensible thickness range and is still a worktop; the strip is what gives it away",
+      );
+
+      // End to end: the model and the cut list follow the board.
+      const base = startingDesign("tv_unit", { width: 1400 });
+      const inFoam = validateSpec({
+        ...base,
+        carcass: {
+          ...base.carcass,
+          board: foam,
+          frontBoard: foam,
+          interiorBoard: foam,
+          plinthBoard: foam,
+        },
+      }).spec;
+
+      check(
+        "a TV unit keeps the board it was given",
+        inFoam.carcass.board.thickness === 15,
+        `${inFoam.carcass.board.thickness} mm`,
+      );
+
+      const foamParts = buildParts(inFoam);
+      const foamCut = buildCutList(inFoam, foamParts);
+      const structural = foamCut.rows.filter(
+        (row) => row.boardId === foam.id,
+      );
+      check(
+        "and the cut list is cut from it",
+        structural.length > 0 &&
+          structural.every((row) => row.thickness === 15),
+        `${structural.length} rows, thicknesses ${[...new Set(structural.map((r) => r.thickness))].join(", ")}`,
+      );
+      check(
+        "with nothing left at the old thickness",
+        !foamCut.rows.some((row) => row.thickness === 18),
+        foamCut.rows
+          .filter((row) => row.thickness === 18)
+          .map((row) => row.label)
+          .join(", "),
+      );
+      check(
+        "the pieces still fit their sheets",
+        foamCut.buildable,
+      );
+      check(
+        "and choosing it raises no correction about the other zones",
+        !inFoam.meta.corrections.some((note) =>
+          /frontBoard|interiorBoard|plinthBoard/.test(note),
+        ),
+        inFoam.meta.corrections.join("; "),
+      );
+
+      // The validator has to *use* the span, not just have it available.
+      //
+      // Every span check above calls `practicalShelfSpan` directly, and all of
+      // them stayed green with the validator reading the old constant instead
+      // — which would warn about a 900 mm foam shelf and say nothing about a
+      // 700 mm one that will bow just as surely.
+      {
+        const span = practicalShelfSpan(foam);
+        const tooWide = span + 150;
+
+        // Corrections cleared before each run. `validateSpec` appends; it is
+        // `change()` in operations.ts that empties the list first, and calling
+        // the validator directly without doing the same reads last run's
+        // warnings as this run's.
+        const fresh = <T extends { meta: { corrections: string[] } }>(spec: T): T => ({
+          ...spec,
+          meta: { ...spec.meta, corrections: [] },
+        });
+
+        const wide = validateSpec({
+          ...fresh(inFoam),
+          cabinets: inFoam.cabinets.map((cabinet, index) =>
+            index === 0
+              ? {
+                  ...cabinet,
+                  size: { ...cabinet.size, width: tooWide + 100 },
+                  bays: [
+                    {
+                      ...cabinet.bays[0]!,
+                      width: tooWide,
+                      fitting: { kind: "shelves", count: 2, adjustable: true },
+                    },
+                  ],
+                }
+              : cabinet,
+          ),
+        }).spec;
+
+        // Matched on the *correction*, which is what `meta.corrections` holds.
+        // The "will sag" wording lives on the issue's `message`, and asserting
+        // on that against this array is asserting on a field that is not in it.
+        const sagNote = /add a divider, or use a stiffer or thicker board/i;
+        check(
+          "a foam shelf past its span is warned about, at the span foam actually has",
+          wide.meta.corrections.some((note) => sagNote.test(note)),
+          `${tooWide} mm in a board that spans ${span}: ${wide.meta.corrections.join("; ") || "nothing said"}`,
+        );
+
+        // And the same width in MDF, which spans 900, must not be warned about
+        // — otherwise the check above passes on a rule that warns constantly.
+        const mdf = findBoard("mdf-18-white")!;
+        const inMdf = validateSpec({
+          ...fresh(wide),
+          carcass: {
+            ...wide.carcass,
+            board: mdf,
+            frontBoard: mdf,
+            interiorBoard: mdf,
+            plinthBoard: mdf,
+          },
+        }).spec;
+        check(
+          "and the same shelf in 18 mm MDF is not",
+          !inMdf.meta.corrections.some((note) => sagNote.test(note)),
+          `${tooWide} mm is inside MDF's ${practicalShelfSpan(mdf)} mm: ${inMdf.meta.corrections.join("; ")}`,
+        );
+      }
+
+      // A wardrobe refuses it, and says so.
+      const wardrobeInFoam = validateSpec({
+        ...wardrobeExample(),
+        carcass: { ...wardrobeExample().carcass, board: foam },
+      }).spec;
+      check(
+        "a wardrobe is put back on 18 mm board",
+        wardrobeInFoam.carcass.board.thickness === 18,
+      );
+      check(
+        "and says that it did",
+        wardrobeInFoam.meta.corrections.some((note) =>
+          /carcass reset/i.test(note),
+        ),
+        wardrobeInFoam.meta.corrections.join("; "),
+      );
+    }
+  }
 
   // --- Typing a section's width ------------------------------------------
   //

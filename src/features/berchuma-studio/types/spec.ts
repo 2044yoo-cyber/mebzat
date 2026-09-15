@@ -97,6 +97,19 @@ export const boardSchema = z.object({
    * Those designs keep using their legacy design finish as a visual fallback.
    */
   appearance: boardAppearanceSchema.optional(),
+  /**
+   * How stiff the material is, against 18 mm MDF at 1.
+   *
+   * Not decoration: a shelf's sag goes with the cube of its span and inversely
+   * with the cube of its thickness and the material's modulus, so "how far can
+   * this span" is a question about the board and not a number that can be
+   * written down once. Rigid PVC foam board is roughly a third of MDF's
+   * modulus; plywood is stiffer than both.
+   *
+   * Optional, and 1 when absent, so every design saved before this existed
+   * keeps the behaviour it was designed under.
+   */
+  stiffness: z.number().positive().max(10).optional(),
   priceKey: z.string().min(1),
   /** ETB per sheet, used when no live listing matches. */
   fallbackRate: z.number().nonnegative(),
@@ -586,7 +599,12 @@ export type DesignSpec = z.infer<typeof designSpecSchema>;
  * and runs after parsing.
  */
 export const LIMITS = {
-  /** Unsupported shelf span in 18 mm board before visible deflection. */
+  /**
+   * Unsupported shelf span in 18 mm MDF before visible deflection.
+   *
+   * The reference, not the answer. `practicalShelfSpan` scales it for whatever
+   * board a design actually uses — see there for why that became necessary.
+   */
   shelfSpan: 900,
   /** A hinged leaf wider than this fouls on adjacent furniture and sags. */
   hingedLeafWidth: 600,
@@ -800,6 +818,44 @@ function normalisePartIds(spec: DesignSpec, issues: SpecIssue[]): void {
       }
     }
   }
+}
+
+/**
+ * How far a shelf of this board can span before it sags visibly.
+ *
+ * ## Why this is a function now
+ *
+ * `LIMITS.shelfSpan` is 900 mm, and it was measured in 18 mm MDF. That was
+ * fine for as long as every carcass in the studio was 18 mm MDF, which it was:
+ * the wardrobe rules force it and everything else defaulted to it, so a
+ * constant and a function would have returned the same number every time.
+ *
+ * 15 mm PVC foam board is the first material where they do not. A shelf's
+ * deflection under its own load goes with the cube of the span, and inversely
+ * with both the cube of the thickness and the material's modulus:
+ *
+ *     deflection  ∝  L³ / (E · t³)
+ *
+ * Hold the deflection at what 900 mm of 18 mm MDF gives, and the span that
+ * matches it is
+ *
+ *     L  =  900 · ∛( (E · t³) / (E_mdf · 18³) )
+ *
+ * For foam board — a third of MDF's modulus, three millimetres thinner — that
+ * is about 550 mm. Letting the old constant stand would have meant the studio
+ * approving a 900 mm foamboard shelf, which is a shelf that bows in a month,
+ * and doing it while printing the words "in 15 mm board" as though the number
+ * had been worked out for it.
+ *
+ * Rounded down to 10 mm, because a span limit quoted to the millimetre claims
+ * a precision that a rule of thumb about sagging does not have.
+ */
+export function practicalShelfSpan(board: Board): number {
+  const reference = 18;
+  const stiffness = board.stiffness ?? 1;
+  const ratio = (stiffness * board.thickness ** 3) / reference ** 3;
+  const span = LIMITS.shelfSpan * Math.cbrt(ratio);
+  return Math.max(200, Math.floor(span / 10) * 10);
 }
 
 /** Wardrobe structural zones are 18 mm stock board; only the back is 6 mm. */
@@ -1475,12 +1531,13 @@ function validateCabinet(
       }
     }
 
-    if (hasShelves && bay.width > LIMITS.shelfSpan) {
+    const span = practicalShelfSpan(spec.carcass.board);
+    if (hasShelves && bay.width > span) {
       issues.push({
         severity: "warning",
         path: `${bayAt}.width`,
-        message: `A ${Math.round(bay.width)} mm shelf in ${t} mm board will sag; ${LIMITS.shelfSpan} mm is the practical span.`,
-        correction: `${named}: add a divider or specify a thicker board for the ${Math.round(bay.width)} mm shelf.`,
+        message: `A ${Math.round(bay.width)} mm shelf in ${spec.carcass.board.label} will sag; ${span} mm is the practical span for it.`,
+        correction: `${named}: add a divider, or use a stiffer or thicker board for the ${Math.round(bay.width)} mm shelf.`,
       });
     }
 

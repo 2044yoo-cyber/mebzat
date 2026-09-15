@@ -205,6 +205,43 @@ const EDITOR = "src/features/berchuma-studio/components/editor/design-editor.tsx
 }
 
 // ---------------------------------------------------------------------------
+// 3b. The material picker offers what the construction can actually use
+// ---------------------------------------------------------------------------
+
+{
+  const panel = code(PANEL);
+
+  check(
+    "a wardrobe and everything else are offered different boards",
+    /isWardrobe \? wardrobeStructuralBoards\(\) : carcassBoards\(\)/.test(panel),
+    "both pickers called the wardrobe's list, which filters to exactly 18 mm, so a board at any other thickness was invisible to the entire application",
+  );
+  // Scoped to the "Carcass and doors" picker, which is the non-wardrobe one.
+  //
+  // A wardrobe has four pickers of its own, and one of them assigns
+  // `draft.carcass.frontBoard = board` in exactly these words — so a search
+  // across the file matched that and stayed green with the assignments in this
+  // handler deleted. A second copy elsewhere in the file, again.
+  const carcassPicker = (() => {
+    const at = panel.indexOf('label="Carcass and doors"');
+    return at < 0 ? "" : panel.slice(at, at + 1200);
+  })();
+
+  check(
+    "the carcass picker was found to look inside",
+    carcassPicker.length > 0 && /onChange=/.test(carcassPicker),
+    "if this fails the check below is reading an empty string and proves nothing",
+  );
+  check(
+    "picking a carcass board moves the fronts, the interior and the plinth with it",
+    /draft\.carcass\.frontBoard = board;/.test(carcassPicker) &&
+      /draft\.carcass\.interiorBoard = board;/.test(carcassPicker) &&
+      /draft\.carcass\.plinthBoard = board;/.test(carcassPicker),
+    "outside a wardrobe the validator holds the carcass to one thickness, so leaving them behind turns one deliberate choice into three corrections about it",
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 4. The sheet can be pushed down to see the design
 // ---------------------------------------------------------------------------
 

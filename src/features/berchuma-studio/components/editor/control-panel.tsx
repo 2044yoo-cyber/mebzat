@@ -31,6 +31,7 @@ import {
 } from "../../services/module-configs";
 import {
   wardrobeBackBoards,
+  carcassBoards,
   wardrobeStructuralBoards,
 } from "../../services/wardrobe-materials";
 import {
@@ -800,7 +801,13 @@ function Materials({
   const faceBoard = spec.carcass.frontBoard ?? spec.carcass.board;
   const interiorBoard = spec.carcass.interiorBoard ?? spec.carcass.board;
   const plinthBoard = spec.carcass.plinthBoard ?? spec.carcass.board;
-  const structuralBoards = wardrobeStructuralBoards();
+  // Two lists, because two constructions.
+  //
+  // A wardrobe is restricted to 18 mm — the validator resets anything else, so
+  // offering it would be offering a choice that is undone a moment later.
+  // Nothing else is, and this picker used the wardrobe's list too, which meant
+  // no board at any other thickness could be chosen for any furniture at all.
+  const structuralBoards = isWardrobe ? wardrobeStructuralBoards() : carcassBoards();
   const backBoards = wardrobeBackBoards();
 
   return (
@@ -875,7 +882,20 @@ function Materials({
             onChange={(id) =>
               set((draft) => {
                 const board = findBoard(id);
-                if (board) draft.carcass.board = board;
+                if (!board) return;
+                draft.carcass.board = board;
+                // The other three zones move with it.
+                //
+                // Outside a wardrobe the validator holds the whole carcass to
+                // one structural thickness, so leaving these on the old board
+                // meant picking a 15 mm sheet produced the right design and
+                // three corrections explaining that the fronts, the interior
+                // and the plinth had been changed to match — three warnings
+                // for one deliberate choice, about something the person had
+                // just asked for.
+                draft.carcass.frontBoard = board;
+                draft.carcass.interiorBoard = board;
+                draft.carcass.plinthBoard = board;
               })
             }
           />
