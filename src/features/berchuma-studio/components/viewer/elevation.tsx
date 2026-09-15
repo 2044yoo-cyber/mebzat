@@ -16,6 +16,10 @@ import {
   boardColour,
   constructionMaterials,
 } from "../../services/wardrobe-materials";
+import {
+  bayDimensionsWorthDrawing,
+  layOutBays,
+} from "../../services/bay-layout";
 import { resolveDesign } from "../../services/resolve";
 import type { Bay, Cabinet, DesignSpec } from "../../types/spec";
 
@@ -37,6 +41,16 @@ import type { Bay, Cabinet, DesignSpec } from "../../types/spec";
 
 /** Millimetres of paper around the unit, for dimension lines. */
 const MARGIN = 260;
+
+/**
+ * Extra paper below, for the second chain of dimensions.
+ *
+ * A drawing with one overall width on it tells a joiner how long a wall is and
+ * nothing about what to cut. Widths per cabinet go on a chain of their own
+ * under the overall one, which is how a shop drawing is laid out and which
+ * needs room the original margin did not have.
+ */
+const CHAIN_DEPTH = 320;
 
 export function Elevation({
   spec,
@@ -68,9 +82,19 @@ export function Elevation({
         }));
   const shade = boardColour(constructionMaterials(spec).body, spec);
 
+  // A chain is only worth drawing when there is more than one thing on it: on
+  // a single cabinet it would repeat the overall width immediately below the
+  // overall width.
+  const chained = supportsFrontElevation && elevationCabinets.length > 1;
+  const heightsDiffer =
+    new Set(
+      elevationCabinets.map(({ cabinet }) => Math.round(cabinet.size.height)),
+    ).size > 1;
+  const bottomMargin = MARGIN + (chained ? CHAIN_DEPTH : 0);
+
   return (
     <svg
-      viewBox={`${-MARGIN} ${-MARGIN} ${envelope.width + MARGIN * 2} ${envelope.height + MARGIN * 2}`}
+      viewBox={`${-MARGIN} ${-MARGIN} ${envelope.width + MARGIN * 2} ${envelope.height + MARGIN + bottomMargin}`}
       className="h-full w-full"
       role="img"
       aria-label={`Front elevation of ${spec.title}, ${envelope.width} by ${envelope.height} by ${envelope.depth} millimetres`}
@@ -141,6 +165,46 @@ export function Elevation({
       {supportsFrontElevation ? (
         <Dimensions width={envelope.width} height={envelope.height} />
       ) : null}
+
+      {/*
+        Each cabinet's own height, beside it, when they are not all the same.
+
+        A run of identical base units needs one height and gets it from the
+        overall dimension. A TV unit with a wall shelf over it is two different
+        heights and one overall, and the overall is the one number that cannot
+        be cut to.
+      */}
+      {supportsFrontElevation && heightsDiffer ? (
+        <g className="fill-foreground/55" strokeWidth={0}>
+          {elevationCabinets.map(({ cabinet, x, y }) => (
+            <text
+              key={`h-${cabinet.id}`}
+              x={x + 70}
+              y={envelope.height - y - cabinet.size.height / 2}
+              textAnchor="middle"
+              fontSize={62}
+              transform={`rotate(-90 ${x + 70} ${envelope.height - y - cabinet.size.height / 2})`}
+            >
+              {Math.round(cabinet.size.height)}
+            </text>
+          ))}
+        </g>
+      ) : null}
+
+      {/*
+        One segment per cabinet, on its own chain under the overall width.
+        This is the row a joiner sets a saw from.
+      */}
+      {chained ? (
+        <CabinetChain
+          cabinets={elevationCabinets.map(({ cabinet, x }) => ({
+            id: cabinet.id,
+            x,
+            width: cabinet.size.width,
+          }))}
+          y={envelope.height + 130 + CHAIN_DEPTH}
+        />
+      ) : null}
     </svg>
   );
 }
@@ -209,6 +273,31 @@ function CabinetDrawing({
           interiorColour={boardColour(materials.interior, spec)}
         />
       ))}
+
+      {/*
+        The clear opening of each bay, written inside it.
+
+        Inside rather than on a chain of its own, and this is a deliberate
+        departure from how the cabinet widths are drawn. Bays belong to
+        cabinets that stand at different heights — a wall unit above a base
+        unit — so a single chain across the bottom of the drawing would put
+        two rows of openings on one line and say nothing about which was which.
+        Written in the opening it measures, it cannot be misread.
+      */}
+      {bayDimensionsWorthDrawing(cabinet)
+        ? bayGeometry.map((geometry) => (
+            <text
+              key={`w-${geometry.bay.id}`}
+              x={geometry.x + geometry.width / 2}
+              y={top(height - plinth - t) + 90}
+              textAnchor="middle"
+              fontSize={62}
+              className="fill-foreground/55"
+            >
+              {Math.round(geometry.width)}
+            </text>
+          ))
+        : null}
     </>
   );
 }
@@ -678,6 +767,56 @@ function Hinges({ x, y, height }: { x: number; y: number; height: number }) {
 // Dimensions
 // ---------------------------------------------------------------------------
 
+/**
+ * One dimension per cabinet, laid end to end under the overall width.
+ *
+ * The drawing used to carry two numbers: the width of the whole run and its
+ * height. Both are the numbers you need to know whether it fits the wall, and
+ * neither is a number anybody cuts to. A run of three cabinets is three
+ * carcasses, and their widths are the first thing the shop asks for.
+ *
+ * Drawn as a real chain — a tick at every join rather than three separate
+ * lines — because that is what says these add up to the overall dimension
+ * above, and because a gap between two cabinets shows up in it as a gap, which
+ * is exactly the information somebody who deliberately left one wants recorded.
+ */
+function CabinetChain({
+  cabinets,
+  y,
+}: {
+  cabinets: { id: string; x: number; width: number }[];
+  y: number;
+}) {
+  if (cabinets.length === 0) return null;
+  const ordered = [...cabinets].sort((a, b) => a.x - b.x);
+
+  return (
+    <g className="stroke-foreground/35 fill-foreground/60" strokeWidth={4}>
+      {ordered.map((cabinet) => (
+        <g key={cabinet.id}>
+          <line x1={cabinet.x} y1={y} x2={cabinet.x + cabinet.width} y2={y} />
+          <line x1={cabinet.x} y1={y - 26} x2={cabinet.x} y2={y + 26} />
+          <line
+            x1={cabinet.x + cabinet.width}
+            y1={y - 26}
+            x2={cabinet.x + cabinet.width}
+            y2={y + 26}
+          />
+          <text
+            x={cabinet.x + cabinet.width / 2}
+            y={y + 110}
+            textAnchor="middle"
+            fontSize={82}
+            strokeWidth={0}
+          >
+            {Math.round(cabinet.width)}
+          </text>
+        </g>
+      ))}
+    </g>
+  );
+}
+
 function Dimensions({ width, height }: { width: number; height: number }) {
   const below = height + 130;
   const beside = width + 130;
@@ -712,19 +851,4 @@ function Dimensions({ width, height }: { width: number; height: number }) {
       </text>
     </g>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Shared layout
-// ---------------------------------------------------------------------------
-
-/** Left edge and width of every bay opening in one cabinet, left to right. */
-function layOutBays(cabinet: Cabinet, t: number) {
-  let cursor = t;
-
-  return cabinet.bays.map((bay) => {
-    const x = cursor;
-    cursor += bay.width + t;
-    return { bay, x, width: bay.width };
-  });
 }

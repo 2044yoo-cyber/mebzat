@@ -8,6 +8,10 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as THREE from "three";
 
 import { CabinetHandles, DimensionLabel, type DragChange } from "./handles";
+import {
+  bayDimensionsWorthDrawing,
+  layOutBays,
+} from "../../services/bay-layout";
 import { buildParts } from "../../services/geometry";
 import { visibleKitchenParts } from "../../services/kitchen-construction";
 import { partCentre, partRotationRadians } from "../../services/part-transform";
@@ -197,7 +201,11 @@ export default function Model({
                 onDrag={(change) => onResize(positionedSelected.id, change)}
               />
             ) : null}
-            <SelectionLabels cabinet={positionedSelected} reach={reach} />
+            <SelectionLabels
+              cabinet={positionedSelected}
+              reach={reach}
+              board={spec.carcass.board.thickness}
+            />
           </>
         ) : null}
       </group>
@@ -631,9 +639,12 @@ function Controls({
 function SelectionLabels({
   cabinet,
   reach,
+  board,
 }: {
   cabinet: Cabinet;
   reach: number;
+  /** Carcass board thickness, which is what the openings are set in from. */
+  board: number;
 }) {
   const { position, size } = cabinet;
   // Scaled to the whole design rather than to the cabinet. Sizing a label to
@@ -666,6 +677,57 @@ function SelectionLabels({
         ]}
         scale={scale}
       />
+
+      <BayLabels cabinet={cabinet} board={board} scale={scale} />
+    </>
+  );
+}
+
+/**
+ * The clear opening of each bay, written across the front of the bay.
+ *
+ * The same rule as the elevation: measured inside the opening rather than on a
+ * chain below the design, because the cabinets in a kitchen stand at different
+ * heights and one chain across the bottom would put a wall unit's openings on
+ * the same line as a base unit's and say nothing about which was which.
+ *
+ * Skipped for a single-bay cabinet, where the opening is the cabinet width
+ * less two boards and the W label above it already answers the question.
+ */
+function BayLabels({
+  cabinet,
+  board,
+  scale,
+}: {
+  cabinet: Cabinet;
+  board: number;
+  scale: number;
+}) {
+  const { position, size } = cabinet;
+
+  if (!bayDimensionsWorthDrawing(cabinet)) return null;
+
+  // Smaller than the cabinet's own dimensions. Several of these sit side by
+  // side inside one carcass, and at the same size as the W above them they
+  // overlap each other on anything narrower than a kitchen run.
+  const small = scale * 0.7;
+
+  // Just below the top board, where the elevation writes them, and clear of
+  // the W label sitting above the carcass.
+  const y = (position.y + size.height - board) * MM - 0.07 * small;
+  const front = -(position.z * MM) - 0.02;
+
+  return (
+    <>
+      {layOutBays(cabinet, board).map(({ bay, x, width }) => (
+        <DimensionLabel
+          key={bay.id}
+          text={`${Math.round(width)}`}
+          position={[(position.x + x + width / 2) * MM, y, front]}
+          scale={small}
+          tone="muted"
+        />
+      ))}
     </>
   );
 }

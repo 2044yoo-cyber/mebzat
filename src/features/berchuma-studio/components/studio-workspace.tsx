@@ -7,7 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { MessageSquare, Ruler, Wallet } from "lucide-react";
+import { ChevronUp, MessageSquare, Ruler, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -142,6 +142,10 @@ export function StudioWorkspace({
   // it back on the next visit.
   const key = userId ? draftKey(userId, editing?.designId ?? null) : null;
   const [dismissed, setDismissed] = useState(false);
+
+  // Open to begin with: somebody arriving needs to see what they are looking
+  // at and where Save is before they need the extra centimetre of drawing.
+  const [headerOpen, setHeaderOpen] = useState(true);
 
   /**
    * The stored draft, read through `useSyncExternalStore`.
@@ -391,39 +395,74 @@ export function StudioWorkspace({
         >
           {design.spec ? (
             <>
-              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-3 py-2">
-                <div className="min-w-0">
-                  <h1 className="truncate text-sm font-semibold">
-                    {design.spec.title}
-                  </h1>
-                  <p className="text-[11px] text-muted-foreground">
-                    {design.parts?.totals.partCount ?? 0} parts ·{" "}
-                    {design.spec.carcass.board.label}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <SendToCalculator
-                    kind={design.spec.kind}
-                    width={design.spec.envelope.width}
-                  />
-                  <PublishBar
-                    spec={design.spec}
-                    lastBrief={lastBrief}
-                    initialSaved={
-                      editing ? { id: editing.designId, slug: editing.slug } : null
-                    }
-                  />
-                </div>
-              </div>
+              {/*
+                The header folds away, and the drawing takes the room.
 
-              {/* The editor takes the rest of the column. The panel inside it
-                  scrolls on its own, so the design never scrolls off. */}
+                The title, the parts count and the save buttons sat over the
+                model and never moved, which on a phone left the drawing a
+                strip in the middle of the screen. The controls sheet can
+                already be pulled down to a peek; this is the other half of the
+                same want — space above as well as below.
+
+                Folded rather than scrolled. Scrolling the column would mean
+                the editor is taller than what you can see, and two things in
+                it need a known height: the 3D canvas, which sizes its camera
+                to its box, and the controls sheet, which is positioned against
+                the editor's bottom edge — that edge would sit a header's
+                height below the screen, and the sheet's buttons with it.
+                Taking the header out of the layout keeps the editor exactly
+                the height of what is visible, which is the property both of
+                them are built on.
+              */}
+              {headerOpen ? (
+                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-3 py-2">
+                  <div className="flex min-w-0 items-baseline gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setHeaderOpen(false)}
+                      aria-label="Fold this away and give the drawing the room"
+                      title="Give the drawing the room"
+                      className="-ml-1 flex size-6 shrink-0 items-center justify-center self-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      <ChevronUp className="size-4" aria-hidden />
+                    </button>
+                    <div className="min-w-0">
+                      <h1 className="truncate text-sm font-semibold">
+                        {design.spec.title}
+                      </h1>
+                      <p className="text-[11px] text-muted-foreground">
+                        {design.parts?.totals.partCount ?? 0} parts ·{" "}
+                        {design.spec.carcass.board.label}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <SendToCalculator
+                      kind={design.spec.kind}
+                      width={design.spec.envelope.width}
+                    />
+                    <PublishBar
+                      spec={design.spec}
+                      lastBrief={lastBrief}
+                      initialSaved={
+                        editing ? { id: editing.designId, slug: editing.slug } : null
+                      }
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* The editor takes the rest of the column — all of it, when the
+                  header is folded. The panel inside it scrolls on its own, so
+                  the design never scrolls off. */}
               <div className="min-h-0 flex-1">
                 <DesignEditor
                   spec={design.spec}
                   onChange={design.set}
                   onUndo={design.undo}
                   canUndo={design.canUndo}
+                  headerHidden={!headerOpen}
+                  onShowHeader={() => setHeaderOpen(true)}
                 />
               </div>
             </>

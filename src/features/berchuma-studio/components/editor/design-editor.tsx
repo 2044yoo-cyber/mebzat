@@ -2,7 +2,15 @@
 
 import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
-import { Box, Loader2, Ruler, SlidersHorizontal, Undo2, X } from "lucide-react";
+import {
+  Box,
+  ChevronDown,
+  Loader2,
+  Ruler,
+  SlidersHorizontal,
+  Undo2,
+  X,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -44,12 +52,18 @@ export function DesignEditor({
   onChange,
   onUndo,
   canUndo = false,
+  headerHidden = false,
+  onShowHeader,
 }: {
   spec: DesignSpec;
   onChange: (next: DesignSpec) => void;
   /** Absent where there is no history to offer — the public read-only view. */
   onUndo?: () => void;
   canUndo?: boolean;
+  /** True while the studio's title row is folded away. */
+  headerHidden?: boolean;
+  /** Unfolds it. The only way back, so it is never conditional on anything. */
+  onShowHeader?: () => void;
 }) {
   const [view, setView] = useState<View>("solid");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -237,6 +251,26 @@ export function DesignEditor({
               button does not appear and disappear under the thumb that is
               reaching for it.
             */}
+            {/*
+              The way back to the folded header.
+
+              In this row rather than where the header was, because where the
+              header was is now the drawing — and a control that appears in the
+              middle of a picture is a control nobody finds. This row is where
+              every other thing that acts on the view already lives.
+            */}
+            {headerHidden && onShowHeader ? (
+              <button
+                type="button"
+                onClick={onShowHeader}
+                aria-label="Show the title and the save buttons"
+                title="Show the title and the save buttons"
+                className="flex size-8 items-center justify-center rounded-lg border border-white/10 bg-background/70 backdrop-blur-xl"
+              >
+                <ChevronDown className="size-4" aria-hidden />
+              </button>
+            ) : null}
+
             {onUndo ? (
               <button
                 type="button"

@@ -37,7 +37,14 @@ import {
   writeDraft,
   clearDraft,
 } from "../src/features/berchuma-studio/services/draft.ts";
-import { tvUnitExample } from "../src/features/berchuma-studio/services/examples.ts";
+import {
+  bayDimensionsWorthDrawing,
+  layOutBays,
+} from "../src/features/berchuma-studio/services/bay-layout.ts";
+import {
+  kitchenExample,
+  tvUnitExample,
+} from "../src/features/berchuma-studio/services/examples.ts";
 import {
   COALESCE_MS,
   DEPTH,
@@ -92,6 +99,8 @@ const PANEL = "src/features/berchuma-studio/components/editor/control-panel.tsx"
 const RAIL = "src/features/berchuma-studio/components/config/config-rail.tsx";
 const START = "src/features/berchuma-studio/components/start-panel.tsx";
 const EDITOR = "src/features/berchuma-studio/components/editor/design-editor.tsx";
+const ELEVATION = "src/features/berchuma-studio/components/viewer/elevation.tsx";
+const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
 
 // ---------------------------------------------------------------------------
 // 1. Every measurement can be typed
@@ -826,6 +835,179 @@ const EDITOR = "src/features/berchuma-studio/components/editor/design-editor.tsx
   check(
     "the list still scrolls inside whatever height the sheet is",
     /min-h-0 flex-1 overflow-y-auto overscroll-contain/.test(editor),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 6. Where the bays are
+// ---------------------------------------------------------------------------
+
+{
+  const spec = tvUnitExample();
+  const cabinet = spec.cabinets[0];
+  const t = spec.carcass.board.thickness;
+
+  const placed = layOutBays(cabinet, t);
+
+  check(
+    "every bay is placed",
+    placed.length === cabinet.bays.length,
+    `${placed.length} of ${cabinet.bays.length}`,
+  );
+  check(
+    "the first opening starts one board in from the cabinet's edge",
+    placed[0].x === t,
+    `started at ${placed[0].x} with a ${t} mm board`,
+  );
+  check(
+    "there is exactly one board between one opening and the next",
+    placed.every((bay, i) =>
+      i === 0 ? true : bay.x - (placed[i - 1].x + placed[i - 1].width) === t,
+    ),
+    "a bay drawn where the divider is is a bay drawn in the wrong place",
+  );
+  check(
+    "the openings and the boards between them fill the carcass",
+    placed[placed.length - 1].x + placed[placed.length - 1].width + t ===
+      cabinet.size.width,
+    `bays + boards came to ${placed[placed.length - 1].x + placed[placed.length - 1].width + t} in a ${cabinet.size.width} carcass`,
+  );
+  check(
+    "an opening is as wide as the bay it is drawn for",
+    placed.every((bay, i) => bay.width === cabinet.bays[i].width),
+  );
+  check(
+    "a kitchen's cabinets are laid out the same way",
+    kitchenExample().cabinets.every((unit) => {
+      const bays = layOutBays(unit, t);
+      const last = bays[bays.length - 1];
+      return bays[0].x === t && last.x + last.width + t === unit.size.width;
+    }),
+    "the elevation and the 3D view both call this for whatever is on screen",
+  );
+
+  check(
+    "a cabinet with several bays gets them dimensioned",
+    bayDimensionsWorthDrawing(cabinet),
+    `the TV unit has ${cabinet.bays.length} bays`,
+  );
+  check(
+    "a single-bay cabinet does not",
+    !bayDimensionsWorthDrawing({ ...cabinet, bays: cabinet.bays.slice(0, 1) }),
+    "its opening is the cabinet width less two boards, and the width is already on the drawing",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 7. The drawing carries the numbers somebody cuts to
+// ---------------------------------------------------------------------------
+
+{
+  const elevation = code(ELEVATION);
+  const model = code(MODEL);
+
+  check(
+    "the elevation draws a chain of cabinet widths",
+    /<CabinetChain\b/.test(elevation) && /function CabinetChain\(/.test(elevation),
+    "the overall width tells you whether it fits the wall, not what to cut",
+  );
+  check(
+    "which is only drawn when there is more than one cabinet on it",
+    /const chained =\s*\n?\s*supportsFrontElevation && elevationCabinets\.length > 1;/.test(
+      elevation,
+    ),
+    "on a single cabinet the chain repeats the overall width immediately below the overall width",
+  );
+  check(
+    "and the paper grows to hold it",
+    /const bottomMargin = MARGIN \+ \(chained \? CHAIN_DEPTH : 0\);/.test(
+      elevation,
+    ) && /\$\{envelope\.height \+ MARGIN \+ bottomMargin\}/.test(elevation),
+    "drawn below a viewBox that stops at the old margin, the chain is off the page",
+  );
+  check(
+    "the chain is ordered left to right whatever order the cabinets are stored in",
+    /\[\.\.\.cabinets\]\.sort\(\(a, b\) => a\.x - b\.x\)/.test(elevation),
+  );
+  // Whitespace-flattened, because the condition is written across three lines
+  // and a regex over the raw file would be asserting where the line breaks are.
+  const flatElevation = elevation.replace(/\s+/g, " ");
+
+  check(
+    "each cabinet's own height is written beside it when they differ",
+    /const heightsDiffer = new Set\( ?elevationCabinets\.map\(\(\{ cabinet \}\) => Math\.round\(cabinet\.size\.height\)\),? ?\)\.size > 1;/.test(
+      flatElevation,
+    ) && /supportsFrontElevation && heightsDiffer \?/.test(flatElevation),
+    "a TV unit with a shelf over it is two heights and one overall, and the overall is the one you cannot cut to",
+  );
+  check(
+    "and it is the cabinet's height that is written, not the envelope's",
+    /\{Math\.round\(cabinet\.size\.height\)\}/.test(flatElevation),
+  );
+  check(
+    "the elevation writes each opening inside the bay it measures",
+    /\{bayDimensionsWorthDrawing\(cabinet\)/.test(elevation) &&
+      /\{Math\.round\(geometry\.width\)\}/.test(elevation),
+  );
+  check(
+    "the 3D view labels the openings of the selected cabinet too",
+    /<BayLabels cabinet=\{cabinet\} board=\{board\} scale=\{scale\} \/>/.test(
+      model,
+    ) && /function BayLabels\(/.test(model),
+    "a label the elevation carries and the model does not is a drawing somebody has to switch views to read",
+  );
+  check(
+    "it is given the real board thickness, not a guess",
+    /board=\{spec\.carcass\.board\.thickness\}/.test(model),
+    "15 mm foam board and 18 mm MDF put the openings in different places",
+  );
+  check(
+    "and both views place the bays with the same function",
+    /layOutBays\(cabinet, board\)/.test(model) &&
+      /layOutBays\(cabinet, t\)/.test(elevation),
+    "two copies of the sum is one edit away from the elevation and the model disagreeing about where a bay is",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 8. The header folds away
+// ---------------------------------------------------------------------------
+
+{
+  const workspace = code(
+    "src/features/berchuma-studio/components/studio-workspace.tsx",
+  );
+  const editor = code(EDITOR);
+
+  check(
+    "the header starts open",
+    /const \[headerOpen, setHeaderOpen\] = useState\(true\)/.test(workspace),
+    "somebody arriving needs to see what they are looking at and where Save is",
+  );
+  check(
+    "and it is taken out of the layout, not just hidden",
+    /\{headerOpen \? \(/.test(workspace) && /\) : null\}/.test(workspace),
+    "a header hidden with a class still takes its height, which is the whole point of folding it",
+  );
+  check(
+    "there is a control that folds it",
+    /onClick=\{\(\) => setHeaderOpen\(false\)\}/.test(workspace) &&
+      /aria-label="Fold this away and give the drawing the room"/.test(workspace),
+  );
+  check(
+    "the editor is told the header is gone",
+    /headerHidden=\{!headerOpen\}/.test(workspace) &&
+      /onShowHeader=\{\(\) => setHeaderOpen\(true\)\}/.test(workspace),
+  );
+  check(
+    "and offers the way back, over the drawing",
+    /\{headerHidden && onShowHeader \? \(/.test(editor) &&
+      /onClick=\{onShowHeader\}/.test(editor),
+    "folded with no control to unfold it, the title and the Save buttons are gone for good",
+  );
+  check(
+    "the way back is labelled for a screen reader",
+    /aria-label="Show the title and the save buttons"/.test(editor),
   );
 }
 
