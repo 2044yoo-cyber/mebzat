@@ -6,6 +6,7 @@ import {
   Box,
   ChevronDown,
   Loader2,
+  Grid2x2,
   Minus,
   Plus,
   Ruler,
@@ -34,6 +35,7 @@ import {
   resizeCabinet,
 } from "../../services/operations";
 import { Elevation } from "../viewer/elevation";
+import { Plan } from "../viewer/plan";
 import type { DesignSpec } from "../../types/spec";
 
 /**
@@ -74,7 +76,7 @@ const Model = dynamic(() => import("../viewer/model"), {
   loading: () => <Loading />,
 });
 
-type View = "solid" | "flat";
+type View = "solid" | "flat" | "plan";
 
 export function DesignEditor({
   spec,
@@ -280,11 +282,19 @@ export function DesignEditor({
             />
           ) : (
             <div className="h-full w-full p-4">
-              <Elevation
-                spec={spec}
-                selectedCabinetId={selectedId}
-                onSelectCabinet={setSelectedId}
-              />
+              {view === "plan" ? (
+                <Plan
+                  spec={spec}
+                  selectedCabinetId={selectedId}
+                  onSelectCabinet={setSelectedId}
+                />
+              ) : (
+                <Elevation
+                  spec={spec}
+                  selectedCabinetId={selectedId}
+                  onSelectCabinet={setSelectedId}
+                />
+              )}
             </div>
           )}
         </div>
@@ -305,6 +315,19 @@ export function DesignEditor({
                 icon={Ruler}
                 label="Elevation"
               />
+              {/*
+                Only where there is a corner to look at. On a straight wardrobe
+                the plan is one rectangle and says nothing the elevation does
+                not, so it would be a third tab that is never the right answer.
+              */}
+              {spec.layout !== "straight" ? (
+                <ViewTab
+                  active={view === "plan"}
+                  onClick={() => setView("plan")}
+                  icon={Grid2x2}
+                  label="Top"
+                />
+              ) : null}
             </div>
 
             {/*

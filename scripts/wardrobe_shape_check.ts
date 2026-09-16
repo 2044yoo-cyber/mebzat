@@ -39,6 +39,10 @@ import {
   partRotationRadians,
 } from "../src/features/berchuma-studio/services/part-transform.ts";
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import { Plan } from "../src/features/berchuma-studio/components/viewer/plan.tsx";
 
 import { parseSpec, type DesignSpec } from "../src/features/berchuma-studio/types/spec.ts";
 
@@ -519,6 +523,190 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
       new RegExp(`value: "${shape}"`).test(setup),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// 9. The plan, which is the only view an L is an L in
+//
+// An elevation projects two runs at a right angle onto one another: the leg
+// coming towards you is a sliver the width of its depth and the corner is not
+// visible at all. So there is a third view.
+//
+// It is *rendered* here rather than read. Three source-text assertions were
+// written first and all three survived mutation — `usableLength` still appeared
+// in the label offset after the polygon was changed to `wallLength`, and
+// `resolveDesign` still appeared after a statement was appended beside it. The
+// identifier outliving the call, three times in one section. Rendering it and
+// measuring the markup cannot be fooled that way.
+// ---------------------------------------------------------------------------
+
+{
+  const markup = (shape: "l_shaped" | "u_shaped", walls: number[]) =>
+    renderToStaticMarkup(
+      createElement(Plan, { spec: build(shape, walls) }),
+    );
+
+  const l = markup("l_shaped", [2400, 1800]);
+  const u = markup("u_shaped", [1800, 3000, 1800]);
+
+  /** Every `points="…"` polygon in the markup, as numbers. */
+  const polygons = (svg: string) =>
+    [...svg.matchAll(/points="([^"]+)"/g)].map((match) =>
+      match[1]!.split(" ").map((pair) => pair.split(",").map(Number)),
+    );
+
+  const extentOf = (corners: number[][]) => ({
+    width: Math.max(...corners.map((c) => c[0]!)) - Math.min(...corners.map((c) => c[0]!)),
+    depth: Math.max(...corners.map((c) => c[1]!)) - Math.min(...corners.map((c) => c[1]!)),
+  });
+
+  const lShapes = polygons(l).map(extentOf);
+
+  check(
+    "the plan draws something for every run and every carcass",
+    lShapes.length === 4,
+    `${lShapes.length} polygons for an L's two runs and two carcasses`,
+  );
+
+  // 2400 − 600 and 1800 − 600. A run drawn at its wall length would be 2400
+  // and 1800 and would run straight through the corner it stops for.
+  check(
+    "each run is drawn at the length left after its corners",
+    lShapes.some((box) => Math.round(box.width) === 1800 && Math.round(box.depth) === 600) &&
+      lShapes.some((box) => Math.round(box.width) === 600 && Math.round(box.depth) === 1200),
+    lShapes.map((box) => `${Math.round(box.width)}×${Math.round(box.depth)}`).join(", "),
+  );
+  check(
+    "and nothing is drawn at a wall length",
+    !lShapes.some((box) => Math.round(box.width) === 2400 || Math.round(box.depth) === 1800),
+    lShapes.map((box) => `${Math.round(box.width)}×${Math.round(box.depth)}`).join(", "),
+  );
+
+  check(
+    "the wall lengths are still written down, because they are what people know",
+    /Wall A · 2400 mm/.test(l) && /Wall B · 1800 mm/.test(l),
+  );
+  check(
+    "and the U names its three walls",
+    /Left wall · 1800 mm/.test(u) &&
+      /Back wall · 3000 mm/.test(u) &&
+      /Right wall · 1800 mm/.test(u),
+  );
+
+  // The corner squares are `<rect>`s filled with the hatch pattern.
+  const cornerRects = (svg: string) =>
+    [...svg.matchAll(/<rect[^>]*url\(#plan-corner\)[^>]*>/g)].length;
+
+  check(
+    "an L draws its one corner",
+    cornerRects(l) === 1,
+    `${cornerRects(l)}`,
+  );
+  check(
+    "and a U draws both of its corners",
+    cornerRects(u) === 2,
+    `${cornerRects(u)}`,
+  );
+
+  // At the size it is, not merely present. A zero-width rect is still a rect
+  // and still counted, which is what a count alone cannot tell you.
+  const cornerWidths = [...l.matchAll(/<rect[^>]*url\(#plan-corner\)[^>]*>/g)]
+    .map((match) => Number(/width="(\d+)"/.exec(match[0]!)?.[1] ?? 0));
+  check(
+    "at the depth it actually takes out of both walls",
+    cornerWidths.every((width) => width === 600),
+    cornerWidths.join(", "),
+  );
+  check(
+    "the corner is labelled with the depth it takes out of both walls",
+    /<text[^>]*>600<\/text>/.test(l),
+    "the gap between a wall and its carcass is the number people are surprised by",
+  );
+
+  check(
+    "each carcass says how many bays it has",
+    /3 bays/.test(l) && /2 bays/.test(l),
+  );
+  check(
+    "and the footprint is stated once",
+    /2400 × 1800 mm on the floor/.test(l) &&
+      /3000 × 1800 mm on the floor/.test(u),
+  );
+
+  // Selection is shared with the other two views, so a cabinet picked in the
+  // plan is still picked after switching.
+  //
+  // Compared against the unpicked drawing rather than searched for a class.
+  // `stroke-brand` is on the corner square and the corner's label too, so a
+  // search for it passes on a plan that shows no selection at all.
+  const spec = build("l_shaped", [2400, 1800]);
+  const unpicked = renderToStaticMarkup(createElement(Plan, { spec }));
+  const picked = renderToStaticMarkup(
+    createElement(Plan, { spec, selectedCabinetId: spec.cabinets[0]!.id }),
+  );
+
+  check(
+    "a selected carcass is drawn differently from an unselected one",
+    picked !== unpicked,
+    "the plan has to show the same selection the 3D view and the elevation do",
+  );
+  // Both, because either alone survives losing the other: dropping the colour
+  // leaves the weight, and a drawing that still shows the selection is not a
+  // drawing that shows it properly.
+  check(
+    "by a heavier outline",
+    /<polygon[^>]*stroke-width="22"/.test(picked) &&
+      !/<polygon[^>]*stroke-width="22"/.test(unpicked),
+  );
+  check(
+    "and in the selection colour",
+    /<polygon[^>]*stroke-brand/.test(picked) &&
+      !/<polygon[^>]*stroke-brand/.test(unpicked),
+    "the corner square is stroke-brand too, so this has to be the polygon",
+  );
+
+  const clickable = renderToStaticMarkup(
+    createElement(Plan, { spec, onSelectCabinet: () => {} }),
+  );
+  check(
+    "a carcass shows as clickable when the view can select",
+    /cursor-pointer/.test(clickable) && !/cursor-pointer/.test(unpicked),
+  );
+
+  // A rendered handler leaves no trace in static markup, so this one is read.
+  // Scoped to the carcass loop: `onSelectCabinet` appears in the props and in
+  // the cursor class, and a search of the file passes with the click gone.
+  const plan = readFileSync(
+    "src/features/berchuma-studio/components/viewer/plan.tsx",
+    "utf8",
+  );
+  const carcassLoop = plan.slice(
+    plan.indexOf("{resolved.cabinets.map("),
+  );
+  check(
+    "and pressing it actually selects",
+    /onClick=\{\s*onSelectCabinet\s*\?\s*\(\) =>\s*onSelectCabinet\(selected \? null : placed\.cabinet\.id\)/.test(
+      carcassLoop,
+    ),
+    "a cursor that promises a click over nothing is worse than no cursor",
+  );
+}
+
+{
+  const editor = readFileSync(
+    "src/features/berchuma-studio/components/editor/design-editor.tsx",
+    "utf8",
+  );
+
+  check(
+    "the editor offers a third view",
+    /type View = "solid" \| "flat" \| "plan";/.test(editor) && /<Plan\b/.test(editor),
+  );
+  check(
+    "only where there is a corner to look at",
+    /\{spec\.layout !== "straight" \? \(/.test(editor),
+    "on a straight wardrobe the plan is one rectangle and says nothing the elevation does not",
+  );
 }
 
 // ---------------------------------------------------------------------------
