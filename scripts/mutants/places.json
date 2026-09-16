@@ -1,0 +1,140 @@
+[
+  {
+    "name": "Ayertena removed from the list",
+    "file": "src/lib/location/places.ts",
+    "from": "{ name: \"Ayertena\", subCity: \"Kolfe Keranyo\"",
+    "to": "{ name: \"Ayertenaa\", subCity: \"Kolfe Keranyo\""
+  },
+  {
+    "name": "Ayertena moved to the wrong sub-city",
+    "file": "src/lib/location/places.ts",
+    "from": "{ name: \"Ayertena\", subCity: \"Kolfe Keranyo\"",
+    "to": "{ name: \"Ayertena\", subCity: \"Bole\""
+  },
+  {
+    "name": "the list is no longer sorted",
+    "file": "src/lib/location/places.ts",
+    "from": "  return places.sort((a, b) => a.name.localeCompare(b.name));",
+    "to": "  return places;"
+  },
+  {
+    "name": "an empty query returns nothing",
+    "file": "src/lib/location/places.ts",
+    "from": "  if (!text) return pool.slice(0, limit);",
+    "to": "  if (!text) return [];"
+  },
+  {
+    "name": "the limit is ignored",
+    "file": "src/lib/location/places.ts",
+    "from": "  return scored.slice(0, limit).map((entry) => entry.place);",
+    "to": "  return scored.map((entry) => entry.place);"
+  },
+  {
+    "name": "regions become service areas",
+    "file": "src/lib/location/places.ts",
+    "from": "  (place) => place.kind !== \"region\",",
+    "to": "  () => true,"
+  },
+  {
+    "name": "the city/region duplicate is let back in",
+    "file": "src/lib/location/places.ts",
+    "from": "    if (cityNames.has(region.name)) continue;",
+    "to": "    if (false) continue;"
+  },
+  {
+    "name": "a single letter counts as a place name",
+    "file": "src/lib/location/places.ts",
+    "from": "  if (trimmed.length < 2 || trimmed.length > 80) return false;",
+    "to": "  if (trimmed.length < 1) return false;"
+  },
+  {
+    "name": "markup counts as a place name",
+    "file": "src/lib/location/places.ts",
+    "from": "  return /^[\\p{L}\\p{N}][\\p{L}\\p{N}\\s'\u2019\\-.,/()]*$/u.test(trimmed);",
+    "to": "  return true;"
+  },
+  {
+    "name": "the gazetteer is copied rather than imported",
+    "file": "src/lib/location/places.ts",
+    "from": "  for (const area of knownNeighbourhoods()) {",
+    "to": "  for (const area of knownNeighbourhoods().slice(1)) {"
+  },
+  {
+    "name": "a gazetteer coordinate is dropped on the way in",
+    "file": "src/lib/location/places.ts",
+    "from": "      latitude: area.latitude,\n      longitude: area.longitude,\n      aliases: AREA_ALIASES[area.name],",
+    "to": "      latitude: 0,\n      longitude: area.longitude,\n      aliases: AREA_ALIASES[area.name],"
+  },
+  {
+    "name": "a migration row disagrees about where Ayertena is",
+    "file": "supabase/migrations/0085_places.sql",
+    "from": "('ayertena', 'Ayertena', 'Kolfe Keranyo', 'Addis Ababa', 'Addis Ababa', 8.9895, 38.6935)",
+    "to": "('ayertena', 'Ayertena', 'Kolfe Keranyo', 'Addis Ababa', 'Addis Ababa', 8.99, 38.6935)"
+  },
+  {
+    "name": "a migration row is missing",
+    "file": "supabase/migrations/0085_places.sql",
+    "from": "  ('piassa', 'Piassa', 'Arada', 'Addis Ababa', 'Addis Ababa', 9.0355, 38.7515),\n",
+    "to": ""
+  },
+  {
+    "name": "the migration inserts a place nothing knows about",
+    "file": "supabase/migrations/0085_places.sql",
+    "from": "  ('piassa', 'Piassa',",
+    "to": "  ('atlantis', 'Atlantis', null, 'Atlantis', 'Atlantis', 0, 0),\n  ('piassa', 'Piassa',"
+  },
+  {
+    "name": "re-running the migration is no longer free",
+    "file": "supabase/migrations/0085_places.sql",
+    "from": "on conflict (slug, city, country) do nothing;",
+    "to": ";"
+  },
+  {
+    "name": "the migration deletes the rows 0078 seeded",
+    "file": "supabase/migrations/0085_places.sql",
+    "from": "insert into public.location_areas (slug",
+    "to": "delete from public.location_areas;\ninsert into public.location_areas (slug"
+  },
+  {
+    "name": "ties stop coming back alphabetically",
+    "file": "src/lib/location/places.ts",
+    "from": "  scored.sort((a, b) => a.rank - b.rank);",
+    "to": "  scored.sort((a, b) => b.rank - a.rank);"
+  },
+  {
+    "name": "aliases are ignored",
+    "file": "src/lib/location/places.ts",
+    "from": "  for (const spelling of [place.name, ...(place.aliases ?? [])]) {",
+    "to": "  for (const spelling of [place.name]) {"
+  },
+  {
+    "name": "the whole name no longer outranks a prefix",
+    "file": "src/lib/location/places.ts",
+    "from": "    if (text === query) keep(0);",
+    "to": "    if (text === query) keep(1);"
+  },
+  {
+    "name": "a prefix no longer outranks a substring",
+    "file": "src/lib/location/places.ts",
+    "from": "      keep(1);",
+    "to": "      keep(2);"
+  },
+  {
+    "name": "the sub-city outranks the name",
+    "file": "src/lib/location/places.ts",
+    "from": "  if (normalise(place.parent ?? \"\").includes(query)) keep(3);",
+    "to": "  if (normalise(place.parent ?? \"\").includes(query)) keep(0);"
+  },
+  {
+    "name": "the sub-city stops finding what is inside it",
+    "file": "src/lib/location/places.ts",
+    "from": "  if (normalise(place.parent ?? \"\").includes(query)) keep(3);",
+    "to": "  if (false) keep(3);"
+  },
+  {
+    "name": "the worst tier wins instead of the best",
+    "file": "src/lib/location/places.ts",
+    "from": "    if (best === -1 || tier < best) best = tier;",
+    "to": "    if (best === -1 || tier > best) best = tier;"
+  }
+]
