@@ -82,7 +82,39 @@ begin
       (61, '0061_floor_plans',        'table',   'floor_plans'),
       (62, '0062_tours_in_the_feed',  'column',  'tours.share_to_feed'),
       (63, '0063_account_restriction','column',  'profiles.restricted_until'),
-      (64, '0064_admin_team',         'table',   'admin_members')
+      (64, '0064_admin_team',         'table',   'admin_members'),
+      -- `feed_page` existed before 0065; the migration rewrote it and added
+      -- `p_seed`. Same for 0076's and 0079's objects further down — a name
+      -- that predates the migration is not evidence the migration ran, and
+      -- all three reported APPLIED on a database that had never seen them.
+      (65, '0065_feed_discovery',     'body',    'feed_page|p_seed'),
+      (66, '0066_buildings_viewport', 'func',    'buildings_in_viewport'),
+      (67, '0067_saved_calculations', 'table',   'saved_calculations'),
+      (68, '0068_verification',       'func',    'sync_phone_verification'),
+      (69, '0069_image_watermarks',   'table',   'watermark_settings'),
+      -- 0070 adds one value to an enum and nothing else, so the value is the
+      -- only thing that can be looked for.
+      (70, '0070_infringement',       'enumval', 'moderation_category.infringement'),
+      (71, '0071_professional_prof',  'func',    'professional_reputation'),
+      (72, '0072_company_profile',    'func',    'refresh_company_aggregates'),
+      (73, '0073_professional_search','func',    'search_professionals'),
+      (74, '0074_used_items',         'type',    'product_condition'),
+      (75, '0075_digital_products',   'type',    'digital_kind'),
+      (76, '0076_review_after_post',  'func',    'moderation_hide_threshold'),
+      (77, '0077_project_categories', 'type',    'project_category'),
+      (78, '0078_service_areas',      'table',   'location_areas'),
+      (79, '0079_job_area_matching',  'column',  'project_briefs.location_area'),
+      (80, '0080_project_prof_links', 'func',    'enforce_project_company_claim'),
+      (81, '0081_panorama_capture',   'table',   'panorama_jobs'),
+      (82, '0082_panorama_stage',     'column',  'panorama_jobs.stage'),
+      (83, '0083_panorama_poses',     'column',  'panorama_jobs.frames'),
+      -- 0084 and 0085 create no object: one seeds people, the other seeds
+      -- places. A row is the only evidence either ran, so a row is what is
+      -- looked for — and both are idempotent, so a missing one is safe to
+      -- apply again.
+      (84, '0084_professionals_seed', 'row',     'seed_content|batch = ''professionals-2026-09'''),
+      (85, '0085_places',             'row',     'location_areas|slug = ''ayertena'''),
+      (86, '0086_profile_documents',  'column',  'profiles.cv_path')
     ) as t (ordering, migration, kind, object)
   loop
     present := case row.kind
@@ -98,6 +130,11 @@ begin
           and table_name = split_part(row.object, '.', 1)
           and column_name = split_part(row.object, '.', 2)
       )
+      -- 'row' is handled after the case, not in it: it needs dynamic SQL, and
+      -- the reason is in this file's header — a query naming a table that does
+      -- not exist is refused by the parser before a row is read, so one absent
+      -- table would take the whole report down.
+      when 'row' then null
       when 'bucket' then exists (select 1 from storage.buckets where id = row.object)
       when 'enumval' then exists (
         select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
@@ -111,6 +148,22 @@ begin
           and pg_get_functiondef(p.oid) like '%' || split_part(row.object, '|', 2) || '%'
       )
     end;
+
+    -- The dynamic half. `present` is null for a 'row' check because the table
+    -- name is only known at run time and a plain query naming a table that
+    -- does not exist is refused by the parser — the whole reason this report
+    -- is built up in a loop rather than written as one select.
+    if row.kind = 'row' then
+      if to_regclass('public.' || split_part(row.object, '|', 1)) is null then
+        present := false;
+      else
+        execute format(
+          'select exists (select 1 from public.%I where %s)',
+          split_part(row.object, '|', 1),
+          split_part(row.object, '|', 2)
+        ) into present;
+      end if;
+    end if;
 
     insert into which_migrations_report values (
       row.ordering,
