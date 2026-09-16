@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Menu, PanelLeft, PanelRight, Search, Sparkles } from "lucide-react";
+import { Menu, PanelLeft, PanelRight, Search, Sparkles } from "lucide-react";
 
 import { Breadcrumbs } from "@/components/shell/breadcrumbs";
 import { LanguageSelector } from "@/components/i18n/language-selector";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { NotificationPanel } from "@/components/notifications/notification-panel";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { UserNav } from "@/components/layout/user-nav";
 import { GlobalSearch } from "@/components/search/global-search";
@@ -101,23 +102,15 @@ export function Topbar({
           <Sparkles className="size-4.5" />
         </button>
 
+        {/* The bell opens the tray here rather than navigating to it. The
+            page at /notifications is still there and still linked from the
+            panel's footer — what changed is that glancing at what arrived no
+            longer means leaving whatever you were doing. */}
         {profile && (
-          <Link
-            href="/notifications"
-            aria-label={
-              notifications > 0
-                ? t("common.notificationsUnread").replace("{count}", String(notifications))
-                : t("navigation.notifications")
-            }
-            className="relative flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Bell className="size-4.5" />
-            {notifications > 0 && (
-              <span className="absolute top-0.5 right-0.5 flex min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-medium text-brand-foreground">
-                {notifications > 99 ? "99+" : notifications}
-              </span>
-            )}
-          </Link>
+          <NotificationPanel
+            viewerId={profile.id}
+            initialCount={notifications}
+          />
         )}
 
         <LanguageSelector />

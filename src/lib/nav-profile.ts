@@ -24,6 +24,7 @@ export async function getNavProfile(): Promise<NavProfile | null> {
     .single();
 
   return {
+    id: user.id,
     fullName: data?.full_name ?? null,
     email: user.email ?? null,
     avatarUrl: data?.avatar_url ?? null,

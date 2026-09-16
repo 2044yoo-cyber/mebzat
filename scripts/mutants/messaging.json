@@ -1,0 +1,248 @@
+[
+  {
+    "name": "the inbox goes back to a placeholder",
+    "file": "src/app/(dashboard)/messages/page.tsx",
+    "from": "        <ConversationList conversations={conversations} />",
+    "to": "        <ComingSoon title=\"Messaging is on the way\" />"
+  },
+  {
+    "name": "the empty inbox renders an empty list instead of saying so",
+    "file": "src/app/(dashboard)/messages/page.tsx",
+    "from": "        <InboxEmpty />",
+    "to": "        <div />"
+  },
+  {
+    "name": "the inbox stops requiring a sign-in",
+    "file": "src/app/(dashboard)/messages/page.tsx",
+    "from": "  await requireViewer(\"/messages\");",
+    "to": "  void 0;"
+  },
+  {
+    "name": "the thread route loses its desktop split",
+    "file": "src/app/(dashboard)/messages/[id]/page.tsx",
+    "from": "md:grid-cols-[22rem_1fr]",
+    "to": "grid-cols-1"
+  },
+  {
+    "name": "the list stops hiding on a phone",
+    "file": "src/app/(dashboard)/messages/[id]/page.tsx",
+    "from": "\"hidden min-h-0 md:block md:border-r\"",
+    "to": "\"min-h-0 md:border-r\""
+  },
+  {
+    "name": "the bell goes back to being a link",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "          <NotificationPanel\n            viewerId={profile.id}\n            initialCount={notifications}\n          />",
+    "to": "          <a href=\"/notifications\">bell</a>"
+  },
+  {
+    "name": "the panel is not given the account to filter on",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "            viewerId={profile.id}",
+    "to": "            viewerId={\"\"}"
+  },
+  {
+    "name": "the badge starts at zero instead of the server count",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "            initialCount={notifications}",
+    "to": "            initialCount={0}"
+  },
+  {
+    "name": "the panel stops being a sheet on a phone",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "              \"fixed inset-x-0 bottom-0 z-50 flex max-h-[80dvh] flex-col rounded-t-2xl border bg-popover text-popover-foreground shadow-lg\",",
+    "to": "              \"absolute z-50 flex flex-col border bg-popover text-popover-foreground shadow-lg\","
+  },
+  {
+    "name": "the panel stops becoming a dropdown on desktop",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "              \"sm:absolute sm:inset-auto sm:top-full sm:right-0 sm:mt-2 sm:max-h-[32rem] sm:w-96 sm:rounded-xl\",",
+    "to": "              \"\","
+  },
+  {
+    "name": "the tabs are gone",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "              role=\"tablist\"",
+    "to": "              data-tablist"
+  },
+  {
+    "name": "unread stops looking different from read",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "                        row.readAt === null && \"bg-brand/5\",",
+    "to": "                        false && \"bg-brand/5\","
+  },
+  {
+    "name": "an entry can no longer be marked read on its own",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "                            onClick={() => readOne(row.id)}",
+    "to": "                            onClick={() => undefined}"
+  },
+  {
+    "name": "an entry can no longer be deleted",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "                          onClick={() => removeOne(row.id)}",
+    "to": "                          onClick={() => undefined}"
+  },
+  {
+    "name": "mark-all-read is gone",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "                onClick={readEverything}",
+    "to": "                onClick={() => undefined}"
+  },
+  {
+    "name": "mark-all stays enabled with nothing to mark",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "                disabled={count === 0}",
+    "to": "                disabled={false}"
+  },
+  {
+    "name": "clicking an entry goes nowhere",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "    if (row.href) router.push(row.href);",
+    "to": "    void row;"
+  },
+  {
+    "name": "clicking an entry leaves it unread",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "    if (row.readAt === null) readOne(row.id);",
+    "to": "    void row;"
+  },
+  {
+    "name": "the badge tracks a delta instead of recounting",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "      .select(\"id\", { count: \"exact\", head: true })\n      .is(\"read_at\", null);",
+    "to": "      .select(\"id\", { count: \"exact\", head: true });"
+  },
+  {
+    "name": "Realtime subscribes to everybody's notifications",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "          filter: `user_id=eq.${viewerId}`,",
+    "to": ""
+  },
+  {
+    "name": "a closed panel is refetched on every change",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "          if (open) void load();",
+    "to": "          void load();"
+  },
+  {
+    "name": "the channel is leaked on unmount",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "      void supabase.removeChannel(channel);",
+    "to": "      void channel;"
+  },
+  {
+    "name": "Escape no longer closes the panel",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "      if (event.key === \"Escape\") setOpen(false);",
+    "to": "      void event;"
+  },
+  {
+    "name": "the full page is no longer reachable from the panel",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "                href=\"/notifications\"",
+    "to": "                href=\"#\""
+  },
+  {
+    "name": "the rows load from an effect watching open",
+    "file": "src/components/notifications/notification-panel.tsx",
+    "from": "          if (!open && rows === null) void load();",
+    "to": "          void rows;"
+  },
+  {
+    "name": "marking one read writes the table directly",
+    "file": "src/app/notifications/actions.ts",
+    "from": "  const { error } = await supabase.rpc(\"mark_notification_read\", {\n    target_notification: id,\n  });",
+    "to": "  const { error } = await supabase.from(\"notifications\").update({ read_at: new Date().toISOString() }).eq(\"id\", id);"
+  },
+  {
+    "name": "deleting one writes the table directly",
+    "file": "src/app/notifications/actions.ts",
+    "from": "  const { error } = await supabase.rpc(\"delete_notification\", {\n    target_notification: id,\n  });",
+    "to": "  const { error } = await supabase.from(\"notifications\").delete().eq(\"id\", id);"
+  },
+  {
+    "name": "blocking writes user_blocks directly",
+    "file": "src/app/(dashboard)/messages/block-actions.ts",
+    "from": "  const { error } = await supabase.rpc(\"block_user\", {\n    target_user: targetUserId,\n    why: reason ?? null,\n  });",
+    "to": "  const { error } = await supabase.from(\"user_blocks\").insert({ blocker_id: targetUserId, blocked_id: targetUserId });"
+  },
+  {
+    "name": "reporting is dropped",
+    "file": "src/app/(dashboard)/messages/block-actions.ts",
+    "from": "  const { error } = await supabase.rpc(\"report_user\", {",
+    "to": "  const { error } = await supabase.rpc(\"unblock_user\", {"
+  },
+  {
+    "name": "blocking stops asking first",
+    "file": "src/components/messages/conversation-menu.tsx",
+    "from": "    if (!blocked && !window.confirm(t(\"messages.blockConfirm\"))) return;",
+    "to": "    void blocked;"
+  },
+  {
+    "name": "a refused block is left showing as a block",
+    "file": "src/components/messages/conversation-menu.tsx",
+    "from": "        setBlocked(!next);",
+    "to": "        void next;"
+  },
+  {
+    "name": "the menu appears on a company conversation too",
+    "file": "src/components/messages/chat-window.tsx",
+    "from": "        {header.otherUserId && (\n          <ConversationMenu",
+    "to": "        {true && (\n          <ConversationMenu"
+  },
+  {
+    "name": "a blocked thread stops saying so",
+    "file": "src/components/messages/chat-window.tsx",
+    "from": "      {blocked && (",
+    "to": "      {false && ("
+  },
+  {
+    "name": "the blocked state is not read at all",
+    "file": "src/app/(dashboard)/messages/[id]/page.tsx",
+    "from": "    header.otherUserId ? isBlocked(header.otherUserId) : Promise.resolve(false),",
+    "to": "    Promise.resolve(false),"
+  },
+  {
+    "name": "ninety seconds reads as ninety seconds",
+    "file": "src/lib/notifications/relative-time.ts",
+    "from": "      ? [elapsed, \"second\"]\n      : elapsed < HOUR",
+    "to": "      ? [elapsed, \"second\"]\n      : elapsed < 0"
+  },
+  {
+    "name": "forty days reads as forty days",
+    "file": "src/lib/notifications/relative-time.ts",
+    "from": "            : elapsed < MONTH\n              ? [Math.floor(elapsed / WEEK), \"week\"]",
+    "to": "            : elapsed < YEAR * 10\n              ? [Math.floor(elapsed / DAY), \"day\"]"
+  },
+  {
+    "name": "clock skew produces a time in the future",
+    "file": "src/lib/notifications/relative-time.ts",
+    "from": "  const elapsed = Math.max(\n    Math.round((now.getTime() - then.getTime()) / 1000),\n    0,\n  );",
+    "to": "  const elapsed = Math.round((now.getTime() - then.getTime()) / 1000);"
+  },
+  {
+    "name": "a junk timestamp renders Invalid Date",
+    "file": "src/lib/notifications/relative-time.ts",
+    "from": "  if (Number.isNaN(then.getTime())) return \"\";",
+    "to": "  if (false) return \"\";"
+  },
+  {
+    "name": "the timestamp is English everywhere",
+    "file": "src/lib/notifications/relative-time.ts",
+    "from": "const LOCALES: Record<string, string> = { en: \"en\", am: \"am\", om: \"om\" };",
+    "to": "const LOCALES: Record<string, string> = { en: \"en\", am: \"en\", om: \"en\" };"
+  },
+  {
+    "name": "an Amharic string is left in English",
+    "file": "src/lib/i18n/translations.ts",
+    "from": "      tabAll: \"\u1201\u1209\u121d\", tabUnread: \"\u12eb\u120d\u1270\u1290\u1260\u1260\",",
+    "to": "      tabAll: \"All\", tabUnread: \"Unread\","
+  },
+  {
+    "name": "an Afaan Oromo string is missing",
+    "file": "src/lib/i18n/translations.ts",
+    "from": "      remove: \"Balleessi\", seeAll: \"Beeksisa hunda ilaali\",",
+    "to": "      seeAll: \"Beeksisa hunda ilaali\","
+  }
+]

@@ -3898,6 +3898,27 @@ export interface Database {
         };
         Relationships: [];
       };
+      user_blocks: {
+        Row: {
+          blocker_id: string;
+          blocked_id: string;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          blocker_id: string;
+          blocked_id: string;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          blocker_id?: string;
+          blocked_id?: string;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       job_applications: {
         Row: {
           id: string;
@@ -8251,6 +8272,30 @@ export interface Database {
           p_job: string;
         };
         Returns: boolean;
+      };
+      mark_notification_read: {
+        Args: { target_notification: string };
+        Returns: undefined;
+      };
+      delete_notification: {
+        Args: { target_notification: string };
+        Returns: undefined;
+      };
+      block_user: {
+        Args: { target_user: string; why?: string | null };
+        Returns: undefined;
+      };
+      unblock_user: {
+        Args: { target_user: string };
+        Returns: undefined;
+      };
+      report_user: {
+        Args: {
+          target_user: string;
+          why: string;
+          note?: string | null;
+        };
+        Returns: string;
       };
       job_application_set_saved_documents: {
         Args: {

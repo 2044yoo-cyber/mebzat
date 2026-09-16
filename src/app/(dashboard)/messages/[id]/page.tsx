@@ -8,6 +8,7 @@ import {
   getConversations,
   getMessages,
 } from "@/lib/data/messages";
+import { isBlocked } from "@/app/(dashboard)/messages/block-actions";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Messages" };
@@ -29,9 +30,12 @@ export default async function ConversationPage({
   // RLS hides other people's threads, so a missing header means no access.
   if (!header) notFound();
 
-  const [conversations, messages, { data: profile }] = await Promise.all([
+  const [conversations, messages, blocked, { data: profile }] = await Promise.all([
     getConversations(),
     getMessages(id),
+    // Only meaningful for a one-to-one thread; a company conversation has no
+    // single account to have blocked.
+    header.otherUserId ? isBlocked(header.otherUserId) : Promise.resolve(false),
     supabase
       .from("profiles")
       .select("full_name, username")
@@ -54,6 +58,7 @@ export default async function ConversationPage({
         viewerId={user.id}
         viewerName={viewerName}
         initialMessages={messages}
+        blocked={blocked}
       />
     </div>
   );

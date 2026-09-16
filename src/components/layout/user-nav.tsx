@@ -32,6 +32,8 @@ import type { FontChoice } from "@/lib/constants/fonts";
 import { createClient } from "@/lib/supabase/client";
 
 export type NavProfile = {
+  /** The signed-in account. The notification panel filters Realtime on it. */
+  id: string;
   fullName: string | null;
   email: string | null;
   avatarUrl: string | null;
@@ -93,6 +95,7 @@ export function UserNav({
       // Show something immediately from the session, then enrich with the
       // profile row (name + avatar) without blocking the first paint.
       setProfile((prev) => ({
+        id: session.user.id,
         fullName: prev?.fullName ?? null,
         email: session.user.email ?? prev?.email ?? null,
         avatarUrl: prev?.avatarUrl ?? null,
@@ -106,6 +109,7 @@ export function UserNav({
         .single();
       if (!active) return;
       setProfile({
+        id: session.user.id,
         fullName: data?.full_name ?? null,
         email: session.user.email ?? null,
         avatarUrl: data?.avatar_url ?? null,

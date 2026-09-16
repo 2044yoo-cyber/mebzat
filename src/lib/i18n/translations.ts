@@ -7,6 +7,22 @@ interface Dictionary {
 
 export const translations: Record<Language, Dictionary> = {
   en: {
+    notifications: {
+      tabAll: "All", tabUnread: "Unread",
+      markRead: "Mark as read", markAllRead: "Mark all read",
+      remove: "Remove", seeAll: "See all notifications",
+      empty: "Nothing here yet.",
+      emptyUnread: "You are all caught up.",
+    },
+    messages: {
+      emptyTitle: "No conversations yet",
+      emptyBody: "Message a professional, a company or a supplier and the conversation will appear here.",
+      block: "Block", unblock: "Unblock", report: "Report",
+      blocked: "Blocked", blockedNotice: "You blocked this person. They cannot send you messages.",
+      blockConfirm: "Block this person? They will not be able to message you.",
+      reportConfirm: "Report this person to Medosha moderators?",
+      blockDone: "Blocked", unblockDone: "Unblocked", reportDone: "Reported. Moderators will look at it.",
+    },
     language: { label: "Language", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
       home: "Home", ai: "AI", "ai-home": "Medosha AI", market: "Market", marketplace: "Marketplace",
@@ -146,6 +162,22 @@ export const translations: Record<Language, Dictionary> = {
     info: { about: "About Medosha", howToUse: "How to Use", faq: "FAQ", contact: "Contact us", privacy: "Privacy Policy", terms: "Terms of Service" },
   },
   am: {
+    notifications: {
+      tabAll: "ሁሉም", tabUnread: "ያልተነበበ",
+      markRead: "እንደተነበበ ምልክት አድርግ", markAllRead: "ሁሉንም እንደተነበበ",
+      remove: "አስወግድ", seeAll: "ሁሉንም ማሳወቂያዎች ይመልከቱ",
+      empty: "እስካሁን ምንም የለም።",
+      emptyUnread: "ሁሉንም አንብበዋል።",
+    },
+    messages: {
+      emptyTitle: "እስካሁን ምንም ውይይት የለም",
+      emptyBody: "ለባለሙያ፣ ለኩባንያ ወይም ለአቅራቢ መልእክት ይላኩ፤ ውይይቱ እዚህ ይታያል።",
+      block: "አግድ", unblock: "እገዳ አንሳ", report: "ሪፖርት አድርግ",
+      blocked: "ታግዷል", blockedNotice: "ይህን ሰው አግደዋል። መልእክት ሊልክልዎ አይችልም።",
+      blockConfirm: "ይህን ሰው ማገድ ይፈልጋሉ? መልእክት ሊልክልዎ አይችልም።",
+      reportConfirm: "ይህን ሰው ለሜዶሻ ተቆጣጣሪዎች ሪፖርት ያድርጉ?",
+      blockDone: "ታግዷል", unblockDone: "እገዳ ተነስቷል", reportDone: "ሪፖርት ተደርጓል። ተቆጣጣሪዎች ይመለከቱታል።",
+    },
     language: { label: "ቋንቋ", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
       home: "መነሻ", ai: "AI", "ai-home": "Medosha AI", market: "ገበያ", marketplace: "ገበያ", property: "ንብረት",
@@ -255,6 +287,22 @@ export const translations: Record<Language, Dictionary> = {
     info: { about: "ስለ ሜዶሻ", howToUse: "እንዴት መጠቀም እንደሚቻል", faq: "ተደጋጋሚ ጥያቄዎች", contact: "ያግኙን", privacy: "የግላዊነት ፖሊሲ", terms: "የአገልግሎት ውሎች" },
   },
   om: {
+    notifications: {
+      tabAll: "Hunda", tabUnread: "Kan hin dubbifamne",
+      markRead: "Akka dubbifametti mallattoo godhi", markAllRead: "Hunda dubbifameera",
+      remove: "Balleessi", seeAll: "Beeksisa hunda ilaali",
+      empty: "Hanga ammaatti homaa hin jiru.",
+      emptyUnread: "Hunda dubbisteetta.",
+    },
+    messages: {
+      emptyTitle: "Hanga ammaatti marii hin jiru",
+      emptyBody: "Ogeessa, dhaabbata yookaan dhiyeessaaf ergaa ergi; mariin achi ni mul'ata.",
+      block: "Ugguri", unblock: "Uggura kaasi", report: "Gabaasi",
+      blocked: "Uggurameera", blockedNotice: "Nama kana uggurteetta. Ergaa siif erguu hin danda'u.",
+      blockConfirm: "Nama kana ugguruu barbaaddaa? Ergaa siif erguu hin danda'u.",
+      reportConfirm: "Nama kana to'attoota Medosha'tti gabaastaa?",
+      blockDone: "Uggurameera", unblockDone: "Uggurri ka'eera", reportDone: "Gabaafameera. To'attoonni ni ilaalu.",
+    },
     language: { label: "Afaan", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
       home: "Mana", ai: "AI", "ai-home": "Medosha AI", market: "Gabaa", marketplace: "Gabaa", property: "Qabeenya",

@@ -11,6 +11,8 @@ import {
 } from "@/components/messages/message-bubble";
 import { MessageInput } from "@/components/messages/message-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useLanguage } from "@/components/i18n/language-provider";
+import { ConversationMenu } from "@/components/messages/conversation-menu";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -57,12 +59,16 @@ export function ChatWindow({
   viewerId,
   viewerName,
   initialMessages,
+  blocked = false,
 }: {
   header: ConversationHeader;
   viewerId: string;
   viewerName: string;
   initialMessages: ChatMessage[];
+  /** Whether the viewer has blocked the other person. Read on the server. */
+  blocked?: boolean;
 }) {
+  const { t } = useLanguage();
   // initialMessages is the server-rendered history; realtime arrivals and
   // optimistic drafts are appended on top and de-duplicated at render, so a
   // fresh server render never has to be copied back into state.
@@ -329,7 +335,22 @@ export function ChatWindow({
                 : (header.subject ?? "Offline")}
           </p>
         </div>
+
+        {/* Only on a conversation with one other person. Blocking "a company"
+            is not a thing this means — there is no single account to refuse. */}
+        {header.otherUserId && (
+          <ConversationMenu
+            otherUserId={header.otherUserId}
+            initiallyBlocked={blocked}
+          />
+        )}
       </header>
+
+      {blocked && (
+        <p className="border-b bg-muted/60 px-4 py-2 text-xs text-muted-foreground">
+          {t("messages.blockedNotice")}
+        </p>
+      )}
 
       <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
