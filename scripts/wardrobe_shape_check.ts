@@ -29,6 +29,7 @@ import {
   wardrobeShapeDesign,
   wardrobeWalls,
   wardrobeShapes,
+  wardrobeCornerKind,
 } from "../src/features/berchuma-studio/services/starting-designs.ts";
 import { startingDesign } from "../src/features/berchuma-studio/services/starting-designs.ts";
 import { buildParts } from "../src/features/berchuma-studio/services/geometry.ts";
@@ -428,17 +429,83 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
 }
 
 // ---------------------------------------------------------------------------
-// 7. A known defect in the U corner, recorded rather than hidden
+// 7. The corner construction follows the shape, and nothing overlaps
 //
-// The overlap test found it and it is not mine to have caused: the same corner
-// code serves U-shaped kitchens and predates this work. A U's *left* corner
-// parks its return leaf in the same 18 × 592 × 2298 space as the left run's
-// gable — the whole door, inside a board.
+// This is the section that earned its keep. An L and a U put their corner
+// square in geometrically different places: an L turns at the end of a run and
+// the square has two faces on open air, while a U's square sits between the
+// back run and a side run with both inner faces against them. Only one
+// construction fits each, and an `l_corner` in a U hangs its return leaf where
+// the back run's gable already is — the whole 18 × 592 × 2298 mm door inside
+// the board.
 //
-// It is asserted here as the defect it is, so that the day it is fixed this
-// check fails and says so, rather than a silent expectation quietly passing.
-// Straight and L are clean, which is why they are the two the picker offers.
+// The cut list is correct either way. It is the placement that is impossible,
+// which is why this is found by intersecting parts and not by reading code.
 // ---------------------------------------------------------------------------
+
+{
+  check(
+    "an L turns at an open square, so it gets a hinged return",
+    wardrobeCornerKind("l_shaped") === "l_corner",
+    wardrobeCornerKind("l_shaped"),
+  );
+  check(
+    "a U's square is enclosed by its own runs, so it gets a blind corner",
+    wardrobeCornerKind("u_shaped") === "blind",
+    wardrobeCornerKind("u_shaped"),
+  );
+  check(
+    "and the design carries the kind it was solved with",
+    build("l_shaped", [2400, 1800]).cornerKind === "l_corner" &&
+      build("u_shaped", [1800, 3000, 1800]).cornerKind === "blind",
+    "solved one way and stored another, every later edit re-solves it differently",
+  );
+
+  for (const [label, shape, walls] of [
+    ["straight", "straight", [2400]],
+    ["L", "l_shaped", [2400, 1800]],
+    ["U", "u_shaped", [1800, 3000, 1800]],
+  ] as const) {
+    const found = clashes(build(shape, [...walls]));
+    check(
+      `${label}: no two boards occupy the same space`,
+      found.length === 0,
+      found.slice(0, 3).join(" | "),
+    );
+  }
+
+  // The blind corner is a real corner, not an empty square that happens not to
+  // collide with anything. Its filler is what closes the face the neighbouring
+  // run covers, and it is the piece a shop would otherwise improvise.
+  const blind = buildParts(build("u_shaped", [1800, 3000, 1800])).parts.filter(
+    (part) => /corner/i.test(part.label),
+  );
+  check(
+    "a U's corners are cut as real boards",
+    blind.length >= 16,
+    `${blind.length} pieces across two corners`,
+  );
+  check(
+    "including the filler that closes the covered face",
+    blind.some((part) => /filler/i.test(part.label)),
+    [...new Set(blind.map((part) => part.label))].join(" / "),
+  );
+  check(
+    "and both gables, since a blind corner is closed on two sides",
+    blind.filter((part) => part.role === "gable").length >= 4,
+    `${blind.filter((part) => part.role === "gable").length} gables across two corners`,
+  );
+
+  // The one that would have shipped. Asserted as a fault so that nobody
+  // "simplifies" the choice back to a single corner kind.
+  const wrong = build("u_shaped", [1800, 3000, 1800]);
+  wrong.cornerKind = "l_corner";
+  check(
+    "a U built with an L's corner still collides, which is why it is not",
+    clashes(wrong).length > 0,
+    "if this passes, the corner code changed and the choice may be redundant",
+  );
+}
 
 {
   const setup = readFileSync(
@@ -446,28 +513,12 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
     "utf8",
   );
 
-  check(
-    "the picker offers the two shapes that are clean",
-    /value: "straight"/.test(setup) && /value: "l_shaped"/.test(setup),
-  );
-  check(
-    "and does not offer the one that is not",
-    !/\{ value: "u_shaped"/.test(setup),
-    "a manufacturing tool should not offer a shape it knows draws two boards in one place",
-  );
-
-  const found = clashes(build("u_shaped", [1800, 3000, 1800]));
-
-  check(
-    "the U corner defect is still exactly the two pairs it was",
-    found.length === 2,
-    `${found.length}: ${found.join(" | ")} — if this changed, re-read section 7`,
-  );
-  check(
-    "and it is the corner's return leaf, in the adjacent run's gable",
-    found.some((clash) => /return door/.test(clash) && /gable/i.test(clash)),
-    found.join(" | "),
-  );
+  for (const shape of wardrobeShapes) {
+    check(
+      `the picker offers ${shape}`,
+      new RegExp(`value: "${shape}"`).test(setup),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -480,4 +531,4 @@ if (failures.length > 0) {
 }
 
 console.log(`${GREEN}${passed} passed, 0 failed${RESET}`);
-console.log(`${DIM}wardrobe shapes: straight and L are clean; the U corner is not${RESET}`);
+console.log(`${DIM}wardrobe shapes: straight, L and U, and no two boards in one place${RESET}`);

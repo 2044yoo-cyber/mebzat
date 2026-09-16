@@ -14,7 +14,7 @@ import {
   type DesignKind,
   type DesignSpec,
 } from "../types/spec";
-import type { RunSpec } from "../types/layout";
+import type { CornerKind, RunSpec } from "../types/layout";
 import { solveLayout } from "./layout";
 
 /**
@@ -775,6 +775,33 @@ export function wardrobeWalls(
   }
 }
 
+/**
+ * Which corner construction a shape needs.
+ *
+ * Not a preference. The two shapes put their corner square in geometrically
+ * different places and only one construction fits each.
+ *
+ * An **L** turns at the end of its first run, so the square has two faces on
+ * open air: an `l_corner` puts a hinged leaf on each of them and the whole
+ * corner is reachable. That is the richer corner and it is what an L gets.
+ *
+ * A **U** is the opposite. Its corner square sits at the junction of the back
+ * run and a side run, and *both* of its inner faces are those runs — the
+ * square is enclosed, and the only way in is past one of them. An `l_corner`
+ * there has nowhere to hang its return leaf, so it hangs it where the back
+ * run's gable already is: measured, the whole 18 × 592 × 2298 mm door inside
+ * the board. A `blind` corner is the construction for an enclosed square and
+ * what a shop actually builds — two gables, a back, and a filler across the
+ * part of the face the neighbouring run covers.
+ *
+ * Found by intersecting every pair of parts rather than by reading the code,
+ * which is the only way this kind of fault shows itself: the cut list is
+ * correct either way, and it is the *placement* that is impossible.
+ */
+export function wardrobeCornerKind(shape: WardrobeShape): CornerKind {
+  return shape === "u_shaped" ? "blind" : "l_corner";
+}
+
 export type WardrobeShapeOptions = {
   shape: WardrobeShape;
   /** Wall lengths in millimetres, in `wardrobeWalls` order. */
@@ -834,7 +861,8 @@ export function wardrobeShapeDesign(
     return startingDesign("wardrobe", { width: runs[0]!.length });
   }
 
-  const solved = solveLayout(options.shape, runs, { cornerKind: "l_corner" });
+  const cornerKind = wardrobeCornerKind(options.shape);
+  const solved = solveLayout(options.shape, runs, { cornerKind });
 
   const cabinets = solved.placements.map((placement) =>
     unit(
@@ -869,7 +897,7 @@ export function wardrobeShapeDesign(
 
   return shell("wardrobe", title, cabinets, { width: solved.extent.width }, {
     layout: options.shape,
-    cornerKind: "l_corner",
+    cornerKind,
     runs,
     envelope: {
       width: Math.round(solved.extent.width),

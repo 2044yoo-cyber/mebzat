@@ -33,24 +33,10 @@ import type { DesignSpec } from "../types/spec";
  * and appliances, and a wardrobe asks about three walls.
  */
 
-/**
- * The shapes on offer.
- *
- * U is deliberately absent, and `wardrobeShapeDesign` builds one perfectly
- * well — its runs, its two corners and its cut list are all correct and are
- * checked in `wardrobe_shape_check.ts`. What is wrong is where one leaf ends
- * up: a U's left corner parks its return door in the same 18 × 592 × 2298 mm
- * of space as the adjacent run's gable, so the door renders through the board.
- * The overlap test found it, the same corner code serves U-shaped kitchens,
- * and it predates this work.
- *
- * A manufacturing tool should not offer a shape it knows draws two boards in
- * one place, so the entry waits here until the corner leaf is turned to face
- * its own run. Adding the line back is the whole of enabling it.
- */
 const SHAPES: { value: WardrobeShape; label: string; path: string }[] = [
   { value: "straight", label: "Straight", path: "M12 12H68" },
   { value: "l_shaped", label: "L shape", path: "M12 12H68V48" },
+  { value: "u_shaped", label: "U shape", path: "M12 48V12H68V48" },
 ];
 
 /** What each shape starts at, in millimetres, in `wardrobeWalls` order. */
