@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, MapPin } from "lucide-react";
+import { Check, MapPin, Search } from "lucide-react";
 
+import { PlacePicker } from "@/components/location/place-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -11,6 +12,7 @@ import {
   TRAVEL_RADII,
   specialtiesFor,
 } from "@/lib/constants/professions";
+import { searchPlaces } from "@/lib/location/places";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,6 +27,31 @@ import { cn } from "@/lib/utils";
  */
 
 export type AreaOption = { slug: string; name: string; sub_city: string | null };
+
+function AreaChip({
+  area,
+  on,
+  onToggle,
+}: {
+  area: AreaOption;
+  on: boolean;
+  onToggle: (slug: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={() => onToggle(area.slug)}
+      className={cn(
+        "flex min-h-9 items-center gap-1 rounded-full border px-3 text-sm transition-colors",
+        on ? "border-brand bg-brand text-brand-foreground" : "hover:bg-muted",
+      )}
+    >
+      {on && <Check className="size-3" />}
+      {area.name}
+    </button>
+  );
+}
 
 export function TradeAndAreas({
   areas,
@@ -49,6 +76,7 @@ export function TradeAndAreas({
   const [chosen, setChosen] = useState<string[]>(serviceAreaSlugs);
   const [wholeCity, setWholeCity] = useState(servesEntireCity);
   const [specialtyText, setSpecialtyText] = useState(specialties.join(", "));
+  const [areaQuery, setAreaQuery] = useState("");
 
   const suggested = useMemo(() => specialtiesFor(trade), [trade]);
 
@@ -67,7 +95,26 @@ export function TradeAndAreas({
     setSpecialtyText([...parts, value].join(", "));
   }
 
-  // Grouped so a list of forty areas reads as a map rather than as a wall.
+  /**
+   * The areas that answer what has been typed, best first, or null while the
+   * search box is empty.
+   *
+   * Ranked by `searchPlaces` rather than filtered here, so the picker and every
+   * other place field agree about what "bol" means. The rows still come from
+   * the database — an area exists because there is a row for it — and the
+   * ranking is applied to those rows by slug.
+   */
+  const matching = useMemo(() => {
+    if (!areaQuery.trim()) return null;
+    const ranked = searchPlaces(areaQuery, { limit: 200, kinds: ["area", "city"] });
+    const order = new Map(ranked.map((place, index) => [place.slug, index]));
+    return areas
+      .filter((area) => order.has(area.slug))
+      .sort((a, b) => order.get(a.slug)! - order.get(b.slug)!);
+  }, [areaQuery, areas]);
+
+  // Grouped so a list of a hundred and thirty areas reads as a map rather than
+  // as a wall — but only while nothing has been typed.
   const grouped = useMemo(() => {
     const map = new Map<string, AreaOption[]>();
     for (const area of areas) {
@@ -149,19 +196,12 @@ export function TradeAndAreas({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="baseArea">Based in</Label>
-          <select
+          <PlacePicker
             id="baseArea"
             name="baseArea"
-            defaultValue={baseArea ?? ""}
-            className="min-h-11 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
-          >
-            <option value="">Not set</option>
-            {areas.map((area) => (
-              <option key={area.slug} value={area.name}>
-                {area.name}
-              </option>
-            ))}
-          </select>
+            defaultValue={baseArea}
+            placeholder="Ayertena, Bole, Adama…"
+          />
           <p className="text-xs text-muted-foreground">
             Shown on your profile. Customers do not search by this.
           </p>
@@ -211,36 +251,57 @@ export function TradeAndAreas({
         </label>
 
         {!wholeCity && (
-          <div className="max-h-72 space-y-3 overflow-y-auto rounded-lg border p-3">
-            {grouped.map(([subCity, list]) => (
-              <div key={subCity} className="space-y-1.5">
-                <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <MapPin className="size-3" /> {subCity}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {list.map((area) => {
-                    const on = chosen.includes(area.slug);
-                    return (
-                      <button
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={areaQuery}
+                onChange={(event) => setAreaQuery(event.target.value)}
+                placeholder="Search areas and towns"
+                aria-label="Search areas"
+                className="pl-9"
+              />
+            </div>
+
+            <div className="max-h-72 space-y-3 overflow-y-auto overscroll-contain rounded-lg border p-3">
+              {matching ? (
+                matching.length === 0 ? (
+                  <p className="py-2 text-sm text-muted-foreground">
+                    Nothing matches “{areaQuery.trim()}”.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {matching.map((area) => (
+                      <AreaChip
                         key={area.slug}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => toggleArea(area.slug)}
-                        className={cn(
-                          "flex min-h-9 items-center gap-1 rounded-full border px-3 text-sm transition-colors",
-                          on
-                            ? "border-brand bg-brand text-brand-foreground"
-                            : "hover:bg-muted",
-                        )}
-                      >
-                        {on && <Check className="size-3" />}
-                        {area.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+                        area={area}
+                        on={chosen.includes(area.slug)}
+                        onToggle={toggleArea}
+                      />
+                    ))}
+                  </div>
+                )
+              ) : (
+                grouped.map(([subCity, list]) => (
+                  <div key={subCity} className="space-y-1.5">
+                    <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <MapPin className="size-3" /> {subCity}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {list.map((area) => (
+                        <AreaChip
+                          key={area.slug}
+                          area={area}
+                          on={chosen.includes(area.slug)}
+                          onToggle={toggleArea}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { APPLICATION_STATUS_LABEL } from "@/lib/constants/community";
 import { JOB_FILES_BUCKET, salaryPeriodLabel } from "@/lib/constants/jobs";
 import { AVATAR_PLACEHOLDER } from "@/lib/constants/placeholders";
+import { formatYears } from "@/lib/profile/experience";
 import { createClient } from "@/lib/supabase/client";
 import type { ApplicantSnapshot } from "@/lib/data/jobs";
 import type { JobApplication, JobFileKind } from "@/types/database.types";
@@ -298,9 +299,7 @@ export function ApplyForm({
               <p className="truncate text-xs text-muted-foreground">
                 {[
                   profile.city,
-                  profile.yearsExperience
-                    ? `${profile.yearsExperience} years`
-                    : null,
+                  formatYears(profile.yearsExperience),
                 ]
                   .filter(Boolean)
                   .join(" · ") || "Add a city and your experience"}

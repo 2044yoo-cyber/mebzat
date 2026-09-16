@@ -7,6 +7,9 @@ import {
   isTravelRadius,
   parseSpecialties,
 } from "@/lib/constants/professions";
+import { parseLanguages } from "@/lib/constants/languages";
+import { isPlausiblePlace } from "@/lib/location/places";
+import { parseYears } from "@/lib/profile/experience";
 import { createClient } from "@/lib/supabase/server";
 import { profileDetailsSchema } from "@/lib/validations/profile";
 import type { AccountType, WorkStatus } from "@/types/database.types";
@@ -23,7 +26,20 @@ export type EditProfileState = {
   error?: string;
   fieldErrors?: Record<string, string>;
   success?: boolean;
+  /**
+   * When this save finished, as a millisecond stamp.
+   *
+   * `success: true` is not enough to confirm a save with. It is already `true`
+   * when the *next* save finishes, so a `useEffect` watching it sees no change
+   * and never fires — the form saved, said nothing, and looked broken. A stamp
+   * differs on every save, which is the property the confirmation needs.
+   */
+  savedAt?: number;
+  /** The same, for a failure, so two identical errors in a row both show. */
+  erroredAt?: number;
 };
+
+const stamp = () => Date.now();
 
 export async function updateProfile(
   _prevState: EditProfileState,
@@ -50,7 +66,13 @@ export async function updateProfile(
     for (const issue of parsed.error.issues) {
       fieldErrors[String(issue.path[0])] = issue.message;
     }
-    return { fieldErrors };
+    // The inline messages say which field; this says that nothing was saved,
+    // which on a form long enough to scroll is the part that gets missed.
+    return {
+      fieldErrors,
+      error: "Nothing was saved — check the fields marked below.",
+      erroredAt: stamp(),
+    };
   }
 
   const supabase = await createClient();
@@ -59,7 +81,7 @@ export async function updateProfile(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { error: "Your session expired. Log in again." };
+    return { error: "Your session expired. Log in again.", erroredAt: stamp() };
   }
 
   const {
@@ -85,7 +107,12 @@ export async function updateProfile(
   const professionRaw = String(formData.get("profession") ?? "").trim();
   const profession = isProfession(professionRaw) ? professionRaw : null;
 
-  const baseArea = String(formData.get("baseArea") ?? "").trim().slice(0, 80);
+  // A place somebody typed rather than picked is allowed — the list will
+  // always be missing somewhere — but it still has to look like a place name,
+  // which is the line between "a list you can add to" and a free-text field
+  // under a different name.
+  const baseAreaRaw = String(formData.get("baseArea") ?? "").trim();
+  const baseArea = isPlausiblePlace(baseAreaRaw) ? baseAreaRaw : "";
 
   const radiusRaw = Number(formData.get("travelRadius"));
   const travelRadius = isTravelRadius(radiusRaw) ? radiusRaw : null;
@@ -106,25 +133,28 @@ export async function updateProfile(
       full_name: fullName,
       company_name: companyName || null,
       username,
-      location_city: locationCity || null,
+      location_city:
+        locationCity && isPlausiblePlace(locationCity) ? locationCity : null,
       location_country: locationCountry || null,
       phone: phone || null,
       show_phone: showPhone,
       show_email: showEmail,
-      years_experience: yearsExperience ?? null,
+      years_experience: parseYears(yearsExperience),
       bio: bio || null,
       website: website || null,
-      languages: languages
-        ? languages.split(",").map((l) => l.trim()).filter(Boolean)
-        : [],
+      languages: parseLanguages(languages),
     })
     .eq("id", user.id);
 
   if (error) {
     if (error.code === "23505") {
-      return { fieldErrors: { username: "That username is taken." } };
+      return {
+        fieldErrors: { username: "That username is taken." },
+        error: "That username is taken.",
+        erroredAt: stamp(),
+      };
     }
-    return { error: error.message };
+    return { error: error.message, erroredAt: stamp() };
   }
 
   // Service areas are rows, not a column, so they are replaced rather than
@@ -170,5 +200,5 @@ export async function updateProfile(
   // The public page renders these, so it has to be rebuilt or the owner
   // switches their number off and still sees it published.
   if (username) revalidatePath(`/u/${username}`);
-  return { success: true };
+  return { success: true, savedAt: stamp() };
 }

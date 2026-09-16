@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { APPLICATION_STATUS_LABEL } from "@/lib/constants/community";
 import { APPLICATION_PIPELINE, salaryPeriodLabel } from "@/lib/constants/jobs";
 import { AVATAR_PLACEHOLDER } from "@/lib/constants/placeholders";
+import { formatYears } from "@/lib/profile/experience";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { ApplicationRow } from "@/lib/data/jobs";
 import type { ApplicationStatus } from "@/types/database.types";
@@ -181,9 +182,9 @@ export function ApplicantCard({
                 {applicant.location_city}
               </span>
             )}
-            {applicant?.years_experience ? (
-              <span>{applicant.years_experience} years</span>
-            ) : null}
+            {formatYears(applicant?.years_experience) && (
+              <span>{formatYears(applicant?.years_experience)}</span>
+            )}
             <span>Applied {formatRelativeTime(application.created_at)}</span>
           </div>
         </div>

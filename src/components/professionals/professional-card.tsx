@@ -9,6 +9,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import type { ProfessionalRow } from "@/lib/data/professionals";
+import { formatYears } from "@/lib/profile/experience";
 import { cn } from "@/lib/utils";
 
 /**
@@ -152,10 +153,7 @@ export function ProfessionalCard({
             )}
             {typeof person.years_experience === "number" &&
               person.years_experience > 0 && (
-                <span>
-                  {person.years_experience}{" "}
-                  {person.years_experience === 1 ? "year" : "years"} experience
-                </span>
+                <span>{formatYears(person.years_experience)} experience</span>
               )}
           </div>
         </div>

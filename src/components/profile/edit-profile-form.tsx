@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
   updateProfile,
   type EditProfileState,
 } from "@/app/(dashboard)/profile/edit/actions";
+import { PlacePicker } from "@/components/location/place-picker";
 import { AvatarUpload } from "@/components/profile/avatar-upload";
 import { CoverUpload } from "@/components/profile/cover-upload";
 import {
@@ -25,7 +26,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { TokenPicker } from "@/components/ui/token-picker";
 import { ACCOUNT_TYPES } from "@/lib/constants/account-types";
+import { searchLanguages } from "@/lib/constants/languages";
+import { digitsOnly, MAX_YEARS } from "@/lib/profile/experience";
 import { ORGANIZATION_ACCOUNT_TYPES } from "@/lib/validations/profile";
 import type { AccountType, Profile } from "@/types/database.types";
 
@@ -47,12 +51,38 @@ export function EditProfileForm({
   const [accountType, setAccountType] = useState<AccountType>(
     profile.account_type ?? "individual",
   );
+  const [years, setYears] = useState(
+    profile.years_experience === null ? "" : String(profile.years_experience),
+  );
+  const [languages, setLanguages] = useState<string[]>(profile.languages ?? []);
 
+  const languageOptions = useCallback(
+    (query: string) =>
+      searchLanguages(query).map((language) => ({
+        value: language.name,
+        label: language.name,
+        hint: language.native ?? null,
+      })),
+    [],
+  );
+
+  /**
+   * The confirmation, once per save.
+   *
+   * Keyed on `savedAt` rather than on `success`, because `success` is a boolean
+   * that is already `true` when the second save finishes — the dependency array
+   * sees no change and the effect never runs, so saving twice in a row confirmed
+   * once. That is the whole of the "Saved doesn't work properly" report.
+   */
   useEffect(() => {
-    if (state.success) {
-      toast.success("Profile updated");
-    }
-  }, [state.success]);
+    if (state.savedAt) toast.success("Profile saved");
+  }, [state.savedAt]);
+
+  // A failure was a line of red text below the submit button, off the bottom of
+  // a long form on a phone. It gets the same channel as the success.
+  useEffect(() => {
+    if (state.error) toast.error(state.error);
+  }, [state.error, state.erroredAt]);
 
   const isOrganization = ORGANIZATION_ACCOUNT_TYPES.has(accountType);
   const displayName = profile.company_name || profile.full_name || "Unnamed";
@@ -139,13 +169,14 @@ export function EditProfileForm({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="locationCity">City</Label>
-            <Input
+            <Label htmlFor="locationCity">City or area</Label>
+            <PlacePicker
               id="locationCity"
               name="locationCity"
-              defaultValue={profile.location_city ?? ""}
+              defaultValue={profile.location_city}
+              placeholder="Ayertena, Bole, Bahir Dar…"
             />
           </div>
           <div className="space-y-2">
@@ -158,7 +189,7 @@ export function EditProfileForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
             <Input
@@ -170,14 +201,24 @@ export function EditProfileForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="yearsExperience">Years of experience</Label>
+            {/* Controlled and filtered rather than `type="number"`: a number
+                input still accepts "e", "+" and "-", still lets a phone keyboard
+                offer letters, and reports the lot as an empty value rather than
+                as the text somebody actually typed. */}
             <Input
               id="yearsExperience"
               name="yearsExperience"
-              type="number"
-              min={0}
-              max={80}
-              defaultValue={profile.years_experience ?? ""}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={2}
+              value={years}
+              onChange={(event) => setYears(digitsOnly(event.target.value))}
+              placeholder="5"
+              aria-describedby="yearsExperience-hint"
             />
+            <p id="yearsExperience-hint" className="text-xs text-muted-foreground">
+              {years ? `Shown as “${years} ${years === "1" ? "yr." : "yrs."}”` : `Numbers only, up to ${MAX_YEARS}.`}
+            </p>
           </div>
         </div>
 
@@ -250,13 +291,21 @@ export function EditProfileForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="languages">Languages</Label>
-          <Input
-            id="languages"
+          <Label id="languages-label">Languages</Label>
+          <TokenPicker
             name="languages"
-            placeholder="English, Amharic, French"
-            defaultValue={profile.languages.join(", ")}
+            labelledBy="languages-label"
+            value={languages}
+            onChange={setLanguages}
+            search={languageOptions}
+            placeholder="Amharic, Afaan Oromo, English…"
+            emptyText="Not on our list — type it and add it"
+            max={12}
           />
+          <p className="text-xs text-muted-foreground">
+            Pick as many as you work in. Anything missing can be typed and
+            added.
+          </p>
         </div>
 
         <div className="space-y-2">

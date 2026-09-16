@@ -27,6 +27,7 @@ import {
   type PublicProfile,
 } from "@/lib/data/professional-profile";
 import { cn } from "@/lib/utils";
+import { formatYears } from "@/lib/profile/experience";
 
 /**
  * The top of a public profile.
@@ -161,11 +162,11 @@ export function ProfileHeader({ data }: { data: PublicProfile }) {
               label={data.services.length === 1 ? "service" : "services"}
             />
           )}
-          {typeof profile.years_experience === "number" && (
+          {formatYears(profile.years_experience) && (
             <Stat
               icon={Briefcase}
-              value={String(profile.years_experience)}
-              label="years of experience"
+              value={formatYears(profile.years_experience)!}
+              label="experience"
             />
           )}
           {isOwner && (

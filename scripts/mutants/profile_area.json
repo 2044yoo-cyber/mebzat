@@ -1,0 +1,266 @@
+[
+  {
+    "name": "the menu link item stops closing the menu",
+    "file": "src/components/ui/dropdown-menu.tsx",
+    "from": "  closeOnClick = true,\n  ...props\n}: MenuPrimitive.LinkItem.Props",
+    "to": "  closeOnClick = false,\n  ...props\n}: MenuPrimitive.LinkItem.Props"
+  },
+  {
+    "name": "the link item loses the default while a sibling keeps a closeOnClick",
+    "file": "src/components/ui/dropdown-menu.tsx",
+    "from": "  variant = \"default\",\n  closeOnClick = true,\n  ...props\n}: MenuPrimitive.LinkItem.Props",
+    "to": "  variant = \"default\",\n  ...props\n}: MenuPrimitive.LinkItem.Props & { closeOnClick?: boolean }"
+  },
+  {
+    "name": "the default is destructured and never passed on",
+    "file": "src/components/ui/dropdown-menu.tsx",
+    "from": "      data-slot=\"dropdown-menu-link-item\"\n      closeOnClick={closeOnClick}",
+    "to": "      data-slot=\"dropdown-menu-link-item\""
+  },
+  {
+    "name": "an empty years field becomes zero again",
+    "file": "src/lib/profile/experience.ts",
+    "from": "  if (!text) return null;\n\n  const digits",
+    "to": "  if (!text) return 0;\n\n  const digits"
+  },
+  {
+    "name": "years are no longer clamped",
+    "file": "src/lib/profile/experience.ts",
+    "from": "  return Math.min(Math.max(years, 0), MAX_YEARS);",
+    "to": "  return years;"
+  },
+  {
+    "name": "a word with no digits becomes a number",
+    "file": "src/lib/profile/experience.ts",
+    "from": "  if (!digits) return null;",
+    "to": "  if (!digits) return 0;"
+  },
+  {
+    "name": "one year reads as one yrs.",
+    "file": "src/lib/profile/experience.ts",
+    "from": "  return `${whole} ${whole === 1 ? \"yr.\" : \"yrs.\"}`;",
+    "to": "  return `${whole} yrs.`;"
+  },
+  {
+    "name": "the field stops filtering to digits",
+    "file": "src/lib/profile/experience.ts",
+    "from": "  return value.replace(/\\D/g, \"\").replace(/^0+(?=\\d)/, \"\").slice(0, 2);",
+    "to": "  return value.slice(0, 2);"
+  },
+  {
+    "name": "the field accepts a third digit",
+    "file": "src/lib/profile/experience.ts",
+    "from": ".slice(0, 2);",
+    "to": ".slice(0, 3);"
+  },
+  {
+    "name": "the years input goes back to type=number",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "              inputMode=\"numeric\"",
+    "to": "              type=\"number\""
+  },
+  {
+    "name": "the keystroke filter is dropped but the import stays",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "onChange={(event) => setYears(digitsOnly(event.target.value))}",
+    "to": "onChange={(event) => setYears(event.target.value)}"
+  },
+  {
+    "name": "the action stores the raw value again",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "      years_experience: parseYears(yearsExperience),",
+    "to": "      years_experience: yearsExperience ?? null,"
+  },
+  {
+    "name": "one screen writes the words itself",
+    "file": "src/components/profile/profile-display.tsx",
+    "from": "              {formatYears(profile.years_experience)} experience",
+    "to": "              {profile.years_experience} years of experience"
+  },
+  {
+    "name": "the save is no longer stamped",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "  return { success: true, savedAt: stamp() };",
+    "to": "  return { success: true };"
+  },
+  {
+    "name": "the confirmation watches the boolean again",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    if (state.savedAt) toast.success(\"Profile saved\");\n  }, [state.savedAt]);",
+    "to": "    if (state.success) toast.success(\"Profile saved\");\n  }, [state.success]);"
+  },
+  {
+    "name": "a failure goes back to silent red text",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    if (state.error) toast.error(state.error);",
+    "to": "    if (false) toast.error(state.error);"
+  },
+  {
+    "name": "a database failure is not stamped",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "    return { error: error.message, erroredAt: stamp() };",
+    "to": "    return { error: error.message };"
+  },
+  {
+    "name": "Ethiopian languages stop coming first",
+    "file": "src/lib/constants/languages.ts",
+    "from": "  ...ETHIOPIAN.map((language) => ({ ...language, ethiopian: true })),\n  ...OTHER,",
+    "to": "  ...OTHER,\n  ...ETHIOPIAN.map((language) => ({ ...language, ethiopian: true })),"
+  },
+  {
+    "name": "a language cannot be found by its own script",
+    "file": "src/lib/constants/languages.ts",
+    "from": "    for (const spelling of [language.name, language.native ?? \"\"]) {",
+    "to": "    for (const spelling of [language.name]) {"
+  },
+  {
+    "name": "a trailing comma stores an empty language",
+    "file": "src/lib/constants/languages.ts",
+    "from": "    if (!clean) continue;",
+    "to": "    if (false) continue;"
+  },
+  {
+    "name": "the same language can be stored twice",
+    "file": "src/lib/constants/languages.ts",
+    "from": "    if (seen.has(key)) continue;",
+    "to": "    if (false) continue;"
+  },
+  {
+    "name": "the language list has no ceiling",
+    "file": "src/lib/constants/languages.ts",
+    "from": "    if (out.length >= max) break;",
+    "to": "    if (false) break;"
+  },
+  {
+    "name": "a chip can carry the separator it is joined with",
+    "file": "src/components/ui/token-picker.tsx",
+    "from": "    const clean = entry.replace(/,/g, \" \").replace(/\\s+/g, \" \").trim();",
+    "to": "    const clean = entry.trim();"
+  },
+  {
+    "name": "a chip can be added twice",
+    "file": "src/components/ui/token-picker.tsx",
+    "from": "    if (value.some((item) => item.toLowerCase() === clean.toLowerCase())) return;",
+    "to": "    if (false) return;"
+  },
+  {
+    "name": "the city field goes back to a plain input",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "            <PlacePicker\n              id=\"locationCity\"\n              name=\"locationCity\"",
+    "to": "            <Input\n              id=\"locationCity\"\n              name=\"locationCity\""
+  },
+  {
+    "name": "the base location goes back to a select",
+    "file": "src/components/profile/trade-and-areas.tsx",
+    "from": "          <PlacePicker\n            id=\"baseArea\"\n            name=\"baseArea\"",
+    "to": "          <select\n            id=\"baseArea\"\n            name=\"baseArea\""
+  },
+  {
+    "name": "the service-area search box stops filtering",
+    "file": "src/components/profile/trade-and-areas.tsx",
+    "from": "                onChange={(event) => setAreaQuery(event.target.value)}",
+    "to": "                onChange={() => setAreaQuery(\"\")}"
+  },
+  {
+    "name": "the service-area search stops using the shared ranking",
+    "file": "src/components/profile/trade-and-areas.tsx",
+    "from": "    const ranked = searchPlaces(areaQuery, { limit: 200, kinds: [\"area\", \"city\"] });",
+    "to": "    const ranked = areas.filter((a) => a.name.toLowerCase().includes(areaQuery.toLowerCase())).map((a) => ({ slug: a.slug }));"
+  },
+  {
+    "name": "the grouped list is replaced rather than kept",
+    "file": "src/components/profile/trade-and-areas.tsx",
+    "from": "    if (!areaQuery.trim()) return null;",
+    "to": "    if (false) return null;"
+  },
+  {
+    "name": "the picker submits only what was clicked",
+    "file": "src/components/location/place-picker.tsx",
+    "from": "      <input type=\"hidden\" name={name} value={usable ? trimmed : \"\"} />",
+    "to": "      <input type=\"hidden\" name={name} value={known ? trimmed : \"\"} />"
+  },
+  {
+    "name": "the picker submits anything at all",
+    "file": "src/components/location/place-picker.tsx",
+    "from": "  const usable = trimmed.length === 0 || isPlausiblePlace(trimmed);",
+    "to": "  const usable = true;"
+  },
+  {
+    "name": "the server takes the browser's word for the base area",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "  const baseArea = isPlausiblePlace(baseAreaRaw) ? baseAreaRaw : \"\";",
+    "to": "  const baseArea = baseAreaRaw;"
+  },
+  {
+    "name": "the server takes the browser's word for the city",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "      location_city:\n        locationCity && isPlausiblePlace(locationCity) ? locationCity : null,",
+    "to": "      location_city: locationCity || null,"
+  },
+  {
+    "name": "a pointer selection is lost to blur again",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "              onPointerDown={(event) => {\n                event.preventDefault();\n                choose(index);\n              }}",
+    "to": "              onClick={() => {\n                choose(index);\n              }}"
+  },
+  {
+    "name": "the highlight is no longer clamped",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "  const active = highlight >= rows ? 0 : highlight;",
+    "to": "  const active = highlight;"
+  },
+  {
+    "name": "Enter stops taking the highlighted row",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "    if (event.key === \"Enter\" && open && rows > 0) {",
+    "to": "    if (false) {"
+  },
+  {
+    "name": "the list stops announcing itself",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "          aria-activedescendant={",
+    "to": "          data-activedescendant={"
+  },
+  {
+    "name": "the rows shrink below a thumb",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "                \"flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm\",\n                index === active",
+    "to": "                \"flex cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm\",\n                index === active"
+  },
+  {
+    "name": "a pointer selection is lost to blur on the add row",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "              onPointerDown={(event) => {\n                event.preventDefault();\n                choose(options.length);\n              }}",
+    "to": "              onClick={() => {\n                choose(options.length);\n              }}"
+  },
+  {
+    "name": "the add row shrinks below a thumb",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "                \"flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm\",\n                active === options.length",
+    "to": "                \"flex cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm\",\n                active === options.length"
+  },
+  {
+    "name": "the field itself shrinks below a thumb",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "          className=\"min-h-11 w-full rounded-lg border border-input",
+    "to": "          className=\"w-full rounded-lg border border-input"
+  },
+  {
+    "name": "the lapsed-session failure is not stamped",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "    return { error: \"Your session expired. Log in again.\", erroredAt: stamp() };",
+    "to": "    return { error: \"Your session expired. Log in again.\" };"
+  },
+  {
+    "name": "the validation failure is not stamped",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "      error: \"Nothing was saved \u2014 check the fields marked below.\",\n      erroredAt: stamp(),",
+    "to": "      error: \"Nothing was saved \u2014 check the fields marked below.\","
+  },
+  {
+    "name": "the duplicate-username failure is not stamped",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "        error: \"That username is taken.\",\n        erroredAt: stamp(),",
+    "to": "        error: \"That username is taken.\","
+  }
+]

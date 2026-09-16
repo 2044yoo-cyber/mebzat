@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { ACCOUNT_TYPE_MAP } from "@/lib/constants/account-types";
 import { visibleContact } from "@/lib/data/professional-profile";
+import { formatYears } from "@/lib/profile/experience";
 import type { Profile } from "@/types/database.types";
 
 export function ProfileDisplay({
@@ -128,10 +129,10 @@ export function ProfileDisplay({
               {contact.phone}
             </div>
           )}
-          {typeof profile.years_experience === "number" && (
+          {formatYears(profile.years_experience) && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Briefcase className="size-4 shrink-0" />
-              {profile.years_experience} years of experience
+              {formatYears(profile.years_experience)} experience
             </div>
           )}
           {profile.languages.length > 0 && (
