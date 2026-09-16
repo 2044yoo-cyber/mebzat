@@ -63,12 +63,15 @@ export function ApplicantCard({
   salaryPeriod,
   jobTitle,
   signedUrls,
+  signedDocuments = {},
 }: {
   application: ApplicationRow;
   currency: string;
   salaryPeriod: string;
   jobTitle: string;
   signedUrls: Record<string, string>;
+  /** Links to the CV and portfolio this applicant offered from their profile. */
+  signedDocuments?: Record<string, string>;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(application.status);
@@ -230,6 +233,35 @@ export function ApplicantCard({
               : application.availability_note}
           </span>
         )}
+        {/* The CV on the applicant's profile, read live rather than as a copy
+            taken on the day they applied. Absent when they took the offer
+            back: the link is signed against a policy that checks the
+            application still stands, so an unticked box produces no URL here
+            rather than a link that fails when it is clicked. */}
+        {application.use_saved_cv &&
+          applicant?.cv_path &&
+          signedDocuments[applicant.cv_path] && (
+            <a
+              href={signedDocuments[applicant.cv_path]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              {applicant.cv_filename ?? "CV"}
+            </a>
+          )}
+        {application.use_saved_portfolio &&
+          applicant?.portfolio_path &&
+          signedDocuments[applicant.portfolio_path] && (
+            <a
+              href={signedDocuments[applicant.portfolio_path]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              {applicant.portfolio_filename ?? "Portfolio"}
+            </a>
+          )}
         {application.cv_url && (
           <a
             href={application.cv_url}
@@ -237,7 +269,7 @@ export function ApplicantCard({
             rel="noopener noreferrer"
             className="underline"
           >
-            CV
+            CV link
           </a>
         )}
         {application.portfolio_url && (
@@ -247,7 +279,7 @@ export function ApplicantCard({
             rel="noopener noreferrer"
             className="underline"
           >
-            Portfolio
+            Portfolio link
           </a>
         )}
       </div>

@@ -7,6 +7,7 @@ import {
   isTravelRadius,
   parseSpecialties,
 } from "@/lib/constants/professions";
+import { isCompanySize, isIndustry } from "@/lib/constants/industries";
 import { parseLanguages } from "@/lib/constants/languages";
 import { isPlausiblePlace } from "@/lib/location/places";
 import { parseYears } from "@/lib/profile/experience";
@@ -56,6 +57,12 @@ export async function updateProfile(
     showPhone: formData.get("showPhone") === "on",
     showEmail: formData.get("showEmail") === "on",
     yearsExperience: formData.get("yearsExperience") || undefined,
+    // `?? undefined`, not the raw value. `FormData.get` returns null for a
+    // field the form never rendered — an organisation's post carries no
+    // portfolio link — and `z.string().optional()` rejects null, which would
+    // fail the whole save with an error about a field nobody was shown.
+    portfolioLink: formData.get("portfolioLink") ?? undefined,
+    linkedinUrl: formData.get("linkedinUrl") ?? undefined,
     bio: formData.get("bio"),
     website: formData.get("website"),
     languages: formData.get("languages"),
@@ -98,6 +105,8 @@ export async function updateProfile(
     bio,
     website,
     languages,
+    portfolioLink,
+    linkedinUrl,
   } = parsed.data;
 
   // The trade block. Validated against the constants rather than trusted:
@@ -120,6 +129,23 @@ export async function updateProfile(
   const statusRaw = String(formData.get("workStatus") ?? "") as WorkStatus;
   const workStatus = WORK_STATUSES.has(statusRaw) ? statusRaw : undefined;
 
+  // An organisation's two questions, checked against the lists rather than
+  // trusted — both are text columns so the lists can grow without a migration,
+  // which makes this the only thing between them and a crafted post.
+  const industryRaw = formData.get("industry");
+  const industry = isIndustry(industryRaw) ? industryRaw : null;
+  const companySizeRaw = formData.get("companySize");
+  const companySize = isCompanySize(companySizeRaw) ? companySizeRaw : null;
+
+  // A field the form did not render is left alone, rather than written null.
+  //
+  // The form asks an organisation about its industry and a person about their
+  // CV, so a person's post carries no `industry` field at all. Writing the
+  // parsed value unconditionally would clear it — and somebody who switched
+  // from company to individual, saved, and switched back would find the
+  // industry gone. Absent is not the same as cleared.
+  const asked = (field: string) => formData.has(field);
+
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -140,6 +166,10 @@ export async function updateProfile(
       show_phone: showPhone,
       show_email: showEmail,
       years_experience: parseYears(yearsExperience),
+      ...(asked("industry") ? { industry } : {}),
+      ...(asked("companySize") ? { company_size: companySize } : {}),
+      ...(asked("portfolioLink") ? { portfolio_link: portfolioLink || null } : {}),
+      ...(asked("linkedinUrl") ? { linkedin_url: linkedinUrl || null } : {}),
       bio: bio || null,
       website: website || null,
       languages: parseLanguages(languages),

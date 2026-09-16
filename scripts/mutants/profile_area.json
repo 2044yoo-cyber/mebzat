@@ -262,5 +262,239 @@
     "file": "src/app/(dashboard)/profile/edit/actions.ts",
     "from": "        error: \"That username is taken.\",\n        erroredAt: stamp(),",
     "to": "        error: \"That username is taken.\","
+  },
+  {
+    "name": "a company is asked for years of experience again",
+    "file": "src/lib/profile/completion.ts",
+    "from": "const ORGANIZATION: CompletionField[] = [",
+    "to": "const ORGANIZATION: CompletionField[] = [\n  { key: \"years_experience\", label: \"Years of experience\", weight: 0, filled: (p) => p.years_experience !== null },"
+  },
+  {
+    "name": "a person is asked for a website again",
+    "file": "src/lib/profile/completion.ts",
+    "from": "const PERSON: CompletionField[] = [",
+    "to": "const PERSON: CompletionField[] = [\n  { key: \"website\", label: \"Website\", weight: 0, filled: (p) => filledText(p.website) },"
+  },
+  {
+    "name": "the two sets stop totalling a hundred",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  { key: \"languages\", label: \"Languages\", weight: 7, filled: (p) => (p.languages ?? []).length > 0 },",
+    "to": "  { key: \"languages\", label: \"Languages\", weight: 5, filled: (p) => (p.languages ?? []).length > 0 },"
+  },
+  {
+    "name": "whitespace counts as an answer",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  typeof value === \"string\" && value.trim().length > 0;",
+    "to": "  typeof value === \"string\" && value.length > 0;"
+  },
+  {
+    "name": "everybody gets the same required set",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  return isOrganizationAccount(accountType) ? ORGANIZATION : PERSON;",
+    "to": "  return PERSON;"
+  },
+  {
+    "name": "a base area stops counting as a location",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  { key: \"location\", label: \"Where you are\", weight: 13, filled: (p) => filledText(p.location_city) || filledText(p.base_area) },\n  { key: \"bio\", label: \"About you\"",
+    "to": "  { key: \"location\", label: \"Where you are\", weight: 13, filled: (p) => filledText(p.location_city) },\n  { key: \"bio\", label: \"About you\""
+  },
+  {
+    "name": "the card vanishes at a hundred per cent again",
+    "file": "src/components/profile/profile-completion-card.tsx",
+    "from": "  if (complete) {\n    return (",
+    "to": "  if (complete) {\n    return null;\n  }\n  if (false) {\n    return ("
+  },
+  {
+    "name": "the applicant snapshot goes back to its own rule",
+    "file": "src/lib/data/jobs.ts",
+    "from": "    complete: getProfileCompletion(data).complete,",
+    "to": "    complete: Boolean(data.full_name && data.bio && data.location_city),"
+  },
+  {
+    "name": "the snapshot narrows its select again",
+    "file": "src/lib/data/jobs.ts",
+    "from": "    .select(\"*\")\n    .eq(\"id\", userId)\n    .maybeSingle();",
+    "to": "    .select(\"full_name, company_name, bio, website, location_city, years_experience, avatar_url, username, account_type, base_area, phone, profession, languages, industry\")\n    .eq(\"id\", userId)\n    .maybeSingle();"
+  },
+  {
+    "name": "the completion card is dropped from the profile page",
+    "file": "src/app/(dashboard)/profile/page.tsx",
+    "from": "      <ProfileCompletionCard profile={profile} />\n",
+    "to": ""
+  },
+  {
+    "name": "an employer is asked for a CV after all",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "        {!isOrganization && (\n          <fieldset className=\"space-y-3 rounded-xl border p-4\">",
+    "to": "        {true && (\n          <fieldset className=\"space-y-3 rounded-xl border p-4\">"
+  },
+  {
+    "name": "a person is asked for an industry",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "          {isOrganization ? (\n            <div className=\"space-y-2\">\n              <Label htmlFor=\"industry\">Industry</Label>",
+    "to": "          {true ? (\n            <div className=\"space-y-2\">\n              <Label htmlFor=\"industry\">Industry</Label>"
+  },
+  {
+    "name": "a company size is asked of everybody",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "        {isOrganization && (\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"companySize\">Company size</Label>",
+    "to": "        {true && (\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"companySize\">Company size</Label>"
+  },
+  {
+    "name": "a firm is asked for a trade and a travel radius",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "        {!isOrganization && (\n        <TradeAndAreas",
+    "to": "        {true && (\n        <TradeAndAreas"
+  },
+  {
+    "name": "a field nobody was shown is written null",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "      ...(asked(\"industry\") ? { industry } : {}),",
+    "to": "      industry,"
+  },
+  {
+    "name": "a missing optional field fails the whole save",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "    portfolioLink: formData.get(\"portfolioLink\") ?? undefined,",
+    "to": "    portfolioLink: formData.get(\"portfolioLink\"),"
+  },
+  {
+    "name": "the industry is taken on trust",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "  const industry = isIndustry(industryRaw) ? industryRaw : null;",
+    "to": "  const industry = industryRaw ? String(industryRaw) : null;"
+  },
+  {
+    "name": "a document is stored outside the profile's folder",
+    "file": "src/components/profile/document-upload.tsx",
+    "from": "    const path = `${userId}/${kind}-${crypto.randomUUID()}-${safe}`;",
+    "to": "    const path = `${kind}-${crypto.randomUUID()}-${safe}`;"
+  },
+  {
+    "name": "a document waits for Save",
+    "file": "src/components/profile/document-upload.tsx",
+    "from": "    const result = await saveProfileDocument(kind, path, file.name);",
+    "to": "    const result = { error: undefined };"
+  },
+  {
+    "name": "the server accepts a path into somebody else's folder",
+    "file": "src/app/(dashboard)/profile/edit/document-actions.ts",
+    "from": "  if (!path.startsWith(`${user.id}/`) || path.includes(\"..\")) {",
+    "to": "  if (false) {"
+  },
+  {
+    "name": "removing a document leaves the file in storage",
+    "file": "src/app/(dashboard)/profile/edit/document-actions.ts",
+    "from": "    await supabase.storage.from(PROFILE_DOCUMENTS_BUCKET).remove([existing]);",
+    "to": "    void existing;"
+  },
+  {
+    "name": "a document link lasts a year",
+    "file": "src/app/(dashboard)/profile/edit/document-actions.ts",
+    "from": "    .createSignedUrl(path, 60 * 60);",
+    "to": "    .createSignedUrl(path, 60 * 60 * 24 * 365);"
+  },
+  {
+    "name": "the saved CV is not offered on an application",
+    "file": "src/components/jobs/apply-form.tsx",
+    "from": "                Use my saved CV",
+    "to": "                Attach a CV"
+  },
+  {
+    "name": "an edited application forgets the answer it was given",
+    "file": "src/components/jobs/apply-form.tsx",
+    "from": "    existing ? existing.use_saved_cv : Boolean(profile?.savedCv),",
+    "to": "    Boolean(profile?.savedCv),"
+  },
+  {
+    "name": "a document nobody uploaded is offered anyway",
+    "file": "src/components/jobs/apply-form.tsx",
+    "from": "        useSavedCv: Boolean(profile?.savedCv) && useSavedCv,",
+    "to": "        useSavedCv,"
+  },
+  {
+    "name": "the flags never reach the database",
+    "file": "src/app/jobs/actions.ts",
+    "from": "        p_cv: Boolean(input.useSavedCv),",
+    "to": "        p_cv: false,"
+  },
+  {
+    "name": "a failure to record the flags is swallowed",
+    "file": "src/app/jobs/actions.ts",
+    "from": "    if (flagsError) return { error: rpcMessage(flagsError) };",
+    "to": "    void flagsError;"
+  },
+  {
+    "name": "the employer's page signs every applicant's documents",
+    "file": "src/app/jobs/[id]/applications/page.tsx",
+    "from": "        application.use_saved_cv ? application.applicant?.cv_path : null,",
+    "to": "        application.applicant?.cv_path,"
+  },
+  {
+    "name": "the employer sees a CV that was not offered",
+    "file": "src/components/jobs/applicant-card.tsx",
+    "from": "        {application.use_saved_cv &&\n          applicant?.cv_path &&",
+    "to": "        {applicant?.cv_path &&"
+  },
+  {
+    "name": "the Ethiopic face is declared and never loaded",
+    "file": "src/app/layout.tsx",
+    "from": "  subsets: [\"ethiopic\"],",
+    "to": "  subsets: [\"latin\"],"
+  },
+  {
+    "name": "the Ethiopic variable never reaches the document",
+    "file": "src/app/layout.tsx",
+    "from": " ${notoEthiopic.variable}",
+    "to": ""
+  },
+  {
+    "name": "the font choice is not rendered on the server",
+    "file": "src/app/layout.tsx",
+    "from": "      data-font={profile?.font ?? undefined}",
+    "to": ""
+  },
+  {
+    "name": "the pre-paint script runs after the app",
+    "file": "src/app/layout.tsx",
+    "from": "        <FontPreference serverChoice={profile?.font ?? null} />\n        <LanguageProvider",
+    "to": "        <LanguageProvider"
+  },
+  {
+    "name": "one browser's stale choice overrides the account",
+    "file": "src/components/layout/font-preference.tsx",
+    "from": "    if (server) {\n      root.setAttribute(\"data-font\", server);",
+    "to": "    if (false) {\n      root.setAttribute(\"data-font\", server);"
+  },
+  {
+    "name": "a private window takes the page down",
+    "file": "src/components/layout/font-preference.tsx",
+    "from": "  } catch (error) {}",
+    "to": "  } finally {}"
+  },
+  {
+    "name": "choosing a font waits for the round trip",
+    "file": "src/components/settings/font-settings-form.tsx",
+    "from": "      document.documentElement.setAttribute(\"data-font\", next);",
+    "to": "      void next;"
+  },
+  {
+    "name": "choosing the default leaves the override in place",
+    "file": "src/components/settings/font-settings-form.tsx",
+    "from": "      document.documentElement.removeAttribute(\"data-font\");",
+    "to": "      void next;"
+  },
+  {
+    "name": "the samples stop being drawn in their own faces",
+    "file": "src/components/settings/font-settings-form.tsx",
+    "from": "              data-font={option.value}",
+    "to": ""
+  },
+  {
+    "name": "the font setting is dropped from Settings",
+    "file": "src/app/(dashboard)/settings/page.tsx",
+    "from": "      <FontSettingsForm initial={toFontChoice(profile?.font_preference)} />\n",
+    "to": ""
   }
 ]

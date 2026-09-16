@@ -105,8 +105,10 @@ export function getProfileCompletion(profile: Profile): ProfileCompletion {
     else missing.push(field.label);
   }
 
-  // `missing.length === 0` rather than `percent >= 100`. They agree today
-  // because both sets total 100, and if a weight is ever mistyped the honest
-  // answer is "nothing is missing", not "the arithmetic came out right".
+  // `missing.length === 0` rather than `percent >= 100`. The two agree today,
+  // and no test can tell them apart for exactly that reason — both sets total
+  // 100, which is itself asserted. The difference only appears on the day a
+  // weight is mistyped, and on that day the honest answer is "nothing is
+  // missing" rather than "the arithmetic came out right".
   return { percent, missing, complete: missing.length === 0, audience };
 }

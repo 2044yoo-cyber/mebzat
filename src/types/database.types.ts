@@ -3914,6 +3914,8 @@ export interface Database {
           proposal: string | null;
           availability_note: string | null;
           withdrawn_at: string | null;
+          use_saved_cv: boolean;
+          use_saved_portfolio: boolean;
         };
         Insert: {
           id?: string;
@@ -3930,6 +3932,8 @@ export interface Database {
           proposal?: string | null;
           availability_note?: string | null;
           withdrawn_at?: string | null;
+          use_saved_cv?: boolean;
+          use_saved_portfolio?: boolean;
         };
         Update: {
           id?: string;
@@ -3946,6 +3950,8 @@ export interface Database {
           proposal?: string | null;
           availability_note?: string | null;
           withdrawn_at?: string | null;
+          use_saved_cv?: boolean;
+          use_saved_portfolio?: boolean;
         };
         Relationships: [];
       };
@@ -5509,6 +5515,17 @@ export interface Database {
           id_verified: boolean;
           business_verified: boolean;
           license_verified: boolean;
+          cv_path: string | null;
+          cv_filename: string | null;
+          cv_updated_at: string | null;
+          portfolio_path: string | null;
+          portfolio_filename: string | null;
+          portfolio_updated_at: string | null;
+          portfolio_link: string | null;
+          linkedin_url: string | null;
+          industry: string | null;
+          company_size: string | null;
+          font_preference: string | null;
         };
         Insert: {
           id: string;
@@ -5557,6 +5574,17 @@ export interface Database {
           id_verified?: boolean;
           business_verified?: boolean;
           license_verified?: boolean;
+          cv_path?: string | null;
+          cv_filename?: string | null;
+          cv_updated_at?: string | null;
+          portfolio_path?: string | null;
+          portfolio_filename?: string | null;
+          portfolio_updated_at?: string | null;
+          portfolio_link?: string | null;
+          linkedin_url?: string | null;
+          industry?: string | null;
+          company_size?: string | null;
+          font_preference?: string | null;
         };
         Update: {
           id?: string;
@@ -5605,6 +5633,17 @@ export interface Database {
           id_verified?: boolean;
           business_verified?: boolean;
           license_verified?: boolean;
+          cv_path?: string | null;
+          cv_filename?: string | null;
+          cv_updated_at?: string | null;
+          portfolio_path?: string | null;
+          portfolio_filename?: string | null;
+          portfolio_updated_at?: string | null;
+          portfolio_link?: string | null;
+          linkedin_url?: string | null;
+          industry?: string | null;
+          company_size?: string | null;
+          font_preference?: string | null;
         };
         Relationships: [];
       };
@@ -8212,6 +8251,14 @@ export interface Database {
           p_job: string;
         };
         Returns: boolean;
+      };
+      job_application_set_saved_documents: {
+        Args: {
+          p_application: string;
+          p_cv: boolean;
+          p_portfolio: boolean;
+        };
+        Returns: undefined;
       };
       job_withdraw_application: {
         Args: {

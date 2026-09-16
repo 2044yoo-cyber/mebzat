@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Noto_Sans_Ethiopic } from "next/font/google";
 import { Suspense } from "react";
 
+import { FontPreference } from "@/components/layout/font-preference";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { LanguageProvider } from "@/components/i18n/language-provider";
 import { LegacyTranslationBridge } from "@/components/i18n/legacy-translation-bridge";
@@ -26,6 +27,21 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+/**
+ * Fidel, loaded rather than hoped for.
+ *
+ * Every local Ethiopic font is somebody else's operating system — Nyala on
+ * Windows, Kefa on Apple's, Noto on Android — and a machine with none of them
+ * showed boxes where the Amharic was. `display: "swap"` because Latin is
+ * already drawn from Geist while this arrives: the alternative is holding the
+ * whole page back for a script most of it is not written in.
+ */
+const notoEthiopic = Noto_Sans_Ethiopic({
+  variable: "--font-noto-ethiopic",
+  subsets: ["ethiopic"],
+  display: "swap",
 });
 
 /**
@@ -98,9 +114,14 @@ export default async function RootLayout({
     <html
       lang={language}
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      /* Rendered on the server from the signed-in profile so the page does not
+         arrive in one face and repaint in another. `FontPreference` covers the
+         signed-out reader, whose choice is only in their browser. */
+      data-font={profile?.font ?? undefined}
+      className={`${geistSans.variable} ${geistMono.variable} ${notoEthiopic.variable} h-full antialiased`}
     >
       <body className="min-h-full">
+        <FontPreference serverChoice={profile?.font ?? null} />
         <LanguageProvider initialLanguage={language}>
           <LegacyTranslationBridge />
           <ThemeProvider

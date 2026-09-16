@@ -9,6 +9,7 @@ import {
 } from "@/app/(dashboard)/profile/edit/actions";
 import { PlacePicker } from "@/components/location/place-picker";
 import { AvatarUpload } from "@/components/profile/avatar-upload";
+import { DocumentUpload } from "@/components/profile/document-upload";
 import { CoverUpload } from "@/components/profile/cover-upload";
 import {
   TradeAndAreas,
@@ -28,6 +29,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { TokenPicker } from "@/components/ui/token-picker";
 import { ACCOUNT_TYPES } from "@/lib/constants/account-types";
+import { COMPANY_SIZES, INDUSTRIES } from "@/lib/constants/industries";
 import { searchLanguages } from "@/lib/constants/languages";
 import { digitsOnly, MAX_YEARS } from "@/lib/profile/experience";
 import { ORGANIZATION_ACCOUNT_TYPES } from "@/lib/validations/profile";
@@ -199,6 +201,24 @@ export function EditProfileForm({
               defaultValue={profile.phone ?? ""}
             />
           </div>
+          {isOrganization ? (
+            <div className="space-y-2">
+              <Label htmlFor="industry">Industry</Label>
+              <select
+                id="industry"
+                name="industry"
+                defaultValue={profile.industry ?? ""}
+                className="min-h-11 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+              >
+                <option value="">Not set</option>
+                {INDUSTRIES.map((industry) => (
+                  <option key={industry} value={industry}>
+                    {industry}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
           <div className="space-y-2">
             <Label htmlFor="yearsExperience">Years of experience</Label>
             {/* Controlled and filtered rather than `type="number"`: a number
@@ -220,8 +240,33 @@ export function EditProfileForm({
               {years ? `Shown as “${years} ${years === "1" ? "yr." : "yrs."}”` : `Numbers only, up to ${MAX_YEARS}.`}
             </p>
           </div>
+          )}
         </div>
 
+        {isOrganization && (
+          <div className="space-y-2">
+            <Label htmlFor="companySize">Company size</Label>
+            <select
+              id="companySize"
+              name="companySize"
+              defaultValue={profile.company_size ?? ""}
+              className="min-h-11 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+            >
+              <option value="">Not set</option>
+              {COMPANY_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* A firm does not have a trade, specialties or a travel radius — its
+            people do, and they have their own profiles. Asked of a person
+            only, which is also why the completion rule for an organisation
+            does not count it. */}
+        {!isOrganization && (
         <TradeAndAreas
           areas={areas}
           profession={profile.profession}
@@ -232,6 +277,7 @@ export function EditProfileForm({
           servesEntireCity={profile.serves_entire_city}
           workStatus={profile.work_status}
         />
+        )}
 
         {/* Off unless asked for. A number entered to receive a confirmation
             code used to be published on the public profile as a side effect of
@@ -289,6 +335,63 @@ export function EditProfileForm({
             </p>
           )}
         </div>
+
+        {/* Somebody looking for work. An employer is never asked for a CV —
+            that was the complaint, and the account type already knew. */}
+        {!isOrganization && (
+          <fieldset className="space-y-3 rounded-xl border p-4">
+            <legend className="px-1 text-sm font-medium">
+              What you send with an application
+            </legend>
+            <p className="text-xs text-muted-foreground">
+              Uploaded once and kept here. Every job you apply for offers them,
+              and each employer sees them only if you say so.
+            </p>
+
+            <DocumentUpload
+              userId={profile.id}
+              kind="cv"
+              filename={profile.cv_filename}
+              updatedAt={profile.cv_updated_at}
+            />
+            <DocumentUpload
+              userId={profile.id}
+              kind="portfolio"
+              filename={profile.portfolio_filename}
+              updatedAt={profile.portfolio_updated_at}
+            />
+
+            <div className="space-y-2">
+              <Label htmlFor="portfolioLink">Portfolio link</Label>
+              <Input
+                id="portfolioLink"
+                name="portfolioLink"
+                placeholder="https://behance.net/…"
+                defaultValue={profile.portfolio_link ?? ""}
+              />
+              {state.fieldErrors?.portfolioLink && (
+                <p className="text-sm text-destructive">
+                  {state.fieldErrors.portfolioLink}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="linkedinUrl">LinkedIn</Label>
+              <Input
+                id="linkedinUrl"
+                name="linkedinUrl"
+                placeholder="https://linkedin.com/in/…"
+                defaultValue={profile.linkedin_url ?? ""}
+              />
+              {state.fieldErrors?.linkedinUrl && (
+                <p className="text-sm text-destructive">
+                  {state.fieldErrors.linkedinUrl}
+                </p>
+              )}
+            </div>
+          </fieldset>
+        )}
 
         <div className="space-y-2">
           <Label id="languages-label">Languages</Label>

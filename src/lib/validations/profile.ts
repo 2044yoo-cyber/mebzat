@@ -55,4 +55,16 @@ export const profileDetailsSchema = z.object({
       "Include http:// or https://",
     ),
   languages: z.string().trim().optional().or(z.literal("")),
+  portfolioLink: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .refine((v) => !v || /^https?:\/\/.+/.test(v), "Include http:// or https://"),
+  linkedinUrl: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .refine((v) => !v || /^https?:\/\/.+/.test(v), "Include http:// or https://"),
 });

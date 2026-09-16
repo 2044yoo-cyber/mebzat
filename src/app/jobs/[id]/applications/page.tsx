@@ -5,7 +5,12 @@ import { ArrowLeft } from "lucide-react";
 
 import { ApplicantCard } from "@/components/jobs/applicant-card";
 import { APPLICATION_STATUS_LABEL } from "@/lib/constants/community";
-import { getJob, getJobApplications, signJobFiles } from "@/lib/data/jobs";
+import {
+  getJob,
+  getJobApplications,
+  signJobFiles,
+  signProfileDocuments,
+} from "@/lib/data/jobs";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import type { ApplicationStatus } from "@/types/database.types";
@@ -75,11 +80,24 @@ export default async function JobApplicationsPage(props: {
   if (job.poster_id !== user.id) notFound();
 
   const applications = await getJobApplications(job.id);
-  const signed = await signJobFiles(
-    applications.flatMap((application) =>
-      application.attachments.map((file) => file.url),
+  const [signed, signedDocuments] = await Promise.all([
+    signJobFiles(
+      applications.flatMap((application) =>
+        application.attachments.map((file) => file.url),
+      ),
     ),
-  );
+    // Only for the applications that offered them. Signing a path the policy
+    // refuses simply returns nothing, but asking for it at all is asking the
+    // wrong question.
+    signProfileDocuments(
+      applications.flatMap((application) => [
+        application.use_saved_cv ? application.applicant?.cv_path : null,
+        application.use_saved_portfolio
+          ? application.applicant?.portfolio_path
+          : null,
+      ]),
+    ),
+  ]);
 
   const shown = applications.filter((application) =>
     filter.match.includes(application.status),
@@ -158,6 +176,7 @@ export default async function JobApplicationsPage(props: {
               salaryPeriod={job.salary_period}
               jobTitle={job.title}
               signedUrls={signed}
+              signedDocuments={signedDocuments}
             />
           ))}
         </ul>

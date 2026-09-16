@@ -28,12 +28,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { FontChoice } from "@/lib/constants/fonts";
 import { createClient } from "@/lib/supabase/client";
 
 export type NavProfile = {
   fullName: string | null;
   email: string | null;
   avatarUrl: string | null;
+  /** Which reading face this account chose. The root layout renders it. */
+  font?: FontChoice;
 };
 
 /** Name shown in the nav. profiles has no display_name column, so the

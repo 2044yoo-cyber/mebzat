@@ -2,9 +2,68 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* The reading face.
+ *
+ * `--font-sans` used to be declared only inside `@theme inline`, as
+ * `--font-sans: var(--font-sans)` — a property defined in terms of itself,
+ * which is invalid at computed-value time. So `font-family: var(--font-sans)`
+ * resolved to nothing and the whole site rendered in the browser's fallback
+ * while Geist was downloaded on every page load and never drawn. This is the
+ * definition that was missing.
+ *
+ * Order inside a stack matters and is not the obvious one. A browser chooses a
+ * face per character, so the Latin face goes first and the Ethiopic faces
+ * follow: English keeps Geist, and Fidel falls through to a font that has the
+ * syllables. Leading with the Ethiopic font — the obvious way to "support
+ * Amharic" — renders every Latin letter in its Latin glyphs instead.
+ *
+ * The local names after the loaded one are for a failed webfont: Nyala ships
+ * on Windows, Kefa on macOS and iOS, Noto on Android.
+ *
+ * The three stacks are named separately from the selector that picks one so
+ * that `[data-font]` can be an *attribute* selector rather than `html[...]`.
+ * The settings screen renders each option in its own face by putting the
+ * attribute on the button, which only works if the rule is not anchored to the
+ * root element. */
+:root {
+  --font-ethiopic-stack: var(--font-noto-ethiopic), "Noto Sans Ethiopic",
+    "Abyssinica SIL", "Kefa", "Nyala";
+  --font-stack-default: var(--font-geist-sans), var(--font-ethiopic-stack),
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* The device's own UI font, with the Ethiopic stack still behind it — the
+   * point of this choice is speed and familiarity, not going without Fidel. */
+  --font-stack-system: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, var(--font-ethiopic-stack), sans-serif;
+  --font-stack-serif: ui-serif, Georgia, "Times New Roman",
+    var(--font-ethiopic-stack), serif;
+
+  --font-sans: var(--font-stack-default);
+}
+
+/* `default` is spelled out rather than left to `:root`, so a sample rendered
+ * inside a page already set to another face shows the default rather than
+ * inheriting the one it is meant to be an alternative to. */
+[data-font="default"] {
+  --font-sans: var(--font-stack-default);
+}
+[data-font="system"] {
+  --font-sans: var(--font-stack-system);
+}
+[data-font="serif"] {
+  --font-sans: var(--font-stack-serif);
+}
+
+/* Reading a whole page in Fidel is a different job from reading a word of it.
+ * Here the Ethiopic face leads, because almost every glyph on the page will be
+ * one it has.
+ *
+ * `var(--font-sans)` behind it rather than Geist by name: the reader's font
+ * choice still has to decide what the Latin words are drawn in, and naming the
+ * default face here would quietly make the setting do nothing for anybody
+ * reading in Amharic or Afaan Oromo. */
 html[lang="am"] body,
 html[lang="om"] body {
-  font-family: "Noto Sans Ethiopic", "Abyssinica SIL", "Nyala", var(--font-geist-sans), sans-serif;
+  font-family: var(--font-ethiopic-stack), var(--font-sans);
 }
 
 [data-i18n-managed] {

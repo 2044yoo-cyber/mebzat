@@ -357,6 +357,16 @@ export type ApplyInput = {
   expectedSalary?: number | null;
   availableFrom?: string | null;
   availabilityNote?: string;
+  /**
+   * Offer the CV and portfolio already on the profile.
+   *
+   * A flag rather than a copy of the file. Copying would freeze the document
+   * at the version it had on the day, so an applicant who fixes a typo fixes
+   * it for future employers only — which is not what "saved CV" means to
+   * anybody.
+   */
+  useSavedCv?: boolean;
+  useSavedPortfolio?: boolean;
 };
 
 export async function applyToJob(
@@ -388,6 +398,26 @@ export async function applyToJob(
   });
 
   if (error) return { error: rpcMessage(error) };
+
+  // A second call rather than two more arguments on `job_apply`: adding
+  // defaulted parameters to an existing plpgsql function means dropping and
+  // recreating it, because `create or replace` with a different argument list
+  // makes an overload instead — and an accidental overload of an RPC fails at
+  // run time on call sites nobody touched.
+  if (data && (input.useSavedCv || input.useSavedPortfolio)) {
+    const { error: flagsError } = await supabase.rpc(
+      "job_application_set_saved_documents",
+      {
+        p_application: data,
+        p_cv: Boolean(input.useSavedCv),
+        p_portfolio: Boolean(input.useSavedPortfolio),
+      },
+    );
+    // Reported rather than swallowed: the application exists either way, but
+    // an applicant told "sent" who believes their CV went with it and it did
+    // not is worse off than one who is told to try again.
+    if (flagsError) return { error: rpcMessage(flagsError) };
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/jobs/applications");

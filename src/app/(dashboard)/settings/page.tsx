@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 
+import { FontSettingsForm } from "@/components/settings/font-settings-form";
 import { WatermarkSettingsForm } from "@/components/settings/watermark-settings-form";
 import { buttonVariants } from "@/components/ui/button";
+import { toFontChoice } from "@/lib/constants/fonts";
 import {
   DEFAULT_WATERMARK,
   normaliseSettings,
@@ -31,7 +33,7 @@ export default async function SettingsPage() {
       .maybeSingle(),
     supabase
       .from("profiles")
-      .select("username, full_name, company_name, phone, avatar_url")
+      .select("username, full_name, company_name, phone, avatar_url, font_preference")
       .eq("id", viewer.id)
       .maybeSingle(),
   ]);
@@ -51,6 +53,8 @@ export default async function SettingsPage() {
           Privacy and security for your account.
         </p>
       </header>
+
+      <FontSettingsForm initial={toFontChoice(profile?.font_preference)} />
 
       <WatermarkSettingsForm
         initial={initial}

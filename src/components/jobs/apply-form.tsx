@@ -75,7 +75,21 @@ export function ApplyForm({
   const [proposal, setProposal] = useState(existing?.proposal ?? "");
   const [cvUrl, setCvUrl] = useState(existing?.cv_url ?? "");
   const [portfolioUrl, setPortfolioUrl] = useState(
-    existing?.portfolio_url ?? profile?.website ?? "",
+    existing?.portfolio_url ?? profile?.portfolioLink ?? profile?.website ?? "",
+  );
+  /**
+   * Whether the documents on the profile go with this application.
+   *
+   * Ticked by default on a first application when there is something to offer,
+   * because somebody who has uploaded a CV to Medosha has already answered the
+   * question of whether they want employers to see it. On an application being
+   * edited the stored answer wins — unticking it has to stay unticked.
+   */
+  const [useSavedCv, setUseSavedCv] = useState(
+    existing ? existing.use_saved_cv : Boolean(profile?.savedCv),
+  );
+  const [useSavedPortfolio, setUseSavedPortfolio] = useState(
+    existing ? existing.use_saved_portfolio : Boolean(profile?.savedPortfolio),
   );
   const [salary, setSalary] = useState(
     existing?.expected_salary === null || existing?.expected_salary === undefined
@@ -250,6 +264,8 @@ export function ApplyForm({
         expectedSalary: salary.trim() ? Number(salary) : null,
         availableFrom: availableFrom || null,
         availabilityNote: availabilityNote.trim(),
+        useSavedCv: Boolean(profile?.savedCv) && useSavedCv,
+        useSavedPortfolio: Boolean(profile?.savedPortfolio) && useSavedPortfolio,
       });
 
       if (result.error) {
@@ -376,6 +392,53 @@ export function ApplyForm({
         </div>
       </div>
 
+      {/* What is already on the profile, offered rather than re-uploaded. The
+          employer reads the live file, so a CV corrected next week is
+          corrected on this application too. */}
+      {(profile?.savedCv || profile?.savedPortfolio) && (
+        <div className="space-y-2 rounded-xl border bg-muted/40 p-3">
+          {profile.savedCv && (
+            <label className="flex min-h-11 items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={useSavedCv}
+                onChange={(event) => setUseSavedCv(event.target.checked)}
+                className="size-4 accent-[var(--brand)]"
+              />
+              <span className="min-w-0 flex-1">
+                Use my saved CV
+                <span className="block truncate text-xs text-muted-foreground">
+                  {profile.savedCv}
+                </span>
+              </span>
+            </label>
+          )}
+          {profile.savedPortfolio && (
+            <label className="flex min-h-11 items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={useSavedPortfolio}
+                onChange={(event) => setUseSavedPortfolio(event.target.checked)}
+                className="size-4 accent-[var(--brand)]"
+              />
+              <span className="min-w-0 flex-1">
+                Use my saved portfolio
+                <span className="block truncate text-xs text-muted-foreground">
+                  {profile.savedPortfolio}
+                </span>
+              </span>
+            </label>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Only this employer sees them, and only while this application
+            stands.{" "}
+            <Link href="/profile/edit" className="underline">
+              Change what is saved
+            </Link>
+          </p>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         <Label htmlFor="apply-cv">CV link</Label>
         <Input
@@ -383,7 +446,11 @@ export function ApplyForm({
           type="url"
           value={cvUrl}
           onChange={(event) => setCvUrl(event.target.value)}
-          placeholder="Optional — https://…"
+          placeholder={
+            profile?.savedCv && useSavedCv
+              ? "Optional — your saved CV is already attached"
+              : "Optional — https://…"
+          }
         />
       </div>
 

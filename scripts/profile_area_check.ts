@@ -37,11 +37,16 @@ import { readFileSync } from "node:fs";
 
 import { searchLanguages, parseLanguages } from "../src/lib/constants/languages.ts";
 import {
+  getProfileCompletion,
+  requiredFields,
+} from "../src/lib/profile/completion.ts";
+import {
   digitsOnly,
   formatYears,
   parseYears,
   MAX_YEARS,
 } from "../src/lib/profile/experience.ts";
+import type { AccountType, Profile } from "../src/types/database.types.ts";
 
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
@@ -439,6 +444,405 @@ check(
   check(
     "and so is the field itself",
     /min-h-11 w-full rounded-lg border border-input/.test(combobox),
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// 7. One completion rule, and it knows who it is asking
+// ---------------------------------------------------------------------------
+
+{
+  const person = (extra: Partial<Profile> = {}) =>
+    ({
+      account_type: "individual",
+      full_name: "Hana Woldemariam",
+      avatar_url: "https://example.test/a.png",
+      location_city: "Ayertena",
+      base_area: null,
+      bio: "Carpenter.",
+      username: "hana",
+      phone: "+251900000000",
+      profession: "Carpenter",
+      years_experience: 5,
+      languages: ["Amharic"],
+      company_name: null,
+      website: null,
+      industry: null,
+      ...extra,
+    }) as unknown as Profile;
+
+  const firm = (extra: Partial<Profile> = {}) =>
+    ({
+      account_type: "company",
+      company_name: "Abyssinia Build PLC",
+      full_name: "Contact Person",
+      avatar_url: "https://example.test/logo.png",
+      location_city: "Bole",
+      base_area: null,
+      bio: "Fit-out contractor.",
+      username: "abyssinia",
+      phone: "+251900000001",
+      website: "https://abyssinia.test",
+      industry: "General contracting",
+      years_experience: null,
+      profession: null,
+      languages: [],
+      ...extra,
+    }) as unknown as Profile;
+
+  check(
+    "a finished profile reaches a hundred per cent",
+    getProfileCompletion(person()).percent === 100 &&
+      getProfileCompletion(person()).complete,
+    `${getProfileCompletion(person()).percent}% — missing ${getProfileCompletion(person()).missing.join(", ")}`,
+  );
+  check(
+    "and so does a finished company",
+    getProfileCompletion(firm()).percent === 100 &&
+      getProfileCompletion(firm()).complete,
+    `${getProfileCompletion(firm()).percent}% — missing ${getProfileCompletion(firm()).missing.join(", ")}`,
+  );
+
+  check(
+    "a company is never asked for years of experience",
+    getProfileCompletion(firm({ years_experience: null })).complete,
+    "a firm has no years of experience as a person, and was permanently short for saying so",
+  );
+  check(
+    "or for a trade",
+    !requiredFields("company").some((field) => field.key === "profession"),
+  );
+  check(
+    "or for languages it never gave",
+    getProfileCompletion(firm({ languages: [] })).complete,
+  );
+  check(
+    "a person is never asked for an industry",
+    getProfileCompletion(person({ industry: null })).complete,
+  );
+  check(
+    "or for a website",
+    getProfileCompletion(person({ website: null })).complete,
+    "a day labourer has no website and was permanently short for saying so",
+  );
+
+  check(
+    "both sets can actually reach a hundred",
+    ["individual", "company", "student", "contractor", "supplier"].every(
+      (type) =>
+        requiredFields(type as AccountType).reduce(
+          (total, field) => total + field.weight,
+          0,
+        ) === 100,
+    ),
+    "a bar that cannot reach the end is a bar people stop reading",
+  );
+
+  check(
+    "what is missing is named",
+    getProfileCompletion(person({ avatar_url: null })).missing.includes(
+      "Profile photo",
+    ),
+  );
+  check(
+    "an empty string is not an answer",
+    !getProfileCompletion(person({ bio: "   " })).complete,
+    "`Boolean(\"   \")` is true, and a bio of three spaces is not a bio",
+  );
+  check(
+    "a location can come from either field",
+    getProfileCompletion(person({ location_city: null, base_area: "Bole" }))
+      .complete,
+  );
+  check(
+    "and the card says which audience it scored",
+    getProfileCompletion(firm()).audience === "organization" &&
+      getProfileCompletion(person()).audience === "person",
+  );
+}
+
+{
+  const card = code("src/components/profile/profile-completion-card.tsx");
+  check(
+    "the card does not vanish at a hundred per cent",
+    /if \(complete\) \{\s*return \(/.test(card) &&
+      !/return null;/.test(card) &&
+      /Profile complete/.test(card),
+    // The branch *and* what it returns. Asserting the words "Profile complete"
+    // appear somewhere passes with them sitting in a branch guarded by
+    // `if (false)` above a `return null`, which is exactly the bug back again.
+    "the one moment it had good news was the moment it disappeared",
+  );
+  check(
+    "it reads the shared rule",
+    /getProfileCompletion\(profile\)/.test(card),
+  );
+
+  const jobs = code("src/lib/data/jobs.ts");
+  check(
+    "and so does the applicant snapshot",
+    /complete: getProfileCompletion\(data\)\.complete/.test(jobs),
+  );
+  check(
+    "the second rule is gone",
+    !/full_name && data\.bio && data\.location_city/.test(jobs),
+    "a profile with those three was complete here and 45% on the Dashboard",
+  );
+  check(
+    "and the snapshot fetches the whole row the rule reads",
+    /\.from\("profiles"\)\s*\.select\("\*"\)/.test(jobs),
+    "a narrowed select reports every profile as missing whatever it did not fetch",
+  );
+
+  const profilePage = code("src/app/(dashboard)/profile/page.tsx");
+  const dashboard = code("src/app/(dashboard)/dashboard/page.tsx");
+  check(
+    "the same card is on the Profile and on the Dashboard",
+    /<ProfileCompletionCard profile=\{profile\} \/>/.test(profilePage) &&
+      /<ProfileCompletionCard profile=\{profile\} \/>/.test(dashboard),
+    "they used to disagree; showing it in both places is how that stays visible",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 8. Different questions for someone looking for work and someone hiring
+// ---------------------------------------------------------------------------
+
+{
+  const form = code("src/components/profile/edit-profile-form.tsx");
+
+  check(
+    "an employer is not asked for a CV",
+    // The guard and the element it guards, adjacent. A window of a few
+    // thousand characters reaches the *other* `!isOrganization` block further
+    // up the file, so removing this one still matched.
+    /\{!isOrganization && \(\s*<fieldset[\s\S]{0,1200}?<DocumentUpload/.test(form),
+    "the complaint, in one line: the account type already knew",
+  );
+  check(
+    "a person is not asked for an industry",
+    /\{isOrganization \? \([\s\S]{0,400}?name="industry"/.test(form),
+  );
+  check(
+    "and the two are alternatives, not both",
+    /name="industry"[\s\S]{0,900}?\) : \([\s\S]{0,200}?htmlFor="yearsExperience"/.test(
+      form,
+    ),
+    "years of experience is the person's version of the same question",
+  );
+  check(
+    "a company size is asked only of a company",
+    /\{isOrganization && \([\s\S]{0,400}?name="companySize"/.test(form),
+  );
+  check(
+    "a firm is not asked for a trade or a travel radius",
+    /\{!isOrganization && \(\s*<TradeAndAreas/.test(form),
+    "a firm does not have a trade; its people do, and they have their own profiles",
+  );
+  check(
+    "a job seeker is offered a portfolio link and a LinkedIn",
+    /name="portfolioLink"/.test(form) && /name="linkedinUrl"/.test(form),
+  );
+  check(
+    "both documents can be uploaded",
+    /kind="cv"/.test(form) && /kind="portfolio"/.test(form),
+  );
+
+  const action = code("src/app/(dashboard)/profile/edit/actions.ts");
+  check(
+    "a field the form never rendered is left alone rather than cleared",
+    /asked\("industry"\) \? \{ industry \}/.test(action) &&
+      /const asked = \(field: string\) => formData\.has\(field\);/.test(action),
+    "switching account type, saving, and switching back must not empty the other side",
+  );
+  check(
+    "a missing field does not fail the whole save",
+    /formData\.get\("portfolioLink"\) \?\? undefined/.test(action),
+    "`z.string().optional()` rejects null, and FormData.get returns null for a field nobody was shown",
+  );
+  check(
+    "the industry is checked against the list rather than trusted",
+    /isIndustry\(industryRaw\) \? industryRaw : null/.test(action) &&
+      /isCompanySize\(companySizeRaw\) \? companySizeRaw : null/.test(action),
+  );
+
+  const upload = code("src/components/profile/document-upload.tsx");
+  check(
+    "a document is stored under the profile it belongs to",
+    /const path = `\$\{userId\}\/\$\{kind\}-\$\{crypto\.randomUUID\(\)\}-\$\{safe\}`/.test(
+      upload,
+    ),
+    "the storage policy reads the first folder segment as the owner",
+  );
+  check(
+    "and is saved as soon as it is chosen",
+    /await saveProfileDocument\(kind, path, file\.name\)/.test(upload),
+    "holding a file in state until Save loses it if Save is never pressed",
+  );
+
+  const documents = code("src/app/(dashboard)/profile/edit/document-actions.ts");
+  check(
+    "the server refuses a path into somebody else's folder",
+    /if \(!path\.startsWith\(`\$\{user\.id\}\/`\) \|\| path\.includes\("\.\."\)\)/.test(
+      documents,
+    ),
+    "the column's reader does not re-check it",
+  );
+  check(
+    "removing a document removes the file too",
+    /storage\s*\.from\(PROFILE_DOCUMENTS_BUCKET\)\s*\.remove\(\[existing\]\)/.test(
+      documents,
+    ),
+    "clearing the column alone leaves it readable by every employer holding an application",
+  );
+  check(
+    "a link to a document lasts a sitting, not a year",
+    /createSignedUrl\(path, 60 \* 60\)/.test(documents),
+    "a link with a year on it is a CV on the open internet the moment it is forwarded",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 9. The CV is uploaded once and offered on every application
+// ---------------------------------------------------------------------------
+
+{
+  const apply = code("src/components/jobs/apply-form.tsx");
+  check(
+    "the saved CV is offered on an application",
+    /Use my saved CV/.test(apply) && /Use my saved portfolio/.test(apply),
+  );
+  check(
+    "a first application offers it by default",
+    /existing \? existing\.use_saved_cv : Boolean\(profile\?\.savedCv\)/.test(apply),
+    "somebody who uploaded a CV to Medosha has already answered that question",
+  );
+  check(
+    "but an application being edited keeps the answer it was given",
+    /existing \? existing\.use_saved_portfolio : Boolean\(profile\?\.savedPortfolio\)/.test(
+      apply,
+    ),
+    "unticking it has to stay unticked",
+  );
+  check(
+    "nothing is offered that is not there",
+    /useSavedCv: Boolean\(profile\?\.savedCv\) && useSavedCv/.test(apply),
+  );
+
+  const actions = code("src/app/jobs/actions.ts");
+  check(
+    "the flags reach the database",
+    /"job_application_set_saved_documents"/.test(actions) &&
+      /p_cv: Boolean\(input\.useSavedCv\)/.test(actions),
+  );
+  check(
+    "and a failure to record them is reported",
+    /if \(flagsError\) return \{ error: rpcMessage\(flagsError\) \};/.test(actions),
+    "an applicant told 'sent' who believes their CV went with it is worse off than one told to try again",
+  );
+
+  const jobsData = code("src/lib/data/jobs.ts");
+  check(
+    "the employer's page can sign the offered documents",
+    /export async function signProfileDocuments/.test(jobsData) &&
+      /createSignedUrls\(wanted, 60 \* 60\)/.test(jobsData),
+  );
+
+  const applications = code("src/app/jobs/[id]/applications/page.tsx");
+  check(
+    "and only asks for the ones that were offered",
+    /application\.use_saved_cv \? application\.applicant\?\.cv_path : null/.test(
+      applications,
+    ),
+  );
+
+  const card = code("src/components/jobs/applicant-card.tsx");
+  check(
+    "the employer sees the offered CV under its own name",
+    /application\.use_saved_cv &&[\s\S]{0,80}?applicant\?\.cv_path/.test(card),
+  );
+  check(
+    "and a document nobody offered is not shown",
+    !/signedDocuments\[applicant\.cv_path\]\s*\?\?/.test(card),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 10. The reading font
+// ---------------------------------------------------------------------------
+
+{
+  const css = readFileSync("src/app/globals.css", "utf8");
+  check(
+    "--font-sans has a value of its own",
+    /--font-sans: var\(--font-stack-default\);/.test(css),
+    "it used to be `--font-sans: var(--font-sans)`, which computes to nothing",
+  );
+  check(
+    "the Ethiopic face is loaded rather than hoped for",
+    /--font-ethiopic-stack: var\(--font-noto-ethiopic\)/.test(css),
+  );
+
+  const layout = code("src/app/layout.tsx");
+  check(
+    "and the layout actually loads it",
+    /Noto_Sans_Ethiopic\(\{/.test(layout) &&
+      /variable: "--font-noto-ethiopic"/.test(layout) &&
+      /subsets: \["ethiopic"\]/.test(layout),
+  );
+  check(
+    "the variable reaches the document",
+    /\$\{notoEthiopic\.variable\}/.test(layout),
+    "a font declared and not put on an element is a font that is never used",
+  );
+  check(
+    "the choice is rendered on the server",
+    /data-font=\{profile\?\.font \?\? undefined\}/.test(layout),
+    "an effect would repaint the page in a second face after the first",
+  );
+  check(
+    "and the script that covers a signed-out reader runs before the page",
+    /<FontPreference serverChoice=\{profile\?\.font \?\? null\} \/>/.test(layout) &&
+      layout.indexOf("<FontPreference") < layout.indexOf("<LanguageProvider"),
+  );
+
+  const preference = code("src/components/layout/font-preference.tsx");
+  check(
+    "the account beats what one browser remembers",
+    /if \(server\) \{[\s\S]{0,200}?setAttribute\("data-font", server\)/.test(
+      preference,
+    ),
+    "a stale value in one browser must not override what the profile says",
+  );
+  check(
+    "and storage that throws does not take the page down",
+    /catch \(error\) \{\}/.test(preference),
+    "reading localStorage throws outright in a Safari private window",
+  );
+
+  const settings = code("src/components/settings/font-settings-form.tsx");
+  check(
+    "choosing a font applies it before anything is saved",
+    /document\.documentElement\.setAttribute\("data-font", next\)/.test(settings),
+  );
+  check(
+    "choosing the default removes the override",
+    /document\.documentElement\.removeAttribute\("data-font"\)/.test(settings),
+  );
+  check(
+    "each option is shown in its own face",
+    /data-font=\{option\.value\}/.test(settings) &&
+      /fontFamily: "var\(--font-sans\)"/.test(settings),
+    "a custom property set on an element changes nothing unless something re-declares font-family",
+  );
+
+  const page = code("src/app/(dashboard)/settings/page.tsx");
+  check(
+    "and the setting is on the Settings screen",
+    /<FontSettingsForm initial=\{toFontChoice\(profile\?\.font_preference\)\} \/>/.test(
+      page,
+    ),
   );
 }
 

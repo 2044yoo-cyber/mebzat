@@ -1,0 +1,80 @@
+[
+  {
+    "name": "the offer is no longer required, only an application",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "        and (a.use_saved_cv or a.use_saved_portfolio)",
+    "to": "        and true"
+  },
+  {
+    "name": "a withdrawn application still opens the document",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "        and a.status <> 'withdrawn'",
+    "to": "        and true"
+  },
+  {
+    "name": "any employer can read any applicant's documents",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "        and a.applicant_id::text = (storage.foldername(name))[1]",
+    "to": "        and true"
+  },
+  {
+    "name": "the employer policy stops naming the job's poster",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "      where j.poster_id = auth.uid()",
+    "to": "      where true"
+  },
+  {
+    "name": "the owner policy stops checking the folder",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "  with check (\n    bucket_id = 'profile-documents'\n    and (storage.foldername(name))[1] = auth.uid()::text\n  );",
+    "to": "  with check (\n    bucket_id = 'profile-documents'\n  );"
+  },
+  {
+    "name": "the employer policy is not read-only",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "create policy \"employers read an applicant's offered documents\"\n  on storage.objects for select",
+    "to": "create policy \"employers read an applicant's offered documents\"\n  on storage.objects for all"
+  },
+  {
+    "name": "the bucket becomes public",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "  'profile-documents',\n  'profile-documents',\n  false,",
+    "to": "  'profile-documents',\n  'profile-documents',\n  true,"
+  },
+  {
+    "name": "the CV columns are not added",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "  add column if not exists cv_path text,",
+    "to": "  add column if not exists cv_path_unused text,"
+  },
+  {
+    "name": "industry is not added",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "  add column if not exists industry text,",
+    "to": "  add column if not exists industry_unused text,"
+  },
+  {
+    "name": "the application flags are not added",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "  add column if not exists use_saved_cv boolean not null default false,",
+    "to": "  add column if not exists use_saved_cv_unused boolean not null default false,"
+  },
+  {
+    "name": "the saved-documents function forgets whose application it is",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "  where id = p_application\n    and applicant_id = auth.uid();",
+    "to": "  where id = p_application;"
+  },
+  {
+    "name": "the saved-documents function does not set the flags",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "  set use_saved_cv = coalesce(p_cv, false),",
+    "to": "  set use_saved_cv = use_saved_cv,"
+  },
+  {
+    "name": "the anon grant that Supabase adds by default is left in place",
+    "file": "supabase/migrations/0086_profile_documents.sql",
+    "from": "  from public, anon;",
+    "to": "  from public;"
+  }
+]

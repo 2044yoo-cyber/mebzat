@@ -1,6 +1,7 @@
 import "server-only";
 
 import { JOB_FILES_BUCKET } from "@/lib/constants/jobs";
+import { getProfileCompletion } from "@/lib/profile/completion";
 import { createClient } from "@/lib/supabase/server";
 import type {
   ApplicationStatus,
@@ -65,7 +66,8 @@ const COLUMNS = `
 const APPLICANT_COLUMNS = `
   id, username, full_name, company_name, avatar_url, bio, account_type,
   location_city, location_country, years_experience, verification_status,
-  work_status, next_available_on, reputation_points
+  work_status, next_available_on, reputation_points,
+  cv_path, cv_filename, portfolio_path, portfolio_filename
 `;
 
 export type Applicant = {
@@ -83,6 +85,10 @@ export type Applicant = {
   work_status: string;
   next_available_on: string | null;
   reputation_points: number;
+  cv_path: string | null;
+  cv_filename: string | null;
+  portfolio_path: string | null;
+  portfolio_filename: string | null;
 };
 
 /**
@@ -224,6 +230,38 @@ export async function signJobFiles(
   const { data } = await supabase.storage
     .from(JOB_FILES_BUCKET)
     .createSignedUrls(paths, 60 * 60);
+
+  const signed: Record<string, string> = {};
+  for (const entry of data ?? []) {
+    if (entry.signedUrl && entry.path) signed[entry.path] = entry.signedUrl;
+  }
+  return signed;
+}
+
+/**
+ * Signed links to the CVs and portfolios applicants offered from their
+ * profiles.
+ *
+ * A different bucket from `signJobFiles`, and a different set of rules: these
+ * documents live on the applicant's profile rather than under the job, so the
+ * policy that lets this call succeed is the one that checks there is a
+ * standing application offering them. An applicant who withdraws, or who
+ * unticks the box, makes this return nothing — which is the intended
+ * behaviour, not a failure to handle.
+ *
+ * Keyed by path, like `signJobFiles`, so a card can look one up without
+ * knowing the order.
+ */
+export async function signProfileDocuments(
+  paths: (string | null | undefined)[],
+): Promise<Record<string, string>> {
+  const wanted = [...new Set(paths.filter((path): path is string => Boolean(path)))];
+  if (wanted.length === 0) return {};
+
+  const supabase = await createClient();
+  const { data } = await supabase.storage
+    .from("profile-documents")
+    .createSignedUrls(wanted, 60 * 60);
 
   const signed: Record<string, string> = {};
   for (const entry of data ?? []) {
@@ -592,17 +630,23 @@ export type ApplicantSnapshot = {
   username: string | null;
   /** Whether the profile has enough on it to be worth an employer's click. */
   complete: boolean;
+  /** The documents already on the profile, offered rather than re-uploaded. */
+  savedCv: string | null;
+  savedPortfolio: string | null;
+  portfolioLink: string | null;
 };
 
 export async function getApplicantSnapshot(
   userId: string,
 ): Promise<ApplicantSnapshot | null> {
   const supabase = await createClient();
+  // `select("*")` rather than the seven columns this function displays,
+  // because `getProfileCompletion` reads a different set and a narrowed select
+  // would silently report every profile as missing whatever it did not fetch.
+  // One rule means one row.
   const { data } = await supabase
     .from("profiles")
-    .select(
-      "full_name, company_name, bio, website, location_city, years_experience, avatar_url, username",
-    )
+    .select("*")
     .eq("id", userId)
     .maybeSingle();
 
@@ -616,6 +660,15 @@ export async function getApplicantSnapshot(
     website: data.website,
     avatarUrl: data.avatar_url,
     username: data.username,
-    complete: Boolean(data.full_name && data.bio && data.location_city),
+    savedCv: data.cv_path ? data.cv_filename ?? "Your CV" : null,
+    savedPortfolio: data.portfolio_path
+      ? data.portfolio_filename ?? "Your portfolio"
+      : null,
+    portfolioLink: data.portfolio_link,
+    // Was `Boolean(full_name && bio && location_city)` — a second, quieter
+    // completion rule that disagreed with the one on the Dashboard by
+    // construction. A profile with those three was "complete" here and 45%
+    // there.
+    complete: getProfileCompletion(data).complete,
   };
 }

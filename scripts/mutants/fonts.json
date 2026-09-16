@@ -1,0 +1,74 @@
+[
+  {
+    "name": "--font-sans goes back to referring to itself",
+    "file": "src/app/globals.css",
+    "from": "  --font-sans: var(--font-stack-default);\n}",
+    "to": "  --font-sans: var(--font-sans);\n}"
+  },
+  {
+    "name": "the Ethiopic face leads the default stack",
+    "file": "src/app/globals.css",
+    "from": "  --font-stack-default: var(--font-geist-sans), var(--font-ethiopic-stack),",
+    "to": "  --font-stack-default: var(--font-ethiopic-stack), var(--font-geist-sans),"
+  },
+  {
+    "name": "the Ethiopic face is dropped from the default stack",
+    "file": "src/app/globals.css",
+    "from": "  --font-stack-default: var(--font-geist-sans), var(--font-ethiopic-stack),\n    ui-sans-serif",
+    "to": "  --font-stack-default: var(--font-geist-sans),\n    ui-sans-serif"
+  },
+  {
+    "name": "the local Ethiopic fallbacks are dropped",
+    "file": "src/app/globals.css",
+    "from": "  --font-ethiopic-stack: var(--font-noto-ethiopic), \"Noto Sans Ethiopic\",\n    \"Abyssinica SIL\", \"Kefa\", \"Nyala\";",
+    "to": "  --font-ethiopic-stack: var(--font-noto-ethiopic);"
+  },
+  {
+    "name": "the serif choice stops changing anything",
+    "file": "src/app/globals.css",
+    "from": "[data-font=\"serif\"] {\n  --font-sans: var(--font-stack-serif);\n}",
+    "to": "[data-font=\"serif\"] {\n  --font-weight: 400;\n}"
+  },
+  {
+    "name": "the device choice stops changing anything",
+    "file": "src/app/globals.css",
+    "from": "[data-font=\"system\"] {\n  --font-sans: var(--font-stack-system);\n}",
+    "to": "[data-font=\"system\"] {\n  --font-weight: 400;\n}"
+  },
+  {
+    "name": "the serif choice loses its Ethiopic fallback",
+    "file": "src/app/globals.css",
+    "from": "  --font-stack-serif: ui-serif, Georgia, \"Times New Roman\",\n    var(--font-ethiopic-stack), serif;",
+    "to": "  --font-stack-serif: ui-serif, Georgia, \"Times New Roman\", serif;"
+  },
+  {
+    "name": "the device choice loses its Ethiopic fallback",
+    "file": "src/app/globals.css",
+    "from": "    Roboto, var(--font-ethiopic-stack), sans-serif;",
+    "to": "    Roboto, sans-serif;"
+  },
+  {
+    "name": "the default rule is deleted as redundant",
+    "file": "src/app/globals.css",
+    "from": "[data-font=\"default\"] {\n  --font-sans: var(--font-stack-default);\n}",
+    "to": ""
+  },
+  {
+    "name": "the rules are anchored to the root element again",
+    "file": "src/app/globals.css",
+    "from": "[data-font=\"serif\"] {\n  --font-sans: var(--font-stack-serif);\n}",
+    "to": "html[data-font=\"serif\"] {\n  --font-sans: var(--font-stack-serif);\n}"
+  },
+  {
+    "name": "an Amharic page stops leading with the Ethiopic face",
+    "file": "src/app/globals.css",
+    "from": "  font-family: var(--font-ethiopic-stack), var(--font-sans);",
+    "to": "  font-family: var(--font-sans);"
+  },
+  {
+    "name": "an Amharic page ignores the reader's font choice",
+    "file": "src/app/globals.css",
+    "from": "  font-family: var(--font-ethiopic-stack), var(--font-sans);",
+    "to": "  font-family: var(--font-ethiopic-stack), var(--font-geist-sans), sans-serif;"
+  }
+]
