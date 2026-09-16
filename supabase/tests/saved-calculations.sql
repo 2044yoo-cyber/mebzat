@@ -84,19 +84,26 @@ end $$;
 -- ===================================================================
 reset role;
 
+-- `material_prices_verified_has_verifier` refuses an `admin_verified` row with
+-- no `verified_by` and `verified_at`. The constraint arrived after this
+-- fixture, which is why the two columns were absent. The verifier is the
+-- price-admin created above — the account whose whole purpose in this file is
+-- to be the one who checked a price.
 insert into public.material_prices
-  (category, material, unit, city_region, price_etb, data_status, price_date, supplier)
+  (category, material, unit, city_region, price_etb, data_status, price_date,
+   supplier, verified_by, verified_at)
 values
   -- The verified row is deliberately the OLDER of the two Addis rows. If the
   -- lookup ranked on date alone it would return the submitted 1150, so this
   -- fixture is what makes check 4 able to fail. With both rows on the same
   -- date the tie broke the right way by luck and the check proved nothing.
-  ('Cement', 'Ordinary Portland Cement', 'bag', 'Addis Ababa', 1200, 'admin_verified', current_date - 5, 'Probe Supplier'),
-  ('Cement', 'Ordinary Portland Cement', 'bag', 'Addis Ababa', 1150, 'supplier_submitted', current_date, 'Probe Other'),
+  ('Cement', 'Ordinary Portland Cement', 'bag', 'Addis Ababa', 1200, 'admin_verified', current_date - 5, 'Probe Supplier',
+   'd0000000-0000-4000-8000-000000000003', now()),
+  ('Cement', 'Ordinary Portland Cement', 'bag', 'Addis Ababa', 1150, 'supplier_submitted', current_date, 'Probe Other', null, null),
   -- The newest Addis row of all, and the least trustworthy: this is what the
   -- 0042 seed looks like, and it must not win on date alone.
-  ('Cement', 'Ordinary Portland Cement', 'bag', 'Addis Ababa', 9999, 'educational_estimate', current_date, 'Seed'),
-  ('Cement', 'Ordinary Portland Cement', 'bag', 'Mekelle', 1320, 'supplier_submitted', current_date - 40, 'Probe North');
+  ('Cement', 'Ordinary Portland Cement', 'bag', 'Addis Ababa', 9999, 'educational_estimate', current_date, 'Seed', null, null),
+  ('Cement', 'Ordinary Portland Cement', 'bag', 'Mekelle', 1320, 'supplier_submitted', current_date - 40, 'Probe North', null, null);
 
 set role authenticated;
 set local request.jwt.claim.sub = 'd0000000-0000-4000-8000-000000000002';
@@ -192,9 +199,15 @@ select '5. a superseded row is skipped' as step,
        price = 1150 as should_be_true
 from public.calculator_material_price('Ordinary Portland Cement', 'Addis Ababa');
 
+-- Counted over this file's own rows, not over the table. 0042 seeds a cement
+-- price of its own — `educational_estimate`, supplier null — so a count of
+-- everything is 5 here and would be a different number again on any database
+-- that has had a real price submitted. The assertion is "superseding does not
+-- delete", and that is about these four.
 select '5b. but the history is still there' as step,
        count(*) = 4 as should_be_true
-from public.material_prices where material = 'Ordinary Portland Cement';
+from public.material_prices
+where material = 'Ordinary Portland Cement' and supplier is not null;
 
 -- ===================================================================
 -- 6. A signed-out visitor can still be offered a price.

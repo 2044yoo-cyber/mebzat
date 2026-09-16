@@ -56,10 +56,36 @@ fi
 for test in $tests; do
   name=$(basename "$test" .sql)
   run postgres -c "drop database if exists ${DB}_t;" -c "create database ${DB}_t template $DB;" >/dev/null 2>&1
-  if run "${DB}_t" -f "$test" >/dev/null 2>/tmp/pg-test-err; then
-    echo "  ok   $name"
-  else
+
+  # A test may declare data it needs that the migrations do not create — a
+  # seed file, for instance. It says so with `-- requires: <path>` in its
+  # header, and those are applied before it. Without this, a test of a seed
+  # runs against an empty table and reports the feature broken.
+  prereq_failed=0
+  for prereq in $(grep -oE '^-- requires: .+$' "$test" | sed 's/^-- requires: //'); do
+    if ! run "${DB}_t" -f "$ROOT/$prereq" >/dev/null 2>/tmp/pg-prereq-err; then
+      echo "  FAIL $name (prerequisite $prereq)"; grep ERROR /tmp/pg-prereq-err | head -2
+      failed=1; prereq_failed=1
+    fi
+  done
+  [ $prereq_failed -eq 1 ] && continue
+
+  # Two kinds of test live in here and they report failure differently.
+  #
+  # Most `raise exception`, so a non-zero exit is the answer. A few were
+  # written to be pasted into the Supabase SQL editor and *read*: they
+  # `select ... as should_be_true` and print `t` or `f`. Those exit 0 whatever
+  # the answer is, so an exit code alone reported a broken feature as a pass —
+  # which it did, for every assertion in three files, until mutation testing
+  # said so. Both are checked.
+  if ! run "${DB}_t" -f "$test" >/tmp/pg-test-out 2>/tmp/pg-test-err; then
     echo "  FAIL $name"; grep ERROR /tmp/pg-test-err | head -3; failed=1
+  elif ! awk -f "$ROOT/supabase/tests/verdicts.awk" /tmp/pg-test-out; then
+    echo "  FAIL $name"
+    awk -f "$ROOT/supabase/tests/verdicts.awk" -v list=1 -v max=6 /tmp/pg-test-out || true
+    failed=1
+  else
+    echo "  ok   $name"
   fi
 done
 

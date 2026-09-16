@@ -184,12 +184,23 @@ from public.feed_page(
   p_seen_ids => array(select id from public.feed_posts where title like 'Feed probe %')
 ) where title like 'Feed probe %' and not seen;
 
+-- Scoped to this file's author, the way the `probe` view above is.
+--
+-- Unscoped, `feed_page(p_limit => 8)` returns the eight best posts on the
+-- database — which, once 0027's feed seed is applied, are all seeded ones and
+-- none of this file's. Both sides of the comparison were then `string_agg`
+-- over no rows, and `null is distinct from null` is false: the check reported
+-- the shuffle broken while measuring nothing at all. It stayed that way
+-- because this file prints its verdicts rather than raising, and the runner
+-- read only the exit code.
 select '6c. two seeds give a different order' as step,
        (select string_agg(id::text, ',' order by score desc)
-        from public.feed_page(p_limit => 8, p_seed => 1) where title like 'Feed probe %')
+        from public.feed_page(p_limit => 8, p_seed => 1,
+          p_author_key => 'profile:ee000000-0000-4000-8000-0000000000aa'))
     is distinct from
        (select string_agg(id::text, ',' order by score desc)
-        from public.feed_page(p_limit => 8, p_seed => 2) where title like 'Feed probe %')
+        from public.feed_page(p_limit => 8, p_seed => 2,
+          p_author_key => 'profile:ee000000-0000-4000-8000-0000000000aa'))
          as should_be_true;
 
 -- ===================================================================

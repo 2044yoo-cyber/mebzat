@@ -7,6 +7,14 @@
 -- poster's profile, a company page, and applying.
 --
 -- Run it after supabase/seed/jobs-50.sql. It rolls itself back.
+--
+-- The line below is not a comment to a reader, it is one to the runner:
+-- `supabase/tests/run.sh` applies every `requires:` file before the test. This
+-- file asserts things about a *seed*, not about the migrations, and a database
+-- built from migrations alone has no postings for it to find — so without the
+-- declaration it failed on an empty table and read as a broken feature.
+--
+-- requires: supabase/seed/jobs-50.sql
 
 begin;
 
