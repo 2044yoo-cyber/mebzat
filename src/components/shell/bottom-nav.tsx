@@ -7,6 +7,8 @@ import {
   Bot,
   HardHat,
   CalendarDays,
+  Calculator,
+  Search,
   ChevronRight,
   Home,
   LayoutGrid,
@@ -184,6 +186,19 @@ function MoreSheet({
           >
             <X className="size-5" />
           </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 px-3 pb-3">
+          {[
+            { href: "/search", textKey: "navigation.search", icon: Search },
+            { href: "/calculators", textKey: "common.calculators", icon: Calculator },
+          ].map((item) => (
+            <Link key={item.href} href={item.href} onClick={onClose}
+              className="flex min-h-11 items-center gap-2 rounded-xl border px-3 text-sm font-medium active:bg-muted">
+              <item.icon className="size-4 shrink-0 text-brand" />
+              <I18nText textKey={item.textKey} />
+            </Link>
+          ))}
         </div>
 
         <div className="grid grid-cols-4 gap-1 px-3 pb-3">
