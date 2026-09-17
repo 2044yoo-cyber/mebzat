@@ -63,10 +63,10 @@ export default async function Home() {
             looking for one specific thing should not have to find the header
             first. */}
         <div className="mb-3 px-3 @lg/ws:px-0">
-          <GlobalSearch />
+          <GlobalSearch compactMobile />
         </div>
 
-        <FeedComposer signedIn={signedIn} viewer={viewer} />
+        <FeedComposer signedIn={signedIn} viewer={viewer} compactMobile />
 
         <CalculatorRail />
 

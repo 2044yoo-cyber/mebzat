@@ -1,3 +1,6 @@
+"use client";
+
+import { useLanguage } from "@/components/i18n/language-provider";
 import Link from "next/link";
 
 import { ArrowRight, Calculator } from "lucide-react";
@@ -14,24 +17,32 @@ import { popularCalculators } from "@/lib/calculators/registry";
  */
 export function CalculatorRail() {
   const popular = popularCalculators();
+  const { t } = useLanguage();
 
   return (
     <section className="mb-3 rounded-2xl border p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
           <Calculator className="size-4" />
-          Construction Calculators
+          {t("common.calculators")}
         </h2>
         <Link
           href="/calculators"
           className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-brand hover:underline"
         >
-          View all
+          {t("common.viewAll")}
           <ArrowRight className="size-3.5" />
         </Link>
       </div>
 
-      <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ul className="flex gap-2 lg:hidden">
+        {[["construction-cost", "common.constructionCost"], ["boq", "common.boq"]].map(([slug, key]) => (
+          <li key={slug} className="min-w-0 flex-1">
+            <Link href={`/calculators/${slug}`} className="flex min-h-11 items-center justify-center rounded-full border px-2 text-center text-xs font-medium hover:bg-muted">{t(key)}</Link>
+          </li>
+        ))}
+      </ul>
+      <ul className="-mx-4 hidden lg:flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {popular.map((calculator) => (
           <li key={calculator.slug} className="shrink-0">
             <Link

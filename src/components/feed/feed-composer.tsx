@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef } from "react";
-import { Camera, Home, ImagePlus, Sparkles, Store } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, X, Home, ImagePlus, Sparkles, Store } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -23,11 +23,25 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export function FeedComposer({
   signedIn,
   viewer,
+  compactMobile = false,
 }: {
+  compactMobile?: boolean;
   signedIn: boolean;
   viewer: { name: string; avatarUrl: string | null } | null;
 }) {
   const router = useRouter();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => {
+    if (!compactMobile) return;
+    const open = () => setMobileOpen(true);
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); };
+    window.addEventListener("medosha:compose", open);
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("medosha:compose", open);
+      window.removeEventListener("keydown", close);
+    };
+  }, [compactMobile]);
   const camera = useRef<HTMLInputElement>(null);
 
   function start(href: string) {
@@ -35,7 +49,8 @@ export function FeedComposer({
   }
 
   return (
-    <div className="mb-3 border-b border-border bg-background px-3 py-3 @lg/ws:rounded-2xl @lg/ws:border">
+    <div className={`${compactMobile && !mobileOpen ? "hidden lg:block" : ""} mb-3 border-b border-border bg-background px-3 py-3 @lg/ws:rounded-2xl @lg/ws:border`}>
+      {compactMobile && mobileOpen && <button type="button" aria-label="Close composer" onClick={() => setMobileOpen(false)} className="mb-2 ml-auto flex size-11 items-center justify-center lg:hidden"><X className="size-4" /></button>}
       <div className="flex items-center gap-2.5">
         <Avatar size="lg" className="shrink-0">
           {viewer?.avatarUrl && <AvatarImage src={viewer.avatarUrl} alt="" />}

@@ -16,7 +16,7 @@ export function I18nText({
   secondaryClassName?: string;
 }) {
   const { language, t } = useLanguage();
-  if (language !== "en" || !secondary) {
+  if (language !== "en" || !secondary || textKey.startsWith("navigation.")) {
     return <span data-i18n-managed className={className}>{t(textKey)}</span>;
   }
 

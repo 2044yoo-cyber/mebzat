@@ -52,6 +52,7 @@ export const translations: Record<Language, Dictionary> = {
       soon: "Soon",
     },
     common: {
+      searchMedosha: "Search Medosha", constructionCost: "Construction Cost", boq: "BOQ", calculators: "Calculators", viewAll: "View All",
       save: "Save", cancel: "Cancel", close: "Close", back: "Back", next: "Next",
       continue: "Continue", submit: "Submit", edit: "Edit", delete: "Delete", remove: "Remove",
       add: "Add", create: "Create", update: "Update", upload: "Upload", download: "Download",
@@ -202,6 +203,7 @@ export const translations: Record<Language, Dictionary> = {
       help: "እገዛ", saved: "የተቀመጡ", allMedosha: "ሁሉም ሜዶሻ", myWorkspace: "የስራ ቦታዬ", soon: "በቅርቡ",
     },
     common: {
+      searchMedosha: "መዶሻን ፈልግ", constructionCost: "የግንባታ ወጪ", boq: "የሥራ ዝርዝር", calculators: "ማስሊያዎች", viewAll: "ሁሉንም ይመልከቱ",
       save: "አስቀምጥ", cancel: "ሰርዝ", close: "ዝጋ", back: "ተመለስ", next: "ቀጣይ", continue: "ቀጥል",
       submit: "ላክ", edit: "አስተካክል", delete: "ሰርዝ", remove: "አስወግድ", add: "ጨምር", create: "ፍጠር",
       update: "አዘምን", upload: "ጫን", download: "አውርድ", publish: "አትም", unpublish: "ከህትመት አውጣ",
@@ -325,6 +327,7 @@ export const translations: Record<Language, Dictionary> = {
       help: "Gargaarsa", saved: "Olkaa'ame", allMedosha: "Medosha Hundaa", myWorkspace: "Iddoo Hojii Koo", soon: "Dhiheenyatti",
     },
     common: {
+      searchMedosha: "Medosha barbaadi", constructionCost: "Baasii ijaarsaa", boq: "BOQ", calculators: "Shallagduu", viewAll: "Hunda ilaali",
       save: "Olkaa'i", cancel: "Dhiisi", close: "Cufi", back: "Duubatti", next: "Itti aanu", continue: "Itti fufi",
       submit: "Ergi", edit: "Gulaali", delete: "Haqi", remove: "Dhabamsiisi", add: "Dabali", create: "Uumi", update: "Haaromsi",
       upload: "Olkaa'i", download: "Buufadhu", publish: "Maxxansi", unpublish: "Maxxansa irraa kaasi", search: "Barbaadi",

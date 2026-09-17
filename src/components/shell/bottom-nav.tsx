@@ -5,12 +5,11 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Bot,
-  Building2,
+  HardHat,
   CalendarDays,
   ChevronRight,
   Home,
   LayoutGrid,
-  MessagesSquare,
   Store,
   TrendingUp,
   Truck,
@@ -34,7 +33,7 @@ import { NavPending, NavPendingTint } from "@/components/shell/nav-pending";
  * navigation as a thumb-height bar at the bottom of the screen, where the
  * thumb already is.
  *
- * Six destinations, because seven is where a 360px screen starts truncating
+ * Five destinations, so a 360px screen has room for readable
  * labels, and everything else lives behind "More" — which opens a sheet built
  * from the same `NAV_SECTIONS` manifest the sidebar and the command palette
  * read, so a module added there appears here without another edit.
@@ -52,8 +51,7 @@ const PRIMARY: Destination[] = [
   { id: "home", href: "/", icon: Home },
   { id: "ai", href: "/ai", icon: Bot, prefix: "/ai" },
   { id: "market", href: "/marketplace", icon: Store, prefix: "/marketplace" },
-  { id: "property", href: "/city", icon: Building2, prefix: "/city" },
-  { id: "community", href: "/community", icon: MessagesSquare, prefix: "/community" },
+  { id: "projects", href: "/projects", icon: HardHat, prefix: "/projects" },
 ];
 
 /** Shown in the sheet above the full module list, because they are the ones
@@ -130,7 +128,7 @@ export function BottomNav({ signedIn }: { signedIn: boolean }) {
                     <NavPending className="size-3" />
                   </span>
                 </span>
-                <I18nText textKey={navigationKey(item.id)} secondary />
+                <I18nText textKey={navigationKey(item.id)} />
               </Link>
             </li>
           ))}
@@ -144,7 +142,7 @@ export function BottomNav({ signedIn }: { signedIn: boolean }) {
               className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 py-1 text-[10px] font-medium text-muted-foreground transition-colors active:bg-muted active:text-foreground"
             >
               <LayoutGrid className="size-5" />
-              <I18nText textKey="navigation.more" secondary />
+              <I18nText textKey="navigation.more" />
             </button>
           </li>
         </ul>
@@ -177,7 +175,7 @@ function MoreSheet({
         {/* The grab handle. Nothing drags it — it is the affordance that says
             this panel came from the bottom and closes downwards. */}
         <div className="sticky top-0 z-10 flex items-center justify-between bg-background px-4 pt-3 pb-2">
-          <I18nText textKey="navigation.allMedosha" secondary className="text-sm font-semibold text-foreground" />
+          <I18nText textKey="navigation.allMedosha" className="text-sm font-semibold text-foreground" />
           <button
             type="button"
             onClick={onClose}

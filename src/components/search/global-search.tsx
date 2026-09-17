@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { Loader2, Search, Sparkles } from "lucide-react";
 
+import { useLanguage } from "@/components/i18n/language-provider";
 import { SearchKindIcon } from "@/components/search/kind-icon";
 import { Button } from "@/components/ui/button";
 import { searchKindLabel } from "@/lib/constants/search";
@@ -31,13 +32,16 @@ export function GlobalSearch({
   size = "default",
   autoFocus = false,
   initialQuery = "",
+  compactMobile = false,
 }: {
   placeholder?: string;
   size?: "default" | "hero";
   autoFocus?: boolean;
   initialQuery?: string;
+  compactMobile?: boolean;
 }) {
   const router = useRouter();
+  const { t } = useLanguage();
   const listId = useId();
 
   const [term, setTerm] = useState(initialQuery);
@@ -153,12 +157,19 @@ export function GlobalSearch({
 
   return (
     <div ref={containerRef} className="relative w-full">
+      {compactMobile && (
+        <button type="button" onClick={() => go("/search")} className="glass flex h-11 w-full items-center gap-2 rounded-2xl border px-3 text-left text-sm text-muted-foreground shadow-sm lg:hidden">
+          <Search className="size-4 shrink-0" />
+          {t("common.searchMedosha")}
+        </button>
+      )}
       <form
         onSubmit={submit}
         role="search"
         className={cn(
           "glass flex items-center gap-2 rounded-2xl border shadow-sm transition-shadow",
           hero ? "p-2" : "p-1.5",
+          compactMobile && "hidden lg:flex",
           showPanel && "rounded-b-none",
         )}
       >
