@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   Briefcase,
@@ -129,6 +130,7 @@ const PENDING: QuickCreate[] = [
 ];
 
 export function QuickActions() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -158,7 +160,14 @@ export function QuickActions() {
             <Link
               key={action.id}
               href={action.href}
-              onClick={() => setOpen(false)}
+              onClick={(event) => {
+                setOpen(false);
+                if (action.id === "post" && pathname === "/" && window.matchMedia("(max-width: 1023px)").matches) {
+                  event.preventDefault();
+                  window.dispatchEvent(new Event("medosha:compose"));
+                  document.getElementById("workspace")?.scrollTo({ top: 0, behavior: "smooth" });
+                }
+              }}
               className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-muted"
             >
               <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-brand/12 text-brand">

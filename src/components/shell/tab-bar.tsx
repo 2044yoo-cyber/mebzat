@@ -61,7 +61,7 @@ export function TabBar() {
   }
 
   return (
-    <div className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b px-2 print:hidden">
+    <div className="hidden lg:flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b px-2 print:hidden">
       {tabs.map((tab) => {
         const active = tab.href === current;
         return (
