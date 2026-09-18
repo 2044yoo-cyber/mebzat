@@ -1,0 +1,134 @@
+[
+  {
+    "name": "starting a project no longer makes you a member",
+    "file": "supabase/migrations/0089_agenda_projects.sql",
+    "from": "create trigger agenda_project_seed_owner\n  after insert on public.agenda_projects",
+    "to": "create trigger agenda_project_seed_owner\n  after update on public.agenda_projects"
+  },
+  {
+    "name": "the owner is seeded with a status the helpers do not accept",
+    "file": "supabase/migrations/0089_agenda_projects.sql",
+    "from": "    new.id, new.owner_id, 'administrator', 'active',",
+    "to": "    new.id, new.owner_id, 'administrator', 'invited',"
+  },
+  {
+    "name": "any signed-in person can read any project",
+    "file": "supabase/migrations/0089_agenda_projects.sql",
+    "from": "  using (owner_id = auth.uid() or public.agenda_is_member(id));",
+    "to": "  using (true);"
+  },
+  {
+    "name": "anybody can create a project owned by somebody else",
+    "file": "supabase/migrations/0089_agenda_projects.sql",
+    "from": "  with check (owner_id = auth.uid());",
+    "to": "  with check (true);"
+  },
+  {
+    "name": "the repointing skips the existing agenda tables",
+    "file": "supabase/migrations/0089_agenda_projects.sql",
+    "from": "      and att.attname = 'project_id'",
+    "to": "      and att.attname = 'nothing_matches_this'"
+  },
+  {
+    "name": "site records are readable without membership",
+    "file": "supabase/migrations/0090_agenda_site.sql",
+    "from": "        using (public.agenda_is_member(project_id));\n    $f$, t, t);\n\n    execute format($f$\n      drop policy if exists \"agenda site: members write\"",
+    "to": "        using (true);\n    $f$, t, t);\n\n    execute format($f$\n      drop policy if exists \"agenda site: members write\""
+  },
+  {
+    "name": "site records are writable without membership",
+    "file": "supabase/migrations/0090_agenda_site.sql",
+    "from": "        with check (public.agenda_is_member(project_id));\n    $f$, t, t);\n\n    execute format($f$\n      drop policy if exists \"agenda site: members update\"",
+    "to": "        with check (true);\n    $f$, t, t);\n\n    execute format($f$\n      drop policy if exists \"agenda site: members update\""
+  },
+  {
+    "name": "a confidential document is readable by any member",
+    "file": "supabase/migrations/0090_agenda_site.sql",
+    "from": "      confidentiality = 'members'\n      or (confidentiality = 'finance' and public.agenda_can_view_finance(project_id))",
+    "to": "      true\n      or (confidentiality = 'finance' and public.agenda_can_view_finance(project_id))"
+  },
+  {
+    "name": "issuing a new revision does not make it current",
+    "file": "supabase/migrations/0090_agenda_site.sql",
+    "from": "  set current_revision_id = new.id, updated_at = now()\n  where id = new.drawing_id;",
+    "to": "  set updated_at = now()\n  where id = new.drawing_id;"
+  },
+  {
+    "name": "a revision replaces the one before it",
+    "file": "supabase/migrations/0090_agenda_site.sql",
+    "from": "  constraint agenda_drawing_revision_unique unique (drawing_id, revision)",
+    "to": "  constraint agenda_drawing_revision_unique unique (drawing_id)"
+  },
+  {
+    "name": "money is readable by any member",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "        using (public.agenda_is_member(project_id)\n               and (public.agenda_can_view_finance(project_id)\n                    or public.agenda_is_owner(project_id)));\n      drop policy if exists \"agenda money: write\"",
+    "to": "        using (public.agenda_is_member(project_id));\n      drop policy if exists \"agenda money: write\""
+  },
+  {
+    "name": "money is writable by any member",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "        with check (public.agenda_is_member(project_id)\n                    and (public.agenda_can_view_finance(project_id)\n                         or public.agenda_is_owner(project_id)));\n      drop policy if exists \"agenda money: update\"",
+    "to": "        with check (public.agenda_is_member(project_id));\n      drop policy if exists \"agenda money: update\""
+  },
+  {
+    "name": "contracts are gated on finance rather than on contracts",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "        using (public.agenda_is_member(project_id)\n               and (public.agenda_can_view_contracts(project_id)\n                    or public.agenda_is_owner(project_id)));\n      drop policy if exists \"agenda contracts: write\"",
+    "to": "        using (public.agenda_is_member(project_id)\n               and (public.agenda_can_view_finance(project_id)\n                    or public.agenda_is_owner(project_id)));\n      drop policy if exists \"agenda contracts: write\""
+  },
+  {
+    "name": "the contracts permission reads the wrong column",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "      and m.can_view_contracts\n  );",
+    "to": "      and m.can_view_finance\n  );"
+  },
+  {
+    "name": "the contracts permission is open to a signed-out visitor",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "revoke all on function public.agenda_can_view_contracts(uuid) from public, anon;",
+    "to": "revoke all on function public.agenda_can_view_contracts(uuid) from public;"
+  },
+  {
+    "name": "a draft change order moves the contract sum",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "        where co.contract_id = target and co.status = 'approved'",
+    "to": "        where co.contract_id = target"
+  },
+  {
+    "name": "the contract sum is incremented rather than recomputed",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "  set approved_changes = coalesce((",
+    "to": "  set approved_changes = c.approved_changes + coalesce(("
+  },
+  {
+    "name": "the contract's current value stops including changes",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "  generated always as (original_value + approved_changes) stored;",
+    "to": "  generated always as (original_value) stored;"
+  },
+  {
+    "name": "retention is folded into the invoice total",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "  generated always as (amount + tax_amount - retention_amount) stored;",
+    "to": "  generated always as (amount + tax_amount) stored;"
+  },
+  {
+    "name": "a part payment marks the invoice paid",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "        when settled >= due then 'paid'::public.agenda_money_status",
+    "to": "        when settled > 0 then 'paid'::public.agenda_money_status"
+  },
+  {
+    "name": "a payment settles an invoice nobody approved",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "    and status in ('approved', 'submitted', 'under_review', 'partially_paid', 'paid');",
+    "to": "    ;"
+  },
+  {
+    "name": "a BOQ line total is written rather than computed",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "  generated always as (round(quantity * unit_price, 2)) stored;\n\ncreate index if not exists agenda_boq_project_idx",
+    "to": "  generated always as (quantity) stored;\n\ncreate index if not exists agenda_boq_project_idx"
+  }
+]
