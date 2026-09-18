@@ -584,4 +584,157 @@ begin
 end;
 $$;
 
+-- ===================================================================
+-- 13. A submittal's current revision is the newest one issued.
+--
+-- 0090 gave submittals the column and the foreign key and no trigger, so it
+-- was null on every row. Drawings had the same shape and did have one, which
+-- is exactly how a gap like this hides: the pattern looks complete.
+-- ===================================================================
+reset role;
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000001';
+
+do $$
+declare
+  submittal uuid;
+  rev_one uuid;
+  rev_two uuid;
+  current_id uuid;
+begin
+  insert into public.agenda_submittals (project_id, number, title, status)
+  values ('a6000000-0000-4000-8000-00000000000a', 'SUB-900',
+          'Reinforcement shop drawings', 'pending')
+  returning id into submittal;
+
+  insert into public.agenda_submittal_revisions
+    (submittal_id, project_id, revision, status)
+  values (submittal, 'a6000000-0000-4000-8000-00000000000a', 1, 'pending')
+  returning id into rev_one;
+
+  select current_revision_id into current_id
+  from public.agenda_submittals where id = submittal;
+  if current_id is distinct from rev_one then
+    raise exception 'FAIL 13a: Rev 01 did not become current';
+  end if;
+  raise notice 'ok 13a: issuing Rev 01 makes it current';
+
+  insert into public.agenda_submittal_revisions
+    (submittal_id, project_id, revision, status)
+  values (submittal, 'a6000000-0000-4000-8000-00000000000a', 2, 'pending')
+  returning id into rev_two;
+
+  select current_revision_id into current_id
+  from public.agenda_submittals where id = submittal;
+  if current_id is distinct from rev_two then
+    raise exception 'FAIL 13b: Rev 02 did not replace Rev 01 as current';
+  end if;
+  raise notice 'ok 13b: Rev 02 replaces it';
+
+  -- Nothing is deleted. Rev 01 is still there to answer "what did the
+  -- contractor build to in March", which is the question a dispute turns on.
+  if not exists (
+    select 1 from public.agenda_submittal_revisions where id = rev_one
+  ) then
+    raise exception 'FAIL 13c: issuing Rev 02 destroyed Rev 01';
+  end if;
+  raise notice 'ok 13c: and does not destroy it';
+end;
+$$;
+
+-- ===================================================================
+-- 14. The site file store: one private bucket, keyed by project.
+--
+-- A site photograph shows a client's building, its progress and often its
+-- security arrangements. "Unlisted URL" is not a permission, so the bucket is
+-- private and the policy asks the same question every table asks.
+-- ===================================================================
+reset role;
+do $$
+declare is_public boolean;
+begin
+  select public into is_public from storage.buckets where id = 'agenda-files';
+  if is_public is null then
+    raise exception 'FAIL 14a: there is no agenda-files bucket';
+  end if;
+  if is_public then
+    raise exception 'FAIL 14a: the agenda-files bucket is public';
+  end if;
+  raise notice 'ok 14a: agenda-files exists and is private';
+end;
+$$;
+
+-- A member files something under the project.
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000003';
+
+do $$
+declare visible integer;
+begin
+  insert into storage.objects (bucket_id, name, owner)
+  values ('agenda-files',
+          'a6000000-0000-4000-8000-00000000000a/photos/slab-pour.jpg',
+          'a6000000-0000-4000-8000-000000000003');
+
+  select count(*) into visible from storage.objects
+  where bucket_id = 'agenda-files';
+  if visible <> 1 then
+    raise exception 'FAIL 14b: a member sees % of their own project files', visible;
+  end if;
+  raise notice 'ok 14b: a member files and reads what is under their project';
+end;
+$$;
+
+-- Somebody not on the project can neither read it nor file into it.
+reset role;
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000004';
+
+do $$
+declare visible integer;
+begin
+  select count(*) into visible from storage.objects
+  where bucket_id = 'agenda-files';
+  if visible <> 0 then
+    raise exception 'FAIL 14c: an outsider reads % site files', visible;
+  end if;
+  raise notice 'ok 14c: an outsider reads none of them';
+end;
+$$;
+
+do $$
+begin
+  insert into storage.objects (bucket_id, name, owner)
+  values ('agenda-files',
+          'a6000000-0000-4000-8000-00000000000a/photos/intruder.jpg',
+          'a6000000-0000-4000-8000-000000000004');
+  raise exception 'FAIL 14d: an outsider filed into somebody else''s project';
+exception
+  when insufficient_privilege then
+    raise notice 'ok 14d: and cannot file into it';
+end;
+$$;
+
+-- Nothing is deleted. The tables in 0024 and 0090 have no DELETE policy and
+-- neither does the store behind them, so a photograph filed in error is
+-- archived by the row that points at it rather than removed from under it.
+reset role;
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000003';
+
+do $$
+declare removed integer;
+begin
+  delete from storage.objects where bucket_id = 'agenda-files';
+  get diagnostics removed = row_count;
+  if removed <> 0 then
+    raise exception 'FAIL 14e: a member deleted % site files', removed;
+  end if;
+  raise notice 'ok 14e: not even a member can delete one';
+exception
+  when insufficient_privilege then
+    raise notice 'ok 14e: not even a member can delete one';
+end;
+$$;
+
 rollback;

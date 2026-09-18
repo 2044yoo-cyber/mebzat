@@ -50,7 +50,7 @@
   {
     "name": "an unbuilt section becomes a link",
     "file": "src/components/agenda/shell/workspace-nav.tsx",
-    "from": "            if (section.phase !== 1) {",
+    "from": "            if (section.phase > BUILT_THROUGH_PHASE) {",
     "to": "            if (false) {"
   },
   {
@@ -238,5 +238,173 @@
     "file": "src/app/(dashboard)/agenda/page.tsx",
     "from": "          Every job you are on, and what needs you today.",
     "to": "          Procore-style construction management."
+  },
+  {
+    "name": "phase 2 is still marked unbuilt",
+    "file": "src/lib/agenda/workspace-nav.ts",
+    "from": "export const BUILT_THROUGH_PHASE = 2;",
+    "to": "export const BUILT_THROUGH_PHASE = 1;"
+  },
+  {
+    "name": "the menu hard-codes the phase it links",
+    "file": "src/components/agenda/shell/workspace-nav.tsx",
+    "from": "            if (section.phase > BUILT_THROUGH_PHASE) {",
+    "to": "            if (section.phase !== 1) {"
+  },
+  {
+    "name": "a closed RFI counts as still waiting",
+    "file": "src/lib/agenda/records.ts",
+    "from": "const SETTLED: readonly ReviewStatus[] = [\n  \"answered\",",
+    "to": "const SETTLED: readonly ReviewStatus[] = [\n  \"draft\","
+  },
+  {
+    "name": "due today is already overdue",
+    "file": "src/lib/agenda/records.ts",
+    "from": "  return late !== null && late > 0;",
+    "to": "  return late !== null && late >= 0;"
+  },
+  {
+    "name": "an undated record is treated as due at epoch",
+    "file": "src/lib/agenda/records.ts",
+    "from": "  if (!dueDate) return null;",
+    "to": "  if (!dueDate) return 1;"
+  },
+  {
+    "name": "a settled record can still be late",
+    "file": "src/lib/agenda/records.ts",
+    "from": "  if (!isAwaitingAnswer(status)) return false;",
+    "to": "  if (false) return false;"
+  },
+  {
+    "name": "a revision is not padded",
+    "file": "src/lib/agenda/records.ts",
+    "from": "  return `Rev ${String(Math.max(revision, 0)).padStart(2, \"0\")}`;",
+    "to": "  return `Rev ${String(Math.max(revision, 0))}`;"
+  },
+  {
+    "name": "the next revision is the count plus one",
+    "file": "src/lib/agenda/records.ts",
+    "from": "  return existing.length === 0 ? 1 : Math.max(...existing) + 1;",
+    "to": "  return existing.length + 1;"
+  },
+  {
+    "name": "an undated activity is reported as on track",
+    "file": "src/lib/agenda/records.ts",
+    "from": "  if (elapsed === null) return null;",
+    "to": "  if (elapsed === null) return 0;"
+  },
+  {
+    "name": "elapsed is not clamped to the activity's own dates",
+    "file": "src/lib/agenda/records.ts",
+    "from": "  return Math.max(0, Math.min(100, Math.round(((now - from) / (to - from)) * 100)));",
+    "to": "  return Math.round(((now - from) / (to - from)) * 100);"
+  },
+  {
+    "name": "an activity whose parent is missing is dropped",
+    "file": "src/lib/agenda/records.ts",
+    "from": "    if (parent && parent !== node) parent.children.push(node);\n    else roots.push(node);",
+    "to": "    if (parent && parent !== node) parent.children.push(node);"
+  },
+  {
+    "name": "the programme comes back in whatever order it was read",
+    "file": "src/lib/agenda/records.ts",
+    "from": "    nodes.sort((a, b) => a.position - b.position);",
+    "to": "    nodes.sort(() => 0);"
+  },
+  {
+    "name": "a photo's place prints dashes for what nobody filled in",
+    "file": "src/lib/agenda/records.ts",
+    "from": "  return parts.length > 0 ? parts.join(\" \u00b7 \") : null;",
+    "to": "  return [photo.building ?? \"-\", photo.floor ?? \"-\", photo.area ?? \"-\"].join(\" \u00b7 \");"
+  },
+  {
+    "name": "the photo diary reads oldest day first",
+    "file": "src/lib/agenda/records.ts",
+    "from": "    .sort((a, b) => (a[0] < b[0] ? 1 : -1))",
+    "to": "    .sort((a, b) => (a[0] < b[0] ? -1 : 1))"
+  },
+  {
+    "name": "an RFI numbers itself from a shared counter",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    { target_project: projectId, record_kind: \"rfi\", prefix: \"RFI\", width: 3 },",
+    "to": "    { target_project: projectId, record_kind: \"any\", prefix: \"RFI\", width: 3 },"
+  },
+  {
+    "name": "a submittal shares the RFI counter",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "      record_kind: \"submittal\",\n      prefix: \"SUB\",",
+    "to": "      record_kind: \"rfi\",\n      prefix: \"SUB\","
+  },
+  {
+    "name": "a resubmission reuses a withdrawn number",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    revision: highest + 1,",
+    "to": "    revision: highest,"
+  },
+  {
+    "name": "a review is recorded on the revision only",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "  const { error: rollUpError } = await supabase\n    .from(\"agenda_submittals\")\n    .update({ status: outcome as Reviewable })",
+    "to": "  const { error: rollUpError } = await supabase\n    .from(\"agenda_submittals\")\n    .update({ status: \"pending\" as Reviewable })"
+  },
+  {
+    "name": "any string is accepted as a review outcome",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "  if (!REVIEWABLE.includes(outcome as Reviewable)) {",
+    "to": "  if (false) {"
+  },
+  {
+    "name": "an activity at 100 per cent still reads as to do",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "      status: clamped >= 100 ? \"done\" : clamped > 0 ? \"in_progress\" : \"todo\",",
+    "to": "      status: \"todo\","
+  },
+  {
+    "name": "a photo row can point at another project's object",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "  if (!isInProject(storagePath, projectId)) {",
+    "to": "  if (false) {"
+  },
+  {
+    "name": "photos are filed outside the folder the policy matches",
+    "file": "src/lib/agenda/files.ts",
+    "from": "  return `${projectId}/${folder}/${crypto.randomUUID()}.${safe}`;",
+    "to": "  return `${folder}/${crypto.randomUUID()}.${safe}`;"
+  },
+  {
+    "name": "the RFI register sorts by date alone",
+    "file": "src/components/agenda/site/rfi-register.tsx",
+    "from": "    if (aOpen !== bOpen) return aOpen - bOpen;",
+    "to": "    if (false) return aOpen - bOpen;"
+  },
+  {
+    "name": "the programme draws one bar instead of two",
+    "file": "src/components/agenda/site/schedule-board.tsx",
+    "from": "          <Bar\n            label=\"Elapsed\"",
+    "to": "          <Bar\n            label=\"Built again\""
+  },
+  {
+    "name": "progress is written on every pixel of the drag",
+    "file": "src/components/agenda/site/schedule-board.tsx",
+    "from": "            onBlur={(event) => {",
+    "to": "            onChange={(event) => {"
+  },
+  {
+    "name": "the bucket name drifts from the one the migration created",
+    "file": "src/lib/agenda/files.ts",
+    "from": "export const AGENDA_FILES_BUCKET = \"agenda-files\";",
+    "to": "export const AGENDA_FILES_BUCKET = \"agenda_files\";"
+  },
+  {
+    "name": "any project's path counts as inside this one",
+    "file": "src/lib/agenda/files.ts",
+    "from": "  return storagePath.startsWith(`${projectId}/`);",
+    "to": "  return storagePath.includes(projectId);"
+  },
+  {
+    "name": "a file name is trusted to end in an extension",
+    "file": "src/lib/agenda/files.ts",
+    "from": "  const safe = /^[a-z0-9]{1,8}$/.test(extension) ? extension : \"bin\";",
+    "to": "  const safe = extension;"
   }
 ]

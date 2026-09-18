@@ -29,12 +29,34 @@ import {
   isLiveProject,
 } from "../src/lib/agenda/projects.ts";
 import {
+  BUILT_THROUGH_PHASE,
   LIVE_SECTIONS,
   WORKSPACE_GROUPS,
   WORKSPACE_SECTIONS,
   activeSection,
   sectionHref,
 } from "../src/lib/agenda/workspace-nav.ts";
+import {
+  AGENDA_FILES_BUCKET,
+  agendaFilePath,
+  isInProject,
+} from "../src/lib/agenda/files.ts";
+import {
+  REVIEW_STATUSES,
+  buildScheduleTree,
+  daysLate,
+  // Named `elapsedOnSchedule` here because `lib/agenda/projects` exports an
+  // `elapsedPercent` of its own — the project's, not an activity's — and this
+  // file checks both.
+  elapsedPercent as elapsedOnSchedule,
+  groupPhotosByDay,
+  isAwaitingAnswer,
+  isOverdue,
+  nextRevision,
+  photoPlace,
+  revisionLabel,
+  scheduleVariance,
+} from "../src/lib/agenda/records.ts";
 import { translations, LANGUAGES } from "../src/lib/i18n/translations.ts";
 
 const GREEN = "\x1b[32m";
@@ -184,8 +206,15 @@ function exists(path: string): boolean {
   const navSource = code("src/components/agenda/shell/workspace-nav.tsx");
   check(
     "a section that is not built yet is not a link",
-    /if \(section\.phase !== 1\) \{[\s\S]{0,400}?<span/.test(navSource),
+    /if \(section\.phase > BUILT_THROUGH_PHASE\) \{[\s\S]{0,400}?<span/.test(
+      navSource,
+    ),
     "a link to an empty page costs somebody a tap to find out",
+  );
+  check(
+    "and it asks the shared constant rather than a literal phase number",
+    /BUILT_THROUGH_PHASE/.test(navSource) && !/section\.phase [!=]== \d/.test(navSource),
+    "a hard-coded 1 here is how the menu and LIVE_SECTIONS came to disagree",
   );
   check(
     "the built ones are",
@@ -496,6 +525,300 @@ function exists(path: string): boolean {
       !/procore/i.test(readFileSync(file, "utf8")),
     );
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// 6. Phase 2: the records a site actually argues about
+// ---------------------------------------------------------------------------
+
+{
+  check(
+    "the build has reached phase 2",
+    BUILT_THROUGH_PHASE >= 2,
+  );
+  check(
+    "the uploader names the bucket 0094 actually created",
+    AGENDA_FILES_BUCKET === "agenda-files" &&
+      readFileSync("supabase/migrations/0094_agenda_files.sql", "utf8").includes(
+        "'agenda-files'",
+      ),
+  );
+  for (const id of [
+    "rfis",
+    "submittals",
+    "schedule",
+    "photos",
+    "daily-logs",
+    "meetings",
+  ]) {
+    check(
+      `${id} is live rather than "soon"`,
+      LIVE_SECTIONS.some((section) => section.id === id),
+    );
+  }
+
+  // --- review status -------------------------------------------------------
+
+  check(
+    "every review status the database has is spelled here",
+    REVIEW_STATUSES.length === 9,
+    `${REVIEW_STATUSES.length} of agenda_review_status's 9`,
+  );
+  check(
+    "each one has a tone the chip can actually draw",
+    REVIEW_STATUSES.every((entry) =>
+      ["neutral", "info", "active", "warning", "success", "danger", "muted"].includes(
+        entry.tone,
+      ),
+    ),
+  );
+  check(
+    "a draft is still waiting on somebody",
+    isAwaitingAnswer("draft") && isAwaitingAnswer("open") &&
+      isAwaitingAnswer("pending") && isAwaitingAnswer("revise_resubmit"),
+  );
+  check(
+    "and an answered, approved, rejected or closed one is not",
+    !isAwaitingAnswer("answered") && !isAwaitingAnswer("approved") &&
+      !isAwaitingAnswer("approved_with_comments") &&
+      !isAwaitingAnswer("rejected") && !isAwaitingAnswer("closed"),
+    "counting a closed RFI as open is how a register stops being believed",
+  );
+
+  // --- overdue -------------------------------------------------------------
+
+  const today = new Date("2026-03-10T09:00:00Z");
+  check(
+    "an undated record is not late",
+    daysLate(null, today) === null && !isOverdue(null, "open", today),
+    "a red badge on everything teaches people to ignore red badges",
+  );
+  check(
+    "due today is not yet overdue",
+    daysLate("2026-03-10", today) === 0 && !isOverdue("2026-03-10", "open", today),
+  );
+  check(
+    "yesterday is one day late",
+    daysLate("2026-03-09", today) === 1 && isOverdue("2026-03-09", "open", today),
+  );
+  check(
+    "a settled record is never late, however old the date",
+    !isOverdue("2020-01-01", "answered", today) &&
+      !isOverdue("2020-01-01", "closed", today),
+  );
+  check(
+    "a date that is not a date does not become day zero",
+    daysLate("not a date", today) === null,
+  );
+
+  // --- revisions -----------------------------------------------------------
+
+  check(
+    "a revision reads the way a transmittal writes it",
+    revisionLabel(1) === "Rev 01" && revisionLabel(12) === "Rev 12",
+    "Rev 9 sorting after Rev 10 is a list somebody misreads",
+  );
+  check(
+    "the next revision follows the highest issued, not the count",
+    nextRevision([1, 2, 5]) === 6 && nextRevision([]) === 1,
+    "reusing a withdrawn number puts two documents in two inboxes as one",
+  );
+
+  // --- schedule ------------------------------------------------------------
+
+  check(
+    "elapsed is null without both dates, not zero",
+    elapsedOnSchedule("2026-03-01", null, today) === null &&
+      elapsedOnSchedule(null, "2026-03-20", today) === null,
+    "undated is not the same as not started",
+  );
+  check(
+    "halfway through the dates is halfway elapsed",
+    elapsedOnSchedule("2026-03-05", "2026-03-15", today) === 50,
+  );
+  check(
+    "before it starts is 0 and after it finishes is 100",
+    elapsedOnSchedule("2026-04-01", "2026-04-10", today) === 0 &&
+      elapsedOnSchedule("2026-01-01", "2026-01-10", today) === 100,
+  );
+  check(
+    "variance is progress minus elapsed, in points",
+    scheduleVariance("2026-03-05", "2026-03-15", 20, today) === -30 &&
+      scheduleVariance("2026-03-05", "2026-03-15", 50, today) === 0,
+    "20% built against 80% elapsed is the activity the meeting is about",
+  );
+  check(
+    "an undated activity has no variance rather than a variance of zero",
+    scheduleVariance(null, null, 40, today) === null,
+    "zero means on track, and unplanned is not on track",
+  );
+
+  {
+    const flat = [
+      { id: "b", parentId: "a", position: 1 },
+      { id: "a", parentId: null, position: 0 },
+      { id: "c", parentId: "a", position: 0 },
+      { id: "orphan", parentId: "gone", position: 9 },
+    ];
+    const tree = buildScheduleTree(flat);
+    check(
+      "the programme nests, in planner's order",
+      tree.length === 2 &&
+        tree[0]?.id === "a" &&
+        tree[0]?.children.map((child) => child.id).join(",") === "c,b",
+    );
+    check(
+      "an activity whose parent is missing is kept, not dropped",
+      tree.some((node) => node.id === "orphan"),
+      "a programme that silently loses rows is worse than a wrong indent",
+    );
+  }
+
+  // --- photos --------------------------------------------------------------
+
+  check(
+    "a photo's place skips the parts nobody filled in",
+    photoPlace({ building: "Block B", floor: null, area: "Core" }) ===
+      "Block B · Core" &&
+      photoPlace({ building: null, floor: null, area: null }) === null,
+  );
+  {
+    const days = groupPhotosByDay([
+      { takenAt: "2026-03-01T08:00:00Z" },
+      { takenAt: "2026-03-02T08:00:00Z" },
+      { takenAt: "2026-03-01T17:00:00Z" },
+    ]);
+    check(
+      "photos read as a diary: newest day first, both of that day together",
+      days.length === 2 &&
+        days[0]?.day === "2026-03-02" &&
+        days[1]?.photos.length === 2,
+    );
+  }
+
+  // --- the writes ----------------------------------------------------------
+
+  const actions = code(
+    "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+  );
+  check(
+    "an RFI takes its number from the counter, not from a count",
+    /supabase\.rpc\(\s*"agenda_next_number",\s*\{\s*target_project: projectId,\s*record_kind: "rfi"/.test(
+      actions,
+    ),
+    "count(*) + 1 hands two engineers the same RFI-024",
+  );
+  check(
+    "and a submittal takes its own",
+    /record_kind: "submittal",\s*prefix: "SUB"/.test(actions),
+  );
+  check(
+    "neither counts rows to find the next number",
+    !/count\(\*\)/.test(actions) &&
+      !/\.select\("id",\s*\{\s*count: "exact"[\s\S]{0,200}?number/.test(actions),
+  );
+  check(
+    "a resubmission follows the highest revision issued",
+    /order\("revision",\s*\{\s*ascending: false\s*\}\)[\s\S]{0,400}?revision: highest \+ 1,/.test(
+      actions,
+    ),
+  );
+  check(
+    "a review is written to the revision and to the submittal",
+    /from\("agenda_submittal_revisions"\)\s*\.update\(\{[\s\S]{0,300}?reviewed_by: user\.id/.test(
+      actions,
+    ) &&
+      /from\("agenda_submittals"\)\s*\.update\(\{ status: outcome as Reviewable \}\)/.test(
+        actions,
+      ),
+    "the revision keeps what was decided; the register shows the latest",
+  );
+  check(
+    "only a real outcome is accepted",
+    /if \(!REVIEWABLE\.includes\(outcome as Reviewable\)\) \{/.test(actions),
+  );
+  check(
+    "reported progress carries the status with it",
+    /status: clamped >= 100 \? "done" : clamped > 0 \? "in_progress" : "todo"/.test(
+      actions,
+    ),
+    "an activity at 100% still reading To do is a programme nobody believes",
+  );
+  check(
+    "a photo's path is checked against the project it claims",
+    /if \(!isInProject\(storagePath, projectId\)\) \{/.test(actions),
+    "a row and an object that disagree is a photo nobody can open",
+  );
+
+  const wall = code("src/components/agenda/site/photo-wall.tsx");
+  check(
+    "the uploader files under the project id, which is what the policy matches",
+    /agendaFilePath\(projectId, "photos", file\.name\)/.test(wall) &&
+      agendaFilePath("p1", "photos", "slab.JPG").startsWith("p1/photos/"),
+  );
+  check(
+    "and the uploader and the checker share one definition of that",
+    isInProject(agendaFilePath("p1", "photos", "slab.jpg"), "p1") &&
+      !isInProject(agendaFilePath("p2", "photos", "slab.jpg"), "p1"),
+    "two spellings of \"inside this project\" is one of them being wrong",
+  );
+  check(
+    "inside means the first segment, not anywhere in the path",
+    !isInProject("p2/photos/p1-elevation.jpg", "p1") &&
+      !isInProject("elsewhere/p1/photos/slab.jpg", "p1"),
+    "the storage policy reads foldername[1]; a substring match is not that",
+  );
+  check(
+    "a file name that is not really an extension does not become the path",
+    agendaFilePath("p1", "photos", "slab.tar.gz;rm -rf").endsWith(".bin"),
+  );
+  check(
+    "and it uploads from the browser rather than through the action",
+    /storage\.from\(AGENDA_FILES_BUCKET\)\s*\.upload\(path, file/.test(wall),
+    "an 8 MB phone photo through a server action is held in memory twice",
+  );
+
+  const rfiView = code("src/components/agenda/site/rfi-register.tsx");
+  check(
+    "the RFI register puts what is waiting above what is settled",
+    /const aOpen = isAwaitingAnswer\(a\.status\) \? 0 : 1;[\s\S]{0,200}?if \(aOpen !== bOpen\) return aOpen - bOpen;/.test(
+      rfiView,
+    ),
+    "sorted by date alone, last month's clash sits below this morning's query",
+  );
+
+  const board = code("src/components/agenda/site/schedule-board.tsx");
+  check(
+    "the programme draws reported progress and elapsed time separately",
+    /<Bar\s+label="Built"/.test(board) && /<Bar\s+label="Elapsed"/.test(board),
+    "one bar would hide the activity 20% built and 80% elapsed",
+  );
+  check(
+    "progress is written when the slider is let go, not on every pixel",
+    /onBlur=\{\(event\) => \{[\s\S]{0,200}?onProgress\(node\.id, next\)/.test(board) &&
+      !/onChange=\{\(event\) => \{[\s\S]{0,120}?onProgress\(/.test(board),
+  );
+
+  // Daily logs and meetings are 0024's panels, reused. The check is that they
+  // were reused: a second daily-log form is a second place for "one entry per
+  // day" to be wrong.
+  const logPage = code(
+    "src/app/(dashboard)/agenda/projects/[projectId]/daily-logs/page.tsx",
+  );
+  check(
+    "the daily log screen reuses the panel that already existed",
+    /<DailyLogPanel projectId=\{projectId\} logs=\{logs\} \/>/.test(logPage),
+  );
+  const meetingPage = code(
+    "src/app/(dashboard)/agenda/projects/[projectId]/meetings/page.tsx",
+  );
+  check(
+    "and so does the meetings screen",
+    /<MeetingPanel projectId=\{projectId\} meetings=\{meetings\} \/>/.test(
+      meetingPage,
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------

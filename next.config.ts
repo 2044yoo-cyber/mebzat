@@ -19,6 +19,17 @@ const nextConfig: NextConfig = {
               hostname: supabaseHost,
               pathname: "/storage/v1/object/public/**",
             },
+            // Signed objects from the private buckets. Agenda's site photos
+            // live in one — a photograph of a client's building and its
+            // progress is not something an unlisted URL is a permission for —
+            // so they are served as `/object/sign/...` with an expiry, and the
+            // optimiser has to be told that path exists as well as the public
+            // one. Same host either way: this widens the path, not the origin.
+            {
+              protocol: "https" as const,
+              hostname: supabaseHost,
+              pathname: "/storage/v1/object/sign/**",
+            },
           ]
         : []),
       // Placeholder image hosts used by the development seed dataset only:

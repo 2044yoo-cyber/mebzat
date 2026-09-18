@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import {
+  BUILT_THROUGH_PHASE,
   WORKSPACE_GROUPS,
   activeSection,
   sectionHref,
@@ -44,7 +45,7 @@ export function WorkspaceNav({ projectId }: { projectId: string }) {
             const Icon = section.icon;
             const on = section.id === current;
 
-            if (section.phase !== 1) {
+            if (section.phase > BUILT_THROUGH_PHASE) {
               return (
                 <span
                   key={section.id}

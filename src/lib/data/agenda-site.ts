@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { AGENDA_FILES_BUCKET } from "@/lib/agenda/files";
 import type { Discipline, ReviewStatus } from "@/lib/agenda/records";
 import type { TaskPriority, TaskStatus } from "@/lib/agenda/constants";
 
@@ -405,6 +406,35 @@ export async function getSitePhotos(projectId: string): Promise<SitePhoto[]> {
     panoramaJobId: row.panorama_job_id,
     uploadedBy: toPerson(one(row.uploader)),
   }));
+}
+
+/**
+ * Signed URLs for a page of photos, keyed by storage path.
+ *
+ * The bucket is private, so there is no public URL to render — a site
+ * photograph shows a client's building and its progress, and "unlisted URL" is
+ * not a permission. One batched call rather than one per photo, and an hour of
+ * validity, which outlasts reading a page and not a screenshot pasted into a
+ * group chat.
+ *
+ * A path that cannot be signed is simply absent from the map. The caller draws
+ * a placeholder for it: one unreadable object must not take the wall down.
+ */
+export async function signedPhotoUrls(
+  paths: readonly string[],
+): Promise<Map<string, string>> {
+  const signed = new Map<string, string>();
+  if (paths.length === 0) return signed;
+
+  const supabase = await createClient();
+  const { data } = await supabase.storage
+    .from(AGENDA_FILES_BUCKET)
+    .createSignedUrls([...paths], 3600);
+
+  for (const entry of data ?? []) {
+    if (entry.path && entry.signedUrl) signed.set(entry.path, entry.signedUrl);
+  }
+  return signed;
 }
 
 /**

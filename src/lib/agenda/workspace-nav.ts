@@ -112,9 +112,18 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = WORKSPACE_GROUPS.flatMap(
   (group) => group.sections,
 );
 
+/**
+ * How far the build has got.
+ *
+ * One number rather than a list, so landing a phase is one edit and the
+ * navigation cannot come to disagree with the routes. `section.phase` stays
+ * honest about which stage brought each screen.
+ */
+export const BUILT_THROUGH_PHASE = 2;
+
 /** The sections that have a screen today. */
 export const LIVE_SECTIONS = WORKSPACE_SECTIONS.filter(
-  (section) => section.phase === 1,
+  (section) => section.phase <= BUILT_THROUGH_PHASE,
 );
 
 export function sectionHref(projectId: string, segment: string): string {

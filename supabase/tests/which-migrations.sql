@@ -114,7 +114,22 @@ begin
       -- apply again.
       (84, '0084_professionals_seed', 'row',     'seed_content|batch = ''professionals-2026-09'''),
       (85, '0085_places',             'row',     'location_areas|slug = ''ayertena'''),
-      (86, '0086_profile_documents',  'column',  'profiles.cv_path')
+      (86, '0086_profile_documents',  'column',  'profiles.cv_path'),
+      -- `notifications` predates 0087; `entity_type` is what it added, and it
+      -- is what the message-to-notification link is keyed on.
+      (87, '0087_message_notifications','column', 'notifications.entity_type'),
+      (88, '0088_blocks_and_reports', 'table',   'user_blocks'),
+      -- Agenda's tables are all prefixed `agenda_` and several migrations
+      -- mention each other's, so the object looked for is the one each file
+      -- creates rather than the first name that matches the prefix.
+      (89, '0089_agenda_projects',    'table',   'agenda_projects'),
+      (90, '0090_agenda_site',        'table',   'agenda_rfis'),
+      -- 0091 created `agenda_can_view_contracts`, which 0024 named as a
+      -- permission and never gave a reader.
+      (91, '0091_agenda_commercial',  'func',    'agenda_can_view_contracts'),
+      (92, '0092_agenda_numbering',   'func',    'agenda_next_number'),
+      (93, '0093_agenda_submittal_current', 'func', 'agenda_submittal_set_current'),
+      (94, '0094_agenda_files',       'bucket',  'agenda-files')
     ) as t (ordering, migration, kind, object)
   loop
     present := case row.kind

@@ -166,5 +166,41 @@
     "file": "supabase/migrations/0092_agenda_numbering.sql",
     "from": "  from public, anon;",
     "to": "  from public;"
+  },
+  {
+    "name": "issuing a submittal revision does not make it current",
+    "file": "supabase/migrations/0093_agenda_submittal_current.sql",
+    "from": "  after insert on public.agenda_submittal_revisions",
+    "to": "  after insert on public.agenda_submittal_revisions when (false)"
+  },
+  {
+    "name": "a submittal revision points at the wrong submittal",
+    "file": "supabase/migrations/0093_agenda_submittal_current.sql",
+    "from": "  where id = new.submittal_id;",
+    "to": "  where id = new.project_id;"
+  },
+  {
+    "name": "a new submittal revision replaces the one before it",
+    "file": "supabase/migrations/0093_agenda_submittal_current.sql",
+    "from": "  set current_revision_id = new.id, updated_at = now()\n  where id = new.submittal_id;",
+    "to": "  set current_revision_id = coalesce(current_revision_id, new.id), updated_at = now()\n  where id = new.submittal_id;"
+  },
+  {
+    "name": "the site file bucket is public",
+    "file": "supabase/migrations/0094_agenda_files.sql",
+    "from": "  'agenda-files',\n  'agenda-files',\n  false,",
+    "to": "  'agenda-files',\n  'agenda-files',\n  true,"
+  },
+  {
+    "name": "site files are readable without membership",
+    "file": "supabase/migrations/0094_agenda_files.sql",
+    "from": "    and public.agenda_is_member(((storage.foldername(name))[1])::uuid)\n  );\n\ndrop policy if exists \"agenda files: members upload\"",
+    "to": "    and true\n  );\n\ndrop policy if exists \"agenda files: members upload\""
+  },
+  {
+    "name": "anybody can file into anybody's project",
+    "file": "supabase/migrations/0094_agenda_files.sql",
+    "from": "  with check (\n    bucket_id = 'agenda-files'\n    and (storage.foldername(name))[1] ~\n        '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'\n    and public.agenda_is_member(((storage.foldername(name))[1])::uuid)\n  );",
+    "to": "  with check (\n    bucket_id = 'agenda-files'\n  );"
   }
 ]
