@@ -130,5 +130,41 @@
     "file": "supabase/migrations/0091_agenda_commercial.sql",
     "from": "  generated always as (round(quantity * unit_price, 2)) stored;\n\ncreate index if not exists agenda_boq_project_idx",
     "to": "  generated always as (quantity) stored;\n\ncreate index if not exists agenda_boq_project_idx"
+  },
+  {
+    "name": "one counter serves every record kind",
+    "file": "supabase/migrations/0092_agenda_numbering.sql",
+    "from": "  values (target_project, record_kind, 1)",
+    "to": "  values (target_project, 'any', 1)"
+  },
+  {
+    "name": "anybody can take a number from anybody's project",
+    "file": "supabase/migrations/0092_agenda_numbering.sql",
+    "from": "  if not public.agenda_is_member(target_project) then",
+    "to": "  if false then"
+  },
+  {
+    "name": "the counter never advances",
+    "file": "supabase/migrations/0092_agenda_numbering.sql",
+    "from": "  set next_value = c.next_value + 1",
+    "to": "  set next_value = c.next_value"
+  },
+  {
+    "name": "the number handed back is the one after the one reserved",
+    "file": "supabase/migrations/0092_agenda_numbering.sql",
+    "from": "  returning c.next_value - 1 into reserved",
+    "to": "  returning c.next_value into reserved"
+  },
+  {
+    "name": "the counter table is left open to members",
+    "file": "supabase/migrations/0092_agenda_numbering.sql",
+    "from": "alter table public.agenda_counters enable row level security;",
+    "to": "alter table public.agenda_counters disable row level security;"
+  },
+  {
+    "name": "numbering is left open to a signed-out visitor",
+    "file": "supabase/migrations/0092_agenda_numbering.sql",
+    "from": "  from public, anon;",
+    "to": "  from public;"
   }
 ]

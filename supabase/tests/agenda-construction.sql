@@ -496,4 +496,92 @@ begin
 end;
 $$;
 
+-- ===================================================================
+-- 12. Record numbers: sequential, per project, per kind.
+--
+-- "The clash on RFI-023" is how a site meeting refers to a question, so the
+-- number has to be short, sequential and stable. The interesting failures are
+-- a counter shared between kinds (an RFI and a submittal taking turns) and a
+-- counter that is not a counter at all — a constant, or a count that restarts.
+-- ===================================================================
+reset role;
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000001';
+
+do $$
+declare
+  first text;
+  second text;
+  third text;
+  other text;
+  visible integer;
+begin
+  -- `is distinct from` throughout rather than `<>`. A function that stops
+  -- finding its counter row returns null, `null <> 'RFI-001'` is null, and a
+  -- plpgsql `if` does not fire on null — so the broken version passed every
+  -- one of these until mutation testing said otherwise.
+  first := public.agenda_next_number(
+    'a6000000-0000-4000-8000-00000000000a', 'rfi', 'RFI');
+  second := public.agenda_next_number(
+    'a6000000-0000-4000-8000-00000000000a', 'rfi', 'RFI');
+  third := public.agenda_next_number(
+    'a6000000-0000-4000-8000-00000000000a', 'rfi', 'RFI');
+
+  if first is distinct from 'RFI-001' then
+    raise exception 'FAIL 12a: the first number is %, not RFI-001', first;
+  end if;
+  if second is distinct from 'RFI-002'
+     or third is distinct from 'RFI-003' then
+    raise exception 'FAIL 12a: the sequence went % then % then %',
+      first, second, third;
+  end if;
+  raise notice 'ok 12a: RFI-001, RFI-002, RFI-003';
+
+  -- A shared counter would make this SUB-004.
+  other := public.agenda_next_number(
+    'a6000000-0000-4000-8000-00000000000a', 'submittal', 'SUB');
+  if other is distinct from 'SUB-001' then
+    raise exception 'FAIL 12b: submittals started at %, so the counter is shared with RFIs', other;
+  end if;
+  raise notice 'ok 12b: each kind counts on its own';
+
+  -- The table has no policy. The function is the whole interface to it, and
+  -- a member reading it directly must come back empty rather than being
+  -- allowed to set the next number themselves.
+  select count(*) into visible from public.agenda_counters;
+  if visible <> 0 then
+    raise exception 'FAIL 12c: a member can read % counter rows directly', visible;
+  end if;
+  raise notice 'ok 12c: the counter table is reachable only through the function';
+end;
+$$;
+
+-- Somebody who is not on the project cannot take a number from it.
+reset role;
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000004';
+
+do $$
+declare taken text;
+begin
+  taken := public.agenda_next_number(
+    'a6000000-0000-4000-8000-00000000000a', 'rfi', 'RFI');
+  raise exception 'FAIL 12d: an outsider took % from a project they are not on', taken;
+exception
+  when insufficient_privilege then
+    raise notice 'ok 12d: an outsider is refused a number';
+end;
+$$;
+
+reset role;
+do $$
+begin
+  if has_function_privilege('anon',
+       'public.agenda_next_number(uuid, text, text, integer)', 'execute') then
+    raise exception 'FAIL 12e: a signed-out visitor can take record numbers';
+  end if;
+  raise notice 'ok 12e: numbering is not open to anon';
+end;
+$$;
+
 rollback;
