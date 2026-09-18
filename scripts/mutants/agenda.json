@@ -1,0 +1,242 @@
+[
+  {
+    "name": "Agenda is not in the navigation",
+    "file": "src/lib/workspace/navigation.ts",
+    "from": "    id: \"agenda\",\n    label: \"Agenda\",",
+    "to": "    id: \"agenda-hidden\",\n    label: \"Agenda\","
+  },
+  {
+    "name": "the Agenda menu is public",
+    "file": "src/lib/workspace/navigation.ts",
+    "from": "        href: \"/agenda\",\n        private: true,",
+    "to": "        href: \"/agenda\",\n        private: false,"
+  },
+  {
+    "name": "the calendar row is dropped",
+    "file": "src/lib/workspace/navigation.ts",
+    "from": "        href: \"/agenda/calendar\",",
+    "to": "        href: \"/agenda/nowhere\","
+  },
+  {
+    "name": "a built section links nowhere",
+    "file": "src/lib/agenda/workspace-nav.ts",
+    "from": "      { id: \"drawings\", segment: \"drawings\", label: \"Drawings\", icon: PencilRuler, phase: 1 },",
+    "to": "      { id: \"drawings\", segment: \"drawings-missing\", label: \"Drawings\", icon: PencilRuler, phase: 1 },"
+  },
+  {
+    "name": "two sections share a segment",
+    "file": "src/lib/agenda/workspace-nav.ts",
+    "from": "      { id: \"documents\", segment: \"documents\", label: \"Documents\", icon: FileStack, phase: 1 },",
+    "to": "      { id: \"documents\", segment: \"drawings\", label: \"Documents\", icon: FileStack, phase: 1 },"
+  },
+  {
+    "name": "Overview stops being the project root",
+    "file": "src/lib/agenda/workspace-nav.ts",
+    "from": "      { id: \"overview\", segment: \"\", label: \"Overview\", icon: LayoutDashboard, phase: 1 },",
+    "to": "      { id: \"overview\", segment: \"overview\", label: \"Overview\", icon: LayoutDashboard, phase: 1 },"
+  },
+  {
+    "name": "opening a drawing un-highlights Drawings",
+    "file": "src/lib/agenda/workspace-nav.ts",
+    "from": "  const rest = pathname.slice(base.length + 1).split(\"/\")[0] ?? \"\";",
+    "to": "  const rest = pathname.slice(base.length + 1);"
+  },
+  {
+    "name": "an unknown path highlights nothing",
+    "file": "src/lib/agenda/workspace-nav.ts",
+    "from": "    WORKSPACE_SECTIONS.find((section) => section.segment === rest)?.id ??\n    \"overview\"",
+    "to": "    WORKSPACE_SECTIONS.find((section) => section.segment === rest)?.id ??\n    \"\""
+  },
+  {
+    "name": "an unbuilt section becomes a link",
+    "file": "src/components/agenda/shell/workspace-nav.tsx",
+    "from": "            if (section.phase !== 1) {",
+    "to": "            if (false) {"
+  },
+  {
+    "name": "the workspace navigation stops being a strip on a phone",
+    "file": "src/components/agenda/shell/workspace-nav.tsx",
+    "from": "        \"flex gap-1 overflow-x-auto border-b p-2\",",
+    "to": "        \"flex flex-col gap-1 border-b p-2\","
+  },
+  {
+    "name": "on hold counts as active",
+    "file": "src/lib/agenda/projects.ts",
+    "from": "const LIVE: readonly AgendaProjectStatus[] = [\"planning\", \"tender\", \"construction\"];",
+    "to": "const LIVE: readonly AgendaProjectStatus[] = [\"planning\", \"tender\", \"construction\", \"on_hold\"];"
+  },
+  {
+    "name": "the dashboard counts a different set of statuses than the filter",
+    "file": "src/lib/data/agenda-projects.ts",
+    "from": "    countWhere(\"agenda_projects\", [\"planning\", \"tender\", \"construction\"]),",
+    "to": "    countWhere(\"agenda_projects\", [\"planning\", \"tender\", \"construction\", \"on_hold\"]),"
+  },
+  {
+    "name": "a status names a colour instead of a meaning",
+    "file": "src/lib/agenda/projects.ts",
+    "from": "  { value: \"on_hold\", label: \"On Hold\", tone: \"warning\" },",
+    "to": "  { value: \"on_hold\", label: \"On Hold\", tone: \"amber\" },"
+  },
+  {
+    "name": "a project type is dropped",
+    "file": "src/lib/agenda/projects.ts",
+    "from": "  { value: \"mixed_use\", label: \"Mixed Use\" },\n",
+    "to": ""
+  },
+  {
+    "name": "no target date reads as due today",
+    "file": "src/lib/agenda/projects.ts",
+    "from": "  if (!targetDate) return null;",
+    "to": "  if (!targetDate) return 0;"
+  },
+  {
+    "name": "a late job cannot say it is late",
+    "file": "src/lib/agenda/projects.ts",
+    "from": "  return Math.round((target.getTime() - today) / 86_400_000);",
+    "to": "  return Math.max(Math.round((target.getTime() - today) / 86_400_000), 0);"
+  },
+  {
+    "name": "a junk date becomes a number",
+    "file": "src/lib/agenda/projects.ts",
+    "from": "  if (Number.isNaN(target.getTime())) return null;",
+    "to": "  if (false) return null;"
+  },
+  {
+    "name": "elapsed time is not clamped",
+    "file": "src/lib/agenda/projects.ts",
+    "from": "  return Math.min(Math.max(Math.round(share), 0), 100);",
+    "to": "  return Math.round(share);"
+  },
+  {
+    "name": "a finish before a start produces a negative percentage",
+    "file": "src/lib/agenda/projects.ts",
+    "from": "  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;",
+    "to": "  if (Number.isNaN(start) || Number.isNaN(end)) return null;"
+  },
+  {
+    "name": "money loses its currency",
+    "file": "src/lib/agenda/projects.ts",
+    "from": "      style: \"currency\",\n      currency,",
+    "to": "      style: \"decimal\","
+  },
+  {
+    "name": "an unformattable currency renders nothing",
+    "file": "src/lib/agenda/projects.ts",
+    "from": "    return `${currency} ${Math.round(amount).toLocaleString()}`;",
+    "to": "    return null;"
+  },
+  {
+    "name": "the data layer filters membership itself",
+    "file": "src/lib/data/agenda-projects.ts",
+    "from": "    .from(\"agenda_projects\")\n    .select(SUMMARY_COLUMNS)\n    .is(\"archived_at\", null)",
+    "to": "    .from(\"agenda_projects\")\n    .select(`${SUMMARY_COLUMNS}, agenda_members!inner(user_id)`)\n    .is(\"archived_at\", null)"
+  },
+  {
+    "name": "a project the viewer is not on is not null",
+    "file": "src/lib/data/agenda-projects.ts",
+    "from": "  return data ? toSummary(data as unknown as SummaryRow) : null;",
+    "to": "  return toSummary((data ?? {}) as unknown as SummaryRow);"
+  },
+  {
+    "name": "the workspace stops checking the sign-in",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/layout.tsx",
+    "from": "  await requireViewer(`/agenda/projects/${projectId}`);",
+    "to": "  void projectId;"
+  },
+  {
+    "name": "a missing project renders instead of not-found",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/layout.tsx",
+    "from": "  if (!project) notFound();",
+    "to": "  if (!project) return null;"
+  },
+  {
+    "name": "a section page trusts the layout to have checked access",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/drawings/page.tsx",
+    "from": "  const project = await getAgendaProject(projectId);\n  if (!project) notFound();",
+    "to": "  const project = null;\n  void project;"
+  },
+  {
+    "name": "the owner is taken from the form",
+    "file": "src/app/(dashboard)/agenda/projects/actions.ts",
+    "from": "      owner_id: user.id,",
+    "to": "      owner_id: String(formData.get(\"ownerId\") ?? user.id),"
+  },
+  {
+    "name": "the project type is taken on trust",
+    "file": "src/app/(dashboard)/agenda/projects/actions.ts",
+    "from": "      project_type: isAgendaProjectType(type) ? type : \"residential\",",
+    "to": "      project_type: String(type ?? \"residential\"),"
+  },
+  {
+    "name": "the location skips the gazetteer",
+    "file": "src/app/(dashboard)/agenda/projects/actions.ts",
+    "from": "      location: location && isPlausiblePlace(location) ? location : null,",
+    "to": "      location,"
+  },
+  {
+    "name": "an empty date is sent as an empty string",
+    "file": "src/app/(dashboard)/agenda/projects/actions.ts",
+    "from": "  return /^\\d{4}-\\d{2}-\\d{2}$/.test(raw) ? raw : null;",
+    "to": "  return raw;"
+  },
+  {
+    "name": "the action seeds the owner instead of the trigger",
+    "file": "src/app/(dashboard)/agenda/projects/actions.ts",
+    "from": "  revalidatePath(\"/agenda\");",
+    "to": "  await supabase.from(\"agenda_members\").insert({ project_id: data.id, user_id: user.id, role: \"administrator\", status: \"active\" });\n  revalidatePath(\"/agenda\");"
+  },
+  {
+    "name": "the status chip uses raw palette classes",
+    "file": "src/components/agenda/shell/status-chip.tsx",
+    "from": "  active: \"border-brand/40 bg-brand text-brand-foreground\",",
+    "to": "  active: \"border-blue-500 bg-blue-600 text-white\","
+  },
+  {
+    "name": "the project list becomes a desktop table",
+    "file": "src/components/agenda/shell/project-card.tsx",
+    "from": "      className=\"flex flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-brand\"",
+    "to": "      className=\"table-row\""
+  },
+  {
+    "name": "the progress bar is not announced",
+    "file": "src/components/agenda/shell/project-card.tsx",
+    "from": "          role=\"progressbar\"",
+    "to": "          data-progressbar"
+  },
+  {
+    "name": "the filter stops being a link",
+    "file": "src/components/agenda/shell/project-filter.tsx",
+    "from": "          href={\n            filter.value === \"all\"\n              ? \"/agenda/projects\"\n              : `/agenda/projects?status=${filter.value}`\n          }",
+    "to": "          href=\"/agenda/projects\""
+  },
+  {
+    "name": "the overview drops the elapsed-versus-built comparison",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/page.tsx",
+    "from": "          label=\"Programme elapsed\"",
+    "to": "          label=\"Elapsed\""
+  },
+  {
+    "name": "the overview stops warning when a job is behind",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/page.tsx",
+    "from": "  const behind =\n    elapsed !== null && elapsed - project.progressPercent >= 10;",
+    "to": "  const behind = false;"
+  },
+  {
+    "name": "an Amharic navigation string is left in English",
+    "file": "src/lib/i18n/translations.ts",
+    "from": "      agenda: \"\u12a0\u1300\u1295\u12f3\", \"agenda-home\": \"\u12a0\u1300\u1295\u12f3\",",
+    "to": "      agenda: \"Agenda\", \"agenda-home\": \"Agenda\","
+  },
+  {
+    "name": "an Afaan Oromo navigation string is missing",
+    "file": "src/lib/i18n/translations.ts",
+    "from": "      \"agenda-tasks\": \"Hojiiwwan Koo\", \"agenda-calendar\": \"Kaalaandarii\",",
+    "to": "      \"agenda-calendar\": \"Kaalaandarii\","
+  },
+  {
+    "name": "the name of the system this was inspired by appears in the UI",
+    "file": "src/app/(dashboard)/agenda/page.tsx",
+    "from": "          Every job you are on, and what needs you today.",
+    "to": "          Procore-style construction management."
+  }
+]

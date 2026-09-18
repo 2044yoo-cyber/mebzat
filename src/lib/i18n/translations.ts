@@ -25,6 +25,8 @@ export const translations: Record<Language, Dictionary> = {
     },
     language: { label: "Language", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
+      agenda: "Agenda", "agenda-home": "Agenda", "agenda-projects": "Construction Projects",
+      "agenda-tasks": "My Tasks", "agenda-calendar": "Calendar",
       home: "Home", ai: "AI", "ai-home": "Medosha AI", market: "Market", marketplace: "Marketplace",
       property: "Property", community: "Community", more: "More", profile: "Profile",
       "price-exchange": "Price Exchange", equipment: "Equipment", events: "Events",
@@ -180,6 +182,8 @@ export const translations: Record<Language, Dictionary> = {
     },
     language: { label: "ቋንቋ", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
+      agenda: "አጀንዳ", "agenda-home": "አጀንዳ", "agenda-projects": "የግንባታ ፕሮጀክቶች",
+      "agenda-tasks": "የእኔ ተግባራት", "agenda-calendar": "የቀን መቁጠሪያ",
       home: "መነሻ", ai: "AI", "ai-home": "Medosha AI", market: "ገበያ", marketplace: "ገበያ", property: "ንብረት",
       community: "ማህበረሰብ", more: "ተጨማሪ", profile: "መገለጫ", "price-exchange": "የዋጋ ልውውጥ",
       equipment: "መሳሪያ", events: "ዝግጅቶች", berchuma: "በርቹማ ስቱዲዮ",
@@ -305,6 +309,8 @@ export const translations: Record<Language, Dictionary> = {
     },
     language: { label: "Afaan", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
+      agenda: "Ajandaa", "agenda-home": "Ajandaa", "agenda-projects": "Pirojektoota Ijaarsaa",
+      "agenda-tasks": "Hojiiwwan Koo", "agenda-calendar": "Kaalaandarii",
       home: "Mana", ai: "AI", "ai-home": "Medosha AI", market: "Gabaa", marketplace: "Gabaa", property: "Qabeenya",
       community: "Hawaasa", more: "Dabalata", profile: "Piroofaayilii", "price-exchange": "Jijjiirraa Gatii",
       equipment: "Meeshaa", events: "Taateewwan", berchuma: "Istuudiyoo Berchuma", "berchuma-studio": "Istuudiyoo Dizaayinii",

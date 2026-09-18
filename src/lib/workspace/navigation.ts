@@ -24,6 +24,7 @@ import {
   Home,
   Landmark,
   Layers,
+  ListChecks,
   LayoutDashboard,
   LifeBuoy,
   LineChart,
@@ -133,6 +134,63 @@ export const NAV_SECTIONS: NavSection[] = [
           "image", "generate", "edit photo",
           "cost", "estimate", "boq", "supplier", "document",
         ],
+      },
+    ],
+  },
+
+  // Agenda is its own section for the same reason Berchuma Studio is: it is a
+  // different kind of thing from everything around it. The rest of Medosha is
+  // a shop window — listings, profiles, prices, finished work shown off to win
+  // the next job. Agenda is the private record of a job being built, and a row
+  // tucked under Marketplace would say the opposite.
+  //
+  // Not to be confused with /projects, which is the portfolio module. That is
+  // the distinction `agenda_projects` exists to draw in the database, and the
+  // navigation has to draw it too or the two rows read as duplicates.
+  {
+    id: "agenda",
+    label: "Agenda",
+    emoji: "🏗️",
+    icon: ClipboardList,
+    items: [
+      {
+        id: "agenda-home",
+        label: "Agenda",
+        icon: LayoutDashboard,
+        href: "/agenda",
+        private: true,
+        hint: "Run a construction project end to end",
+        keywords: [
+          "construction", "site", "project management", "rfi", "submittal",
+          "punch list", "snag", "daily log", "boq", "drawings", "agenda",
+        ],
+      },
+      {
+        id: "agenda-projects",
+        label: "Projects",
+        icon: HardHat,
+        href: "/agenda/projects",
+        private: true,
+        hint: "Every job you are on",
+        keywords: ["construction projects", "sites", "jobs"],
+      },
+      {
+        id: "agenda-tasks",
+        label: "My Tasks",
+        icon: ListChecks,
+        href: "/agenda/tasks",
+        private: true,
+        hint: "What is assigned to you, across every project",
+        keywords: ["tasks", "assigned", "to do", "overdue"],
+      },
+      {
+        id: "agenda-calendar",
+        label: "Calendar",
+        icon: CalendarDays,
+        href: "/agenda/calendar",
+        private: true,
+        hint: "Deadlines, inspections and meetings in one place",
+        keywords: ["calendar", "schedule", "deadlines", "meetings"],
       },
     ],
   },
