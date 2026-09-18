@@ -41,16 +41,67 @@ export type AdminArea =
   | "security"
   | "settings";
 
+export type AgendaApprovalDecision =
+  | "pending"
+  | "approved"
+  | "approved_with_comments"
+  | "rejected"
+  | "skipped";
+
+export type AgendaBidStatus =
+  | "invited"
+  | "viewed"
+  | "submitted"
+  | "under_review"
+  | "awarded"
+  | "rejected"
+  | "withdrawn";
+
+export type AgendaChangeReason =
+  | "design_change"
+  | "site_condition"
+  | "client_request"
+  | "material_change"
+  | "rfi_result"
+  | "quantity_variation"
+  | "other";
+
 export type AgendaConfidentiality =
   | "members"
   | "finance"
   | "meetings";
+
+export type AgendaContractParty =
+  | "client"
+  | "consultant"
+  | "subcontractor"
+  | "supplier"
+  | "other";
 
 export type AgendaDecisionStatus =
   | "proposed"
   | "approved"
   | "rejected"
   | "superseded";
+
+export type AgendaDiscipline =
+  | "architectural"
+  | "structural"
+  | "electrical"
+  | "plumbing"
+  | "mechanical"
+  | "interior"
+  | "landscape"
+  | "shop_drawing"
+  | "civil"
+  | "other";
+
+export type AgendaEquipmentStatus =
+  | "available"
+  | "in_use"
+  | "maintenance"
+  | "off_hire"
+  | "broken";
 
 export type AgendaEventKind =
   | "log"
@@ -76,6 +127,22 @@ export type AgendaFileKind =
   | "document"
   | "other";
 
+export type AgendaInspectionResult =
+  | "pending"
+  | "pass"
+  | "fail"
+  | "conditional"
+  | "not_applicable";
+
+export type AgendaIssueStatus =
+  | "open"
+  | "assigned"
+  | "in_progress"
+  | "ready_for_inspection"
+  | "rejected"
+  | "resolved"
+  | "closed";
+
 export type AgendaLedgerKind =
   | "material_purchase"
   | "labour_payment"
@@ -100,11 +167,53 @@ export type AgendaMemberStatus =
   | "suspended"
   | "removed";
 
+export type AgendaMoneyStatus =
+  | "draft"
+  | "pending"
+  | "submitted"
+  | "under_review"
+  | "approved"
+  | "rejected"
+  | "partially_paid"
+  | "paid"
+  | "closed"
+  | "cancelled";
+
+export type AgendaObservationKind =
+  | "quality"
+  | "safety"
+  | "design"
+  | "workmanship"
+  | "material"
+  | "environmental"
+  | "general";
+
 export type AgendaPriority =
   | "low"
   | "normal"
   | "high"
   | "urgent";
+
+export type AgendaProjectStatus =
+  | "planning"
+  | "tender"
+  | "construction"
+  | "on_hold"
+  | "completed"
+  | "cancelled";
+
+export type AgendaProjectType =
+  | "residential"
+  | "apartment"
+  | "commercial"
+  | "office"
+  | "hotel"
+  | "industrial"
+  | "infrastructure"
+  | "interior"
+  | "renovation"
+  | "mixed_use"
+  | "other";
 
 export type AgendaReminderKind =
   | "late_task"
@@ -114,6 +223,17 @@ export type AgendaReminderKind =
   | "payment"
   | "warranty"
   | "deadline";
+
+export type AgendaReviewStatus =
+  | "draft"
+  | "open"
+  | "pending"
+  | "answered"
+  | "approved"
+  | "approved_with_comments"
+  | "revise_resubmit"
+  | "rejected"
+  | "closed";
 
 export type AgendaRole =
   | "client"
@@ -313,7 +433,8 @@ export type ContentKind =
   | "listing"
   | "video"
   | "panorama"
-  | "floor_plan";
+  | "floor_plan"
+  | "profile";
 
 export type ContractShape =
   | "labour_only"
@@ -344,6 +465,17 @@ export type DesignVisibility =
   | "private"
   | "unlisted"
   | "public";
+
+export type DigitalKind =
+  | "course"
+  | "sketchup"
+  | "model_3d"
+  | "floor_plan"
+  | "other";
+
+export type DigitalLicense =
+  | "personal"
+  | "commercial";
 
 export type EquipmentCondition =
   | "new"
@@ -571,8 +703,8 @@ export type ModerationCategory =
   | "scam"
   | "spam"
   | "illegal"
-  | "infringement"
-  | "other";
+  | "other"
+  | "infringement";
 
 export type ModerationStatus =
   | "pending"
@@ -604,6 +736,13 @@ export type NotificationKind =
   | "application_update"
   | "job_hired"
   | "job_deadline";
+
+export type PanoramaJobStatus =
+  | "capturing"
+  | "uploading"
+  | "processing"
+  | "ready"
+  | "failed";
 
 export type PaymentPurpose =
   | "subscription"
@@ -685,17 +824,6 @@ export type PriceVatStatus =
   | "exclusive"
   | "exempt";
 
-export type ProductFulfilment = "physical" | "digital" | "rental";
-
-export type DigitalKind =
-  | "course"
-  | "sketchup"
-  | "model_3d"
-  | "floor_plan"
-  | "other";
-
-export type DigitalLicense = "personal" | "commercial";
-
 export type ProductCondition =
   | "new"
   | "used"
@@ -703,28 +831,14 @@ export type ProductCondition =
   | "open_box"
   | "for_parts";
 
-export type UsedGrade =
-  | "like_new"
-  | "good"
-  | "fair"
-  | "needs_repair";
+export type ProductFulfilment =
+  | "physical"
+  | "digital"
+  | "rental";
 
 export type ProductStatus =
   | "draft"
   | "published";
-
-export type ProjectStatus =
-  | "draft"
-  | "published"
-  | "private"
-  | "archived";
-
-export type PanoramaJobStatus =
-  | "capturing"
-  | "uploading"
-  | "processing"
-  | "ready"
-  | "failed";
 
 export type ProjectCategory =
   | "building_construction"
@@ -741,6 +855,12 @@ export type ProjectCategory =
   | "landscaping"
   | "construction_product"
   | "other";
+
+export type ProjectStatus =
+  | "draft"
+  | "published"
+  | "private"
+  | "archived";
 
 export type PropertyMediaKind =
   | "photo"
@@ -904,6 +1024,17 @@ export type TourVisibility =
   | "private"
   | "archived";
 
+export type UsedGrade =
+  | "like_new"
+  | "good"
+  | "fair"
+  | "needs_repair";
+
+export type VerificationStatus =
+  | "unverified"
+  | "pending"
+  | "verified";
+
 export type WatermarkPosition =
   | "bottom_right"
   | "bottom_left"
@@ -912,12 +1043,10 @@ export type WatermarkPosition =
   | "center"
   | "tiled";
 
-export type WatermarkSize = "small" | "medium" | "large";
-
-export type VerificationStatus =
-  | "unverified"
-  | "pending"
-  | "verified";
+export type WatermarkSize =
+  | "small"
+  | "medium"
+  | "large";
 
 export type WorkMode =
   | "on_site"
@@ -958,6 +1087,48 @@ export interface Database {
           granted_by?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_approvals: {
+        Row: {
+          id: string;
+          project_id: string;
+          subject_type: string;
+          subject_id: string;
+          step: number;
+          approver_id: string | null;
+          approver_role: AgendaRole | null;
+          decision: AgendaApprovalDecision;
+          comment: string | null;
+          decided_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          subject_type: string;
+          subject_id: string;
+          step?: number;
+          approver_id?: string | null;
+          approver_role?: AgendaRole | null;
+          decision?: AgendaApprovalDecision;
+          comment?: string | null;
+          decided_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          subject_type?: string;
+          subject_id?: string;
+          step?: number;
+          approver_id?: string | null;
+          approver_role?: AgendaRole | null;
+          decision?: AgendaApprovalDecision;
+          comment?: string | null;
+          decided_at?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -1045,6 +1216,435 @@ export interface Database {
           actor_id?: string | null;
           changes?: Json | null;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_bid_packages: {
+        Row: {
+          id: string;
+          project_id: string;
+          number: string;
+          title: string;
+          scope: string | null;
+          due_at: string | null;
+          status: AgendaMoneyStatus;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          number: string;
+          title: string;
+          scope?: string | null;
+          due_at?: string | null;
+          status?: AgendaMoneyStatus;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          number?: string;
+          title?: string;
+          scope?: string | null;
+          due_at?: string | null;
+          status?: AgendaMoneyStatus;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_bids: {
+        Row: {
+          id: string;
+          package_id: string;
+          project_id: string;
+          bidder_name: string;
+          bidder_id: string | null;
+          amount: number | null;
+          currency: string;
+          status: AgendaBidStatus;
+          submitted_at: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          package_id: string;
+          project_id: string;
+          bidder_name: string;
+          bidder_id?: string | null;
+          amount?: number | null;
+          currency?: string;
+          status?: AgendaBidStatus;
+          submitted_at?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          package_id?: string;
+          project_id?: string;
+          bidder_name?: string;
+          bidder_id?: string | null;
+          amount?: number | null;
+          currency?: string;
+          status?: AgendaBidStatus;
+          submitted_at?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_boq_items: {
+        Row: {
+          id: string;
+          project_id: string;
+          section: string;
+          code: string | null;
+          description: string;
+          unit: string;
+          quantity: number;
+          unit_price: number;
+          currency: string;
+          actual_quantity: number | null;
+          actual_cost: number | null;
+          position: number;
+          created_at: string;
+          updated_at: string;
+          amount: number | null;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          section: string;
+          code?: string | null;
+          description: string;
+          unit?: string;
+          quantity?: number;
+          unit_price?: number;
+          currency?: string;
+          actual_quantity?: number | null;
+          actual_cost?: number | null;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+          amount?: number | null;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          section?: string;
+          code?: string | null;
+          description?: string;
+          unit?: string;
+          quantity?: number;
+          unit_price?: number;
+          currency?: string;
+          actual_quantity?: number | null;
+          actual_cost?: number | null;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+          amount?: number | null;
+        };
+        Relationships: [];
+      };
+      agenda_budget_items: {
+        Row: {
+          id: string;
+          project_id: string;
+          cost_code: string;
+          name: string;
+          original_budget: number;
+          approved_changes: number;
+          committed_cost: number;
+          actual_cost: number;
+          pending_cost: number;
+          forecast_cost: number;
+          currency: string;
+          created_at: string;
+          updated_at: string;
+          revised_budget: number | null;
+          remaining_budget: number | null;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          cost_code: string;
+          name: string;
+          original_budget?: number;
+          approved_changes?: number;
+          committed_cost?: number;
+          actual_cost?: number;
+          pending_cost?: number;
+          forecast_cost?: number;
+          currency?: string;
+          created_at?: string;
+          updated_at?: string;
+          revised_budget?: number | null;
+          remaining_budget?: number | null;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          cost_code?: string;
+          name?: string;
+          original_budget?: number;
+          approved_changes?: number;
+          committed_cost?: number;
+          actual_cost?: number;
+          pending_cost?: number;
+          forecast_cost?: number;
+          currency?: string;
+          created_at?: string;
+          updated_at?: string;
+          revised_budget?: number | null;
+          remaining_budget?: number | null;
+        };
+        Relationships: [];
+      };
+      agenda_change_events: {
+        Row: {
+          id: string;
+          project_id: string;
+          number: string;
+          title: string;
+          description: string | null;
+          reason: AgendaChangeReason;
+          rfi_id: string | null;
+          drawing_revision_id: string | null;
+          potential_cost: number | null;
+          potential_schedule_days: number | null;
+          currency: string;
+          responsible_party: string | null;
+          status: AgendaMoneyStatus;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          number: string;
+          title: string;
+          description?: string | null;
+          reason?: AgendaChangeReason;
+          rfi_id?: string | null;
+          drawing_revision_id?: string | null;
+          potential_cost?: number | null;
+          potential_schedule_days?: number | null;
+          currency?: string;
+          responsible_party?: string | null;
+          status?: AgendaMoneyStatus;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          number?: string;
+          title?: string;
+          description?: string | null;
+          reason?: AgendaChangeReason;
+          rfi_id?: string | null;
+          drawing_revision_id?: string | null;
+          potential_cost?: number | null;
+          potential_schedule_days?: number | null;
+          currency?: string;
+          responsible_party?: string | null;
+          status?: AgendaMoneyStatus;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_change_orders: {
+        Row: {
+          id: string;
+          project_id: string;
+          contract_id: string | null;
+          change_event_id: string | null;
+          number: string;
+          title: string;
+          description: string | null;
+          cost_impact: number;
+          schedule_impact_days: number;
+          currency: string;
+          status: AgendaMoneyStatus;
+          submitted_at: string | null;
+          decided_at: string | null;
+          decided_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          contract_id?: string | null;
+          change_event_id?: string | null;
+          number: string;
+          title: string;
+          description?: string | null;
+          cost_impact?: number;
+          schedule_impact_days?: number;
+          currency?: string;
+          status?: AgendaMoneyStatus;
+          submitted_at?: string | null;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          contract_id?: string | null;
+          change_event_id?: string | null;
+          number?: string;
+          title?: string;
+          description?: string | null;
+          cost_impact?: number;
+          schedule_impact_days?: number;
+          currency?: string;
+          status?: AgendaMoneyStatus;
+          submitted_at?: string | null;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_commitments: {
+        Row: {
+          id: string;
+          project_id: string;
+          contract_id: string | null;
+          budget_item_id: string | null;
+          number: string;
+          title: string;
+          company_name: string | null;
+          original_amount: number;
+          approved_changes: number;
+          currency: string;
+          status: AgendaMoneyStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          contract_id?: string | null;
+          budget_item_id?: string | null;
+          number: string;
+          title: string;
+          company_name?: string | null;
+          original_amount?: number;
+          approved_changes?: number;
+          currency?: string;
+          status?: AgendaMoneyStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          contract_id?: string | null;
+          budget_item_id?: string | null;
+          number?: string;
+          title?: string;
+          company_name?: string | null;
+          original_amount?: number;
+          approved_changes?: number;
+          currency?: string;
+          status?: AgendaMoneyStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_contracts: {
+        Row: {
+          id: string;
+          project_id: string;
+          number: string;
+          party: AgendaContractParty;
+          company_name: string;
+          company_id: string | null;
+          scope: string | null;
+          original_value: number;
+          approved_changes: number;
+          currency: string;
+          start_date: string | null;
+          end_date: string | null;
+          status: AgendaMoneyStatus;
+          created_at: string;
+          updated_at: string;
+          current_value: number | null;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          number: string;
+          party?: AgendaContractParty;
+          company_name: string;
+          company_id?: string | null;
+          scope?: string | null;
+          original_value?: number;
+          approved_changes?: number;
+          currency?: string;
+          start_date?: string | null;
+          end_date?: string | null;
+          status?: AgendaMoneyStatus;
+          created_at?: string;
+          updated_at?: string;
+          current_value?: number | null;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          number?: string;
+          party?: AgendaContractParty;
+          company_name?: string;
+          company_id?: string | null;
+          scope?: string | null;
+          original_value?: number;
+          approved_changes?: number;
+          currency?: string;
+          start_date?: string | null;
+          end_date?: string | null;
+          status?: AgendaMoneyStatus;
+          created_at?: string;
+          updated_at?: string;
+          current_value?: number | null;
+        };
+        Relationships: [];
+      };
+      agenda_counters: {
+        Row: {
+          project_id: string;
+          kind: string;
+          next_value: number;
+        };
+        Insert: {
+          project_id: string;
+          kind: string;
+          next_value?: number;
+        };
+        Update: {
+          project_id?: string;
+          kind?: string;
+          next_value?: number;
         };
         Relationships: [];
       };
@@ -1156,6 +1756,258 @@ export interface Database {
         };
         Relationships: [];
       };
+      agenda_document_folders: {
+        Row: {
+          id: string;
+          project_id: string;
+          parent_id: string | null;
+          name: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          parent_id?: string | null;
+          name: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          parent_id?: string | null;
+          name?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_document_versions: {
+        Row: {
+          id: string;
+          document_id: string;
+          project_id: string;
+          version: number;
+          storage_path: string;
+          file_name: string | null;
+          mime_type: string | null;
+          size_bytes: number | null;
+          notes: string | null;
+          uploaded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          project_id: string;
+          version: number;
+          storage_path: string;
+          file_name?: string | null;
+          mime_type?: string | null;
+          size_bytes?: number | null;
+          notes?: string | null;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          document_id?: string;
+          project_id?: string;
+          version?: number;
+          storage_path?: string;
+          file_name?: string | null;
+          mime_type?: string | null;
+          size_bytes?: number | null;
+          notes?: string | null;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_documents: {
+        Row: {
+          id: string;
+          project_id: string;
+          folder_id: string | null;
+          title: string;
+          kind: AgendaFileKind;
+          tags: string[];
+          current_version_id: string | null;
+          confidentiality: AgendaConfidentiality;
+          archived_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          folder_id?: string | null;
+          title: string;
+          kind?: AgendaFileKind;
+          tags?: string[];
+          current_version_id?: string | null;
+          confidentiality?: AgendaConfidentiality;
+          archived_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          folder_id?: string | null;
+          title?: string;
+          kind?: AgendaFileKind;
+          tags?: string[];
+          current_version_id?: string | null;
+          confidentiality?: AgendaConfidentiality;
+          archived_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_drawing_revisions: {
+        Row: {
+          id: string;
+          drawing_id: string;
+          project_id: string;
+          revision: string;
+          storage_path: string;
+          file_name: string | null;
+          mime_type: string | null;
+          size_bytes: number | null;
+          issued_on: string | null;
+          status: AgendaReviewStatus;
+          notes: string | null;
+          uploaded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          drawing_id: string;
+          project_id: string;
+          revision: string;
+          storage_path: string;
+          file_name?: string | null;
+          mime_type?: string | null;
+          size_bytes?: number | null;
+          issued_on?: string | null;
+          status?: AgendaReviewStatus;
+          notes?: string | null;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          drawing_id?: string;
+          project_id?: string;
+          revision?: string;
+          storage_path?: string;
+          file_name?: string | null;
+          mime_type?: string | null;
+          size_bytes?: number | null;
+          issued_on?: string | null;
+          status?: AgendaReviewStatus;
+          notes?: string | null;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_drawings: {
+        Row: {
+          id: string;
+          project_id: string;
+          drawing_number: string;
+          title: string;
+          discipline: AgendaDiscipline;
+          current_revision_id: string | null;
+          archived_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          drawing_number: string;
+          title: string;
+          discipline?: AgendaDiscipline;
+          current_revision_id?: string | null;
+          archived_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          drawing_number?: string;
+          title?: string;
+          discipline?: AgendaDiscipline;
+          current_revision_id?: string | null;
+          archived_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_equipment: {
+        Row: {
+          id: string;
+          project_id: string;
+          name: string;
+          category: string | null;
+          owner_company: string | null;
+          operator_name: string | null;
+          operator_id: string | null;
+          status: AgendaEquipmentStatus;
+          hours_used: number;
+          last_service_on: string | null;
+          next_service_on: string | null;
+          photo_path: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          name: string;
+          category?: string | null;
+          owner_company?: string | null;
+          operator_name?: string | null;
+          operator_id?: string | null;
+          status?: AgendaEquipmentStatus;
+          hours_used?: number;
+          last_service_on?: string | null;
+          next_service_on?: string | null;
+          photo_path?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          name?: string;
+          category?: string | null;
+          owner_company?: string | null;
+          operator_name?: string | null;
+          operator_id?: string | null;
+          status?: AgendaEquipmentStatus;
+          hours_used?: number;
+          last_service_on?: string | null;
+          next_service_on?: string | null;
+          photo_path?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       agenda_events: {
         Row: {
           id: string;
@@ -1195,6 +2047,228 @@ export interface Database {
           confidentiality?: AgendaConfidentiality;
           occurred_at?: string;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_form_submissions: {
+        Row: {
+          id: string;
+          template_id: string;
+          project_id: string;
+          number: string | null;
+          answers: Json;
+          status: AgendaReviewStatus;
+          submitted_by: string | null;
+          submitted_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          template_id: string;
+          project_id: string;
+          number?: string | null;
+          answers?: Json;
+          status?: AgendaReviewStatus;
+          submitted_by?: string | null;
+          submitted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          template_id?: string;
+          project_id?: string;
+          number?: string | null;
+          answers?: Json;
+          status?: AgendaReviewStatus;
+          submitted_by?: string | null;
+          submitted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_form_templates: {
+        Row: {
+          id: string;
+          project_id: string | null;
+          owner_id: string;
+          name: string;
+          description: string | null;
+          fields: Json;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id?: string | null;
+          owner_id: string;
+          name: string;
+          description?: string | null;
+          fields?: Json;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string | null;
+          owner_id?: string;
+          name?: string;
+          description?: string | null;
+          fields?: Json;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_inspection_items: {
+        Row: {
+          id: string;
+          inspection_id: string;
+          project_id: string;
+          description: string;
+          result: AgendaInspectionResult;
+          comment: string | null;
+          position: number;
+        };
+        Insert: {
+          id?: string;
+          inspection_id: string;
+          project_id: string;
+          description: string;
+          result?: AgendaInspectionResult;
+          comment?: string | null;
+          position?: number;
+        };
+        Update: {
+          id?: string;
+          inspection_id?: string;
+          project_id?: string;
+          description?: string;
+          result?: AgendaInspectionResult;
+          comment?: string | null;
+          position?: number;
+        };
+        Relationships: [];
+      };
+      agenda_inspections: {
+        Row: {
+          id: string;
+          project_id: string;
+          number: string | null;
+          title: string;
+          discipline: AgendaDiscipline | null;
+          location: string | null;
+          scheduled_for: string | null;
+          inspected_at: string | null;
+          result: AgendaInspectionResult;
+          inspector_id: string | null;
+          contractor_signed_by: string | null;
+          inspector_signed_at: string | null;
+          contractor_signed_at: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          number?: string | null;
+          title: string;
+          discipline?: AgendaDiscipline | null;
+          location?: string | null;
+          scheduled_for?: string | null;
+          inspected_at?: string | null;
+          result?: AgendaInspectionResult;
+          inspector_id?: string | null;
+          contractor_signed_by?: string | null;
+          inspector_signed_at?: string | null;
+          contractor_signed_at?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          number?: string | null;
+          title?: string;
+          discipline?: AgendaDiscipline | null;
+          location?: string | null;
+          scheduled_for?: string | null;
+          inspected_at?: string | null;
+          result?: AgendaInspectionResult;
+          inspector_id?: string | null;
+          contractor_signed_by?: string | null;
+          inspector_signed_at?: string | null;
+          contractor_signed_at?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_invoices: {
+        Row: {
+          id: string;
+          project_id: string;
+          contract_id: string | null;
+          commitment_id: string | null;
+          number: string;
+          party: AgendaContractParty;
+          company_name: string;
+          issued_on: string | null;
+          due_on: string | null;
+          amount: number;
+          tax_amount: number;
+          retention_amount: number;
+          currency: string;
+          status: AgendaMoneyStatus;
+          created_at: string;
+          updated_at: string;
+          total_amount: number | null;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          contract_id?: string | null;
+          commitment_id?: string | null;
+          number: string;
+          party?: AgendaContractParty;
+          company_name: string;
+          issued_on?: string | null;
+          due_on?: string | null;
+          amount?: number;
+          tax_amount?: number;
+          retention_amount?: number;
+          currency?: string;
+          status?: AgendaMoneyStatus;
+          created_at?: string;
+          updated_at?: string;
+          total_amount?: number | null;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          contract_id?: string | null;
+          commitment_id?: string | null;
+          number?: string;
+          party?: AgendaContractParty;
+          company_name?: string;
+          issued_on?: string | null;
+          due_on?: string | null;
+          amount?: number;
+          tax_amount?: number;
+          retention_amount?: number;
+          currency?: string;
+          status?: AgendaMoneyStatus;
+          created_at?: string;
+          updated_at?: string;
+          total_amount?: number | null;
         };
         Relationships: [];
       };
@@ -1318,363 +2392,6 @@ export interface Database {
         };
         Relationships: [];
       };
-      agenda_rfis: {
-        Row: {
-          id: string;
-          project_id: string;
-          number: string;
-          subject: string;
-          question: string;
-          discipline: string | null;
-          location: string | null;
-          drawing_revision_id: string | null;
-          requested_from: string | null;
-          created_by: string | null;
-          priority: string;
-          due_date: string | null;
-          status: string;
-          answered_at: string | null;
-          closed_at: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          project_id?: string;
-          number?: string;
-          subject?: string;
-          question?: string;
-          discipline?: string | null;
-          location?: string | null;
-          drawing_revision_id?: string | null;
-          requested_from?: string | null;
-          created_by?: string | null;
-          priority?: string;
-          due_date?: string | null;
-          status?: string;
-          answered_at?: string | null;
-          closed_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          project_id?: string;
-          number?: string;
-          subject?: string;
-          question?: string;
-          discipline?: string | null;
-          location?: string | null;
-          drawing_revision_id?: string | null;
-          requested_from?: string | null;
-          created_by?: string | null;
-          priority?: string;
-          due_date?: string | null;
-          status?: string;
-          answered_at?: string | null;
-          closed_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      agenda_submittals: {
-        Row: {
-          id: string;
-          project_id: string;
-          number: string;
-          title: string;
-          spec_section: string | null;
-          discipline: string | null;
-          contractor: string | null;
-          submitted_by: string | null;
-          reviewer_id: string | null;
-          submitted_on: string | null;
-          required_by: string | null;
-          status: string;
-          current_revision_id: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          project_id?: string;
-          number?: string;
-          title?: string;
-          spec_section?: string | null;
-          discipline?: string | null;
-          contractor?: string | null;
-          submitted_by?: string | null;
-          reviewer_id?: string | null;
-          submitted_on?: string | null;
-          required_by?: string | null;
-          status?: string;
-          current_revision_id?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          project_id?: string;
-          number?: string;
-          title?: string;
-          spec_section?: string | null;
-          discipline?: string | null;
-          contractor?: string | null;
-          submitted_by?: string | null;
-          reviewer_id?: string | null;
-          submitted_on?: string | null;
-          required_by?: string | null;
-          status?: string;
-          current_revision_id?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      agenda_punch_items: {
-        Row: {
-          id: string;
-          project_id: string;
-          number: string | null;
-          description: string;
-          location: string | null;
-          assigned_company: string | null;
-          assigned_to: string | null;
-          due_date: string | null;
-          priority: string;
-          status: string;
-          drawing_revision_id: string | null;
-          observation_id: string | null;
-          before_photo_id: string | null;
-          after_photo_id: string | null;
-          created_by: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          project_id?: string;
-          number?: string | null;
-          description?: string;
-          location?: string | null;
-          assigned_company?: string | null;
-          assigned_to?: string | null;
-          due_date?: string | null;
-          priority?: string;
-          status?: string;
-          drawing_revision_id?: string | null;
-          observation_id?: string | null;
-          before_photo_id?: string | null;
-          after_photo_id?: string | null;
-          created_by?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          project_id?: string;
-          number?: string | null;
-          description?: string;
-          location?: string | null;
-          assigned_company?: string | null;
-          assigned_to?: string | null;
-          due_date?: string | null;
-          priority?: string;
-          status?: string;
-          drawing_revision_id?: string | null;
-          observation_id?: string | null;
-          before_photo_id?: string | null;
-          after_photo_id?: string | null;
-          created_by?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      agenda_drawings: {
-        Row: {
-          id: string;
-          project_id: string;
-          drawing_number: string;
-          title: string;
-          discipline: string;
-          current_revision_id: string | null;
-          archived_at: string | null;
-          created_by: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          project_id?: string;
-          drawing_number?: string;
-          title?: string;
-          discipline?: string;
-          current_revision_id?: string | null;
-          archived_at?: string | null;
-          created_by?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          project_id?: string;
-          drawing_number?: string;
-          title?: string;
-          discipline?: string;
-          current_revision_id?: string | null;
-          archived_at?: string | null;
-          created_by?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      agenda_documents: {
-        Row: {
-          id: string;
-          project_id: string;
-          folder_id: string | null;
-          title: string;
-          kind: string;
-          tags: string[];
-          current_version_id: string | null;
-          confidentiality: string;
-          archived_at: string | null;
-          created_by: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          project_id?: string;
-          folder_id?: string | null;
-          title?: string;
-          kind?: string;
-          tags?: string[];
-          current_version_id?: string | null;
-          confidentiality?: string;
-          archived_at?: string | null;
-          created_by?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          project_id?: string;
-          folder_id?: string | null;
-          title?: string;
-          kind?: string;
-          tags?: string[];
-          current_version_id?: string | null;
-          confidentiality?: string;
-          archived_at?: string | null;
-          created_by?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      agenda_projects: {
-        Row: {
-          id: string;
-          owner_id: string;
-          name: string;
-          project_number: string | null;
-          project_type: string;
-          status: string;
-          client_name: string | null;
-          client_id: string | null;
-          main_contractor: string | null;
-          consultant: string | null;
-          architect: string | null;
-          structural_engineer: string | null;
-          mep_engineer: string | null;
-          project_manager_id: string | null;
-          site_engineer_id: string | null;
-          location: string | null;
-          latitude: number | null;
-          longitude: number | null;
-          start_date: string | null;
-          target_completion_date: string | null;
-          actual_completion_date: string | null;
-          contract_value: number | null;
-          currency: string;
-          description: string | null;
-          image_url: string | null;
-          progress_percent: number;
-          showcase_project_id: string | null;
-          archived_at: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          owner_id: string;
-          name: string;
-          project_number?: string | null;
-          project_type?: string;
-          status?: string;
-          client_name?: string | null;
-          client_id?: string | null;
-          main_contractor?: string | null;
-          consultant?: string | null;
-          architect?: string | null;
-          structural_engineer?: string | null;
-          mep_engineer?: string | null;
-          project_manager_id?: string | null;
-          site_engineer_id?: string | null;
-          location?: string | null;
-          latitude?: number | null;
-          longitude?: number | null;
-          start_date?: string | null;
-          target_completion_date?: string | null;
-          actual_completion_date?: string | null;
-          contract_value?: number | null;
-          currency?: string;
-          description?: string | null;
-          image_url?: string | null;
-          progress_percent?: number;
-          showcase_project_id?: string | null;
-          archived_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          owner_id?: string;
-          name?: string;
-          project_number?: string | null;
-          project_type?: string;
-          status?: string;
-          client_name?: string | null;
-          client_id?: string | null;
-          main_contractor?: string | null;
-          consultant?: string | null;
-          architect?: string | null;
-          structural_engineer?: string | null;
-          mep_engineer?: string | null;
-          project_manager_id?: string | null;
-          site_engineer_id?: string | null;
-          location?: string | null;
-          latitude?: number | null;
-          longitude?: number | null;
-          start_date?: string | null;
-          target_completion_date?: string | null;
-          actual_completion_date?: string | null;
-          contract_value?: number | null;
-          currency?: string;
-          description?: string | null;
-          image_url?: string | null;
-          progress_percent?: number;
-          showcase_project_id?: string | null;
-          archived_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
       agenda_members: {
         Row: {
           id: string;
@@ -1720,6 +2437,402 @@ export interface Database {
           invited_at?: string;
           accepted_at?: string | null;
           removed_at?: string | null;
+        };
+        Relationships: [];
+      };
+      agenda_observations: {
+        Row: {
+          id: string;
+          project_id: string;
+          kind: AgendaObservationKind;
+          description: string;
+          location: string | null;
+          responsible_company: string | null;
+          assigned_to: string | null;
+          due_date: string | null;
+          status: AgendaIssueStatus;
+          drawing_revision_id: string | null;
+          inspection_item_id: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          kind?: AgendaObservationKind;
+          description: string;
+          location?: string | null;
+          responsible_company?: string | null;
+          assigned_to?: string | null;
+          due_date?: string | null;
+          status?: AgendaIssueStatus;
+          drawing_revision_id?: string | null;
+          inspection_item_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          kind?: AgendaObservationKind;
+          description?: string;
+          location?: string | null;
+          responsible_company?: string | null;
+          assigned_to?: string | null;
+          due_date?: string | null;
+          status?: AgendaIssueStatus;
+          drawing_revision_id?: string | null;
+          inspection_item_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_payments: {
+        Row: {
+          id: string;
+          project_id: string;
+          invoice_id: string | null;
+          payee_name: string;
+          paid_on: string;
+          amount: number;
+          currency: string;
+          method: string | null;
+          reference: string | null;
+          approved_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          invoice_id?: string | null;
+          payee_name: string;
+          paid_on?: string;
+          amount: number;
+          currency?: string;
+          method?: string | null;
+          reference?: string | null;
+          approved_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          invoice_id?: string | null;
+          payee_name?: string;
+          paid_on?: string;
+          amount?: number;
+          currency?: string;
+          method?: string | null;
+          reference?: string | null;
+          approved_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_photos: {
+        Row: {
+          id: string;
+          project_id: string;
+          storage_path: string;
+          caption: string | null;
+          building: string | null;
+          floor: string | null;
+          area: string | null;
+          taken_at: string;
+          latitude: number | null;
+          longitude: number | null;
+          tags: string[];
+          panorama_job_id: string | null;
+          uploaded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          storage_path: string;
+          caption?: string | null;
+          building?: string | null;
+          floor?: string | null;
+          area?: string | null;
+          taken_at?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          tags?: string[];
+          panorama_job_id?: string | null;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          storage_path?: string;
+          caption?: string | null;
+          building?: string | null;
+          floor?: string | null;
+          area?: string | null;
+          taken_at?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          tags?: string[];
+          panorama_job_id?: string | null;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_projects: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          project_number: string | null;
+          project_type: AgendaProjectType;
+          status: AgendaProjectStatus;
+          client_name: string | null;
+          client_id: string | null;
+          main_contractor: string | null;
+          consultant: string | null;
+          architect: string | null;
+          structural_engineer: string | null;
+          mep_engineer: string | null;
+          project_manager_id: string | null;
+          site_engineer_id: string | null;
+          location: string | null;
+          latitude: number | null;
+          longitude: number | null;
+          start_date: string | null;
+          target_completion_date: string | null;
+          actual_completion_date: string | null;
+          contract_value: number | null;
+          currency: string;
+          description: string | null;
+          image_url: string | null;
+          progress_percent: number;
+          showcase_project_id: string | null;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+          project_number?: string | null;
+          project_type?: AgendaProjectType;
+          status?: AgendaProjectStatus;
+          client_name?: string | null;
+          client_id?: string | null;
+          main_contractor?: string | null;
+          consultant?: string | null;
+          architect?: string | null;
+          structural_engineer?: string | null;
+          mep_engineer?: string | null;
+          project_manager_id?: string | null;
+          site_engineer_id?: string | null;
+          location?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
+          start_date?: string | null;
+          target_completion_date?: string | null;
+          actual_completion_date?: string | null;
+          contract_value?: number | null;
+          currency?: string;
+          description?: string | null;
+          image_url?: string | null;
+          progress_percent?: number;
+          showcase_project_id?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          name?: string;
+          project_number?: string | null;
+          project_type?: AgendaProjectType;
+          status?: AgendaProjectStatus;
+          client_name?: string | null;
+          client_id?: string | null;
+          main_contractor?: string | null;
+          consultant?: string | null;
+          architect?: string | null;
+          structural_engineer?: string | null;
+          mep_engineer?: string | null;
+          project_manager_id?: string | null;
+          site_engineer_id?: string | null;
+          location?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
+          start_date?: string | null;
+          target_completion_date?: string | null;
+          actual_completion_date?: string | null;
+          contract_value?: number | null;
+          currency?: string;
+          description?: string | null;
+          image_url?: string | null;
+          progress_percent?: number;
+          showcase_project_id?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_punch_items: {
+        Row: {
+          id: string;
+          project_id: string;
+          number: string | null;
+          description: string;
+          location: string | null;
+          assigned_company: string | null;
+          assigned_to: string | null;
+          due_date: string | null;
+          priority: AgendaPriority;
+          status: AgendaIssueStatus;
+          drawing_revision_id: string | null;
+          observation_id: string | null;
+          before_photo_id: string | null;
+          after_photo_id: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          number?: string | null;
+          description: string;
+          location?: string | null;
+          assigned_company?: string | null;
+          assigned_to?: string | null;
+          due_date?: string | null;
+          priority?: AgendaPriority;
+          status?: AgendaIssueStatus;
+          drawing_revision_id?: string | null;
+          observation_id?: string | null;
+          before_photo_id?: string | null;
+          after_photo_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          number?: string | null;
+          description?: string;
+          location?: string | null;
+          assigned_company?: string | null;
+          assigned_to?: string | null;
+          due_date?: string | null;
+          priority?: AgendaPriority;
+          status?: AgendaIssueStatus;
+          drawing_revision_id?: string | null;
+          observation_id?: string | null;
+          before_photo_id?: string | null;
+          after_photo_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_purchase_order_items: {
+        Row: {
+          id: string;
+          purchase_order_id: string;
+          project_id: string;
+          description: string;
+          unit: string;
+          quantity: number;
+          unit_price: number;
+          delivered_quantity: number;
+          position: number;
+          amount: number | null;
+        };
+        Insert: {
+          id?: string;
+          purchase_order_id: string;
+          project_id: string;
+          description: string;
+          unit?: string;
+          quantity?: number;
+          unit_price?: number;
+          delivered_quantity?: number;
+          position?: number;
+          amount?: number | null;
+        };
+        Update: {
+          id?: string;
+          purchase_order_id?: string;
+          project_id?: string;
+          description?: string;
+          unit?: string;
+          quantity?: number;
+          unit_price?: number;
+          delivered_quantity?: number;
+          position?: number;
+          amount?: number | null;
+        };
+        Relationships: [];
+      };
+      agenda_purchase_orders: {
+        Row: {
+          id: string;
+          project_id: string;
+          commitment_id: string | null;
+          number: string;
+          supplier_name: string;
+          supplier_id: string | null;
+          submittal_id: string | null;
+          delivery_date: string | null;
+          delivery_location: string | null;
+          currency: string;
+          requested_by: string | null;
+          approved_by: string | null;
+          status: AgendaMoneyStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          commitment_id?: string | null;
+          number: string;
+          supplier_name: string;
+          supplier_id?: string | null;
+          submittal_id?: string | null;
+          delivery_date?: string | null;
+          delivery_location?: string | null;
+          currency?: string;
+          requested_by?: string | null;
+          approved_by?: string | null;
+          status?: AgendaMoneyStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          commitment_id?: string | null;
+          number?: string;
+          supplier_name?: string;
+          supplier_id?: string | null;
+          submittal_id?: string | null;
+          delivery_date?: string | null;
+          delivery_location?: string | null;
+          currency?: string;
+          requested_by?: string | null;
+          approved_by?: string | null;
+          status?: AgendaMoneyStatus;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -1771,6 +2884,267 @@ export interface Database {
           completed_at?: string | null;
           created_by?: string | null;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_rfi_responses: {
+        Row: {
+          id: string;
+          rfi_id: string;
+          project_id: string;
+          author_id: string | null;
+          body: string;
+          is_official: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          rfi_id: string;
+          project_id: string;
+          author_id?: string | null;
+          body: string;
+          is_official?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          rfi_id?: string;
+          project_id?: string;
+          author_id?: string | null;
+          body?: string;
+          is_official?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_rfis: {
+        Row: {
+          id: string;
+          project_id: string;
+          number: string;
+          subject: string;
+          question: string;
+          discipline: AgendaDiscipline | null;
+          location: string | null;
+          drawing_revision_id: string | null;
+          requested_from: string | null;
+          created_by: string | null;
+          priority: AgendaPriority;
+          due_date: string | null;
+          status: AgendaReviewStatus;
+          answered_at: string | null;
+          closed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          number: string;
+          subject: string;
+          question: string;
+          discipline?: AgendaDiscipline | null;
+          location?: string | null;
+          drawing_revision_id?: string | null;
+          requested_from?: string | null;
+          created_by?: string | null;
+          priority?: AgendaPriority;
+          due_date?: string | null;
+          status?: AgendaReviewStatus;
+          answered_at?: string | null;
+          closed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          number?: string;
+          subject?: string;
+          question?: string;
+          discipline?: AgendaDiscipline | null;
+          location?: string | null;
+          drawing_revision_id?: string | null;
+          requested_from?: string | null;
+          created_by?: string | null;
+          priority?: AgendaPriority;
+          due_date?: string | null;
+          status?: AgendaReviewStatus;
+          answered_at?: string | null;
+          closed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_schedule_items: {
+        Row: {
+          id: string;
+          project_id: string;
+          parent_id: string | null;
+          name: string;
+          start_date: string | null;
+          finish_date: string | null;
+          duration_days: number | null;
+          progress_percent: number;
+          is_milestone: boolean;
+          is_critical: boolean;
+          assigned_to: string | null;
+          priority: AgendaPriority;
+          status: AgendaTaskStatus;
+          position: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          parent_id?: string | null;
+          name: string;
+          start_date?: string | null;
+          finish_date?: string | null;
+          duration_days?: number | null;
+          progress_percent?: number;
+          is_milestone?: boolean;
+          is_critical?: boolean;
+          assigned_to?: string | null;
+          priority?: AgendaPriority;
+          status?: AgendaTaskStatus;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          parent_id?: string | null;
+          name?: string;
+          start_date?: string | null;
+          finish_date?: string | null;
+          duration_days?: number | null;
+          progress_percent?: number;
+          is_milestone?: boolean;
+          is_critical?: boolean;
+          assigned_to?: string | null;
+          priority?: AgendaPriority;
+          status?: AgendaTaskStatus;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_schedule_links: {
+        Row: {
+          predecessor_id: string;
+          successor_id: string;
+          project_id: string;
+          lag_days: number;
+        };
+        Insert: {
+          predecessor_id: string;
+          successor_id: string;
+          project_id: string;
+          lag_days?: number;
+        };
+        Update: {
+          predecessor_id?: string;
+          successor_id?: string;
+          project_id?: string;
+          lag_days?: number;
+        };
+        Relationships: [];
+      };
+      agenda_submittal_revisions: {
+        Row: {
+          id: string;
+          submittal_id: string;
+          project_id: string;
+          revision: number;
+          status: AgendaReviewStatus;
+          reviewer_comment: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          submitted_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          submittal_id: string;
+          project_id: string;
+          revision: number;
+          status?: AgendaReviewStatus;
+          reviewer_comment?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          submitted_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          submittal_id?: string;
+          project_id?: string;
+          revision?: number;
+          status?: AgendaReviewStatus;
+          reviewer_comment?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          submitted_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_submittals: {
+        Row: {
+          id: string;
+          project_id: string;
+          number: string;
+          title: string;
+          spec_section: string | null;
+          discipline: AgendaDiscipline | null;
+          contractor: string | null;
+          submitted_by: string | null;
+          reviewer_id: string | null;
+          submitted_on: string | null;
+          required_by: string | null;
+          status: AgendaReviewStatus;
+          current_revision_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          number: string;
+          title: string;
+          spec_section?: string | null;
+          discipline?: AgendaDiscipline | null;
+          contractor?: string | null;
+          submitted_by?: string | null;
+          reviewer_id?: string | null;
+          submitted_on?: string | null;
+          required_by?: string | null;
+          status?: AgendaReviewStatus;
+          current_revision_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          number?: string;
+          title?: string;
+          spec_section?: string | null;
+          discipline?: AgendaDiscipline | null;
+          contractor?: string | null;
+          submitted_by?: string | null;
+          reviewer_id?: string | null;
+          submitted_on?: string | null;
+          required_by?: string | null;
+          status?: AgendaReviewStatus;
+          current_revision_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -1849,6 +3223,57 @@ export interface Database {
           archived_at?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_timesheets: {
+        Row: {
+          id: string;
+          project_id: string;
+          worker_name: string;
+          worker_id: string | null;
+          company_name: string | null;
+          worked_on: string;
+          started_at: string | null;
+          finished_at: string | null;
+          hours: number;
+          overtime_hours: number;
+          activity: string | null;
+          schedule_item_id: string | null;
+          recorded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          worker_name: string;
+          worker_id?: string | null;
+          company_name?: string | null;
+          worked_on: string;
+          started_at?: string | null;
+          finished_at?: string | null;
+          hours?: number;
+          overtime_hours?: number;
+          activity?: string | null;
+          schedule_item_id?: string | null;
+          recorded_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          worker_name?: string;
+          worker_id?: string | null;
+          company_name?: string | null;
+          worked_on?: string;
+          started_at?: string | null;
+          finished_at?: string | null;
+          hours?: number;
+          overtime_hours?: number;
+          activity?: string | null;
+          schedule_item_id?: string | null;
+          recorded_by?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -2644,7 +4069,6 @@ export interface Database {
           projects_completed: number;
           followers_count: number;
           rating: number | null;
-          review_count: number;
           verified: boolean;
           is_claimed: boolean;
           owner_id: string | null;
@@ -2658,6 +4082,7 @@ export interface Database {
           active_projects: number;
           capacity_projects: number | null;
           response_minutes: number | null;
+          review_count: number;
         };
         Insert: {
           id?: string;
@@ -2679,7 +4104,6 @@ export interface Database {
           projects_completed?: number;
           followers_count?: number;
           rating?: number | null;
-          review_count?: number;
           verified?: boolean;
           is_claimed?: boolean;
           owner_id?: string | null;
@@ -2693,6 +4117,7 @@ export interface Database {
           active_projects?: number;
           capacity_projects?: number | null;
           response_minutes?: number | null;
+          review_count?: number;
         };
         Update: {
           id?: string;
@@ -2714,7 +4139,6 @@ export interface Database {
           projects_completed?: number;
           followers_count?: number;
           rating?: number | null;
-          review_count?: number;
           verified?: boolean;
           is_claimed?: boolean;
           owner_id?: string | null;
@@ -2728,6 +4152,7 @@ export interface Database {
           active_projects?: number;
           capacity_projects?: number | null;
           response_minutes?: number | null;
+          review_count?: number;
         };
         Relationships: [];
       };
@@ -4255,27 +5680,6 @@ export interface Database {
         };
         Relationships: [];
       };
-      user_blocks: {
-        Row: {
-          blocker_id: string;
-          blocked_id: string;
-          reason: string | null;
-          created_at: string;
-        };
-        Insert: {
-          blocker_id: string;
-          blocked_id: string;
-          reason?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          blocker_id?: string;
-          blocked_id?: string;
-          reason?: string | null;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
       job_applications: {
         Row: {
           id: string;
@@ -4651,6 +6055,45 @@ export interface Database {
         };
         Relationships: [];
       };
+      location_areas: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          sub_city: string | null;
+          city: string;
+          region: string;
+          country: string;
+          latitude: number | null;
+          longitude: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          sub_city?: string | null;
+          city?: string;
+          region?: string;
+          country?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          name?: string;
+          sub_city?: string | null;
+          city?: string;
+          region?: string;
+          country?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       manufacturing_requests: {
         Row: {
           id: string;
@@ -4948,51 +6391,6 @@ export interface Database {
         };
         Relationships: [];
       };
-      watermark_settings: {
-        Row: {
-          user_id: string;
-          enabled: boolean;
-          use_username: boolean;
-          use_display_name: boolean;
-          use_company: boolean;
-          use_logo: boolean;
-          use_phone: boolean;
-          position: WatermarkPosition;
-          size: WatermarkSize;
-          opacity: number;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          user_id: string;
-          enabled?: boolean;
-          use_username?: boolean;
-          use_display_name?: boolean;
-          use_company?: boolean;
-          use_logo?: boolean;
-          use_phone?: boolean;
-          position?: WatermarkPosition;
-          size?: WatermarkSize;
-          opacity?: number;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          user_id?: string;
-          enabled?: boolean;
-          use_username?: boolean;
-          use_display_name?: boolean;
-          use_company?: boolean;
-          use_logo?: boolean;
-          use_phone?: boolean;
-          position?: WatermarkPosition;
-          size?: WatermarkSize;
-          opacity?: number;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
       moderation_items: {
         Row: {
           id: string;
@@ -5142,6 +6540,8 @@ export interface Database {
           href: string | null;
           read_at: string | null;
           created_at: string;
+          entity_type: string | null;
+          entity_id: string | null;
         };
         Insert: {
           id?: string;
@@ -5153,6 +6553,8 @@ export interface Database {
           href?: string | null;
           read_at?: string | null;
           created_at?: string;
+          entity_type?: string | null;
+          entity_id?: string | null;
         };
         Update: {
           id?: string;
@@ -5164,6 +6566,68 @@ export interface Database {
           href?: string | null;
           read_at?: string | null;
           created_at?: string;
+          entity_type?: string | null;
+          entity_id?: string | null;
+        };
+        Relationships: [];
+      };
+      panorama_jobs: {
+        Row: {
+          id: string;
+          owner_id: string;
+          status: PanoramaJobStatus;
+          expected_frames: number;
+          uploaded_frames: number;
+          frames_prefix: string | null;
+          panorama_url: string | null;
+          width: number | null;
+          height: number | null;
+          error_code: string | null;
+          property_id: string | null;
+          project_id: string | null;
+          frames_expire_at: string | null;
+          created_at: string;
+          updated_at: string;
+          stage: string | null;
+          frames: Json | null;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          status?: PanoramaJobStatus;
+          expected_frames?: number;
+          uploaded_frames?: number;
+          frames_prefix?: string | null;
+          panorama_url?: string | null;
+          width?: number | null;
+          height?: number | null;
+          error_code?: string | null;
+          property_id?: string | null;
+          project_id?: string | null;
+          frames_expire_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          stage?: string | null;
+          frames?: Json | null;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          status?: PanoramaJobStatus;
+          expected_frames?: number;
+          uploaded_frames?: number;
+          frames_prefix?: string | null;
+          panorama_url?: string | null;
+          width?: number | null;
+          height?: number | null;
+          error_code?: string | null;
+          property_id?: string | null;
+          project_id?: string | null;
+          frames_expire_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          stage?: string | null;
+          frames?: Json | null;
         };
         Relationships: [];
       };
@@ -5749,21 +7213,21 @@ export interface Database {
           updated_at: string;
           condition: ProductCondition;
           used_grade: UsedGrade | null;
-          fulfilment: ProductFulfilment;
-          rental_period: RentalPeriod | null;
-          rental_deposit: number | null;
-          digital_file_path: string | null;
-          digital_file_name: string | null;
-          digital_kind: DigitalKind | null;
-          file_format: string | null;
-          file_size_mb: number | null;
-          license: DigitalLicense | null;
-          is_sample: boolean;
           condition_notes: string | null;
           known_defects: string | null;
           sale_reason: string | null;
           age_months: number | null;
           location_area: string | null;
+          fulfilment: ProductFulfilment;
+          digital_kind: DigitalKind | null;
+          file_format: string | null;
+          file_size_mb: number | null;
+          license: DigitalLicense | null;
+          is_sample: boolean;
+          rental_period: RentalPeriod | null;
+          rental_deposit: number | null;
+          digital_file_path: string | null;
+          digital_file_name: string | null;
         };
         Insert: {
           id?: string;
@@ -5788,21 +7252,21 @@ export interface Database {
           updated_at?: string;
           condition?: ProductCondition;
           used_grade?: UsedGrade | null;
-          fulfilment?: ProductFulfilment;
-          rental_period?: RentalPeriod | null;
-          rental_deposit?: number | null;
-          digital_file_path?: string | null;
-          digital_file_name?: string | null;
-          digital_kind?: DigitalKind | null;
-          file_format?: string | null;
-          file_size_mb?: number | null;
-          license?: DigitalLicense | null;
-          is_sample?: boolean;
           condition_notes?: string | null;
           known_defects?: string | null;
           sale_reason?: string | null;
           age_months?: number | null;
           location_area?: string | null;
+          fulfilment?: ProductFulfilment;
+          digital_kind?: DigitalKind | null;
+          file_format?: string | null;
+          file_size_mb?: number | null;
+          license?: DigitalLicense | null;
+          is_sample?: boolean;
+          rental_period?: RentalPeriod | null;
+          rental_deposit?: number | null;
+          digital_file_path?: string | null;
+          digital_file_name?: string | null;
         };
         Update: {
           id?: string;
@@ -5827,21 +7291,51 @@ export interface Database {
           updated_at?: string;
           condition?: ProductCondition;
           used_grade?: UsedGrade | null;
-          fulfilment?: ProductFulfilment;
-          rental_period?: RentalPeriod | null;
-          rental_deposit?: number | null;
-          digital_file_path?: string | null;
-          digital_file_name?: string | null;
-          digital_kind?: DigitalKind | null;
-          file_format?: string | null;
-          file_size_mb?: number | null;
-          license?: DigitalLicense | null;
-          is_sample?: boolean;
           condition_notes?: string | null;
           known_defects?: string | null;
           sale_reason?: string | null;
           age_months?: number | null;
           location_area?: string | null;
+          fulfilment?: ProductFulfilment;
+          digital_kind?: DigitalKind | null;
+          file_format?: string | null;
+          file_size_mb?: number | null;
+          license?: DigitalLicense | null;
+          is_sample?: boolean;
+          rental_period?: RentalPeriod | null;
+          rental_deposit?: number | null;
+          digital_file_path?: string | null;
+          digital_file_name?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_service_areas: {
+        Row: {
+          id: string;
+          profile_id: string;
+          area_slug: string;
+          area_name: string;
+          city: string;
+          country: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          area_slug: string;
+          area_name: string;
+          city?: string;
+          country?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string;
+          area_slug?: string;
+          area_name?: string;
+          city?: string;
+          country?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -6041,8 +7535,6 @@ export interface Database {
           budget_max: number | null;
           currency: string;
           location_city: string | null;
-          location_area: string | null;
-          profession: string | null;
           location_country: string;
           latitude: number | null;
           longitude: number | null;
@@ -6058,6 +7550,8 @@ export interface Database {
           status: BriefStatus;
           created_at: string;
           updated_at: string;
+          location_area: string | null;
+          profession: string | null;
         };
         Insert: {
           id?: string;
@@ -6074,8 +7568,6 @@ export interface Database {
           budget_max?: number | null;
           currency?: string;
           location_city?: string | null;
-          location_area?: string | null;
-          profession?: string | null;
           location_country?: string;
           latitude?: number | null;
           longitude?: number | null;
@@ -6091,6 +7583,8 @@ export interface Database {
           status?: BriefStatus;
           created_at?: string;
           updated_at?: string;
+          location_area?: string | null;
+          profession?: string | null;
         };
         Update: {
           id?: string;
@@ -6107,8 +7601,6 @@ export interface Database {
           budget_max?: number | null;
           currency?: string;
           location_city?: string | null;
-          location_area?: string | null;
-          profession?: string | null;
           location_country?: string;
           latitude?: number | null;
           longitude?: number | null;
@@ -6124,6 +7616,8 @@ export interface Database {
           status?: BriefStatus;
           created_at?: string;
           updated_at?: string;
+          location_area?: string | null;
+          profession?: string | null;
         };
         Relationships: [];
       };
@@ -6154,135 +7648,6 @@ export interface Database {
         };
         Relationships: [];
       };
-      location_areas: {
-        Row: {
-          id: string;
-          slug: string;
-          name: string;
-          sub_city: string | null;
-          city: string;
-          region: string;
-          country: string;
-          latitude: number | null;
-          longitude: number | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          slug: string;
-          name: string;
-          sub_city?: string | null;
-          city?: string;
-          region?: string;
-          country?: string;
-          latitude?: number | null;
-          longitude?: number | null;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          slug?: string;
-          name?: string;
-          sub_city?: string | null;
-          city?: string;
-          region?: string;
-          country?: string;
-          latitude?: number | null;
-          longitude?: number | null;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
-      panorama_jobs: {
-        Row: {
-          id: string;
-          owner_id: string;
-          status: PanoramaJobStatus;
-          expected_frames: number;
-          uploaded_frames: number;
-          frames_prefix: string | null;
-          panorama_url: string | null;
-          width: number | null;
-          height: number | null;
-          error_code: string | null;
-          stage: string | null;
-          frames: Json | null;
-          property_id: string | null;
-          project_id: string | null;
-          frames_expire_at: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          owner_id: string;
-          status?: PanoramaJobStatus;
-          expected_frames?: number;
-          uploaded_frames?: number;
-          frames_prefix?: string | null;
-          panorama_url?: string | null;
-          width?: number | null;
-          height?: number | null;
-          error_code?: string | null;
-          stage?: string | null;
-          frames?: Json | null;
-          property_id?: string | null;
-          project_id?: string | null;
-          frames_expire_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          owner_id?: string;
-          status?: PanoramaJobStatus;
-          expected_frames?: number;
-          uploaded_frames?: number;
-          frames_prefix?: string | null;
-          panorama_url?: string | null;
-          width?: number | null;
-          height?: number | null;
-          error_code?: string | null;
-          stage?: string | null;
-          frames?: Json | null;
-          property_id?: string | null;
-          project_id?: string | null;
-          frames_expire_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      professional_service_areas: {
-        Row: {
-          id: string;
-          profile_id: string;
-          area_slug: string;
-          area_name: string;
-          city: string;
-          country: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          profile_id: string;
-          area_slug: string;
-          area_name: string;
-          city?: string;
-          country?: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          profile_id?: string;
-          area_slug?: string;
-          area_name?: string;
-          city?: string;
-          country?: string;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
       projects: {
         Row: {
           id: string;
@@ -6302,14 +7667,14 @@ export interface Database {
           completion_date: string | null;
           client: string | null;
           cover_image_url: string | null;
-          company_id: string | null;
           status: ProjectStatus;
-          category: ProjectCategory;
-          metadata: Record<string, unknown>;
-          tags: string[];
           views: number;
           created_at: string;
           updated_at: string;
+          category: ProjectCategory;
+          metadata: Json;
+          tags: string[];
+          company_id: string | null;
         };
         Insert: {
           id?: string;
@@ -6329,14 +7694,14 @@ export interface Database {
           completion_date?: string | null;
           client?: string | null;
           cover_image_url?: string | null;
-          company_id?: string | null;
           status?: ProjectStatus;
-          category?: ProjectCategory;
-          metadata?: Record<string, unknown>;
-          tags?: string[];
           views?: number;
           created_at?: string;
           updated_at?: string;
+          category?: ProjectCategory;
+          metadata?: Json;
+          tags?: string[];
+          company_id?: string | null;
         };
         Update: {
           id?: string;
@@ -6356,14 +7721,14 @@ export interface Database {
           completion_date?: string | null;
           client?: string | null;
           cover_image_url?: string | null;
-          company_id?: string | null;
           status?: ProjectStatus;
-          category?: ProjectCategory;
-          metadata?: Record<string, unknown>;
-          tags?: string[];
           views?: number;
           created_at?: string;
           updated_at?: string;
+          category?: ProjectCategory;
+          metadata?: Json;
+          tags?: string[];
+          company_id?: string | null;
         };
         Relationships: [];
       };
@@ -6916,6 +8281,39 @@ export interface Database {
           view_analytics?: boolean;
           view_finance?: boolean;
           publish_content?: boolean;
+        };
+        Relationships: [];
+      };
+      saved_calculations: {
+        Row: {
+          id: string;
+          user_id: string;
+          slug: string;
+          name: string;
+          inputs: Json;
+          headline: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          slug: string;
+          name: string;
+          inputs?: Json;
+          headline?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          slug?: string;
+          name?: string;
+          inputs?: Json;
+          headline?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -7648,6 +9046,27 @@ export interface Database {
         };
         Relationships: [];
       };
+      user_blocks: {
+        Row: {
+          blocker_id: string;
+          blocked_id: string;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          blocker_id: string;
+          blocked_id: string;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          blocker_id?: string;
+          blocked_id?: string;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       user_strikes: {
         Row: {
           id: string;
@@ -7684,42 +9103,51 @@ export interface Database {
         };
         Relationships: [];
       };
-
-      /** 0067. A named calculation somebody kept. */
-      saved_calculations: {
+      watermark_settings: {
         Row: {
-          id: string;
           user_id: string;
-          slug: string;
-          name: string;
-          inputs: Json;
-          headline: string | null;
+          enabled: boolean;
+          use_username: boolean;
+          use_display_name: boolean;
+          use_company: boolean;
+          use_logo: boolean;
+          use_phone: boolean;
+          position: WatermarkPosition;
+          size: WatermarkSize;
+          opacity: number;
           created_at: string;
           updated_at: string;
         };
         Insert: {
-          id?: string;
           user_id: string;
-          slug: string;
-          name: string;
-          inputs?: Json;
-          headline?: string | null;
+          enabled?: boolean;
+          use_username?: boolean;
+          use_display_name?: boolean;
+          use_company?: boolean;
+          use_logo?: boolean;
+          use_phone?: boolean;
+          position?: WatermarkPosition;
+          size?: WatermarkSize;
+          opacity?: number;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
-          id?: string;
           user_id?: string;
-          slug?: string;
-          name?: string;
-          inputs?: Json;
-          headline?: string | null;
+          enabled?: boolean;
+          use_username?: boolean;
+          use_display_name?: boolean;
+          use_company?: boolean;
+          use_logo?: boolean;
+          use_phone?: boolean;
+          position?: WatermarkPosition;
+          size?: WatermarkSize;
+          opacity?: number;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [];
       };
-
     };
     Views: {
       feed_authors: {
@@ -7891,36 +9319,15 @@ export interface Database {
         };
         Returns: boolean;
       };
-      /** 0067. The price the calculators offer for a material, or no row. */
-      calculator_material_price: {
-        Args: {
-          p_material: string;
-          p_city?: string | null;
-        };
-        Returns: {
-          price: number;
-          currency: string;
-          unit: string;
-          material: string;
-          city_region: string;
-          supplier: string | null;
-          data_status: PriceDataStatus;
-          verified: boolean;
-          price_date: string;
-          age_days: number;
-        }[];
-      };
-      /** 0068. The only route to the verified badge. */
-      sync_phone_verification: {
-        Args: Record<string, never>;
-        Returns: {
-          phone_verified: boolean;
-          verification_status: VerificationStatus;
-        }[];
-      };
       admin_can: {
         Args: {
           area: AdminArea;
+        };
+        Returns: boolean;
+      };
+      agenda_can_view_contracts: {
+        Args: {
+          target_project: string;
         };
         Returns: boolean;
       };
@@ -7960,6 +9367,15 @@ export interface Database {
           happened_at?: string | null;
         };
         Returns: undefined;
+      };
+      agenda_next_number: {
+        Args: {
+          target_project: string;
+          record_kind: string;
+          prefix: string;
+          width?: number | null;
+        };
+        Returns: string;
       };
       agenda_overview: {
         Args: {
@@ -8040,11 +9456,24 @@ export interface Database {
         };
         Returns: { id: string; slug: string; name: string; city: string; logo_url: string; verified: boolean; rating: number; projects_completed: number; is_claimed: boolean }[];
       };
+      block_user: {
+        Args: {
+          target_user: string;
+          why?: string | null;
+        };
+        Returns: undefined;
+      };
       building_availability: {
         Args: {
           target: string;
         };
         Returns: { total_units: number; available_units: number; for_sale: number; for_rent: number; from_price: number }[];
+      };
+      building_summary: {
+        Args: {
+          target: string;
+        };
+        Returns: { total_units: number; available_units: number; min_price: number; max_price: number; floors_with_units: number }[];
       };
       buildings_in_viewport: {
         Args: {
@@ -8057,11 +9486,12 @@ export interface Database {
         };
         Returns: { id: string; code: string; name: string; building_type: PropertyType; construction_status: ConstructionStatus; floors: number; total_units: number; completion_percent: number; latitude: number; longitude: number; address: string; sub_city: string; neighbourhood: string; cover_image_url: string; company_id: string; company_name: string; unit_count: number; price_from: number }[];
       };
-      building_summary: {
+      calculator_material_price: {
         Args: {
-          target: string;
+          p_material: string;
+          p_city?: string | null;
         };
-        Returns: { total_units: number; available_units: number; min_price: number; max_price: number; floors_with_units: number }[];
+        Returns: { price: number; currency: string; unit: string; material: string; city_region: string; supplier: string; data_status: PriceDataStatus; verified: boolean; price_date: string; age_days: number }[];
       };
       can_see_exact_location: {
         Args: {
@@ -8078,6 +9508,12 @@ export interface Database {
           post: string;
         };
         Returns: boolean;
+      };
+      company_reputation: {
+        Args: {
+          p_company: string;
+        };
+        Returns: { average: number; total: number; five: number; four: number; three: number; two: number; one: number; verified_total: number; service_count: number }[];
       };
       credit_preflight: {
         Args: {
@@ -8152,6 +9588,12 @@ export interface Database {
         };
         Returns: string;
       };
+      delete_notification: {
+        Args: {
+          target_notification: string;
+        };
+        Returns: undefined;
+      };
       design_slug: {
         Args: {
           title: string;
@@ -8217,6 +9659,12 @@ export interface Database {
       expire_subscriptions: {
         Args: Record<PropertyKey, never>;
         Returns: number;
+      };
+      expired_panorama_frames: {
+        Args: {
+          p_limit?: number | null;
+        };
+        Returns: { id: string; frames_prefix: string }[];
       };
       feed_comment_tree: {
         Args: {
@@ -8297,6 +9745,12 @@ export interface Database {
           target_uuid: string;
         };
         Returns: number;
+      };
+      forget_panorama_frames: {
+        Args: {
+          p_job: string;
+        };
+        Returns: undefined;
       };
       fulfil_payment: {
         Args: {
@@ -8568,6 +10022,13 @@ export interface Database {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
+      is_blocked_by_anyone_in: {
+        Args: {
+          target_conversation: string;
+          sender: string;
+        };
+        Returns: boolean;
+      };
       is_conversation_participant: {
         Args: {
           conversation_id: string;
@@ -8582,6 +10043,14 @@ export interface Database {
       is_platform_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      job_application_set_saved_documents: {
+        Args: {
+          p_application: string;
+          p_cv: boolean;
+          p_portfolio: boolean;
+        };
+        Returns: undefined;
       };
       job_apply: {
         Args: {
@@ -8630,38 +10099,6 @@ export interface Database {
         };
         Returns: boolean;
       };
-      mark_notification_read: {
-        Args: { target_notification: string };
-        Returns: undefined;
-      };
-      delete_notification: {
-        Args: { target_notification: string };
-        Returns: undefined;
-      };
-      block_user: {
-        Args: { target_user: string; why?: string | null };
-        Returns: undefined;
-      };
-      unblock_user: {
-        Args: { target_user: string };
-        Returns: undefined;
-      };
-      report_user: {
-        Args: {
-          target_user: string;
-          why: string;
-          note?: string | null;
-        };
-        Returns: string;
-      };
-      job_application_set_saved_documents: {
-        Args: {
-          p_application: string;
-          p_cv: boolean;
-          p_portfolio: boolean;
-        };
-        Returns: undefined;
-      };
       job_withdraw_application: {
         Args: {
           p_application: string;
@@ -8680,6 +10117,12 @@ export interface Database {
       };
       mark_conversations_delivered: {
         Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
+      mark_notification_read: {
+        Args: {
+          target_notification: string;
+        };
         Returns: undefined;
       };
       mark_notifications_read: {
@@ -8701,6 +10144,16 @@ export interface Database {
           max_rows?: number | null;
         };
         Returns: { id: string; category: string; subcategory: string | null; material: string; specification: string | null; unit: string; brand: string | null; city_region: string; price_etb: number; currency: string; vat_status: PriceVatStatus; supplier: string | null; supplier_id: string | null; source: string | null; price_date: string; data_status: PriceDataStatus; verified: boolean | null; verified_by: string | null; verified_at: string | null; superseded_by: string | null; notes: string | null; created_by: string | null; created_at: string; updated_at: string }[];
+      };
+      moderation_hide_threshold: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+      moderation_hides_on_first: {
+        Args: {
+          category: ModerationCategory;
+        };
+        Returns: boolean;
       };
       my_admin_areas: {
         Args: Record<PropertyKey, never>;
@@ -8833,6 +10286,12 @@ export interface Database {
         };
         Returns: { day: string; price: number }[];
       };
+      professional_reputation: {
+        Args: {
+          p_user: string;
+        };
+        Returns: { average: number; total: number; five: number; four: number; three: number; two: number; one: number; verified_total: number; service_count: number }[];
+      };
       properties_in_viewport: {
         Args: {
           south: number;
@@ -8901,6 +10360,10 @@ export interface Database {
         };
         Returns: undefined;
       };
+      refresh_company_aggregates: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
       refresh_earned_badges: {
         Args: {
           target_user_id: string;
@@ -8925,57 +10388,19 @@ export interface Database {
         };
         Returns: { entity: string; removed: number }[];
       };
+      report_user: {
+        Args: {
+          target_user: string;
+          why: ModerationCategory;
+          note?: string | null;
+        };
+        Returns: string;
+      };
       reputation_summary: {
         Args: {
           target_user_id: string;
         };
         Returns: { points: number; rank_percentile: number; badge_count: number; completed_projects: number; positive_reviews: number }[];
-      };
-      search_professionals: {
-        Args: {
-          p_query?: string | null;
-          p_category?: string | null;
-          p_city?: string | null;
-          p_min_rating?: number | null;
-          p_verified_only?: boolean | null;
-          p_available_only?: boolean | null;
-          p_limit?: number | null;
-          p_offset?: number | null;
-        };
-        Returns: {
-          id: string;
-          username: string | null;
-          full_name: string | null;
-          company_name: string | null;
-          avatar_url: string | null;
-          account_type: AccountType | null;
-          location_city: string | null;
-          years_experience: number | null;
-          phone_verified: boolean;
-          work_status: WorkStatus;
-          rating: number | null;
-          review_count: number;
-          verified_reviews: number;
-          service_count: number;
-          trades: string[];
-          total_count: number;
-        }[];
-      };
-      company_reputation: {
-        Args: {
-          p_company: string;
-        };
-        Returns: { average: number; total: number; five: number; four: number; three: number; two: number; one: number; verified_total: number; service_count: number }[];
-      };
-      refresh_company_aggregates: {
-        Args: Record<string, never>;
-        Returns: undefined;
-      };
-      professional_reputation: {
-        Args: {
-          p_user: string;
-        };
-        Returns: { average: number; total: number; five: number; four: number; three: number; two: number; one: number; verified_total: number; service_count: number }[];
       };
       review_summary: {
         Args: {
@@ -9004,6 +10429,24 @@ export interface Database {
           max_results?: number | null;
         };
         Returns: { kind: string; label: string; detail: string; latitude: number; longitude: number; city: string }[];
+      };
+      search_professionals: {
+        Args: {
+          p_query?: string | null;
+          p_category?: string | null;
+          p_profession?: string | null;
+          p_area?: string | null;
+          p_city?: string | null;
+          p_provider?: string | null;
+          p_min_rating?: number | null;
+          p_verified_only?: boolean | null;
+          p_available_only?: boolean | null;
+          p_min_experience?: number | null;
+          p_sort?: string | null;
+          p_limit?: number | null;
+          p_offset?: number | null;
+        };
+        Returns: { id: string; username: string; full_name: string; company_name: string; avatar_url: string; account_type: AccountType; location_city: string; base_area: string; phone: string; profession: string; specialties: string[]; years_experience: number; phone_verified: boolean; id_verified: boolean; business_verified: boolean; license_verified: boolean; work_status: WorkStatus; rating: number; review_count: number; verified_reviews: number; service_count: number; trades: string[]; service_areas: string[]; serves_entire_city: boolean; travel_radius_km: number; projects_completed: number; distance_km: number; match_kind: string; total_count: number }[];
       };
       search_suggestions: {
         Args: {
@@ -9140,11 +10583,43 @@ export interface Database {
         };
         Returns: boolean;
       };
+      sync_phone_verification: {
+        Args: Record<PropertyKey, never>;
+        Returns: { phone_verified: boolean; verification_status: VerificationStatus }[];
+      };
       tour_is_readable: {
         Args: {
           t: string;
         };
         Returns: boolean;
+      };
+      unaccent: {
+        Args: {
+          arg1: string;
+          arg2: string;
+        };
+        Returns: string;
+      };
+      unaccent_init: {
+        Args: {
+          arg1: string;
+        };
+        Returns: string;
+      };
+      unaccent_lexize: {
+        Args: {
+          arg1: string;
+          arg2: string;
+          arg3: string;
+          arg4: string;
+        };
+        Returns: string;
+      };
+      unblock_user: {
+        Args: {
+          target_user: string;
+        };
+        Returns: undefined;
       };
       unread_message_count: {
         Args: Record<PropertyKey, never>;
@@ -9153,6 +10628,52 @@ export interface Database {
       unread_notification_count: {
         Args: Record<PropertyKey, never>;
         Returns: number;
+      };
+      uuid_generate_v1: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      uuid_generate_v1mc: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      uuid_generate_v3: {
+        Args: {
+          namespace: string;
+          name: string;
+        };
+        Returns: string;
+      };
+      uuid_generate_v4: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      uuid_generate_v5: {
+        Args: {
+          namespace: string;
+          name: string;
+        };
+        Returns: string;
+      };
+      uuid_nil: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      uuid_ns_dns: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      uuid_ns_oid: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      uuid_ns_url: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      uuid_ns_x500: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
       };
       word_similarity: {
         Args: {
@@ -9194,15 +10715,28 @@ export interface Database {
       account_plan: AccountPlan;
       account_type: AccountType;
       admin_area: AdminArea;
+      agenda_approval_decision: AgendaApprovalDecision;
+      agenda_bid_status: AgendaBidStatus;
+      agenda_change_reason: AgendaChangeReason;
       agenda_confidentiality: AgendaConfidentiality;
+      agenda_contract_party: AgendaContractParty;
       agenda_decision_status: AgendaDecisionStatus;
+      agenda_discipline: AgendaDiscipline;
+      agenda_equipment_status: AgendaEquipmentStatus;
       agenda_event_kind: AgendaEventKind;
       agenda_file_kind: AgendaFileKind;
+      agenda_inspection_result: AgendaInspectionResult;
+      agenda_issue_status: AgendaIssueStatus;
       agenda_ledger_kind: AgendaLedgerKind;
       agenda_ledger_status: AgendaLedgerStatus;
       agenda_member_status: AgendaMemberStatus;
+      agenda_money_status: AgendaMoneyStatus;
+      agenda_observation_kind: AgendaObservationKind;
       agenda_priority: AgendaPriority;
+      agenda_project_status: AgendaProjectStatus;
+      agenda_project_type: AgendaProjectType;
       agenda_reminder_kind: AgendaReminderKind;
+      agenda_review_status: AgendaReviewStatus;
       agenda_role: AgendaRole;
       agenda_task_status: AgendaTaskStatus;
       ai_agent: AiAgent;
@@ -9232,6 +10766,8 @@ export interface Database {
       credit_entry_kind: CreditEntryKind;
       design_asset_kind: DesignAssetKind;
       design_visibility: DesignVisibility;
+      digital_kind: DigitalKind;
+      digital_license: DigitalLicense;
       equipment_condition: EquipmentCondition;
       event_kind: EventKind;
       event_status: EventStatus;
@@ -9265,6 +10801,7 @@ export interface Database {
       moderation_category: ModerationCategory;
       moderation_status: ModerationStatus;
       notification_kind: NotificationKind;
+      panorama_job_status: PanoramaJobStatus;
       payment_purpose: PaymentPurpose;
       payment_status: PaymentStatus;
       place_kind: PlaceKind;
@@ -9275,9 +10812,11 @@ export interface Database {
       price_event: PriceEvent;
       price_sector: PriceSector;
       price_vat_status: PriceVatStatus;
+      product_condition: ProductCondition;
+      product_fulfilment: ProductFulfilment;
       product_status: ProductStatus;
-      project_status: ProjectStatus;
       project_category: ProjectCategory;
+      project_status: ProjectStatus;
       property_media_kind: PropertyMediaKind;
       property_status: PropertyStatus;
       property_type: PropertyType;
@@ -9295,7 +10834,10 @@ export interface Database {
       strike_level: StrikeLevel;
       team_role: TeamRole;
       tour_visibility: TourVisibility;
+      used_grade: UsedGrade;
       verification_status: VerificationStatus;
+      watermark_position: WatermarkPosition;
+      watermark_size: WatermarkSize;
       work_mode: WorkMode;
       work_status: WorkStatus;
     };
@@ -9322,17 +10864,52 @@ export type ServicePortfolioItem = Database["public"]["Tables"]["service_portfol
 export type SocialPublishLogEntry = Database["public"]["Tables"]["social_publish_log"]["Row"];
 
 export type AdminMember = Database["public"]["Tables"]["admin_members"]["Row"];
+export type AgendaApproval = Database["public"]["Tables"]["agenda_approvals"]["Row"];
 export type AgendaAttachment = Database["public"]["Tables"]["agenda_attachments"]["Row"];
 export type AgendaAudit = Database["public"]["Tables"]["agenda_audit"]["Row"];
+export type AgendaBid = Database["public"]["Tables"]["agenda_bids"]["Row"];
+export type AgendaBidPackage = Database["public"]["Tables"]["agenda_bid_packages"]["Row"];
+export type AgendaBoqItem = Database["public"]["Tables"]["agenda_boq_items"]["Row"];
+export type AgendaBudgetItem = Database["public"]["Tables"]["agenda_budget_items"]["Row"];
+export type AgendaChangeEvent = Database["public"]["Tables"]["agenda_change_events"]["Row"];
+export type AgendaChangeOrder = Database["public"]["Tables"]["agenda_change_orders"]["Row"];
+export type AgendaCommitment = Database["public"]["Tables"]["agenda_commitments"]["Row"];
+export type AgendaContract = Database["public"]["Tables"]["agenda_contracts"]["Row"];
+export type AgendaCounter = Database["public"]["Tables"]["agenda_counters"]["Row"];
 export type AgendaDailyLog = Database["public"]["Tables"]["agenda_daily_logs"]["Row"];
 export type AgendaDecision = Database["public"]["Tables"]["agenda_decisions"]["Row"];
+export type AgendaDocument = Database["public"]["Tables"]["agenda_documents"]["Row"];
+export type AgendaDocumentFolder = Database["public"]["Tables"]["agenda_document_folders"]["Row"];
+export type AgendaDocumentVersion = Database["public"]["Tables"]["agenda_document_versions"]["Row"];
+export type AgendaDrawing = Database["public"]["Tables"]["agenda_drawings"]["Row"];
+export type AgendaDrawingRevision = Database["public"]["Tables"]["agenda_drawing_revisions"]["Row"];
+export type AgendaEquipment = Database["public"]["Tables"]["agenda_equipment"]["Row"];
 export type AgendaEvent = Database["public"]["Tables"]["agenda_events"]["Row"];
+export type AgendaFormSubmission = Database["public"]["Tables"]["agenda_form_submissions"]["Row"];
+export type AgendaFormTemplate = Database["public"]["Tables"]["agenda_form_templates"]["Row"];
+export type AgendaInspection = Database["public"]["Tables"]["agenda_inspections"]["Row"];
+export type AgendaInspectionItem = Database["public"]["Tables"]["agenda_inspection_items"]["Row"];
+export type AgendaInvoice = Database["public"]["Tables"]["agenda_invoices"]["Row"];
 export type AgendaLedger = Database["public"]["Tables"]["agenda_ledger"]["Row"];
 export type AgendaMeeting = Database["public"]["Tables"]["agenda_meetings"]["Row"];
 export type AgendaMember = Database["public"]["Tables"]["agenda_members"]["Row"];
+export type AgendaObservation = Database["public"]["Tables"]["agenda_observations"]["Row"];
+export type AgendaPayment = Database["public"]["Tables"]["agenda_payments"]["Row"];
+export type AgendaPhoto = Database["public"]["Tables"]["agenda_photos"]["Row"];
+export type AgendaProject = Database["public"]["Tables"]["agenda_projects"]["Row"];
+export type AgendaPunchItem = Database["public"]["Tables"]["agenda_punch_items"]["Row"];
+export type AgendaPurchaseOrder = Database["public"]["Tables"]["agenda_purchase_orders"]["Row"];
+export type AgendaPurchaseOrderItem = Database["public"]["Tables"]["agenda_purchase_order_items"]["Row"];
 export type AgendaReminder = Database["public"]["Tables"]["agenda_reminders"]["Row"];
+export type AgendaRfi = Database["public"]["Tables"]["agenda_rfis"]["Row"];
+export type AgendaRfiRespons = Database["public"]["Tables"]["agenda_rfi_responses"]["Row"];
+export type AgendaScheduleItem = Database["public"]["Tables"]["agenda_schedule_items"]["Row"];
+export type AgendaScheduleLink = Database["public"]["Tables"]["agenda_schedule_links"]["Row"];
+export type AgendaSubmittal = Database["public"]["Tables"]["agenda_submittals"]["Row"];
+export type AgendaSubmittalRevision = Database["public"]["Tables"]["agenda_submittal_revisions"]["Row"];
 export type AgendaTask = Database["public"]["Tables"]["agenda_tasks"]["Row"];
 export type AgendaTaskComment = Database["public"]["Tables"]["agenda_task_comments"]["Row"];
+export type AgendaTimesheet = Database["public"]["Tables"]["agenda_timesheets"]["Row"];
 export type AiContentPost = Database["public"]["Tables"]["ai_content_posts"]["Row"];
 export type AiContentSchedule = Database["public"]["Tables"]["ai_content_schedules"]["Row"];
 export type AiContentVersion = Database["public"]["Tables"]["ai_content_versions"]["Row"];
@@ -9400,6 +10977,7 @@ export type JobInterview = Database["public"]["Tables"]["job_interviews"]["Row"]
 export type JobSaved = Database["public"]["Tables"]["job_saved"]["Row"];
 export type KnowledgeArticle = Database["public"]["Tables"]["knowledge_articles"]["Row"];
 export type LaborPrice = Database["public"]["Views"]["labor_prices"]["Row"];
+export type LocationArea = Database["public"]["Tables"]["location_areas"]["Row"];
 export type ManufacturingRequest = Database["public"]["Tables"]["manufacturing_requests"]["Row"];
 export type MaterialPrice = Database["public"]["Tables"]["material_prices"]["Row"];
 export type MaterialPriceEvent = Database["public"]["Tables"]["material_price_events"]["Row"];
@@ -9410,6 +10988,7 @@ export type ModerationAudit = Database["public"]["Tables"]["moderation_audit"]["
 export type ModerationItem = Database["public"]["Tables"]["moderation_items"]["Row"];
 export type ModerationReport = Database["public"]["Tables"]["moderation_reports"]["Row"];
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+export type PanoramaJob = Database["public"]["Tables"]["panorama_jobs"]["Row"];
 export type Payment = Database["public"]["Tables"]["payments"]["Row"];
 export type PaymentEvent = Database["public"]["Tables"]["payment_events"]["Row"];
 export type PlatformSetting = Database["public"]["Tables"]["platform_settings"]["Row"];
@@ -9427,6 +11006,7 @@ export type Product = Database["public"]["Tables"]["products"]["Row"];
 export type ProductCategory = Database["public"]["Tables"]["product_categories"]["Row"];
 export type ProductFavorite = Database["public"]["Tables"]["product_favorites"]["Row"];
 export type ProductImage = Database["public"]["Tables"]["product_images"]["Row"];
+export type ProfessionalServiceArea = Database["public"]["Tables"]["professional_service_areas"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
@@ -9444,6 +11024,7 @@ export type ReputationRule = Database["public"]["Tables"]["reputation_rules"]["R
 export type Review = Database["public"]["Tables"]["reviews"]["Row"];
 export type ReviewHelpful = Database["public"]["Tables"]["review_helpful"]["Row"];
 export type RolePermission = Database["public"]["Tables"]["role_permissions"]["Row"];
+export type SavedCalculation = Database["public"]["Tables"]["saved_calculations"]["Row"];
 export type SeedContent = Database["public"]["Tables"]["seed_content"]["Row"];
 export type Service = Database["public"]["Tables"]["services"]["Row"];
 export type ServiceBookmark = Database["public"]["Tables"]["service_bookmarks"]["Row"];
@@ -9463,7 +11044,9 @@ export type TourHotspot = Database["public"]["Tables"]["tour_hotspots"]["Row"];
 export type TourScene = Database["public"]["Tables"]["tour_scenes"]["Row"];
 export type TravelLandmark = Database["public"]["Tables"]["travel_landmarks"]["Row"];
 export type UserBadge = Database["public"]["Tables"]["user_badges"]["Row"];
+export type UserBlock = Database["public"]["Tables"]["user_blocks"]["Row"];
 export type UserStrike = Database["public"]["Tables"]["user_strikes"]["Row"];
+export type WatermarkSetting = Database["public"]["Tables"]["watermark_settings"]["Row"];
 
 /** Row of public.places_near_property(). */
 export type NearbyPlace = {

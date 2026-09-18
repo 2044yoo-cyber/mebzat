@@ -91,7 +91,18 @@ export function parseTags(raw: FormDataEntryValue | null): string[] {
 /** Mirrors `projects_metadata_bounded` in 0077, with room to spare. */
 const MAX_METADATA_VALUE_LENGTH = 200;
 
-function coerce(field: CategoryField, raw: string): unknown | null {
+/**
+ * One answer, narrowed to something the `metadata` JSON column can hold.
+ *
+ * The return type is the three JSON scalars rather than `unknown`: every
+ * branch below already produces one of them, and saying so is what lets the
+ * built object be handed to the database without a cast that would also let a
+ * `Date` or a `Map` through unnoticed.
+ */
+function coerce(
+  field: CategoryField,
+  raw: string,
+): string | number | boolean | null {
   const value = raw.trim();
   if (!value) return null;
 
@@ -131,8 +142,8 @@ function coerce(field: CategoryField, raw: string): unknown | null {
 export function parseMetadata(
   category: ProjectCategory,
   formData: FormData,
-): Record<string, unknown> {
-  const metadata: Record<string, unknown> = {};
+): Record<string, string | number | boolean> {
+  const metadata: Record<string, string | number | boolean> = {};
 
   for (const field of fieldsFor(category)) {
     if (field.source !== "metadata") continue;

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import type { ModerationCategory } from "@/types/database.types";
 
 export type ModerationResult = { error?: string; ok?: boolean };
 
@@ -46,13 +47,14 @@ export async function unblockUser(
 /**
  * Reports somebody to the moderators.
  *
- * `category` is one of `moderation_category`, validated by PostgreSQL when the
+ * `category` is one of `moderation_category`. PostgreSQL validates it when the
  * argument is cast — an invented value fails the call rather than filing a
- * report nobody can triage.
+ * report nobody can triage — and the type says so here too, so a caller
+ * inventing one is a build failure rather than a refusal at runtime.
  */
 export async function reportUser(
   targetUserId: string,
-  category: string,
+  category: ModerationCategory,
   note?: string,
 ): Promise<ModerationResult> {
   const supabase = await createClient();

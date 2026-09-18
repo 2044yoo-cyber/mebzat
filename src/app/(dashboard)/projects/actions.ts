@@ -65,7 +65,7 @@ type ProjectColumns = {
   title: string;
   category: ProjectCategory;
   company_id: string | null;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, string | number | boolean>;
   tags: string[];
   description: string | null;
   location_city: string | null;
