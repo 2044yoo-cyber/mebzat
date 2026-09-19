@@ -52,7 +52,7 @@ function checkWiring(transform = (s) => s) {
   const start = transform(clean('src/features/berchuma-studio/components/start-panel.tsx').split('export function StartPanel')[1]);
   assert.match(start, /chosen\?\.kind === "kitchen" \? <KitchenSetup[^>]*onStart=\{onStart\}/);
   const workspace = clean('src/features/berchuma-studio/components/studio-workspace.tsx');
-  assert.match(workspace, /opening && opening.kind !== "kitchen" \? startingDesign\(/);
+  assert.match(workspace, /opening && opening.kind !== "kitchen"\s*\? startingDesign\(/);
   const controls = clean('src/features/berchuma-studio/components/editor/control-panel.tsx');
   assert.match(controls, /<KitchenSetup[^>]*submitLabel="Replace kitchen layout"/);
   assert.match(controls, /onChange\(addKitchenUpper\(spec, selected.id\)\)/);
@@ -73,6 +73,7 @@ for (const mutation of [
   ['/services/geometry.ts', 'part.role === "rail" && part.manufacture !== "cut"', 'part.role === "rail"'],
   ['/types/spec.ts', 'spec.kitchenSetup?.details ? 200 : LIMITS.minWidth', 'LIMITS.minWidth'],
   ['/types/kitchen.ts', 'appliance.offset < other.offset + other.width', 'false'],
+  ['/types/kitchen.ts', 'const chosen = clear[0];', 'const chosen = undefined;'],
 ]) await assert.rejects(load('scripts/kitchen-detail-check.ts', mutation), undefined, `Detailed kitchen rejects broken ${mutation[0]}`);
 async function checkApplianceForm(mutation) {
   const { KitchenSetup } = await load('src/features/berchuma-studio/components/kitchen-setup.tsx', mutation);
@@ -90,3 +91,10 @@ async function checkApplianceForm(mutation) {
 await checkApplianceForm();
 await assert.rejects(checkApplianceForm(['/components/kitchen-setup.tsx', 'aria-label={`${role} ${key} in cm`}', 'aria-label="removed"']));
 console.log('PASS: appliance setup and detailed construction; deliberate connection, placement, opening, alignment, plinth, visibility, pricing and validation mutations rejected.');
+
+await load('scripts/wardrobe_shape_check.ts');
+for (const mutation of [
+  ['/services/resolve.ts', '!!spec.kitchenSetup ||', '!!spec.kitchenSetup &&'],
+  ['/services/corners.ts', 'corner.id === "corner-left" ? 135 : -135', '-135'],
+]) await assert.rejects(load('scripts/wardrobe_shape_check.ts', mutation), undefined, `Wardrobe orientation rejects broken ${mutation[0]}`);
+console.log('PASS: L/U wardrobe run and corner orientation; two deliberate mutations rejected.');

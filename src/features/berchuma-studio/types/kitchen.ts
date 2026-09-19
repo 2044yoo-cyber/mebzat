@@ -45,7 +45,7 @@ export function kitchenSetupError(input: KitchenSetup): string | null {
   if (input.shape === "island" && (input.roomWidth - input.islandWidth < 1800 || input.roomDepth < 3040))
     return "Allow at least 90 cm around the island: increase the room size or shorten the island.";
   if (input.details) {
-    const d = input.details;
+    const d = placeFridgeAtRunEdge(input).details!;
     const runs = kitchenRunChoices(input);
     const intervals = [d.fridge, d.sink, d.stove];
     for (const [index, appliance] of intervals.entries()) {
@@ -76,4 +76,41 @@ export function kitchenRunChoices(input: KitchenSetup): { id: string; label: str
   if (["l_shaped", "u_shaped", "g_shaped"].includes(input.shape)) runs.push(side("right"));
   if (["island", "g_shaped"].includes(input.shape)) runs.push({ id: input.shape === "island" ? "kitchen-island" : "kitchen-peninsula", label: input.shape === "island" ? "Island" : "Peninsula", length: input.islandWidth });
   return runs;
+}
+
+/** Keep the fridge at an outer terminal, away from L/U/G inside corners. */
+export function placeFridgeAtRunEdge(input: KitchenSetup): KitchenSetup {
+  if (!input.details) return input;
+  const d = input.details;
+  const lengths = new Map(kitchenRunChoices(input).map((run) => [run.id, run.length]));
+  const end = (runId: string) => ({ runId, offset: (lengths.get(runId) ?? 0) - d.fridge.width });
+  const candidates = input.shape === "l_shaped"
+    ? [{ runId: "kitchen-back", offset: 0 }, end("kitchen-right")]
+    : input.shape === "u_shaped"
+      ? [end("kitchen-left"), end("kitchen-right")]
+      : input.shape === "g_shaped"
+        ? [end("kitchen-right")]
+        : [{ runId: "kitchen-back", offset: 0 }, end("kitchen-back")];
+  const clear = candidates.filter((candidate) => {
+    const length = lengths.get(candidate.runId) ?? 0;
+    if (candidate.offset < 0 || candidate.offset + d.fridge.width > length) return false;
+    return [d.sink, d.stove].every((item) =>
+      item.runId !== candidate.runId ||
+      candidate.offset + d.fridge.width <= item.offset ||
+      item.offset + item.width <= candidate.offset,
+    );
+  });
+  clear.sort((a, b) => {
+    const distance = (candidate: typeof a) =>
+      candidate.runId === d.fridge.runId
+        ? Math.abs(candidate.offset - d.fridge.offset)
+        : Number.MAX_SAFE_INTEGER;
+    return distance(a) - distance(b);
+  });
+  const chosen = clear[0];
+  if (!chosen) return input;
+  return {
+    ...input,
+    details: { ...d, fridge: { ...d.fridge, ...chosen } },
+  };
 }

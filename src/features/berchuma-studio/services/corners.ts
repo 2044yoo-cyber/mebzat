@@ -312,8 +312,10 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       // front-left clear corner. -135° gives it the same 45° line but pushes
       // its thickness toward the open side of the triangular cabinet instead
       // of into the left gable and rear HDF panel.
-      rotationY: -135,
-      placements: [at(size - t, t, size - t)],
+      rotationY: corner.id === "corner-left" ? 135 : -135,
+      placements: corner.id === "corner-left"
+        ? [at(size, t, t)]
+        : [at(size - t, t, size - t)],
     });
   }
 

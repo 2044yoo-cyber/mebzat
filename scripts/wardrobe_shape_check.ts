@@ -231,6 +231,11 @@ function build(shape: "straight" | "l_shaped" | "u_shaped", walls: number[]) {
     resolved.issues.length === 0,
     resolved.issues.join(" | "),
   );
+  check(
+    "both L runs face the usable inside",
+    resolved.cabinets.map((cabinet) => cabinet.rotation).join() === "180,270",
+    resolved.cabinets.map((cabinet) => cabinet.rotation).join(),
+  );
   const validated = parseSpec(spec);
   check(
     "and neither does validation",
@@ -257,6 +262,10 @@ function build(shape: "straight" | "l_shaped" | "u_shaped", walls: number[]) {
   check(
     "and it stands on the wardrobe's own plinth, not bought legs",
     corner.some((part) => part.role === "plinth"),
+  );
+  check(
+    "the L corner opens diagonally toward the usable inside",
+    corner.filter((part) => part.role === "door").every((part) => part.rotationY === -135),
   );
 
   check(
@@ -300,6 +309,26 @@ function build(shape: "straight" | "l_shaped" | "u_shaped", walls: number[]) {
     "the solver has nothing to complain about",
     resolved.issues.length === 0,
     resolved.issues.join(" | "),
+  );
+  check(
+    "left, back and right U runs face the centre",
+    resolved.cabinets.map((cabinet) => cabinet.rotation).join() === "90,180,270",
+    resolved.cabinets.map((cabinet) => cabinet.rotation).join(),
+  );
+  const cornerIds = new Set(resolved.layout.corners.map((corner) => corner.id));
+  const cornerDoors = buildParts(spec).parts.filter((part) =>
+    part.role === "door" && cornerIds.has(part.id.split("/")[0]!),
+  );
+  check(
+    "both U corner fronts face the centre",
+    cornerDoors.every((part) =>
+      part.rotationY === (part.id.startsWith("corner-left/") ? 135 : -135)),
+  );
+  const resized = resolveDesign(build("u_shaped", [2200, 3600, 2000]));
+  check(
+    "resizing keeps every U run inward",
+    resized.cabinets.map((cabinet) => cabinet.rotation).join() === "90,180,270",
+    resized.cabinets.map((cabinet) => cabinet.rotation).join(),
   );
 }
 
@@ -435,13 +464,9 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
 // ---------------------------------------------------------------------------
 // 7. The corner construction follows the shape, and nothing overlaps
 //
-// This is the section that earned its keep. An L and a U put their corner
-// square in geometrically different places: an L turns at the end of a run and
-// the square has two faces on open air, while a U's square sits between the
-// back run and a side run with both inner faces against them. Only one
-// construction fits each, and an `l_corner` in a U hangs its return leaf where
-// the back run's gable already is — the whole 18 × 592 × 2298 mm door inside
-// the board.
+// A diagonal opening stays inside the carved-out corner square and faces the
+// usable centre. Putting square doors on those inner faces crosses the end
+// gables of the neighbouring runs.
 //
 // The cut list is correct either way. It is the placement that is impossible,
 // which is why this is found by intersecting parts and not by reading code.
@@ -449,19 +474,19 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
 
 {
   check(
-    "an L turns at an open square, so it gets a hinged return",
-    wardrobeCornerKind("l_shaped") === "l_corner",
+    "an L corner opens diagonally toward its usable inside",
+    wardrobeCornerKind("l_shaped") === "diagonal",
     wardrobeCornerKind("l_shaped"),
   );
   check(
-    "a U's square is enclosed by its own runs, so it gets a blind corner",
-    wardrobeCornerKind("u_shaped") === "blind",
+    "a U corner also opens diagonally toward its centre",
+    wardrobeCornerKind("u_shaped") === "diagonal",
     wardrobeCornerKind("u_shaped"),
   );
   check(
     "and the design carries the kind it was solved with",
-    build("l_shaped", [2400, 1800]).cornerKind === "l_corner" &&
-      build("u_shaped", [1800, 3000, 1800]).cornerKind === "blind",
+    build("l_shaped", [2400, 1800]).cornerKind === "diagonal" &&
+      build("u_shaped", [1800, 3000, 1800]).cornerKind === "diagonal",
     "solved one way and stored another, every later edit re-solves it differently",
   );
 
@@ -478,26 +503,23 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
     );
   }
 
-  // The blind corner is a real corner, not an empty square that happens not to
-  // collide with anything. Its filler is what closes the face the neighbouring
-  // run covers, and it is the piece a shop would otherwise improvise.
-  const blind = buildParts(build("u_shaped", [1800, 3000, 1800])).parts.filter(
+  const diagonal = buildParts(build("u_shaped", [1800, 3000, 1800])).parts.filter(
     (part) => /corner/i.test(part.label),
   );
   check(
     "a U's corners are cut as real boards",
-    blind.length >= 16,
-    `${blind.length} pieces across two corners`,
+    diagonal.length >= 16,
+    `${diagonal.length} pieces across two corners`,
   );
   check(
-    "including the filler that closes the covered face",
-    blind.some((part) => /filler/i.test(part.label)),
-    [...new Set(blind.map((part) => part.label))].join(" / "),
+    "including one diagonal inner door per corner",
+    diagonal.filter((part) => part.role === "door").length === 2,
+    [...new Set(diagonal.map((part) => part.label))].join(" / "),
   );
   check(
-    "and both gables, since a blind corner is closed on two sides",
-    blind.filter((part) => part.role === "gable").length >= 4,
-    `${blind.filter((part) => part.role === "gable").length} gables across two corners`,
+    "and a structural gable in each corner",
+    diagonal.filter((part) => part.role === "gable").length >= 2,
+    `${diagonal.filter((part) => part.role === "gable").length} gables across two corners`,
   );
 
   // The one that would have shipped. Asserted as a fault so that nobody
@@ -715,7 +737,7 @@ if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
   for (const failure of failures) console.log(`  ${RED}✗${RESET} ${failure}`);
   console.log(`${GREEN}${passed} passed${RESET}`);
-  process.exit(1);
+  throw new Error(`${failures.length} wardrobe shape checks failed`);
 }
 
 console.log(`${GREEN}${passed} passed, 0 failed${RESET}`);
