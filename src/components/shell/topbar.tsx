@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, PanelLeft, PanelRight, Search, Sparkles } from "lucide-react";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { Ellipsis, Menu, PanelLeft, PanelRight, Search, Sparkles } from "lucide-react";
 
 import { Breadcrumbs } from "@/components/shell/breadcrumbs";
 import { LanguageSelector } from "@/components/i18n/language-selector";
@@ -37,9 +39,27 @@ export function Topbar({
 }) {
   const { navCollapsed, aiOpen } = useShell();
   const { t } = useLanguage();
+  const home = usePathname() === "/";
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-2 sm:px-3 print:hidden">
+    <>
+      {home && <header className="flex h-16 shrink-0 items-center gap-1 border-b border-blue-100/60 px-3 lg:hidden print:hidden">
+        <Link href="/" aria-label="Medosha" className="relative mr-auto h-12 w-32 min-w-20 overflow-hidden rounded-lg bg-white sm:w-44">
+          <Image src="/medosha_full_logo.jpg" alt="Medosha — Build, Manage, Grow" fill sizes="176px" className="object-cover" />
+        </Link>
+        <div className="rounded-full border border-blue-100 text-blue-600"><LanguageSelector /></div>
+        {profile && <NotificationPanel viewerId={profile.id} initialCount={notifications} />}
+        <UserNav initialProfile={profile} />
+        <details className="relative">
+          <summary aria-label={t("navigation.more")} className="flex size-8 cursor-pointer list-none items-center justify-center rounded-full text-muted-foreground [&::-webkit-details-marker]:hidden"><Ellipsis className="size-4" /></summary>
+          <div className="absolute top-full right-0 z-60 mt-2 flex items-center gap-2 rounded-xl border bg-background p-2 shadow-lg">
+            <ThemeToggle />
+            <button type="button" onClick={onOpenMobileNav} aria-label={t("common.openNavigation")} className="flex size-10 items-center justify-center rounded-lg hover:bg-muted"><Menu className="size-4" /></button>
+            <button type="button" onClick={onTogglePanel} aria-label={panelOpen ? t("common.hidePanel") : t("common.showPanel")} className="flex size-10 items-center justify-center rounded-lg hover:bg-muted"><PanelRight className="size-4" /></button>
+          </div>
+        </details>
+      </header>}
+    <header className={cn("h-14 shrink-0 items-center gap-2 border-b px-2 sm:px-3 print:hidden", home ? "hidden lg:flex" : "flex")}>
       <button
         type="button"
         onClick={onOpenMobileNav}
@@ -130,5 +150,6 @@ export function Topbar({
         </button>
       </div>
     </header>
+    </>
   );
 }

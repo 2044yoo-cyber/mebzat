@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 
 import { FeedCard } from "@/components/feed/feed-card";
@@ -57,6 +57,7 @@ export function Feed({
   followingOnly = false,
   authorKey = null,
   showFilters = true,
+  beforePosts,
   showDiagnostics = false,
 }: {
   initial: FeedPage;
@@ -67,6 +68,7 @@ export function Feed({
   followingOnly?: boolean;
   authorKey?: string | null;
   showFilters?: boolean;
+  beforePosts?: ReactNode;
   /**
    * Whether to name the missing migration when the feed tables are absent.
    *
@@ -219,6 +221,8 @@ export function Feed({
       {showFilters && (
         <FilterChips value={filter} onChange={(next) => void changeFilter(next)} />
       )}
+
+      {beforePosts}
 
       {switching ? (
         <FeedSkeleton count={3} />
@@ -545,7 +549,7 @@ function FilterChips({
           className={cn(
             "flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium whitespace-nowrap transition-colors",
             value === chip.id
-              ? "bg-foreground text-background"
+              ? "bg-blue-600 text-white"
               : "bg-muted text-muted-foreground hover:text-foreground",
           )}
         >
