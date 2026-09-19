@@ -3,6 +3,18 @@
 import { revalidatePath } from "next/cache";
 
 import { isInProject } from "@/lib/agenda/files";
+import {
+  INSPECTION_RESULTS,
+  ISSUE_STATUSES,
+  OBSERVATION_KINDS,
+  missingAnswers,
+  parseFieldLines,
+  rollUpInspection,
+  type FormField,
+  type InspectionResult,
+  type IssueStatus,
+  type ObservationKind,
+} from "@/lib/agenda/quality";
 import { DISCIPLINES, type Discipline } from "@/lib/agenda/records";
 import { TASK_PRIORITIES, type TaskPriority } from "@/lib/agenda/constants";
 import { createClient } from "@/lib/supabase/server";
@@ -577,6 +589,443 @@ export async function fileSitePhoto(
 
   if (error) {
     return { error: explain(error.message, "That photo was not filed.") };
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Quality: inspections, observations, punch list
+// ---------------------------------------------------------------------------
+
+function issueStatus(value: FormDataEntryValue | null): IssueStatus {
+  const raw = String(value ?? "");
+  return ISSUE_STATUSES.some((entry) => entry.value === raw)
+    ? (raw as IssueStatus)
+    : "open";
+}
+
+function inspectionResult(
+  value: FormDataEntryValue | null,
+): InspectionResult {
+  const raw = String(value ?? "");
+  return INSPECTION_RESULTS.some((entry) => entry.value === raw)
+    ? (raw as InspectionResult)
+    : "pending";
+}
+
+/**
+ * Books an inspection, with the checklist it will be walked against.
+ *
+ * The checklist arrives as one line per check in a textarea rather than as a
+ * repeating field set. A site engineer booking a rebar inspection on a phone
+ * types the list; making them press "add a row" twelve times is how the
+ * checklist ends up empty and the inspection becomes one unexplained word.
+ */
+export async function bookInspection(
+  projectId: string,
+  formData: FormData,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  const title = text(formData.get("title"), 200);
+  if (!title) return { error: "The inspection needs a title." };
+
+  const { data: number } = await supabase.rpc("agenda_next_number", {
+    target_project: projectId,
+    record_kind: "inspection",
+    prefix: "INS",
+    width: 3,
+  });
+
+  const { data: inspection, error } = await supabase
+    .from("agenda_inspections")
+    .insert({
+      project_id: projectId,
+      number,
+      title,
+      discipline: discipline(formData.get("discipline")),
+      location: text(formData.get("location"), 120),
+      scheduled_for: date(formData.get("scheduledFor")),
+      inspector_id: reference(formData.get("inspector")) ?? user.id,
+      notes: text(formData.get("notes"), 2000),
+      result: "pending",
+    })
+    .select("id")
+    .single();
+
+  if (error || !inspection) {
+    return {
+      error: explain(error?.message ?? "", "That inspection was not booked."),
+    };
+  }
+
+  const checks = String(formData.get("checklist") ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 100);
+
+  if (checks.length > 0) {
+    const { error: itemsError } = await supabase
+      .from("agenda_inspection_items")
+      .insert(
+        checks.map((description, index) => ({
+          inspection_id: inspection.id,
+          project_id: projectId,
+          description: description.slice(0, 500),
+          result: "pending" as const,
+          position: index,
+        })),
+      );
+    if (itemsError) {
+      return {
+        error:
+          "The inspection was booked, but its checklist was not saved. Open it and add the checks.",
+      };
+    }
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+/**
+ * Records the result of one check, and rolls the inspection up from its items.
+ *
+ * The header is derived rather than typed, because one failed item fails the
+ * inspection and leaving that to the inspector is how a failed check ends up
+ * under a passed heading. `rollUpInspection` is the one definition of that
+ * rule and the screen shows the same number it produces.
+ */
+export async function recordInspectionItem(
+  projectId: string,
+  inspectionId: string,
+  itemId: string,
+  formData: FormData,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  const { error } = await supabase
+    .from("agenda_inspection_items")
+    .update({
+      result: inspectionResult(formData.get("result")),
+      comment: text(formData.get("comment"), 1000),
+    })
+    .eq("id", itemId);
+  if (error) {
+    return { error: explain(error.message, "That result was not recorded.") };
+  }
+
+  // Read the items back rather than trusting what the form knew: another
+  // inspector may have recorded a check on the same walk, and rolling up from
+  // a stale page would overwrite their fail with a pass.
+  const { data: items } = await supabase
+    .from("agenda_inspection_items")
+    .select("result")
+    .eq("inspection_id", inspectionId);
+
+  const rolled = rollUpInspection(
+    (items ?? []).map((item) => ({ result: item.result as InspectionResult })),
+  );
+
+  if (rolled) {
+    const { error: headerError } = await supabase
+      .from("agenda_inspections")
+      .update({
+        result: rolled,
+        // Settled the moment it stops being pending, so "when was this
+        // inspected" has an answer without a second button to press.
+        inspected_at: rolled === "pending" ? null : new Date().toISOString(),
+      })
+      .eq("id", inspectionId);
+    if (headerError) {
+      return {
+        error:
+          "The check was recorded, but the inspection's own result did not move.",
+      };
+    }
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+/**
+ * Raises an observation, optionally from the inspection item that found it.
+ *
+ * `inspectionItemId` is the link the whole section turns on: six months later,
+ * "why was this rebuilt" is answered by walking back from the punch item to
+ * the observation to the failed check and the inspection it was part of.
+ */
+export async function raiseObservation(
+  projectId: string,
+  formData: FormData,
+  inspectionItemId?: string,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  const description = text(formData.get("description"), 2000);
+  if (!description) return { error: "Say what was observed." };
+
+  const kind = String(formData.get("kind") ?? "");
+
+  const { error } = await supabase.from("agenda_observations").insert({
+    project_id: projectId,
+    kind: OBSERVATION_KINDS.some((entry) => entry.value === kind)
+      ? (kind as ObservationKind)
+      : "general",
+    description,
+    location: text(formData.get("location"), 120),
+    responsible_company: text(formData.get("company"), 160),
+    assigned_to: reference(formData.get("assignedTo")),
+    due_date: date(formData.get("dueDate")),
+    inspection_item_id: inspectionItemId ?? null,
+    created_by: user.id,
+    status: "open",
+  });
+
+  if (error) {
+    return { error: explain(error.message, "That observation was not saved.") };
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+/**
+ * Adds a punch item, optionally from the observation that caused it.
+ *
+ * Numbered, because a punch list is read out on site — "PL-035 is done" — and
+ * a uuid is not something anybody says.
+ */
+export async function addPunchItem(
+  projectId: string,
+  formData: FormData,
+  observationId?: string,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  const description = text(formData.get("description"), 2000);
+  if (!description) return { error: "Say what has to be put right." };
+
+  const { data: number } = await supabase.rpc("agenda_next_number", {
+    target_project: projectId,
+    record_kind: "punch",
+    prefix: "PL",
+    width: 3,
+  });
+
+  const { error } = await supabase.from("agenda_punch_items").insert({
+    project_id: projectId,
+    number,
+    description,
+    location: text(formData.get("location"), 120),
+    assigned_company: text(formData.get("company"), 160),
+    assigned_to: reference(formData.get("assignedTo")),
+    due_date: date(formData.get("dueDate")),
+    priority: priority(formData.get("priority")),
+    observation_id: observationId ?? null,
+    created_by: user.id,
+    status: "open",
+  });
+
+  if (error) {
+    return { error: explain(error.message, "That punch item was not added.") };
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+/** Moves an observation or a punch item along. Both use one status set. */
+export async function setIssueStatus(
+  projectId: string,
+  table: "agenda_observations" | "agenda_punch_items",
+  itemId: string,
+  status: FormDataEntryValue | null,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  const { error } = await supabase
+    .from(table)
+    .update({ status: issueStatus(status) })
+    .eq("id", itemId);
+
+  if (error) {
+    return { error: explain(error.message, "That change was not saved.") };
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Forms
+// ---------------------------------------------------------------------------
+
+/**
+ * Fills in a form.
+ *
+ * The answers are keyed by field id rather than by label, so renaming a
+ * question on the template does not orphan every answer already given to it.
+ * Required fields are checked here against the template's own list — the
+ * `answers` column is jsonb and the database has no opinion about what belongs
+ * in it, which is the price of letting a company define its own permit.
+ */
+export async function submitForm(
+  projectId: string,
+  templateId: string,
+  fields: readonly FormField[],
+  formData: FormData,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  const answers: Record<string, string | number | boolean> = {};
+  for (const field of fields) {
+    const raw = formData.get(`field.${field.id}`);
+    if (field.kind === "yes_no") {
+      // An unticked checkbox posts nothing, and "no" is an answer. Every
+      // yes/no field is written, so a deliberate no is not read as a skip.
+      answers[field.id] = raw === "on";
+      continue;
+    }
+    if (typeof raw !== "string" || raw.trim() === "") continue;
+    if (field.kind === "number") {
+      const n = Number(raw);
+      if (Number.isFinite(n)) answers[field.id] = n;
+      continue;
+    }
+    if (field.kind === "choice" && !field.options?.includes(raw)) continue;
+    answers[field.id] = raw.slice(0, 2000);
+  }
+
+  const missing = missingAnswers(fields, answers);
+  if (missing.length > 0) {
+    return {
+      error: `Still to answer: ${missing.map((field) => field.label).join(", ")}.`,
+    };
+  }
+
+  const { data: number } = await supabase.rpc("agenda_next_number", {
+    target_project: projectId,
+    record_kind: "form",
+    prefix: "FRM",
+    width: 3,
+  });
+
+  const { error } = await supabase.from("agenda_form_submissions").insert({
+    template_id: templateId,
+    project_id: projectId,
+    number,
+    answers,
+    status: "pending",
+    submitted_by: user.id,
+    submitted_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    return { error: explain(error.message, "That form was not submitted.") };
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+/**
+ * Saves a form template.
+ *
+ * The owner is the caller, which is what the policy in 0091 checks — a
+ * template with no project is one somebody reuses across their jobs, and
+ * membership cannot gate a row with no project on it. `scope` decides which
+ * of the two this is.
+ *
+ * Each field gets a minted id rather than one derived from its label or its
+ * position, because answers are keyed by field id and both of those change
+ * when somebody corrects a question.
+ */
+export async function saveFormTemplate(
+  projectId: string,
+  formData: FormData,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  const name = text(formData.get("name"), 160);
+  if (!name) return { error: "The form needs a name." };
+
+  const fields = parseFieldLines(
+    String(formData.get("questions") ?? "").slice(0, 8000),
+  ).map((field) => ({ ...field, id: crypto.randomUUID() }));
+
+  if (fields.length === 0) {
+    return { error: "Write at least one question, one per line." };
+  }
+
+  const { error } = await supabase.from("agenda_form_templates").insert({
+    owner_id: user.id,
+    // "everywhere" is a template the owner reuses; anything else belongs to
+    // this project and dies with it.
+    project_id: formData.get("scope") === "everywhere" ? null : projectId,
+    name,
+    description: text(formData.get("description"), 500),
+    fields,
+  });
+
+  if (error) {
+    return { error: explain(error.message, "That form was not saved.") };
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// 360 progress
+// ---------------------------------------------------------------------------
+
+/**
+ * Pins a finished panorama to a place on this project.
+ *
+ * The panorama itself is not copied. 0081 to 0083 captured, stitched and
+ * published it, and this writes an `agenda_photos` row that points at that job
+ * — so a re-stitch that fixes a seam fixes the site record too, rather than
+ * leaving the tour corrected and the progress record wrong.
+ *
+ * 0095 is what allows the row to exist at all: `storage_path` was `not null`,
+ * and a panorama has no file in the site bucket to name.
+ */
+export async function pinPanorama(
+  projectId: string,
+  jobId: string,
+  formData: FormData,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  const takenAt = date(formData.get("takenAt"));
+
+  const { error } = await supabase.from("agenda_photos").insert({
+    project_id: projectId,
+    panorama_job_id: jobId,
+    storage_path: null,
+    caption: text(formData.get("caption"), 300),
+    building: text(formData.get("building"), 80),
+    floor: text(formData.get("floor"), 80),
+    area: text(formData.get("area"), 80),
+    taken_at: takenAt ? `${takenAt}T12:00:00Z` : new Date().toISOString(),
+    uploaded_by: user.id,
+  });
+
+  if (error) {
+    return { error: explain(error.message, "That panorama was not pinned.") };
   }
 
   refresh(projectId);

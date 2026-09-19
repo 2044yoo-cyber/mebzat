@@ -202,5 +202,17 @@
     "file": "supabase/migrations/0094_agenda_files.sql",
     "from": "  with check (\n    bucket_id = 'agenda-files'\n    and (storage.foldername(name))[1] ~\n        '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'\n    and public.agenda_is_member(((storage.foldername(name))[1])::uuid)\n  );",
     "to": "  with check (\n    bucket_id = 'agenda-files'\n  );"
+  },
+  {
+    "name": "a progress panorama still needs a file of its own",
+    "file": "supabase/migrations/0095_agenda_panorama_photos.sql",
+    "from": "alter table public.agenda_photos\n  alter column storage_path drop not null;",
+    "to": "alter table public.agenda_photos\n  alter column storage_path set default 'x';"
+  },
+  {
+    "name": "a photo row with no image at all is accepted",
+    "file": "supabase/migrations/0095_agenda_panorama_photos.sql",
+    "from": "  check (storage_path is not null or panorama_job_id is not null);",
+    "to": "  check (true);"
   }
 ]

@@ -2537,7 +2537,7 @@ export interface Database {
         Row: {
           id: string;
           project_id: string;
-          storage_path: string;
+          storage_path: string | null;
           caption: string | null;
           building: string | null;
           floor: string | null;
@@ -2553,7 +2553,7 @@ export interface Database {
         Insert: {
           id?: string;
           project_id: string;
-          storage_path: string;
+          storage_path?: string | null;
           caption?: string | null;
           building?: string | null;
           floor?: string | null;
@@ -2569,7 +2569,7 @@ export interface Database {
         Update: {
           id?: string;
           project_id?: string;
-          storage_path?: string;
+          storage_path?: string | null;
           caption?: string | null;
           building?: string | null;
           floor?: string | null;

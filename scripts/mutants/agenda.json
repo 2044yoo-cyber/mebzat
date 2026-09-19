@@ -240,10 +240,10 @@
     "to": "          Procore-style construction management."
   },
   {
-    "name": "phase 2 is still marked unbuilt",
+    "name": "the latest phase is still marked unbuilt",
     "file": "src/lib/agenda/workspace-nav.ts",
-    "from": "export const BUILT_THROUGH_PHASE = 2;",
-    "to": "export const BUILT_THROUGH_PHASE = 1;"
+    "from": "export const BUILT_THROUGH_PHASE = 3;",
+    "to": "export const BUILT_THROUGH_PHASE = 2;"
   },
   {
     "name": "the menu hard-codes the phase it links",
@@ -406,5 +406,221 @@
     "file": "src/lib/agenda/files.ts",
     "from": "  const safe = /^[a-z0-9]{1,8}$/.test(extension) ? extension : \"bin\";",
     "to": "  const safe = extension;"
+  },
+  {
+    "name": "a failed check does not fail the inspection",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "  if (judged.some((item) => item.result === \"fail\")) return \"fail\";",
+    "to": "  if (judged.every((item) => item.result === \"fail\")) return \"fail\";"
+  },
+  {
+    "name": "an unfinished check is rounded up to a pass",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "  if (judged.some((item) => item.result === \"pending\")) return \"pending\";",
+    "to": "  if (false) return \"pending\";"
+  },
+  {
+    "name": "a condition does not reach the header",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "  if (judged.some((item) => item.result === \"conditional\")) return \"conditional\";",
+    "to": "  if (false) return \"conditional\";"
+  },
+  {
+    "name": "a check that did not apply counts as a pass",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "  const judged = items.filter((item) => item.result !== \"not_applicable\");",
+    "to": "  const judged = [...items];"
+  },
+  {
+    "name": "an inspection with no checklist reports a pass",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "  if (judged.length === 0) return null;",
+    "to": "  if (judged.length === 0) return \"pass\";"
+  },
+  {
+    "name": "a rejected fix counts as done",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "const SETTLED: readonly IssueStatus[] = [\"resolved\", \"closed\"];",
+    "to": "const SETTLED: readonly IssueStatus[] = [\"resolved\", \"closed\", \"rejected\"];"
+  },
+  {
+    "name": "an empty punch list reads as finished",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "  if (items.length === 0) return null;",
+    "to": "  if (items.length === 0) return 100;"
+  },
+  {
+    "name": "punch progress counts open items as done",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "  const done = items.filter((item) => !isIssueOpen(item.status)).length;",
+    "to": "  const done = items.length;"
+  },
+  {
+    "name": "an undated snag is pushed above the late work",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "    if (a.dueDate === null) return 1;\n    if (b.dueDate === null) return -1;",
+    "to": "    if (a.dueDate === null) return -1;\n    if (b.dueDate === null) return 1;"
+  },
+  {
+    "name": "settled work is mixed in with what is outstanding",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "    if (aOpen !== bOpen) return aOpen - bOpen;\n    if (a.dueDate === b.dueDate) return 0;",
+    "to": "    if (a.dueDate === b.dueDate) return 0;"
+  },
+  {
+    "name": "a trailing star is left in the question's label",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "    const required = line.endsWith(\"*\");\n    if (required) line = line.slice(0, -1).trim();",
+    "to": "    const required = line.endsWith(\"*\");"
+  },
+  {
+    "name": "the kind bracket is left in the label",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "      line = line.slice(0, bracket.index).trim();",
+    "to": "      line = line.trim();"
+  },
+  {
+    "name": "a bar-separated bracket is not a list",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "      if (inside.includes(\"|\")) {",
+    "to": "      if (false) {"
+  },
+  {
+    "name": "an unrecognised bracket loses the question",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "        // An unrecognised bracket leaves the kind as a short answer rather",
+    "to": "        else continue;\n        // An unrecognised bracket leaves the kind as a short answer rather"
+  },
+  {
+    "name": "a list with no options is rendered unanswerable",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "    if (kind === \"choice\" && (!options || options.length === 0)) continue;\n\n    fields.push({\n      label:",
+    "to": "    if (false) continue;\n\n    fields.push({\n      label:"
+  },
+  {
+    "name": "a stored field with no kind is rendered anyway",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "    if (!FORM_FIELD_KINDS.some((kind) => kind.value === row.kind)) continue;",
+    "to": "    if (false) continue;"
+  },
+  {
+    "name": "a stored fields column that is not a list throws",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "  if (!Array.isArray(value)) return [];",
+    "to": "  const _unused = value;\n  if (false) return [];"
+  },
+  {
+    "name": "an answer of no reads as a skipped question",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "    if (typeof answer === \"string\") return answer.trim() === \"\";\n    return false;",
+    "to": "    return !answer;"
+  },
+  {
+    "name": "whitespace counts as an answer",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "    if (typeof answer === \"string\") return answer.trim() === \"\";",
+    "to": "    if (typeof answer === \"string\") return answer === \"\";"
+  },
+  {
+    "name": "an observation forgets the check that found it",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    inspection_item_id: inspectionItemId ?? null,",
+    "to": "    inspection_item_id: null,"
+  },
+  {
+    "name": "a punch item forgets the observation that caused it",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    observation_id: observationId ?? null,",
+    "to": "    observation_id: null,"
+  },
+  {
+    "name": "the inspection header is rolled up from a stale page",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "  const { data: items } = await supabase\n    .from(\"agenda_inspection_items\")\n    .select(\"result\")\n    .eq(\"inspection_id\", inspectionId);",
+    "to": "  const items: { result: string }[] = [];"
+  },
+  {
+    "name": "a punch item is not numbered",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    record_kind: \"punch\",\n    prefix: \"PL\",",
+    "to": "    record_kind: \"rfi\",\n    prefix: \"PL\","
+  },
+  {
+    "name": "a deliberate no is not written down",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "      answers[field.id] = raw === \"on\";\n      continue;",
+    "to": "      if (raw === \"on\") answers[field.id] = true;\n      continue;"
+  },
+  {
+    "name": "an answer to a list is taken on trust",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    if (field.kind === \"choice\" && !field.options?.includes(raw)) continue;",
+    "to": "    if (false) continue;"
+  },
+  {
+    "name": "a form is filed with its compulsory questions blank",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "  const missing = missingAnswers(fields, answers);\n  if (missing.length > 0) {",
+    "to": "  const missing = missingAnswers(fields, answers);\n  if (false) {"
+  },
+  {
+    "name": "a reusable template is pinned to one project",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    project_id: formData.get(\"scope\") === \"everywhere\" ? null : projectId,",
+    "to": "    project_id: projectId,"
+  },
+  {
+    "name": "a question's id is derived from its position",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "  ).map((field) => ({ ...field, id: crypto.randomUUID() }));",
+    "to": "  ).map((field, index) => ({ ...field, id: `f${index}` }));"
+  },
+  {
+    "name": "a pinned panorama copies the image instead of pointing at it",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    panorama_job_id: jobId,\n    storage_path: null,",
+    "to": "    panorama_job_id: jobId,\n    storage_path: `${projectId}/panoramas/${jobId}.jpg`,"
+  },
+  {
+    "name": "the register shows the typed result over the rolled-up one",
+    "file": "src/components/agenda/site/inspection-register.tsx",
+    "from": "            const rolled = rollUpInspection(inspection.items) ?? inspection.result;",
+    "to": "            const rolled = inspection.result;"
+  },
+  {
+    "name": "a passed check also offers to raise an observation",
+    "file": "src/components/agenda/site/inspection-register.tsx",
+    "from": "                            {item.result === \"fail\" && (",
+    "to": "                            {true && ("
+  },
+  {
+    "name": "an observation cannot become a punch item",
+    "file": "src/components/agenda/site/observation-list.tsx",
+    "from": "                        const result = await addPunchItem(\n                          projectId,\n                          formData,\n                          observation.id,\n                        );",
+    "to": "                        const result = await addPunchItem(projectId, formData);"
+  },
+  {
+    "name": "360 progress starts a second WebGL runtime",
+    "file": "src/components/agenda/site/progress-360.tsx",
+    "from": "          <PanoramaViewer\n            src={open.panoramaUrl}",
+    "to": "          <PanoramaViewerX\n            src={open.panoramaUrl}"
+  },
+  {
+    "name": "a panorama still stitching is offered to pin",
+    "file": "src/lib/data/agenda-site.ts",
+    "from": "    .eq(\"status\", \"ready\")\n    .not(\"panorama_url\", \"is\", null)",
+    "to": "    .not(\"panorama_url\", \"is\", null)"
+  },
+  {
+    "name": "an observation kind is dropped",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "  { value: \"environmental\", label: \"Environmental\" },\n",
+    "to": ""
+  },
+  {
+    "name": "safety is buried down the list",
+    "file": "src/lib/agenda/quality.ts",
+    "from": "  { value: \"safety\", label: \"Safety\" },\n  { value: \"quality\", label: \"Quality\" },",
+    "to": "  { value: \"quality\", label: \"Quality\" },\n  { value: \"safety\", label: \"Safety\" },"
   }
 ]

@@ -37,6 +37,20 @@ import {
   sectionHref,
 } from "../src/lib/agenda/workspace-nav.ts";
 import {
+  FORM_FIELD_KINDS,
+  INSPECTION_RESULTS,
+  ISSUE_STATUSES,
+  OBSERVATION_KINDS,
+  byUrgency,
+  isIssueOpen,
+  missingAnswers,
+  parseFieldLines,
+  parseFormFields,
+  punchProgress,
+  rollUpInspection,
+  type FormField,
+} from "../src/lib/agenda/quality.ts";
+import {
   AGENDA_FILES_BUCKET,
   agendaFilePath,
   isInProject,
@@ -818,6 +832,338 @@ function exists(path: string): boolean {
     /<MeetingPanel projectId=\{projectId\} meetings=\{meetings\} \/>/.test(
       meetingPage,
     ),
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// 7. Phase 3: quality, safety, and the chain that joins them
+// ---------------------------------------------------------------------------
+
+{
+  check(
+    "the build has reached phase 3",
+    BUILT_THROUGH_PHASE >= 3,
+  );
+  for (const id of [
+    "inspections",
+    "observations",
+    "punch-list",
+    "forms",
+    "progress-360",
+  ]) {
+    check(
+      `${id} is live rather than "soon"`,
+      LIVE_SECTIONS.some((section) => section.id === id),
+    );
+  }
+
+  // --- inspections ---------------------------------------------------------
+
+  check(
+    "every inspection result the database has is spelled here",
+    INSPECTION_RESULTS.length === 5,
+    `${INSPECTION_RESULTS.length} of agenda_inspection_result's 5`,
+  );
+  check(
+    "one failed check fails the inspection",
+    rollUpInspection([
+      { result: "pass" },
+      { result: "pass" },
+      { result: "fail" },
+    ]) === "fail",
+    "you do not pass a slab because nineteen of twenty checks were fine",
+  );
+  check(
+    "a failed check outranks an unfinished one",
+    rollUpInspection([{ result: "pending" }, { result: "fail" }]) === "fail",
+  );
+  check(
+    "an unfinished check keeps the inspection unfinished",
+    rollUpInspection([{ result: "pass" }, { result: "pending" }]) === "pending",
+  );
+  check(
+    "a condition carries to the header",
+    rollUpInspection([{ result: "pass" }, { result: "conditional" }]) ===
+      "conditional",
+  );
+  check(
+    "all passed is a pass",
+    rollUpInspection([{ result: "pass" }, { result: "pass" }]) === "pass",
+  );
+  check(
+    "a check that did not apply is not evidence of a pass",
+    rollUpInspection([{ result: "not_applicable" }]) === null &&
+      rollUpInspection([]) === null,
+    "null lets the recorded result stand for an inspection with no checklist",
+  );
+
+  // --- observations --------------------------------------------------------
+
+  check(
+    "every observation kind the database has is spelled here",
+    OBSERVATION_KINDS.length === 7,
+    `${OBSERVATION_KINDS.length} of agenda_observation_kind's 7`,
+  );
+  check(
+    "safety is offered first",
+    OBSERVATION_KINDS[0]?.value === "safety",
+    "it is the one that stops the job, so it should not be fourth in a list",
+  );
+
+  // --- issues --------------------------------------------------------------
+
+  check(
+    "every issue status the database has is spelled here",
+    ISSUE_STATUSES.length === 7,
+    `${ISSUE_STATUSES.length} of agenda_issue_status's 7`,
+  );
+  check(
+    "a rejected fix is still somebody's work",
+    isIssueOpen("rejected") && isIssueOpen("ready_for_inspection"),
+    "counting it as done is how a punch list reaches zero with snags on site",
+  );
+  check(
+    "resolved and closed are not",
+    !isIssueOpen("resolved") && !isIssueOpen("closed"),
+  );
+  check(
+    "an empty punch list is not a finished one",
+    punchProgress([]) === null,
+    "a complete bar for a snagging nobody has carried out is the worst answer",
+  );
+  check(
+    "progress counts only what is settled",
+    punchProgress([
+      { status: "closed" },
+      { status: "resolved" },
+      { status: "rejected" },
+      { status: "open" },
+    ]) === 50,
+  );
+  {
+    const sorted = byUrgency([
+      { status: "closed", dueDate: "2026-01-01" },
+      { status: "open", dueDate: null },
+      { status: "open", dueDate: "2026-03-01" },
+      { status: "open", dueDate: "2026-02-01" },
+    ]);
+    check(
+      "open work comes first, soonest due at the top",
+      sorted[0]?.dueDate === "2026-02-01" && sorted[1]?.dueDate === "2026-03-01",
+    );
+    check(
+      "an undated item sorts after every dated one, not before",
+      sorted[2]?.dueDate === null && sorted[3]?.status === "closed",
+      "it has no deadline to have missed; the top is for work that is late",
+    );
+  }
+
+  // --- forms ---------------------------------------------------------------
+
+  check(
+    "every field kind has a label",
+    FORM_FIELD_KINDS.length === 6,
+  );
+  {
+    const fields = parseFieldLines(
+      [
+        "Permit number*",
+        "Gas tested [yes/no]",
+        "Depth [number]",
+        "Dug on [date]",
+        "Method [hand dig | machine]",
+        "What was found [long]",
+        "",
+        "   ",
+      ].join("\n"),
+    );
+    check(
+      "a form is written one question per line",
+      fields.length === 6,
+      `${fields.length} questions parsed`,
+    );
+    check(
+      "a trailing star makes an answer compulsory, and is not part of the label",
+      fields[0]?.required === true && fields[0]?.label === "Permit number",
+    );
+    check(
+      "the bracket says what kind of answer, and is not part of the label",
+      fields[1]?.kind === "yes_no" && fields[1]?.label === "Gas tested" &&
+        fields[2]?.kind === "number" && fields[3]?.kind === "date" &&
+        fields[5]?.kind === "long_text",
+    );
+    check(
+      "a bracket with bars is a list to pick from",
+      fields[4]?.kind === "choice" &&
+        fields[4]?.options?.join(",") === "hand dig,machine",
+    );
+    check(
+      "a question is not given an id it would lose when renamed",
+      fields.every((field) => !("id" in field)),
+      "answers are keyed by id; deriving it from the label orphans them",
+    );
+  }
+  check(
+    "a bracket nobody recognises leaves a question standing",
+    parseFieldLines("Notes [ማስታወሻ]").length === 1,
+    "losing a line somebody typed is worse than a text box",
+  );
+  check(
+    "a list with no options is dropped rather than rendered unanswerable",
+    parseFieldLines("Pick one [ | ]").length === 0,
+  );
+  check(
+    "a template's stored fields are validated, not trusted",
+    parseFormFields([
+      { id: "a", label: "Fine", kind: "text" },
+      { id: "b", label: "No kind" },
+      { label: "No id", kind: "text" },
+      "not an object",
+      null,
+      { id: "c", label: "Empty list", kind: "choice", options: [] },
+    ]).length === 1,
+    "fields is jsonb, so nothing in the database has an opinion about it",
+  );
+  check(
+    "and something that is not a list at all is empty rather than a throw",
+    parseFormFields(null).length === 0 && parseFormFields("[]").length === 0,
+  );
+  {
+    const fields: FormField[] = [
+      { id: "a", label: "Permit", kind: "text", required: true },
+      { id: "b", label: "Gas tested", kind: "yes_no", required: true },
+      { id: "c", label: "Notes", kind: "text", required: false },
+    ];
+    check(
+      "a compulsory answer left blank is reported by name",
+      missingAnswers(fields, { b: true }).map((f) => f.id).join() === "a",
+    );
+    check(
+      "an answer of no is an answer",
+      missingAnswers(fields, { a: "P1", b: false }).length === 0,
+      "false and the empty string are not the same thing",
+    );
+    check(
+      "and whitespace is not",
+      missingAnswers(fields, { a: "   ", b: true }).map((f) => f.id).join() === "a",
+    );
+  }
+
+  // --- the chain -----------------------------------------------------------
+
+  const quality = code(
+    "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+  );
+  check(
+    "an observation can be raised from the inspection check that found it",
+    /inspection_item_id: inspectionItemId \?\? null,/.test(quality),
+    "the chain is what answers \"why was this rebuilt\" six months later",
+  );
+  check(
+    "and a punch item from the observation that caused it",
+    /observation_id: observationId \?\? null,/.test(quality),
+  );
+  check(
+    "the inspection header is rolled up from its items, not typed",
+    /const rolled = rollUpInspection\(/.test(quality),
+  );
+  check(
+    "and rolled up from the items as they are now, not as the page knew them",
+    /from\("agenda_inspection_items"\)\s*\.select\("result"\)\s*\.eq\("inspection_id", inspectionId\)/.test(
+      quality,
+    ),
+    "another inspector recording a fail on the same walk must not be overwritten",
+  );
+  check(
+    "a punch item is numbered, because it is read out on site",
+    /record_kind: "punch",\s*prefix: "PL",/.test(quality),
+  );
+  check(
+    "a yes/no answer is always written, so a deliberate no is not a skip",
+    /if \(field\.kind === "yes_no"\) \{\s*[\s\S]{0,200}?answers\[field\.id\] = raw === "on";/.test(
+      quality,
+    ),
+  );
+  check(
+    "an answer to a list is checked against that list",
+    /if \(field\.kind === "choice" && !field\.options\?\.includes\(raw\)\) continue;/.test(
+      quality,
+    ),
+  );
+  check(
+    "a form's compulsory questions are checked before it is filed",
+    /const missing = missingAnswers\(fields, answers\);\s*if \(missing\.length > 0\)/.test(
+      quality,
+    ),
+  );
+  check(
+    "a template minted for reuse has no project rather than this one",
+    /project_id: formData\.get\("scope"\) === "everywhere" \? null : projectId,/.test(
+      quality,
+    ),
+    "membership cannot gate a row with no project on it",
+  );
+  check(
+    "each question gets a minted id",
+    /\.map\(\(field\) => \(\{ \.\.\.field, id: crypto\.randomUUID\(\) \}\)\)/.test(
+      quality,
+    ),
+  );
+  check(
+    "a pinned panorama points at the job rather than copying the image",
+    /panorama_job_id: jobId,\s*storage_path: null,/.test(quality),
+    "a re-stitch that fixes a seam must fix the site record too",
+  );
+
+  const inspectionView = code(
+    "src/components/agenda/site/inspection-register.tsx",
+  );
+  check(
+    "the register shows the rolled-up result, with the recorded one as fallback",
+    /rollUpInspection\(inspection\.items\) \?\? inspection\.result/.test(
+      inspectionView,
+    ),
+    "a row reading pass over a check reading fail is the bug this prevents",
+  );
+  {
+    // Scoped by hand rather than with one regex: `item.result === "fail"` also
+    // appears in the row's own className a hundred lines earlier, and a
+    // distance-bounded match found that one and proved nothing about the
+    // button. The guard's exact text is asserted as well as the containment,
+    // because a button inside `{false && (...)}` is still in the source.
+    const guard = inspectionView.indexOf('{item.result === "fail" && (');
+    const button = inspectionView.indexOf("Raise an observation");
+    check(
+      "a failed check offers to raise an observation where somebody is looking",
+      guard !== -1 &&
+        button > guard &&
+        !inspectionView.slice(guard, button).includes("</li>"),
+      "on a passed check there is nothing to raise",
+    );
+  }
+
+  const observationView = code("src/components/agenda/site/observation-list.tsx");
+  check(
+    "an observation offers to become a punch item",
+    /Add to the punch list/.test(observationView) &&
+      /addPunchItem\(\s*projectId,\s*formData,\s*observation\.id,\s*\)/.test(
+        observationView,
+      ),
+  );
+
+  const panoramaView = code("src/components/agenda/site/progress-360.tsx");
+  check(
+    "360 progress reuses the viewer that already exists",
+    /<PanoramaViewer\s+src=\{open\.panoramaUrl\}/.test(panoramaView),
+    "a second WebGL runtime on a phone that already carries Three and MapLibre",
+  );
+  check(
+    "and offers only panoramas that have finished stitching",
+    /\.eq\("status", "ready"\)\s*\.not\("panorama_url", "is", null\)/.test(
+      code("src/lib/data/agenda-site.ts"),
+    ),
+    "a job still stitching has no image to put on the wall",
   );
 }
 

@@ -737,4 +737,62 @@ exception
 end;
 $$;
 
+-- ===================================================================
+-- 15. A photograph is a file here or a panorama over there — one of the two.
+--
+-- 0090 made `storage_path` not null while also giving the table a
+-- `panorama_job_id`, so pinning a progress panorama to a place on site was
+-- impossible: its image belongs to the panorama pipeline and there is nothing
+-- to put in `agenda-files` for it.
+-- ===================================================================
+reset role;
+insert into auth.users (id, email) values
+  ('a6000000-0000-4000-8000-000000000005', 'pano@example.test')
+on conflict (id) do nothing;
+
+insert into public.panorama_jobs (id, owner_id, status, panorama_url, width, height)
+values ('a6000000-0000-4000-8000-0000000000b1',
+        'a6000000-0000-4000-8000-000000000001',
+        'ready', 'https://example.test/p.jpg', 4096, 2048);
+
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000003';
+
+do $$
+declare n integer;
+begin
+  -- A panorama with no file of its own.
+  insert into public.agenda_photos (project_id, panorama_job_id, caption)
+  values ('a6000000-0000-4000-8000-00000000000a',
+          'a6000000-0000-4000-8000-0000000000b1',
+          'Third floor, week 14');
+
+  select count(*) into n from public.agenda_photos
+  where project_id = 'a6000000-0000-4000-8000-00000000000a'
+    and panorama_job_id is not null;
+  if n <> 1 then
+    raise exception 'FAIL 15a: a progress panorama cannot be filed without a storage path';
+  end if;
+  raise notice 'ok 15a: a panorama needs no file in the site bucket';
+
+  -- An ordinary photograph still works.
+  insert into public.agenda_photos (project_id, storage_path, caption)
+  values ('a6000000-0000-4000-8000-00000000000a',
+          'a6000000-0000-4000-8000-00000000000a/photos/slab.jpg', 'Slab pour');
+  raise notice 'ok 15b: and an ordinary photograph is unaffected';
+end;
+$$;
+
+-- Neither a file nor a panorama is a caption with no picture.
+do $$
+begin
+  insert into public.agenda_photos (project_id, caption)
+  values ('a6000000-0000-4000-8000-00000000000a', 'Nothing at all');
+  raise exception 'FAIL 15c: a photo row with no image of any kind was accepted';
+exception
+  when check_violation then
+    raise notice 'ok 15c: a row with neither is refused';
+end;
+$$;
+
 rollback;

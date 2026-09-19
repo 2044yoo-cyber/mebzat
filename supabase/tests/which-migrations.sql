@@ -129,7 +129,11 @@ begin
       (91, '0091_agenda_commercial',  'func',    'agenda_can_view_contracts'),
       (92, '0092_agenda_numbering',   'func',    'agenda_next_number'),
       (93, '0093_agenda_submittal_current', 'func', 'agenda_submittal_set_current'),
-      (94, '0094_agenda_files',       'bucket',  'agenda-files')
+      (94, '0094_agenda_files',       'bucket',  'agenda-files'),
+      -- 0095 creates nothing: it drops a not-null and adds a check. The
+      -- constraint is the only evidence it ran.
+      (95, '0095_agenda_panorama_photos', 'constraint',
+           'agenda_photos.agenda_photos_has_an_image')
     ) as t (ordering, migration, kind, object)
   loop
     present := case row.kind
@@ -155,6 +159,16 @@ begin
         select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
         where t.typname = split_part(row.object, '.', 1)
           and e.enumlabel = split_part(row.object, '.', 2)
+      )
+      -- A migration that creates nothing and only relaxes a column has a
+      -- named constraint as the one object that can be looked for.
+      when 'constraint' then exists (
+        select 1 from pg_constraint c
+        join pg_class t on t.oid = c.conrelid
+        join pg_namespace n on n.oid = t.relnamespace
+        where n.nspname = 'public'
+          and t.relname = split_part(row.object, '.', 1)
+          and c.conname = split_part(row.object, '.', 2)
       )
       when 'body' then exists (
         select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

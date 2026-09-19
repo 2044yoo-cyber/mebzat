@@ -3,6 +3,13 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { AGENDA_FILES_BUCKET } from "@/lib/agenda/files";
 import type { Discipline, ReviewStatus } from "@/lib/agenda/records";
+import {
+  parseFormFields,
+  type FormField,
+  type InspectionResult,
+  type IssueStatus,
+  type ObservationKind,
+} from "@/lib/agenda/quality";
 import type { TaskPriority, TaskStatus } from "@/lib/agenda/constants";
 
 /**
@@ -462,4 +469,442 @@ export async function getProjectPeople(projectId: string): Promise<Person[]> {
         b.fullName ?? b.username ?? "",
       ),
     );
+}
+
+// ---------------------------------------------------------------------------
+// Quality: inspections, observations, punch list
+// ---------------------------------------------------------------------------
+
+export type InspectionItem = {
+  id: string;
+  description: string;
+  result: InspectionResult;
+  comment: string | null;
+  position: number;
+};
+
+export type Inspection = {
+  id: string;
+  number: string | null;
+  title: string;
+  discipline: Discipline | null;
+  location: string | null;
+  scheduledFor: string | null;
+  inspectedAt: string | null;
+  result: InspectionResult;
+  notes: string | null;
+  createdAt: string;
+  inspector: Person | null;
+  items: InspectionItem[];
+};
+
+type InspectionRow = {
+  id: string;
+  number: string | null;
+  title: string;
+  discipline: string | null;
+  location: string | null;
+  scheduled_for: string | null;
+  inspected_at: string | null;
+  result: string;
+  notes: string | null;
+  created_at: string;
+  inspector: PersonRow | PersonRow[] | null;
+  agenda_inspection_items:
+    | {
+        id: string;
+        description: string;
+        result: string;
+        comment: string | null;
+        position: number;
+      }[]
+    | null;
+};
+
+export async function getInspections(
+  projectId: string,
+): Promise<Inspection[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_inspections")
+    .select(
+      `id, number, title, discipline, location, scheduled_for, inspected_at,
+       result, notes, created_at,
+       inspector:profiles!agenda_inspections_inspector_id_fkey(${PERSON_COLUMNS}),
+       agenda_inspection_items(id, description, result, comment, position)`,
+    )
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(PAGE);
+
+  if (!data) return [];
+
+  return (data as unknown as InspectionRow[]).map((row) => ({
+    id: row.id,
+    number: row.number,
+    title: row.title,
+    discipline: row.discipline as Discipline | null,
+    location: row.location,
+    scheduledFor: row.scheduled_for,
+    inspectedAt: row.inspected_at,
+    result: row.result as InspectionResult,
+    notes: row.notes,
+    createdAt: row.created_at,
+    inspector: toPerson(one(row.inspector)),
+    items: (row.agenda_inspection_items ?? [])
+      .map((item) => ({
+        id: item.id,
+        description: item.description,
+        result: item.result as InspectionResult,
+        comment: item.comment,
+        position: item.position,
+      }))
+      // A checklist is walked in the order it was written, not the order the
+      // database happened to return.
+      .sort((a, b) => a.position - b.position),
+  }));
+}
+
+export type Observation = {
+  id: string;
+  kind: ObservationKind;
+  description: string;
+  location: string | null;
+  responsibleCompany: string | null;
+  dueDate: string | null;
+  status: IssueStatus;
+  inspectionItemId: string | null;
+  createdAt: string;
+  assignedTo: Person | null;
+  createdBy: Person | null;
+};
+
+type ObservationRow = {
+  id: string;
+  kind: string;
+  description: string;
+  location: string | null;
+  responsible_company: string | null;
+  due_date: string | null;
+  status: string;
+  inspection_item_id: string | null;
+  created_at: string;
+  assignee: PersonRow | PersonRow[] | null;
+  author: PersonRow | PersonRow[] | null;
+};
+
+export async function getObservations(
+  projectId: string,
+): Promise<Observation[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_observations")
+    .select(
+      `id, kind, description, location, responsible_company, due_date, status,
+       inspection_item_id, created_at,
+       assignee:profiles!agenda_observations_assigned_to_fkey(${PERSON_COLUMNS}),
+       author:profiles!agenda_observations_created_by_fkey(${PERSON_COLUMNS})`,
+    )
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(PAGE);
+
+  if (!data) return [];
+
+  return (data as unknown as ObservationRow[]).map((row) => ({
+    id: row.id,
+    kind: row.kind as ObservationKind,
+    description: row.description,
+    location: row.location,
+    responsibleCompany: row.responsible_company,
+    dueDate: row.due_date,
+    status: row.status as IssueStatus,
+    inspectionItemId: row.inspection_item_id,
+    createdAt: row.created_at,
+    assignedTo: toPerson(one(row.assignee)),
+    createdBy: toPerson(one(row.author)),
+  }));
+}
+
+export type PunchItem = {
+  id: string;
+  number: string | null;
+  description: string;
+  location: string | null;
+  assignedCompany: string | null;
+  dueDate: string | null;
+  priority: TaskPriority;
+  status: IssueStatus;
+  observationId: string | null;
+  createdAt: string;
+  assignedTo: Person | null;
+};
+
+type PunchRow = {
+  id: string;
+  number: string | null;
+  description: string;
+  location: string | null;
+  assigned_company: string | null;
+  due_date: string | null;
+  priority: string;
+  status: string;
+  observation_id: string | null;
+  created_at: string;
+  assignee: PersonRow | PersonRow[] | null;
+};
+
+export async function getPunchItems(projectId: string): Promise<PunchItem[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_punch_items")
+    .select(
+      `id, number, description, location, assigned_company, due_date, priority,
+       status, observation_id, created_at,
+       assignee:profiles!agenda_punch_items_assigned_to_fkey(${PERSON_COLUMNS})`,
+    )
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(PAGE);
+
+  if (!data) return [];
+
+  return (data as unknown as PunchRow[]).map((row) => ({
+    id: row.id,
+    number: row.number,
+    description: row.description,
+    location: row.location,
+    assignedCompany: row.assigned_company,
+    dueDate: row.due_date,
+    priority: row.priority as TaskPriority,
+    status: row.status as IssueStatus,
+    observationId: row.observation_id,
+    createdAt: row.created_at,
+    assignedTo: toPerson(one(row.assignee)),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Forms
+// ---------------------------------------------------------------------------
+
+export type FormTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  fields: FormField[];
+  /** Null when it is a template the owner reuses across their projects. */
+  projectId: string | null;
+};
+
+export type FormSubmission = {
+  id: string;
+  templateId: string;
+  templateName: string | null;
+  number: string | null;
+  answers: Record<string, unknown>;
+  status: ReviewStatus;
+  submittedAt: string | null;
+  createdAt: string;
+  submittedBy: Person | null;
+};
+
+/**
+ * The templates available on this project: its own, and the ones the viewer
+ * reuses across projects.
+ *
+ * Two conditions in one `or`, because the policy in 0091 allows both and a
+ * query that asked only for `project_id = x` would hide the reusable ones the
+ * policy was written to let through.
+ */
+export async function getFormTemplates(
+  projectId: string,
+): Promise<FormTemplate[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_form_templates")
+    .select("id, name, description, fields, project_id")
+    .or(`project_id.eq.${projectId},project_id.is.null`)
+    .is("archived_at", null)
+    .order("name", { ascending: true })
+    .limit(100);
+
+  if (!data) return [];
+
+  return (
+    data as unknown as {
+      id: string;
+      name: string;
+      description: string | null;
+      fields: unknown;
+      project_id: string | null;
+    }[]
+  ).map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    fields: parseFormFields(row.fields),
+    projectId: row.project_id,
+  }));
+}
+
+export async function getFormSubmissions(
+  projectId: string,
+): Promise<FormSubmission[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_form_submissions")
+    .select(
+      `id, template_id, number, answers, status, submitted_at, created_at,
+       template:agenda_form_templates!agenda_form_submissions_template_id_fkey(name),
+       submitter:profiles!agenda_form_submissions_submitted_by_fkey(${PERSON_COLUMNS})`,
+    )
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(PAGE);
+
+  if (!data) return [];
+
+  return (
+    data as unknown as {
+      id: string;
+      template_id: string;
+      number: string | null;
+      answers: unknown;
+      status: string;
+      submitted_at: string | null;
+      created_at: string;
+      template: { name: string } | { name: string }[] | null;
+      submitter: PersonRow | PersonRow[] | null;
+    }[]
+  ).map((row) => ({
+    id: row.id,
+    templateId: row.template_id,
+    templateName: one(row.template)?.name ?? null,
+    number: row.number,
+    answers:
+      typeof row.answers === "object" && row.answers !== null
+        ? (row.answers as Record<string, unknown>)
+        : {},
+    status: row.status as ReviewStatus,
+    submittedAt: row.submitted_at,
+    createdAt: row.created_at,
+    submittedBy: toPerson(one(row.submitter)),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// 360 progress
+// ---------------------------------------------------------------------------
+
+export type ProgressPanorama = {
+  id: string;
+  caption: string | null;
+  building: string | null;
+  floor: string | null;
+  area: string | null;
+  takenAt: string;
+  jobId: string;
+  /** The published equirectangular image, or null while it is still stitching. */
+  panoramaUrl: string | null;
+  width: number | null;
+  height: number | null;
+};
+
+/**
+ * The project's progress panoramas, newest first.
+ *
+ * `agenda_photos` rows that point at a `panorama_jobs` row rather than at a
+ * file of their own — see 0095. The image is read through the join rather than
+ * copied, so a re-stitch that fixes a seam fixes the site record too.
+ */
+export async function getProgressPanoramas(
+  projectId: string,
+): Promise<ProgressPanorama[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_photos")
+    .select(
+      `id, caption, building, floor, area, taken_at, panorama_job_id,
+       job:panorama_jobs!agenda_photos_panorama_job_id_fkey(panorama_url, width, height)`,
+    )
+    .eq("project_id", projectId)
+    .not("panorama_job_id", "is", null)
+    .order("taken_at", { ascending: false })
+    .limit(PAGE);
+
+  if (!data) return [];
+
+  return (
+    data as unknown as {
+      id: string;
+      caption: string | null;
+      building: string | null;
+      floor: string | null;
+      area: string | null;
+      taken_at: string;
+      panorama_job_id: string;
+      job:
+        | { panorama_url: string | null; width: number | null; height: number | null }
+        | { panorama_url: string | null; width: number | null; height: number | null }[]
+        | null;
+    }[]
+  ).map((row) => {
+    const job = one(row.job);
+    return {
+      id: row.id,
+      caption: row.caption,
+      building: row.building,
+      floor: row.floor,
+      area: row.area,
+      takenAt: row.taken_at,
+      jobId: row.panorama_job_id,
+      panoramaUrl: job?.panorama_url ?? null,
+      width: job?.width ?? null,
+      height: job?.height ?? null,
+    };
+  });
+}
+
+export type FinishedPanorama = {
+  id: string;
+  panoramaUrl: string;
+  createdAt: string;
+};
+
+/**
+ * The viewer's own finished panoramas, for the "pin one to this project"
+ * picker.
+ *
+ * Scoped to `ready` rather than to everything: a job still stitching has no
+ * image, and offering it would put a broken tile on the wall. The policy in
+ * 0081 already limits this to the caller's own jobs.
+ */
+export async function getFinishedPanoramas(): Promise<FinishedPanorama[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("panorama_jobs")
+    .select("id, panorama_url, created_at")
+    .eq("status", "ready")
+    .not("panorama_url", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(60);
+
+  if (!data) return [];
+
+  return (
+    data as unknown as {
+      id: string;
+      panorama_url: string | null;
+      created_at: string;
+    }[]
+  )
+    .filter((row): row is { id: string; panorama_url: string; created_at: string } =>
+      Boolean(row.panorama_url),
+    )
+    .map((row) => ({
+      id: row.id,
+      panoramaUrl: row.panorama_url,
+      createdAt: row.created_at,
+    }));
 }
