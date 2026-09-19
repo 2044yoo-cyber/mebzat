@@ -670,6 +670,13 @@ export type ManufacturingStatus =
   | "delivered"
   | "cancelled";
 
+export type MedoshaRole =
+  | "client"
+  | "professional"
+  | "company"
+  | "agent"
+  | "seller";
+
 export type MemberStatus =
   | "invited"
   | "active"
@@ -3273,6 +3280,75 @@ export interface Database {
           activity?: string | null;
           schedule_item_id?: string | null;
           recorded_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      agent_profiles: {
+        Row: {
+          profile_id: string;
+          agency_name: string | null;
+          license_number: string | null;
+          specialisations: string[];
+          years_experience: number | null;
+          contact_phone: string | null;
+          contact_email: string | null;
+          about: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          agency_name?: string | null;
+          license_number?: string | null;
+          specialisations?: string[];
+          years_experience?: number | null;
+          contact_phone?: string | null;
+          contact_email?: string | null;
+          about?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          profile_id?: string;
+          agency_name?: string | null;
+          license_number?: string | null;
+          specialisations?: string[];
+          years_experience?: number | null;
+          contact_phone?: string | null;
+          contact_email?: string | null;
+          about?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agent_service_areas: {
+        Row: {
+          id: string;
+          profile_id: string;
+          area_slug: string;
+          area_name: string;
+          city: string;
+          country: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          area_slug: string;
+          area_name: string;
+          city?: string;
+          country?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string;
+          area_slug?: string;
+          area_name?: string;
+          city?: string;
+          country?: string;
           created_at?: string;
         };
         Relationships: [];
@@ -7398,6 +7474,9 @@ export interface Database {
           industry: string | null;
           company_size: string | null;
           font_preference: string | null;
+          roles: MedoshaRole[];
+          primary_role: MedoshaRole | null;
+          profession_details: Json;
         };
         Insert: {
           id: string;
@@ -7457,6 +7536,9 @@ export interface Database {
           industry?: string | null;
           company_size?: string | null;
           font_preference?: string | null;
+          roles?: MedoshaRole[];
+          primary_role?: MedoshaRole | null;
+          profession_details?: Json;
         };
         Update: {
           id?: string;
@@ -7516,6 +7598,9 @@ export interface Database {
           industry?: string | null;
           company_size?: string | null;
           font_preference?: string | null;
+          roles?: MedoshaRole[];
+          primary_role?: MedoshaRole | null;
+          profession_details?: Json;
         };
         Relationships: [];
       };
@@ -8337,6 +8422,75 @@ export interface Database {
           entity?: string;
           entity_id?: string;
           batch?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      seller_profiles: {
+        Row: {
+          profile_id: string;
+          store_name: string | null;
+          category_slugs: string[];
+          contact_phone: string | null;
+          contact_email: string | null;
+          about: string | null;
+          delivers: boolean;
+          delivery_note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          store_name?: string | null;
+          category_slugs?: string[];
+          contact_phone?: string | null;
+          contact_email?: string | null;
+          about?: string | null;
+          delivers?: boolean;
+          delivery_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          profile_id?: string;
+          store_name?: string | null;
+          category_slugs?: string[];
+          contact_phone?: string | null;
+          contact_email?: string | null;
+          about?: string | null;
+          delivers?: boolean;
+          delivery_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      seller_service_areas: {
+        Row: {
+          id: string;
+          profile_id: string;
+          area_slug: string;
+          area_name: string;
+          city: string;
+          country: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          area_slug: string;
+          area_name: string;
+          city?: string;
+          country?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string;
+          area_slug?: string;
+          area_name?: string;
+          city?: string;
+          country?: string;
           created_at?: string;
         };
         Relationships: [];
@@ -10795,6 +10949,7 @@ export interface Database {
       location_grant_reason: LocationGrantReason;
       location_visibility: LocationVisibility;
       manufacturing_status: ManufacturingStatus;
+      medosha_role: MedoshaRole;
       member_status: MemberStatus;
       message_context: MessageContext;
       moderation_action: ModerationAction;
@@ -10910,6 +11065,8 @@ export type AgendaSubmittalRevision = Database["public"]["Tables"]["agenda_submi
 export type AgendaTask = Database["public"]["Tables"]["agenda_tasks"]["Row"];
 export type AgendaTaskComment = Database["public"]["Tables"]["agenda_task_comments"]["Row"];
 export type AgendaTimesheet = Database["public"]["Tables"]["agenda_timesheets"]["Row"];
+export type AgentProfile = Database["public"]["Tables"]["agent_profiles"]["Row"];
+export type AgentServiceArea = Database["public"]["Tables"]["agent_service_areas"]["Row"];
 export type AiContentPost = Database["public"]["Tables"]["ai_content_posts"]["Row"];
 export type AiContentSchedule = Database["public"]["Tables"]["ai_content_schedules"]["Row"];
 export type AiContentVersion = Database["public"]["Tables"]["ai_content_versions"]["Row"];
@@ -11026,6 +11183,8 @@ export type ReviewHelpful = Database["public"]["Tables"]["review_helpful"]["Row"
 export type RolePermission = Database["public"]["Tables"]["role_permissions"]["Row"];
 export type SavedCalculation = Database["public"]["Tables"]["saved_calculations"]["Row"];
 export type SeedContent = Database["public"]["Tables"]["seed_content"]["Row"];
+export type SellerProfile = Database["public"]["Tables"]["seller_profiles"]["Row"];
+export type SellerServiceArea = Database["public"]["Tables"]["seller_service_areas"]["Row"];
 export type Service = Database["public"]["Tables"]["services"]["Row"];
 export type ServiceBookmark = Database["public"]["Tables"]["service_bookmarks"]["Row"];
 export type ServiceCategory = Database["public"]["Tables"]["service_categories"]["Row"];

@@ -2,6 +2,7 @@ import { Users } from "lucide-react";
 
 import { ProfileCard } from "@/components/profile/profile-card";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MARKETPLACE_ROLES } from "@/lib/profile/roles";
 import { createClient } from "@/lib/supabase/server";
 
 export async function RecommendedProfessionals({
@@ -18,6 +19,11 @@ export async function RecommendedProfessionals({
     .neq("id", currentUserId)
     .not("account_type", "is", null)
     .not("username", "is", null)
+    // Who this heading says they are. Without it the four newest accounts were
+    // recommended as professionals whatever they had come here to do, and a
+    // homeowner two days old was top of the list. Filtered in the query rather
+    // than after it, or the limit of four would quietly return two.
+    .overlaps("roles", MARKETPLACE_ROLES)
     .order("created_at", { ascending: false })
     .limit(4);
 

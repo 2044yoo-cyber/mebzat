@@ -1,0 +1,188 @@
+[
+  {
+    "name": "existing accounts are made to answer the question again",
+    "file": "supabase/migrations/0097_account_roles.sql",
+    "from": "  onboarding_completed = true\nwhere cardinality(roles) = 0;",
+    "to": "  onboarding_completed = false\nwhere cardinality(roles) = 0;"
+  },
+  {
+    "name": "the backfill runs over accounts that already answered",
+    "file": "supabase/migrations/0097_account_roles.sql",
+    "from": "where cardinality(roles) = 0;",
+    "to": "where true;"
+  },
+  {
+    "name": "somebody with a trade is backfilled as a client",
+    "file": "supabase/migrations/0097_account_roles.sql",
+    "from": "      when profession is not null and length(trim(profession)) > 0\n        then 'professional'::public.medosha_role\n      when account_type in ('supplier', 'manufacturer')",
+    "to": "      when account_type in ('supplier', 'manufacturer')"
+  },
+  {
+    "name": "the dashboard asks everybody, onboarded or not",
+    "file": "src/app/(dashboard)/dashboard/page.tsx",
+    "from": "  if (!profile.onboarding_completed) {\n    redirect(\"/welcome\");\n  }",
+    "to": "  if (!profile.username) {\n    redirect(\"/welcome\");\n  }"
+  },
+  {
+    "name": "the welcome screen asks again every time it is opened",
+    "file": "src/app/(dashboard)/welcome/page.tsx",
+    "from": "  if (profile?.onboarding_completed) redirect(\"/dashboard\");",
+    "to": ""
+  },
+  {
+    "name": "answering writes the role but leaves the question open",
+    "file": "src/app/(dashboard)/welcome/actions.ts",
+    "from": "      primary_role: role,\n      onboarding_completed: true,",
+    "to": "      primary_role: role,"
+  },
+  {
+    "name": "a homeowner is sent to the professional's form",
+    "file": "src/app/(dashboard)/welcome/actions.ts",
+    "from": "  redirect(role === \"client\" ? \"/dashboard\" : \"/profile/edit\");",
+    "to": "  redirect(\"/profile/edit\");"
+  },
+  {
+    "name": "a homeowner is asked for a trade again",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  { key: \"avatar_url\", label: \"Profile photo\", weight: 15, filled: (p) => filledText(p.avatar_url) },\n];\n\n/**\n * An agent is asked",
+    "to": "  { key: \"avatar_url\", label: \"Profile photo\", weight: 15, filled: (p) => filledText(p.avatar_url) },\n  { key: \"profession\", label: \"Your trade\", weight: 0, filled: (p) => filledText(p.profession) },\n];\n\n/**\n * An agent is asked"
+  },
+  {
+    "name": "the client's bar stops short of 100",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  { key: \"full_name\", label: \"Your name\", weight: 35, filled: (p) => filledText(p.full_name) },\n  { key: \"location\", label: \"Where you are\", weight: 25,",
+    "to": "  { key: \"full_name\", label: \"Your name\", weight: 30, filled: (p) => filledText(p.full_name) },\n  { key: \"location\", label: \"Where you are\", weight: 25,"
+  },
+  {
+    "name": "the role stops choosing the set, so everybody is a professional again",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  if (role === \"client\") return CLIENT;",
+    "to": ""
+  },
+  {
+    "name": "an agent falls back to the person's set",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  if (role === \"agent\") return AGENT;",
+    "to": ""
+  },
+  {
+    "name": "an account with no roles is nothing rather than a client",
+    "file": "src/lib/profile/roles.ts",
+    "from": "  return [profile.primary_role ?? \"client\"];",
+    "to": "  return [];"
+  },
+  {
+    "name": "a client is offered for hire again",
+    "file": "src/lib/profile/roles.ts",
+    "from": "export const MARKETPLACE_ROLES: MedoshaRole[] = [\"professional\", \"company\"];",
+    "to": "export const MARKETPLACE_ROLES: MedoshaRole[] = [\"professional\", \"company\", \"client\"];"
+  },
+  {
+    "name": "the search function stops reading the role",
+    "file": "supabase/migrations/0099_professional_search_roles.sql",
+    "from": "      and (\n        cardinality(p.roles) = 0\n        or p.roles && array['professional', 'company']::public.medosha_role[]\n      )",
+    "to": ""
+  },
+  {
+    "name": "an account mid-question is thrown out of the search",
+    "file": "supabase/migrations/0099_professional_search_roles.sql",
+    "from": "        cardinality(p.roles) = 0\n        or p.roles &&",
+    "to": "        p.roles &&"
+  },
+  {
+    "name": "the recommendations stop reading the role",
+    "file": "src/components/dashboard/recommended-professionals.tsx",
+    "from": "    .overlaps(\"roles\", MARKETPLACE_ROLES)",
+    "to": ""
+  },
+  {
+    "name": "settings loses the form that unlocks a first answer",
+    "file": "src/app/(dashboard)/settings/page.tsx",
+    "from": "          <RoleSettingsForm",
+    "to": "          <RoleSettingsFormDisabled"
+  },
+  {
+    "name": "a profile that is finished is never told so",
+    "file": "src/app/(dashboard)/settings/page.tsx",
+    "from": "            (completion.complete ? (",
+    "to": "            (false ? ("
+  },
+  {
+    "name": "settings lets somebody keep no role at all",
+    "file": "src/app/(dashboard)/settings/role-actions.ts",
+    "from": "  if (chosen.length === 0) {",
+    "to": "  if (chosen.length === -1) {"
+  },
+  {
+    "name": "the role somebody leads with need not be one they have",
+    "file": "src/app/(dashboard)/settings/role-actions.ts",
+    "from": "    isMedoshaRole(asked) && chosen.includes(asked) ? asked : chosen[0];",
+    "to": "    isMedoshaRole(asked) ? asked : chosen[0];"
+  },
+  {
+    "name": "dropping a role deletes what it held",
+    "file": "src/app/(dashboard)/settings/role-actions.ts",
+    "from": "  const { error } = await supabase\n    .from(\"profiles\")",
+    "to": "  await supabase.from(\"agent_profiles\").delete().eq(\"profile_id\", user.id);\n  const { error } = await supabase\n    .from(\"profiles\")"
+  },
+  {
+    "name": "an empty years field becomes nought years in property",
+    "file": "src/app/(dashboard)/profile/agent/actions.ts",
+    "from": "      years_experience: Number.isInteger(years) ? years : null,",
+    "to": "      years_experience: Number.isInteger(years) ? years : 0,"
+  },
+  {
+    "name": "the agent's row is inserted rather than upserted",
+    "file": "src/app/(dashboard)/profile/agent/actions.ts",
+    "from": "    { onConflict: \"profile_id\" },",
+    "to": "    {},"
+  },
+  {
+    "name": "a category name containing a comma becomes two categories",
+    "file": "src/app/(dashboard)/profile/seller/actions.ts",
+    "from": "      formData\n        .getAll(\"categories\")\n        .map((value) => String(value).trim().toLowerCase())",
+    "to": "      String(formData.get(\"categories\") ?? \"\")\n        .split(\",\")\n        .map((value) => String(value).trim().toLowerCase())"
+  },
+  {
+    "name": "a shop that does not deliver keeps its delivery promise",
+    "file": "src/app/(dashboard)/profile/seller/actions.ts",
+    "from": "      delivery_note: delivers ? text(formData.get(\"deliveryNote\")) : null,",
+    "to": "      delivery_note: text(formData.get(\"deliveryNote\")),"
+  },
+  {
+    "name": "areas are merged instead of replaced, so one can never be removed",
+    "file": "src/lib/data/role-profiles.ts",
+    "from": "  await supabase.from(table).delete().eq(\"profile_id\", profileId);",
+    "to": ""
+  },
+  {
+    "name": "a posted slug is written without checking it is a real area",
+    "file": "src/lib/data/role-profiles.ts",
+    "from": "    .from(\"location_areas\")\n    .select(\"slug, name, city, country\")\n    .in(\"slug\", slugs);",
+    "to": "    .from(\"agent_service_areas\")\n    .select(\"area_slug\")\n    .limit(0);"
+  },
+  {
+    "name": "the same area posted twice is written twice",
+    "file": "src/lib/data/role-profiles.ts",
+    "from": "  return [\n    ...new Set(",
+    "to": "  return [\n    ...("
+  },
+  {
+    "name": "the dashboard shows the full card, not the compact one",
+    "file": "src/app/(dashboard)/dashboard/page.tsx",
+    "from": "<ProfileCompletionCard profile={profile} compact />",
+    "to": "<ProfileCompletionCard profile={profile} />"
+  },
+  {
+    "name": "the done sentence stops following the role",
+    "file": "src/components/profile/profile-completion-card.tsx",
+    "from": "            {DONE_BLURB[audience]} You can still change any of it.",
+    "to": "            Everything an employer looks for is filled in. You can still change any of it."
+  },
+  {
+    "name": "the welcome screen stops saying the answer can change",
+    "file": "src/components/profile/role-picker.tsx",
+    "from": "change this later",
+    "to": "choose once"
+  }
+]

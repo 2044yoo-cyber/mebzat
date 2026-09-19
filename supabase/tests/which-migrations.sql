@@ -137,7 +137,18 @@ begin
       -- 0096 creates nothing at all: it takes a grant away. The evidence is
       -- that `anon` no longer holds it.
       (96, '0096_agenda_permission_grants', 'grant',
-           'agenda_is_member(uuid)|anon|no')
+           'agenda_is_member(uuid)|anon|no'),
+      -- 0097 adds the role enum and two profile tables. The enum is the
+      -- sentinel: the tables are named in 0099's comments as well, and a
+      -- sentinel that something else mentions is a sentinel that can be found
+      -- without the migration having run.
+      (97, '0097_account_roles',      'type',    'medosha_role'),
+      (98, '0098_profession_details', 'column',  'profiles.profession_details'),
+      -- 0099 creates nothing. It replaces `search_professionals` with the same
+      -- signature, so the function exists either way and only its body says
+      -- whether the replacement happened.
+      (99, '0099_professional_search_roles', 'body',
+           'search_professionals|p.roles &&')
     ) as t (ordering, migration, kind, object)
   loop
     present := case row.kind

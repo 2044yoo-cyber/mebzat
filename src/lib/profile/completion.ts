@@ -1,5 +1,6 @@
 import { ORGANIZATION_ACCOUNT_TYPES } from "@/lib/validations/profile";
-import type { AccountType, Profile } from "@/types/database.types";
+import { storedRoleOf } from "@/lib/profile/roles";
+import type { AccountType, MedoshaRole, Profile } from "@/types/database.types";
 
 /**
  * How complete a profile is. One answer, for everybody who asks.
@@ -33,6 +34,17 @@ import type { AccountType, Profile } from "@/types/database.types";
  *
  * Both sets total 100, deliberately. A percentage that cannot reach 100 is the
  * bug above in a different form.
+ *
+ * ## And now the set depends on what you came here to do
+ *
+ * 0097 added roles, and they cut across this. A homeowner was being asked for
+ * a trade, years of experience and languages — the same bar as somebody
+ * advertising for work — and could not honestly finish it. An agent was being
+ * asked for a trade they do not have.
+ *
+ * So the role chooses the set first, and the person-or-organisation split
+ * still decides it for the two roles where it is the real question. Every set
+ * totals 100, which is asserted rather than assumed.
  */
 
 export type CompletionField = {
@@ -68,6 +80,58 @@ const ORGANIZATION: CompletionField[] = [
   { key: "phone", label: "Phone number", weight: 10, filled: (p) => filledText(p.phone) },
 ];
 
+/**
+ * A homeowner is asked for four things.
+ *
+ * Name, photograph, where they are, and how to be reached. That is everything
+ * somebody hiring a carpenter needs to be, and asking for more would be asking
+ * them to advertise a service they are not offering.
+ */
+const CLIENT: CompletionField[] = [
+  { key: "full_name", label: "Your name", weight: 35, filled: (p) => filledText(p.full_name) },
+  { key: "location", label: "Where you are", weight: 25, filled: (p) => filledText(p.location_city) || filledText(p.base_area) },
+  { key: "phone", label: "Phone number", weight: 25, filled: (p) => filledText(p.phone) },
+  { key: "avatar_url", label: "Profile photo", weight: 15, filled: (p) => filledText(p.avatar_url) },
+];
+
+/**
+ * An agent is asked what somebody looking for a flat would want to know.
+ *
+ * No trade, no years of experience as a tradesperson, no languages. The agency
+ * and the areas they cover are the two things that decide whether to call
+ * them, and both live on `agent_profiles` — which is why this set stops at the
+ * account itself and the agent screen carries the rest.
+ */
+const AGENT: CompletionField[] = [
+  { key: "full_name", label: "Your name", weight: 25, filled: (p) => filledText(p.full_name) },
+  { key: "avatar_url", label: "Profile photo", weight: 15, filled: (p) => filledText(p.avatar_url) },
+  { key: "location", label: "Where you are", weight: 20, filled: (p) => filledText(p.location_city) || filledText(p.base_area) },
+  { key: "phone", label: "Phone number", weight: 20, filled: (p) => filledText(p.phone) },
+  { key: "bio", label: "About you", weight: 20, filled: (p) => filledText(p.bio) },
+];
+
+/**
+ * A seller is asked what somebody buying cement would want to know.
+ *
+ * The store name sits on `seller_profiles`; this is the account behind it.
+ */
+const SELLER: CompletionField[] = [
+  { key: "name", label: "Your name or the shop's", weight: 25, filled: (p) => filledText(p.full_name) || filledText(p.company_name) },
+  { key: "avatar_url", label: "Logo or photo", weight: 15, filled: (p) => filledText(p.avatar_url) },
+  { key: "location", label: "Where you are", weight: 20, filled: (p) => filledText(p.location_city) || filledText(p.base_area) },
+  { key: "phone", label: "Phone number", weight: 20, filled: (p) => filledText(p.phone) },
+  { key: "bio", label: "About the shop", weight: 20, filled: (p) => filledText(p.bio) },
+];
+
+/** Every set, so the check can assert each one totals 100. */
+export const COMPLETION_SETS: Record<string, readonly CompletionField[]> = {
+  person: PERSON,
+  organization: ORGANIZATION,
+  client: CLIENT,
+  agent: AGENT,
+  seller: SELLER,
+};
+
 /** Whether this account belongs to an organisation rather than a person. */
 export function isOrganizationAccount(
   accountType: AccountType | null | undefined,
@@ -75,10 +139,24 @@ export function isOrganizationAccount(
   return ORGANIZATION_ACCOUNT_TYPES.has(accountType ?? "individual");
 }
 
-/** What this kind of account is asked for. */
+/**
+ * What this kind of account is asked for.
+ *
+ * The role decides first. `client`, `agent` and `seller` each have their own
+ * short set; `professional` and `company` fall through to the person or
+ * organisation split, which is the question that actually distinguishes those
+ * two and was already being asked correctly.
+ *
+ * The `accountType` parameter is kept so existing callers that have only that
+ * still work and still get the old answer.
+ */
 export function requiredFields(
   accountType: AccountType | null | undefined,
+  role?: MedoshaRole | null,
 ): readonly CompletionField[] {
+  if (role === "client") return CLIENT;
+  if (role === "agent") return AGENT;
+  if (role === "seller") return SELLER;
   return isOrganizationAccount(accountType) ? ORGANIZATION : PERSON;
 }
 
@@ -88,14 +166,19 @@ export type ProfileCompletion = {
   missing: string[];
   complete: boolean;
   /** Which set was used, so a caller can say "as a company" without guessing. */
-  audience: "person" | "organization";
+  audience: "person" | "organization" | "client" | "agent" | "seller";
 };
 
 export function getProfileCompletion(profile: Profile): ProfileCompletion {
-  const fields = requiredFields(profile.account_type);
-  const audience = isOrganizationAccount(profile.account_type)
-    ? "organization"
-    : "person";
+  const role = storedRoleOf(profile);
+  const fields = requiredFields(profile.account_type, role);
+
+  const audience: ProfileCompletion["audience"] =
+    role === "client" || role === "agent" || role === "seller"
+      ? role
+      : isOrganizationAccount(profile.account_type)
+        ? "organization"
+        : "person";
 
   let percent = 0;
   const missing: string[] = [];

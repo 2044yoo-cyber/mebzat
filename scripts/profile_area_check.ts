@@ -597,10 +597,13 @@ check(
 
   const profilePage = code("src/app/(dashboard)/profile/page.tsx");
   const dashboard = code("src/app/(dashboard)/dashboard/page.tsx");
+  // The dashboard's is the compact variant — title, bar, Continue — because
+  // the full card lists everything missing and that is a wall of text beside
+  // a welcome card. Both still read the one rule, which is the point.
   check(
     "the same card is on the Profile and on the Dashboard",
     /<ProfileCompletionCard profile=\{profile\} \/>/.test(profilePage) &&
-      /<ProfileCompletionCard profile=\{profile\} \/>/.test(dashboard),
+      /<ProfileCompletionCard profile=\{profile\} compact \/>/.test(dashboard),
     "they used to disagree; showing it in both places is how that stays visible",
   );
 }
