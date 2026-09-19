@@ -12,8 +12,8 @@
  * So these checks are about *where the decision lives* as much as what it is.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 let passed = 0;
 const failures: string[] = [];
@@ -128,6 +128,48 @@ const MUST_BE_PRIVATE = [
   "/(dashboard)/dashboard/services/[id]/analytics",
   "/(dashboard)/projects/[id]/agenda",
   "/(dashboard)/admin/diagnostics",
+
+  // Agenda. Every one of these is a construction record — a contract sum, a
+  // day's crew, a site photograph — and none of it is shareable, so the whole
+  // module is private. The section pages under a project are gated by the
+  // workspace layout rather than each repeating the call; they also refuse a
+  // non-member through row-level security, which is the check that matters.
+  "/(dashboard)/agenda",
+  "/(dashboard)/agenda/calendar",
+  "/(dashboard)/agenda/projects",
+  "/(dashboard)/agenda/projects/[projectId]",
+  "/(dashboard)/agenda/projects/[projectId]/activity",
+  "/(dashboard)/agenda/projects/[projectId]/bidding",
+  "/(dashboard)/agenda/projects/[projectId]/boq",
+  "/(dashboard)/agenda/projects/[projectId]/budget",
+  "/(dashboard)/agenda/projects/[projectId]/change-events",
+  "/(dashboard)/agenda/projects/[projectId]/change-orders",
+  "/(dashboard)/agenda/projects/[projectId]/commitments",
+  "/(dashboard)/agenda/projects/[projectId]/contracts",
+  "/(dashboard)/agenda/projects/[projectId]/daily-logs",
+  "/(dashboard)/agenda/projects/[projectId]/directory",
+  "/(dashboard)/agenda/projects/[projectId]/documents",
+  "/(dashboard)/agenda/projects/[projectId]/drawings",
+  "/(dashboard)/agenda/projects/[projectId]/equipment",
+  "/(dashboard)/agenda/projects/[projectId]/forms",
+  "/(dashboard)/agenda/projects/[projectId]/inspections",
+  "/(dashboard)/agenda/projects/[projectId]/invoices",
+  "/(dashboard)/agenda/projects/[projectId]/meetings",
+  "/(dashboard)/agenda/projects/[projectId]/observations",
+  "/(dashboard)/agenda/projects/[projectId]/payments",
+  "/(dashboard)/agenda/projects/[projectId]/photos",
+  "/(dashboard)/agenda/projects/[projectId]/progress-360",
+  "/(dashboard)/agenda/projects/[projectId]/punch-list",
+  "/(dashboard)/agenda/projects/[projectId]/purchase-orders",
+  "/(dashboard)/agenda/projects/[projectId]/reports",
+  "/(dashboard)/agenda/projects/[projectId]/rfis",
+  "/(dashboard)/agenda/projects/[projectId]/schedule",
+  "/(dashboard)/agenda/projects/[projectId]/settings",
+  "/(dashboard)/agenda/projects/[projectId]/submittals",
+  "/(dashboard)/agenda/projects/[projectId]/tasks",
+  "/(dashboard)/agenda/projects/[projectId]/timesheets",
+  "/(dashboard)/agenda/projects/new",
+  "/(dashboard)/agenda/tasks",
 ];
 
 // Known limit, stated rather than glossed: this reads the gate's text, not
@@ -135,16 +177,78 @@ const MUST_BE_PRIVATE = [
 // unreachable (`if (false) redirect(...)`) is not, because the call is still
 // written. Catching that needs the type checker or a running request, not a
 // regex — so do not read a pass here as proof the gate fires.
+/** Whether one file's text contains a gate of any accepted spelling. */
+function gates(source: string): boolean {
+  return (
+    /redirect\(["'`]\/login/.test(source) ||
+    /requireViewer\(/.test(source) ||
+    // `canAdmin` replaced `isAdmin` for the area-scoped admin checks and this
+    // list was not updated with it, so a page that gates itself harder than
+    // before reported as ungated.
+    (/\b(?:is|can)Admin\(/.test(source) && /notFound\(\)/.test(source))
+  );
+}
+
+/**
+ * The layouts that wrap a page, from its own folder up to — but not including
+ * — the `(dashboard)` root.
+ *
+ * Stopping short of the root is the whole point. The blanket gate this check
+ * was written to kill lived there, and counting it again would restore the
+ * failure by the back door. A layout *inside* a subtree is a different thing:
+ * `agenda/projects/[projectId]/layout.tsx` gates thirty sections that every
+ * one of them genuinely requires, and making each repeat the call would be
+ * thirty places for it to be dropped from.
+ */
+function scopedLayouts(file: string): string[] {
+  const found: string[] = [];
+  let dir = dirname(file);
+  while (dir.includes("(dashboard)") && !dir.endsWith("(dashboard)")) {
+    const layout = join(dir, "layout.tsx");
+    if (existsSync(layout)) found.push(layout);
+    dir = dirname(dir);
+  }
+  return found;
+}
+
+/** Read a layout, or the empty string if it has since been removed. */
+function layoutText(path: string): string {
+  try {
+    return code(readFileSync(path, "utf8"));
+  } catch {
+    return "";
+  }
+}
+
 for (const target of MUST_BE_PRIVATE) {
   const file = files.find((f) => route(f) === target && f.endsWith("page.tsx"));
   if (!file) continue;
   const source = code(readFileSync(file, "utf8"));
   check(
     `${target} still requires an account`,
-    /redirect\(["'`]\/login/.test(source) ||
-      /requireViewer\(/.test(source) ||
-      (/isAdmin\(/.test(source) && /notFound\(\)/.test(source)),
+    gates(source) || scopedLayouts(file).some((l) => gates(layoutText(l))),
     "this page shows one person's own data and lost its only gate",
+  );
+}
+
+// The stop-at-the-root rule, asserted directly. Nothing at `(dashboard)`
+// gates today, so a version of `scopedLayouts` that walked all the way up
+// would behave identically and no mutant could tell the two apart — but the
+// day somebody puts a redirect back in the root layout, that difference is
+// the whole member area going quietly private again.
+{
+  const deep = files.find(
+    (f) =>
+      f.includes("agenda/projects/[projectId]/rfis") && f.endsWith("page.tsx"),
+  );
+  check(
+    "a scoped layout counts and the dashboard root never does",
+    deep !== undefined &&
+      scopedLayouts(deep).some((l) => l.includes("[projectId]")) &&
+      !scopedLayouts(deep).some((l) =>
+        /\(dashboard\)[\\/]layout\.tsx$/.test(l),
+      ),
+    "counting the root would restore the blanket gate this check exists to kill",
   );
 }
 
