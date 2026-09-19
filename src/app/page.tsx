@@ -1,7 +1,6 @@
 import Link from "next/link";
-import Image from "next/image";
+import { HomeFront } from "@/components/home/home-front";
 
-import { CalculatorRail } from "@/components/calculators/calculator-rail";
 import { SuggestedAuthors } from "@/components/feed/discovery-rail";
 import { Feed } from "@/components/feed/feed";
 import { FeedComposer } from "@/components/feed/feed-composer";
@@ -60,35 +59,16 @@ export default async function Home() {
     <div className="mx-auto flex w-full max-w-[1500px] justify-center gap-6 px-0 py-3 @lg/ws:px-4 @2xl/ws:py-5">
       {/* ---- The feed ------------------------------------------------- */}
       <div className="min-w-0 flex-1 @5xl/ws:max-w-[820px] @7xl/ws:max-w-[960px]">
-        <div className="mx-3 mb-3 overflow-hidden rounded-2xl bg-white lg:hidden">
-          <div className="relative mx-auto aspect-[3.4/1] w-full max-w-lg">
-            <Image
-              src="/medosha_full_logo.jpg"
-              alt="Medosha — Build, Manage, Grow"
-              fill
-              sizes="(max-width: 536px) calc(100vw - 24px), 512px"
-              className="object-cover"
-              priority
-            />
-          </div>
-        </div>
         <div className="mb-3 hidden px-3 lg:block @lg/ws:px-0">
           <GlobalSearch />
         </div>
 
         <FeedComposer signedIn={signedIn} viewer={viewer} compactMobile />
 
-        <div className="hidden lg:block">
-          <CalculatorRail />
-        </div>
-
-        {/* Narrow, the rail has nowhere to go, so the people row is injected
-            into the stream where a reader will actually meet it. */}
-        <div className="mb-3">
-          <SuggestedAuthors authors={authors.slice(0, 6)} signedIn={signedIn} />
-        </div>
+        <HomeFront />
 
         <Feed
+          beforePosts={<SuggestedAuthors authors={authors.slice(0, 6)} signedIn={signedIn} />}
           initial={page}
           signedIn={signedIn}
           viewer={viewer}

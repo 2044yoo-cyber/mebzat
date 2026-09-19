@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { BadgeCheck, Plus, TrendingUp } from "lucide-react";
+import { ArrowRight, BadgeCheck, Plus, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -37,9 +37,10 @@ export function SuggestedAuthors({
         layout === "column" && "border @lg/ws:border",
       )}
     >
-      <h2 className="px-3 pb-2 text-sm font-semibold text-foreground">
-        People worth following
-      </h2>
+      <div className="flex items-center justify-between gap-2 px-3 pb-2">
+        <h2 className="text-sm font-semibold text-foreground">People worth following</h2>
+        <Link href="/professionals" className="inline-flex min-h-9 items-center gap-1 text-xs font-medium text-blue-600">See all <ArrowRight className="size-3.5" /></Link>
+      </div>
 
       <div
         className={cn(
