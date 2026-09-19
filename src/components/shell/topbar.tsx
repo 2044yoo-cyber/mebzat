@@ -42,29 +42,26 @@ export function Topbar({
   const home = usePathname() === "/";
 
   return (
-    <>
-      {home && <header className="flex h-16 shrink-0 items-center gap-1 border-b border-blue-100/60 px-3 lg:hidden print:hidden">
+    <header
+      className={cn(
+        "flex shrink-0 items-center gap-2 border-b px-2 sm:px-3 print:hidden",
+        home ? "h-16 border-blue-100/60" : "h-14",
+      )}
+    >
+      {home && <div className="contents lg:hidden">
         <Link href="/" aria-label="Medosha" className="relative mr-auto h-12 w-32 min-w-20 overflow-hidden rounded-lg bg-white sm:w-44">
           <Image src="/medosha_full_logo.jpg" alt="Medosha — Build, Manage, Grow" fill sizes="176px" className="object-cover" />
         </Link>
-        <div className="rounded-full border border-blue-100 text-blue-600"><LanguageSelector /></div>
-        {profile && <NotificationPanel viewerId={profile.id} initialCount={notifications} />}
-        <UserNav initialProfile={profile} />
-        <details className="relative">
-          <summary aria-label={t("navigation.more")} className="flex size-8 cursor-pointer list-none items-center justify-center rounded-full text-muted-foreground [&::-webkit-details-marker]:hidden"><Ellipsis className="size-4" /></summary>
-          <div className="absolute top-full right-0 z-60 mt-2 flex items-center gap-2 rounded-xl border bg-background p-2 shadow-lg">
-            <ThemeToggle />
-            <button type="button" onClick={onOpenMobileNav} aria-label={t("common.openNavigation")} className="flex size-10 items-center justify-center rounded-lg hover:bg-muted"><Menu className="size-4" /></button>
-            <button type="button" onClick={onTogglePanel} aria-label={panelOpen ? t("common.hidePanel") : t("common.showPanel")} className="flex size-10 items-center justify-center rounded-lg hover:bg-muted"><PanelRight className="size-4" /></button>
-          </div>
-        </details>
-      </header>}
-    <header className={cn("h-14 shrink-0 items-center gap-2 border-b px-2 sm:px-3 print:hidden", home ? "hidden lg:flex" : "flex")}>
+      </div>}
+
       <button
         type="button"
         onClick={onOpenMobileNav}
         aria-label={t("common.openNavigation")}
-        className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+        className={cn(
+          "size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden",
+          home ? "hidden" : "flex",
+        )}
       >
         <Menu className="size-4.5" />
       </button>
@@ -80,13 +77,13 @@ export function Topbar({
         <PanelLeft className="size-4.5" />
       </button>
 
-      <div className="hidden min-w-0 flex-1 sm:block">
+      <div className={cn("min-w-0 flex-1", home ? "hidden lg:block" : "hidden sm:block")}>
         <Breadcrumbs />
       </div>
 
       {/* One search box for the whole platform. Below sm it gives way to the
           icon beside it — a 200px field is worse than a link to /search. */}
-      <div className="hidden flex-1 sm:block md:max-w-md">
+      <div className={cn("flex-1 md:max-w-md", home ? "hidden lg:block" : "hidden sm:block")}>
         <GlobalSearch placeholder={t("common.searchEverything")} />
       </div>
 
@@ -94,7 +91,10 @@ export function Topbar({
         <Link
           href="/search"
           aria-label={t("navigation.search")}
-          className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:hidden"
+          className={cn(
+            "size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:hidden",
+            home ? "hidden" : "flex",
+          )}
         >
           <Search className="size-4.5" />
         </Link>
@@ -113,7 +113,8 @@ export function Topbar({
           aria-label={t("navigation.ai-home")}
           title={t("ai.ask")}
           className={cn(
-            "flex size-8 items-center justify-center rounded-lg transition-colors",
+            "size-8 items-center justify-center rounded-lg transition-colors",
+            home ? "hidden lg:flex" : "flex",
             aiOpen
               ? "bg-brand/15 text-brand"
               : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -133,9 +134,11 @@ export function Topbar({
           />
         )}
 
-        <LanguageSelector />
+        <div className={cn(home && "rounded-full border border-blue-100 text-blue-600")}>
+          <LanguageSelector />
+        </div>
 
-        <ThemeToggle />
+        <div className={cn(home && "hidden lg:block")}><ThemeToggle /></div>
         <UserNav initialProfile={profile} />
 
         <button
@@ -144,12 +147,23 @@ export function Topbar({
           aria-label={panelOpen ? t("common.hidePanel") : t("common.showPanel")}
           aria-pressed={panelOpen}
           title={panelOpen ? t("common.hidePanel") : t("common.showPanel")}
-          className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className={cn(
+            "size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+            home ? "hidden lg:flex" : "flex",
+          )}
         >
           <PanelRight className="size-4.5" />
         </button>
+
+        {home && <details className="relative lg:hidden">
+          <summary aria-label={t("navigation.more")} className="flex size-8 cursor-pointer list-none items-center justify-center rounded-full text-muted-foreground [&::-webkit-details-marker]:hidden"><Ellipsis className="size-4" /></summary>
+          <div className="absolute top-full right-0 z-60 mt-2 flex items-center gap-2 rounded-xl border bg-background p-2 shadow-lg">
+            <ThemeToggle />
+            <button type="button" onClick={onOpenMobileNav} aria-label={t("common.openNavigation")} className="flex size-10 items-center justify-center rounded-lg hover:bg-muted"><Menu className="size-4" /></button>
+            <button type="button" onClick={onTogglePanel} aria-label={panelOpen ? t("common.hidePanel") : t("common.showPanel")} className="flex size-10 items-center justify-center rounded-lg hover:bg-muted"><PanelRight className="size-4" /></button>
+          </div>
+        </details>}
       </div>
     </header>
-    </>
   );
 }
