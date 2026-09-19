@@ -119,7 +119,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = WORKSPACE_GROUPS.flatMap(
  * navigation cannot come to disagree with the routes. `section.phase` stays
  * honest about which stage brought each screen.
  */
-export const BUILT_THROUGH_PHASE = 3;
+export const BUILT_THROUGH_PHASE = 4;
 
 /** The sections that have a screen today. */
 export const LIVE_SECTIONS = WORKSPACE_SECTIONS.filter(

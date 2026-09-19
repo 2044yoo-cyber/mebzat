@@ -214,5 +214,17 @@
     "file": "supabase/migrations/0095_agenda_panorama_photos.sql",
     "from": "  check (storage_path is not null or panorama_job_id is not null);",
     "to": "  check (true);"
+  },
+  {
+    "name": "the contracts permission answers yes to everybody",
+    "file": "supabase/migrations/0091_agenda_commercial.sql",
+    "from": "      and m.can_view_contracts\n  );\n$$;",
+    "to": "      and true\n  );\n$$;"
+  },
+  {
+    "name": "the oldest helpers are left open to a signed-out visitor",
+    "file": "supabase/migrations/0096_agenda_permission_grants.sql",
+    "from": "    execute format('revoke all on function public.%s from public, anon', fn);",
+    "to": "    execute format('revoke all on function public.%s from public', fn);"
   }
 ]

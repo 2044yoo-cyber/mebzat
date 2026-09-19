@@ -133,7 +133,11 @@ begin
       -- 0095 creates nothing: it drops a not-null and adds a check. The
       -- constraint is the only evidence it ran.
       (95, '0095_agenda_panorama_photos', 'constraint',
-           'agenda_photos.agenda_photos_has_an_image')
+           'agenda_photos.agenda_photos_has_an_image'),
+      -- 0096 creates nothing at all: it takes a grant away. The evidence is
+      -- that `anon` no longer holds it.
+      (96, '0096_agenda_permission_grants', 'grant',
+           'agenda_is_member(uuid)|anon|no')
     ) as t (ordering, migration, kind, object)
   loop
     present := case row.kind
@@ -159,6 +163,16 @@ begin
         select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
         where t.typname = split_part(row.object, '.', 1)
           and e.enumlabel = split_part(row.object, '.', 2)
+      )
+      -- A migration that only changes who may call a function has nothing to
+      -- look for but the privilege itself. `object` is `<function>|<role>|
+      -- <yes or no>`: whether that role should hold execute on it.
+      when 'grant' then (
+        has_function_privilege(
+          split_part(row.object, '|', 2),
+          'public.' || split_part(row.object, '|', 1),
+          'execute')
+        = (split_part(row.object, '|', 3) = 'yes')
       )
       -- A migration that creates nothing and only relaxes a column has a
       -- named constraint as the one object that can be looked for.

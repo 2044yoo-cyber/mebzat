@@ -242,8 +242,8 @@
   {
     "name": "the latest phase is still marked unbuilt",
     "file": "src/lib/agenda/workspace-nav.ts",
-    "from": "export const BUILT_THROUGH_PHASE = 3;",
-    "to": "export const BUILT_THROUGH_PHASE = 2;"
+    "from": "export const BUILT_THROUGH_PHASE = 4;",
+    "to": "export const BUILT_THROUGH_PHASE = 3;"
   },
   {
     "name": "the menu hard-codes the phase it links",
@@ -622,5 +622,209 @@
     "file": "src/lib/agenda/quality.ts",
     "from": "  { value: \"safety\", label: \"Safety\" },\n  { value: \"quality\", label: \"Quality\" },",
     "to": "  { value: \"quality\", label: \"Quality\" },\n  { value: \"safety\", label: \"Safety\" },"
+  },
+  {
+    "name": "a submitted change order counts as agreed",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  return status === \"approved\" || status === \"paid\";",
+    "to": "  return status === \"approved\" || status === \"paid\" || status === \"submitted\";"
+  },
+  {
+    "name": "a rejected row is still counted as live",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  return ![\"rejected\", \"paid\", \"closed\", \"cancelled\"].includes(status);",
+    "to": "  return ![\"paid\", \"closed\", \"cancelled\"].includes(status);"
+  },
+  {
+    "name": "a money status is dropped",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  { value: \"partially_paid\", label: \"Part paid\", tone: \"warning\" },\n",
+    "to": ""
+  },
+  {
+    "name": "a contract party is dropped",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  { value: \"consultant\", label: \"Consultant\" },\n",
+    "to": ""
+  },
+  {
+    "name": "a change reason is dropped",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  { value: \"rfi_result\", label: \"Answer to an RFI\" },\n",
+    "to": ""
+  },
+  {
+    "name": "a bill can only be measured in pieces",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  \"pcs\", \"m\", \"m2\", \"m3\", \"kg\", \"ton\", \"litre\", \"bag\", \"roll\", \"set\",",
+    "to": "  \"pcs\","
+  },
+  {
+    "name": "the revised total forgets approved changes",
+    "file": "src/lib/agenda/money.ts",
+    "from": "    revisedBudget: total.originalBudget + total.approvedChanges,",
+    "to": "    revisedBudget: total.originalBudget,"
+  },
+  {
+    "name": "committed money is not taken off what is left",
+    "file": "src/lib/agenda/money.ts",
+    "from": "      total.actualCost -\n      total.committedCost,",
+    "to": "      total.actualCost,"
+  },
+  {
+    "name": "committed money does not count towards what is spoken for",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  return Math.round(((row.actualCost + row.committedCost) / revised) * 100);",
+    "to": "  return Math.round((row.actualCost / revised) * 100);"
+  },
+  {
+    "name": "a line over budget is capped at full",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  return Math.round(((row.actualCost + row.committedCost) / revised) * 100);\n}",
+    "to": "  return Math.min(Math.round(((row.actualCost + row.committedCost) / revised) * 100), 100);\n}"
+  },
+  {
+    "name": "an unbudgeted line reports nothing spent",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  if (revised <= 0) return null;",
+    "to": "  if (revised <= 0) return 0;"
+  },
+  {
+    "name": "over budget is reported as a positive number",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  return (\n    row.originalBudget +\n    row.approvedChanges -\n    row.actualCost -\n    row.committedCost\n  );",
+    "to": "  return Math.abs(\n    row.originalBudget +\n    row.approvedChanges -\n    row.actualCost -\n    row.committedCost\n  );"
+  },
+  {
+    "name": "a bill is sorted alphabetically",
+    "file": "src/lib/agenda/money.ts",
+    "from": "  return [...groups.entries()].map(([section, sectionRows]) => ({",
+    "to": "  return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([section, sectionRows]) => ({"
+  },
+  {
+    "name": "a line with no actual poisons its section's actual",
+    "file": "src/lib/agenda/money.ts",
+    "from": "    actual: sectionRows.reduce((sum, row) => sum + (row.actualCost ?? 0), 0),",
+    "to": "    actual: sectionRows.reduce((sum, row) => sum + (row.actualCost ?? row.amount), 0),"
+  },
+  {
+    "name": "approved and pending change are added together",
+    "file": "src/lib/agenda/money.ts",
+    "from": "    if (isAgreed(order.status)) {\n      approvedCost += order.costImpact;",
+    "to": "    if (true) {\n      approvedCost += order.costImpact;"
+  },
+  {
+    "name": "a rejected change is left on the screen as pending",
+    "file": "src/lib/agenda/money.ts",
+    "from": "    } else if (isLiveMoney(order.status)) {",
+    "to": "    } else if (true) {"
+  },
+  {
+    "name": "a generated bill total is written by the application",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/money-actions.ts",
+    "from": "    unit_price: money(formData.get(\"unitPrice\")),\n    currency: currency(formData.get(\"currency\")),\n    position: count ?? 0,",
+    "to": "    unit_price: money(formData.get(\"unitPrice\")),\n    amount: 0,\n    currency: currency(formData.get(\"currency\")),\n    position: count ?? 0,"
+  },
+  {
+    "name": "a change order arrives already approved",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/money-actions.ts",
+    "from": "    // Always draft. An order that arrives already approved has moved a\n    // contract sum without anybody deciding to, and 0091's trigger fires on\n    // insert as well as update \u2014 so the decision is a separate act.\n    status: \"draft\",\n  });",
+    "to": "    status: moneyStatus(formData.get(\"status\")),\n  });"
+  },
+  {
+    "name": "a decision does not record who made it",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/money-actions.ts",
+    "from": "      status: decision,\n      decided_at: new Date().toISOString(),\n      decided_by: user.id,",
+    "to": "      status: decision,"
+  },
+  {
+    "name": "the action moves the contract sum itself",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/money-actions.ts",
+    "from": "  refresh(projectId);\n  return { ok: true };\n}\n\n/** Moves a contract, commitment, order or change along its status. */",
+    "to": "  await supabase.from(\"agenda_contracts\").update({ status: \"approved\" }).eq(\"id\", orderId);\n  refresh(projectId);\n  return { ok: true };\n}\n\n/** Moves a contract, commitment, order or change along its status. */"
+  },
+  {
+    "name": "an order for nothing can be raised",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/money-actions.ts",
+    "from": "  if (lines.length === 0) {\n    return { error: \"Add at least one line to the order.\" };\n  }",
+    "to": "  if (false) {\n    return { error: \"Add at least one line to the order.\" };\n  }"
+  },
+  {
+    "name": "money with thousands separators becomes zero",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/money-actions.ts",
+    "from": "  const raw = String(value ?? \"\").replace(/[,\\s]/g, \"\").trim();\n  if (!raw) return 0;\n  const amount = Number(raw);\n  return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;",
+    "to": "  const raw = String(value ?? \"\").trim();\n  if (!raw) return 0;\n  const amount = Number(raw);\n  return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;"
+  },
+  {
+    "name": "a credit change order is forced positive",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/money-actions.ts",
+    "from": "  return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;\n}\n\n/** A quantity.",
+    "to": "  return Number.isFinite(amount) ? Math.max(Math.round(amount * 100) / 100, 0) : 0;\n}\n\n/** A quantity."
+  },
+  {
+    "name": "an unpriced change becomes a change priced at zero",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/money-actions.ts",
+    "from": "    potential_cost: optionalMoney(formData.get(\"potentialCost\")),",
+    "to": "    potential_cost: money(formData.get(\"potentialCost\")),"
+  },
+  {
+    "name": "any string is stored as a currency",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/money-actions.ts",
+    "from": "  return /^[A-Z]{3}$/.test(raw) ? raw : \"ETB\";",
+    "to": "  return raw || \"ETB\";"
+  },
+  {
+    "name": "the screen guesses the permission instead of asking",
+    "file": "src/lib/data/agenda-money.ts",
+    "from": "    supabase.rpc(\"agenda_can_view_finance\", { target_project: projectId }),",
+    "to": "    Promise.resolve({ data: true }),"
+  },
+  {
+    "name": "a failed permission call reads as yes",
+    "file": "src/lib/data/agenda-money.ts",
+    "from": "    finance: finance.data === true,",
+    "to": "    finance: finance.data !== false,"
+  },
+  {
+    "name": "the budget says nothing here yet when it is not shared",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/budget/page.tsx",
+    "from": "  if (!access.finance) return <NoMoneyAccess what=\"The budget\" />;",
+    "to": "  if (false) return null;"
+  },
+  {
+    "name": "the contract register asks the finance permission",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/contracts/page.tsx",
+    "from": "  if (!access.contracts) return <NoMoneyAccess what=\"The contract register\" />;",
+    "to": "  if (!access.finance) return <NoMoneyAccess what=\"The contract register\" />;"
+  },
+  {
+    "name": "the spend bar hides a line that is over",
+    "file": "src/components/agenda/money/money-bits.tsx",
+    "from": "        {percent}%",
+    "to": "        {Math.min(percent, 100)}%"
+  },
+  {
+    "name": "the budget recomputes the database's own figures",
+    "file": "src/components/agenda/money/budget-table.tsx",
+    "from": "                  amount={item.revisedBudget}",
+    "to": "                  amount={item.originalBudget + item.approvedChanges}"
+  },
+  {
+    "name": "approved and pending change share one figure",
+    "file": "src/components/agenda/money/change-orders.tsx",
+    "from": "            label=\"Still being argued\"",
+    "to": "            label=\"Approved\""
+  },
+  {
+    "name": "an order cannot name the submittal it was approved on",
+    "file": "src/components/agenda/money/purchase-orders.tsx",
+    "from": "              <select name=\"submittalId\" className={inputClass} defaultValue=\"\">",
+    "to": "              <select name=\"notSubmittalId\" className={inputClass} defaultValue=\"\">"
+  },
+  {
+    "name": "a delivery is written on every keystroke",
+    "file": "src/components/agenda/money/purchase-orders.tsx",
+    "from": "                              onBlur={(event) => {",
+    "to": "                              onChange={(event) => {"
   }
 ]

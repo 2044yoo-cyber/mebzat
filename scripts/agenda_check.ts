@@ -37,6 +37,19 @@ import {
   sectionHref,
 } from "../src/lib/agenda/workspace-nav.ts";
 import {
+  BOQ_UNITS,
+  CHANGE_REASONS,
+  CONTRACT_PARTIES,
+  MONEY_STATUSES,
+  budgetTotals,
+  budgetVariance,
+  changeImpact,
+  committedPercent,
+  groupBySection,
+  isAgreed,
+  isLiveMoney,
+} from "../src/lib/agenda/money.ts";
+import {
   FORM_FIELD_KINDS,
   INSPECTION_RESULTS,
   ISSUE_STATUSES,
@@ -1164,6 +1177,354 @@ function exists(path: string): boolean {
       code("src/lib/data/agenda-site.ts"),
     ),
     "a job still stitching has no image to put on the wall",
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// 8. Phase 4: the commercial record
+// ---------------------------------------------------------------------------
+
+{
+  check("the build has reached phase 4", BUILT_THROUGH_PHASE >= 4);
+  for (const id of [
+    "boq",
+    "budget",
+    "contracts",
+    "commitments",
+    "purchase-orders",
+    "change-events",
+    "change-orders",
+  ]) {
+    check(
+      `${id} is live rather than "soon"`,
+      LIVE_SECTIONS.some((section) => section.id === id),
+    );
+  }
+
+  // --- the vocabulary ------------------------------------------------------
+
+  check(
+    "every money status the database has is spelled here",
+    MONEY_STATUSES.length === 10,
+    `${MONEY_STATUSES.length} of agenda_money_status's 10`,
+  );
+  check(
+    "every contract party and change reason too",
+    CONTRACT_PARTIES.length === 5 && CHANGE_REASONS.length === 7,
+  );
+  check(
+    "a bill can be measured in more than pieces",
+    BOQ_UNITS.includes("m3") && BOQ_UNITS.includes("ton"),
+  );
+  check(
+    "only approved and paid count as agreed",
+    isAgreed("approved") && isAgreed("paid") &&
+      !isAgreed("submitted") && !isAgreed("under_review") &&
+      !isAgreed("pending") && !isAgreed("draft"),
+    "0091's trigger moves a contract sum on approved alone",
+  );
+  check(
+    "a rejected, paid, closed or cancelled row has stopped moving",
+    !isLiveMoney("rejected") && !isLiveMoney("paid") &&
+      !isLiveMoney("closed") && !isLiveMoney("cancelled"),
+  );
+  check(
+    "and a draft or a part payment has not",
+    isLiveMoney("draft") && isLiveMoney("partially_paid"),
+  );
+
+  // --- budget arithmetic ---------------------------------------------------
+
+  {
+    const rows = [
+      {
+        originalBudget: 1000,
+        approvedChanges: 200,
+        committedCost: 300,
+        actualCost: 400,
+        pendingCost: 50,
+        forecastCost: 1100,
+      },
+      {
+        originalBudget: 500,
+        approvedChanges: 0,
+        committedCost: 100,
+        actualCost: 100,
+        pendingCost: 0,
+        forecastCost: 600,
+      },
+    ];
+    const totals = budgetTotals(rows);
+    check(
+      "a budget total adds up its parts",
+      totals.originalBudget === 1500 && totals.approvedChanges === 200 &&
+        totals.actualCost === 500 && totals.committedCost === 400,
+    );
+    check(
+      "the revised total is original plus approved changes",
+      totals.revisedBudget === 1700,
+    );
+    check(
+      "and what is left has committed money taken off as well as spent",
+      totals.remainingBudget === 800,
+      "a PO placed and not yet invoiced is money that has left",
+    );
+    check(
+      "an empty budget totals to zero rather than throwing",
+      budgetTotals([]).revisedBudget === 0,
+    );
+  }
+  check(
+    "committed money counts towards what is spoken for",
+    committedPercent({
+      originalBudget: 1000,
+      approvedChanges: 0,
+      committedCost: 300,
+      actualCost: 400,
+      pendingCost: 0,
+      forecastCost: 0,
+    }) === 70,
+  );
+  check(
+    "a line over its budget is reported over, not capped at full",
+    committedPercent({
+      originalBudget: 1000,
+      approvedChanges: 0,
+      committedCost: 0,
+      actualCost: 1300,
+      pendingCost: 0,
+      forecastCost: 0,
+    }) === 130,
+    "a bar that stops at 100 hides the one line that matters",
+  );
+  check(
+    "an unbudgeted line has no percentage rather than a percentage of zero",
+    committedPercent({
+      originalBudget: 0,
+      approvedChanges: 0,
+      committedCost: 0,
+      actualCost: 500,
+      pendingCost: 0,
+      forecastCost: 0,
+    }) === null,
+    "zero would read as nothing spent, which is the opposite of the truth",
+  );
+  check(
+    "negative variance means over budget, as it does for lateness elsewhere",
+    budgetVariance({
+      originalBudget: 1000,
+      approvedChanges: 0,
+      committedCost: 200,
+      actualCost: 900,
+      pendingCost: 0,
+      forecastCost: 0,
+    }) === -100,
+    "two sign conventions in one product is a red number read as good news",
+  );
+
+  // --- the bill ------------------------------------------------------------
+
+  {
+    const sections = groupBySection([
+      { section: "Substructure", amount: 100, actualCost: 90 },
+      { section: "Finishes", amount: 50, actualCost: null },
+      { section: "Substructure", amount: 200, actualCost: null },
+    ]);
+    check(
+      "a bill keeps the order it was written in",
+      sections.map((s) => s.section).join(",") === "Substructure,Finishes",
+      "sorting alphabetically puts Finishes first, which is nobody's bill",
+    );
+    check(
+      "a section totals its lines",
+      sections[0]?.priced === 300 && sections[0]?.rows.length === 2,
+    );
+    check(
+      "a line with no actual recorded does not poison the section's actual",
+      sections[0]?.actual === 90 && sections[1]?.actual === 0,
+    );
+  }
+
+  // --- change orders -------------------------------------------------------
+
+  {
+    const impact = changeImpact([
+      { status: "approved", costImpact: 4000, scheduleImpactDays: 10 },
+      { status: "under_review", costImpact: 6000, scheduleImpactDays: 5 },
+      { status: "rejected", costImpact: 9000, scheduleImpactDays: 30 },
+      { status: "cancelled", costImpact: 1000, scheduleImpactDays: 1 },
+    ]);
+    check(
+      "approved change is counted apart from what is still argued",
+      impact.approvedCost === 4000 && impact.pendingCost === 6000,
+      "one total says \"up by four million\" while meaning six more may follow",
+    );
+    check(
+      "days follow the same split",
+      impact.approvedDays === 10 && impact.pendingDays === 5,
+    );
+    check(
+      "a rejected or cancelled change is neither agreed nor still arguable",
+      impact.approvedCost + impact.pendingCost === 10000,
+      "leaving it as pending is a number nobody is going to resolve",
+    );
+  }
+
+  // --- the writes ----------------------------------------------------------
+
+  const moneyActions = code(
+    "src/app/(dashboard)/agenda/projects/[projectId]/money-actions.ts",
+  );
+  check(
+    "a generated column is never written",
+    // `^\s+amount:` rather than `amount:`, which also matches
+    // `original_amount:` — a real stored column on commitments, and the kind
+    // of substring match that makes a check fail on correct code.
+    !/^\s+amount:/m.test(moneyActions) &&
+      !/revised_budget/.test(moneyActions) &&
+      !/remaining_budget/.test(moneyActions) &&
+      !/current_value/.test(moneyActions),
+    "0091 generates these so a stored copy cannot be wrong",
+  );
+  check(
+    "a change order is always raised as a draft",
+    /    status: "draft",\n  \}\);/.test(moneyActions),
+    "0091's trigger fires on insert, so approving is a separate act",
+  );
+  check(
+    "deciding one records who decided and when",
+    /      status: decision,\n      decided_at: new Date\(\)\.toISOString\(\),\n      decided_by: user\.id,/.test(
+      moneyActions,
+    ),
+  );
+  check(
+    "and does not touch the contract sum itself",
+    // Scoped to updating the contracts table. A blanket ban on
+    // `approved_changes` would also catch the budget's own column of that
+    // name, which is stored rather than generated and is edited by hand.
+    !/from\("agenda_contracts"\)\s*\.update/.test(moneyActions),
+    "agenda_sync_contract_changes recomputes it from every approved order",
+  );
+  check(
+    "a purchase order cannot exist without lines",
+    /if \(lines\.length === 0\) \{\s*return \{ error: "Add at least one line to the order\." \};/.test(
+      moneyActions,
+    ),
+    "an order for nothing is a number somebody has to chase",
+  );
+  check(
+    "money written as a site office writes it still parses",
+    // All three parsers, counted. Asserting the pattern appears "somewhere"
+    // passed with it deleted from `money` because `quantity` and
+    // `optionalMoney` each have their own copy — the second-copy trap.
+    (moneyActions.match(/\.replace\(\/\[,\\s\]\/g, ""\)/g) ?? []).length === 3,
+    "Number(\"4,200,000\") is NaN",
+  );
+  check(
+    "a credit change order is allowed to be negative",
+    // The exact return, rather than a grep for clamping that has to guess
+    // what the clamp would look like — the first version of this check missed
+    // `Math.max(Math.round(amount * 100) / 100, 0)` entirely.
+    moneyActions.includes(
+      "return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;",
+    ),
+    "refusing one means recording a reduction as an increase somewhere else",
+  );
+  check(
+    "an unknown cost stays unknown rather than becoming zero",
+    /potential_cost: optionalMoney\(formData\.get\("potentialCost"\)\),/.test(
+      moneyActions,
+    ),
+    "zero is a priced change; null is one nobody has priced",
+  );
+  check(
+    "a currency that is not a currency code falls back rather than being stored",
+    /return \/\^\[A-Z\]\{3\}\$\/\.test\(raw\) \? raw : "ETB";/.test(moneyActions),
+  );
+
+  // --- why a section is empty ----------------------------------------------
+
+  const moneyReads = code("src/lib/data/agenda-money.ts");
+  check(
+    "the screen asks the same two functions the policies ask",
+    /supabase\.rpc\("agenda_can_view_finance", \{ target_project: projectId \}\)/.test(
+      moneyReads,
+    ) &&
+      /supabase\.rpc\("agenda_can_view_contracts", \{ target_project: projectId \}\)/.test(
+        moneyReads,
+      ),
+    "a second spelling of the permission is a second thing to get wrong",
+  );
+  check(
+    "a failed permission call reads as no rather than as yes",
+    /finance: finance\.data === true,/.test(moneyReads) &&
+      /contracts: contracts\.data === true,/.test(moneyReads),
+  );
+  check(
+    "the reads do not filter by permission themselves",
+    !/can_view/.test(moneyReads.replace(/agenda_can_view_\w+", \{[^}]*\}/g, "")),
+    "the policies do it; a copy in TypeScript is the one that drifts",
+  );
+  for (const [section, what] of [
+    ["boq", "The bill of quantities"],
+    ["budget", "The budget"],
+    ["contracts", "The contract register"],
+    ["commitments", "Commitments"],
+    ["purchase-orders", "Purchase orders"],
+    ["change-events", "Change events"],
+    ["change-orders", "Change orders"],
+  ] as [string, string][]) {
+    const page = code(
+      `src/app/(dashboard)/agenda/projects/[projectId]/${section}/page.tsx`,
+    );
+    check(
+      `${section} says why it is empty rather than "nothing here yet"`,
+      new RegExp(
+        `if \\(!access\\.(finance|contracts)\\) return <NoMoneyAccess what="${what}" \\/>;`,
+      ).test(page),
+      "\"no budget yet\" and \"not shared with you\" look identical through RLS",
+    );
+  }
+  check(
+    "the contract register asks the contracts permission, not the finance one",
+    /if \(!access\.contracts\)/.test(
+      code(
+        "src/app/(dashboard)/agenda/projects/[projectId]/contracts/page.tsx",
+      ),
+    ),
+    "a surveyor who prices the work is not shown what the client signed",
+  );
+
+  // --- the screens ---------------------------------------------------------
+
+  const budgetView = code("src/components/agenda/money/budget-table.tsx");
+  check(
+    "the budget reads the database's own revised and remaining figures",
+    /item\.revisedBudget/.test(budgetView) &&
+      /item\.remainingBudget/.test(budgetView),
+  );
+  const bits = code("src/components/agenda/money/money-bits.tsx");
+  check(
+    "the bar is clamped and the number is not",
+    /Math\.min\(percent, 100\)/.test(bits) && /\{percent\}%/.test(bits),
+  );
+  const changeOrderView = code("src/components/agenda/money/change-orders.tsx");
+  check(
+    "approved and pending change are drawn apart",
+    /label="Approved"/.test(changeOrderView) &&
+      /label="Still being argued"/.test(changeOrderView),
+  );
+  const poView = code("src/components/agenda/money/purchase-orders.tsx");
+  check(
+    "an order can be placed against the submittal its material was approved on",
+    /name="submittalId"/.test(poView),
+    "ordering against the approved revision is what stops the wrong thing arriving",
+  );
+  check(
+    "a delivery is recorded when the field is left, not on every keystroke",
+    /onBlur=\{\(event\) => \{[\s\S]{0,700}?recordDelivery\(/.test(poView) &&
+      !/onChange=\{\(event\) => \{[\s\S]{0,200}?recordDelivery\(/.test(poView),
   );
 }
 

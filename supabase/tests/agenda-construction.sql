@@ -795,4 +795,108 @@ exception
 end;
 $$;
 
+-- ===================================================================
+-- 16. The money permissions answer, and answer differently per person.
+--
+-- The policies have been checked from the outside since 0091 — a member
+-- without finance reads no rows. What is new is that the *screen* asks these
+-- two functions directly, to say "this is not shared with you" instead of
+-- "nothing here yet". That only works if they can be called and if they
+-- distinguish the surveyor from the site engineer.
+-- ===================================================================
+-- Section 9 suspended the surveyor to prove a suspended member is refused,
+-- and this file is one transaction, so that is still true here. Put back
+-- rather than assumed: a section that relies on another section's leftovers
+-- is a section that breaks when the one above it is edited.
+reset role;
+update public.agenda_members
+set status = 'active', can_view_finance = true, can_view_contracts = true
+where project_id = 'a6000000-0000-4000-8000-00000000000a'
+  and user_id = 'a6000000-0000-4000-8000-000000000002';
+
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000002';
+
+do $$
+begin
+  if not public.agenda_can_view_finance('a6000000-0000-4000-8000-00000000000a') then
+    raise exception 'FAIL 16a: the surveyor cannot see finance';
+  end if;
+  if not public.agenda_can_view_contracts('a6000000-0000-4000-8000-00000000000a') then
+    raise exception 'FAIL 16a: the surveyor cannot see contracts';
+  end if;
+  raise notice 'ok 16a: the surveyor is told yes to both';
+end;
+$$;
+
+reset role;
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000003';
+
+do $$
+begin
+  if public.agenda_can_view_finance('a6000000-0000-4000-8000-00000000000a') then
+    raise exception 'FAIL 16b: the site engineer is shown the money';
+  end if;
+  if public.agenda_can_view_contracts('a6000000-0000-4000-8000-00000000000a') then
+    raise exception 'FAIL 16b: the site engineer is shown the contracts';
+  end if;
+  raise notice 'ok 16b: and the site engineer is told no to both';
+end;
+$$;
+
+-- The owner sees everything, which is the override both functions carry.
+reset role;
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000001';
+
+do $$
+begin
+  if not public.agenda_can_view_finance('a6000000-0000-4000-8000-00000000000a') then
+    raise exception 'FAIL 16c: the owner cannot see the money on their own project';
+  end if;
+  raise notice 'ok 16c: the owner is not locked out of their own project';
+end;
+$$;
+
+-- Somebody not on the project is told no rather than raising.
+reset role;
+set role authenticated;
+set local request.jwt.claim.sub = 'a6000000-0000-4000-8000-000000000004';
+
+do $$
+begin
+  if public.agenda_can_view_finance('a6000000-0000-4000-8000-00000000000a') then
+    raise exception 'FAIL 16d: an outsider is shown the money';
+  end if;
+  raise notice 'ok 16d: an outsider is told no';
+end;
+$$;
+
+reset role;
+do $$
+declare fn text;
+begin
+  -- All four of 0024's helpers, not just the one the money screens call.
+  -- `revoke ... from public` is not enough on Supabase: the default
+  -- privileges hand `anon` a grant of its own, which is how these stayed
+  -- open from 0024 until 0096.
+  foreach fn in array array[
+    'public.agenda_is_member(uuid)',
+    'public.agenda_is_owner(uuid)',
+    'public.agenda_can_view_finance(uuid)',
+    'public.agenda_can_view_meetings(uuid)',
+    'public.agenda_can_view_contracts(uuid)'
+  ] loop
+    if has_function_privilege('anon', fn, 'execute') then
+      raise exception 'FAIL 16e: a signed-out visitor can call %', fn;
+    end if;
+    if not has_function_privilege('authenticated', fn, 'execute') then
+      raise exception 'FAIL 16e: a signed-in member cannot call %', fn;
+    end if;
+  end loop;
+  raise notice 'ok 16e: the permissions are open to members and not to anon';
+end;
+$$;
+
 rollback;
