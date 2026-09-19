@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { SectionShell } from "@/components/agenda/shell/section-shell";
+import { DrawingRegister } from "@/components/agenda/site/drawing-register";
+import { getDrawings, signedFileUrls } from "@/lib/data/agenda-site";
 import { getAgendaProject } from "@/lib/data/agenda-projects";
 
 export default async function Page({
@@ -9,19 +10,23 @@ export default async function Page({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  // Each page asks for the project again rather than trusting the layout.
-  // A layout cannot hand data to a page in the App Router, and a page that
-  // assumed the layout had already checked access would be a page that is
-  // reachable without the check when it is rendered another way.
   const project = await getAgendaProject(projectId);
   if (!project) notFound();
 
+  const drawings = await getDrawings(projectId);
+  // Signed on the server, in one call for every revision on the register: the
+  // bucket is private, and signing per sheet would be a round trip each.
+  const urls = await signedFileUrls(
+    drawings.flatMap((drawing) =>
+      drawing.revisions.map((revision) => revision.storagePath),
+    ),
+  );
+
   return (
-    <SectionShell
-      title="Drawings"
-      blurb="Every sheet, and every revision of it. Nothing is ever replaced."
+    <DrawingRegister
       projectId={projectId}
-      section="drawings"
+      drawings={drawings}
+      urls={Object.fromEntries(urls)}
     />
   );
 }

@@ -3,6 +3,12 @@
 import { revalidatePath } from "next/cache";
 
 import { isInProject } from "@/lib/agenda/files";
+import { fileKindOf, type Confidentiality } from "@/lib/agenda/constants";
+import {
+  isAgendaProjectStatus,
+  isAgendaProjectType,
+} from "@/lib/agenda/projects";
+import { isPlausiblePlace } from "@/lib/location/places";
 import {
   INSPECTION_RESULTS,
   ISSUE_STATUSES,
@@ -33,6 +39,13 @@ import { createClient } from "@/lib/supabase/server";
  */
 
 export type Result = { error?: string; ok?: boolean };
+
+/** The three levels 0024 defined. Named here so a fourth cannot be invented. */
+const CONFIDENTIALITY: readonly Confidentiality[] = [
+  "members",
+  "finance",
+  "meetings",
+];
 
 function text(value: FormDataEntryValue | null, max = 200): string | null {
   const trimmed = String(value ?? "").trim().slice(0, max);
@@ -1026,6 +1039,262 @@ export async function pinPanorama(
 
   if (error) {
     return { error: explain(error.message, "That panorama was not pinned.") };
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Drawings and documents
+// ---------------------------------------------------------------------------
+
+/**
+ * Issues a revision of a sheet, opening the sheet if it is new.
+ *
+ * `agenda_drawing_set_current` in 0090 points the drawing at it — the
+ * application does not get a say, so "current" cannot disagree with what was
+ * actually issued. Nothing replaces anything: Rev 03 becomes current and Rev
+ * 02 stays exactly where it was.
+ *
+ * The revision label is free text because real sheets are issued as "Rev 01",
+ * "Rev A" and "P2", and an integer would refuse two of the three.
+ */
+export async function issueDrawingRevision(
+  projectId: string,
+  storagePath: string,
+  formData: FormData,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  if (!isInProject(storagePath, projectId)) {
+    return { error: "That file was not uploaded to this project." };
+  }
+
+  const revision = text(formData.get("revision"), 20);
+  if (!revision) return { error: "Say which revision this is." };
+
+  let drawingId = reference(formData.get("drawingId"));
+
+  if (!drawingId) {
+    const drawingNumber = text(formData.get("drawingNumber"), 60);
+    const title = text(formData.get("title"), 200);
+    if (!drawingNumber || !title) {
+      return { error: "A new sheet needs a number and a title." };
+    }
+
+    const { data: drawing, error } = await supabase
+      .from("agenda_drawings")
+      .insert({
+        project_id: projectId,
+        drawing_number: drawingNumber,
+        title,
+        discipline: discipline(formData.get("discipline")) ?? "architectural",
+        created_by: user.id,
+      })
+      .select("id")
+      .single();
+
+    if (error || !drawing) {
+      return { error: explain(error?.message ?? "", "That sheet was not opened.") };
+    }
+    drawingId = drawing.id;
+  }
+
+  const { error } = await supabase.from("agenda_drawing_revisions").insert({
+    drawing_id: drawingId,
+    project_id: projectId,
+    revision,
+    storage_path: storagePath,
+    file_name: text(formData.get("fileName"), 200),
+    mime_type: text(formData.get("mimeType"), 120),
+    issued_on: date(formData.get("issuedOn")) ?? new Date().toISOString().slice(0, 10),
+    notes: text(formData.get("notes"), 2000),
+    uploaded_by: user.id,
+  });
+
+  if (error) {
+    return { error: explain(error.message, "That revision was not issued.") };
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+/**
+ * Files a document, or a new version of one.
+ *
+ * `confidentiality` is the same three-level vocabulary 0024 defined for the
+ * ledger — `members`, `finance`, `meetings` — rather than a fourth word, and
+ * the read policy in 0090 gates on it. Filing a contract as `finance` is what
+ * keeps it off the screen of everybody on site.
+ */
+export async function fileDocument(
+  projectId: string,
+  storagePath: string,
+  formData: FormData,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  if (!isInProject(storagePath, projectId)) {
+    return { error: "That file was not uploaded to this project." };
+  }
+
+  const fileName = text(formData.get("fileName"), 200);
+  let documentId = reference(formData.get("documentId"));
+
+  if (!documentId) {
+    const title = text(formData.get("title"), 200);
+    if (!title) return { error: "The document needs a title." };
+
+    const level = String(formData.get("confidentiality") ?? "");
+    const { data: document, error } = await supabase
+      .from("agenda_documents")
+      .insert({
+        project_id: projectId,
+        title,
+        kind: fileKindOf(fileName ?? storagePath, String(formData.get("mimeType") ?? "")),
+        confidentiality: CONFIDENTIALITY.includes(level as Confidentiality)
+          ? (level as Confidentiality)
+          : "members",
+        created_by: user.id,
+      })
+      .select("id")
+      .single();
+
+    if (error || !document) {
+      return {
+        error: explain(error?.message ?? "", "That document was not filed."),
+      };
+    }
+    documentId = document.id;
+  }
+
+  // The next version after the highest already filed, read rather than
+  // counted: a version withdrawn leaves a gap, and reusing its number puts
+  // two different files in two people's hands as the same one.
+  const { data: existing } = await supabase
+    .from("agenda_document_versions")
+    .select("version")
+    .eq("document_id", documentId)
+    .order("version", { ascending: false })
+    .limit(1);
+
+  const { error } = await supabase.from("agenda_document_versions").insert({
+    document_id: documentId,
+    project_id: projectId,
+    version: (existing?.[0]?.version ?? 0) + 1,
+    storage_path: storagePath,
+    file_name: fileName,
+    mime_type: text(formData.get("mimeType"), 120),
+    notes: text(formData.get("notes"), 2000),
+    uploaded_by: user.id,
+  });
+
+  if (error) {
+    return { error: explain(error.message, "That version was not filed.") };
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Project settings
+// ---------------------------------------------------------------------------
+
+/**
+ * Edits the project itself.
+ *
+ * Only the owner and administrators may: 0089's update policy says so, and
+ * this does not repeat the check. What it does repeat is the gazetteer rule
+ * the project form uses — a place not on the list can still be typed, but it
+ * has to look like a place name.
+ */
+export async function updateProject(
+  projectId: string,
+  formData: FormData,
+): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  const name = text(formData.get("name"), 160);
+  if (!name) return { error: "The project needs a name." };
+
+  const type = String(formData.get("projectType") ?? "");
+  const status = String(formData.get("status") ?? "");
+  const location = text(formData.get("location"), 120);
+  const progress = Number(formData.get("progressPercent") ?? Number.NaN);
+
+  const { error } = await supabase
+    .from("agenda_projects")
+    .update({
+      name,
+      project_number: text(formData.get("projectNumber"), 40),
+      project_type: isAgendaProjectType(type) ? type : "residential",
+      status: isAgendaProjectStatus(status) ? status : "planning",
+      client_name: text(formData.get("clientName")),
+      main_contractor: text(formData.get("mainContractor")),
+      consultant: text(formData.get("consultant")),
+      architect: text(formData.get("architect")),
+      structural_engineer: text(formData.get("structuralEngineer")),
+      mep_engineer: text(formData.get("mepEngineer")),
+      location: location && isPlausiblePlace(location) ? location : null,
+      start_date: date(formData.get("startDate")),
+      target_completion_date: date(formData.get("targetDate")),
+      actual_completion_date: date(formData.get("actualDate")),
+      description: text(formData.get("description"), 2000),
+      // Reported, never derived. A percentage computed from tasks or from
+      // spend is a number the site did not agree to, and the first argument
+      // about it destroys trust in every other figure on the screen.
+      ...(Number.isFinite(progress)
+        ? { progress_percent: Math.min(Math.max(Math.round(progress), 0), 100) }
+        : {}),
+    })
+    .eq("id", projectId);
+
+  if (error) {
+    if (
+      error.message.includes("row-level security") ||
+      error.message.includes("permission denied")
+    ) {
+      return {
+        error: "Only the client or an administrator can change the project.",
+      };
+    }
+    if (error.message.includes("agenda_projects_dates")) {
+      return { error: "The completion date is before the start date." };
+    }
+    return { error: explain(error.message, "Those changes were not saved.") };
+  }
+
+  refresh(projectId);
+  return { ok: true };
+}
+
+/**
+ * Archives the project.
+ *
+ * Archived, never deleted — the rule 0024 set and every migration since has
+ * kept. The row stays readable to its members and drops off the dashboard,
+ * and there is no DELETE policy to do anything else with.
+ */
+export async function archiveProject(projectId: string): Promise<Result> {
+  const { supabase, user } = await actor();
+  if (!user) return { error: "Your session expired. Log in again." };
+
+  const { error } = await supabase
+    .from("agenda_projects")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", projectId);
+
+  if (error) {
+    return {
+      error:
+        "Only the client or an administrator can archive the project.",
+    };
   }
 
   refresh(projectId);

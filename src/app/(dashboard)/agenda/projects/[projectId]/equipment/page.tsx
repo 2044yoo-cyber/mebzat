@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 
-import { ProjectSettings } from "@/components/agenda/site/project-settings";
+import { PlantList } from "@/components/agenda/site/plant-list";
+import { getEquipment } from "@/lib/data/agenda-billing";
 import { getAgendaProject } from "@/lib/data/agenda-projects";
 
+/** Plant is a site record too: a crane being here is not what it cost. */
 export default async function Page({
   params,
 }: {
@@ -12,5 +14,6 @@ export default async function Page({
   const project = await getAgendaProject(projectId);
   if (!project) notFound();
 
-  return <ProjectSettings project={project} />;
+  const items = await getEquipment(projectId);
+  return <PlantList projectId={projectId} items={items} />;
 }

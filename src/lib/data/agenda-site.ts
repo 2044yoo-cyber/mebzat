@@ -908,3 +908,187 @@ export async function getFinishedPanoramas(): Promise<FinishedPanorama[]> {
       createdAt: row.created_at,
     }));
 }
+
+// ---------------------------------------------------------------------------
+// Drawings and documents
+// ---------------------------------------------------------------------------
+
+export type DrawingRevision = {
+  id: string;
+  revision: string;
+  storagePath: string;
+  fileName: string | null;
+  issuedOn: string | null;
+  status: ReviewStatus;
+  notes: string | null;
+  createdAt: string;
+  uploadedBy: Person | null;
+};
+
+export type Drawing = {
+  id: string;
+  drawingNumber: string;
+  title: string;
+  discipline: Discipline;
+  currentRevisionId: string | null;
+  revisions: DrawingRevision[];
+};
+
+/**
+ * The drawing register, with every revision of every sheet.
+ *
+ * A drawing is not a file, it is a series of files with one of them current —
+ * 0090's own words. The whole series comes back because "what did the
+ * contractor build to in March" is the question a dispute turns on, and it
+ * cannot be answered from the current sheet alone.
+ */
+export async function getDrawings(projectId: string): Promise<Drawing[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_drawings")
+    .select(
+      `id, drawing_number, title, discipline, current_revision_id,
+       agenda_drawing_revisions(id, revision, storage_path, file_name, issued_on,
+         status, notes, created_at,
+         uploader:profiles!agenda_drawing_revisions_uploaded_by_fkey(${PERSON_COLUMNS}))`,
+    )
+    .eq("project_id", projectId)
+    .is("archived_at", null)
+    .order("drawing_number", { ascending: true })
+    .limit(PAGE);
+
+  if (!data) return [];
+
+  return (
+    data as unknown as {
+      id: string;
+      drawing_number: string;
+      title: string;
+      discipline: string;
+      current_revision_id: string | null;
+      agenda_drawing_revisions:
+        | (Record<string, string | null> & {
+            uploader: PersonRow | PersonRow[] | null;
+          })[]
+        | null;
+    }[]
+  ).map((row) => ({
+    id: row.id,
+    drawingNumber: row.drawing_number,
+    title: row.title,
+    discipline: row.discipline as Discipline,
+    currentRevisionId: row.current_revision_id,
+    revisions: (row.agenda_drawing_revisions ?? [])
+      .map((revision) => ({
+        id: String(revision.id),
+        revision: String(revision.revision),
+        storagePath: String(revision.storage_path),
+        fileName: revision.file_name === null ? null : String(revision.file_name),
+        issuedOn: revision.issued_on === null ? null : String(revision.issued_on),
+        status: revision.status as ReviewStatus,
+        notes: revision.notes === null ? null : String(revision.notes),
+        createdAt: String(revision.created_at),
+        uploadedBy: toPerson(one(revision.uploader)),
+      }))
+      // Newest issued first. The revision label is free text — "Rev 01",
+      // "Rev A", "P2" are all real — so it cannot be sorted on, and the date
+      // it was issued is what "newest" actually means.
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+  }));
+}
+
+export type DocumentVersion = {
+  id: string;
+  version: number;
+  storagePath: string;
+  fileName: string | null;
+  notes: string | null;
+  createdAt: string;
+  uploadedBy: Person | null;
+};
+
+export type ProjectDocument = {
+  id: string;
+  title: string;
+  kind: string;
+  tags: string[];
+  confidentiality: "members" | "finance" | "meetings";
+  currentVersionId: string | null;
+  versions: DocumentVersion[];
+};
+
+/**
+ * The documents the viewer may read.
+ *
+ * 0090 replaced the read policy on this table rather than adding one, so a
+ * document filed as `finance` or `meetings` is gated a second time on the
+ * matching permission. A document missing from this list is a document the
+ * reader is not entitled to, and that is the correct answer rather than an
+ * error.
+ */
+export async function getDocuments(
+  projectId: string,
+): Promise<ProjectDocument[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_documents")
+    .select(
+      `id, title, kind, tags, confidentiality, current_version_id,
+       agenda_document_versions(id, version, storage_path, file_name, notes,
+         created_at,
+         uploader:profiles!agenda_document_versions_uploaded_by_fkey(${PERSON_COLUMNS}))`,
+    )
+    .eq("project_id", projectId)
+    .is("archived_at", null)
+    .order("title", { ascending: true })
+    .limit(PAGE);
+
+  if (!data) return [];
+
+  return (
+    data as unknown as {
+      id: string;
+      title: string;
+      kind: string;
+      tags: string[] | null;
+      confidentiality: string;
+      current_version_id: string | null;
+      agenda_document_versions:
+        | (Record<string, string | number | null> & {
+            uploader: PersonRow | PersonRow[] | null;
+          })[]
+        | null;
+    }[]
+  ).map((row) => ({
+    id: row.id,
+    title: row.title,
+    kind: row.kind,
+    tags: row.tags ?? [],
+    confidentiality: row.confidentiality as "members" | "finance" | "meetings",
+    currentVersionId: row.current_version_id,
+    versions: (row.agenda_document_versions ?? [])
+      .map((version) => ({
+        id: String(version.id),
+        version: Number(version.version),
+        storagePath: String(version.storage_path),
+        fileName: version.file_name === null ? null : String(version.file_name),
+        notes: version.notes === null ? null : String(version.notes),
+        createdAt: String(version.created_at),
+        uploadedBy: toPerson(one(version.uploader)),
+      }))
+      .sort((a, b) => b.version - a.version),
+  }));
+}
+
+/**
+ * Signed URLs for files in the project's store, keyed by path.
+ *
+ * The same batched signing the photo wall uses, named for what it is: a
+ * drawing and a contract are downloaded rather than rendered, but they live in
+ * the same private bucket and need the same short-lived link.
+ */
+export async function signedFileUrls(
+  paths: readonly string[],
+): Promise<Map<string, string>> {
+  return signedPhotoUrls(paths);
+}

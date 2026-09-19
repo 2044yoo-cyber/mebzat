@@ -202,3 +202,214 @@ export async function getAgendaHeadline(): Promise<AgendaHeadline> {
     overdueTasks,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Across every project
+// ---------------------------------------------------------------------------
+
+export type MyTask = {
+  id: string;
+  projectId: string;
+  projectName: string | null;
+  title: string;
+  status: string;
+  priority: string;
+  dueAt: string | null;
+};
+
+/**
+ * Every open task assigned to the viewer, across every project they are on.
+ *
+ * Not filtered by project: the policies already limit this to projects the
+ * viewer is a member of, so asking for "my tasks" is one query rather than one
+ * per project, and a member added to a fifth job sees its tasks without this
+ * file knowing the job exists.
+ *
+ * Assigned to *me* specifically, which is the one filter that is this screen's
+ * job rather than a policy's — being on a project does not make its tasks
+ * mine.
+ */
+export async function getMyTasks(userId: string): Promise<MyTask[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_tasks")
+    .select(
+      `id, project_id, title, status, priority, due_at,
+       project:agenda_projects!agenda_tasks_project_id_fkey(name)`,
+    )
+    .eq("assigned_to", userId)
+    .in("status", ["todo", "in_progress", "blocked", "review"])
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .limit(200);
+
+  if (!data) return [];
+
+  return (
+    data as unknown as {
+      id: string;
+      project_id: string;
+      title: string;
+      status: string;
+      priority: string;
+      due_at: string | null;
+      project: { name: string } | { name: string }[] | null;
+    }[]
+  ).map((row) => ({
+    id: row.id,
+    projectId: row.project_id,
+    projectName: Array.isArray(row.project)
+      ? (row.project[0]?.name ?? null)
+      : (row.project?.name ?? null),
+    title: row.title,
+    status: row.status,
+    priority: row.priority,
+    dueAt: row.due_at,
+  }));
+}
+
+export type DiaryEntry = {
+  id: string;
+  projectId: string;
+  projectName: string | null;
+  kind: "task" | "meeting" | "inspection" | "milestone" | "rfi" | "invoice";
+  title: string;
+  /** The day it lands on, as YYYY-MM-DD. */
+  on: string;
+};
+
+/**
+ * Everything dated, across every project, in one list.
+ *
+ * Six separate reads rather than a view, because the six tables have six
+ * different permissions — an invoice is finance-gated and a meeting needs
+ * `can_view_meetings`, and a view would have to reproduce all of that or
+ * leak. Asking each table separately lets each one's policy answer for itself,
+ * and a table the viewer may not read simply returns nothing.
+ */
+export async function getDiary(
+  userId: string,
+  fromDay: string,
+  toDay: string,
+): Promise<DiaryEntry[]> {
+  const supabase = await createClient();
+
+  const name = (value: unknown): string | null => {
+    if (Array.isArray(value)) {
+      return (value[0] as { name?: string })?.name ?? null;
+    }
+    return (value as { name?: string } | null)?.name ?? null;
+  };
+
+  const [tasks, meetings, inspections, milestones, rfis, invoices] =
+    await Promise.all([
+      supabase
+        .from("agenda_tasks")
+        .select(`id, project_id, title, due_at,
+                 project:agenda_projects!agenda_tasks_project_id_fkey(name)`)
+        .eq("assigned_to", userId)
+        .gte("due_at", `${fromDay}T00:00:00Z`)
+        .lte("due_at", `${toDay}T23:59:59Z`)
+        .limit(200),
+      supabase
+        .from("agenda_meetings")
+        .select(`id, project_id, title, held_at,
+                 project:agenda_projects!agenda_meetings_project_id_fkey(name)`)
+        .gte("held_at", `${fromDay}T00:00:00Z`)
+        .lte("held_at", `${toDay}T23:59:59Z`)
+        .limit(200),
+      supabase
+        .from("agenda_inspections")
+        .select(`id, project_id, title, scheduled_for,
+                 project:agenda_projects!agenda_inspections_project_id_fkey(name)`)
+        .gte("scheduled_for", fromDay)
+        .lte("scheduled_for", toDay)
+        .limit(200),
+      supabase
+        .from("agenda_schedule_items")
+        .select(`id, project_id, name, finish_date,
+                 project:agenda_projects!agenda_schedule_items_project_id_fkey(name)`)
+        .eq("is_milestone", true)
+        .gte("finish_date", fromDay)
+        .lte("finish_date", toDay)
+        .limit(200),
+      supabase
+        .from("agenda_rfis")
+        .select(`id, project_id, subject, due_date,
+                 project:agenda_projects!agenda_rfis_project_id_fkey(name)`)
+        .gte("due_date", fromDay)
+        .lte("due_date", toDay)
+        .limit(200),
+      supabase
+        .from("agenda_invoices")
+        .select(`id, project_id, number, company_name, due_on,
+                 project:agenda_projects!agenda_invoices_project_id_fkey(name)`)
+        .gte("due_on", fromDay)
+        .lte("due_on", toDay)
+        .limit(200),
+    ]);
+
+  const entries: DiaryEntry[] = [];
+
+  for (const row of (tasks.data ?? []) as Record<string, unknown>[]) {
+    entries.push({
+      id: `task-${String(row.id)}`,
+      projectId: String(row.project_id),
+      projectName: name(row.project),
+      kind: "task",
+      title: String(row.title),
+      on: String(row.due_at).slice(0, 10),
+    });
+  }
+  for (const row of (meetings.data ?? []) as Record<string, unknown>[]) {
+    entries.push({
+      id: `meeting-${String(row.id)}`,
+      projectId: String(row.project_id),
+      projectName: name(row.project),
+      kind: "meeting",
+      title: String(row.title),
+      on: String(row.held_at).slice(0, 10),
+    });
+  }
+  for (const row of (inspections.data ?? []) as Record<string, unknown>[]) {
+    entries.push({
+      id: `inspection-${String(row.id)}`,
+      projectId: String(row.project_id),
+      projectName: name(row.project),
+      kind: "inspection",
+      title: String(row.title),
+      on: String(row.scheduled_for),
+    });
+  }
+  for (const row of (milestones.data ?? []) as Record<string, unknown>[]) {
+    entries.push({
+      id: `milestone-${String(row.id)}`,
+      projectId: String(row.project_id),
+      projectName: name(row.project),
+      kind: "milestone",
+      title: String(row.name),
+      on: String(row.finish_date),
+    });
+  }
+  for (const row of (rfis.data ?? []) as Record<string, unknown>[]) {
+    entries.push({
+      id: `rfi-${String(row.id)}`,
+      projectId: String(row.project_id),
+      projectName: name(row.project),
+      kind: "rfi",
+      title: String(row.subject),
+      on: String(row.due_date),
+    });
+  }
+  for (const row of (invoices.data ?? []) as Record<string, unknown>[]) {
+    entries.push({
+      id: `invoice-${String(row.id)}`,
+      projectId: String(row.project_id),
+      projectName: name(row.project),
+      kind: "invoice",
+      title: `${String(row.number)} — ${String(row.company_name)}`,
+      on: String(row.due_on),
+    });
+  }
+
+  return entries.sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0));
+}

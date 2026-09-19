@@ -37,6 +37,19 @@ import {
   sectionHref,
 } from "../src/lib/agenda/workspace-nav.ts";
 import {
+  AGE_BUCKETS,
+  BID_STATUSES,
+  EQUIPMENT_STATUSES,
+  ageInvoices,
+  ageOf,
+  compareBids,
+  hoursByDay,
+  invoiceTotals,
+  outstanding,
+  plantInUsePercent,
+  serviceDue,
+} from "../src/lib/agenda/billing.ts";
+import {
   BOQ_UNITS,
   CHANGE_REASONS,
   CONTRACT_PARTIES,
@@ -773,9 +786,13 @@ function exists(path: string): boolean {
     "an activity at 100% still reading To do is a programme nobody believes",
   );
   check(
-    "a photo's path is checked against the project it claims",
-    /if \(!isInProject\(storagePath, projectId\)\) \{/.test(actions),
-    "a row and an object that disagree is a photo nobody can open",
+    "every upload's path is checked against the project it claims",
+    // Counted, not matched. Three actions take an uploaded path — a photo, a
+    // drawing revision, a document version — and asserting the guard appears
+    // "somewhere" passed with it deleted from one of the three.
+    (actions.match(/if \(!isInProject\(storagePath, projectId\)\) \{/g) ?? [])
+      .length === 3,
+    "a row and an object that disagree is a file nobody can open",
   );
 
   const wall = code("src/components/agenda/site/photo-wall.tsx");
@@ -1525,6 +1542,334 @@ function exists(path: string): boolean {
     "a delivery is recorded when the field is left, not on every keystroke",
     /onBlur=\{\(event\) => \{[\s\S]{0,700}?recordDelivery\(/.test(poView) &&
       !/onChange=\{\(event\) => \{[\s\S]{0,200}?recordDelivery\(/.test(poView),
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// 9. Phase 5, and the module finished
+// ---------------------------------------------------------------------------
+
+{
+  check("the build has reached phase 5", BUILT_THROUGH_PHASE >= 5);
+  check(
+    "every section in the workspace is live",
+    LIVE_SECTIONS.length === WORKSPACE_SECTIONS.length,
+    `${LIVE_SECTIONS.length} of ${WORKSPACE_SECTIONS.length}`,
+  );
+  check(
+    "and every one of them has a route",
+    WORKSPACE_SECTIONS.every((section) =>
+      exists(
+        section.segment
+          ? `src/app/(dashboard)/agenda/projects/[projectId]/${section.segment}/page.tsx`
+          : "src/app/(dashboard)/agenda/projects/[projectId]/page.tsx",
+      ),
+    ),
+  );
+  check(
+    "nothing is left saying it is being built",
+    !exists("src/components/agenda/shell/section-shell.tsx"),
+    "an unused stub is a stub somebody will route to again",
+  );
+  for (const route of [
+    "src/app/(dashboard)/agenda/tasks/page.tsx",
+    "src/app/(dashboard)/agenda/calendar/page.tsx",
+  ]) {
+    check(
+      `${route.replace("src/app/(dashboard)", "")} is a real screen`,
+      !/SectionShell/.test(code(route)),
+    );
+  }
+
+  // --- invoices ------------------------------------------------------------
+
+  const invoice = (over: Partial<Parameters<typeof outstanding>[0]> = {}) => ({
+    amount: 1000,
+    taxAmount: 150,
+    retentionAmount: 50,
+    totalAmount: 1100,
+    paidAmount: 0,
+    status: "approved" as const,
+    dueOn: null,
+    ...over,
+  });
+
+  check(
+    "what is outstanding is the total less what was paid",
+    outstanding(invoice({ paidAmount: 400 })) === 700,
+  );
+  check(
+    "an overpayment is not negative debt",
+    outstanding(invoice({ paidAmount: 1500 })) === 0,
+    "a negative outstanding invites somebody to net it off the next invoice",
+  );
+  {
+    const totals = invoiceTotals([
+      invoice({ paidAmount: 400 }),
+      invoice({ status: "draft" }),
+      invoice({ status: "rejected" }),
+      invoice({ status: "cancelled" }),
+      invoice({ paidAmount: 1100 }),
+    ]);
+    check(
+      "a draft, rejected or cancelled invoice is not a claim on the project",
+      totals.invoiced === 2200,
+      "counting them overstates what is owed by whatever somebody typed",
+    );
+    check(
+      "and what is outstanding follows",
+      totals.paid === 1500 && totals.outstanding === 700,
+    );
+    check(
+      "retention is counted apart from what is unpaid",
+      totals.retentionHeld === 100,
+      "folding it in cannot tell a subcontractor why they are short",
+    );
+  }
+  {
+    const today = new Date("2026-03-31T09:00:00Z");
+    check(
+      "a settled invoice has no age",
+      ageOf(invoice({ paidAmount: 1100, dueOn: "2020-01-01" }), today) === null,
+    );
+    check(
+      "an undated one has no age either, rather than being called current",
+      ageOf(invoice({ dueOn: null }), today) === null,
+      "undated is not the same as not yet due",
+    );
+    check(
+      "due today is not yet late, and due yesterday is",
+      // The day itself is the case worth naming: the first version of this
+      // check tested tomorrow and yesterday, which a boundary of `< 0` rather
+      // than `<= 0` satisfies just as well.
+      ageOf(invoice({ dueOn: "2026-03-31" }), today) === "not_due" &&
+        ageOf(invoice({ dueOn: "2026-04-01" }), today) === "not_due" &&
+        ageOf(invoice({ dueOn: "2026-03-30" }), today) === "under_30",
+    );
+    check(
+      "the buckets break at thirty and sixty days",
+      ageOf(invoice({ dueOn: "2026-03-01" }), today) === "under_30" &&
+        ageOf(invoice({ dueOn: "2026-02-25" }), today) === "under_60" &&
+        ageOf(invoice({ dueOn: "2026-01-01" }), today) === "over_60",
+    );
+    const aged = ageInvoices(
+      [
+        invoice({ dueOn: "2026-01-01" }),
+        invoice({ dueOn: "2026-04-01" }),
+        invoice({ dueOn: "2026-03-30" }),
+      ],
+      today,
+    );
+    check(
+      "the ledger is read ending on what is worst",
+      aged.at(-1)?.bucket === "over_60" && aged[0]?.bucket === "not_due",
+      "the last line of a list is the one somebody acts on",
+    );
+    check(
+      "and a bucket nothing falls into is left out rather than shown as zero",
+      aged.length === 3 && AGE_BUCKETS.length === 4,
+    );
+  }
+
+  // --- bidding -------------------------------------------------------------
+
+  check(
+    "every bid status the database has is spelled here",
+    BID_STATUSES.length === 7,
+    `${BID_STATUSES.length} of agenda_bid_status's 7`,
+  );
+  {
+    const comparison = compareBids([
+      { amount: 1000, status: "submitted" },
+      { amount: 1400, status: "under_review" },
+      { amount: null, status: "invited" },
+      { amount: 500, status: "withdrawn" },
+    ]);
+    check(
+      "an invitation nobody answered is not a bid of nothing",
+      comparison.priced === 2 && comparison.lowest === 1000,
+      "counting it as zero makes the lowest bid free",
+    );
+    check(
+      "and a withdrawn bid is not compared either",
+      comparison.highest === 1400,
+    );
+    check(
+      "the spread is measured against the lowest",
+      comparison.spreadPercent === 40 && comparison.average === 1200,
+      "three bids 40% apart mean the scope is unclear, not that one is cheap",
+    );
+  }
+  check(
+    "a package nobody has priced compares to nothing rather than to zero",
+    compareBids([{ amount: null, status: "invited" }]).lowest === null,
+  );
+
+  // --- timesheets ----------------------------------------------------------
+
+  {
+    const days = hoursByDay([
+      { workerName: "Abebe", companyName: null, workedOn: "2026-03-02", hours: 8, overtimeHours: 2 },
+      { workerName: "abebe", companyName: null, workedOn: "2026-03-02", hours: 3, overtimeHours: 0 },
+      { workerName: "Kebede", companyName: null, workedOn: "2026-03-02", hours: 8, overtimeHours: 0 },
+      { workerName: "Abebe", companyName: null, workedOn: "2026-03-01", hours: 8, overtimeHours: 0 },
+    ]);
+    check(
+      "hours read newest day first",
+      days[0]?.day === "2026-03-02",
+    );
+    check(
+      "a day's hours are all of its hours",
+      days[0]?.hours === 19 && days[0]?.overtime === 2,
+    );
+    check(
+      "two entries for one person on one day is a split shift, not two people",
+      days[0]?.workers === 2,
+    );
+  }
+
+  // --- plant ---------------------------------------------------------------
+
+  check(
+    "every equipment state the database has is spelled here",
+    EQUIPMENT_STATUSES.length === 5,
+  );
+  check(
+    "a service due today is due, not due tomorrow",
+    serviceDue("2026-03-31", new Date("2026-03-31T09:00:00Z")) &&
+      !serviceDue("2026-04-01", new Date("2026-03-31T09:00:00Z")),
+    "a service that reads as not yet is how a machine goes another week",
+  );
+  check(
+    "a machine with no service date is not overdue for one",
+    !serviceDue(null) && !serviceDue("not a date"),
+  );
+  check(
+    "off-hire plant is out of both halves of utilisation",
+    plantInUsePercent([
+      { status: "in_use" },
+      { status: "available" },
+      { status: "off_hire" },
+      { status: "off_hire" },
+    ]) === 50,
+    "leaving it in makes a site look idle for machines it no longer has",
+  );
+  check(
+    "an empty yard has no utilisation rather than nought per cent",
+    plantInUsePercent([]) === null &&
+      plantInUsePercent([{ status: "off_hire" }]) === null,
+  );
+
+  // --- the writes ----------------------------------------------------------
+
+  const billing = code(
+    "src/app/(dashboard)/agenda/projects/[projectId]/billing-actions.ts",
+  );
+  check(
+    "an invoice's generated total is never written",
+    !/total_amount/.test(billing),
+    "0091 generates it from the amount, the tax and the retention",
+  );
+  check(
+    "nothing marks an invoice paid by hand",
+    !/status: "paid"/.test(billing),
+    "agenda_sync_invoice_status follows the payments, so there is no button",
+  );
+  check(
+    "a payment has to be more than nothing before it is even sent",
+    /if \(amount <= 0\) return \{ error: "A payment has to be more than nothing\." \};/.test(
+      billing,
+    ),
+  );
+  check(
+    "a bid with no price is stored with no price",
+    /const amount = optionalMoney\(formData\.get\("amount"\)\);/.test(billing) &&
+      /submitted_at: amount === null \? null : new Date\(\)\.toISOString\(\),/.test(
+        billing,
+      ),
+  );
+  check(
+    "awarding a package closes the other bidders",
+    /\.update\(\{ status: "rejected" \}\)\s*\.eq\("package_id", packageId\)\s*\.neq\("id", bidId\)/.test(
+      billing,
+    ),
+    "three bidders all believing they are still in it is how a tender becomes a complaint",
+  );
+  check(
+    "and does not reopen one that withdrew",
+    /\.in\("status", \["invited", "viewed", "submitted", "under_review"\]\)/.test(
+      billing,
+    ),
+  );
+  check(
+    "a package due on a day closes at the end of it",
+    /due_at: dueDate \? `\$\{dueDate\}T23:59:00Z` : null,/.test(billing),
+    "closing as the day begins loses a day nobody agreed to",
+  );
+  check(
+    "a machine's hours are left alone when the box is blank",
+    /\.\.\.\(Number\.isFinite\(hoursUsed\) && hoursUsed >= 0[\s\S]{0,140}?: \{\}\),/.test(
+      billing,
+    ),
+    "a blank box is not \"no hours\"; a machine's clock only goes up",
+  );
+
+  // --- the last of the stubs -----------------------------------------------
+
+  const site = code(
+    "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+  );
+  check(
+    "a drawing revision does not decide for itself that it is current",
+    !/current_revision_id/.test(site),
+    "agenda_drawing_set_current does it, so current cannot disagree with issued",
+  );
+  check(
+    "a document version follows the highest already filed",
+    /order\("version", \{ ascending: false \}\)[\s\S]{0,200}?version: \(existing\?\.\[0\]\?\.version \?\? 0\) \+ 1,/.test(
+      site,
+    ),
+  );
+  check(
+    "a document's confidentiality comes from the three words 0024 chose",
+    /CONFIDENTIALITY\.includes\(level as Confidentiality\)/.test(site),
+    "a fourth word is a second permission system to keep correct",
+  );
+  check(
+    "reported progress stays reported",
+    /\.\.\.\(Number\.isFinite\(progress\)[\s\S]{0,120}?progress_percent: Math\.min/.test(
+      site,
+    ),
+  );
+  check(
+    "a project is archived, never deleted",
+    /archived_at: new Date\(\)\.toISOString\(\)/.test(site) &&
+      !/\.delete\(\)/.test(site),
+  );
+
+  const shelf = code("src/components/agenda/site/document-shelf.tsx");
+  check(
+    "a document the reader may not see is absent rather than shown locked",
+    !/may not|not shared|no access/i.test(shelf),
+    "a row saying a contract exists is itself the leak",
+  );
+
+  const report = code(
+    "src/app/(dashboard)/agenda/projects/[projectId]/reports/page.tsx",
+  );
+  check(
+    "the report reuses each section's own arithmetic",
+    /punchProgress\(punchItems\)/.test(report) &&
+      /invoiceTotals\(invoices\)/.test(report) &&
+      /changeImpact\(changeOrders\)/.test(report) &&
+      /rollUpInspection\(inspection\.items\)/.test(report),
+    "a report that sums its own version disagrees with the screen it summarises",
+  );
+  check(
+    "and leaves the money out rather than totalling an empty list to zero",
+    /const money = access\.finance/.test(report),
+    "empty lists total to zero, and \"0 outstanding\" is a confident lie",
   );
 }
 

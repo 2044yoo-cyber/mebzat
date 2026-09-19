@@ -1,27 +1,31 @@
 import { notFound } from "next/navigation";
 
-import { SectionShell } from "@/components/agenda/shell/section-shell";
+import { AgendaTimeline } from "@/components/agenda/timeline";
+import { agendaReminders, agendaTimeline } from "@/lib/data/agenda";
 import { getAgendaProject } from "@/lib/data/agenda-projects";
 
+/**
+ * What has happened, in order.
+ *
+ * The timeline is written by triggers on the tables themselves — 0024 put
+ * `agenda_*_timeline` on logs, tasks, the ledger, meetings and decisions — so
+ * this reads a record nothing here maintains. That is the point: an activity
+ * log an application writes is an activity log that misses whatever the
+ * application forgot.
+ */
 export default async function Page({
   params,
 }: {
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  // Each page asks for the project again rather than trusting the layout.
-  // A layout cannot hand data to a page in the App Router, and a page that
-  // assumed the layout had already checked access would be a page that is
-  // reachable without the check when it is rendered another way.
   const project = await getAgendaProject(projectId);
   if (!project) notFound();
 
-  return (
-    <SectionShell
-      title="Activity Log"
-      blurb="Who did what, and when. Append-only."
-      projectId={projectId}
-      section="activity"
-    />
-  );
+  const [events, reminders] = await Promise.all([
+    agendaTimeline(projectId),
+    agendaReminders(projectId),
+  ]);
+
+  return <AgendaTimeline events={events} reminders={reminders} />;
 }

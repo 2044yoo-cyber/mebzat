@@ -242,8 +242,8 @@
   {
     "name": "the latest phase is still marked unbuilt",
     "file": "src/lib/agenda/workspace-nav.ts",
-    "from": "export const BUILT_THROUGH_PHASE = 4;",
-    "to": "export const BUILT_THROUGH_PHASE = 3;"
+    "from": "export const BUILT_THROUGH_PHASE = 5;",
+    "to": "export const BUILT_THROUGH_PHASE = 4;"
   },
   {
     "name": "the menu hard-codes the phase it links",
@@ -826,5 +826,227 @@
     "file": "src/components/agenda/money/purchase-orders.tsx",
     "from": "                              onBlur={(event) => {",
     "to": "                              onChange={(event) => {"
+  },
+  {
+    "name": "a section is left without a screen",
+    "file": "src/lib/agenda/workspace-nav.ts",
+    "from": "{ id: \"reports\", segment: \"reports\", label: \"Reports\", icon: Building2, phase: 5 },",
+    "to": "{ id: \"reports\", segment: \"reports-missing\", label: \"Reports\", icon: Building2, phase: 5 },"
+  },
+  {
+    "name": "an overpayment becomes negative debt",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  return Math.max(invoice.totalAmount - invoice.paidAmount, 0);",
+    "to": "  return invoice.totalAmount - invoice.paidAmount;"
+  },
+  {
+    "name": "a draft invoice is counted as a claim",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "    if (invoice.status === \"draft\" || invoice.status === \"rejected\" ||\n        invoice.status === \"cancelled\") {\n      continue;\n    }",
+    "to": "    if (false) {\n      continue;\n    }"
+  },
+  {
+    "name": "retention is folded into what is unpaid",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "    retentionHeld += invoice.retentionAmount;",
+    "to": "    retentionHeld += 0;"
+  },
+  {
+    "name": "a settled invoice is still aged",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  if (outstanding(invoice) <= 0) return null;",
+    "to": "  if (false) return null;"
+  },
+  {
+    "name": "an undated invoice is called current",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  if (!invoice.dueOn) return null;",
+    "to": "  if (!invoice.dueOn) return \"not_due\";"
+  },
+  {
+    "name": "due today is already thirty days late",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  if (days <= 0) return \"not_due\";\n  if (days <= 30) return \"under_30\";",
+    "to": "  if (days < 0) return \"not_due\";\n  if (days <= 30) return \"under_30\";"
+  },
+  {
+    "name": "the aging buckets break in the wrong places",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  if (days <= 60) return \"under_60\";",
+    "to": "  if (days <= 90) return \"under_60\";"
+  },
+  {
+    "name": "the ledger ends on what is least urgent",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  return AGE_BUCKETS.filter((entry) => totals.has(entry.value)).map((entry) => ({",
+    "to": "  return [...AGE_BUCKETS].reverse().filter((entry) => totals.has(entry.value)).map((entry) => ({"
+  },
+  {
+    "name": "an empty aging bucket is shown as zero",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  return AGE_BUCKETS.filter((entry) => totals.has(entry.value))",
+    "to": "  return AGE_BUCKETS.filter(() => true)"
+  },
+  {
+    "name": "an unanswered invitation bids nothing",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "        typeof bid.amount === \"number\" &&\n        Number.isFinite(bid.amount),\n    )\n    .map((bid) => bid.amount as number);",
+    "to": "        true,\n    )\n    .map((bid) => (bid.amount ?? 0) as number);"
+  },
+  {
+    "name": "a withdrawn bid is still compared",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "        bid.status !== \"withdrawn\" &&",
+    "to": "        true &&"
+  },
+  {
+    "name": "the spread is measured against the highest",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "      lowest > 0 ? Math.round(((highest - lowest) / lowest) * 100) : null,",
+    "to": "      highest > 0 ? Math.round(((highest - lowest) / highest) * 100) : null,"
+  },
+  {
+    "name": "a bid status is dropped",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  { value: \"withdrawn\", label: \"Withdrawn\", tone: \"muted\" },\n",
+    "to": ""
+  },
+  {
+    "name": "the day list reads oldest first",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "    .sort((a, b) => (a[0] < b[0] ? 1 : -1))\n    .map(([day, dayRows]) => ({",
+    "to": "    .sort((a, b) => (a[0] < b[0] ? -1 : 1))\n    .map(([day, dayRows]) => ({"
+  },
+  {
+    "name": "a split shift counts as two people",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "      workers: new Set(dayRows.map((row) => row.workerName.toLowerCase())).size,",
+    "to": "      workers: dayRows.length,"
+  },
+  {
+    "name": "overtime is not counted",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "      overtime: dayRows.reduce((sum, row) => sum + row.overtimeHours, 0),",
+    "to": "      overtime: 0,"
+  },
+  {
+    "name": "a service due today reads as not yet",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  return now >= due.getTime();",
+    "to": "  return now > due.getTime();"
+  },
+  {
+    "name": "a machine with no service date is overdue",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  if (!nextServiceOn) return false;",
+    "to": "  if (!nextServiceOn) return true;"
+  },
+  {
+    "name": "off-hire plant makes the site look idle",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  const here = items.filter((item) => item.status !== \"off_hire\");",
+    "to": "  const here = [...items];"
+  },
+  {
+    "name": "an empty yard reports nought per cent utilisation",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  if (here.length === 0) return null;",
+    "to": "  if (here.length === 0) return 0;"
+  },
+  {
+    "name": "an equipment state is dropped",
+    "file": "src/lib/agenda/billing.ts",
+    "from": "  { value: \"broken\", label: \"Broken down\", tone: \"danger\" },\n",
+    "to": ""
+  },
+  {
+    "name": "an invoice's generated total is written by hand",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/billing-actions.ts",
+    "from": "    retention_amount: money(formData.get(\"retentionAmount\")),",
+    "to": "    retention_amount: money(formData.get(\"retentionAmount\")),\n    total_amount: 0,"
+  },
+  {
+    "name": "a payment of nothing is sent to the database",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/billing-actions.ts",
+    "from": "  if (amount <= 0) return { error: \"A payment has to be more than nothing.\" };",
+    "to": "  if (false) return { error: \"A payment has to be more than nothing.\" };"
+  },
+  {
+    "name": "an invoice is marked paid by hand",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/billing-actions.ts",
+    "from": "    approved_by: user.id,\n  });\n\n  if (error) {\n    return { error: explain(error.message, \"That payment was not recorded.\") };",
+    "to": "    approved_by: user.id,\n  });\n  await supabase.from(\"agenda_invoices\").update({ status: \"paid\" }).eq(\"id\", String(formData.get(\"invoiceId\")));\n\n  if (error) {\n    return { error: explain(error.message, \"That payment was not recorded.\") };"
+  },
+  {
+    "name": "an unpriced bid is stored as priced at zero",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/billing-actions.ts",
+    "from": "  const amount = optionalMoney(formData.get(\"amount\"));",
+    "to": "  const amount = money(formData.get(\"amount\"));"
+  },
+  {
+    "name": "awarding leaves the other bidders in the running",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/billing-actions.ts",
+    "from": "    .update({ status: \"rejected\" })\n    .eq(\"package_id\", packageId)\n    .neq(\"id\", bidId)",
+    "to": "    .update({ status: \"under_review\" })\n    .eq(\"package_id\", packageId)\n    .neq(\"id\", bidId)"
+  },
+  {
+    "name": "awarding reopens a bidder who withdrew",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/billing-actions.ts",
+    "from": "    .in(\"status\", [\"invited\", \"viewed\", \"submitted\", \"under_review\"]);",
+    "to": "    .neq(\"status\", \"awarded\");"
+  },
+  {
+    "name": "a package closes as its due day begins",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/billing-actions.ts",
+    "from": "    due_at: dueDate ? `${dueDate}T23:59:00Z` : null,",
+    "to": "    due_at: dueDate ? `${dueDate}T00:00:00Z` : null,"
+  },
+  {
+    "name": "a blank hours box resets a machine's clock",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/billing-actions.ts",
+    "from": "      ...(Number.isFinite(hoursUsed) && hoursUsed >= 0\n        ? { hours_used: Math.round(hoursUsed * 10) / 10 }\n        : {}),",
+    "to": "      hours_used: Number.isFinite(hoursUsed) ? hoursUsed : 0,"
+  },
+  {
+    "name": "the application decides which revision is current",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    uploaded_by: user.id,\n  });\n\n  if (error) {\n    return { error: explain(error.message, \"That revision was not issued.\") };",
+    "to": "    uploaded_by: user.id,\n  });\n  await supabase.from(\"agenda_drawings\").update({ current_revision_id: drawingId }).eq(\"id\", drawingId);\n\n  if (error) {\n    return { error: explain(error.message, \"That revision was not issued.\") };"
+  },
+  {
+    "name": "a document version reuses a withdrawn number",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    version: (existing?.[0]?.version ?? 0) + 1,",
+    "to": "    version: (existing?.[0]?.version ?? 0),"
+  },
+  {
+    "name": "any word is accepted as a confidentiality level",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "        confidentiality: CONFIDENTIALITY.includes(level as Confidentiality)\n          ? (level as Confidentiality)\n          : \"members\",",
+    "to": "        confidentiality: (level || \"members\") as Confidentiality,"
+  },
+  {
+    "name": "progress is set to zero when the box is blank",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "      ...(Number.isFinite(progress)\n        ? { progress_percent: Math.min(Math.max(Math.round(progress), 0), 100) }\n        : {}),",
+    "to": "      progress_percent: Number.isFinite(progress) ? Math.round(progress) : 0,"
+  },
+  {
+    "name": "a project can be deleted",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/site-actions.ts",
+    "from": "    .update({ archived_at: new Date().toISOString() })\n    .eq(\"id\", projectId);",
+    "to": "    .delete()\n    .eq(\"id\", projectId);"
+  },
+  {
+    "name": "the report sums the punch list itself",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/reports/page.tsx",
+    "from": "      punchProgress: punchProgress(punchItems),",
+    "to": "      punchProgress: punchItems.length === 0 ? null : Math.round((punchItems.filter((i) => i.status === \"closed\").length / punchItems.length) * 100),"
+  },
+  {
+    "name": "the report totals an empty money list to zero",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/reports/page.tsx",
+    "from": "  const money = access.finance",
+    "to": "  const money = true"
   }
 ]
