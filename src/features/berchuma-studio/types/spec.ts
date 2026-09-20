@@ -18,6 +18,7 @@ import { kitchenSetupSchema } from "./kitchen";
 
 import {
   cornerKinds,
+  cornerSettingsSchema,
   furnitureTypes,
   layoutKinds,
   runSchema,
@@ -515,6 +516,8 @@ export const designSpecSchema = z.object({
   cornerKind: z.enum(cornerKinds).default("l_corner"),
   /** Optional per-corner choices; `cornerKind` remains the layout fallback. */
   cornerKinds: z.record(z.string(), z.enum(cornerKinds)).optional(),
+  /** Persisted dimensions and shelf count for each generated corner id. */
+  cornerSettings: z.record(z.string(), cornerSettingsSchema).optional(),
   units: z.literal("mm"),
   title: z.string().min(1).max(160),
 

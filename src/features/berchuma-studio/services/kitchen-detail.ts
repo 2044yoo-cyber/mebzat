@@ -20,7 +20,7 @@ export function createDetailedKitchen(options: KitchenSetup): DesignSpec {
       : [run("kitchen-left", "Left wall", options.roomDepth), run("kitchen-back", "Back wall", options.roomWidth), run("kitchen-right", "Right wall", options.roomDepth)];
   if (options.shape === "g_shaped") spec.runs.push(run("kitchen-peninsula", "Peninsula", options.islandWidth));
   if (options.shape === "island") spec.runs.push({ ...run("kitchen-island", "Island", options.islandWidth), origin: { x: (options.roomWidth - options.islandWidth) / 2, z: d.baseDepth + 940 }, rotation: 0 });
-  const solved = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, cornerKinds: spec.cornerKinds, kitchenFacing: true });
+  const solved = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, cornerKinds: spec.cornerKinds, cornerSettings: spec.cornerSettings, kitchenFacing: true });
   spec.cabinets = [];
   type Segment = { offset: number; width: number; role?: "fridge" | "sink" | "stove" };
   function fill(start: number, end: number): Segment[] {
@@ -84,7 +84,7 @@ export function createDetailedKitchen(options: KitchenSetup): DesignSpec {
       if (options.topHeight > 0) spec.cabinets.push({ ...cabinet(`${wall.id}-top`, { ...segment, role: undefined }, upperRun.id, "wall", d.upperBottom + options.wallHeight, options.topHeight, d.upperDepth), label: "Extra top cabinet", stackedOn: wall.id, frontInsets: wall.frontInsets });
     }
   }
-  const finalLayout = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, cornerKinds: spec.cornerKinds, kitchenFacing: true });
+  const finalLayout = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, cornerKinds: spec.cornerKinds, cornerSettings: spec.cornerSettings, kitchenFacing: true });
   for (const c of spec.cabinets) {
     const placement = finalLayout.placements.find((r) => r.runId === c.runId)!;
     const p = placeOnRun(placement, c.offset ?? 0, c.size.depth);

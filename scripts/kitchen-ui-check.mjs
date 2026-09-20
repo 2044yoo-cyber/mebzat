@@ -56,7 +56,7 @@ function checkWiring(transform = (s) => s) {
   const controls = clean('src/features/berchuma-studio/components/editor/control-panel.tsx');
   assert.match(controls, /<KitchenSetup[^>]*submitLabel="Replace kitchen layout"/);
   assert.match(controls, /onChange\(addKitchenUpper\(spec, selected.id\)\)/);
-  assert.match(controls, /title="Corner module"/);
+  assert.match(controls, /title="CORNER"/);
   assert.match(controls, /\[selectedCornerId\]: event\.target\.value as CornerKind/);
 }
 checkWiring();
@@ -102,7 +102,7 @@ for (const mutation of [
   ['/services/starting-designs.ts', 'return "l_corner";', 'return "diagonal";'],
   ['/services/layout.ts', 'kind: cornerKinds?.["corner-left"] ?? cornerKind,', 'kind: cornerKind,'],
   ['/services/corners.ts', 'if (corner.kind === "hanging") {', 'if (false) {'],
-  ['/services/geometry.ts', 'if (joinsShelfCorner) {', 'if (false) {'],
+  ['/services/geometry.ts', 'if (joinsWardrobeCorner) {', 'if (false) {'],
   ['/services/corners.ts', 'const exteriorRight = wardrobeShelving && corner.id !== "corner-left";', 'const exteriorRight = false;'],
 ]) await assert.rejects(load('scripts/wardrobe_shape_check.ts', mutation), undefined, `Wardrobe orientation rejects broken ${mutation[0]}`);
 for (const mutation of [

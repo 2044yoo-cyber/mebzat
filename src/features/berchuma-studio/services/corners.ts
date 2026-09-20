@@ -55,12 +55,12 @@ export function cornerParts(
   const parts: Part[] = [];
 
   for (const corner of manufacturedCorners(spec, resolved)) {
-    parts.push(...partsForCorner(spec, corner));
+    parts.push(...partsForCorner(spec, corner).map((part) => ({ ...part, cabinetId: corner.id })));
     if (spec.kitchenSetup?.details && !corner.baseY) {
       const template = spec.cabinets.find((c) => c.kind === "base" || c.kind === "island");
       if (template) for (const p of kitchenConstruction(spec, { ...template, kitchenRole: undefined,
-        size: { width: corner.size, height: corner.height, depth: corner.size }, plinthHeight: spec.carcass.plinthHeight }, [])) {
-        if (p.role === "plinth") parts.push({ ...p, id: `${corner.id}/${p.id}`, placements: p.placements.map((at) => ({ ...at, x: at.x + corner.x, z: at.z + corner.z })) });
+        size: { width: corner.width ?? corner.size, height: corner.height, depth: corner.depth ?? corner.size }, plinthHeight: spec.carcass.plinthHeight }, [])) {
+        if (p.role === "plinth") parts.push({ ...p, id: `${corner.id}/${p.id}`, cabinetId: corner.id, placements: p.placements.map((at) => ({ ...at, x: at.x + corner.x, z: at.z + corner.z })) });
       }
     }
   }
@@ -80,12 +80,14 @@ function manufacturedCorners(spec: DesignSpec, resolved: ResolvedDesign): Corner
     id: `upper-${corner.id}`,
     // Blind is a base-cabinet economy choice; upper corners are accessible
     // L modules unless the user explicitly selected a diagonal corner.
-    kind: corner.kind === "diagonal" ? "diagonal" : "l_corner",
+    kind: spec.cornerKinds?.[`upper-${corner.id}`] ?? (corner.kind === "diagonal" ? "diagonal" : "l_corner"),
     x: corner.id.endsWith("corner-left") ? 0 : setup.roomWidth - upperDepth,
     z: 0,
     size: upperDepth,
+    width: spec.cornerSettings?.[`upper-${corner.id}`]?.width ?? upperDepth,
+    depth: spec.cornerSettings?.[`upper-${corner.id}`]?.depth ?? upperDepth,
     between: [`upper-${corner.between[0]}`, `upper-${corner.between[1]}`],
-    height,
+    height: spec.cornerSettings?.[`upper-${corner.id}`]?.height ?? height,
     baseY: upperBottom,
     plinthHeight: 0,
   }))];
@@ -109,9 +111,11 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
   );
   const t = board.thickness;
 
-  const size = corner.size;
+  const sizeX = corner.width ?? corner.size;
+  const sizeZ = corner.depth ?? corner.size;
   const height = corner.height;
-  const wardrobeShelving = spec.furnitureType === "wardrobe" && corner.kind === "l_corner";
+  const wardrobeCorner = spec.furnitureType === "wardrobe";
+  const wardrobeShelving = wardrobeCorner && (corner.kind === "l_corner" || corner.kind === "custom");
   const exteriorRight = wardrobeShelving && corner.id !== "corner-left";
 
   // The carcass sits on the plinth like every other base unit, so its panels
@@ -120,16 +124,16 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
   const carcassHeight = Math.max(0, height - plinth);
 
   // Inside the two gables.
-  const inner = Math.max(0, size - (wardrobeShelving ? t : 2 * t));
+  const inner = Math.max(0, sizeX - (wardrobeShelving ? t : 2 * t));
   const shelfX = exteriorRight ? 0 : t;
   // Just like a straight wardrobe, every 18 mm shell board stops at the
   // front face of the 6 mm applied back. The old corner builder extended its
   // gables all the way through a back panel at both z = 0 and z = size, which
   // made a convincing front view but generated overlapping boards.
   const inwardOpening =
-    (corner.kind === "l_corner" && spec.furnitureType === "wardrobe") ||
+    ((corner.kind === "l_corner" || corner.kind === "custom") && spec.furnitureType === "wardrobe") ||
     corner.kind === "blind";
-  const shellDepth = Math.max(0, size - backBoard.thickness);
+  const shellDepth = Math.max(0, sizeZ - backBoard.thickness);
   const storageZ = inwardOpening ? backBoard.thickness : 0;
   const doorHeight = Math.max(0, carcassHeight - spec.carcass.doorGap);
 
@@ -142,8 +146,8 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
   const wardrobePlinths: Part[] =
     spec.furnitureType === "wardrobe" && plinth > 0
       ? recessedWardrobePlinthParts({
-          width: size,
-          depth: size,
+          width: sizeX,
+          depth: sizeZ,
           height: plinth,
           board: materials.plinth,
           edgeBand: edgeBandForConstructionBoard(
@@ -166,7 +170,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       : [];
 
   const sideStructures: Part[] =
-    corner.kind === "l_corner" || corner.kind === "hanging" || corner.kind === "diagonal"
+    corner.kind === "l_corner" || corner.kind === "hanging" || corner.kind === "diagonal" || corner.kind === "custom"
         ? []
         : [
             // A blind/custom corner has only one front opening, so it retains
@@ -185,7 +189,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
               edgeBand: bodyBand,
               size: { x: t, y: carcassHeight, z: shellDepth },
               axis: "x",
-              placements: [at(size - t, 0, storageZ)],
+              placements: [at(sizeX - t, 0, storageZ)],
             },
           ];
 
@@ -204,7 +208,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       edgeBand: bodyBand,
       size: { x: t, y: carcassHeight, z: shellDepth },
       axis: "x",
-      placements: [at(exteriorRight ? size - t : 0, 0, storageZ)],
+      placements: [at(exteriorRight ? sizeX - t : 0, 0, storageZ)],
     },
     ...sideStructures,
     {
@@ -241,11 +245,11 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       label: `${labelFor(corner)} back`,
       board: backBoard,
       length: carcassHeight,
-      width: size,
+      width: sizeX,
       quantity: 1,
       edges: { front: false, back: false, top: false, bottom: false },
       edgeBand: backBand,
-      size: { x: size, y: carcassHeight, z: backBoard.thickness },
+      size: { x: sizeX, y: carcassHeight, z: backBoard.thickness },
       axis: "z",
       // The back is at the rear, never at the door plane. Placing an HDF
       // panel at z = 0 was the source of full-height collisions with every
@@ -273,7 +277,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       // This closes the blind return; it is not an operable leaf and must not
       // receive a handle or hinge in the hardware schedule.
       doorStyle: "fixed",
-      placements: [at(t, 0, size)],
+      placements: [at(t, 0, sizeZ)],
     });
     const opening = Math.max(0, inner - filler - spec.carcass.doorGap);
     parts.push({
@@ -281,7 +285,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       board: frontBoard, length: doorHeight, width: opening, quantity: 1,
       edges: { front: true, back: true, top: true, bottom: true }, edgeBand: frontBand,
       size: { x: opening, y: doorHeight, z: frontBoard.thickness }, axis: "z",
-      doorStyle: "hinged", placements: [at(t + filler + spec.carcass.doorGap, 0, size)],
+      doorStyle: "hinged", placements: [at(t + filler + spec.carcass.doorGap, 0, sizeZ)],
     });
   }
 
@@ -316,8 +320,8 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       // of into the left gable and rear HDF panel.
       rotationY: corner.id.endsWith("corner-left") ? 135 : -135,
       placements: corner.id.endsWith("corner-left")
-        ? [at(size, t, t)]
-        : [at(size - t, t, size - t)],
+        ? [at(sizeX, t, t)]
+        : [at(sizeX - t, t, sizeZ - t)],
     });
   }
 
@@ -344,13 +348,14 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       doorStyle: "corner",
       rotationY: corner.id.endsWith("corner-left") ? 135 : -135,
       placements: corner.id.endsWith("corner-left")
-        ? [at(size, t, t)]
-        : [at(size - t, t, size - t)],
+        ? [at(sizeX, t, t)]
+        : [at(sizeX - t, t, sizeZ - t)],
     });
   }
 
-  if (corner.kind === "l_corner") {
-    const shelfYs = [0.25, 0.5, 0.75].map((share) => Math.round((carcassHeight - t) * share));
+  if (corner.kind === "l_corner" || corner.kind === "custom") {
+    const count = spec.cornerSettings?.[corner.id]?.shelves ?? 3;
+    const shelfYs = Array.from({ length: count }, (_, index) => Math.round((carcassHeight - t) * (index + 1) / (count + 1)));
     parts.push({
       id: `${corner.id}/corner-shelves`, role: "shelf", label: `${labelFor(corner)} shelves`,
       board, length: inner, width: shellDepth, quantity: shelfYs.length,

@@ -102,6 +102,15 @@ export const cornerKinds = [
 
 export type CornerKind = (typeof cornerKinds)[number];
 
+export const cornerSettingsSchema = z.object({
+  width: z.number().positive().optional(),
+  depth: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  shelves: z.number().int().min(0).max(20).optional(),
+});
+
+export type CornerSettings = z.infer<typeof cornerSettingsSchema>;
+
 export function cornerLabel(kind: CornerKind): string {
   switch (kind) {
     case "l_corner":
@@ -113,7 +122,7 @@ export function cornerLabel(kind: CornerKind): string {
     case "hanging":
       return "Hanging corner";
     case "custom":
-      return "Custom corner";
+      return "Open corner";
   }
 }
 

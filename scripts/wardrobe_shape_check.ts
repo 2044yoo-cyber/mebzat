@@ -538,10 +538,29 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
       mixedParts.some((part) => part.id === "corner-right/diagonal-face"),
   );
   check(
+    "every visible corner board selects only its own corner",
+    mixedParts.filter((part) => part.id.startsWith("corner-")).every((part) => part.cabinetId === part.id.split("/")[0]),
+  );
+  check(
     "edited corner types remain collision free",
     clashes(mixed).length === 0,
     clashes(mixed).slice(0, 3).join(" | "),
   );
+
+  const sized = build("u_shaped", [1800, 3000, 1800]);
+  sized.cornerSettings = {
+    "corner-left": { width: 700, depth: 650, height: 2300, shelves: 4 },
+    "corner-right": { width: 650, depth: 700, shelves: 5 },
+  };
+  const sizedResolved = resolveDesign(sized);
+  check("corner dimensions reserve their own non-overlapping run space", sizedResolved.layout.placements.map((run) => run.usableLength).join() === "1150,1650,1100", sizedResolved.layout.placements.map((run) => run.usableLength).join());
+  const sizedBoxes = [
+    ...sizedResolved.cabinets.map((cabinet) => rotatedRectBounds(cabinet, cabinet.cabinet.size, cabinet.rotation)),
+    ...sizedResolved.layout.corners.map((corner) => rotatedRectBounds(corner, { width: corner.width ?? corner.size, depth: corner.depth ?? corner.size }, 0)),
+  ];
+  check("edited corner dimensions keep cabinet volumes separate", sizedBoxes.every((a, index) => sizedBoxes.slice(index + 1).every((b) => Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) < 0.01 || Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ) < 0.01)));
+  check("each corner keeps its own shelf count", buildParts(sized).parts.find((part) => part.id === "corner-left/corner-shelves")?.quantity === 4 && buildParts(sized).parts.find((part) => part.id === "corner-right/corner-shelves")?.quantity === 5);
+  check("per-corner settings survive design serialization", (() => { const restored = parseSpec(JSON.parse(JSON.stringify(sized))); return restored.ok && restored.spec.cornerSettings?.["corner-right"]?.shelves === 5; })());
 }
 
 {
@@ -752,7 +771,7 @@ for (const shape of ["l_shaped", "u_shaped"] as const) {
   const count = shape === "u_shaped" ? 2 : 1;
   const moduleBoxes = [
     ...resolved.cabinets.map((c) => rotatedRectBounds(c, c.cabinet.size, c.rotation)),
-    ...resolved.layout.corners.map((c) => rotatedRectBounds(c, { width: c.size, depth: c.size }, 0)),
+    ...resolved.layout.corners.map((c) => rotatedRectBounds(c, { width: c.width ?? c.size, depth: c.depth ?? c.size }, 0)),
   ];
   check(`${shape}: cabinet and corner footprints never overlap`, moduleBoxes.every((a, i) => moduleBoxes.slice(i + 1).every((b) =>
     Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) < 0.01 || Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ) < 0.01)));

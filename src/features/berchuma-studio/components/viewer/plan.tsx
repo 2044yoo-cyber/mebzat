@@ -162,8 +162,8 @@ export function Plan({
           <rect
             x={corner.x}
             y={corner.z}
-            width={corner.size}
-            height={corner.size}
+            width={corner.width ?? corner.size}
+            height={corner.depth ?? corner.size}
             fill="url(#plan-corner)"
             className={selectedCabinetId === corner.id ? "cursor-pointer stroke-brand" : onSelectCabinet ? "cursor-pointer stroke-brand/60" : "stroke-brand/60"}
             strokeWidth={10}
@@ -176,13 +176,15 @@ export function Plan({
             }}
           />
           <text
-            x={corner.x + corner.size / 2}
-            y={corner.z + corner.size / 2 + 30}
+            x={corner.x + (corner.width ?? corner.size) / 2}
+            y={corner.z + (corner.depth ?? corner.size) / 2 + 30}
             textAnchor="middle"
             fontSize={88}
             className="fill-brand"
           >
-            {Math.round(corner.size)}
+            {(corner.width ?? corner.size) === (corner.depth ?? corner.size)
+              ? Math.round(corner.width ?? corner.size)
+              : `${Math.round(corner.width ?? corner.size)} × ${Math.round(corner.depth ?? corner.size)}`}
           </text>
         </g>
       ))}

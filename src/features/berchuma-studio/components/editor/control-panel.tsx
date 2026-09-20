@@ -68,7 +68,8 @@ import {
   type Cabinet,
   type DesignSpec,
 } from "../../types/spec";
-import { cornerLabel, type CornerKind } from "../../types/layout";
+import type { CornerKind } from "../../types/layout";
+import { resolveDesign } from "../../services/resolve";
 
 /**
  * Everything you can change, beside the thing you are changing.
@@ -99,7 +100,15 @@ export function ControlPanel({
 }: ControlPanelProps) {
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
-  const selectedCornerId = selectedId?.startsWith("corner-") ? selectedId : null;
+  const selectedCornerId = selectedId?.includes("corner-") ? selectedId : null;
+  const selectedCorner = selectedCornerId
+    ? resolveDesign(spec).layout.corners.find((corner) => corner.id === selectedCornerId) ?? null
+    : null;
+  const cornerSettings = selectedCornerId ? spec.cornerSettings?.[selectedCornerId] : undefined;
+  const updateCorner = (change: Partial<NonNullable<DesignSpec["cornerSettings"]>[string]>) => {
+    if (!selectedCornerId) return;
+    onChange({ ...spec, cornerSettings: { ...spec.cornerSettings, [selectedCornerId]: { ...cornerSettings, ...change } } });
+  };
 
   return (
     /*
@@ -156,12 +165,12 @@ export function ControlPanel({
             />
           </>
         ) : selectedCornerId ? (
-          <Section title="Corner module" icon={Layers} defaultOpen>
+          <Section title="CORNER" icon={Layers} defaultOpen>
             <label className="space-y-1 text-xs">
               <span className="font-medium">Corner type</span>
               <select
                 className="w-full rounded-md border bg-background px-2 py-2"
-                value={spec.cornerKinds?.[selectedCornerId] ?? spec.cornerKind}
+                value={spec.cornerKinds?.[selectedCornerId] ?? (selectedCornerId.startsWith("upper-") ? "l_corner" : spec.cornerKind)}
                 onChange={(event) => onChange({
                   ...spec,
                   cornerKinds: {
@@ -170,11 +179,31 @@ export function ControlPanel({
                   },
                 })}
               >
-                {["l_corner", "blind", "diagonal", ...(spec.furnitureType === "wardrobe" ? ["hanging"] : [])].map((kind) => (
-                  <option key={kind} value={kind}>{cornerLabel(kind as CornerKind)}</option>
+                {(spec.furnitureType === "wardrobe"
+                  ? ["l_corner", "hanging", "diagonal", "custom"]
+                  : selectedCornerId.startsWith("upper-")
+                    ? ["l_corner", "diagonal"]
+                    : ["blind", "l_corner", "diagonal"]
+                ).map((kind) => (
+                  <option key={kind} value={kind}>{
+                    spec.furnitureType === "wardrobe"
+                      ? ({ l_corner: "L Shelves", hanging: "Hanging Corner", diagonal: "45° Diagonal", custom: "Open Corner" } as Record<string, string>)[kind]
+                      : selectedCornerId.startsWith("upper-")
+                        ? kind === "diagonal" ? "45° Wall Corner" : "L Wall Corner"
+                        : kind === "blind" ? "Blind Corner" : kind === "diagonal" ? "45° Diagonal" : "L Corner"
+                  }</option>
                 ))}
               </select>
             </label>
+            {spec.furnitureType === "wardrobe" && selectedCorner ? <>
+              <LengthField label="Width" value={selectedCorner.width ?? selectedCorner.size} min={300} max={3000} step={10} onChange={(width) => updateCorner({ width })} />
+              <LengthField label="Depth" value={selectedCorner.depth ?? selectedCorner.size} min={300} max={3000} step={10} onChange={(depth) => updateCorner({ depth })} />
+              <LengthField label="Height" value={selectedCorner.height} min={200} max={LIMITS.maxHeight} step={10} onChange={(height) => updateCorner({ height })} />
+              {["l_corner", "custom"].includes(spec.cornerKinds?.[selectedCornerId] ?? spec.cornerKind) ? <label className="space-y-1 text-xs">
+                <span className="font-medium">Number of shelves</span>
+                <input type="number" min={0} max={20} value={cornerSettings?.shelves ?? 3} onChange={(event) => updateCorner({ shelves: Math.max(0, Math.min(20, Number(event.target.value))) })} className="w-full rounded-md border bg-background px-2 py-2" />
+              </label> : null}
+            </> : null}
           </Section>
         ) : (
           <p className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
@@ -236,6 +265,7 @@ function CabinetPicker({
 }) {
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
+  const corners = resolveDesign(spec).layout.corners;
 
   return (
     <Section title="Cabinet" icon={Boxes} defaultOpen>
@@ -254,6 +284,22 @@ function CabinetPicker({
             )}
           >
             {cabinet.label}
+          </button>
+        ))}
+        {corners.map((corner) => (
+          <button
+            key={corner.id}
+            type="button"
+            aria-pressed={corner.id === selectedId}
+            onClick={() => onSelect(corner.id)}
+            className={cn(
+              "rounded-md border px-2 py-1 text-[11px] transition-colors",
+              corner.id === selectedId
+                ? "border-brand bg-brand text-brand-foreground"
+                : "hover:border-brand hover:bg-brand/5",
+            )}
+          >
+            {corner.id === "corner-left" ? "Left corner" : corner.id === "corner-right" ? "Right corner" : "Corner"}
           </button>
         ))}
       </div>

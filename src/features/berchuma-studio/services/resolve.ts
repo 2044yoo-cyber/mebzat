@@ -72,6 +72,7 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
     cornerKinds: spec.cornerKinds,
+    cornerSettings: spec.cornerSettings,
     kitchenFacing:
       !!spec.kitchenSetup ||
       (spec.furnitureType === "wardrobe" &&
@@ -88,6 +89,8 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
   // How much of each run is spoken for, so an over-filled run is reported
   // once with a number rather than once per cabinet.
   const filled = new Map<string, number>();
+  const runCounts = new Map<string, number>();
+  for (const cabinet of spec.cabinets) if (cabinet.runId) runCounts.set(cabinet.runId, (runCounts.get(cabinet.runId) ?? 0) + 1);
 
   for (const cabinet of spec.cabinets) {
     const placement = cabinet.runId ? byRun.get(cabinet.runId) : undefined;
@@ -115,10 +118,25 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
     }
 
     const offset = cabinet.offset ?? 0;
-    const placed = placeOnRun(placement, offset, spec.kitchenSetup ? cabinet.size.depth : undefined);
+    // A generated turned wardrobe has one fitted carcass per run. Corner
+    // dimension edits change the run's usable span, so derive that carcass and
+    // its bay openings from the same span instead of leaving it inside the
+    // newly enlarged corner volume.
+    let effectiveCabinet = cabinet;
+    if (spec.furnitureType === "wardrobe" && spec.layout !== "straight" && runCounts.get(placement.runId) === 1 && Math.abs(cabinet.size.width - placement.usableLength) > 0.01) {
+      const t = spec.carcass.board.thickness;
+      const available = Math.max(0, placement.usableLength - (cabinet.bays.length + 1) * t);
+      const oldOpenings = cabinet.bays.reduce((sum, bay) => sum + bay.width, 0);
+      effectiveCabinet = {
+        ...cabinet,
+        size: { ...cabinet.size, width: placement.usableLength },
+        bays: cabinet.bays.map((bay) => ({ ...bay, width: oldOpenings > 0 ? available * bay.width / oldOpenings : 0 })),
+      };
+    }
+    const placed = placeOnRun(placement, offset, spec.kitchenSetup ? effectiveCabinet.size.depth : undefined);
 
     cabinets.push({
-      cabinet,
+      cabinet: effectiveCabinet,
       x: placed.x,
       z: placed.z,
       y: cabinet.position.y,
@@ -130,8 +148,8 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
     // Wall units sit above base units on the same run and share its length —
     // counting both would report every kitchen as twice over-filled. Fill is
     // measured per kind, and only the fullest kind is reported.
-    const key = `${placement.runId}:${cabinet.kind}:${cabinet.position.y}`;
-    filled.set(key, (filled.get(key) ?? 0) + cabinet.size.width);
+    const key = `${placement.runId}:${effectiveCabinet.kind}:${effectiveCabinet.position.y}`;
+    filled.set(key, (filled.get(key) ?? 0) + effectiveCabinet.size.width);
   }
 
   for (const placement of layout.placements) {
@@ -185,7 +203,7 @@ export function designWorldBounds(spec: DesignSpec): DesignWorldBounds {
     plan.push(
       rotatedRectBounds(
         { x: corner.x, z: corner.z },
-        { width: corner.size, depth: corner.size },
+        { width: corner.width ?? corner.size, depth: corner.depth ?? corner.size },
       ),
     );
   }
@@ -247,6 +265,7 @@ export function remainingOn(
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
     cornerKinds: spec.cornerKinds,
+    cornerSettings: spec.cornerSettings,
     kitchenFacing: !!spec.kitchenSetup,
   });
 
@@ -291,8 +310,8 @@ export function worktopSections(
     sections.push({
       x: corner.x,
       z: corner.z,
-      width: corner.size,
-      depth: corner.size,
+      width: corner.width ?? corner.size,
+      depth: corner.depth ?? corner.size,
     });
   }
 

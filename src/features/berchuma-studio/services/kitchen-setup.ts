@@ -27,7 +27,7 @@ export function createKitchenDesign(options: KitchenSetup): DesignSpec {
     ...run("kitchen-island", "Island", options.islandWidth),
     origin: { x: (options.roomWidth - options.islandWidth) / 2, z: 1540 }, rotation: 0,
   });
-  const solved = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, cornerKinds: spec.cornerKinds, kitchenFacing: true });
+  const solved = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, cornerKinds: spec.cornerKinds, cornerSettings: spec.cornerSettings, kitchenFacing: true });
   spec.cabinets = [];
   for (const placement of solved.placements) {
     const count = Math.max(1, Math.ceil(placement.usableLength / 800));
@@ -86,7 +86,7 @@ export function addKitchenUpper(spec: DesignSpec, lowerId: string): DesignSpec {
   if (spec.kitchenSetup && y + height > spec.kitchenSetup.roomHeight) return spec;
   const target = { ...lower };
   if (spec.kitchenSetup?.details) {
-    const layout = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, cornerKinds: spec.cornerKinds, kitchenFacing: true });
+    const layout = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, cornerKinds: spec.cornerKinds, cornerSettings: spec.cornerSettings, kitchenFacing: true });
     const baseRun = layout.placements.find((r) => r.runId === lower.runId);
     const upperRun = layout.placements.find((r) => r.runId === `upper-${lower.runId}`);
     if (!baseRun || !upperRun) return spec;
