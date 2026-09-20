@@ -111,6 +111,8 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
 
   const size = corner.size;
   const height = corner.height;
+  const wardrobeShelving = spec.furnitureType === "wardrobe" && corner.kind === "l_corner";
+  const exteriorRight = wardrobeShelving && corner.id !== "corner-left";
 
   // The carcass sits on the plinth like every other base unit, so its panels
   // are shorter than the corner's overall height by it.
@@ -118,7 +120,8 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
   const carcassHeight = Math.max(0, height - plinth);
 
   // Inside the two gables.
-  const inner = Math.max(0, size - 2 * t);
+  const inner = Math.max(0, size - (wardrobeShelving ? t : 2 * t));
+  const shelfX = exteriorRight ? 0 : t;
   // Just like a straight wardrobe, every 18 mm shell board stops at the
   // front face of the 6 mm applied back. The old corner builder extended its
   // gables all the way through a back panel at both z = 0 and z = size, which
@@ -201,7 +204,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       edgeBand: bodyBand,
       size: { x: t, y: carcassHeight, z: shellDepth },
       axis: "x",
-      placements: [at(0, 0, storageZ)],
+      placements: [at(exteriorRight ? size - t : 0, 0, storageZ)],
     },
     ...sideStructures,
     {
@@ -216,7 +219,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       edgeBand: bodyBand,
       size: { x: inner, y: t, z: shellDepth },
       axis: "y",
-      placements: [at(t, 0, storageZ)],
+      placements: [at(shelfX, 0, storageZ)],
     },
     {
       id: `${corner.id}/top`,
@@ -230,7 +233,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       edgeBand: bodyBand,
       size: { x: inner, y: t, z: shellDepth },
       axis: "y",
-      placements: [at(t, carcassHeight - t, storageZ)],
+      placements: [at(shelfX, carcassHeight - t, storageZ)],
     },
     {
       id: `${corner.id}/back`,
@@ -353,7 +356,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       board, length: inner, width: shellDepth, quantity: shelfYs.length,
       edges: { front: true, back: false, top: false, bottom: false }, edgeBand: bodyBand,
       adjustable: true, size: { x: inner, y: t, z: shellDepth }, axis: "y",
-      placements: shelfYs.map((y) => at(t, y, storageZ)),
+      placements: shelfYs.map((y) => at(shelfX, y, storageZ)),
     });
   }
 

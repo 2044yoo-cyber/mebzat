@@ -37,6 +37,7 @@ import { resolveDesign } from "../src/features/berchuma-studio/services/resolve.
 import {
   partCentre,
   partRotationRadians,
+  rotatedRectBounds,
 } from "../src/features/berchuma-studio/services/part-transform.ts";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
@@ -742,6 +743,30 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
 }
 
 // ---------------------------------------------------------------------------
+
+// Exercise the actual boards consumed by Model, including access into corners.
+for (const shape of ["l_shaped", "u_shaped"] as const) {
+  const spec = build(shape, shape === "u_shaped" ? [1800, 3000, 1800] : [3000, 1800]);
+  const resolved = resolveDesign(spec);
+  const parts = buildParts(spec).parts;
+  const count = shape === "u_shaped" ? 2 : 1;
+  const moduleBoxes = [
+    ...resolved.cabinets.map((c) => rotatedRectBounds(c, c.cabinet.size, c.rotation)),
+    ...resolved.layout.corners.map((c) => rotatedRectBounds(c, { width: c.size, depth: c.size }, 0)),
+  ];
+  check(`${shape}: cabinet and corner footprints never overlap`, moduleBoxes.every((a, i) => moduleBoxes.slice(i + 1).every((b) =>
+    Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) < 0.01 || Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ) < 0.01)));
+  check(`${shape}: physical corner shelf modules`, parts.filter((p) => p.id.endsWith("/corner-shelves")).length === count);
+  check(`${shape}: both adjacent ends open into every corner`, parts.filter((p) => p.label === "Corner access rear support" && p.size.z === 60).length === count * 2);
+  for (const corner of resolved.layout.corners) {
+    const gable = parts.find((p) => p.id === `${corner.id}/gable-left`)!;
+    const exteriorX = corner.id === "corner-left" ? corner.x : corner.x + corner.size - gable.size.x;
+    check(`${corner.id}: closed side lies on exterior`, Math.abs(gable.placements[0]!.x - exteriorX) < 0.01);
+    check(`${corner.id}: full usable shelf reaches open side`, parts.find((p) => p.id === `${corner.id}/corner-shelves`)!.size.x === corner.size - gable.size.x);
+  }
+  check(`${shape}: exact requested dimensions have no board overlaps`, clashes(spec).length === 0, clashes(spec).slice(0, 3).join("; "));
+  if (shape === "u_shaped") check("3000 × 1800 U reserves two 600 mm corners", resolved.layout.placements.map((p) => p.usableLength).join() === "1200,1800,1200");
+}
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);

@@ -112,6 +112,22 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
     const { cabinet, rotation } = placed;
 
     for (const part of kitchenConstruction(spec, cabinet, cabinetParts(spec, cabinet))) {
+      // Open the adjoining end panel into the dedicated shelf corner. A full
+      // gable here seals the corner behind two ordinary cabinet boxes.
+      const endX = part.id === "gable-left" ? 0 : part.id === "gable-right" ? cabinet.size.width : null;
+      const end = endX === null ? null : rotateThenPlace({ x: endX, y: 0, z: cabinet.size.depth / 2 }, rotation, placed.x, 0, placed.z);
+      const joinsShelfCorner = spec.furnitureType === "wardrobe" && end && resolved.layout.corners.some((corner) =>
+        corner.kind === "l_corner" && corner.between.includes(placed.runId ?? "") &&
+        end.x >= corner.x - 0.01 && end.x <= corner.x + corner.size + 0.01 &&
+        end.z >= corner.z - 0.01 && end.z <= corner.z + corner.size + 0.01);
+      if (joinsShelfCorner) {
+        // Retain a rear support stile; the remaining depth is a real opening.
+        const supportDepth = Math.min(60, part.size.z);
+        part.placements = part.placements.map((at) => ({ ...at, z: at.z + part.size.z - supportDepth }));
+        part.size = { ...part.size, z: supportDepth };
+        part.width = supportDepth;
+        part.label = "Corner access rear support";
+      }
       parts.push({
         ...part,
         // Ids must be unique across the design — two base units both containing

@@ -102,6 +102,8 @@ for (const mutation of [
   ['/services/starting-designs.ts', 'return "l_corner";', 'return "diagonal";'],
   ['/services/layout.ts', 'kind: cornerKinds?.["corner-left"] ?? cornerKind,', 'kind: cornerKind,'],
   ['/services/corners.ts', 'if (corner.kind === "hanging") {', 'if (false) {'],
+  ['/services/geometry.ts', 'if (joinsShelfCorner) {', 'if (false) {'],
+  ['/services/corners.ts', 'const exteriorRight = wardrobeShelving && corner.id !== "corner-left";', 'const exteriorRight = false;'],
 ]) await assert.rejects(load('scripts/wardrobe_shape_check.ts', mutation), undefined, `Wardrobe orientation rejects broken ${mutation[0]}`);
 for (const mutation of [
   ['/services/kitchen-setup.ts', 'spec.cornerKind = "blind";', 'spec.cornerKind = "l_corner";'],
