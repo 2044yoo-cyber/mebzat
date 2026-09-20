@@ -56,6 +56,8 @@ function checkWiring(transform = (s) => s) {
   const controls = clean('src/features/berchuma-studio/components/editor/control-panel.tsx');
   assert.match(controls, /<KitchenSetup[^>]*submitLabel="Replace kitchen layout"/);
   assert.match(controls, /onChange\(addKitchenUpper\(spec, selected.id\)\)/);
+  assert.match(controls, /title="Corner module"/);
+  assert.match(controls, /\[selectedCornerId\]: event\.target\.value as CornerKind/);
 }
 checkWiring();
 assert.throws(() => checkWiring((s) => s.replace('onStart={onStart}', 'onStart={() => {}}')));
@@ -64,6 +66,8 @@ console.log('PASS: setup fields, invalid submission, entry points and editor con
 await load('scripts/kitchen-detail-check.ts');
 for (const mutation of [
   ['/services/kitchen-detail.ts', 'options.roomDepth - d.upperDepth', 'options.roomDepth - d.baseDepth'],
+  ['/services/kitchen-detail.ts', 'options.roomWidth - rearCorners * d.upperDepth', 'options.roomWidth'],
+  ['/services/corners.ts', 'return [...base, ...base.map((corner): CornerBlock => ({', 'return [...base, ...base.slice(0, 0).map((corner): CornerBlock => ({'],
   ['/services/kitchen-detail.ts', 'offset: segment.offset,', 'offset: 0,'],
   ['/services/kitchen-detail.ts', 'const cornerFront = d.upperDepth + (spec.carcass.frontBoard ?? spec.carcass.board).thickness;', 'const cornerFront = 0;'],
   ['/services/kitchen-construction.ts', 'const opening = detail.fridgeHeight;', 'const opening = 100;'],
@@ -95,6 +99,12 @@ console.log('PASS: appliance setup and detailed construction; deliberate connect
 await load('scripts/wardrobe_shape_check.ts');
 for (const mutation of [
   ['/services/resolve.ts', '!!spec.kitchenSetup ||', '!!spec.kitchenSetup &&'],
-  ['/services/corners.ts', 'corner.id === "corner-left" ? 135 : -135', '-135'],
+  ['/services/starting-designs.ts', 'return "l_corner";', 'return "diagonal";'],
+  ['/services/layout.ts', 'kind: cornerKinds?.["corner-left"] ?? cornerKind,', 'kind: cornerKind,'],
+  ['/services/corners.ts', 'if (corner.kind === "hanging") {', 'if (false) {'],
 ]) await assert.rejects(load('scripts/wardrobe_shape_check.ts', mutation), undefined, `Wardrobe orientation rejects broken ${mutation[0]}`);
-console.log('PASS: L/U wardrobe run and corner orientation; two deliberate mutations rejected.');
+for (const mutation of [
+  ['/services/kitchen-setup.ts', 'spec.cornerKind = "blind";', 'spec.cornerKind = "l_corner";'],
+  ['/services/kitchen-detail.ts', 'spec.cornerKind = "blind";', 'spec.cornerKind = "l_corner";'],
+]) await assert.rejects(load(mutation[0].includes('detail') ? 'scripts/kitchen-detail-check.ts' : 'scripts/kitchen-check.ts', mutation), undefined, `Kitchen corner default rejects broken ${mutation[0]}`);
+console.log('PASS: dedicated wardrobe and kitchen corner defaults, editing and hardware; six deliberate mutations rejected.');

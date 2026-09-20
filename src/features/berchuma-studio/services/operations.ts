@@ -144,6 +144,7 @@ function shiftAfter(
 function syncRunBoundPositions(spec: DesignSpec): void {
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
+    cornerKinds: spec.cornerKinds,
     kitchenFacing: !!spec.kitchenSetup,
   });
   const placements = new Map(
@@ -567,6 +568,7 @@ function moveOffsetOnRun(
 
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
+    cornerKinds: spec.cornerKinds,
     kitchenFacing: !!spec.kitchenSetup,
   });
   const placement = layout.placements.find(

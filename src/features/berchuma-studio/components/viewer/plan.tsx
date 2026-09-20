@@ -165,8 +165,15 @@ export function Plan({
             width={corner.size}
             height={corner.size}
             fill="url(#plan-corner)"
-            className="stroke-brand/60"
+            className={selectedCabinetId === corner.id ? "cursor-pointer stroke-brand" : onSelectCabinet ? "cursor-pointer stroke-brand/60" : "stroke-brand/60"}
             strokeWidth={10}
+            role="button"
+            tabIndex={0}
+            aria-label={`Select ${corner.id}`}
+            onClick={() => onSelectCabinet?.(corner.id)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") onSelectCabinet?.(corner.id);
+            }}
           />
           <text
             x={corner.x + corner.size / 2}

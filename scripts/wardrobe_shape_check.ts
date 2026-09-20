@@ -253,8 +253,8 @@ function build(shape: "straight" | "l_shaped" | "u_shaped", walls: number[]) {
     `${corner.length} corner pieces`,
   );
   check(
-    "including its own gable, top, bottom, back and doors",
-    ["gable", "top", "back", "door"].every((role) =>
+    "including its own gable, top, bottom, back and shelves",
+    ["gable", "top", "back", "shelf"].every((role) =>
       corner.some((part) => part.role === role),
     ),
     [...new Set(corner.map((part) => part.role))].join(", "),
@@ -264,8 +264,9 @@ function build(shape: "straight" | "l_shaped" | "u_shaped", walls: number[]) {
     corner.some((part) => part.role === "plinth"),
   );
   check(
-    "the L corner opens diagonally toward the usable inside",
-    corner.filter((part) => part.role === "door").every((part) => part.rotationY === -135),
+    "the default wardrobe corner is open shelving, not an exterior door",
+    corner.filter((part) => part.role === "door").length === 0 &&
+      corner.filter((part) => part.role === "shelf").reduce((sum, part) => sum + part.quantity, 0) >= 4,
   );
 
   check(
@@ -474,19 +475,19 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
 
 {
   check(
-    "an L corner opens diagonally toward its usable inside",
-    wardrobeCornerKind("l_shaped") === "diagonal",
+    "an L wardrobe defaults to full corner shelving",
+    wardrobeCornerKind("l_shaped") === "l_corner",
     wardrobeCornerKind("l_shaped"),
   );
   check(
-    "a U corner also opens diagonally toward its centre",
-    wardrobeCornerKind("u_shaped") === "diagonal",
+    "a U wardrobe uses the same full corner default",
+    wardrobeCornerKind("u_shaped") === "l_corner",
     wardrobeCornerKind("u_shaped"),
   );
   check(
     "and the design carries the kind it was solved with",
-    build("l_shaped", [2400, 1800]).cornerKind === "diagonal" &&
-      build("u_shaped", [1800, 3000, 1800]).cornerKind === "diagonal",
+    build("l_shaped", [2400, 1800]).cornerKind === "l_corner" &&
+      build("u_shaped", [1800, 3000, 1800]).cornerKind === "l_corner",
     "solved one way and stored another, every later edit re-solves it differently",
   );
 
@@ -503,33 +504,42 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
     );
   }
 
-  const diagonal = buildParts(build("u_shaped", [1800, 3000, 1800])).parts.filter(
+  const shelving = buildParts(build("u_shaped", [1800, 3000, 1800])).parts.filter(
     (part) => /corner/i.test(part.label),
   );
   check(
     "a U's corners are cut as real boards",
-    diagonal.length >= 16,
-    `${diagonal.length} pieces across two corners`,
+    shelving.length >= 16,
+    `${shelving.length} pieces across two corners`,
   );
   check(
-    "including one diagonal inner door per corner",
-    diagonal.filter((part) => part.role === "door").length === 2,
-    [...new Set(diagonal.map((part) => part.label))].join(" / "),
+    "including usable shelves in both corners",
+    shelving.filter((part) => part.role === "shelf").reduce((sum, part) => sum + part.quantity, 0) >= 8,
+    [...new Set(shelving.map((part) => part.label))].join(" / "),
   );
   check(
     "and a structural gable in each corner",
-    diagonal.filter((part) => part.role === "gable").length >= 2,
-    `${diagonal.filter((part) => part.role === "gable").length} gables across two corners`,
+    shelving.filter((part) => part.role === "gable").length >= 2,
+    `${shelving.filter((part) => part.role === "gable").length} gables across two corners`,
   );
 
-  // The one that would have shipped. Asserted as a fault so that nobody
-  // "simplifies" the choice back to a single corner kind.
-  const wrong = build("u_shaped", [1800, 3000, 1800]);
-  wrong.cornerKind = "l_corner";
+  const mixed = build("u_shaped", [1800, 3000, 1800]);
+  mixed.cornerKinds = { "corner-left": "hanging", "corner-right": "diagonal" };
+  const mixedResolved = resolveDesign(mixed);
+  const mixedParts = buildParts(mixed).parts;
   check(
-    "a U built with an L's corner still collides, which is why it is not",
-    clashes(wrong).length > 0,
-    "if this passes, the corner code changed and the choice may be redundant",
+    "each U corner can keep its own edited type",
+    mixedResolved.layout.corners.map((corner) => corner.kind).join() === "hanging,diagonal",
+  );
+  check(
+    "a hanging corner produces a real rail and a diagonal produces its face",
+    mixedParts.some((part) => part.id === "corner-left/hanging-rail") &&
+      mixedParts.some((part) => part.id === "corner-right/diagonal-face"),
+  );
+  check(
+    "edited corner types remain collision free",
+    clashes(mixed).length === 0,
+    clashes(mixed).slice(0, 3).join(" | "),
   );
 }
 

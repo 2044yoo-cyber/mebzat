@@ -1661,7 +1661,7 @@ function hardwareFor(
   // resolved corner blocks that produced the panels above, so those parts can
   // never appear in the scene without their purchased hardware appearing in
   // the order and cost.
-  for (const requirement of cornerHardware(resolved, parts)) {
+  for (const requirement of cornerHardware(resolved, parts, spec)) {
     const hardware = findHardware(requirement.catalogueId);
     if (!hardware) continue;
     lines.push({

@@ -775,9 +775,10 @@ export function wardrobeWalls(
   }
 }
 
-/** Turned wardrobes use a diagonal inner opening instead of exterior doors. */
+/** Turned wardrobes default to the full, shelf-accessible L corner. */
 export function wardrobeCornerKind(shape: WardrobeShape): CornerKind {
-  return shape === "straight" ? "l_corner" : "diagonal";
+  void shape;
+  return "l_corner";
 }
 
 export type WardrobeShapeOptions = {

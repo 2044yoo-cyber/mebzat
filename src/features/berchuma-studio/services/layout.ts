@@ -68,6 +68,10 @@ export type CornerBlock = {
   /** The two runs it joins, in order. */
   between: [WallRunId, WallRunId];
   height: number;
+  /** Optional vertical placement for wall/upper corner modules. */
+  baseY?: number;
+  /** Wall corners have no floor plinth. */
+  plinthHeight?: number;
 };
 
 export type SolvedLayout = {
@@ -103,7 +107,7 @@ const MIN_RUN = 300;
 export function solveLayout(
   kind: LayoutKind,
   runs: RunSpec[],
-  options: { cornerKind?: CornerKind; kitchenFacing?: boolean } = {},
+  options: { cornerKind?: CornerKind; cornerKinds?: Record<string, CornerKind>; kitchenFacing?: boolean } = {},
 ): SolvedLayout {
   const solved = solveLayoutFrame(kind, runs, options);
   if (!options.kitchenFacing) return solved;
@@ -128,7 +132,7 @@ export function solveLayout(
 function solveLayoutFrame(
   kind: LayoutKind,
   runs: RunSpec[],
-  options: { cornerKind?: CornerKind } = {},
+  options: { cornerKind?: CornerKind; cornerKinds?: Record<string, CornerKind> } = {},
 ): SolvedLayout {
   const cornerKind = options.cornerKind ?? "l_corner";
 
@@ -136,11 +140,11 @@ function solveLayoutFrame(
     case "straight":
       return solveStraight(runs);
     case "l_shaped":
-      return solveL(runs, cornerKind);
+      return solveL(runs, cornerKind, options.cornerKinds);
     case "u_shaped":
-      return solveU(runs, cornerKind);
+      return solveU(runs, cornerKind, options.cornerKinds);
     case "g_shaped": {
-      const solved = solveU(runs.slice(0, 3), cornerKind);
+      const solved = solveU(runs.slice(0, 3), cornerKind, options.cornerKinds);
       const peninsula = runs[3];
       if (!peninsula || !runs[0]) return { ...solved, kind, notes: [...solved.notes, "A G layout needs a peninsula run."] };
       return {
@@ -214,7 +218,7 @@ function solveStraight(runs: RunSpec[]): SolvedLayout {
  * the corner and therefore B's *origin* — which is correct, because the corner
  * is where the walls meet and moving one wall moves the meeting point.
  */
-function solveL(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
+function solveL(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<string, CornerKind>): SolvedLayout {
   const a = runs[0];
   const b = runs[1];
   const notes: string[] = [];
@@ -282,7 +286,7 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
     corners: [
       {
         id: "corner-ab",
-        kind: cornerKind,
+        kind: cornerKinds?.["corner-ab"] ?? cornerKind,
         x: a.length - corner,
         z: 0,
         size: corner,
@@ -306,7 +310,7 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
  * if it is built by bolting two Ls together: one corner is subtracted twice
  * and the back run comes out short by a cabinet.
  */
-function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
+function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<string, CornerKind>): SolvedLayout {
   const left = runs[0];
   const back = runs[1];
   const right = runs[2];
@@ -315,7 +319,7 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
   if (!left || !back || !right) {
     const available = [left, back].filter(Boolean) as RunSpec[];
     return {
-      ...solveL(available, cornerKind),
+      ...solveL(available, cornerKind, cornerKinds),
       kind: "u_shaped",
       notes: ["A U needs three runs. Falling back to what was given."],
     };
@@ -385,7 +389,7 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
     corners: [
       {
         id: "corner-left",
-        kind: cornerKind,
+        kind: cornerKinds?.["corner-left"] ?? cornerKind,
         x: 0,
         z: 0,
         size: leftCorner,
@@ -394,7 +398,7 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
       },
       {
         id: "corner-right",
-        kind: cornerKind,
+        kind: cornerKinds?.["corner-right"] ?? cornerKind,
         x: back.length - rightCorner,
         z: 0,
         size: rightCorner,

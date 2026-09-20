@@ -8,6 +8,7 @@ import type { RunSpec } from "../types/layout";
 export function createDetailedKitchen(options: KitchenSetup): DesignSpec {
   const d = options.details!;
   const spec = startingDesign("kitchen");
+  spec.cornerKind = "blind";
   spec.kitchenSetup = structuredClone(options);
   spec.layout = options.shape;
   spec.title = `${options.shape.replaceAll("_", " ")} kitchen · ${options.roomWidth / 1000} × ${options.roomDepth / 1000} m`;
@@ -19,7 +20,7 @@ export function createDetailedKitchen(options: KitchenSetup): DesignSpec {
       : [run("kitchen-left", "Left wall", options.roomDepth), run("kitchen-back", "Back wall", options.roomWidth), run("kitchen-right", "Right wall", options.roomDepth)];
   if (options.shape === "g_shaped") spec.runs.push(run("kitchen-peninsula", "Peninsula", options.islandWidth));
   if (options.shape === "island") spec.runs.push({ ...run("kitchen-island", "Island", options.islandWidth), origin: { x: (options.roomWidth - options.islandWidth) / 2, z: d.baseDepth + 940 }, rotation: 0 });
-  const solved = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, kitchenFacing: true });
+  const solved = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, cornerKinds: spec.cornerKinds, kitchenFacing: true });
   spec.cabinets = [];
   type Segment = { offset: number; width: number; role?: "fridge" | "sink" | "stove" };
   function fill(start: number, end: number): Segment[] {
@@ -56,16 +57,16 @@ export function createDetailedKitchen(options: KitchenSetup): DesignSpec {
       }
     }
     if (!options.wallCabinets || /island|peninsula/.test(placement.runId)) continue;
-    // A full back row owns the wall corner; side rows butt against its face.
-    // Separate upper runs avoid the base corner's 550 mm gap in a 300 mm row.
+    // Wall runs stop at dedicated upper-corner modules, just as base runs do.
     const side = placement.runId.endsWith("left") ? "left" : placement.runId.endsWith("right") ? "right" : "back";
+    const rearCorners = side === "back" ? options.shape === "l_shaped" ? 1 : ["u_shaped", "g_shaped"].includes(options.shape) ? 2 : 0 : 1;
     const upperRun: RunSpec = { id: `upper-${placement.runId}`, label: `${placement.label} uppers`,
-      length: side === "back" ? options.roomWidth : options.roomDepth - d.upperDepth,
+      length: side === "back" ? options.roomWidth - rearCorners * d.upperDepth : options.roomDepth - d.upperDepth,
       depth: d.upperDepth, height: options.wallHeight,
-      origin: side === "back" ? { x: options.roomWidth, z: d.upperDepth } : side === "left" ? { x: d.upperDepth, z: d.upperDepth } : { x: options.roomWidth - d.upperDepth, z: options.roomDepth },
+      origin: side === "back" ? { x: options.roomWidth - (rearCorners ? d.upperDepth : 0), z: d.upperDepth } : side === "left" ? { x: d.upperDepth, z: d.upperDepth } : { x: options.roomWidth - d.upperDepth, z: options.roomDepth },
       rotation: side === "back" ? 180 : side === "left" ? 90 : 270 };
     spec.runs.push(upperRun);
-    const shift = side === "back" ? options.roomWidth - placement.origin.x : side === "left" ? placement.origin.z - d.upperDepth : options.roomDepth - placement.origin.z;
+    const shift = side === "back" ? upperRun.origin!.x - placement.origin.x : side === "left" ? placement.origin.z - d.upperDepth : options.roomDepth - placement.origin.z;
     const upperSegments = [...fill(0, shift), ...segments.map((s) => ({ ...s, offset: s.offset + shift })), ...fill(shift + placement.usableLength, upperRun.length)];
     for (const [index, segment] of upperSegments.entries()) {
       if (segment.role === "fridge") continue; // Its tall side panels and overhead box already occupy this space.
@@ -83,7 +84,7 @@ export function createDetailedKitchen(options: KitchenSetup): DesignSpec {
       if (options.topHeight > 0) spec.cabinets.push({ ...cabinet(`${wall.id}-top`, { ...segment, role: undefined }, upperRun.id, "wall", d.upperBottom + options.wallHeight, options.topHeight, d.upperDepth), label: "Extra top cabinet", stackedOn: wall.id, frontInsets: wall.frontInsets });
     }
   }
-  const finalLayout = solveLayout(spec.layout, spec.runs, { kitchenFacing: true });
+  const finalLayout = solveLayout(spec.layout, spec.runs, { cornerKind: spec.cornerKind, cornerKinds: spec.cornerKinds, kitchenFacing: true });
   for (const c of spec.cabinets) {
     const placement = finalLayout.placements.find((r) => r.runId === c.runId)!;
     const p = placeOnRun(placement, c.offset ?? 0, c.size.depth);

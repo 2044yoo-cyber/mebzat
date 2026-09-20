@@ -71,6 +71,7 @@ export type DesignWorldBounds = {
 export function resolveDesign(spec: DesignSpec): ResolvedDesign {
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
+    cornerKinds: spec.cornerKinds,
     kitchenFacing:
       !!spec.kitchenSetup ||
       (spec.furnitureType === "wardrobe" &&
@@ -245,6 +246,7 @@ export function remainingOn(
 ): number {
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
+    cornerKinds: spec.cornerKinds,
     kitchenFacing: !!spec.kitchenSetup,
   });
 

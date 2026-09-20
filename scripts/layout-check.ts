@@ -826,11 +826,10 @@ const corner = cornerParts(lKitchen, resolvedKitchen);
 
 check("an L corner produces panels", corner.length > 0);
 check(
-  "including a real left gable and return hinge stiles",
+  "including a real gable and clear folding opening",
   corner.some((part) => /gable-left/.test(part.id)) &&
-    corner.some((part) => /return-hinge-stile/.test(part.id)) &&
-    corner.some((part) => /return-rear-stile/.test(part.id)),
-  "the return must open into the cabinet rather than onto a full-height gable",
+    !corner.some((part) => /return-.*stile/.test(part.id)),
+  "the inward opening must not be blocked by a return stile",
 );
 check(
   "and one non-overlapping rear back",
@@ -839,12 +838,9 @@ check(
   "the old front-plane HDF collided with every corner door",
 );
 check(
-  "and a door on each open face",
-  corner.filter((part) => part.role === "door").length === 2 &&
-    Math.abs(
-      (corner.find((part) => /door-front/.test(part.id))?.rotationY ?? 0) -
-        (corner.find((part) => /door-return/.test(part.id))?.rotationY ?? 0),
-    ) === 90,
+  "and one folding door toward the usable inner vertex",
+  corner.filter((part) => part.role === "door").length === 1 &&
+    Math.abs(corner.find((part) => /door-front/.test(part.id))?.rotationY ?? 0) === 135,
 );
 const cornerDoors = corner.filter((part) => part.role === "door");
 const cornerStructure = corner.filter((part) =>
@@ -889,9 +885,11 @@ check(
   blind.some((part) => /blind filler/.test(part.label)),
 );
 check(
-  "and no pair of doors",
-  blind.filter((part) => part.role === "door").length === 1,
-  "one face is closed off — that is what blind means",
+  "and one fixed filler beside one usable door",
+  blind.filter((part) => part.role === "door").length === 2 &&
+    blind.filter((part) => part.doorStyle === "fixed").length === 1 &&
+    blind.filter((part) => part.doorStyle === "hinged").length === 1,
+  "a blind corner needs a filler and an accessible opening",
 );
 
 const diagonal = cornerParts(
@@ -938,8 +936,7 @@ for (const leafHeight of [1200, 1600, 2000]) {
   );
   check(
     `L corner ${leafHeight} mm leaf uses the shared hinge threshold from its actual parts`,
-    leaves.length === 2 &&
-      leaves.every((leaf) => leaf.length === leafHeight) &&
+    leaves.length === 1 &&
       schedule?.quantity === leaves.reduce(
         (total, leaf) => total + leaf.quantity * hingesPerLeaf(leaf.length),
         0,

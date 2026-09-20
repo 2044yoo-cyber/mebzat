@@ -513,6 +513,8 @@ export const designSpecSchema = z.object({
 
   /** How the runs meet. Ignored for a straight layout. */
   cornerKind: z.enum(cornerKinds).default("l_corner"),
+  /** Optional per-corner choices; `cornerKind` remains the layout fallback. */
+  cornerKinds: z.record(z.string(), z.enum(cornerKinds)).optional(),
   units: z.literal("mm"),
   title: z.string().min(1).max(160),
 

@@ -68,6 +68,7 @@ import {
   type Cabinet,
   type DesignSpec,
 } from "../../types/spec";
+import { cornerLabel, type CornerKind } from "../../types/layout";
 
 /**
  * Everything you can change, beside the thing you are changing.
@@ -98,6 +99,7 @@ export function ControlPanel({
 }: ControlPanelProps) {
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
+  const selectedCornerId = selectedId?.startsWith("corner-") ? selectedId : null;
 
   return (
     /*
@@ -153,6 +155,27 @@ export function ControlPanel({
               onChange={onChange}
             />
           </>
+        ) : selectedCornerId ? (
+          <Section title="Corner module" icon={Layers} defaultOpen>
+            <label className="space-y-1 text-xs">
+              <span className="font-medium">Corner type</span>
+              <select
+                className="w-full rounded-md border bg-background px-2 py-2"
+                value={spec.cornerKinds?.[selectedCornerId] ?? spec.cornerKind}
+                onChange={(event) => onChange({
+                  ...spec,
+                  cornerKinds: {
+                    ...spec.cornerKinds,
+                    [selectedCornerId]: event.target.value as CornerKind,
+                  },
+                })}
+              >
+                {["l_corner", "blind", "diagonal", ...(spec.furnitureType === "wardrobe" ? ["hanging"] : [])].map((kind) => (
+                  <option key={kind} value={kind}>{cornerLabel(kind as CornerKind)}</option>
+                ))}
+              </select>
+            </label>
+          </Section>
         ) : (
           <p className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
             Click a cabinet to change it, or add one below.
