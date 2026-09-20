@@ -126,10 +126,9 @@ export default async function RootLayout({
           <LegacyTranslationBridge />
           <ThemeProvider
             attribute="class"
-            // The workspace is designed dark first — that is what a tool people
-            // sit in front of all day should be. The toggle still works, and a
-            // returning visitor keeps whatever they last chose.
-            defaultTheme="dark"
+            // New visitors see the same blue/white palette as the homepage.
+            // Returning visitors keep their saved light, dark or device choice.
+            defaultTheme="light"
             enableSystem
             disableTransitionOnChange
           >
