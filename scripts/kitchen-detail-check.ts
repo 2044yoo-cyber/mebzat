@@ -18,8 +18,17 @@ for (const shape of ["straight", "l_shaped", "u_shaped", "g_shaped", "island"] a
   for (const role of ["fridge", "sink", "stove"] as const) {
     const c = spec.cabinets.find((c) => c.kitchenRole === role)!;
     assert.ok(c, role);
-    assert.equal(c.offset, input.details![role].offset);
+    assert.equal(c.offset, spec.kitchenSetup!.details![role].offset);
     assert.equal(c.size.width, input.details![role].width);
+  }
+  const fridgePosition = spec.kitchenSetup!.details!.fridge;
+  const fridgeRun = resolved.layout.placements.find((run) => run.runId === fridgePosition.runId)!;
+  const atStart = fridgePosition.runId === "kitchen-back" && fridgePosition.offset === 0;
+  const atOuterEnd = fridgePosition.offset + fridgePosition.width === fridgeRun.usableLength;
+  assert.ok(atStart || atOuterEnd, `${shape}: fridge is at a run edge`);
+  if (["u_shaped", "g_shaped"].includes(shape)) {
+    assert.ok(fridgePosition.runId === "kitchen-left" || fridgePosition.runId === "kitchen-right");
+    assert.ok(atOuterEnd, `${shape}: fridge stays away from the inside corner`);
   }
   // Upper runs meet at their edges rather than overlapping or leaving the
   // base corner's depth as an empty gap.
@@ -86,7 +95,7 @@ moved.details!.sink = { runId: "kitchen-island", offset: 0, width: 600 };
 const changed = createKitchenDesign(moved);
 assert.equal(changed.cabinets.find((c) => c.kitchenRole === "sink")?.runId, "kitchen-island");
 assert.ok(!changed.cabinets.some((c) => c.runId === "upper-kitchen-island"));
-const overlap = options("l_shaped"); overlap.details!.sink.offset = 100;
+const overlap = options("l_shaped"); overlap.details!.sink.offset = 1400;
 assert.ok(kitchenSetupError(overlap)); assert.throws(() => createKitchenDesign(overlap));
 const outside = options("l_shaped"); outside.details!.stove.offset = 9000;
 assert.ok(kitchenSetupError(outside));

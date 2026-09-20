@@ -71,7 +71,10 @@ export type DesignWorldBounds = {
 export function resolveDesign(spec: DesignSpec): ResolvedDesign {
   const layout = solveLayout(spec.layout, spec.runs, {
     cornerKind: spec.cornerKind,
-    kitchenFacing: !!spec.kitchenSetup,
+    kitchenFacing:
+      !!spec.kitchenSetup ||
+      (spec.furnitureType === "wardrobe" &&
+        (spec.layout === "l_shaped" || spec.layout === "u_shaped")),
   });
 
   const byRun = new Map<string, RunPlacement>(

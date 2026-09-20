@@ -3,10 +3,11 @@ import { createDetailedKitchen } from "./kitchen-detail";
 import { placeOnRun, solveLayout } from "./layout";
 import { validateSpec, type Cabinet, type DesignSpec } from "../types/spec";
 import { layoutLabel, type RunSpec } from "../types/layout";
-import { kitchenSetupError, type KitchenSetup } from "../types/kitchen";
+import { kitchenSetupError, placeFridgeAtRunEdge, type KitchenSetup } from "../types/kitchen";
 
 /** Build actual cabinets on measured runs, with separate overhead carcasses. */
 export function createKitchenDesign(options: KitchenSetup): DesignSpec {
+  options = placeFridgeAtRunEdge(options);
   const error = kitchenSetupError(options);
   if (error) throw new Error(error);
   if (options.details) return createDetailedKitchen(options);

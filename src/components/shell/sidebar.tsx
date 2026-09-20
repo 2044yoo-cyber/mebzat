@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { ChevronRight, Pin, PinOff, Star } from "lucide-react";
 
-import { Logo } from "@/components/layout/logo";
+import { BrandIcon, Logo } from "@/components/layout/logo";
 import { I18nText } from "@/components/i18n/i18n-text";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { navigationKey } from "@/lib/i18n/translations";
@@ -93,9 +93,9 @@ export function Sidebar({
         <Link
           href="/"
           aria-label={`${t("navigation.home")} — Medosha`}
-          className="mb-2 flex size-11 items-center justify-center rounded-lg bg-brand text-sm font-bold text-brand-foreground"
+          className="mb-2 flex size-11 items-center justify-center rounded-xl bg-blue-50 shadow-sm ring-1 ring-blue-100 dark:bg-blue-950 dark:ring-blue-900"
         >
-          M
+          <BrandIcon />
         </Link>
         {NAV_SECTIONS.map((section) => {
           const target =
