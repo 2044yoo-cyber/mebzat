@@ -96,21 +96,14 @@ check(
 );
 check(
   "with room to tap the last control rather than it sitting flush",
-  /--content-bottom-gap:\s*calc\([^;]*\+\s*0\.5rem/.test(baseGap),
+  /--content-bottom-gap:\s*calc\([^;]*\+\s*1\.5rem/.test(baseGap),
 );
 
-// The floating buttons are 150px tall and about 90px wide, in one corner.
-// Reserving their height across the whole width — which the first version of
-// this did — put a band of dead space under every page. That is a different
-// way of wasting the screen, not a fix. They are opt-in instead.
 check(
-  "the global reservation does NOT include the corner buttons",
-  !/--content-bottom-gap:\s*calc\([^;]*--floating-actions-h/.test(baseGap),
+  "the global reservation includes the corner buttons",
+  /--content-bottom-gap:\s*calc\([^;]*--floating-actions-h/.test(baseGap),
 );
-// A control at the foot of a column steps *around* the corner rather than the
-// whole column being lifted above it. Reserving the buttons' height cost about
-// 4cm of a phone screen to dodge 88px of width, and showed as a band of
-// nothing under the page.
+// Pinned and internally scrolling controls can also step around the corner.
 check("the floating stack's width is defined", /--floating-actions-w:\s*5\.5rem/.test(baseGap));
 check("with a utility to step around it", /\.pr-actions-safe\s*\{[\s\S]{0,80}var\(--floating-actions-w\)/.test(css));
 check(
@@ -195,7 +188,12 @@ check(
 // ---------------------------------------------------------------------------
 
 check("the shell is sized in dynamic viewport units", /h-dvh/.test(shell));
+check("the mobile root has a dynamic viewport minimum", /min-h-dvh/.test(shell));
 check("and not the static one", !/h-screen/.test(shell.slice(shell.indexOf("overflow-hidden bg-background") - 60, shell.indexOf("overflow-hidden bg-background") + 20)));
+check(
+  "the primary scroller hides horizontal overflow",
+  /className="@container\/ws[^"]*overflow-x-hidden[^"]*overflow-y-auto/.test(shell),
+);
 
 {
   const files = [...walkAll("src/app"), ...walkAll("src/components"), ...walkAll("src/features")].filter(

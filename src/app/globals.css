@@ -157,23 +157,9 @@ html[lang="om"] :where(button, a, label, [role="button"]) {
    * what the bar was getting blamed for. */
   --floating-actions-h: 9.25rem;
 
-  /* What every scrolling column reserves at its foot.
-   *
-   * The bar spans the full width, so every page has to clear all of it. That
-   * is the part that is genuinely global, and it is all this reserves.
-   *
-   * The floating buttons are deliberately *not* in here. They are 150px tall
-   * but only about 90px wide, in one corner — reserving their full height
-   * across the whole width to dodge a corner left a band of dead space under
-   * every page, which is a different way of wasting the screen than hiding
-   * things under the bar. A control that would otherwise run under them steps
-   * around them instead — see `--floating-actions-w` below.
-   *
-   * The extra half-rem keeps the last element off the bar without a visible
-   * band under it. The bar is 3.5rem and on a 393px-wide phone that is already
-   * almost exactly a centimetre of glass, so the reservation lands at about
-   * 1.15cm — the bar, and just enough not to be flush against it. */
-  --content-bottom-gap: calc(var(--bottom-nav-h) + 0.5rem);
+  /* Let the final control scroll fully above the bottom bar and both floating
+   * actions, with a small comfortable over-scroll margin. */
+  --content-bottom-gap: calc(var(--bottom-nav-h) + var(--floating-actions-h) + 1.5rem);
 
   /* A strip down each side of a full-screen map that the page keeps.
    *
@@ -191,15 +177,10 @@ html[lang="om"] :where(button, a, label, [role="button"]) {
    * keeps almost all of the screen. */
   --map-scroll-gutter: 1.5rem;
 
-  /* How much of the *width* the floating stack takes, rather than the height.
+  /* How much of the *width* the floating stack takes.
    *
    * 20px of padding either side of a 48px button. This is the number that
-   * matters for a control at the foot of a column: the buttons are a corner,
-   * and a corner is cheaper to step around than to sit above.
-   *
-   * The alternative — reserving `--floating-actions-h` at the foot — costs
-   * 3.97cm of vertical space on a phone to dodge 88px of horizontal, and the
-   * result is a band of nothing under the page. */
+   * lets pinned or internally scrolling controls step around the stack too. */
   --floating-actions-w: 5.5rem;
 
   --background: oklch(0.99 0.006 255);

@@ -141,7 +141,7 @@ export function AppShell({
     // not the 900 pixels that happened to be in view, so `print:` unpicks the
     // shell: the panels go, the height cap goes, and the workspace becomes an
     // ordinary flowing page the browser can paginate.
-    <div className="flex h-dvh overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
+    <div className="flex h-dvh min-h-dvh overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
       {/* ---- Navigation ---------------------------------------------- */}
       <div
         style={{ width: navWidth }}
@@ -277,7 +277,7 @@ export function AppShell({
             // open. This is the passive half of the keyboard fix; there is
             // deliberately no scrollIntoView on focus, because automatic
             // scrolling that fires on every tap is its own problem.
-            className="@container/ws min-w-0 flex-1 overflow-y-auto overscroll-contain pb-content-safe scroll-pb-content-safe print:overflow-visible print:pb-0"
+            className="@container/ws min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pb-content-safe scroll-pb-content-safe print:overflow-visible print:pb-0"
           >
             {children}
           </main>
