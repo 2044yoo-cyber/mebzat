@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Pencil } from "lucide-react";
+import { Check, Pencil } from "lucide-react";
 
 import { FontSettingsForm } from "@/components/settings/font-settings-form";
+import { RoleSettingsForm } from "@/components/settings/role-settings-form";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import { WatermarkSettingsForm } from "@/components/settings/watermark-settings-form";
 import { buttonVariants } from "@/components/ui/button";
 import { toFontChoice } from "@/lib/constants/fonts";
+import { getProfileCompletion } from "@/lib/profile/completion";
+import { primaryRoleOf, rolesOf } from "@/lib/profile/roles";
 import {
   DEFAULT_WATERMARK,
   normaliseSettings,
@@ -34,7 +37,7 @@ export default async function SettingsPage() {
       .maybeSingle(),
     supabase
       .from("profiles")
-      .select("username, full_name, company_name, phone, avatar_url, font_preference")
+      .select("*")
       .eq("id", viewer.id)
       .maybeSingle(),
   ]);
@@ -46,6 +49,8 @@ export default async function SettingsPage() {
     ? normaliseSettings(watermark as Partial<WatermarkSettings>)
     : { ...DEFAULT_WATERMARK };
 
+  const completion = profile ? getProfileCompletion(profile) : null;
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <header className="space-y-1">
@@ -56,6 +61,24 @@ export default async function SettingsPage() {
       </header>
 
       <AppearanceSettings />
+
+      {profile && (
+        <section className="space-y-3 rounded-2xl border p-4 sm:p-6">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight">
+              How you use Medosha
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              This decides what your profile is asked for. You can change it
+              whenever it changes.
+            </p>
+          </div>
+          <RoleSettingsForm
+            initialRoles={rolesOf(profile)}
+            initialPrimary={primaryRoleOf(profile)}
+          />
+        </section>
+      )}
 
       <FontSettingsForm initial={toFontChoice(profile?.font_preference)} />
 
@@ -76,6 +99,16 @@ export default async function SettingsPage() {
           <p className="text-sm text-muted-foreground">
             Your name, photo, bio and contact details.
           </p>
+          {completion &&
+            (completion.complete ? (
+              <p className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                <Check className="size-4" /> Profile complete
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {completion.percent}% complete
+              </p>
+            ))}
         </div>
         <Link
           href="/profile/edit"
