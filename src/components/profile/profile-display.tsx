@@ -9,6 +9,7 @@ import {
   Phone,
 } from "lucide-react";
 
+import { ProfessionDetails } from "@/components/profile/profession-details";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -99,6 +100,11 @@ export function ProfileDisplay({
           <p className="text-sm leading-relaxed whitespace-pre-line">
             {profile.bio || "No bio yet."}
           </p>
+
+          {/* The owner's own view of what their trade said. Same component as
+              the public page, so there is no version of this that shows one
+              thing to them and another to a client. */}
+          <ProfessionDetails profile={profile} />
         </div>
 
         <div className="space-y-3 rounded-2xl border p-5 text-sm">

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Check, MapPin, Search } from "lucide-react";
 
 import { PlacePicker } from "@/components/location/place-picker";
+import { ProfessionFieldsForm } from "@/components/profile/profession-fields-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -13,6 +14,7 @@ import {
   specialtiesFor,
 } from "@/lib/constants/professions";
 import { searchPlaces } from "@/lib/location/places";
+import type { ProfessionDetails } from "@/lib/profile/profession-fields";
 import { cn } from "@/lib/utils";
 
 /**
@@ -62,6 +64,7 @@ export function TradeAndAreas({
   travelRadiusKm,
   servesEntireCity,
   workStatus,
+  professionDetails,
 }: {
   areas: AreaOption[];
   profession: string | null;
@@ -71,6 +74,8 @@ export function TradeAndAreas({
   travelRadiusKm: number | null;
   servesEntireCity: boolean;
   workStatus: string;
+  /** Everything ever answered, including for trades no longer chosen. */
+  professionDetails: ProfessionDetails;
 }) {
   const [trade, setTrade] = useState(profession ?? "");
   const [chosen, setChosen] = useState<string[]>(serviceAreaSlugs);
@@ -305,6 +310,10 @@ export function TradeAndAreas({
           </div>
         )}
       </div>
+
+      {/* Driven by the profession state above, not by the saved value: pick a
+          different trade and its questions appear without a round trip. */}
+      <ProfessionFieldsForm profession={trade} details={professionDetails} />
     </div>
   );
 }

@@ -11,6 +11,13 @@ import { isCompanySize, isIndustry } from "@/lib/constants/industries";
 import { parseLanguages } from "@/lib/constants/languages";
 import { isPlausiblePlace } from "@/lib/location/places";
 import { parseYears } from "@/lib/profile/experience";
+import {
+  detailsOf,
+  detailsToWrite,
+  fieldsFor,
+  readPostedDetail,
+  type ProfessionDetails,
+} from "@/lib/profile/profession-fields";
 import { createClient } from "@/lib/supabase/server";
 import { profileDetailsSchema } from "@/lib/validations/profile";
 import type { AccountType, WorkStatus } from "@/types/database.types";
@@ -146,10 +153,39 @@ export async function updateProfile(
   // industry gone. Absent is not the same as cleared.
   const asked = (field: string) => formData.has(field);
 
+  // The trade's own questions.
+  //
+  // Read against the trade being *saved*, not the one on the row: somebody
+  // changing from Carpenter to Contractor posts the contractor's fields, and
+  // reading the old trade's list would store nothing and score them at zero.
+  //
+  // Merged over what is stored, never replacing it. The form posts only the
+  // fields the current trade shows, so a contractor's save carries no
+  // `own_workshop` — and if absent meant "clear", changing trade would delete
+  // the answers of the trade somebody came from, which they would find gone
+  // the moment they changed back.
+  const shownFields = fieldsFor([profession]);
+
+  let professionDetails: ProfessionDetails | undefined;
+  if (shownFields.length > 0) {
+    const { data: stored } = await supabase
+      .from("profiles")
+      .select("profession_details")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    professionDetails = detailsToWrite(
+      detailsOf({ profession_details: stored?.profession_details ?? null }),
+      shownFields,
+      (field) => readPostedDetail(formData, field),
+    );
+  }
+
   const { error } = await supabase
     .from("profiles")
     .update({
       profession,
+      ...(professionDetails ? { profession_details: professionDetails } : {}),
       specialties: parseSpecialties(formData.get("specialties")),
       base_area: baseArea || null,
       travel_radius_km: travelRadius,

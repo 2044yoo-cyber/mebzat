@@ -32,6 +32,7 @@ import { ACCOUNT_TYPES } from "@/lib/constants/account-types";
 import { COMPANY_SIZES, INDUSTRIES } from "@/lib/constants/industries";
 import { searchLanguages } from "@/lib/constants/languages";
 import { digitsOnly, MAX_YEARS } from "@/lib/profile/experience";
+import { detailsOf } from "@/lib/profile/profession-fields";
 import { ORGANIZATION_ACCOUNT_TYPES } from "@/lib/validations/profile";
 import type { AccountType, Profile } from "@/types/database.types";
 
@@ -276,6 +277,7 @@ export function EditProfileForm({
           travelRadiusKm={profile.travel_radius_km}
           servesEntireCity={profile.serves_entire_city}
           workStatus={profile.work_status}
+          professionDetails={detailsOf(profile)}
         />
         )}
 

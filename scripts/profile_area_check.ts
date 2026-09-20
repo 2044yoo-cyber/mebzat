@@ -463,7 +463,12 @@ check(
       bio: "Carpenter.",
       username: "hana",
       phone: "+251900000000",
-      profession: "Carpenter",
+      // A trade with no questions of its own, on purpose. These checks are
+      // about the person-or-organisation split, which is what still decides
+      // the set for somebody hired by the day. A carpenter here would be
+      // scored against the carpenter's own required fields — which is correct,
+      // and is asserted in scripts/profession_fields_check.ts instead.
+      profession: "Construction Labourer",
       years_experience: 5,
       languages: ["Amharic"],
       company_name: null,

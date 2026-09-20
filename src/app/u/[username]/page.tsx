@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReviewCard } from "@/components/reviews/review-card";
 import { ProfileCredentials } from "@/components/profile/profile-credentials";
+import { ProfessionDetails } from "@/components/profile/profession-details";
 import { WorksInYourArea } from "@/components/professionals/works-in-your-area";
 import { listAreas, serviceAreasFor } from "@/lib/data/professionals";
 import { ProfileHeader } from "@/components/profile/profile-header";
@@ -105,6 +106,11 @@ export default async function PublicProfilePage(props: {
                     </p>
                   </section>
                 )}
+                {/* The trade's own answers, and only the ones given. A
+                    field somebody left empty is not shown as a dash, and a
+                    field belonging to a trade they used to do is not shown at
+                    all — the answers are kept, not published. */}
+                <ProfessionDetails profile={profile} />
                 <ProfilePortfolio
                   portfolio={data.portfolio.slice(0, 6)}
                   name={displayName}
