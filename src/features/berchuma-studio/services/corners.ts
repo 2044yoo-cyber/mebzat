@@ -115,7 +115,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
   const sizeZ = corner.depth ?? corner.size;
   const height = corner.height;
   const wardrobeCorner = spec.furnitureType === "wardrobe";
-  const wardrobeShelving = wardrobeCorner && (corner.kind === "l_corner" || corner.kind === "custom");
+  const wardrobeShelving = wardrobeCorner && (corner.kind === "l_corner" || corner.kind === "custom" || corner.kind === "hanging" || corner.kind === "diagonal");
   const exteriorRight = wardrobeShelving && corner.id !== "corner-left";
 
   // The carcass sits on the plinth like every other base unit, so its panels
@@ -131,7 +131,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
   // gables all the way through a back panel at both z = 0 and z = size, which
   // made a convincing front view but generated overlapping boards.
   const inwardOpening =
-    ((corner.kind === "l_corner" || corner.kind === "custom") && spec.furnitureType === "wardrobe") ||
+    wardrobeCorner ||
     corner.kind === "blind";
   const shellDepth = Math.max(0, sizeZ - backBoard.thickness);
   const storageZ = inwardOpening ? backBoard.thickness : 0;
@@ -289,7 +289,35 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
     });
   }
 
-  if (corner.kind === "diagonal") {
+  if (corner.kind === "diagonal" && wardrobeCorner) {
+    // The shell and shelves end at the diagonal even with Show inside enabled.
+    // Mirror the right corner; use both dimensions for rectangular footprints.
+    const w = sizeX - 2 * t;
+    const d = sizeZ - backBoard.thickness - t;
+    const left = corner.id === "corner-left";
+    const outline = left
+      ? [{ x: 0, z: 0 }, { x: w, z: 0 }, { x: 0, z: d }]
+      : [{ x: 0, z: 0 }, { x: w, z: 0 }, { x: w, z: d }];
+    for (const panel of parts) {
+      if (panel.axis !== "y" || !["shelf", "top"].includes(panel.role)) continue;
+      panel.length = w; panel.width = d;
+      panel.size = { x: w, y: t, z: d };
+      panel.footprint = outline;
+      panel.placements = panel.placements.map((p) => ({ ...p, x: corner.x + t, z: corner.z + backBoard.thickness }));
+    }
+    const bottom = parts.find((p) => p.id === `${corner.id}/bottom`)!;
+    const count = spec.cornerSettings?.[corner.id]?.shelves ?? 3;
+    if (count) parts.push({ ...bottom, id: `${corner.id}/corner-shelves`, label: "Diagonal corner shelves · triangular cut", adjustable: true, quantity: count,
+      placements: Array.from({ length: count }, (_, i) => at(t, (carcassHeight - t) * (i + 1) / (count + 1), backBoard.thickness)) });
+    const face = Math.hypot(w, d);
+    const angle = Math.atan2(left ? -d : d, w) * 180 / Math.PI;
+    parts.push({ id: `${corner.id}/diagonal-face`, role: "door", label: "Diagonal corner door", board: frontBoard,
+      length: carcassHeight - 2 * t, width: face, quantity: 1, edges: { front: true, back: true, top: true, bottom: true }, edgeBand: frontBand,
+      size: { x: face, y: carcassHeight - 2 * t, z: frontBoard.thickness }, axis: "z", doorStyle: "corner", rotationY: angle,
+      placements: [at(t, t, left ? backBoard.thickness + d : backBoard.thickness)] });
+  }
+
+  if (corner.kind === "diagonal" && !wardrobeCorner) {
     // One panel across the 45° face. Longer than either side by √2, which is
     // the reason a diagonal corner costs more board than it looks like it
     // should — and the reason both runs must be the same depth for it.
@@ -325,7 +353,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
     });
   }
 
-  if ((corner.kind === "l_corner" && spec.furnitureType === "kitchen") || corner.kind === "hanging") {
+  if ((corner.kind === "l_corner" && spec.furnitureType === "kitchen") || (corner.kind === "hanging" && !wardrobeCorner)) {
     // A folding inner leaf reaches the corner without occupying either
     // neighbouring run's end gable.
     const leaf = Math.floor(inner * Math.SQRT2);

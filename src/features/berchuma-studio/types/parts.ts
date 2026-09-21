@@ -48,6 +48,8 @@ export type BandedEdges = {
 export type Vec3 = { x: number; y: number; z: number };
 
 export type Part = {
+  /** Horizontal board outline; length/width remain its rectangular cutting blank. */
+  footprint?: { x: number; z: number }[];
   id: string;
   role: PartRole;
   label: string;
