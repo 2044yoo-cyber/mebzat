@@ -255,6 +255,17 @@ function PartMesh({
     Math.max(part.size.y * MM, 0.001),
     Math.max(part.size.z * MM, 0.001),
   ];
+  const shapedGeometry = useMemo(() => {
+    if (!part.footprint) return null;
+    const shape = new THREE.Shape(part.footprint.map((p) => new THREE.Vector2(
+      (p.x - part.size.x / 2) * MM, (p.z - part.size.z / 2) * MM,
+    )));
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: part.size.y * MM, bevelEnabled: false });
+    geometry.rotateX(-Math.PI / 2);
+    geometry.translate(0, -part.size.y * MM / 2, 0);
+    return geometry;
+  }, [part]);
+  useEffect(() => () => { shapedGeometry?.dispose(); }, [shapedGeometry]);
 
   // The spec's z runs backwards from the front face; three.js runs it towards
   // the camera. Negating it is what puts the doors in front of the carcass
@@ -283,7 +294,7 @@ function PartMesh({
           : undefined
       }
     >
-      <boxGeometry args={size} />
+      {shapedGeometry ? <primitive object={shapedGeometry} attach="geometry" /> : <boxGeometry args={size} />}
       <meshStandardMaterial
         color={colourFor(part, spec)}
         roughness={roughnessFor(part, spec)}

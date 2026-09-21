@@ -10,6 +10,7 @@ import { validateSpec } from "../src/features/berchuma-studio/types/spec";
 const options = (shape: KitchenSetup["shape"]): KitchenSetup => ({ ...DEFAULT_KITCHEN_SETUP, shape });
 for (const [shape, runs, corners] of [["straight", 1, 0], ["l_shaped", 2, 1], ["u_shaped", 3, 2], ["g_shaped", 4, 2], ["island", 2, 0]] as const) {
   const spec = createKitchenDesign(options(shape));
+  if (["l_shaped", "u_shaped", "g_shaped"].includes(shape)) assert.equal(spec.cornerKind, "blind", `${shape}: economical blind corner is the default`);
   assert.equal(validateSpec(JSON.parse(JSON.stringify(spec))).spec.kitchenSetup?.shape, shape);
   const resolved = resolveDesign(spec);
   assert.equal(resolved.layout.placements.length, runs);

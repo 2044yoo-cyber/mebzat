@@ -1,6 +1,7 @@
 import {
   cornerKinds,
   type CornerKind,
+  type CornerSettings,
   type LayoutKind,
   type RunPlacement,
   type RunSpec,
@@ -65,9 +66,15 @@ export type CornerBlock = {
   z: number;
   /** Always the run depth: a corner between two `d`-deep runs is `d × d`. */
   size: number;
+  width?: number;
+  depth?: number;
   /** The two runs it joins, in order. */
   between: [WallRunId, WallRunId];
   height: number;
+  /** Optional vertical placement for wall/upper corner modules. */
+  baseY?: number;
+  /** Wall corners have no floor plinth. */
+  plinthHeight?: number;
 };
 
 export type SolvedLayout = {
@@ -103,7 +110,7 @@ const MIN_RUN = 300;
 export function solveLayout(
   kind: LayoutKind,
   runs: RunSpec[],
-  options: { cornerKind?: CornerKind; kitchenFacing?: boolean } = {},
+  options: { cornerKind?: CornerKind; cornerKinds?: Record<string, CornerKind>; cornerSettings?: Record<string, CornerSettings>; kitchenFacing?: boolean } = {},
 ): SolvedLayout {
   const solved = solveLayoutFrame(kind, runs, options);
   if (!options.kitchenFacing) return solved;
@@ -128,7 +135,7 @@ export function solveLayout(
 function solveLayoutFrame(
   kind: LayoutKind,
   runs: RunSpec[],
-  options: { cornerKind?: CornerKind } = {},
+  options: { cornerKind?: CornerKind; cornerKinds?: Record<string, CornerKind>; cornerSettings?: Record<string, CornerSettings> } = {},
 ): SolvedLayout {
   const cornerKind = options.cornerKind ?? "l_corner";
 
@@ -136,11 +143,11 @@ function solveLayoutFrame(
     case "straight":
       return solveStraight(runs);
     case "l_shaped":
-      return solveL(runs, cornerKind);
+      return solveL(runs, cornerKind, options.cornerKinds, options.cornerSettings);
     case "u_shaped":
-      return solveU(runs, cornerKind);
+      return solveU(runs, cornerKind, options.cornerKinds, options.cornerSettings);
     case "g_shaped": {
-      const solved = solveU(runs.slice(0, 3), cornerKind);
+      const solved = solveU(runs.slice(0, 3), cornerKind, options.cornerKinds, options.cornerSettings);
       const peninsula = runs[3];
       if (!peninsula || !runs[0]) return { ...solved, kind, notes: [...solved.notes, "A G layout needs a peninsula run."] };
       return {
@@ -214,7 +221,7 @@ function solveStraight(runs: RunSpec[]): SolvedLayout {
  * the corner and therefore B's *origin* — which is correct, because the corner
  * is where the walls meet and moving one wall moves the meeting point.
  */
-function solveL(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
+function solveL(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<string, CornerKind>, cornerSettings?: Record<string, CornerSettings>): SolvedLayout {
   const a = runs[0];
   const b = runs[1];
   const notes: string[] = [];
@@ -232,21 +239,24 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
   // The corner is square and takes the deeper of the two runs, so neither run
   // pokes out past it. Two different depths meeting is unusual but legal — a
   // 600 base run into a 350 wall-unit return, for instance.
-  const corner = Math.max(a.depth, b.depth);
+  const fallback = Math.max(a.depth, b.depth);
+  const settings = cornerSettings?.["corner-ab"];
+  const cornerWidth = Math.min(a.length - MIN_RUN, Math.max(b.depth, settings?.width ?? fallback));
+  const cornerDepth = Math.min(b.length - MIN_RUN, Math.max(a.depth, settings?.depth ?? fallback));
 
-  const usableA = a.length - corner;
-  const usableB = b.length - corner;
+  const usableA = a.length - cornerWidth;
+  const usableB = b.length - cornerDepth;
 
   if (usableA < MIN_RUN) {
     notes.push(
-      `${a.label} is ${a.length} mm and the corner needs ${corner} mm of it, ` +
-        `leaving too little for a cabinet. Lengthen it past ${corner + MIN_RUN} mm.`,
+      `${a.label} is ${a.length} mm and the corner needs ${cornerWidth} mm of it, ` +
+        `leaving too little for a cabinet. Lengthen it past ${cornerWidth + MIN_RUN} mm.`,
     );
   }
   if (usableB < MIN_RUN) {
     notes.push(
-      `${b.label} is ${b.length} mm and the corner needs ${corner} mm of it, ` +
-        `leaving too little for a cabinet. Lengthen it past ${corner + MIN_RUN} mm.`,
+      `${b.label} is ${b.length} mm and the corner needs ${cornerDepth} mm of it, ` +
+        `leaving too little for a cabinet. Lengthen it past ${cornerDepth + MIN_RUN} mm.`,
     );
   }
 
@@ -267,7 +277,7 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
       // A +90° local depth projects towards -x. Anchor its front-right
       // corner at the wall so the returned carcass fills x = La-d…La below
       // the corner, rather than floating one depth to the left of it.
-      origin: { x: a.length, z: corner },
+      origin: { x: a.length, z: cornerDepth },
       rotation: 90,
       wallLength: b.length,
       usableLength: Math.max(0, usableB),
@@ -282,12 +292,14 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
     corners: [
       {
         id: "corner-ab",
-        kind: cornerKind,
-        x: a.length - corner,
+        kind: cornerKinds?.["corner-ab"] ?? cornerKind,
+        x: a.length - cornerWidth,
         z: 0,
-        size: corner,
+        size: Math.max(cornerWidth, cornerDepth),
+        width: cornerWidth,
+        depth: cornerDepth,
         between: [a.id, b.id],
-        height: Math.max(a.height, b.height),
+        height: settings?.height ?? Math.max(a.height, b.height),
       },
     ],
     extent: { width: a.length, depth: b.length },
@@ -306,7 +318,7 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
  * if it is built by bolting two Ls together: one corner is subtracted twice
  * and the back run comes out short by a cabinet.
  */
-function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
+function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<string, CornerKind>, cornerSettings?: Record<string, CornerSettings>): SolvedLayout {
   const left = runs[0];
   const back = runs[1];
   const right = runs[2];
@@ -315,18 +327,28 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
   if (!left || !back || !right) {
     const available = [left, back].filter(Boolean) as RunSpec[];
     return {
-      ...solveL(available, cornerKind),
+      ...solveL(available, cornerKind, cornerKinds, cornerSettings),
       kind: "u_shaped",
       notes: ["A U needs three runs. Falling back to what was given."],
     };
   }
 
-  const leftCorner = Math.max(left.depth, back.depth);
-  const rightCorner = Math.max(right.depth, back.depth);
+  const leftFallback = Math.max(left.depth, back.depth);
+  const rightFallback = Math.max(right.depth, back.depth);
+  const leftSettings = cornerSettings?.["corner-left"];
+  const rightSettings = cornerSettings?.["corner-right"];
+  const leftWidth = Math.max(left.depth, leftSettings?.width ?? leftFallback);
+  const rightWidth = Math.max(right.depth, rightSettings?.width ?? rightFallback);
+  const totalWidth = leftWidth + rightWidth;
+  const widthScale = totalWidth > back.length - MIN_RUN ? (back.length - MIN_RUN) / totalWidth : 1;
+  const leftCorner = leftWidth * widthScale;
+  const rightCorner = rightWidth * widthScale;
+  const leftCornerDepth = Math.min(left.length - MIN_RUN, Math.max(back.depth, leftSettings?.depth ?? leftFallback));
+  const rightCornerDepth = Math.min(right.length - MIN_RUN, Math.max(back.depth, rightSettings?.depth ?? rightFallback));
 
   const usableBack = back.length - leftCorner - rightCorner;
-  const usableLeft = left.length - leftCorner;
-  const usableRight = right.length - rightCorner;
+  const usableLeft = left.length - leftCornerDepth;
+  const usableRight = right.length - rightCornerDepth;
 
   if (usableBack < MIN_RUN) {
     notes.push(
@@ -347,7 +369,7 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
       runId: left.id,
       label: left.label,
       // Down the left wall, starting below the left corner.
-      origin: { x: left.depth, z: leftCorner },
+      origin: { x: left.depth, z: leftCornerDepth },
       rotation: 90,
       wallLength: left.length,
       usableLength: Math.max(0, usableLeft),
@@ -370,7 +392,7 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
       label: right.label,
       // Same +90° convention as the L return: local depth reaches left from
       // the anchor, so the right wall is anchored at the room's outer edge.
-      origin: { x: back.length, z: rightCorner },
+      origin: { x: back.length, z: rightCornerDepth },
       rotation: 90,
       wallLength: right.length,
       usableLength: Math.max(0, usableRight),
@@ -385,21 +407,25 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind): SolvedLayout {
     corners: [
       {
         id: "corner-left",
-        kind: cornerKind,
+        kind: cornerKinds?.["corner-left"] ?? cornerKind,
         x: 0,
         z: 0,
         size: leftCorner,
+        width: leftCorner,
+        depth: leftCornerDepth,
         between: [left.id, back.id],
-        height: Math.max(left.height, back.height),
+        height: leftSettings?.height ?? Math.max(left.height, back.height),
       },
       {
         id: "corner-right",
-        kind: cornerKind,
+        kind: cornerKinds?.["corner-right"] ?? cornerKind,
         x: back.length - rightCorner,
         z: 0,
         size: rightCorner,
+        width: rightCorner,
+        depth: rightCornerDepth,
         between: [back.id, right.id],
-        height: Math.max(back.height, right.height),
+        height: rightSettings?.height ?? Math.max(back.height, right.height),
       },
     ],
     extent: {

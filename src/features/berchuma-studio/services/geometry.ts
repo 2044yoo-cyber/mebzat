@@ -112,6 +112,22 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
     const { cabinet, rotation } = placed;
 
     for (const part of kitchenConstruction(spec, cabinet, cabinetParts(spec, cabinet))) {
+      // Open the adjoining end panel into the dedicated shelf corner. A full
+      // gable here seals the corner behind two ordinary cabinet boxes.
+      const endX = part.id === "gable-left" ? 0 : part.id === "gable-right" ? cabinet.size.width : null;
+      const end = endX === null ? null : rotateThenPlace({ x: endX, y: 0, z: cabinet.size.depth / 2 }, rotation, placed.x, 0, placed.z);
+      const joinsWardrobeCorner = spec.furnitureType === "wardrobe" && end && resolved.layout.corners.some((corner) =>
+        corner.between.includes(placed.runId ?? "") &&
+        end.x >= corner.x - 0.01 && end.x <= corner.x + (corner.width ?? corner.size) + 0.01 &&
+        end.z >= corner.z - 0.01 && end.z <= corner.z + (corner.depth ?? corner.size) + 0.01);
+      if (joinsWardrobeCorner) {
+        // Retain a rear support stile; the remaining depth is a real opening.
+        const supportDepth = Math.min(60, part.size.z);
+        part.placements = part.placements.map((at) => ({ ...at, z: at.z + part.size.z - supportDepth }));
+        part.size = { ...part.size, z: supportDepth };
+        part.width = supportDepth;
+        part.label = "Corner access rear support";
+      }
       parts.push({
         ...part,
         // Ids must be unique across the design — two base units both containing
@@ -371,10 +387,10 @@ function worktopParts(spec: DesignSpec): Part[] {
   for (const corner of resolved.layout.corners) {
     parts.push({
       id: `${corner.id}-worktop`, role: "worktop", label: "Corner worktop",
-      board: spec.worktop.board, length: corner.size, width: corner.size, quantity: 1,
+      board: spec.worktop.board, length: corner.width ?? corner.size, width: corner.depth ?? corner.size, quantity: 1,
       edges: { front: true, back: false, top: true, bottom: false }, edgeBand: spec.carcass.edgeBand,
       placements: [{ x: corner.x, y: corner.height, z: corner.z }],
-      size: { x: corner.size, y: spec.worktop.board.thickness, z: corner.size }, axis: "y",
+      size: { x: corner.width ?? corner.size, y: spec.worktop.board.thickness, z: corner.depth ?? corner.size }, axis: "y",
     });
   }
   return parts;
@@ -1661,7 +1677,7 @@ function hardwareFor(
   // resolved corner blocks that produced the panels above, so those parts can
   // never appear in the scene without their purchased hardware appearing in
   // the order and cost.
-  for (const requirement of cornerHardware(resolved, parts)) {
+  for (const requirement of cornerHardware(resolved, parts, spec)) {
     const hardware = findHardware(requirement.catalogueId);
     if (!hardware) continue;
     lines.push({

@@ -89,16 +89,27 @@ export function furnitureLabel(type: FurnitureType): string {
  *               awkward; it is the cheapest and by far the commonest.
  *   diagonal  — a single door across the 45° face. Elegant, wasteful of the
  *               square's volume, and needs both runs at one depth.
+ *   hanging   — a wide inner opening with a rail through the deep corner.
  *   custom    — the author has drawn something; the solver leaves it alone.
  */
 export const cornerKinds = [
   "l_corner",
   "blind",
   "diagonal",
+  "hanging",
   "custom",
 ] as const;
 
 export type CornerKind = (typeof cornerKinds)[number];
+
+export const cornerSettingsSchema = z.object({
+  width: z.number().positive().optional(),
+  depth: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  shelves: z.number().int().min(0).max(20).optional(),
+});
+
+export type CornerSettings = z.infer<typeof cornerSettingsSchema>;
 
 export function cornerLabel(kind: CornerKind): string {
   switch (kind) {
@@ -108,8 +119,10 @@ export function cornerLabel(kind: CornerKind): string {
       return "Blind corner";
     case "diagonal":
       return "Diagonal corner";
+    case "hanging":
+      return "Hanging corner";
     case "custom":
-      return "Custom corner";
+      return "Open corner";
   }
 }
 

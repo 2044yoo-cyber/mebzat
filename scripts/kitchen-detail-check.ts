@@ -11,6 +11,7 @@ const options = (shape: KitchenSetup["shape"]): KitchenSetup => ({ ...DEFAULT_KI
 for (const shape of ["straight", "l_shaped", "u_shaped", "g_shaped", "island"] as const) {
   const input = options(shape);
   const spec = createKitchenDesign(input);
+  if (["l_shaped", "u_shaped", "g_shaped"].includes(shape)) assert.equal(spec.cornerKind, "blind", `${shape}: economical blind corner is the default`);
   const restored = validateSpec(JSON.parse(JSON.stringify(spec))).spec;
   assert.equal(restored.kitchenSetup?.details?.fridgeHeight, 1800);
   const resolved = resolveDesign(spec);
@@ -35,6 +36,8 @@ for (const shape of ["straight", "l_shaped", "u_shaped", "g_shaped", "island"] a
   const upperRuns = resolved.layout.placements.filter((r) => r.runId.startsWith("upper-"));
   for (const run of upperRuns) assert.equal(run.depth, 300);
   const back = upperRuns.find((r) => r.runId === "upper-kitchen-back")!;
+  const expectedUpperCorners = shape === "l_shaped" ? 1 : ["u_shaped", "g_shaped"].includes(shape) ? 2 : 0;
+  assert.equal(back.usableLength, input.roomWidth - expectedUpperCorners * input.details!.upperDepth);
   const backBox = rotatedRectBounds(back.origin, { width: back.usableLength, depth: back.depth }, back.rotation);
   for (const side of upperRuns.filter((r) => r !== back)) {
     const sideBox = rotatedRectBounds(side.origin, { width: side.usableLength, depth: side.depth }, side.rotation);
@@ -50,6 +53,9 @@ for (const shape of ["straight", "l_shaped", "u_shaped", "g_shaped", "island"] a
     }
   }
   const all = buildParts(spec);
+  const upperCornerIds = new Set(all.parts.filter((p) => p.id.startsWith("upper-corner-")).map((p) => p.id.split("/")[0]));
+  assert.equal(upperCornerIds.size, expectedUpperCorners, `${shape}: each rear wall corner has one upper corner module`);
+  assert.ok(all.parts.filter((p) => p.id.startsWith("upper-corner-")).every((p) => p.placements.every((at) => at.y >= input.details!.upperBottom)));
   const upperIds = new Set(uppers.map((p) => p.cabinet.id));
   const upperParts = all.parts.filter((p) => p.cabinetId && upperIds.has(p.cabinetId));
   for (const door of upperParts.filter((p) => p.role === "door")) for (const other of upperParts) {
