@@ -258,6 +258,27 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
     },
   ];
 
+  if (wardrobeCorner && ["l_corner", "custom", "hanging"].includes(corner.kind)) {
+    // A wardrobe corner is an open wraparound, not a square shelf stack. The
+    // two arms follow the perpendicular walls and leave the room-facing inner
+    // quadrant clear. Mirror that opening for the right-hand corner.
+    const w = inner;
+    const d = shellDepth;
+    const arm = Math.min(w, d) / 2;
+    const outline = exteriorRight
+      ? [
+          { x: 0, z: 0 }, { x: w, z: 0 }, { x: w, z: d },
+          { x: w - arm, z: d }, { x: w - arm, z: arm }, { x: 0, z: arm },
+        ]
+      : [
+          { x: 0, z: 0 }, { x: w, z: 0 }, { x: w, z: arm },
+          { x: arm, z: arm }, { x: arm, z: d }, { x: 0, z: d },
+        ];
+    for (const panel of parts) {
+      if (panel.axis === "y" && ["shelf", "top"].includes(panel.role)) panel.footprint = outline;
+    }
+  }
+
   if (corner.kind === "blind") {
     // The filler that makes it blind: a fixed panel across part of one open
     // face, behind which the space is reachable but not fronted.
@@ -384,7 +405,9 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
   if (corner.kind === "l_corner" || corner.kind === "custom") {
     const count = spec.cornerSettings?.[corner.id]?.shelves ?? 3;
     const shelfYs = Array.from({ length: count }, (_, index) => Math.round((carcassHeight - t) * (index + 1) / (count + 1)));
+    const shelf = { ...parts.find((part) => part.id === `${corner.id}/bottom`)! };
     parts.push({
+      ...shelf,
       id: `${corner.id}/corner-shelves`, role: "shelf", label: `${labelFor(corner)} shelves`,
       board, length: inner, width: shellDepth, quantity: shelfYs.length,
       edges: { front: true, back: false, top: false, bottom: false }, edgeBand: bodyBand,
@@ -395,12 +418,20 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
 
   if (corner.kind === "hanging") {
     const railLength = Math.max(0, inner - 80);
+    const returnLength = Math.max(0, shellDepth - 80);
+    const railY = Math.round(carcassHeight * 0.68);
     parts.push({
       id: `${corner.id}/hanging-rail`, role: "rail", label: `${labelFor(corner)} rail`,
       board, manufacture: "purchased", length: railLength, width: 25, quantity: 1,
       edges: { front: false, back: false, top: false, bottom: false }, edgeBand: bodyBand,
       size: { x: railLength, y: 25, z: 25 }, axis: "x",
-      placements: [at(t + 40, Math.round(carcassHeight * 0.68), shellDepth / 2)],
+      placements: [at(shelfX + 40, railY, storageZ + shellDepth / 2)],
+    }, {
+      id: `${corner.id}/hanging-return-rail`, role: "rail", label: `${labelFor(corner)} return rail`,
+      board, manufacture: "purchased", length: returnLength, width: 25, quantity: 1,
+      edges: { front: false, back: false, top: false, bottom: false }, edgeBand: bodyBand,
+      size: { x: returnLength, y: 25, z: 25 }, axis: "x", rotationY: 90,
+      placements: [at(exteriorRight ? sizeX - t - 40 : t + 40, railY, storageZ + 40)],
     });
   }
 

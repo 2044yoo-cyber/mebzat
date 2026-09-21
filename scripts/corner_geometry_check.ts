@@ -35,8 +35,18 @@ for (const shape of ["l_shaped", "u_shaped"] as const) {
         assert.ok(shelves.every(p => p.length === p.size.x && p.width === p.size.z), "cut list retains full cutting blanks");
       } else {
         assert.ok(!parts.some(p => p.role === "door"));
-        assert.equal(parts.some(p => p.role === "rail"), kind === "hanging");
+        assert.equal(parts.filter(p => p.role === "rail").length, kind === "hanging" ? 2 : 0);
         assert.equal(parts.some(p => p.id.endsWith("/corner-shelves")), kind !== "hanging");
+        const horizontal = parts.filter(p => p.axis === "y" && (p.role === "shelf" || p.role === "top"));
+        assert.ok(horizontal.every(p => p.footprint?.length === 6), "open corners use one continuous L outline");
+        assert.ok(horizontal.every(p => {
+          const footprint = p.footprint!;
+          const area = Math.abs(footprint.reduce((sum, point, index) => {
+            const next = footprint[(index + 1) % footprint.length];
+            return sum + point.x * next.z - next.x * point.z;
+          }, 0)) / 2;
+          return area < p.size.x * p.size.z && area > p.size.x * p.size.z / 2;
+        }), "the interior quadrant stays open without broken shelf fragments");
       }
     }
   }
