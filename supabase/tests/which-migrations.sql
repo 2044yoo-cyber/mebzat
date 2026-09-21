@@ -148,7 +148,15 @@ begin
       -- signature, so the function exists either way and only its body says
       -- whether the replacement happened.
       (99, '0099_professional_search_roles', 'body',
-           'search_professionals|p.roles &&')
+           'search_professionals|p.roles &&'),
+      -- 0100 adds nothing new. It re-asks for the columns the profile form
+      -- writes, so a database that stopped part-way through an earlier
+      -- migration has them — which means every column it adds is also added
+      -- somewhere else, and no column can tell whether *this* file ran. Its
+      -- comment on `company_size` can: 0086 adds that column and does not
+      -- comment on it.
+      (100, '0100_profile_form_columns', 'comment',
+           'profiles.company_size|Re-asserted by 0100')
     ) as t (ordering, migration, kind, object)
   loop
     present := case row.kind
@@ -195,6 +203,18 @@ begin
           and t.relname = split_part(row.object, '.', 1)
           and c.conname = split_part(row.object, '.', 2)
       )
+      -- A migration that only re-asserts what other migrations created has no
+      -- object of its own to look for. A comment it leaves behind is the one
+      -- thing that is unambiguously its.
+      when 'comment' then coalesce(
+        col_description(
+          to_regclass('public.' || split_part(split_part(row.object, '|', 1), '.', 1)),
+          (select attnum from pg_attribute
+           where attrelid = to_regclass('public.' || split_part(split_part(row.object, '|', 1), '.', 1))
+             and attname = split_part(split_part(row.object, '|', 1), '.', 2)
+             and not attisdropped)
+        ) like '%' || split_part(row.object, '|', 2) || '%',
+        false)
       when 'body' then exists (
         select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public'
