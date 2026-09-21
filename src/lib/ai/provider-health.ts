@@ -1,5 +1,6 @@
 import "server-only";
 
+import { XAI_PATHS, xaiEndpoint } from "@/lib/ai/xai-config";
 import {
   IMAGE_PROVIDERS,
   modelsByProvider,
@@ -230,7 +231,7 @@ function headerQuota(headers: Headers): { label: string; value: string } | null 
 
 const PROBES: Record<ImageProviderName, Probe> = {
   xai: {
-    url: () => "https://api.x.ai/v1/models",
+    url: () => xaiEndpoint(XAI_PATHS.models),
     headers: bearer("XAI_API_KEY"),
     models: (body) => {
       const data = (body as { data?: { id?: string }[] })?.data;

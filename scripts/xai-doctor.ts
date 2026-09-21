@@ -25,7 +25,10 @@
 export {};
 
 const KEY = process.env.XAI_API_KEY ?? "";
-const MODEL = process.env.XAI_MODEL ?? "grok-4.5";
+// Defaults mirror src/lib/ai/xai-config.ts. Repeated rather than imported so
+// this script runs on a machine with the key and nothing else set up — and
+// scripts/xai-check.ts asserts the two agree, so the copy cannot drift.
+const MODEL = process.env.XAI_MODEL ?? "grok-4.6";
 const IMAGE_MODEL = process.env.XAI_IMAGE_MODEL ?? "grok-2-image-1212";
 
 const GREEN = "\x1b[32m";
@@ -58,7 +61,11 @@ function heading(text: string) {
 }
 
 /**
- * A chat completion, non-streaming.
+ * One answer from the Responses API, non-streaming.
+ *
+ * `/v1/responses`, because that is what Medosha calls. Testing a different
+ * endpoint than production uses is a green doctor beside a broken feature,
+ * which is the position this script existed to prevent and did not.
  *
  * Non-streaming on purpose: this is testing whether the endpoint answers, and
  * a streaming parser between the request and the verdict is one more thing
@@ -68,7 +75,7 @@ async function ask(
   prompt: string,
   options: { system?: string; maxTokens?: number } = {},
 ): Promise<{ text: string; status: number; model: string }> {
-  const response = await fetch("https://api.x.ai/v1/chat/completions", {
+  const response = await fetch("https://api.x.ai/v1/responses", {
     method: "POST",
     headers: {
       authorization: `Bearer ${KEY}`,
@@ -77,13 +84,13 @@ async function ask(
     signal: AbortSignal.timeout(60_000),
     body: JSON.stringify({
       model: MODEL,
-      messages: [
+      input: [
         ...(options.system
           ? [{ role: "system", content: options.system }]
           : []),
         { role: "user", content: prompt },
       ],
-      max_tokens: options.maxTokens ?? 300,
+      max_output_tokens: options.maxTokens ?? 300,
       temperature: 0.2,
     }),
   });
@@ -95,14 +102,20 @@ async function ask(
 
   const payload = (await response.json()) as {
     model?: string;
-    choices?: { message?: { content?: string } }[];
+    output_text?: string;
+    output?: { content?: { text?: string }[] }[];
   };
 
-  return {
-    text: payload.choices?.[0]?.message?.content ?? "",
-    status: response.status,
-    model: payload.model ?? MODEL,
-  };
+  // Both readings. xAI returns `output_text` as a convenience and the parts
+  // under `output` as the real thing, and which one arrives has changed.
+  const text =
+    payload.output_text?.trim() ||
+    (payload.output ?? [])
+      .flatMap((item) => item.content ?? [])
+      .map((part) => part.text ?? "")
+      .join("");
+
+  return { text, status: response.status, model: payload.model ?? MODEL };
 }
 
 async function main() {
@@ -401,7 +414,7 @@ async function main() {
   // Medosha falls back to a redraw and says so in the UI — but the render will
   // not hold geometry, and this is where you find that out.
 
-  const EDIT_MODEL = process.env.XAI_EDIT_MODEL?.trim() || "grok-imagine-image-quality";
+  const EDIT_MODEL = process.env.XAI_EDIT_MODEL?.trim() || "grok-imagine-image-2.0";
 
   // A 4x4 red PNG. Enough to prove the endpoint accepts an image part.
   const TINY = Buffer.from(
@@ -416,17 +429,24 @@ async function main() {
     );
   } else {
     try {
-      const form = new FormData();
-      form.append("model", EDIT_MODEL);
-      form.append("image", new Blob([new Uint8Array(TINY)], { type: "image/png" }), "t.png");
-      form.append("prompt", "Make the lighting warmer. Change nothing else.");
-      form.append("n", "1");
-      form.append("response_format", "b64_json");
-
+      // JSON with the source inline, which is what xAI's edit endpoint takes
+      // and what Medosha sends. A multipart form — OpenAI's shape — is refused
+      // here, and sending one from the doctor while production sent the other
+      // is how a passing test sat next to a broken edit.
       const response = await fetch("https://api.x.ai/v1/images/edits", {
         method: "POST",
-        headers: { authorization: `Bearer ${KEY}` },
-        body: form,
+        headers: {
+          authorization: `Bearer ${KEY}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: EDIT_MODEL,
+          prompt: "Make the lighting warmer. Change nothing else.",
+          image: {
+            type: "image_url",
+            url: `data:image/png;base64,${TINY.toString("base64")}`,
+          },
+        }),
         signal: AbortSignal.timeout(120_000),
       });
 

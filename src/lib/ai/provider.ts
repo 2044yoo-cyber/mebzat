@@ -1,6 +1,14 @@
 import "server-only";
 
 import { looksLikeVision } from "./vision-models";
+import {
+  XAI_PATHS,
+  classifyXaiStatus,
+  logXaiCall,
+  logXaiFailure,
+  xaiEndpoint,
+  xaiTextModel,
+} from "./xai-config";
 
 /**
  * Provider abstraction for Medosha AI.
@@ -69,33 +77,35 @@ export type AiProvider = {
    */
   seesImages: () => boolean;
   headers: (key: string | null) => Record<string, string>;
+  /**
+   * Which request and response shape this provider speaks.
+   *
+   * `"chat"` is the OpenAI chat-completions dialect every other entry uses and
+   * the default, so adding this field changed none of them. `"responses"` is
+   * xAI's current surface.
+   */
+  dialect?: "chat" | "responses";
 };
-
-/**
- * The model Grok runs as when XAI_MODEL is unset.
- *
- * Named once rather than repeated at each of the four places that need it. The
- * three-way repetition in the other entries is how `seesImages` and
- * `defaultModel` drifted apart in the past: one was updated and the other was
- * not, and a vision model quietly reported that it could not see.
- */
-const XAI_DEFAULT_MODEL = "grok-4.5";
-
-function xaiModel(): string {
-  return process.env.XAI_MODEL ?? XAI_DEFAULT_MODEL;
-}
 
 const PROVIDERS: Record<AiProviderName, AiProvider> = {
   xai: {
     name: "xai",
-    // xAI speaks the OpenAI chat-completions dialect, so nothing above this
-    // entry changes — same request body, same SSE frames, same usage block.
-    endpoint: "https://api.x.ai/v1/chat/completions",
-    defaultModel: xaiModel(),
+    // The Responses API, not chat completions.
+    //
+    // This is the fix for "Medosha could not reach Grok". Every other provider
+    // here speaks chat completions and xAI's current text surface is
+    // `/v1/responses`, which takes `input` rather than `messages` and streams
+    // typed events rather than `choices[].delta`. Pointing the old body at the
+    // new endpoint fails the request, and pointing the new endpoint's reply at
+    // the old parser yields an empty answer — so the dialect is a property of
+    // the provider and both halves switch together.
+    endpoint: xaiEndpoint(XAI_PATHS.responses),
+    dialect: "responses",
+    defaultModel: xaiTextModel(),
     apiKey: () => process.env.XAI_API_KEY ?? null,
     requiresKey: true,
     headers: (key) => ({ authorization: `Bearer ${key}` }),
-    seesImages: () => looksLikeVision(xaiModel()),
+    seesImages: () => looksLikeVision(xaiTextModel()),
   },
   openai: {
     name: "openai",
@@ -158,11 +168,19 @@ const PROVIDERS: Record<AiProviderName, AiProvider> = {
   },
 };
 
-/** Order tried when the preferred provider is unavailable. */
+/**
+ * Order tried when the preferred provider is unavailable.
+ *
+ * Groq is not in it, and that absence is deliberate. Groq and Grok are
+ * different companies with names one letter apart, and a chain that fell
+ * through to `api.groq.com` meant a deployment with a broken xAI key answered
+ * from Llama while every screen said Grok — a wrong answer that looks exactly
+ * like a right one. It is still a provider and still works when somebody sets
+ * `AI_PROVIDER=groq` and means it; nothing reaches it by accident.
+ */
 const FALLBACK_ORDER: AiProviderName[] = [
   "xai",
   "openai",
-  "groq",
   "gemini",
   "openrouter",
   "ollama",
@@ -204,18 +222,17 @@ const KEY_VAR: Record<AiProviderName, string | null> = {
  * MEDOSHA_AI_PROVIDER is still honoured so an existing deployment does not
  * break, but AI_PROVIDER wins where both are set.
  *
- * With neither set, a present XAI_API_KEY selects xAI. Adding a key is the
- * whole of what somebody thinks they are doing when they add a key, and making
- * them also discover a second variable named nowhere in the xAI documentation
- * is how an integration reads as broken on the first try. Groq remains the
- * default when no xAI key is present, so a deployment that was working before
- * this provider existed keeps working.
+ * With neither set, xAI is the answer. Medosha AI is a Grok integration and
+ * the environment names one key; defaulting to anything else meant a missing
+ * or expired XAI_API_KEY silently selected a different company's model rather
+ * than reporting a configuration problem, and `configurationError()` below
+ * then named the wrong variable.
  */
 export function preferredProvider(): AiProviderName {
   const configured = (process.env[PROVIDER_VAR] ??
     process.env.MEDOSHA_AI_PROVIDER) as AiProviderName | undefined;
   if (configured && configured in PROVIDERS) return configured;
-  return process.env.XAI_API_KEY ? "xai" : "groq";
+  return "xai";
 }
 
 /**
@@ -240,8 +257,8 @@ export function configurationError(): string | null {
   // Ollama needs no key, so reaching here means it is not running.
   return (
     `${PROVIDER_VAR} is set to "ollama", but no Ollama server was found at ` +
-    `${process.env.OLLAMA_URL ?? "http://localhost:11434"}. Start Ollama, or set ` +
-    `${PROVIDER_VAR} to groq and add GROQ_API_KEY.`
+    `${process.env.OLLAMA_URL ?? "http://localhost:11434"}. Start Ollama, or unset ` +
+    `${PROVIDER_VAR} and add XAI_API_KEY.`
   );
 }
 
@@ -295,9 +312,10 @@ export function visionConfigurationError(): string | null {
   return (
     `Reading a photograph needs a model that can see images. ` +
     `Configured right now: ${configured}. ` +
-    `If you have XAI_API_KEY set, set XAI_MODEL to grok-4.5 — grok-3 is text ` +
-    `only. Otherwise add OPENAI_API_KEY (gpt-4o-mini reads images) or ` +
-    `GEMINI_API_KEY to .env.local, then restart the server.`
+    `If you have XAI_API_KEY set, leave XAI_MODEL unset so the multimodal ` +
+    `default is used — an older grok-3 is text only. Otherwise add ` +
+    `OPENAI_API_KEY (gpt-4o-mini reads images) or GEMINI_API_KEY to ` +
+    `.env.local, then restart the server.`
   );
 }
 
@@ -338,30 +356,150 @@ export class ProviderError extends Error {
  * in text, not transport. Token counts arrive on the final payload for
  * providers that report them, and default to zero for those that do not.
  */
+/**
+ * A streamed frame, in either dialect.
+ *
+ * One type covering both rather than a cast at the read: the fields are
+ * optional because which ones arrive depends on the dialect, and naming them
+ * here is what stops a rename in one branch going unnoticed in the other.
+ */
+type StreamUsage = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+};
+
+type StreamFrame = {
+  choices?: { delta?: { content?: string } }[];
+  usage?: StreamUsage;
+  /** Responses API: the event name. */
+  type?: string;
+  /** Responses API: the text of an `output_text.delta` event. */
+  delta?: string;
+  /** Responses API: the completed response, which carries the usage block. */
+  response?: { usage?: StreamUsage };
+};
+
+function chatBody(provider: AiProvider, options: StreamOptions) {
+  return {
+    model: provider.defaultModel,
+    messages: options.messages,
+    temperature: options.temperature ?? 0.4,
+    max_tokens: options.maxTokens ?? 2048,
+    stream: true,
+    stream_options: { include_usage: true },
+  };
+}
+
+/**
+ * The Responses API body.
+ *
+ * `input` rather than `messages`, and `max_output_tokens` rather than
+ * `max_tokens`. The roles and the content parts are the same, which is why the
+ * callers above this file did not have to change: a message carrying a picture
+ * is still `{ type: "image_url", image_url: { url } }`.
+ */
+function responsesBody(provider: AiProvider, options: StreamOptions) {
+  return {
+    model: provider.defaultModel,
+    input: options.messages,
+    temperature: options.temperature ?? 0.4,
+    max_output_tokens: options.maxTokens ?? 2048,
+    stream: true,
+  };
+}
+
+/**
+ * The text of a non-streamed Responses reply.
+ *
+ * Exported for the doctor and the checks: the shape has three plausible
+ * readings — `output_text`, `output[].content[].text`, and the chat-completions
+ * one somebody will eventually paste in by mistake — and a parser that silently
+ * returns "" for two of them is a blank answer with no error anywhere.
+ */
+export function textFromResponses(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const body = payload as {
+    output_text?: unknown;
+    output?: { content?: { type?: string; text?: unknown }[] }[];
+  };
+
+  if (typeof body.output_text === "string" && body.output_text.trim()) {
+    return body.output_text;
+  }
+
+  const parts: string[] = [];
+  for (const item of body.output ?? []) {
+    for (const part of item.content ?? []) {
+      if (typeof part.text === "string") parts.push(part.text);
+    }
+  }
+  return parts.join("");
+}
+
 export async function* streamCompletion(
   provider: AiProvider,
   options: StreamOptions,
 ): AsyncGenerator<CompletionChunk> {
   const key = provider.apiKey();
-  const response = await fetch(provider.endpoint, {
-    method: "POST",
-    signal: options.signal,
-    headers: {
-      "content-type": "application/json",
-      ...provider.headers(key),
-    },
-    body: JSON.stringify({
-      model: provider.defaultModel,
-      messages: options.messages,
-      temperature: options.temperature ?? 0.4,
-      max_tokens: options.maxTokens ?? 2048,
-      stream: true,
-      stream_options: { include_usage: true },
-    }),
+  const responses = provider.dialect === "responses";
+  const endpoint = provider.endpoint;
+
+  logXaiCall({
+    endpoint,
+    model: provider.defaultModel,
+    operation: responses ? "responses" : "chat-completions",
   });
+
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      signal: options.signal,
+      headers: {
+        "content-type": "application/json",
+        ...provider.headers(key),
+      },
+      body: JSON.stringify(
+        responses
+          ? responsesBody(provider, options)
+          : chatBody(provider, options),
+      ),
+    });
+  } catch (error) {
+    // A thrown fetch never arrived, so there is no status to classify and no
+    // body to read. Reported as 0 rather than invented as 500: the difference
+    // between "xAI said no" and "we never reached xAI" is the difference
+    // between a key problem and a network one.
+    if (provider.name === "xai") {
+      logXaiFailure({
+        endpoint,
+        model: provider.defaultModel,
+        operation: "responses",
+        kind: "unreachable",
+        body: error instanceof Error ? error.message : String(error),
+      });
+    }
+    throw new ProviderError(
+      provider.name,
+      0,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 
   if (!response.ok || !response.body) {
     const detail = await response.text().catch(() => "");
+    if (provider.name === "xai") {
+      logXaiFailure({
+        endpoint,
+        model: provider.defaultModel,
+        operation: "responses",
+        status: response.status,
+        kind: classifyXaiStatus(response.status, detail),
+        body: detail,
+      });
+    }
     throw new ProviderError(
       provider.name,
       response.status,
@@ -392,15 +530,27 @@ export async function* streamCompletion(
       if (payload === "[DONE]") continue;
 
       try {
-        const parsed = JSON.parse(payload) as {
-          choices?: { delta?: { content?: string } }[];
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        };
-        const text = parsed.choices?.[0]?.delta?.content;
+        const parsed = JSON.parse(payload) as StreamFrame;
+
+        // Two shapes, one loop. Chat completions put the text under
+        // `choices[0].delta.content`; the Responses API emits typed events and
+        // the text arrives on `response.output_text.delta`. Reading only the
+        // first from an xAI stream is an answer that streams nothing and ends
+        // blank, which is what "could not reach Grok" looked like from a
+        // screen where the request had in fact succeeded.
+        const text = responses
+          ? parsed.type === "response.output_text.delta"
+            ? parsed.delta
+            : undefined
+          : parsed.choices?.[0]?.delta?.content;
         if (text) yield { type: "text", value: text };
-        if (parsed.usage) {
-          promptTokens = parsed.usage.prompt_tokens ?? promptTokens;
-          completionTokens = parsed.usage.completion_tokens ?? completionTokens;
+
+        const usage = parsed.usage ?? parsed.response?.usage;
+        if (usage) {
+          promptTokens =
+            usage.prompt_tokens ?? usage.input_tokens ?? promptTokens;
+          completionTokens =
+            usage.completion_tokens ?? usage.output_tokens ?? completionTokens;
         }
       } catch {
         // A frame split across reads is not an error; the remainder arrives

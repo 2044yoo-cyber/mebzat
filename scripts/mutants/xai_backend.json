@@ -1,0 +1,230 @@
+[
+  {
+    "name": "text goes back to chat completions",
+    "file": "src/lib/ai/provider.ts",
+    "from": "    endpoint: xaiEndpoint(XAI_PATHS.responses),\n    dialect: \"responses\",",
+    "to": "    endpoint: \"https://api.x.ai/v1/chat/completions\",\n    dialect: \"responses\","
+  },
+  {
+    "name": "the endpoint moves but the parser does not",
+    "file": "src/lib/ai/provider.ts",
+    "from": "    dialect: \"responses\",\n    defaultModel: xaiTextModel(),",
+    "to": "    defaultModel: xaiTextModel(),"
+  },
+  {
+    "name": "the Responses body sends chat-completions fields",
+    "file": "src/lib/ai/provider.ts",
+    "from": "    input: options.messages,\n    temperature: options.temperature ?? 0.4,\n    max_output_tokens: options.maxTokens ?? 2048,",
+    "to": "    messages: options.messages,\n    temperature: options.temperature ?? 0.4,\n    max_tokens: options.maxTokens ?? 2048,"
+  },
+  {
+    "name": "the stream stops reading output_text deltas",
+    "file": "src/lib/ai/provider.ts",
+    "from": "          ? parsed.type === \"response.output_text.delta\"\n            ? parsed.delta\n            : undefined",
+    "to": "          ? parsed.choices?.[0]?.delta?.content"
+  },
+  {
+    "name": "the chat dialect loses its own parse",
+    "file": "src/lib/ai/provider.ts",
+    "from": "          : parsed.choices?.[0]?.delta?.content;",
+    "to": "          : undefined;"
+  },
+  {
+    "name": "Responses usage stops being counted",
+    "file": "src/lib/ai/provider.ts",
+    "from": "            usage.prompt_tokens ?? usage.input_tokens ?? promptTokens;",
+    "to": "            usage.prompt_tokens ?? promptTokens;"
+  },
+  {
+    "name": "a chat-completions body is accepted by the Responses parser",
+    "file": "src/lib/ai/provider.ts",
+    "from": "  const body = payload as {\n    output_text?: unknown;\n    output?: { content?: { type?: string; text?: unknown }[] }[];\n  };",
+    "to": "  const body = payload as {\n    output_text?: unknown;\n    output?: { content?: { type?: string; text?: unknown }[] }[];\n    choices?: { message?: { content?: string } }[];\n  };\n  if (body.choices?.[0]?.message?.content) return body.choices[0].message.content;"
+  },
+  {
+    "name": "the output parts are no longer read",
+    "file": "src/lib/ai/provider.ts",
+    "from": "      if (typeof part.text === \"string\") parts.push(part.text);",
+    "to": ""
+  },
+  {
+    "name": "the fallback chain reaches Groq again",
+    "file": "src/lib/ai/provider.ts",
+    "from": "const FALLBACK_ORDER: AiProviderName[] = [\n  \"xai\",\n  \"openai\",",
+    "to": "const FALLBACK_ORDER: AiProviderName[] = [\n  \"xai\",\n  \"groq\",\n  \"openai\","
+  },
+  {
+    "name": "an unconfigured deployment reaches for something other than xAI",
+    "file": "src/lib/ai/provider.ts",
+    "from": "  if (configured && configured in PROVIDERS) return configured;\n  return \"xai\";",
+    "to": "  if (configured && configured in PROVIDERS) return configured;\n  return process.env.XAI_API_KEY ? \"xai\" : \"groq\";"
+  },
+  {
+    "name": "the model name is spelled in the provider again",
+    "file": "src/lib/ai/provider.ts",
+    "from": "    defaultModel: xaiTextModel(),\n    apiKey: () => process.env.XAI_API_KEY ?? null,",
+    "to": "    defaultModel: process.env.XAI_MODEL ?? \"grok-4\",\n    apiKey: () => process.env.XAI_API_KEY ?? null,"
+  },
+  {
+    "name": "the base URL is written out again instead of composed",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "export const XAI_API_BASE = \"https://api.x.ai/v1\";",
+    "to": "export const XAI_API_BASE = \"https://api.x.ai/v2\";"
+  },
+  {
+    "name": "the edit path points at generations",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "  edits: \"/images/edits\",",
+    "to": "  edits: \"/images/generations\","
+  },
+  {
+    "name": "one model is used for both drawing and editing",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "const EDIT_MODEL = \"grok-imagine-image-2.0\";",
+    "to": "const EDIT_MODEL = \"grok-4.6\";"
+  },
+  {
+    "name": "403 is reported as a key problem",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "  if (status === 403) return \"forbidden\";",
+    "to": "  if (status === 403) return \"invalid_key\";"
+  },
+  {
+    "name": "404 stops naming the model",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "  if (status === 404) return \"model_unavailable\";",
+    "to": "  if (status === 404) return \"bad_request\";"
+  },
+  {
+    "name": "running out of money reads as being too fast",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "    return /credit|balance|quota|billing/.test(text) ? \"no_credit\" : \"rate_limited\";",
+    "to": "    return \"rate_limited\";"
+  },
+  {
+    "name": "a 5xx is reported as a bad request",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "  if (status >= 500) return \"server_error\";",
+    "to": ""
+  },
+  {
+    "name": "the diagnostic stops saying whether a key exists",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "    keyPresent: hasXaiKey(),\n    // Trimmed: xAI error bodies can carry request identifiers and account",
+    "to": "    // Trimmed: xAI error bodies can carry request identifiers and account"
+  },
+  {
+    "name": "the diagnostic stops naming the endpoint and the status",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "    endpoint: detail.endpoint,\n    model: detail.model,\n    operation: detail.operation,\n    status: detail.status ?? \"none (request did not complete)\",",
+    "to": "    operation: detail.operation,"
+  },
+  {
+    "name": "the key itself is logged",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "    keyPresent: hasXaiKey(),",
+    "to": "    keyPresent: xaiKey(),"
+  },
+  {
+    "name": "a missing key no longer reads as setup",
+    "file": "src/lib/ai/xai-config.ts",
+    "from": "export function xaiConfigurationError(): string | null {",
+    "to": "export function xaiConfigurationErrorRemoved(): string | null {"
+  },
+  {
+    "name": "the edit goes back to multipart",
+    "file": "src/lib/ai/xai-images.ts",
+    "from": "      headers: { \"content-type\": \"application/json\" },\n      body: JSON.stringify(body),",
+    "to": "      body: (() => { const form = new FormData(); form.append(\"prompt\", input.prompt); return form; })(),"
+  },
+  {
+    "name": "the edit sends the prompt and drops the image",
+    "file": "src/lib/ai/xai-images.ts",
+    "from": "    image: { type: \"image_url\", url },",
+    "to": ""
+  },
+  {
+    "name": "the edit posts to the generations endpoint",
+    "file": "src/lib/ai/xai-images.ts",
+    "from": "  const endpoint = `${API}${process.env.XAI_EDIT_PATH?.trim() || XAI_PATHS.edits}`;",
+    "to": "  const endpoint = `${API}${XAI_PATHS.generations}`;"
+  },
+  {
+    "name": "only a hosted url is read back, so a base64 answer is lost",
+    "file": "src/lib/ai/xai-images.ts",
+    "from": "  const payload = (await response.json()) as {\n    data?: { b64_json?: string; url?: string }[];\n  };\n\n  const images = (payload.data ?? [])\n    .map((entry) =>\n      entry.b64_json\n        ? { url: `data:image/jpeg;base64,${entry.b64_json}` }\n        : entry.url\n          ? { url: entry.url }\n          : null,\n    )\n    .filter((entry): entry is XaiGeneratedImage => entry !== null);\n\n  if (images.length === 0) {\n    throw new XaiImageError(\"no_image\", \"The edit returned no image.\");",
+    "to": "  const payload = (await response.json()) as {\n    data?: { b64_json?: string; url?: string }[];\n  };\n\n  const images = (payload.data ?? [])\n    .map((entry) => (entry.url ? { url: entry.url } : null))\n    .filter((entry): entry is XaiGeneratedImage => entry !== null);\n\n  if (images.length === 0) {\n    throw new XaiImageError(\"no_image\", \"The edit returned no image.\");"
+  },
+  {
+    "name": "an uploaded image is described and redrawn instead of edited",
+    "file": "src/lib/ai/image-provider.ts",
+    "from": "      return await editXaiImage({\n        image: request.image,\n        prompt: request.prompt,\n        count: request.count,\n        signal: request.signal,\n      });",
+    "to": "      throw new XaiImageError(\"no_image\", \"skipped\");"
+  },
+  {
+    "name": "an unreadable source is quietly redrawn",
+    "file": "src/lib/ai/image-provider.ts",
+    "from": "      if (error instanceof XaiImageError && error.failure === \"bad_image\") {",
+    "to": "      if (false) {"
+  },
+  {
+    "name": "a failed vision read falls through to a text-only generation",
+    "file": "src/lib/ai/image-provider.ts",
+    "from": "    const description = await readImageWithGrok({\n      image: request.image,\n      focus: request.prompt.slice(0, 200),\n      signal: request.signal,\n    });",
+    "to": "    let description = \"\";\n    try {\n      description = await readImageWithGrok({\n        image: request.image,\n        focus: request.prompt.slice(0, 200),\n        signal: request.signal,\n      });\n    } catch {\n      description = \"\";\n    }"
+  },
+  {
+    "name": "the render engine predicts editing again instead of attempting it",
+    "file": "src/lib/ai/rendering/engine.ts",
+    "from": "    try {\n      const images = await editXaiImage({",
+    "to": "    if (await xaiCanEdit(signal)) try {\n      const images = await editXaiImage({"
+  },
+  {
+    "name": "the strict clause stops naming the base image",
+    "file": "src/lib/ai/intent.ts",
+    "from": "  \"The supplied source image is the base image. Modify ONLY the requested \" +",
+    "to": ""
+  },
+  {
+    "name": "the strict clause stops forbidding a redesign",
+    "file": "src/lib/ai/intent.ts",
+    "from": "  \"and every unrelated object. Do not redesign or replace the building. \" +",
+    "to": "  \"and every unrelated object. \" +"
+  },
+  {
+    "name": "the strict clause is added to every prompt, image or not",
+    "file": "src/lib/ai/intent.ts",
+    "from": "  if (!route.preserveGeometry) return prompt;",
+    "to": ""
+  },
+  {
+    "name": "the chat route charges for an answer that was cut short",
+    "file": "src/app/api/ai/chat/route.ts",
+    "from": "            await hold.refund(\"The answer was cut short\");",
+    "to": "            await hold.commit(charge);"
+  },
+  {
+    "name": "a failed image call settles the hold at zero instead of refunding",
+    "file": "src/app/api/ai/image/route.ts",
+    "from": "      await hold.refund(\"Every image provider failed\");",
+    "to": "      await hold.commit(0);"
+  },
+  {
+    "name": "the doctor goes back to testing chat completions",
+    "file": "scripts/xai-doctor.ts",
+    "from": "  const response = await fetch(\"https://api.x.ai/v1/responses\", {",
+    "to": "  const response = await fetch(\"https://api.x.ai/v1/chat/completions\", {"
+  },
+  {
+    "name": "the doctor edits with a multipart form again",
+    "file": "scripts/xai-doctor.ts",
+    "from": "        body: JSON.stringify({\n          model: EDIT_MODEL,\n          prompt: \"Make the lighting warmer. Change nothing else.\",\n          image: {\n            type: \"image_url\",\n            url: `data:image/png;base64,${TINY.toString(\"base64\")}`,\n          },\n        }),",
+    "to": "        body: (() => { const form = new FormData(); form.append(\"model\", EDIT_MODEL); return form; })(),"
+  },
+  {
+    "name": "the doctor is pinned to a model the application no longer runs",
+    "file": "scripts/xai-doctor.ts",
+    "from": "const MODEL = process.env.XAI_MODEL ?? \"grok-4.6\";",
+    "to": "const MODEL = process.env.XAI_MODEL ?? \"grok-4.5\";"
+  }
+]

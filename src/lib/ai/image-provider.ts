@@ -5,6 +5,7 @@ import {
   buildArchitecturalPrompt,
 } from "@/lib/ai/architectural-prompt";
 import {
+  editXaiImage,
   generateXaiImages,
   readImageWithGrok,
   XaiImageError,
@@ -151,18 +152,20 @@ async function post(
  *
  * ## Editing
  *
- * There is no `/v1/images/edits` at xAI and the generations endpoint accepts no
- * source image. So an edit is: Grok looks at the uploaded photograph and writes
- * down what is actually there, and that description — plus the member's own
- * instruction, plus the rule that nothing else may change — becomes the prompt.
+ * A supplied image goes to `/v1/images/edits`, as pixels. That sentence used
+ * to be false here: this comment said xAI had no edit endpoint, and the code
+ * below matched it — Grok looked at the photograph, wrote a description, and
+ * the description was sent to *generations*. Which is a drawing of a building
+ * that sounds like yours, and is exactly the "my upload was regenerated rather
+ * than edited" report. The endpoint exists and is called now.
  *
- * That is a real edit in the sense that matters: the output is derived from the
- * member's pixels rather than from the four words they typed. It is not a real
- * edit in the sense of compositing onto the original, and `xai-images.ts` says
- * so at length rather than letting the button imply otherwise.
+ * The describe-then-generate path is still here and still worth having, as the
+ * fallback for an account whose model cannot edit. It is reached only after an
+ * edit has actually been refused, and what it produces is reported as a redraw
+ * rather than as an edit.
  *
- * The vision read is one extra call and about a second. It is skipped when
- * there is no image, which is every from-nothing generation.
+ * The vision read is one extra call and about a second. It happens only on
+ * that fallback, so an ordinary edit no longer pays for it.
  */
 async function generateXai(request: ImageRequest): Promise<GeneratedImage[]> {
   const aspect = ASPECT_WORDS[request.aspect];
@@ -172,7 +175,31 @@ async function generateXai(request: ImageRequest): Promise<GeneratedImage[]> {
   let prompt = request.prompt;
 
   if (request.image) {
-    // The edit path. A failed read is not a failed edit — falling through to a
+    // A source image means an edit, and an edit means the edit endpoint.
+    //
+    // Tried first and on its own terms. Only if xAI refuses it does this fall
+    // through to describing the picture and drawing a new one — and that
+    // fallback is a redraw, which is why it is second and not first.
+    try {
+      return await editXaiImage({
+        image: request.image,
+        prompt: request.prompt,
+        count: request.count,
+        signal: request.signal,
+      });
+    } catch (error) {
+      if (error instanceof XaiImageError && error.failure === "bad_image") {
+        // Nothing downstream can rescue a source xAI could not open, and a
+        // redraw here would quietly answer with a different building.
+        throw new ImageProviderError("xai", 400, error.detail);
+      }
+      console.error(
+        "[medosha-ai:image] xAI edit refused, falling back to a described redraw:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+
+    // The fallback. A failed read is not a failed edit — falling through to a
     // text-only generation would produce a picture of a different building,
     // which is exactly the behaviour this exists to prevent — so a read that
     // fails fails the request.

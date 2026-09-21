@@ -39,6 +39,15 @@ import {
   buildArchitecturalPrompt,
 } from "../src/lib/ai/architectural-prompt.ts";
 import { classifyXai, messageFor } from "../src/lib/ai/xai-images.ts";
+import {
+  XAI_API_BASE,
+  XAI_PATHS,
+  classifyXaiStatus,
+  xaiEditModel,
+  xaiEndpoint,
+  xaiTextModel,
+} from "../src/lib/ai/xai-config.ts";
+import { textFromResponses } from "../src/lib/ai/provider.ts";
 import { memberMessageFor } from "../src/lib/ai/provider-status.ts";
 import {
   CATEGORY_ORDER,
@@ -207,17 +216,34 @@ check(
   "xai is in the provider registry",
   /name:\s*"xai"/.test(provider),
 );
+// Scoped to the xai entry. Every other provider in this registry speaks chat
+// completions and always will, so a file-wide search for that string finds
+// five true matches and says nothing about the one that matters.
+const xaiEntry = provider.slice(
+  provider.indexOf("  xai: {"),
+  provider.indexOf("  openai: {"),
+);
+
 check(
-  "and points at the xAI endpoint",
-  /https:\/\/api\.x\.ai\/v1\/chat\/completions/.test(provider),
+  "and points at the Responses API, not chat completions",
+  /endpoint: xaiEndpoint\(XAI_PATHS\.responses\)/.test(xaiEntry) &&
+    !/chat\/completions/.test(xaiEntry),
+  "xAI's text surface is /v1/responses; the old endpoint is what 'could not reach Grok' was",
+);
+check(
+  "and says which dialect it speaks, so the parser switches with it",
+  /dialect: "responses"/.test(xaiEntry),
+  "the new endpoint read by the old parser is an answer that streams nothing",
 );
 check(
   "and reads XAI_API_KEY",
   /process\.env\.XAI_API_KEY/.test(provider),
 );
 check(
-  "and the model comes from XAI_MODEL",
-  /process\.env\.XAI_MODEL/.test(provider),
+  "and the model comes from the one place model names live",
+  /defaultModel: xaiTextModel\(\)/.test(xaiEntry) &&
+    !/process\.env\.XAI_MODEL/.test(xaiEntry),
+  "a model name spelled in each file is how two of them drifted apart",
 );
 check(
   "xai is first in the fallback order",
@@ -225,12 +251,26 @@ check(
   "a configured Grok should be tried before anything else",
 );
 check(
-  "an XAI_API_KEY alone selects xai",
-  /process\.env\.XAI_API_KEY\s*\?\s*"xai"/.test(provider),
-  "otherwise the key is set and nothing uses it",
+  "xai is what an unconfigured deployment reaches for",
+  /if \(configured && configured in PROVIDERS\) return configured;\s*\n\s*return "xai";/.test(
+    provider,
+  ),
+  "Medosha AI is a Grok integration; defaulting elsewhere hid a missing key as a working answer",
+);
+// The array's contents, not a span from its name: the type annotation is
+// `AiProviderName[]`, so a `[^\]]*` run stops at that bracket and never reaches
+// the entries — which is why a "groq" put back into the order survived this.
+const fallbackOrder = provider.slice(
+  provider.indexOf("const FALLBACK_ORDER"),
+  provider.indexOf("];", provider.indexOf("const FALLBACK_ORDER")),
+);
+check(
+  "and nothing falls through to Groq by accident",
+  fallbackOrder.length > 0 && !/"groq"/.test(fallbackOrder),
+  "Groq and Grok are one letter apart; a silent fallback answers from Llama under a Grok label",
 );
 
-check("grok-4.5 is recognised as a vision model", looksLikeVision("grok-4.5"));
+check("grok-4.6 is recognised as a vision model", looksLikeVision("grok-4.6"));
 check("grok-4 too", looksLikeVision("grok-4"));
 check(
   "grok-3 is not — it is text only",
@@ -318,7 +358,8 @@ check(
 check(
   "and the service calls the xAI images endpoint",
   /\$\{API\}\/images\/generations/.test(xaiService) &&
-    /const API = "https:\/\/api\.x\.ai\/v1"/.test(xaiService),
+    /const API = XAI_API_BASE/.test(xaiService),
+  "one base URL, from the config, rather than the host written out again here",
 );
 check(
   "and does not send `size`, `quality` or `style`, which xAI rejects",
@@ -879,8 +920,9 @@ check(
     "without it a client import is a runtime leak rather than a build error",
   );
   check(
-    "it reads XAI_API_KEY from the environment",
-    /process\.env\.XAI_API_KEY/.test(xaiImages),
+    "it reads the key through the one accessor",
+    /xaiKey\(\)/.test(xaiImages),
+    "the key is read in one place, and that place is `server-only`",
   );
   check(
     "it never reads a NEXT_PUBLIC key",
@@ -944,9 +986,28 @@ check(
     adapter.indexOf("if (request.image) {"),
     adapter.indexOf("const full = ["),
   );
+
+  check(
+    "an uploaded image goes to the edit endpoint first",
+    editBlock.indexOf("editXaiImage(") !== -1 &&
+      editBlock.indexOf("editXaiImage(") < editBlock.indexOf("readImageWithGrok("),
+    "describing the picture and generating from the description is a redraw, not an edit",
+  );
+
+  check(
+    "a source xAI could not open fails rather than redrawing",
+    /error\.failure === "bad_image"/.test(editBlock) &&
+      /throw new ImageProviderError/.test(editBlock),
+    "a redraw here answers with a different building and calls it an edit",
+  );
+
+  // Scoped past the edit attempt. That attempt has a `catch` by design — it is
+  // what falls back to the described redraw — so a check for "no catch in this
+  // block" now matches the wrong one and would pass on the bug it guards.
+  const describeBlock = editBlock.slice(editBlock.indexOf("// The fallback."));
   check(
     "a failed read is not swallowed",
-    !/catch/.test(editBlock),
+    describeBlock.length > 0 && !/catch/.test(describeBlock),
     "falling back to text-only here is how an edit becomes a different building",
   );
 }
@@ -1787,6 +1848,7 @@ check(
 // the picture. The roof was never sent, so the roof came back different.
 {
   const xai = readFileSync("src/lib/ai/xai-images.ts", "utf8");
+  const config = readFileSync("src/lib/ai/xai-config.ts", "utf8");
   const engine = readFileSync("src/lib/ai/rendering/engine.ts", "utf8");
   const compose = readFileSync("src/lib/ai/rendering/compose.ts", "utf8");
 
@@ -1799,13 +1861,12 @@ check(
   // in the file untouched, so matching the string anywhere passes on the bug.
   const editBody = xai.slice(
     xai.indexOf("export async function editXaiImage"),
-    xai.indexOf("async function asBlob"),
+    xai.indexOf("async function asImageUrl"),
   );
 
   check(
     "it posts to the edits endpoint",
-    /\$\{API\}\$\{[^}]*EDIT_PATH[^}]*\}/.test(editBody) &&
-      /const EDIT_PATH = "\/images\/edits"/.test(xai),
+    /\$\{API\}\$\{[^}]*XAI_PATHS\.edits[^}]*\}/.test(editBody),
     "generations takes no source image; edits is the one that does",
   );
   check(
@@ -1815,33 +1876,29 @@ check(
   );
   check(
     "and it attaches the actual image",
-    /form\.append\("image", blob, filename\)/.test(xai),
+    /image: \{ type: "image_url", url \}/.test(editBody) &&
+      /const url = await asImageUrl\(input\.image\)/.test(editBody),
     "this is the line whose absence was the entire bug",
   );
   check(
-    "the edit model is Grok Imagine, and overridable",
-    /grok-imagine-image-quality/.test(xai) && /XAI_EDIT_MODEL/.test(xai),
-  );
-  // Comments stripped: the file explains *why* the header is not set, and
-  // matching that explanation would fail the check on the sentence that
-  // documents why it passes.
-  const xaiCode = xai
-    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
-    .replace(/^\s*\/\/.*$/gm, "");
-
-  check(
-    "the multipart content-type is left to fetch",
-    !/"content-type"/.test(
-      xaiCode.slice(
-        xaiCode.indexOf("export async function editXaiImage"),
-        xaiCode.indexOf("async function asBlob"),
-      ),
-    ),
-    "setting it by hand omits the boundary and produces an unreadable 400",
+    "as JSON, which is the shape xAI's edit endpoint takes",
+    /"content-type": "application\/json"/.test(editBody) &&
+      /body: JSON\.stringify\(body\)/.test(editBody) &&
+      !/new FormData\(\)/.test(editBody),
+    "multipart is OpenAI's shape; xAI refuses it, and the caller then redrew from a description",
   );
   check(
-    "the edit asks for base64, not an expiring url",
-    /form\.append\("response_format", "b64_json"\)/.test(xai),
+    "the edit model is Grok Imagine 2.0, and overridable",
+    /grok-imagine-image-2\.0/.test(config) && /XAI_EDIT_MODEL/.test(config),
+  );
+  // Counted across the file, not tested inside the edit alone. Generation and
+  // editing parse their replies with the same two lines, and a mutation that
+  // dropped base64 from one of them left the other for a scoped check to find.
+  check(
+    "both picture replies are read whichever way xAI returns them",
+    (xai.match(/entry\.b64_json/g) ?? []).length === 4 &&
+      (xai.match(/\{ url: entry\.url \}/g) ?? []).length === 2,
+    "a hosted url and inline base64 are both valid answers, and only one of them was handled before",
   );
 
   // Order of preference: xAI's own editor first.
@@ -1856,9 +1913,9 @@ check(
     "xAI is the integration this deployment is built on",
   );
   check(
-    "the editor is only used when the account has it",
-    /await xaiCanEdit\(signal\)/.test(engine),
-    "asked rather than assumed, so a rename does not need a code change",
+    "the editor is attempted rather than predicted",
+    !/xaiCanEdit/.test(engine) && /await editXaiImage\(/.test(engine),
+    "a model listing that did not mention editing sent the building down the redraw path instead",
   );
   check(
     "generation is the last resort, not the first",
@@ -1990,6 +2047,253 @@ check(
 }
 
 /* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/* One configuration, and a log somebody can act on                           */
+/* -------------------------------------------------------------------------- */
+
+// Two reports, one cause between them: "Medosha could not reach Grok" with
+// nothing behind it, and an uploaded building coming back as a different
+// building. The first was the text endpoint; the second was the edit body.
+// What let both hide was that the base URL, the key and the model names were
+// written out in four files, so no single place could say what had been called
+// with what.
+{
+  const config = readFileSync("src/lib/ai/xai-config.ts", "utf8");
+  // Comments stripped before the negative assertions. The file explains that
+  // it reads no NEXT_PUBLIC variable, and matching that sentence would fail
+  // the check on the prose that documents why it passes.
+  const configCode = config
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  check(
+    "the xAI configuration is server-only",
+    /^import "server-only";/m.test(config),
+    "without it a client import is a key in a bundle rather than a build error",
+  );
+  check("and holds no NEXT_PUBLIC anything", !/NEXT_PUBLIC/.test(configCode));
+
+  check("one base URL", XAI_API_BASE === "https://api.x.ai/v1");
+  check(
+    "and it composes the paths the brief names",
+    xaiEndpoint(XAI_PATHS.responses) === "https://api.x.ai/v1/responses" &&
+      xaiEndpoint(XAI_PATHS.generations) ===
+        "https://api.x.ai/v1/images/generations" &&
+      xaiEndpoint(XAI_PATHS.edits) === "https://api.x.ai/v1/images/edits",
+  );
+
+  check(
+    "text and editing are different models",
+    xaiTextModel() !== xaiEditModel() && xaiEditModel().includes("imagine"),
+    "one model name for both is how an edit was sent to a model that cannot edit",
+  );
+
+  // Every status told apart. They read alike in a log and need opposite
+  // actions: renew a key, ask for access, fix a model name, wait, or wait
+  // differently because it is money rather than rate.
+  check("401 is a key", classifyXaiStatus(401) === "invalid_key");
+  check("403 is the account", classifyXaiStatus(403) === "forbidden");
+  check("404 is the model", classifyXaiStatus(404) === "model_unavailable");
+  check("5xx is theirs", classifyXaiStatus(503) === "server_error");
+  check(
+    "429 is rate unless it says money",
+    classifyXaiStatus(429) === "rate_limited" &&
+      classifyXaiStatus(429, "insufficient credit balance") === "no_credit",
+    "both arrive as 429 and the fix for one is not the fix for the other",
+  );
+
+  // Bounded to the one function. `logXaiCall` below it has the same
+  // `keyPresent` line, so a slice running to the end of the file passed while
+  // the failure log had lost it — the second copy elsewhere in the file.
+  const diagnostic = configCode.slice(
+    configCode.indexOf("export function logXaiFailure"),
+    configCode.indexOf("export function logXaiCall"),
+  );
+  check(
+    "the diagnostic line names the endpoint, the model and the status",
+    /endpoint: detail\.endpoint/.test(diagnostic) &&
+      /model: detail\.model/.test(diagnostic) &&
+      /status: detail\.status/.test(diagnostic),
+    "'could not reach Grok' is what a member reads and is useless to whoever fixes it",
+  );
+  check(
+    "and says whether a key exists, as a boolean",
+    /keyPresent: hasXaiKey\(\)/.test(diagnostic),
+    "the most common answer, and the one the old message hid",
+  );
+  check(
+    "and never the key itself",
+    !/xaiKey\(\)/.test(diagnostic) && !/Bearer/.test(diagnostic),
+    "a length or a prefix is still information about a secret",
+  );
+
+  check(
+    "a missing key reads as setup, not as an outage",
+    /export function xaiConfigurationError\(/.test(config) &&
+      /XAI_API_KEY is not set/.test(config),
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* The doctor tests what production calls                                     */
+/* -------------------------------------------------------------------------- */
+
+// A doctor that calls a different endpoint than the application is a green
+// tick beside a broken feature — which is the position this repository was
+// actually in: xai-doctor asked /chat/completions and posted a multipart edit,
+// both of which worked, while Medosha called neither.
+{
+  const doctor = readFileSync("scripts/xai-doctor.ts", "utf8");
+
+  // Scoped to `ask`. The vision probe further down legitimately uses chat
+  // completions, because that is what `readImageWithGrok` uses — a file-wide
+  // search would fail on the call that is right.
+  const doctorAsk = doctor.slice(
+    doctor.indexOf("async function ask("),
+    doctor.indexOf("async function main()"),
+  );
+  check(
+    "the doctor asks the Responses API",
+    /"https:\/\/api\.x\.ai\/v1\/responses"/.test(doctorAsk) &&
+      !/v1\/chat\/completions/.test(doctorAsk),
+  );
+  check(
+    "and sends a Responses body",
+    /input: \[/.test(doctorAsk) && /max_output_tokens:/.test(doctorAsk),
+  );
+  check(
+    "the doctor edits with JSON and the image inline",
+    /type: "image_url"/.test(doctor) && !/form\.append/.test(doctor),
+    "multipart here passes while the application's JSON call fails, or the other way round",
+  );
+  check(
+    "and its defaults are the ones the application uses",
+    doctor.includes(`?? "${xaiTextModel()}"`) &&
+      doctor.includes(`|| "${xaiEditModel()}"`),
+    "a doctor pinned to an older model reports on a model nobody runs",
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* The Responses API, in both directions                                      */
+/* -------------------------------------------------------------------------- */
+
+{
+  const source = readFileSync("src/lib/ai/provider.ts", "utf8");
+  const responsesBody = source.slice(
+    source.indexOf("function responsesBody("),
+    source.indexOf("export function textFromResponses"),
+  );
+
+  check(
+    "the Responses body sends `input`, not `messages`",
+    /input: options\.messages/.test(responsesBody) &&
+      !/\bmessages:/.test(responsesBody),
+    "`messages` is the chat-completions field and the request is refused with it",
+  );
+  check(
+    "and bounds the answer with `max_output_tokens`",
+    /max_output_tokens:/.test(responsesBody) && !/max_tokens:/.test(responsesBody),
+  );
+
+  const stream = source.slice(source.indexOf("const parsed = JSON.parse(payload)"));
+  check(
+    "a streamed Responses frame is read as an output_text delta",
+    /parsed\.type === "response\.output_text\.delta"/.test(stream),
+    "reading `choices[0].delta` from this stream is an answer that arrives blank",
+  );
+  check(
+    "and the chat dialect still reads its own shape",
+    /parsed\.choices\?\.\[0\]\?\.delta\?\.content/.test(stream),
+    "five other providers speak it and none of them changed",
+  );
+  check(
+    "usage is counted whichever name it arrives under",
+    /usage\.input_tokens/.test(stream) && /usage\.prompt_tokens/.test(stream),
+  );
+
+  // The non-streamed shape, exercised rather than described. Three plausible
+  // readings, and a parser that returns "" for two of them is a blank answer
+  // with no error anywhere to say why.
+  check(
+    "a Responses reply is read from output_text",
+    textFromResponses({ output_text: "Hello" }) === "Hello",
+  );
+  check(
+    "or from the output parts when that is where it is",
+    textFromResponses({
+      output: [{ content: [{ type: "output_text", text: "Hel" }, { text: "lo" }] }],
+    }) === "Hello",
+  );
+  check(
+    "and a chat-completions body read by mistake yields nothing rather than junk",
+    textFromResponses({ choices: [{ message: { content: "Hello" } }] }) === "",
+    "silently accepting the wrong shape is how a dialect mismatch stops being visible",
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Nothing is charged for a call that failed                                  */
+/* -------------------------------------------------------------------------- */
+
+{
+  for (const [label, file] of [
+    ["chat", "src/app/api/ai/chat/route.ts"],
+    ["image", "src/app/api/ai/image/route.ts"],
+    ["render", "src/app/api/ai/render/route.ts"],
+  ] as const) {
+    const route = readFileSync(file, "utf8");
+    check(
+      `the ${label} route holds credits rather than spending them`,
+      /holdCredits\(/.test(route),
+      "a charge taken before the work is a charge taken for work that may not happen",
+    );
+    // Counted. One refund left in a file with five others satisfies a
+    // presence test while the path that lost it charges for a failed call.
+    const refunds = (route.match(/hold\.refund\(/g) ?? []).length;
+    check(
+      `and every failure path in the ${label} route refunds`,
+      refunds === { chat: 3, image: 6, render: 2 }[label],
+      `${refunds} refunds — each is a way the call can fail, and each has to give the credits back`,
+    );
+    check(
+      `and the ${label} route never commits a zero`,
+      !/hold\.commit\(0\)/.test(route),
+      "committing nothing is settling the hold without returning it, which reads as a refund and is not one",
+    );
+    check(
+      `and the ${label} route commits what the work actually cost`,
+      /hold\.commit\(charge\)/.test(route),
+      "a constant here is a charge that stopped following the result",
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Original Model Strict names the base image                                 */
+/* -------------------------------------------------------------------------- */
+
+{
+  const intent = readFileSync("src/lib/ai/intent.ts", "utf8");
+  const clause = intent.slice(
+    intent.indexOf("export const GEOMETRY_CLAUSE"),
+    intent.indexOf("export function composeAiPrompt"),
+  );
+  check(
+    "the strict clause says which picture is the base",
+    /The supplied source image is the base image/.test(clause),
+  );
+  check(
+    "and forbids redesigning the building outright",
+    /Do not redesign or replace the building/.test(clause),
+  );
+  check(
+    "and it is only added when there is geometry to preserve",
+    /if \(!route\.preserveGeometry\) return prompt;/.test(intent),
+    "a clause about a source image on a from-nothing generation describes nothing",
+  );
+}
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} failed:\n`);

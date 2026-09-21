@@ -700,10 +700,18 @@ export function shouldPreserveGeometry(
  * instruction.
  */
 export const GEOMETRY_CLAUSE =
-  "Keep the existing building exactly as it is: the same shape and massing, " +
-  "the same number of floors, the same window and door positions and sizes, " +
-  "the same balconies, the same roof form and pitch, the same proportions, " +
-  "and the same camera position and angle. Change only what was asked for.";
+  // Names the supplied picture as the base first. Under Original Model Strict
+  // the request now goes to the edit endpoint with the image attached, so the
+  // model has the pixels — but a clause that opens by saying which image is
+  // the base costs one sentence and is the difference between "change the
+  // walls" read as an instruction and read as a description of a new building.
+  "The supplied source image is the base image. Modify ONLY the requested " +
+  "elements. Keep the existing building exactly as it is: the same shape and " +
+  "massing, the same number of floors, the same window and door positions and " +
+  "sizes, the same balconies, the same roof form and pitch, the same " +
+  "proportions, the same floor levels, the same camera position and angle, " +
+  "and every unrelated object. Do not redesign or replace the building. " +
+  "Change only what was asked for.";
 
 /**
  * The prompt actually sent, with the geometry clause when it applies.

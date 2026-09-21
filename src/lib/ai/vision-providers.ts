@@ -1,5 +1,6 @@
 import "server-only";
 import { siteUrl } from "@/lib/site";
+import { xaiEndpoint } from "@/lib/ai/xai-config";
 
 /**
  * Vision providers, as their own list.
@@ -63,7 +64,10 @@ const PROVIDERS: VisionProvider[] = [
   {
     name: "xai",
     label: "Grok Vision",
-    endpoint: "https://api.x.ai/v1/chat/completions",
+    // Chat completions, not `/responses`: this probe only asks the model to
+    // describe a picture, and xAI still serves that surface. The
+    // conversation moved; a one-shot vision read had no reason to.
+    endpoint: xaiEndpoint("/chat/completions"),
     keyVars: ["XAI_API_KEY"],
     apiKey: () => process.env.XAI_API_KEY ?? null,
     headers: (key) => ({ authorization: `Bearer ${key ?? ""}` }),
@@ -73,7 +77,7 @@ const PROVIDERS: VisionProvider[] = [
     // being read by a different model than the conversation it belongs to.
     envModel: process.env.XAI_VISION_MODEL ?? process.env.XAI_MODEL,
     models: list(process.env.XAI_VISION_MODEL ?? process.env.XAI_MODEL, [
-      "grok-4.5",
+      "grok-4.6",
       "grok-4",
     ]),
   },

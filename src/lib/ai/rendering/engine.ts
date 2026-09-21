@@ -5,7 +5,6 @@ import {
   editXaiImage,
   generateXaiImages,
   readImageWithGrok,
-  xaiCanEdit,
 } from "@/lib/ai/xai-images";
 
 /**
@@ -171,22 +170,27 @@ export async function renderImage(input: {
     // xAI first. It is the integration this deployment is built on, and if the
     // account has the editing model then the building can go to Grok as pixels
     // — which is the whole point and the thing that was missing.
-    if (await xaiCanEdit(signal)) {
-      try {
-        const images = await editXaiImage({
-          image,
-          prompt: editPrompt,
-          count: 1,
-          signal,
-          creativeFreedom,
-        });
-        return { images, path: "image-to-image", description };
-      } catch (error) {
-        console.error(
-          "[medosha-ai:render] xAI edit failed:",
-          error instanceof Error ? error.message : error,
-        );
-      }
+    // Attempted, not predicted.
+    //
+    // This used to ask `/models` first and skip the edit when the listing did
+    // not mention an editing model — a pre-flight guess that answered "no" for
+    // accounts that could in fact edit, and silently sent the building down
+    // the redraw path. xAI's own refusal is the only reliable answer to "can
+    // this account edit", and it costs one request to get it.
+    try {
+      const images = await editXaiImage({
+        image,
+        prompt: editPrompt,
+        count: 1,
+        signal,
+        creativeFreedom,
+      });
+      return { images, path: "image-to-image", description };
+    } catch (error) {
+      console.error(
+        "[medosha-ai:render] xAI edit failed:",
+        error instanceof Error ? error.message : error,
+      );
     }
 
     // A second real editor, if one is configured. Better a true edit through

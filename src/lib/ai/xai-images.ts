@@ -39,7 +39,21 @@ import "server-only";
 
 import { logRenderRequest } from "@/lib/ai/rendering/debug";
 
-const API = "https://api.x.ai/v1";
+import {
+  XAI_API_BASE,
+  XAI_PATHS,
+  classifyXaiStatus,
+  logXaiCall,
+  logXaiFailure,
+  xaiEditModel,
+  xaiFallbackImageModel,
+  xaiKey,
+  xaiTextModel,
+} from "@/lib/ai/xai-config";
+
+export { xaiEditModel, xaiKey, xaiTextModel };
+
+const API = XAI_API_BASE;
 
 /** Long enough for a slow image, short enough that a hung request ends. */
 const IMAGE_TIMEOUT_MS = 120_000;
@@ -47,42 +61,13 @@ const IMAGE_TIMEOUT_MS = 120_000;
 const VISION_TIMEOUT_MS = 60_000;
 
 /**
- * The fallback image model.
+ * The fallback image model, from the one place model names live.
  *
- * `grok-2-image-1212` is xAI's published image model and what an account gets
- * today. It is the *last* resort rather than the default: `xaiImageModel()`
- * asks the account which image models it actually has before falling back to
- * this, so an account with something newer uses the newer one without a code
- * change, and nothing here is a model name somebody guessed.
+ * Kept as a local name because the lookup below reads it twice and a second
+ * spelling of a model name is how the lookup and its fallback drifted apart
+ * before.
  */
-const FALLBACK_IMAGE_MODEL = "grok-2-image-1212";
-
-/**
- * The model used when editing an image rather than making one.
- *
- * Grok Imagine's editing model. Overridable with `XAI_EDIT_MODEL` because model
- * names move and a pinned one is a feature that works until it does not — the
- * environment variable is how an operator follows a rename without waiting for
- * a deploy.
- */
-const EDIT_MODEL = "grok-imagine-image-quality";
-
-/** The editing endpoint path, overridable for the same reason. */
-const EDIT_PATH = "/images/edits";
-
-export function xaiEditModel(): string {
-  return process.env.XAI_EDIT_MODEL?.trim() || EDIT_MODEL;
-}
-
-/** The reasoning model. Multimodal, so it is also what reads a photograph. */
-export function xaiTextModel(): string {
-  return process.env.XAI_MODEL?.trim() || "grok-4.5";
-}
-
-export function xaiKey(): string | null {
-  const key = process.env.XAI_API_KEY?.trim();
-  return key ? key : null;
-}
+const FALLBACK_IMAGE_MODEL = xaiFallbackImageModel();
 
 // ---------------------------------------------------------------------------
 // Failures
@@ -183,11 +168,19 @@ async function call(
   init: RequestInit,
   timeoutMs: number,
   signal?: AbortSignal,
+  /** For the diagnostic line only; never sent. */
+  operation = "image",
+  model = "",
 ): Promise<Response> {
   const key = xaiKey();
   if (!key) {
+    // Checked before the request rather than read off a 401, so a server that
+    // was never configured says so instead of reporting an outage at xAI.
+    logXaiFailure({ endpoint: url, model, operation, kind: "not_configured" });
     throw new XaiImageError("not_configured", "XAI_API_KEY is not set.");
   }
+
+  logXaiCall({ endpoint: url, model, operation });
 
   const timeout = AbortSignal.timeout(timeoutMs);
   const composed = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -204,6 +197,13 @@ async function call(
     });
   } catch (error) {
     // A thrown fetch never reached xAI, so there is no status to classify.
+    logXaiFailure({
+      endpoint: url,
+      model,
+      operation,
+      kind: "unreachable",
+      body: error instanceof Error ? error.message : String(error),
+    });
     throw new XaiImageError(
       "unreachable",
       error instanceof Error ? error.message : String(error),
@@ -212,6 +212,14 @@ async function call(
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
+    logXaiFailure({
+      endpoint: url,
+      model,
+      operation,
+      status: response.status,
+      kind: classifyXaiStatus(response.status, body),
+      body,
+    });
     throw new XaiImageError(
       classifyXai(response.status, body),
       `HTTP ${response.status}: ${body.slice(0, 300)}`,
@@ -376,16 +384,29 @@ export async function editXaiImage(input: {
     throw new XaiImageError("bad_image", "The source is not a data URL or https URL.");
   }
 
-  const { blob, filename } = await asBlob(input.image);
+  // The source image, as something xAI can open.
+  //
+  // An https URL is passed through: xAI fetches it, which is cheaper than
+  // moving the bytes twice. Anything else — a data URI, a signed link that
+  // will not survive the trip — is read here and sent inline as base64, so a
+  // private upload never has to be published for a model to see it.
+  const url = await asImageUrl(input.image);
 
-  const form = new FormData();
-  form.append("model", xaiEditModel());
-  form.append("image", blob, filename);
-  form.append("prompt", input.prompt);
-  form.append("n", String(Math.min(Math.max(input.count ?? 1, 1), 10)));
-  form.append("response_format", "b64_json");
+  const endpoint = `${API}${process.env.XAI_EDIT_PATH?.trim() || XAI_PATHS.edits}`;
 
-  const endpoint = `${API}${process.env.XAI_EDIT_PATH?.trim() || EDIT_PATH}`;
+  // JSON, not multipart.
+  //
+  // This is the second of the two bugs. `/images/edits` at xAI takes a JSON
+  // body with the source under `image`; a multipart form — the shape OpenAI's
+  // edit endpoint wants, and what this function sent — is refused, and the
+  // caller above fell through to text-to-image. Which is how an uploaded
+  // building came back as a different building: the pixels were never in the
+  // request that drew the answer.
+  const body = {
+    model: xaiEditModel(),
+    prompt: input.prompt,
+    image: { type: "image_url", url },
+  };
 
   logRenderRequest({
     endpoint,
@@ -404,12 +425,13 @@ export async function editXaiImage(input: {
     endpoint,
     {
       method: "POST",
-      // No content-type: fetch sets it with the multipart boundary, and setting
-      // it by hand omits the boundary and produces a 400 nobody can read.
-      body: form,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
     },
     IMAGE_TIMEOUT_MS,
     input.signal,
+    "edit",
+    xaiEditModel(),
   );
 
   const payload = (await response.json()) as {
@@ -432,32 +454,23 @@ export async function editXaiImage(input: {
   return images;
 }
 
-/** A data URL or an https URL, as the bytes a multipart part needs. */
-async function asBlob(
-  image: string,
-): Promise<{ blob: Blob; filename: string }> {
+/**
+ * The source, as a URL xAI can read.
+ *
+ * An https link goes as it is. A data URI goes as it is too — it is already
+ * the bytes, inline, which is what "not publicly accessible" needs. The
+ * validity check happens here rather than at the endpoint, because a malformed
+ * data URI produces a 400 whose body says nothing about which of the two
+ * things was wrong.
+ */
+async function asImageUrl(image: string): Promise<string> {
   if (image.startsWith("data:")) {
-    const match = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(image);
-    if (!match) throw new XaiImageError("bad_image", "Unreadable data URL.");
-    const mime = match[1]!.toLowerCase();
-    const extension =
-      mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
-    return {
-      blob: new Blob([new Uint8Array(Buffer.from(match[2]!, "base64"))], {
-        type: mime,
-      }),
-      filename: `source.${extension}`,
-    };
+    if (!/^data:image\/[a-z+]+;base64,.+$/i.test(image)) {
+      throw new XaiImageError("bad_image", "Unreadable data URL.");
+    }
+    return image;
   }
-
-  const response = await fetch(image, { signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) {
-    throw new XaiImageError(
-      "bad_image",
-      `Could not fetch the source image (${response.status}).`,
-    );
-  }
-  return { blob: await response.blob(), filename: "source.jpg" };
+  return image;
 }
 
 /**
@@ -475,7 +488,7 @@ export async function xaiCanEdit(signal?: AbortSignal): Promise<boolean> {
     const response = await call(`${API}/models`, {}, VISION_TIMEOUT_MS, signal);
     const payload = (await response.json()) as { data?: { id?: string }[] };
     const ids = (payload.data ?? []).map((entry) => entry.id ?? "");
-    return ids.some((id) => id.includes("imagine") || id === EDIT_MODEL);
+    return ids.some((id) => id.includes("imagine") || id === xaiEditModel());
   } catch {
     return false;
   }
