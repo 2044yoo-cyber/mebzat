@@ -110,6 +110,15 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
 
   for (const placed of resolved.cabinets) {
     const { cabinet, rotation } = placed;
+    const cornerBaySelections = resolved.layout.corners
+      .filter((corner) => corner.ownerRunId === placed.runId)
+      .map((corner) => {
+        const centre = { x: corner.x + (corner.width ?? corner.size) / 2, z: corner.z + (corner.depth ?? corner.size) / 2 };
+        const start = { x: placed.x, z: placed.z };
+        const finish = rotateThenPlace({ x: cabinet.size.width, y: 0, z: 0 }, rotation, placed.x, 0, placed.z);
+        const distance = (point: { x: number; z: number }) => (point.x - centre.x) ** 2 + (point.z - centre.z) ** 2;
+        return { cornerId: corner.id, bayId: cabinet.bays[distance(start) <= distance(finish) ? 0 : cabinet.bays.length - 1]?.id };
+      });
 
     for (const part of kitchenConstruction(spec, cabinet, cabinetParts(spec, cabinet))) {
       // Open the adjoining end panel into the dedicated shelf corner. A full
@@ -117,6 +126,7 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
       const endX = part.id === "gable-left" ? 0 : part.id === "gable-right" ? cabinet.size.width : null;
       const end = endX === null ? null : rotateThenPlace({ x: endX, y: 0, z: cabinet.size.depth / 2 }, rotation, placed.x, 0, placed.z);
       const joinsWardrobeCorner = spec.furnitureType === "wardrobe" && end && resolved.layout.corners.some((corner) =>
+        !corner.ownerRunId &&
         corner.between.includes(placed.runId ?? "") &&
         end.x >= corner.x - 0.01 && end.x <= corner.x + (corner.width ?? corner.size) + 0.01 &&
         end.z >= corner.z - 0.01 && end.z <= corner.z + (corner.depth ?? corner.size) + 0.01);
@@ -133,7 +143,7 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
         // Ids must be unique across the design — two base units both containing
         // "gable-left" would collide in the viewer's keys and in the cut list.
         id: `${cabinet.id}/${part.id}`,
-        cabinetId: cabinet.id,
+        cabinetId: cornerBaySelections.find((entry) => entry.bayId && (part.bayId === entry.bayId || part.bayId?.startsWith(`${entry.bayId}-`)))?.cornerId ?? cabinet.id,
         rotationY: rotation === 0 ? undefined : rotation,
         placements: part.placements.map((placement) =>
           // The local offset is turned with the run before it is moved onto

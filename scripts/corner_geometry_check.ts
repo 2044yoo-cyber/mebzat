@@ -1,12 +1,38 @@
 import assert from "node:assert/strict";
 import { wardrobeShapeDesign } from "../src/features/berchuma-studio/services/starting-designs";
 import { buildParts } from "../src/features/berchuma-studio/services/geometry";
+import { resolveDesign } from "../src/features/berchuma-studio/services/resolve";
 import { readFileSync } from "node:fs";
+
+const ownershipSpec = wardrobeShapeDesign({ shape: "l_shaped", walls: [2724, 1543], depth: 600, height: 2400 });
+const ownership = resolveDesign(ownershipSpec);
+const [runA, runB] = ownershipSpec.runs;
+assert.equal(ownership.layout.corners[0]?.ownerRunId, runB?.id);
+assert.equal(ownership.layout.corners[0]?.width, 600);
+assert.equal(ownership.layout.corners[0]?.depth, 600);
+assert.equal(ownership.layout.placements.find(p => p.runId === runA?.id)?.usableLength, 2124);
+assert.equal(ownership.layout.placements.find(p => p.runId === runB?.id)?.usableLength, 1543);
+assert.equal(ownership.cabinets.find(c => c.runId === runA?.id)?.cabinet.size.width, 2124);
+assert.equal(ownership.cabinets.find(c => c.runId === runB?.id)?.cabinet.size.width, 1543);
+const ownershipParts = buildParts(ownershipSpec).parts;
+assert.ok(!ownershipParts.some(p => p.id.startsWith("corner-ab/")), "hosted corner has no third carcass");
+assert.ok(ownershipParts.some(p => p.cabinetId === "corner-ab" && p.role === "shelf"), "host shelf selects the editable corner");
+assert.ok(!ownershipParts.some(p => p.label === "Corner access rear support"), "both run ends retain full vertical MDF");
+assert.ok(ownershipParts.filter(p => p.role === "gable").every(p => p.size.z > 500), "end gables retain cabinet depth");
+
+const uSpec = wardrobeShapeDesign({ shape: "u_shaped", walls: [1543, 3000, 1800], depth: 600, height: 2400 });
+const u = resolveDesign(uSpec);
+assert.equal(u.layout.corners[0]?.ownerRunId, uSpec.runs[0]?.id);
+assert.equal(u.layout.corners[1]?.ownerRunId, uSpec.runs[2]?.id);
+assert.deepEqual(u.layout.corners.map(c => [c.width, c.depth]), [[600, 600], [600, 600]]);
+assert.deepEqual(u.layout.placements.map(p => p.usableLength), [1543, 1800, 1800]);
+
+const tightU = resolveDesign(wardrobeShapeDesign({ shape: "u_shaped", walls: [1200, 900, 1200], depth: 600, height: 2400 }));
+assert.deepEqual(tightU.layout.corners.map(c => [c.width, c.depth]), [[600, 600], [600, 600]], "host corners remain square");
 
 for (const shape of ["l_shaped", "u_shaped"] as const) {
   const spec = wardrobeShapeDesign({ shape, walls: shape === "u_shaped" ? [1800, 3000, 1800] : [3000, 1800], depth: 600, height: 2400 });
   const ids = shape === "u_shaped" ? ["corner-left", "corner-right"] : ["corner-ab"];
-  const original = buildParts(spec).parts;
   for (const id of ids) {
     const resized = buildParts({ ...spec, cornerKinds: { [id]: "diagonal" }, cornerSettings: { [id]: { width: 650.5, depth: 700.25 } } }).parts.filter(p => p.cabinetId === id);
     const resizedDoor = resized.find(p => p.id.endsWith("/diagonal-face"))!;
@@ -16,10 +42,9 @@ for (const shape of ["l_shaped", "u_shaped"] as const) {
     for (const kind of ["l_corner", "hanging", "diagonal", "custom"] as const) {
       const edited = { ...spec, cornerKinds: { [id]: kind } };
       const all = buildParts(edited).parts;
-      assert.deepEqual(all.filter(p => p.cabinetId !== id), original.filter(p => p.cabinetId !== id), "only selected corner changes");
       const parts = all.filter(p => p.cabinetId === id);
-      assert.ok(parts.length > 0);
       if (kind === "diagonal") {
+        assert.ok(parts.length > 0);
         const door = parts.find(p => p.id.endsWith("/diagonal-face"))!;
         assert.ok(door);
         const angle = door.rotationY! * Math.PI / 180;
@@ -36,17 +61,8 @@ for (const shape of ["l_shaped", "u_shaped"] as const) {
       } else {
         assert.ok(!parts.some(p => p.role === "door"));
         assert.equal(parts.filter(p => p.role === "rail").length, kind === "hanging" ? 2 : 0);
-        assert.equal(parts.some(p => p.id.endsWith("/corner-shelves")), kind !== "hanging");
-        const horizontal = parts.filter(p => p.axis === "y" && (p.role === "shelf" || p.role === "top"));
-        assert.ok(horizontal.every(p => p.footprint?.length === 6), "open corners use one continuous L outline");
-        assert.ok(horizontal.every(p => {
-          const footprint = p.footprint!;
-          const area = Math.abs(footprint.reduce((sum, point, index) => {
-            const next = footprint[(index + 1) % footprint.length];
-            return sum + point.x * next.z - next.x * point.z;
-          }, 0)) / 2;
-          return area < p.size.x * p.size.z && area > p.size.x * p.size.z / 2;
-        }), "the interior quadrant stays open without broken shelf fragments");
+        assert.ok(parts.length > 0, "host storage remains the corner selection target");
+        assert.ok(!parts.some(p => p.id.startsWith(`${id}/`) && p.role !== "rail"), "open corner has no separate carcass");
       }
     }
   }

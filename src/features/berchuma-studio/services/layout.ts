@@ -70,6 +70,8 @@ export type CornerBlock = {
   depth?: number;
   /** The two runs it joins, in order. */
   between: [WallRunId, WallRunId];
+  /** Wardrobe run whose ordinary carcass continues through this corner. */
+  ownerRunId?: WallRunId;
   height: number;
   /** Optional vertical placement for wall/upper corner modules. */
   baseY?: number;
@@ -110,7 +112,7 @@ const MIN_RUN = 300;
 export function solveLayout(
   kind: LayoutKind,
   runs: RunSpec[],
-  options: { cornerKind?: CornerKind; cornerKinds?: Record<string, CornerKind>; cornerSettings?: Record<string, CornerSettings>; kitchenFacing?: boolean } = {},
+  options: { cornerKind?: CornerKind; cornerKinds?: Record<string, CornerKind>; cornerSettings?: Record<string, CornerSettings>; kitchenFacing?: boolean; wardrobeOwnership?: boolean } = {},
 ): SolvedLayout {
   const solved = solveLayoutFrame(kind, runs, options);
   if (!options.kitchenFacing) return solved;
@@ -135,7 +137,7 @@ export function solveLayout(
 function solveLayoutFrame(
   kind: LayoutKind,
   runs: RunSpec[],
-  options: { cornerKind?: CornerKind; cornerKinds?: Record<string, CornerKind>; cornerSettings?: Record<string, CornerSettings> } = {},
+  options: { cornerKind?: CornerKind; cornerKinds?: Record<string, CornerKind>; cornerSettings?: Record<string, CornerSettings>; wardrobeOwnership?: boolean } = {},
 ): SolvedLayout {
   const cornerKind = options.cornerKind ?? "l_corner";
 
@@ -143,11 +145,11 @@ function solveLayoutFrame(
     case "straight":
       return solveStraight(runs);
     case "l_shaped":
-      return solveL(runs, cornerKind, options.cornerKinds, options.cornerSettings);
+      return solveL(runs, cornerKind, options.cornerKinds, options.cornerSettings, options.wardrobeOwnership);
     case "u_shaped":
-      return solveU(runs, cornerKind, options.cornerKinds, options.cornerSettings);
+      return solveU(runs, cornerKind, options.cornerKinds, options.cornerSettings, options.wardrobeOwnership);
     case "g_shaped": {
-      const solved = solveU(runs.slice(0, 3), cornerKind, options.cornerKinds, options.cornerSettings);
+      const solved = solveU(runs.slice(0, 3), cornerKind, options.cornerKinds, options.cornerSettings, options.wardrobeOwnership);
       const peninsula = runs[3];
       if (!peninsula || !runs[0]) return { ...solved, kind, notes: [...solved.notes, "A G layout needs a peninsula run."] };
       return {
@@ -221,7 +223,7 @@ function solveStraight(runs: RunSpec[]): SolvedLayout {
  * the corner and therefore B's *origin* — which is correct, because the corner
  * is where the walls meet and moving one wall moves the meeting point.
  */
-function solveL(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<string, CornerKind>, cornerSettings?: Record<string, CornerSettings>): SolvedLayout {
+function solveL(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<string, CornerKind>, cornerSettings?: Record<string, CornerSettings>, wardrobeOwnership = false): SolvedLayout {
   const a = runs[0];
   const b = runs[1];
   const notes: string[] = [];
@@ -241,11 +243,14 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
   // 600 base run into a 350 wall-unit return, for instance.
   const fallback = Math.max(a.depth, b.depth);
   const settings = cornerSettings?.["corner-ab"];
-  const cornerWidth = Math.min(a.length - MIN_RUN, Math.max(b.depth, settings?.width ?? fallback));
-  const cornerDepth = Math.min(b.length - MIN_RUN, Math.max(a.depth, settings?.depth ?? fallback));
+  const kind = cornerKinds?.["corner-ab"] ?? cornerKind;
+  const hosted = wardrobeOwnership && ["l_corner", "hanging", "custom"].includes(kind);
+  const ownerRunId = hosted ? (a.length <= b.length ? a.id : b.id) : undefined;
+  const cornerWidth = hosted ? fallback : Math.min(a.length - MIN_RUN, Math.max(b.depth, settings?.width ?? fallback));
+  const cornerDepth = hosted ? fallback : Math.min(b.length - MIN_RUN, Math.max(a.depth, settings?.depth ?? fallback));
 
-  const usableA = a.length - cornerWidth;
-  const usableB = b.length - cornerDepth;
+  const usableA = a.length - (ownerRunId === a.id ? 0 : cornerWidth);
+  const usableB = b.length - (ownerRunId === b.id ? 0 : cornerDepth);
 
   if (usableA < MIN_RUN) {
     notes.push(
@@ -277,7 +282,7 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
       // A +90° local depth projects towards -x. Anchor its front-right
       // corner at the wall so the returned carcass fills x = La-d…La below
       // the corner, rather than floating one depth to the left of it.
-      origin: { x: a.length, z: cornerDepth },
+      origin: { x: a.length, z: ownerRunId === b.id ? 0 : cornerDepth },
       rotation: 90,
       wallLength: b.length,
       usableLength: Math.max(0, usableB),
@@ -292,13 +297,14 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
     corners: [
       {
         id: "corner-ab",
-        kind: cornerKinds?.["corner-ab"] ?? cornerKind,
+        kind,
         x: a.length - cornerWidth,
         z: 0,
         size: Math.max(cornerWidth, cornerDepth),
         width: cornerWidth,
         depth: cornerDepth,
         between: [a.id, b.id],
+        ownerRunId,
         height: settings?.height ?? Math.max(a.height, b.height),
       },
     ],
@@ -318,7 +324,7 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
  * if it is built by bolting two Ls together: one corner is subtracted twice
  * and the back run comes out short by a cabinet.
  */
-function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<string, CornerKind>, cornerSettings?: Record<string, CornerSettings>): SolvedLayout {
+function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<string, CornerKind>, cornerSettings?: Record<string, CornerSettings>, wardrobeOwnership = false): SolvedLayout {
   const left = runs[0];
   const back = runs[1];
   const right = runs[2];
@@ -327,7 +333,7 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
   if (!left || !back || !right) {
     const available = [left, back].filter(Boolean) as RunSpec[];
     return {
-      ...solveL(available, cornerKind, cornerKinds, cornerSettings),
+      ...solveL(available, cornerKind, cornerKinds, cornerSettings, wardrobeOwnership),
       kind: "u_shaped",
       notes: ["A U needs three runs. Falling back to what was given."],
     };
@@ -337,18 +343,28 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
   const rightFallback = Math.max(right.depth, back.depth);
   const leftSettings = cornerSettings?.["corner-left"];
   const rightSettings = cornerSettings?.["corner-right"];
-  const leftWidth = Math.max(left.depth, leftSettings?.width ?? leftFallback);
-  const rightWidth = Math.max(right.depth, rightSettings?.width ?? rightFallback);
+  const leftKind = cornerKinds?.["corner-left"] ?? cornerKind;
+  const rightKind = cornerKinds?.["corner-right"] ?? cornerKind;
+  const leftHosted = wardrobeOwnership && ["l_corner", "hanging", "custom"].includes(leftKind);
+  const rightHosted = wardrobeOwnership && ["l_corner", "hanging", "custom"].includes(rightKind);
+  const leftOwner = leftHosted ? (left.length <= back.length ? left.id : back.id) : undefined;
+  const rightOwner = rightHosted ? (right.length <= back.length ? right.id : back.id) : undefined;
+  const leftWidth = leftHosted ? leftFallback : Math.max(left.depth, leftSettings?.width ?? leftFallback);
+  const rightWidth = rightHosted ? rightFallback : Math.max(right.depth, rightSettings?.width ?? rightFallback);
   const totalWidth = leftWidth + rightWidth;
   const widthScale = totalWidth > back.length - MIN_RUN ? (back.length - MIN_RUN) / totalWidth : 1;
-  const leftCorner = leftWidth * widthScale;
-  const rightCorner = rightWidth * widthScale;
-  const leftCornerDepth = Math.min(left.length - MIN_RUN, Math.max(back.depth, leftSettings?.depth ?? leftFallback));
-  const rightCornerDepth = Math.min(right.length - MIN_RUN, Math.max(back.depth, rightSettings?.depth ?? rightFallback));
+  // A hosted wardrobe corner is a real depth × depth square. Never squeeze it
+  // into a rectangle merely to hide an undersized room; report the short run.
+  const leftCorner = leftHosted ? leftWidth : leftWidth * widthScale;
+  const rightCorner = rightHosted ? rightWidth : rightWidth * widthScale;
+  const leftCornerDepth = leftHosted ? leftFallback : Math.min(left.length - MIN_RUN, Math.max(back.depth, leftSettings?.depth ?? leftFallback));
+  const rightCornerDepth = rightHosted ? rightFallback : Math.min(right.length - MIN_RUN, Math.max(back.depth, rightSettings?.depth ?? rightFallback));
 
-  const usableBack = back.length - leftCorner - rightCorner;
-  const usableLeft = left.length - leftCornerDepth;
-  const usableRight = right.length - rightCornerDepth;
+  const backStopsAtLeft = !leftHosted || leftOwner === left.id;
+  const backStopsAtRight = !rightHosted || rightOwner === right.id;
+  const usableBack = back.length - (backStopsAtLeft ? leftCorner : 0) - (backStopsAtRight ? rightCorner : 0);
+  const usableLeft = left.length - (leftOwner === left.id ? 0 : leftCornerDepth);
+  const usableRight = right.length - (rightOwner === right.id ? 0 : rightCornerDepth);
 
   if (usableBack < MIN_RUN) {
     notes.push(
@@ -369,7 +385,7 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
       runId: left.id,
       label: left.label,
       // Down the left wall, starting below the left corner.
-      origin: { x: left.depth, z: leftCornerDepth },
+      origin: { x: left.depth, z: leftOwner === left.id ? 0 : leftCornerDepth },
       rotation: 90,
       wallLength: left.length,
       usableLength: Math.max(0, usableLeft),
@@ -380,7 +396,7 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
       runId: back.id,
       label: back.label,
       // Between the two corners.
-      origin: { x: leftCorner, z: 0 },
+      origin: { x: backStopsAtLeft ? leftCorner : 0, z: 0 },
       rotation: 0,
       wallLength: back.length,
       usableLength: Math.max(0, usableBack),
@@ -392,7 +408,7 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
       label: right.label,
       // Same +90° convention as the L return: local depth reaches left from
       // the anchor, so the right wall is anchored at the room's outer edge.
-      origin: { x: back.length, z: rightCornerDepth },
+      origin: { x: back.length, z: rightOwner === right.id ? 0 : rightCornerDepth },
       rotation: 90,
       wallLength: right.length,
       usableLength: Math.max(0, usableRight),
@@ -407,24 +423,26 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
     corners: [
       {
         id: "corner-left",
-        kind: cornerKinds?.["corner-left"] ?? cornerKind,
+        kind: leftKind,
         x: 0,
         z: 0,
         size: leftCorner,
         width: leftCorner,
         depth: leftCornerDepth,
         between: [left.id, back.id],
+        ownerRunId: leftOwner,
         height: leftSettings?.height ?? Math.max(left.height, back.height),
       },
       {
         id: "corner-right",
-        kind: cornerKinds?.["corner-right"] ?? cornerKind,
+        kind: rightKind,
         x: back.length - rightCorner,
         z: 0,
         size: rightCorner,
         width: rightCorner,
         depth: rightCornerDepth,
         between: [back.id, right.id],
+        ownerRunId: rightOwner,
         height: rightSettings?.height ?? Math.max(back.height, right.height),
       },
     ],

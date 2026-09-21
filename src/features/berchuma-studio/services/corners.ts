@@ -55,7 +55,10 @@ export function cornerParts(
   const parts: Part[] = [];
 
   for (const corner of manufacturedCorners(spec, resolved)) {
-    parts.push(...partsForCorner(spec, corner).map((part) => ({ ...part, cabinetId: corner.id })));
+    const generated = spec.furnitureType === "wardrobe" && corner.ownerRunId
+      ? (corner.kind === "hanging" ? partsForCorner(spec, corner).filter((part) => part.role === "rail") : [])
+      : partsForCorner(spec, corner);
+    parts.push(...generated.map((part) => ({ ...part, cabinetId: corner.id })));
     if (spec.kitchenSetup?.details && !corner.baseY) {
       const template = spec.cabinets.find((c) => c.kind === "base" || c.kind === "island");
       if (template) for (const p of kitchenConstruction(spec, { ...template, kitchenRole: undefined,

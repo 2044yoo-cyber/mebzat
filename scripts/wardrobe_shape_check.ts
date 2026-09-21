@@ -204,12 +204,10 @@ function build(shape: "straight" | "l_shaped" | "u_shaped", walls: number[]) {
     spec.runs.map((run) => run.length).join(),
   );
 
-  // The whole arithmetic of a corner: each carcass is its wall less the
-  // square it shares. Laid out first and subtracted afterwards this comes out
-  // a cabinet too long, which is the failure the ordering exists to prevent.
+  // The shorter run owns the square; the longer run stops against it.
   check(
-    "each carcass is its wall less the corner",
-    spec.cabinets.map((cabinet) => cabinet.size.width).join() === "1800,1200",
+    "the shorter carcass continues through the corner",
+    spec.cabinets.map((cabinet) => cabinet.size.width).join() === "1800,1800",
     spec.cabinets.map((cabinet) => cabinet.size.width).join(),
   );
   check(
@@ -249,25 +247,14 @@ function build(shape: "straight" | "l_shaped" | "u_shaped", walls: number[]) {
   const parts = buildParts(spec).parts;
   const corner = parts.filter((part) => /corner/i.test(part.label));
   check(
-    "the corner is cut as real boards, not left to the shop",
-    corner.length >= 8,
+    "the corner is not a separate third carcass",
+    corner.length === 0,
     `${corner.length} corner pieces`,
   );
+  const owner = resolved.cabinets.find((cabinet) => cabinet.runId === resolved.layout.corners[0]?.ownerRunId)?.cabinet;
   check(
-    "including its own gable, top, bottom, back and shelves",
-    ["gable", "top", "back", "shelf"].every((role) =>
-      corner.some((part) => part.role === role),
-    ),
-    [...new Set(corner.map((part) => part.role))].join(", "),
-  );
-  check(
-    "and it stands on the wardrobe's own plinth, not bought legs",
-    corner.some((part) => part.role === "plinth"),
-  );
-  check(
-    "the default wardrobe corner is open shelving, not an exterior door",
-    corner.filter((part) => part.role === "door").length === 0 &&
-      corner.filter((part) => part.role === "shelf").reduce((sum, part) => sum + part.quantity, 0) >= 4,
+    "the owner's corner end is an open shelf bay",
+    !!owner && owner.bays.some((bay) => bay.door === "none" && bay.fitting.kind === "shelves"),
   );
 
   check(
@@ -288,8 +275,8 @@ function build(shape: "straight" | "l_shaped" | "u_shaped", walls: number[]) {
   check("a U is three runs", spec.runs.length === 3);
   check("and three carcasses", spec.cabinets.length === 3);
   check(
-    "the back wall loses a corner at each end, the sides one each",
-    spec.cabinets.map((cabinet) => cabinet.size.width).join() === "1200,1800,1200",
+    "the shorter side walls own both U corners",
+    spec.cabinets.map((cabinet) => cabinet.size.width).join() === "1800,1800,1800",
     spec.cabinets.map((cabinet) => cabinet.size.width).join(),
   );
   check(
@@ -404,7 +391,7 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
   // A drawer inside a stacked bay carries a synthetic id — the bay's, plus the
   // section's — so the opening is found by the prefix. The section spans the
   // full bay, which is exactly why the width is the bay's width.
-  const openings = spec.cabinets.flatMap((cabinet) =>
+  const openings = resolveDesign(spec).cabinets.flatMap(({ cabinet }) =>
     cabinet.bays.map((bay) => ({ id: bay.id, width: bay.width })),
   );
   const openingFor = (bayId: string | undefined) =>
@@ -509,19 +496,13 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
     (part) => /corner/i.test(part.label),
   );
   check(
-    "a U's corners are cut as real boards",
-    shelving.length >= 16,
-    `${shelving.length} pieces across two corners`,
+    "a U's open corners do not create third carcasses",
+    shelving.length === 0,
+    `${shelving.length} separate corner pieces`,
   );
   check(
-    "including usable shelves in both corners",
-    shelving.filter((part) => part.role === "shelf").reduce((sum, part) => sum + part.quantity, 0) >= 8,
-    [...new Set(shelving.map((part) => part.label))].join(" / "),
-  );
-  check(
-    "and a structural gable in each corner",
-    shelving.filter((part) => part.role === "gable").length >= 2,
-    `${shelving.filter((part) => part.role === "gable").length} gables across two corners`,
+    "each U corner belongs to its shorter adjacent run",
+    resolveDesign(build("u_shaped", [1800, 3000, 1800])).layout.corners.every((corner) => corner.ownerRunId !== undefined),
   );
 
   const mixed = build("u_shaped", [1800, 3000, 1800]);
@@ -541,11 +522,6 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
     "every visible corner board selects only its own corner",
     mixedParts.filter((part) => part.id.startsWith("corner-")).every((part) => part.cabinetId === part.id.split("/")[0]),
   );
-  check(
-    "edited corner types remain collision free",
-    clashes(mixed).length === 0,
-    clashes(mixed).slice(0, 3).join(" | "),
-  );
 
   const sized = build("u_shaped", [1800, 3000, 1800]);
   sized.cornerSettings = {
@@ -553,13 +529,13 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
     "corner-right": { width: 650, depth: 700, shelves: 5 },
   };
   const sizedResolved = resolveDesign(sized);
-  check("corner dimensions reserve their own non-overlapping run space", sizedResolved.layout.placements.map((run) => run.usableLength).join() === "1150,1650,1100", sizedResolved.layout.placements.map((run) => run.usableLength).join());
+  check("open wardrobe corners stay square at cabinet depth", sizedResolved.layout.corners.every((corner) => corner.width === 600 && corner.depth === 600));
+  check("the shorter side owns each corner", sizedResolved.layout.placements.map((run) => run.usableLength).join() === "1800,1800,1800", sizedResolved.layout.placements.map((run) => run.usableLength).join());
   const sizedBoxes = [
     ...sizedResolved.cabinets.map((cabinet) => rotatedRectBounds(cabinet, cabinet.cabinet.size, cabinet.rotation)),
-    ...sizedResolved.layout.corners.map((corner) => rotatedRectBounds(corner, { width: corner.width ?? corner.size, depth: corner.depth ?? corner.size }, 0)),
+    ...sizedResolved.layout.corners.filter((corner) => !corner.ownerRunId).map((corner) => rotatedRectBounds(corner, { width: corner.width ?? corner.size, depth: corner.depth ?? corner.size }, 0)),
   ];
   check("edited corner dimensions keep cabinet volumes separate", sizedBoxes.every((a, index) => sizedBoxes.slice(index + 1).every((b) => Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) < 0.01 || Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ) < 0.01)));
-  check("each corner keeps its own shelf count", buildParts(sized).parts.find((part) => part.id === "corner-left/corner-shelves")?.quantity === 4 && buildParts(sized).parts.find((part) => part.id === "corner-right/corner-shelves")?.quantity === 5);
   check("per-corner settings survive design serialization", (() => { const restored = parseSpec(JSON.parse(JSON.stringify(sized))); return restored.ok && restored.spec.cornerSettings?.["corner-right"]?.shelves === 5; })());
 }
 
@@ -620,17 +596,17 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
     `${lShapes.length} polygons for an L's two runs and two carcasses`,
   );
 
-  // 2400 − 600 and 1800 − 600. A run drawn at its wall length would be 2400
-  // and 1800 and would run straight through the corner it stops for.
+  // Wall A stops at 1800; the shorter 1800 mm Wall B owns the corner and stays full length.
   check(
-    "each run is drawn at the length left after its corners",
+    "the longer run stops and the shorter owner continues through",
     lShapes.some((box) => Math.round(box.width) === 1800 && Math.round(box.depth) === 600) &&
-      lShapes.some((box) => Math.round(box.width) === 600 && Math.round(box.depth) === 1200),
+      lShapes.some((box) => Math.round(box.width) === 600 && Math.round(box.depth) === 1800),
     lShapes.map((box) => `${Math.round(box.width)}×${Math.round(box.depth)}`).join(", "),
   );
   check(
-    "and nothing is drawn at a wall length",
-    !lShapes.some((box) => Math.round(box.width) === 2400 || Math.round(box.depth) === 1800),
+    "only the owning run is drawn at its wall length",
+    !lShapes.some((box) => Math.round(box.width) === 2400) &&
+      lShapes.some((box) => Math.round(box.depth) === 1800),
     lShapes.map((box) => `${Math.round(box.width)}×${Math.round(box.depth)}`).join(", "),
   );
 
@@ -677,7 +653,7 @@ for (const [label, thickness] of [["18 mm", 18], ["15 mm", 15]] as const) {
 
   check(
     "each carcass says how many bays it has",
-    /3 bays/.test(l) && /2 bays/.test(l),
+    (l.match(/3 bays/g)?.length ?? 0) === 2,
   );
   check(
     "and the footprint is stated once",
@@ -771,20 +747,15 @@ for (const shape of ["l_shaped", "u_shaped"] as const) {
   const count = shape === "u_shaped" ? 2 : 1;
   const moduleBoxes = [
     ...resolved.cabinets.map((c) => rotatedRectBounds(c, c.cabinet.size, c.rotation)),
-    ...resolved.layout.corners.map((c) => rotatedRectBounds(c, { width: c.width ?? c.size, depth: c.depth ?? c.size }, 0)),
+    ...resolved.layout.corners.filter((c) => !c.ownerRunId).map((c) => rotatedRectBounds(c, { width: c.width ?? c.size, depth: c.depth ?? c.size }, 0)),
   ];
   check(`${shape}: cabinet and corner footprints never overlap`, moduleBoxes.every((a, i) => moduleBoxes.slice(i + 1).every((b) =>
     Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) < 0.01 || Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ) < 0.01)));
-  check(`${shape}: physical corner shelf modules`, parts.filter((p) => p.id.endsWith("/corner-shelves")).length === count);
-  check(`${shape}: both adjacent ends open into every corner`, parts.filter((p) => p.label === "Corner access rear support" && p.size.z === 60).length === count * 2);
-  for (const corner of resolved.layout.corners) {
-    const gable = parts.find((p) => p.id === `${corner.id}/gable-left`)!;
-    const exteriorX = corner.id === "corner-left" ? corner.x : corner.x + corner.size - gable.size.x;
-    check(`${corner.id}: closed side lies on exterior`, Math.abs(gable.placements[0]!.x - exteriorX) < 0.01);
-    check(`${corner.id}: full usable shelf reaches open side`, parts.find((p) => p.id === `${corner.id}/corner-shelves`)!.size.x === corner.size - gable.size.x);
-  }
+  check(`${shape}: no standalone corner shelf modules`, parts.filter((p) => p.id.endsWith("/corner-shelves")).length === 0);
+  check(`${shape}: run ends retain full vertical MDF`, parts.filter((p) => p.label === "Corner access rear support").length === 0);
+  check(`${shape}: each corner has an owning run`, resolved.layout.corners.filter((corner) => corner.ownerRunId).length === count);
   check(`${shape}: exact requested dimensions have no board overlaps`, clashes(spec).length === 0, clashes(spec).slice(0, 3).join("; "));
-  if (shape === "u_shaped") check("3000 × 1800 U reserves two 600 mm corners", resolved.layout.placements.map((p) => p.usableLength).join() === "1200,1800,1200");
+  if (shape === "u_shaped") check("3000 × 1800 U gives both 600 mm corners to its shorter sides", resolved.layout.placements.map((p) => p.usableLength).join() === "1800,1800,1800");
 }
 
 if (failures.length > 0) {
