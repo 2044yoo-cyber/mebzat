@@ -186,6 +186,71 @@ function routeExists(href: string): boolean {
   );
 }
 
+// ---------------------------------------------------------------------------
+// The way in, on a phone
+//
+// On the home page the logo used to be a link to "/" — sitting on the page it
+// linked to, so tapping the largest thing in the header did nothing — and the
+// only way into the navigation was two taps away behind the ellipsis. The logo
+// is the button now. These assertions are on the call and on the three lines
+// drawn over it, because an `onOpenMobileNav` that is imported and never wired
+// to anything satisfies a check that only looks for the name.
+// ---------------------------------------------------------------------------
+
+{
+  const topbar = readFileSync("src/components/shell/topbar.tsx", "utf8")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  // Scoped to the element that holds the logo, so the header's other
+  // `onOpenMobileNav` — the one on pages that are not home — cannot answer
+  // for it.
+  const start = topbar.indexOf("{home && <div className=\"contents lg:hidden\">");
+  const logo = start === -1 ? "" : topbar.slice(start, topbar.indexOf("</div>}", start));
+
+  check(
+    "the logo is what opens the navigation on the home page",
+    /<button/.test(logo) && /onClick=\{onOpenMobileNav\}/.test(logo),
+    "a link to the page you are already on is a tap that does nothing",
+  );
+
+  check(
+    "and it says so to a screen reader",
+    /aria-label=\{t\("common\.openNavigation"\)\}/.test(logo),
+  );
+
+  check(
+    "three lines are drawn over it",
+    /\[0, 1, 2\]\.map\(\(index\) => \(/.test(logo) &&
+      /className=\{MENU_LINE\}/.test(logo),
+    "two lines is not a menu glyph and four is a coincidence",
+  );
+
+  // Asserted on the one constant rather than on the rendered spans. Three
+  // copies of the class list meant a mutation could dim one line and leave the
+  // other two for the check to find — the second copy elsewhere in the file
+  // that AGENTS.md names, and it survived here before the class was hoisted.
+  check(
+    "they are translucent, so the wordmark still reads",
+    /const MENU_LINE =\s*"[^"]*bg-neutral-900\/25[^"]*";/.test(topbar) &&
+      /from-white\/70/.test(logo),
+  );
+
+  check(
+    "and they darken when it is pressed",
+    /const MENU_LINE =\s*"[^"]*group-active:bg-neutral-900\/60[^"]*";/.test(topbar) &&
+      /className="group /.test(logo),
+    "without `group` on the button, no `group-active:` under it ever fires",
+  );
+
+  check(
+    "the ellipsis no longer carries a second copy of the same control",
+    (topbar.match(/onClick=\{onOpenMobileNav\}/g) ?? []).length === 2,
+    "moved, not duplicated: one on the logo for home, one on the header for everywhere else",
+  );
+}
+
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
   for (const failure of failures) console.log(`  ${RED}x${RESET} ${failure}`);

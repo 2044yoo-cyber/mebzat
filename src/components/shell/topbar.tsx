@@ -18,6 +18,16 @@ import { useShell } from "@/lib/workspace/use-shell";
 import { cn } from "@/lib/utils";
 
 /**
+ * One of the three lines drawn over the logo on the home page.
+ *
+ * Translucent, because the tile exists to show a wordmark and a solid glyph
+ * over it would be a logo with a menu icon stamped on it. Dark enough to read
+ * as a control, and darker again while it is held.
+ */
+const MENU_LINE =
+  "h-[2px] w-4 rounded-full bg-neutral-900/25 transition-colors group-hover:bg-neutral-900/60 group-active:bg-neutral-900/60";
+
+/**
  * The workspace header.
  *
  * Breadcrumbs on the left, one search box in the middle, the panel controls on
@@ -48,10 +58,37 @@ export function Topbar({
         home ? "h-16 border-blue-100/60" : "h-14",
       )}
     >
+      {/* On the home page the logo is the menu.
+
+          It used to be a link to "/" sitting on the page it linked to, which
+          did nothing, while the way into navigation was two taps away behind
+          the ellipsis. So the biggest target in the header now opens the
+          navigation and the ellipsis no longer carries a duplicate of it.
+
+          The three lines are drawn over the logo rather than beside it: they
+          have to say "this opens something" without covering a wordmark the
+          tile exists to show, so they are translucent, sit in the corner the
+          mark leaves empty, and darken on press. */}
       {home && <div className="contents lg:hidden">
-        <Link href="/" aria-label="Medosha" className="relative mr-auto h-12 w-32 min-w-20 overflow-hidden rounded-lg bg-white sm:w-44">
+        <button
+          type="button"
+          onClick={onOpenMobileNav}
+          aria-label={t("common.openNavigation")}
+          className="group relative mr-auto h-12 w-32 min-w-20 overflow-hidden rounded-lg bg-white sm:w-44"
+        >
           <Image src="/medosha_full_logo.jpg" alt="Medosha — Build, Manage, Grow" fill sizes="176px" className="object-cover" />
-        </Link>
+          <span
+            aria-hidden
+            className="absolute inset-y-0 right-0 flex w-9 flex-col items-center justify-center gap-[3px] bg-gradient-to-l from-white/70 to-transparent transition-colors group-hover:from-white/90 group-active:from-white/90"
+          >
+            {/* Written once and rendered three times. Three copies of the
+                same class list is three places for one of them to drift, and
+                a check looking for the class would still find the other two. */}
+            {[0, 1, 2].map((index) => (
+              <span key={index} className={MENU_LINE} />
+            ))}
+          </span>
+        </button>
       </div>}
 
       <button
@@ -159,7 +196,6 @@ export function Topbar({
           <summary aria-label={t("navigation.more")} className="flex size-8 cursor-pointer list-none items-center justify-center rounded-full text-muted-foreground [&::-webkit-details-marker]:hidden"><Ellipsis className="size-4" /></summary>
           <div className="absolute top-full right-0 z-60 mt-2 flex items-center gap-2 rounded-xl border bg-background p-2 shadow-lg">
             <ThemeToggle />
-            <button type="button" onClick={onOpenMobileNav} aria-label={t("common.openNavigation")} className="flex size-10 items-center justify-center rounded-lg hover:bg-muted"><Menu className="size-4" /></button>
             <button type="button" onClick={onTogglePanel} aria-label={panelOpen ? t("common.hidePanel") : t("common.showPanel")} className="flex size-10 items-center justify-center rounded-lg hover:bg-muted"><PanelRight className="size-4" /></button>
           </div>
         </details>}
