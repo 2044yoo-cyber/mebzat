@@ -18,6 +18,7 @@ import type {
   FeedPost,
   TrendingTag,
 } from "@/lib/feed/types";
+import { diversifyFeed } from "@/lib/feed/ranking";
 
 /**
  * Reading the Smart Discovery Feed.
@@ -256,7 +257,9 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
   // ranking cannot reshuffle underneath a reader who is halfway down it.
   const seed = cursor?.seed ?? seedFor(user?.id ?? null);
 
-  const { data, error } = await supabase.rpc("feed_page", {
+  // Runtime RPC is installed by migration 0101; the generated database type
+  // is refreshed separately after deployment and shares feed_page's shape.
+  const { data, error } = await supabase.rpc("feed_page_personalized" as "feed_page", {
     p_limit: limit,
     // The first page fixes the clock; every page after it reuses that value
     // so the age term cannot move a post across a page boundary mid-scroll.
@@ -308,10 +311,10 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
   }
 
   const rows = (data ?? []) as FeedPageRow[];
-  const posts = rows.flatMap((row) => {
+  const posts = diversifyFeed(rows.flatMap((row) => {
     const post = normalize(row);
     return post ? [post] : [];
-  });
+  }));
 
   // A short page is the end of the feed. Asking for one more page to find an
   // empty one is a wasted round trip on every reader who scrolls to the

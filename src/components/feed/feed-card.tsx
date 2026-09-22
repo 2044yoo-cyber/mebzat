@@ -59,6 +59,7 @@ export function FeedCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
 
   const long = (post.body?.length ?? 0) > 220;
+  const recordOpen = () => void feedApi.open(post.id, post.kind === "tour_360");
 
   return (
     <article
@@ -70,7 +71,7 @@ export function FeedCard({
       <div className="px-3 pb-2">
         <h2 className="text-[15px] leading-snug font-semibold text-foreground">
           {post.linkHref ? (
-            <Link href={post.linkHref} className="hover:underline">
+            <Link href={post.linkHref} onClick={recordOpen} className="hover:underline">
               {post.title}
             </Link>
           ) : (
@@ -104,7 +105,7 @@ export function FeedCard({
         <FeedMedia media={post.media} priority={priority} />
       )}
 
-      <Detail post={post} />
+      <Detail post={post} onOpen={recordOpen} />
 
       {post.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-3 pt-2">
@@ -246,31 +247,31 @@ function Header({ post, signedIn }: { post: FeedPost; signedIn: boolean }) {
 // The kind-specific strip
 // ---------------------------------------------------------------------------
 
-function Detail({ post }: { post: FeedPost }) {
+function Detail({ post, onOpen }: { post: FeedPost; onOpen: () => void }) {
   switch (post.kind) {
     case "property":
     case "investment":
-      return <CommerceStrip post={post} accent />;
+      return <CommerceStrip post={post} onOpen={onOpen} accent />;
 
     case "material":
     case "furniture":
     case "equipment":
-      return <CommerceStrip post={post} />;
+      return <CommerceStrip post={post} onOpen={onOpen} />;
 
     case "price_update":
-      return <PriceStrip post={post} />;
+      return <PriceStrip post={post} onOpen={onOpen} />;
 
     case "document":
     case "boq_template":
     case "floor_plan":
-      return <FilesStrip post={post} />;
+      return <FilesStrip post={post} onOpen={onOpen} />;
 
     default:
-      return post.linkHref ? <LinkStrip post={post} /> : null;
+      return post.linkHref ? <LinkStrip post={post} onOpen={onOpen} /> : null;
   }
 }
 
-function CommerceStrip({ post, accent = false }: { post: FeedPost; accent?: boolean }) {
+function CommerceStrip({ post, onOpen, accent = false }: { post: FeedPost; onOpen: () => void; accent?: boolean }) {
   return (
     <div
       className={cn(
@@ -298,6 +299,7 @@ function CommerceStrip({ post, accent = false }: { post: FeedPost; accent?: bool
       {post.linkHref && (
         <Link
           href={post.linkHref}
+          onClick={onOpen}
           className="flex h-9 shrink-0 items-center gap-1 rounded-full bg-brand px-3.5 text-xs font-semibold text-brand-foreground"
         >
           {post.linkLabel ?? "View"}
@@ -308,7 +310,7 @@ function CommerceStrip({ post, accent = false }: { post: FeedPost; accent?: bool
   );
 }
 
-function PriceStrip({ post }: { post: FeedPost }) {
+function PriceStrip({ post, onOpen }: { post: FeedPost; onOpen: () => void }) {
   const change = post.priceChange ?? 0;
   const rising = change > 0;
   const flat = change === 0;
@@ -349,6 +351,7 @@ function PriceStrip({ post }: { post: FeedPost }) {
       {post.linkHref && (
         <Link
           href={post.linkHref}
+          onClick={onOpen}
           className="flex h-9 shrink-0 items-center gap-1 rounded-full border border-border px-3.5 text-xs font-semibold text-foreground"
         >
           {post.linkLabel ?? "Prices"}
@@ -359,9 +362,9 @@ function PriceStrip({ post }: { post: FeedPost }) {
   );
 }
 
-function FilesStrip({ post }: { post: FeedPost }) {
+function FilesStrip({ post, onOpen }: { post: FeedPost; onOpen: () => void }) {
   if (post.files.length === 0) {
-    return post.linkHref ? <LinkStrip post={post} /> : null;
+    return post.linkHref ? <LinkStrip post={post} onOpen={onOpen} /> : null;
   }
 
   return (
@@ -410,12 +413,13 @@ function FileRow({ file }: { file: FeedFile }) {
   );
 }
 
-function LinkStrip({ post }: { post: FeedPost }) {
+function LinkStrip({ post, onOpen }: { post: FeedPost; onOpen: () => void }) {
   if (!post.linkHref) return null;
   return (
     <div className="px-3 pt-2">
       <Link
         href={post.linkHref}
+        onClick={onOpen}
         className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-muted/60 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
       >
         {post.linkLabel ?? "Open"}

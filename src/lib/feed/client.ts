@@ -57,6 +57,8 @@ export const feedApi = {
   save: (postId: string) => post({ action: "save", postId }),
   follow: (authorKey: string) => post({ action: "follow", authorKey }),
   share: (postId: string) => post({ action: "share", postId }),
+  open: (postId: string, immersive = false) =>
+    post({ action: "open", postId, immersive }),
   hide: (postId: string) => post({ action: "hide", postId }),
   download: (fileId: string) => post({ action: "download", fileId }),
   likeComment: (commentId: string) => post({ action: "comment-like", commentId }),
