@@ -109,4 +109,38 @@ const stacked = createKitchenDesign({ ...options("g_shaped"), topHeight: 300 });
 assert.ok(stacked.cabinets.some((c) => c.stackedOn));
 assert.equal(resolveDesign(stacked).issues.length, 0);
 assert.ok(stacked.cabinets.every((c) => c.position.y + c.size.height <= 2800));
+
+// Plan-first appliance anchors remain exactly where the user placed them.
+const plannedL = options("l_shaped");
+plannedL.placementMode = "plan";
+plannedL.fridgePlacement = "custom";
+plannedL.details!.fridge = { runId: "kitchen-back", offset: 0, width: 700 };
+plannedL.details!.sink = { runId: "kitchen-back", offset: 900, width: 800 };
+plannedL.details!.stove = { runId: "kitchen-right", offset: 700, width: 500 };
+const plannedLSpec = createKitchenDesign(plannedL);
+for (const role of ["fridge", "sink", "stove"] as const) {
+  const cabinet = plannedLSpec.cabinets.find((item) => item.kitchenRole === role)!;
+  assert.equal(cabinet.runId, plannedL.details![role].runId);
+  assert.equal(cabinet.offset, plannedL.details![role].offset);
+}
+
+const rightFridge = options("straight");
+rightFridge.placementMode = "plan";
+rightFridge.fridgePlacement = "right";
+const rightSpec = createKitchenDesign(rightFridge);
+const rightRun = rightSpec.runs.find((run) => run.id === "kitchen-back")!;
+const rightCabinet = rightSpec.cabinets.find((item) => item.kitchenRole === "fridge")!;
+assert.equal(rightCabinet.offset! + rightCabinet.size.width, rightRun.length, "Right-end fridge remains terminal");
+
+const explicitMiddle = options("straight");
+explicitMiddle.placementMode = "plan";
+explicitMiddle.fridgePlacement = "custom";
+explicitMiddle.details!.fridge.offset = 2500;
+assert.equal(createKitchenDesign(explicitMiddle).cabinets.find((item) => item.kitchenRole === "fridge")!.offset, 2500, "Explicit plan placement is not auto-moved");
+
+const longRun = options("straight");
+longRun.roomWidth = 5000;
+const longSpec = createKitchenDesign(longRun);
+assert.ok(longSpec.cabinets.some((item) => !item.kitchenRole && item.size.width >= 1200), "Free runs use continuous carcasses instead of 800 mm boxes");
+assert.ok(longSpec.cabinets.filter((item) => item.kitchenRole === "hood").every((item) => item.size.width <= 500), "Extractor opening is at most 500 mm");
 console.log("PASS: reference kitchen construction, connected uppers, appliance locations, fridge opening, Zekolo, sheet fit, door alignment and countertop visibility.");

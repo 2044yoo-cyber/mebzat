@@ -25,17 +25,37 @@ export function createDetailedKitchen(options: KitchenSetup): DesignSpec {
   type Segment = { offset: number; width: number; role?: "fridge" | "sink" | "stove" };
   function fill(start: number, end: number): Segment[] {
     if (end - start < 1) return [];
-    const count = Math.ceil((end - start) / 800);
+    // One continuous carcass can carry several front bays. Splitting every
+    // 800-ish millimetres duplicated both side panels at every join.
+    const count = Math.ceil((end - start) / 2000);
     const width = Math.floor((end - start) / count);
     return Array.from({ length: count }, (_, i) => ({ offset: start + i * width, width: i === count - 1 ? end - start - i * width : width }));
+  }
+  function bays(id: string, segment: Segment, kind: Cabinet["kind"]): Cabinet["bays"] {
+    if (segment.role) return [{
+      id: `${id}-bay`, width: segment.width - 36,
+      fitting: { kind: "open" },
+      door: segment.role === "fridge" || segment.role === "stove" ? "none" : "hinged",
+      doorLeaves: segment.width > 600 ? 2 : 1,
+    }];
+    const thickness = 18;
+    const count = Math.max(1, Math.ceil((segment.width - 2 * thickness) / 700));
+    const usable = segment.width - 2 * thickness - (count - 1) * thickness;
+    const bayWidth = usable / count;
+    return Array.from({ length: count }, (_, index) => ({
+      id: `${id}-bay-${index + 1}`,
+      width: index === count - 1 ? usable - bayWidth * index : bayWidth,
+      fitting: { kind: "shelves" as const, count: kind === "wall" ? 2 : 1, adjustable: true },
+      door: "hinged" as const,
+      doorLeaves: bayWidth > 600 ? 2 as const : 1 as const,
+    }));
   }
   function cabinet(id: string, segment: Segment, runId: string, kind: Cabinet["kind"], y: number, height: number, depth: number): Cabinet {
     return { id, label: segment.role === "fridge" ? "Fridge enclosure" : segment.role === "sink" ? "Sink space" : segment.role === "stove" ? "Stove / oven space" : kind === "wall" ? "Upper cabinet" : "Base cabinet",
       kind, kitchenRole: segment.role, runId, offset: segment.offset,
       position: { x: 0, y, z: 0 }, size: { width: segment.width, height, depth },
       plinthHeight: kind === "wall" || segment.role === "fridge" ? 0 : d.plinthHeight,
-      bays: [{ id: `${id}-bay`, width: segment.width - 36, fitting: segment.role ? { kind: "open" } : { kind: "shelves", count: 1, adjustable: true },
-        door: segment.role === "fridge" || segment.role === "stove" ? "none" : "hinged", doorLeaves: segment.width > 600 ? 2 : 1 }],
+      bays: bays(id, segment, kind),
     };
   }
   for (const placement of solved.placements) {
@@ -71,12 +91,19 @@ export function createDetailedKitchen(options: KitchenSetup): DesignSpec {
     for (const [index, segment] of upperSegments.entries()) {
       if (segment.role === "fridge") continue; // Its tall side panels and overhead box already occupy this space.
       const hoodLift = segment.role === "stove" ? Math.min(400, options.wallHeight - 200) : 0;
-      const wall = cabinet(`${upperRun.id}-${index}`, { ...segment, role: undefined }, upperRun.id, "wall", d.upperBottom + hoodLift, options.wallHeight - hoodLift, d.upperDepth);
+      const hoodWidth = segment.role === "stove" ? Math.min(500, segment.width) : segment.width;
+      const wallSegment = {
+        ...segment,
+        offset: segment.offset + (segment.width - hoodWidth) / 2,
+        width: hoodWidth,
+        role: undefined,
+      };
+      const wall = cabinet(`${upperRun.id}-${index}`, wallSegment, upperRun.id, "wall", d.upperBottom + hoodLift, options.wallHeight - hoodLift, d.upperDepth);
       if (side === "back") {
         const cornerFront = d.upperDepth + (spec.carcass.frontBoard ?? spec.carcass.board).thickness;
         wall.frontInsets = {
-          start: ["l_shaped", "u_shaped", "g_shaped"].includes(options.shape) ? Math.max(0, cornerFront - segment.offset) : 0,
-          end: ["u_shaped", "g_shaped"].includes(options.shape) ? Math.max(0, segment.offset + segment.width - upperRun.length + cornerFront) : 0,
+          start: ["l_shaped", "u_shaped", "g_shaped"].includes(options.shape) ? Math.max(0, cornerFront - wallSegment.offset) : 0,
+          end: ["u_shaped", "g_shaped"].includes(options.shape) ? Math.max(0, wallSegment.offset + wallSegment.width - upperRun.length + cornerFront) : 0,
         };
       }
       if (hoodLift) { wall.label = "Extractor recess · upper cabinet"; wall.kitchenRole = "hood"; }
