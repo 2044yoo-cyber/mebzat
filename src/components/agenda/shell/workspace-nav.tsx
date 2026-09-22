@@ -37,7 +37,17 @@ export function WorkspaceNav({ projectId }: { projectId: string }) {
       )}
     >
       {WORKSPACE_GROUPS.map((group) => (
-        <div key={group.id} className="flex gap-1 lg:flex-col lg:gap-0.5">
+        // `shrink-0` on the group, not only on the rows inside it.
+        //
+        // Without it the group is a flex item that may shrink below its
+        // content, while every row inside it refuses to — so the rows spilled
+        // out of their group and printed on top of the next one's. On a phone
+        // that read as "Observations" written across "Punch List". The strip
+        // scrolls sideways; nothing in it needs to be narrower than its words.
+        <div
+          key={group.id}
+          className="flex shrink-0 gap-1 lg:flex-col lg:gap-0.5"
+        >
           <p className="hidden px-2 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase lg:block">
             {group.label}
           </p>

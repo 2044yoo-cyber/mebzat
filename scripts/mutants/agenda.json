@@ -1048,5 +1048,35 @@
     "file": "src/app/(dashboard)/agenda/projects/[projectId]/reports/page.tsx",
     "from": "  const money = access.finance",
     "to": "  const money = true"
+  },
+  {
+    "name": "the section groups shrink again, so the labels overlap",
+    "file": "src/components/agenda/shell/workspace-nav.tsx",
+    "from": "          className=\"flex shrink-0 gap-1 lg:flex-col lg:gap-0.5\"",
+    "to": "          className=\"flex gap-1 lg:flex-col lg:gap-0.5\""
+  },
+  {
+    "name": "shrink-0 moves off the group and onto nothing in particular",
+    "file": "src/components/agenda/shell/workspace-nav.tsx",
+    "from": "        <div\n          key={group.id}\n          className=\"flex shrink-0 gap-1 lg:flex-col lg:gap-0.5\"\n        >",
+    "to": "        <div key={group.id} className=\"flex gap-1 lg:flex-col lg:gap-0.5\">"
+  },
+  {
+    "name": "the section column is sized by its widest child again",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/layout.tsx",
+    "from": "<div className=\"min-h-0 min-w-0 overflow-x-auto overflow-y-auto p-4\">",
+    "to": "<div className=\"min-h-0 overflow-y-auto p-4\">"
+  },
+  {
+    "name": "wide content is clipped instead of scrolling inside the card",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/layout.tsx",
+    "from": "\"min-h-0 min-w-0 overflow-x-auto overflow-y-auto p-4\"",
+    "to": "\"min-h-0 min-w-0 overflow-y-auto p-4\""
+  },
+  {
+    "name": "the card stops clipping its own corners",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/layout.tsx",
+    "from": "<div className=\"grid min-h-0 overflow-hidden rounded-2xl border bg-card lg:grid-cols-[15rem_1fr]\">",
+    "to": "<div className=\"grid min-h-0 rounded-2xl border bg-card lg:grid-cols-[15rem_1fr]\">"
   }
 ]

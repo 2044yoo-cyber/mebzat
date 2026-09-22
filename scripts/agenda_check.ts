@@ -267,6 +267,32 @@ function exists(path: string): boolean {
     /flex gap-1 overflow-x-auto border-b p-2/.test(navSource) &&
       /lg:h-full lg:flex-col/.test(navSource),
   );
+
+  // The overlap. Each group is itself a flex item of the strip, and a flex
+  // item shrinks below its content unless told not to. The rows inside it
+  // already refuse to shrink, so they spilled out of their group and printed
+  // on top of the next one's — on a phone, "Observations" written across
+  // "Punch List". Asserted on the group's own class list, because the rows
+  // have the same word in theirs and a file-wide search finds theirs.
+  check(
+    "a group of sections does not shrink below its own labels",
+    /<div\s+key=\{group\.id\}\s+className="flex shrink-0 gap-1/.test(navSource),
+    "without this the rows overflow their group and overlap the next one",
+  );
+
+  const layout = code(
+    "src/app/(dashboard)/agenda/projects/[projectId]/layout.tsx",
+  );
+  check(
+    "the section's own column is the screen, not its widest child",
+    /className="min-h-0 min-w-0 overflow-x-auto overflow-y-auto p-4"/.test(layout),
+    "a grid item is sized by its content by default, so one wide table pushed the text off the right edge",
+  );
+  check(
+    "and the card around it still clips its corners",
+    /grid min-h-0 overflow-hidden rounded-2xl border/.test(layout),
+    "the scroll belongs to the column inside, not to the card",
+  );
 }
 
 // ---------------------------------------------------------------------------

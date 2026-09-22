@@ -66,7 +66,14 @@ export default async function ProjectWorkspaceLayout({
 
       <div className="grid min-h-0 overflow-hidden rounded-2xl border bg-card lg:grid-cols-[15rem_1fr]">
         <WorkspaceNav projectId={projectId} />
-        <div className="min-h-0 overflow-y-auto p-4">{children}</div>
+        {/* `min-w-0` because a grid item is sized by its content by default,
+            so one wide table or one long unbroken word made the column wider
+            than the phone and the text ran off the right-hand edge with the
+            card clipped around it. With it the column is the screen, and
+            anything genuinely too wide scrolls inside the card. */}
+        <div className="min-h-0 min-w-0 overflow-x-auto overflow-y-auto p-4">
+          {children}
+        </div>
       </div>
     </div>
   );
