@@ -381,7 +381,7 @@ export function AppShell({
             "--fab-right": panelOpen ? `${shell.panelWidth}px` : "0px",
           } as React.CSSProperties
         }
-        className="pointer-events-none fixed right-0 bottom-[var(--bottom-nav-h)] z-40 flex flex-col items-end gap-3 p-5 lg:right-[var(--fab-right)] lg:bottom-0 print:hidden"
+        className="pointer-events-none fixed right-4 bottom-[calc(var(--bottom-nav-h)+1rem)] z-40 flex flex-col items-end gap-3 lg:right-[var(--fab-right)] lg:bottom-0 lg:p-5 print:hidden"
       >
         <AiLauncher />
         <QuickActions />

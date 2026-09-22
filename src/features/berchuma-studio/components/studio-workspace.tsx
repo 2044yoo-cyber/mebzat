@@ -308,7 +308,7 @@ export function StudioWorkspace({
   return (
     <div
       className={cn(
-        "flex flex-col @4xl/ws:h-full",
+        "flex w-full min-w-0 max-w-full flex-col overflow-x-hidden @4xl/ws:h-full",
         flowing ? "min-h-full" : "h-full",
       )}
     >
@@ -396,7 +396,7 @@ export function StudioWorkspace({
       */}
       <div
         className={cn(
-          "grid flex-1 @4xl/ws:min-h-0 @4xl/ws:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] @6xl/ws:grid-cols-[minmax(300px,360px)_minmax(0,1fr)_minmax(300px,360px)]",
+          "grid w-full min-w-0 max-w-full flex-1 overflow-x-hidden @4xl/ws:min-h-0 @4xl/ws:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] @6xl/ws:grid-cols-[minmax(300px,360px)_minmax(0,1fr)_minmax(300px,360px)]",
           // `min-h-0` lets a flex child be shorter than its content so the
           // child can scroll instead. That is right for the two columns that
           // scroll inside themselves and wrong for the one that is meant to
@@ -418,7 +418,7 @@ export function StudioWorkspace({
         {/* The design, and the controls over it */}
         <div
           className={cn(
-            "flex flex-col @4xl/ws:flex @4xl/ws:min-h-0",
+            "w-full min-w-0 max-w-full flex-col overflow-x-hidden @4xl/ws:flex @4xl/ws:min-h-0",
             tab === "design" ? "flex" : "hidden",
           )}
         >
@@ -521,7 +521,7 @@ export function StudioWorkspace({
               {/* The editor takes the rest of the column. On a phone that is
                   as much as it wants — the drawing sticks to the top of the
                   page and the controls run past it. */}
-              <div className="flex-1 @4xl/ws:min-h-0">
+              <div className="w-full min-w-0 max-w-full flex-1 overflow-x-hidden @4xl/ws:min-h-0">
                 <DesignEditor
                   spec={design.spec}
                   onChange={design.set}

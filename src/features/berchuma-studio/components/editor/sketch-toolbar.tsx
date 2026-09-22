@@ -46,9 +46,9 @@ export function SketchToolbar({
   }
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-2">
-      <div className="pointer-events-auto mx-auto max-w-xl rounded-xl border bg-background/90 p-2 shadow-lg backdrop-blur-xl">
-        <div className="grid grid-cols-5 gap-1">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 w-full min-w-0 max-w-full overflow-x-hidden px-2 pb-2">
+      <div className="pointer-events-auto mx-auto w-full min-w-0 max-w-xl overflow-x-hidden rounded-xl border bg-background/90 p-2 shadow-lg backdrop-blur-xl">
+        <div className="flex min-w-0 gap-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <Tool active={tool === "select"} label="Select" icon={MousePointer2} onClick={() => { onTool("select"); setMenu(null); }} />
           <Tool active={menu === "draw" || tool === "rectangle" || tool === "line" || tool === "box"} label="Draw" icon={Pencil} onClick={() => setMenu(menu === "draw" ? null : "draw")} />
           <Tool active={tool === "push-pull"} label="Push/Pull" icon={Boxes} onClick={() => { onTool("push-pull"); setMenu(null); }} />
@@ -57,7 +57,7 @@ export function SketchToolbar({
         </div>
 
         {menu === "draw" ? (
-          <div className="mt-1 flex gap-1 overflow-x-auto border-t pt-1">
+          <div className="mt-1 flex min-w-0 gap-1 overflow-x-auto whitespace-nowrap border-t pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <Tool active={tool === "rectangle"} label="Rectangle" icon={Maximize2} onClick={() => { onTool("rectangle"); setMenu(null); }} />
             <Tool active={tool === "line"} label="Line" icon={Pencil} onClick={() => { onTool("line"); setMenu(null); }} />
             <Tool label="Box" icon={Cuboid} onClick={() => { quickBox(); setMenu(null); }} />
@@ -65,7 +65,7 @@ export function SketchToolbar({
         ) : null}
 
         {menu === "more" ? (
-          <div className="mt-1 flex gap-1 overflow-x-auto border-t pt-1">
+          <div className="mt-1 flex min-w-0 gap-1 overflow-x-auto whitespace-nowrap border-t pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <Tool active={tool === "rotate"} label="Rotate" icon={Rotate3d} onClick={() => { onTool("rotate"); setMenu(null); }} />
             <Tool active={tool === "scale"} label="Scale" icon={Scaling} onClick={() => { onTool("scale"); setMenu(null); }} />
             <Tool active={tool === "measure"} label="Measure" icon={Ruler} onClick={() => { onTool("measure"); setMenu(null); }} />
@@ -169,7 +169,7 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
 }
 
 function Tool({ active = false, label, icon: Icon, onClick, disabled }: { active?: boolean; label: string; icon: typeof Box; onClick: () => void; disabled?: boolean }) {
-  return <button type="button" title={label} aria-label={label} aria-pressed={active} disabled={disabled} onClick={onClick} className={cn("flex shrink-0 flex-col items-center gap-0.5 rounded-md px-2 py-1 text-[10px]", active ? "bg-primary text-primary-foreground" : "hover:bg-muted", "disabled:opacity-35")}><Icon className="size-4" />{label}</button>;
+  return <button type="button" title={label} aria-label={label} aria-pressed={active} disabled={disabled} onClick={onClick} className={cn("flex min-w-14 flex-1 shrink-0 flex-col items-center gap-0.5 whitespace-nowrap rounded-md px-2 py-1 text-[10px]", active ? "bg-primary text-primary-foreground" : "hover:bg-muted", "disabled:opacity-35")}><Icon className="size-4" />{label}</button>;
 }
 
 function Action({ label, icon: Icon, onClick, disabled }: { label: string; icon: typeof Box; onClick: () => void; disabled?: boolean }) {

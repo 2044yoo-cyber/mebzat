@@ -229,7 +229,7 @@ export function DesignEditor({
       // A phone reads this as an ordinary block in the page's flow, as tall as
       // the drawing plus the controls under it, so the page scrolls it. A wide
       // workspace reads the `@4xl/ws` half and gets the row it always had.
-      className="w-full @4xl/ws:flex @4xl/ws:h-full @4xl/ws:min-h-0"
+      className="w-full min-w-0 max-w-full overflow-x-hidden @4xl/ws:flex @4xl/ws:h-full @4xl/ws:min-h-0"
     >
       {/*
         The design, stuck to the top of the page while the controls go past.
@@ -254,12 +254,12 @@ export function DesignEditor({
             : undefined
         }
         className={cn(
-          "sticky top-0 z-10 w-full bg-background",
+          "sticky top-0 z-10 w-full min-w-0 max-w-full overflow-hidden bg-background",
           "h-[var(--studio-viewport,60dvh)]",
           "@4xl/ws:relative @4xl/ws:z-auto @4xl/ws:h-full @4xl/ws:min-h-0 @4xl/ws:w-auto @4xl/ws:flex-1",
         )}
       >
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 w-full min-w-0 max-w-full overflow-hidden">
           {view === "solid" ? (
             <Model
               spec={spec}
@@ -362,8 +362,8 @@ export function DesignEditor({
         </div>
 
         {/* Top left: how it is drawn. */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
-          <div className="pointer-events-auto flex items-center gap-1">
+        <div className="pointer-events-auto absolute inset-x-0 top-0 flex min-w-0 max-w-full items-start justify-between gap-2 overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden @4xl/ws:pointer-events-none @4xl/ws:overflow-visible">
+          <div className="pointer-events-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
             <div className="flex gap-1 rounded-lg border border-white/10 bg-background/70 p-0.5 backdrop-blur-xl">
               <ViewTab
                 active={view === "solid"}
@@ -438,7 +438,7 @@ export function DesignEditor({
           </div>
 
           {view === "solid" ? (
-            <div className="pointer-events-auto flex items-center gap-1">
+            <div className="pointer-events-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
             <button type="button" onClick={() => {
               const enabled = !sketchEnabled;
               setSketchEnabled(enabled);
@@ -594,7 +594,7 @@ export function DesignEditor({
       */}
       <div
         className={cn(
-          "w-full border-t",
+          "w-full min-w-0 max-w-full overflow-x-hidden border-t",
           "@4xl/ws:h-full @4xl/ws:min-h-0 @4xl/ws:w-[300px] @4xl/ws:shrink-0",
           "@4xl/ws:border-t-0 @6xl/ws:w-[340px]",
         )}

@@ -147,7 +147,7 @@ export default function Model({
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         onReady?.();
       }}
-      style={{ touchAction: "none" }}
+      style={{ touchAction: "none", width: "100%", maxWidth: "100%", minWidth: 0 }}
       // Clicking the floor or the sky lets go of the selection. Without this
       // the only way to deselect was to select something else, which makes the
       // highlight feel like something you are stuck with.
