@@ -10,12 +10,14 @@ import {
   Minus,
   Plus,
   Ruler,
+  Shapes,
   Undo2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 import { ControlPanel } from "./control-panel";
+import { SketchToolbar } from "./sketch-toolbar";
 import { useViewportHeight } from "../../hooks/use-viewport-height";
 import {
   AXES,
@@ -37,6 +39,16 @@ import {
 import { Elevation } from "../viewer/elevation";
 import { Plan } from "../viewer/plan";
 import type { DesignSpec } from "../../types/spec";
+import {
+  addSketchObject,
+  createSketchObject,
+  duplicateSketchObject,
+  pushPullSketchObject,
+  removeSketchObject,
+  updateSketchObject,
+  type SketchAxis,
+  type SketchTool,
+} from "../../services/sketch";
 
 /**
  * The design, large, with the controls beside it or under it.
@@ -82,7 +94,9 @@ export function DesignEditor({
   spec,
   onChange,
   onUndo,
+  onRedo,
   canUndo = false,
+  canRedo = false,
   headerHidden = false,
   onShowHeader,
 }: {
@@ -90,7 +104,9 @@ export function DesignEditor({
   onChange: (next: DesignSpec) => void;
   /** Absent where there is no history to offer — the public read-only view. */
   onUndo?: () => void;
+  onRedo?: () => void;
   canUndo?: boolean;
+  canRedo?: boolean;
   /** True while the studio's title row is folded away. */
   headerHidden?: boolean;
   /** Unfolds it. The only way back, so it is never conditional on anything. */
@@ -98,6 +114,9 @@ export function DesignEditor({
 }) {
   const [view, setView] = useState<View>("solid");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedSketchId, setSelectedSketchId] = useState<string | null>(null);
+  const [sketchEnabled, setSketchEnabled] = useState(spec.sketchMode);
+  const [sketchTool, setSketchTool] = useState<SketchTool>("select");
   const [hideFronts, setHideFronts] = useState(false);
   const [showCountertop, setShowCountertop] = useState(false);
 
@@ -158,6 +177,19 @@ export function DesignEditor({
         return;
       }
 
+      if (selectedSketchId) {
+        event.preventDefault();
+        if (shortcut.kind === "delete") {
+          onChange(removeSketchObject(spec, selectedSketchId));
+          setSelectedSketchId(null);
+        } else if (shortcut.kind === "duplicate") {
+          onChange(duplicateSketchObject(spec, selectedSketchId));
+        } else if (shortcut.kind === "deselect") {
+          setSelectedSketchId(null);
+        }
+        return;
+      }
+
       if (!selected) return;
       event.preventDefault();
 
@@ -197,7 +229,7 @@ export function DesignEditor({
       // A phone reads this as an ordinary block in the page's flow, as tall as
       // the drawing plus the controls under it, so the page scrolls it. A wide
       // workspace reads the `@4xl/ws` half and gets the row it always had.
-      className="w-full @4xl/ws:flex @4xl/ws:h-full @4xl/ws:min-h-0"
+      className="w-full min-w-0 max-w-full overflow-x-hidden @4xl/ws:flex @4xl/ws:h-full @4xl/ws:min-h-0"
     >
       {/*
         The design, stuck to the top of the page while the controls go past.
@@ -222,19 +254,49 @@ export function DesignEditor({
             : undefined
         }
         className={cn(
-          "sticky top-0 z-10 w-full bg-background",
+          "sticky top-0 z-10 w-full min-w-0 max-w-full overflow-hidden bg-background",
           "h-[var(--studio-viewport,60dvh)]",
           "@4xl/ws:relative @4xl/ws:z-auto @4xl/ws:h-full @4xl/ws:min-h-0 @4xl/ws:w-auto @4xl/ws:flex-1",
         )}
       >
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 w-full min-w-0 max-w-full overflow-hidden">
           {view === "solid" ? (
             <Model
               spec={spec}
               hideFronts={hideFronts}
               hideCountertop={spec.furnitureType === "kitchen" && !showCountertop}
               selectedCabinetId={selectedId}
-              onSelectCabinet={setSelectedId}
+              onSelectCabinet={(id) => {
+                setSelectedId(id);
+                if (id) setSelectedSketchId(null);
+              }}
+              selectedSketchId={selectedSketchId}
+              onSelectSketch={(id) => {
+                setSelectedSketchId(id);
+                if (id) setSelectedId(null);
+                if (id && sketchEnabled && sketchTool === "push-pull") {
+                  onChange(pushPullSketchObject(spec, id, 400));
+                  setSketchTool("select");
+                }
+              }}
+              sketchTool={sketchEnabled ? sketchTool : "orbit"}
+              onPlaceSketch={sketchEnabled ? (position, axis, direction) => {
+                const shape = sketchTool === "line" ? "line" : sketchTool === "box" ? "box" : "face";
+                const object = createSketchObject(spec, shape, position, axis as SketchAxis);
+                const normalSize = axis === "x" ? object.size.width : axis === "y" ? object.size.height : object.size.depth;
+                object.position[axis] += direction * normalSize / 2;
+                onChange(addSketchObject(spec, object));
+                setSelectedSketchId(object.id);
+                setSketchTool("select");
+              } : undefined}
+              onMoveSketch={sketchEnabled && selectedSketchId ? (position) => {
+                const object = spec.sketchObjects.find((entry) => entry.id === selectedSketchId);
+                if (!object) return;
+                onChange(updateSketchObject(spec, object.id, {
+                  position: { ...object.position, x: position.x, z: position.z },
+                }));
+                setSketchTool("select");
+              } : undefined}
               onResize={(id, change) => {
                 // A negative width means the *left* edge was pulled: the
                 // cabinet grows to the left, so it also has to move left by
@@ -300,8 +362,8 @@ export function DesignEditor({
         </div>
 
         {/* Top left: how it is drawn. */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
-          <div className="pointer-events-auto flex items-center gap-1">
+        <div className="pointer-events-auto absolute inset-x-0 top-0 flex min-w-0 max-w-full items-start justify-between gap-2 overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden @4xl/ws:pointer-events-none @4xl/ws:overflow-visible">
+          <div className="pointer-events-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
             <div className="flex gap-1 rounded-lg border border-white/10 bg-background/70 p-0.5 backdrop-blur-xl">
               <ViewTab
                 active={view === "solid"}
@@ -376,7 +438,16 @@ export function DesignEditor({
           </div>
 
           {view === "solid" ? (
-            <label className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-white/10 bg-background/70 px-2 py-1.5 text-[11px] backdrop-blur-xl">
+            <div className="pointer-events-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
+            <button type="button" onClick={() => {
+              const enabled = !sketchEnabled;
+              setSketchEnabled(enabled);
+              setView("solid");
+              onChange({ ...spec, sketchMode: enabled });
+            }} className={cn("flex items-center gap-1.5 rounded-lg border bg-background/70 px-2 py-1.5 text-[11px] backdrop-blur-xl", sketchEnabled && "border-primary text-primary")}>
+              <Shapes className="size-3.5" />Sketch 3D
+            </button>
+            <label className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-background/70 px-2 py-1.5 text-[11px] backdrop-blur-xl">
               <input
                 type="checkbox"
                 checked={hideFronts}
@@ -385,11 +456,27 @@ export function DesignEditor({
               />
               Show inside
             </label>
+            </div>
           ) : null}
           {view === "solid" && spec.furnitureType === "kitchen" ? <label className="pointer-events-auto flex items-center gap-1.5 rounded-lg border bg-background/80 px-2 py-1.5 text-[11px]">
             <input type="checkbox" checked={showCountertop} onChange={(event) => setShowCountertop(event.target.checked)} />Show countertop
           </label> : null}
         </div>
+
+        {view === "solid" && sketchEnabled ? (
+          <SketchToolbar
+            spec={spec}
+            selectedId={selectedSketchId}
+            tool={sketchTool}
+            onTool={setSketchTool}
+            onSelect={setSelectedSketchId}
+            onChange={onChange}
+            onUndo={onUndo}
+            onRedo={onRedo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+          />
+        ) : null}
 
         {/*
           Right edge: move the selected cabinet, one step at a time.
@@ -507,7 +594,7 @@ export function DesignEditor({
       */}
       <div
         className={cn(
-          "w-full border-t",
+          "w-full min-w-0 max-w-full overflow-x-hidden border-t",
           "@4xl/ws:h-full @4xl/ws:min-h-0 @4xl/ws:w-[300px] @4xl/ws:shrink-0",
           "@4xl/ws:border-t-0 @6xl/ws:w-[340px]",
         )}

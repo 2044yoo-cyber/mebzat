@@ -250,6 +250,8 @@ function shell(
     ),
     finish: { colour: colour.name, hex: colour.hex, sheen: "satin" },
     lighting: { ledStrip: false, colourTemperature: 3000 },
+    sketchObjects: [],
+    sketchMode: false,
     meta: {
       style: "modern",
       prompt: "",

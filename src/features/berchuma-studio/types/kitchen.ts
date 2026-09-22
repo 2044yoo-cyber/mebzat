@@ -17,6 +17,8 @@ export const REFERENCE_KITCHEN_DETAILS: KitchenDetails = {
 };
 
 export const kitchenSetupSchema = z.object({
+  placementMode: z.enum(["auto", "plan"]).default("auto"),
+  fridgePlacement: z.enum(["left", "right", "custom"]).default("left"),
   shape: z.enum(["straight", "l_shaped", "u_shaped", "g_shaped", "island"]),
   roomWidth: z.number().min(1800).max(12000),
   roomDepth: z.number().min(1800).max(12000),
@@ -29,6 +31,7 @@ export const kitchenSetupSchema = z.object({
 });
 export type KitchenSetup = z.infer<typeof kitchenSetupSchema>;
 export const DEFAULT_KITCHEN_SETUP: KitchenSetup = {
+  placementMode: "auto", fridgePlacement: "left",
   shape: "l_shaped", roomWidth: 4200, roomDepth: 3600, roomHeight: 2800,
   wallCabinets: true, wallHeight: 720, topHeight: 400, islandWidth: 1200,
 };
@@ -83,6 +86,26 @@ export function placeFridgeAtRunEdge(input: KitchenSetup): KitchenSetup {
   if (!input.details) return input;
   const d = input.details;
   const lengths = new Map(kitchenRunChoices(input).map((run) => [run.id, run.length]));
+  // Plan mode owns explicit appliance anchors. Only an end choice is resolved;
+  // a custom position is never silently moved after the user placed it.
+  if (input.placementMode === "plan") {
+    if (input.fridgePlacement === "custom") return input;
+    const length = lengths.get(d.fridge.runId);
+    if (length !== undefined) {
+      return {
+        ...input,
+        details: {
+          ...d,
+          fridge: {
+            ...d.fridge,
+            offset: input.fridgePlacement === "right"
+              ? Math.max(0, length - d.fridge.width)
+              : 0,
+          },
+        },
+      };
+    }
+  }
   const end = (runId: string) => ({ runId, offset: (lengths.get(runId) ?? 0) - d.fridge.width });
   const candidates = input.shape === "l_shaped"
     ? [{ runId: "kitchen-back", offset: 0 }, end("kitchen-right")]

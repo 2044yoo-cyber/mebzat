@@ -54,8 +54,10 @@ export type DesignController = DesignState & {
   clear: () => void;
   /** Puts back the design as it was before the last edit. */
   undo: () => void;
+  redo: () => void;
   /** Whether there is anything to go back to, for the button's disabled state. */
   canUndo: boolean;
+  canRedo: boolean;
 };
 
 /**
@@ -97,7 +99,9 @@ export function useDesign(
    * needs from it is whether it is empty, which is held separately.
    */
   const past = useRef<Step<Held>[]>([]);
+  const future = useRef<Held[]>([]);
   const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   /**
    * Records the state being replaced, unless this edit continues the last one.
@@ -111,6 +115,8 @@ export function useDesign(
     if (!replacing.spec) return;
     past.current = remember(past.current, replacing, Date.now());
     setCanUndo(canRewind(past.current));
+    future.current = [];
+    setCanRedo(false);
   }, []);
 
   const undo = useCallback(() => {
@@ -123,8 +129,20 @@ export function useDesign(
     // repaired design — and the second pass appends its corrections to the
     // first pass's, which is how undoing five times fills the panel with the
     // same warning five times.
+    future.current = [held, ...future.current];
+    setCanRedo(true);
     setHeld(step.state);
-  }, []);
+  }, [held]);
+
+  const redo = useCallback(() => {
+    const next = future.current[0];
+    if (!next) return;
+    future.current = future.current.slice(1);
+    setCanRedo(future.current.length > 0);
+    if (held.spec) past.current = [...past.current, { state: held, at: Date.now() }].slice(-40);
+    setCanUndo(canRewind(past.current));
+    setHeld(next);
+  }, [held]);
 
   const derived = useMemo(() => {
     if (!held.spec) return { parts: null, cost: null };
@@ -193,7 +211,9 @@ export function useDesign(
 
   const clear = useCallback(() => {
     past.current = [];
+    future.current = [];
     setCanUndo(false);
+    setCanRedo(false);
     setHeld(EMPTY);
   }, []);
 
@@ -206,6 +226,8 @@ export function useDesign(
     set,
     clear,
     undo,
+    redo,
     canUndo,
+    canRedo,
   };
 }

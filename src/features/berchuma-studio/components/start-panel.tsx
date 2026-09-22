@@ -56,7 +56,7 @@ const CATEGORIES: {
   { kind: "vanity", label: "Vanity", icon: Droplets, hint: "Wall hung, with a mirror cabinet" },
   { kind: "bookshelf", label: "Bookshelf", icon: Library, hint: "Open shelving, floor to eye" },
   { kind: "office_storage", label: "Office Storage", icon: Boxes, hint: "Cupboards under open filing" },
-  { kind: "custom", label: "Custom", icon: Shapes, hint: "One cabinet. Change everything" },
+  { kind: "custom", label: "Sketch 3D", icon: Shapes, hint: "Draw custom furniture and simple forms" },
 ];
 
 /** Run lengths people actually ask for, so nobody types a number to begin. */
@@ -330,7 +330,10 @@ export function StartPanel({
 
           <button
             type="button"
-            onClick={() => onStart(startingDesign(chosen.kind, { width }))}
+            onClick={() => {
+              const spec = startingDesign(chosen.kind, { width });
+              onStart(chosen.kind === "custom" ? { ...spec, sketchMode: true } : spec);
+            }}
             // `pr-actions-safe` keeps the label clear of the floating stack
             // in the corner without the whole panel being pushed above it. The
             // button still spans the width; its text simply stops before the

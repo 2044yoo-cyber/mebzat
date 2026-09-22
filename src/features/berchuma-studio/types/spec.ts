@@ -468,6 +468,36 @@ export const worktopSchema = z.object({
 
 export type Worktop = z.infer<typeof worktopSchema>;
 
+export const sketchObjectSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(120),
+  shape: z.enum(["face", "box", "line"]).default("box"),
+  objectType: z.enum(["generic", "board"]).default("generic"),
+  position: z.object({
+    x: z.number(),
+    y: z.number(),
+    z: z.number(),
+  }),
+  size: z.object({
+    width: z.number().positive(),
+    height: z.number().positive(),
+    depth: z.number().positive(),
+  }),
+  rotation: z.object({
+    x: z.number(),
+    y: z.number(),
+    z: z.number(),
+  }).default({ x: 0, y: 0, z: 0 }),
+  /** Axis perpendicular to a newly drawn face; Push/Pull grows this axis. */
+  extrusionAxis: z.enum(["x", "y", "z"]).default("y"),
+  boardId: z.string().optional(),
+  materialHex: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  thickness: z.number().positive().max(100).optional(),
+  groupId: z.string().optional(),
+});
+
+export type SketchObject = z.infer<typeof sketchObjectSchema>;
+
 export const designSpecSchema = z.object({
   /** Schema version. A stored spec outlives the code that wrote it. */
   version: z.literal(3),
@@ -601,6 +631,11 @@ export const designSpecSchema = z.object({
   lighting: lightingSchema.optional(),
   worktop: worktopSchema.optional(),
   kitchenSetup: kitchenSetupSchema.optional(),
+
+  /** Manual geometry drawn in Sketch 3D; optional for every existing design. */
+  sketchObjects: z.array(sketchObjectSchema).max(500).default([]),
+  /** Reopens saved custom work in the compact modeling toolbar. */
+  sketchMode: z.boolean().default(false),
 
   /**
    * The legs. Optional so a v2 design without them still parses; the geometry
