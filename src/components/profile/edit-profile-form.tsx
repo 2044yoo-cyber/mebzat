@@ -1,6 +1,14 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useState } from "react";
+import {
+  useActionState,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -30,13 +38,56 @@ import { Textarea } from "@/components/ui/textarea";
 import { TokenPicker } from "@/components/ui/token-picker";
 import { ACCOUNT_TYPES } from "@/lib/constants/account-types";
 import { COMPANY_SIZES, INDUSTRIES } from "@/lib/constants/industries";
-import { searchLanguages } from "@/lib/constants/languages";
+import { parseLanguages, searchLanguages } from "@/lib/constants/languages";
+import { isTravelRadius, parseSpecialties } from "@/lib/constants/professions";
+import {
+  applyDraftToForm,
+  clearDraft,
+  isDraftWorthKeeping,
+  readDraft,
+  valuesFromForm,
+  writeDraft,
+} from "@/lib/projects/draft";
 import { digitsOnly, MAX_YEARS } from "@/lib/profile/experience";
 import { detailsOf } from "@/lib/profile/profession-fields";
 import { ORGANIZATION_ACCOUNT_TYPES } from "@/lib/validations/profile";
 import type { AccountType, Profile } from "@/types/database.types";
 
 const initialState: EditProfileState = {};
+
+const SAVE_DEBOUNCE_MS = 600;
+
+/**
+ * The unfinished edit, kept where a page navigation cannot reach it.
+ *
+ * Reuses `@/lib/projects/draft` — every function in it is generic over a
+ * `<form>` element and a `Storage`, and only its `images`/`primary` fields are
+ * project-specific. This form has no images to protect: the avatar and cover
+ * upload the moment a file is picked, so nothing here is lost to a refresh
+ * before Save is pressed. Both are passed through empty.
+ *
+ * ## What is not restored
+ *
+ * A profession's own answers — crew size, sectors, licence numbers, the
+ * `detail:*` fields `ProfessionFieldsForm` renders — are not. Several of them
+ * post more than one value under the same name (a multi-select), and this
+ * module's flat `Record<string, string>` keeps only the last one written for
+ * a name. Reconstructing that correctly needs the field's type, which lives
+ * in `profession-fields.ts`, and doing that partially — one checkbox restored
+ * out of three, with nothing to say so — is worse than leaving that block to
+ * the server's own copy and asking somebody to re-answer it if a save was
+ * genuinely lost. Everything above it — name, contact, bio, languages, the
+ * trade itself, service areas — is a plain form field and is restored in
+ * full.
+ */
+function draftStorageKey(profileId: string): string {
+  return `medosha:profile-draft:${profileId}`;
+}
+
+/** No subscription: the draft is read once, when the form opens. */
+function subscribeToNothing(): () => void {
+  return () => {};
+}
 
 export function EditProfileForm({
   profile,
@@ -58,6 +109,138 @@ export function EditProfileForm({
     profile.years_experience === null ? "" : String(profile.years_experience),
   );
   const [languages, setLanguages] = useState<string[]>(profile.languages ?? []);
+
+  const formRef = useRef<HTMLFormElement>(null);
+  const draftKey = draftStorageKey(profile.id);
+
+  // Read once, the same way project-form reads it: through
+  // useSyncExternalStore rather than an effect, so there is no render where a
+  // draft that exists renders as though it did not (localStorage does not
+  // exist on the server, so the server snapshot is always null, which is
+  // correct there and would otherwise be a hydration mismatch here).
+  const snapshot = useRef<string | null | undefined>(undefined);
+  const stored = useSyncExternalStore(
+    subscribeToNothing,
+    () => {
+      if (snapshot.current === undefined) {
+        try {
+          snapshot.current = window.localStorage.getItem(draftKey);
+        } catch {
+          snapshot.current = null;
+        }
+      }
+      return snapshot.current;
+    },
+    () => null,
+  );
+
+  const found = stored
+    ? (() => {
+        try {
+          return readDraft(window.localStorage, draftKey);
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+
+  const [answered, setAnswered] = useState(false);
+  const hasOffer = !answered && isDraftWorthKeeping(found);
+  const offer = hasOffer ? found : null;
+  const settled = answered || !isDraftWorthKeeping(found);
+
+  // What TradeAndAreas mounts with. Null means "the server's own values" —
+  // its normal behaviour. Set once, by continuing a draft, and never again:
+  // TradeAndAreas only reads its props at mount, so changing this alone would
+  // do nothing without the `key` below forcing a fresh one.
+  const [tradeSeed, setTradeSeed] = useState<{
+    profession: string | null;
+    specialties: string[];
+    baseArea: string | null;
+    serviceAreaSlugs: string[];
+    travelRadiusKm: number | null;
+    servesEntireCity: boolean;
+    workStatus: string;
+  } | null>(null);
+  const [restoreNonce, setRestoreNonce] = useState(0);
+
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const save = useCallback(() => {
+    const form = formRef.current;
+    if (!form) return;
+    writeDraft(window.localStorage, draftKey, {
+      values: valuesFromForm(form),
+      images: [],
+      primary: null,
+    });
+  }, [draftKey]);
+
+  const queueSave = useCallback(() => {
+    if (!settled) return;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(save, SAVE_DEBOUNCE_MS);
+  }, [save, settled]);
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  function continueDraft() {
+    const form = formRef.current;
+    if (!form || !offer) return;
+
+    // Every plain-named field — the majority of the form, including the
+    // trade's own text inputs — restores through the DOM directly. The ones
+    // React also holds as state (account type, years, languages, and
+    // everything TradeAndAreas owns) need telling separately, or a later
+    // re-render of just that field would overwrite the restored value with
+    // the state it was still holding.
+    applyDraftToForm(form, offer.values);
+
+    const draftAccountType = offer.values.accountType;
+    if (ACCOUNT_TYPES.some((t) => t.value === draftAccountType)) {
+      setAccountType(draftAccountType as AccountType);
+    }
+    setYears(digitsOnly(offer.values.yearsExperience ?? ""));
+    setLanguages(parseLanguages(offer.values.languages));
+
+    const radius = Number(offer.values.travelRadius);
+    setTradeSeed({
+      profession: offer.values.profession || null,
+      specialties: parseSpecialties(offer.values.specialties ?? null),
+      baseArea: offer.values.baseArea || null,
+      serviceAreaSlugs: (offer.values.serviceAreas ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      travelRadiusKm: isTravelRadius(radius) ? radius : null,
+      servesEntireCity: offer.values.servesEntireCity === "on",
+      workStatus: offer.values.workStatus || profile.work_status,
+    });
+    setRestoreNonce((n) => n + 1);
+    setAnswered(true);
+  }
+
+  function discardDraft() {
+    clearDraft(window.localStorage, draftKey);
+    snapshot.current = null;
+    setAnswered(true);
+  }
+
+  // The confirmation the save actually happened, not a stale draft. Without
+  // this, refreshing after a successful save could still offer to "continue"
+  // a draft written before that save — the exact overwrite-with-something-
+  // older the brief asks not to do.
+  useEffect(() => {
+    if (state.savedAt) {
+      clearDraft(window.localStorage, draftKey);
+      snapshot.current = null;
+    }
+  }, [state.savedAt, draftKey]);
 
   const languageOptions = useCallback(
     (query: string) =>
@@ -102,7 +285,37 @@ export function EditProfileForm({
         />
       </div>
 
-      <form action={formAction} className="space-y-4 p-6">
+      <form
+        ref={formRef}
+        action={formAction}
+        onInput={queueSave}
+        onChange={queueSave}
+        className="space-y-4 p-6"
+      >
+        {offer && (
+          <div className="space-y-3 rounded-xl border border-brand/40 bg-brand/5 p-4">
+            <p className="text-sm font-medium">
+              You have unsaved profile changes.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              The details you had typed, kept on this device.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={continueDraft}>
+                <RotateCcw className="size-4" /> Continue editing
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={discardDraft}
+              >
+                Discard
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="accountType">Account type</Label>
           <Select
@@ -269,14 +482,18 @@ export function EditProfileForm({
             does not count it. */}
         {!isOrganization && (
         <TradeAndAreas
+          // Remounted on a restored draft: TradeAndAreas reads these props
+          // only at mount, so a changed key is what makes a new profession or
+          // areas selection actually take.
+          key={restoreNonce}
           areas={areas}
-          profession={profile.profession}
-          specialties={profile.specialties ?? []}
-          baseArea={profile.base_area}
-          serviceAreaSlugs={serviceAreaSlugs}
-          travelRadiusKm={profile.travel_radius_km}
-          servesEntireCity={profile.serves_entire_city}
-          workStatus={profile.work_status}
+          profession={tradeSeed?.profession ?? profile.profession}
+          specialties={tradeSeed?.specialties ?? profile.specialties ?? []}
+          baseArea={tradeSeed?.baseArea ?? profile.base_area}
+          serviceAreaSlugs={tradeSeed?.serviceAreaSlugs ?? serviceAreaSlugs}
+          travelRadiusKm={tradeSeed?.travelRadiusKm ?? profile.travel_radius_km}
+          servesEntireCity={tradeSeed?.servesEntireCity ?? profile.serves_entire_city}
+          workStatus={tradeSeed?.workStatus ?? profile.work_status}
           professionDetails={detailsOf(profile)}
         />
         )}

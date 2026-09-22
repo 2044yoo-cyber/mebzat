@@ -276,12 +276,6 @@
     "to": "const PERSON: CompletionField[] = [\n  { key: \"website\", label: \"Website\", weight: 0, filled: (p) => filledText(p.website) },"
   },
   {
-    "name": "the two sets stop totalling a hundred",
-    "file": "src/lib/profile/completion.ts",
-    "from": "  { key: \"languages\", label: \"Languages\", weight: 7, filled: (p) => (p.languages ?? []).length > 0 },",
-    "to": "  { key: \"languages\", label: \"Languages\", weight: 5, filled: (p) => (p.languages ?? []).length > 0 },"
-  },
-  {
     "name": "whitespace counts as an answer",
     "file": "src/lib/profile/completion.ts",
     "from": "  typeof value === \"string\" && value.trim().length > 0;",
@@ -292,12 +286,6 @@
     "file": "src/lib/profile/completion.ts",
     "from": "  return isOrganizationAccount(accountType) ? ORGANIZATION : PERSON;",
     "to": "  return PERSON;"
-  },
-  {
-    "name": "a base area stops counting as a location",
-    "file": "src/lib/profile/completion.ts",
-    "from": "  { key: \"location\", label: \"Where you are\", weight: 13, filled: (p) => filledText(p.location_city) || filledText(p.base_area) },\n  { key: \"bio\", label: \"About you\"",
-    "to": "  { key: \"location\", label: \"Where you are\", weight: 13, filled: (p) => filledText(p.location_city) },\n  { key: \"bio\", label: \"About you\""
   },
   {
     "name": "the card vanishes at a hundred per cent again",
@@ -496,5 +484,83 @@
     "file": "src/app/(dashboard)/settings/page.tsx",
     "from": "      <FontSettingsForm initial={toFontChoice(profile?.font_preference)} />\n",
     "to": ""
+  },
+  {
+    "name": "the profile draft is reimplemented instead of reusing the project one",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "} from \"@/lib/projects/draft\";",
+    "to": "} from \"@/lib/projects/draft-copy\";"
+  },
+  {
+    "name": "the profile draft shares the project's storage key",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "  return `medosha:profile-draft:${profileId}`;",
+    "to": "  return `medosha:project-draft:${profileId}:new`;"
+  },
+  {
+    "name": "a field only saves on blur, not while typing",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "        onInput={queueSave}\n        onChange={queueSave}",
+    "to": "        onBlur={queueSave}"
+  },
+  {
+    "name": "a saved draft is written with the avatar carried along",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "      images: [],\n      primary: null,",
+    "to": "      images: [profile.avatar_url ?? \"\"],\n      primary: profile.avatar_url ?? null,"
+  },
+  {
+    "name": "continuing a draft no longer restores the plain fields",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    applyDraftToForm(form, offer.values);",
+    "to": ""
+  },
+  {
+    "name": "account type stops being restored through state",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    if (ACCOUNT_TYPES.some((t) => t.value === draftAccountType)) {\n      setAccountType(draftAccountType as AccountType);\n    }",
+    "to": ""
+  },
+  {
+    "name": "languages stop being restored through state",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    setLanguages(parseLanguages(offer.values.languages));",
+    "to": ""
+  },
+  {
+    "name": "an invented account type is accepted from a corrupted draft",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    if (ACCOUNT_TYPES.some((t) => t.value === draftAccountType)) {\n      setAccountType(draftAccountType as AccountType);\n    }",
+    "to": "    setAccountType(draftAccountType as AccountType);"
+  },
+  {
+    "name": "the trade is not remounted, so a restored profession never takes",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    setRestoreNonce((n) => n + 1);",
+    "to": ""
+  },
+  {
+    "name": "discarding a draft does not clear it",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "  function discardDraft() {\n    clearDraft(window.localStorage, draftKey);",
+    "to": "  function discardDraft() {"
+  },
+  {
+    "name": "a successful save leaves the draft in place",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    if (state.savedAt) {\n      clearDraft(window.localStorage, draftKey);\n      snapshot.current = null;\n    }",
+    "to": ""
+  },
+  {
+    "name": "TradeAndAreas is not keyed, so it never actually remounts",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "          key={restoreNonce}\n          areas={areas}",
+    "to": "          areas={areas}"
+  },
+  {
+    "name": "the offer keeps showing after it has been answered",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "  const hasOffer = !answered && isDraftWorthKeeping(found);",
+    "to": "  const hasOffer = isDraftWorthKeeping(found);"
   }
 ]

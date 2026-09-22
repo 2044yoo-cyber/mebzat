@@ -855,6 +855,95 @@ check(
 }
 
 // ---------------------------------------------------------------------------
+// The profile form remembers what you typed
+//
+// A refresh, a dropped connection, or a phone that closes the tab used to
+// lose whatever had not been submitted yet. `@/lib/projects/draft` already
+// does this for the project form; this reuses the same functions under a
+// different storage key rather than a second copy of the same logic.
+// ---------------------------------------------------------------------------
+
+{
+  const form = code("src/components/profile/edit-profile-form.tsx");
+
+  check(
+    "the form reuses the project draft functions rather than reimplementing them",
+    /from "@\/lib\/projects\/draft"/.test(form) &&
+      /applyDraftToForm/.test(form) &&
+      /writeDraft/.test(form) &&
+      /readDraft/.test(form),
+  );
+  check(
+    "it has its own storage key, not the project's",
+    /medosha:profile-draft:/.test(form) && !/medosha:project-draft:/.test(form),
+    "sharing a key with the project draft would let one form's autosave overwrite the other's",
+  );
+  check(
+    "every field change is what starts the debounce, not only a blur",
+    /onInput=\{queueSave\}/.test(form) && /onChange=\{queueSave\}/.test(form),
+  );
+
+  const save = form.slice(
+    form.indexOf("const save = useCallback"),
+    form.indexOf("const queueSave = useCallback"),
+  );
+  check(
+    "a save carries no images",
+    /images: \[\]/.test(save) && /primary: null/.test(save),
+    "the avatar and cover already upload on selection; nothing here is lost before Save is pressed",
+  );
+
+  const continueDraft = functionText(form, "continueDraft", "  ");
+  check(
+    "continuing a draft restores it before anything else runs",
+    /applyDraftToForm\(form, offer\.values\)/.test(continueDraft),
+  );
+  check(
+    "account type, years and languages are restored through state",
+    /setAccountType\(/.test(continueDraft) &&
+      /setYears\(/.test(continueDraft) &&
+      /setLanguages\(/.test(continueDraft),
+    "these are React state as well as form fields; touching only the DOM leaves the visible control unchanged",
+  );
+  check(
+    "and only a value the account type list actually has is restored",
+    /ACCOUNT_TYPES\.some\(\(t\) => t\.value === draftAccountType\)/.test(
+      continueDraft,
+    ),
+    "a corrupted draft must not put a string into state that nothing on the account-type list produced",
+  );
+  check(
+    "the trade's own fields are restored by remounting it",
+    /setTradeSeed\(/.test(continueDraft) && /setRestoreNonce/.test(continueDraft),
+    "TradeAndAreas only reads its props at mount, so nothing short of a new one takes a restored profession",
+  );
+
+  const discardDraft = functionText(form, "discardDraft", "  ");
+  check(
+    "discarding actually clears the stored draft",
+    /clearDraft\(window\.localStorage, draftKey\)/.test(discardDraft),
+  );
+
+  check(
+    "a successful save clears the draft on its own",
+    /useEffect\(\(\) => \{\s*if \(state\.savedAt\) \{\s*clearDraft/.test(form),
+    "without this, refreshing after a successful save could still offer to continue a draft written before it — stored data overwritten by something older",
+  );
+
+  check(
+    "the trade seed is passed to TradeAndAreas, keyed so it actually remounts",
+    /key=\{restoreNonce\}/.test(form) &&
+      /profession=\{tradeSeed\?\.profession \?\? profile\.profession\}/.test(form),
+  );
+
+  check(
+    "the offer is not shown once it has been answered",
+    /const hasOffer = !answered && isDraftWorthKeeping\(found\)/.test(form),
+    "answered has to gate it, or discarding a draft would show the same offer again on the next render",
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
