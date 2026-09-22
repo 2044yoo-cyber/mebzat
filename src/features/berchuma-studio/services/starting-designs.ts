@@ -841,7 +841,7 @@ export function wardrobeShapeDesign(
   }
 
   const cornerKind = wardrobeCornerKind(options.shape);
-  const solved = solveLayout(options.shape, runs, { cornerKind });
+  const solved = solveLayout(options.shape, runs, { cornerKind, wardrobeOwnership: true });
 
   const cabinets = solved.placements.map((placement) =>
     unit(
@@ -888,7 +888,7 @@ export function wardrobeShapeDesign(
       prompt: "",
       assumptions: [
         `Walls of ${runs.map((run) => `${run.length} mm`).join(", ")}, ${depth} mm deep.`,
-        "Each corner is a module of its own, so no two runs share a panel.",
+        "At each corner the shorter wardrobe run continues through the square corner.",
         ...solved.notes,
       ],
       corrections: [],

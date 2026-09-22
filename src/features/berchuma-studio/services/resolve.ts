@@ -73,6 +73,7 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
     cornerKind: spec.cornerKind,
     cornerKinds: spec.cornerKinds,
     cornerSettings: spec.cornerSettings,
+    wardrobeOwnership: spec.furnitureType === "wardrobe",
     kitchenFacing:
       !!spec.kitchenSetup ||
       (spec.furnitureType === "wardrobe" &&
@@ -133,6 +134,9 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
         bays: cabinet.bays.map((bay) => ({ ...bay, width: oldOpenings > 0 ? available * bay.width / oldOpenings : 0 })),
       };
     }
+    if (spec.furnitureType === "wardrobe") {
+      effectiveCabinet = applyOwnedCornerBays(effectiveCabinet, placement, layout.corners, spec.carcass.board.thickness, spec.cornerSettings);
+    }
     const placed = placeOnRun(placement, offset, spec.kitchenSetup ? effectiveCabinet.size.depth : undefined);
 
     cabinets.push({
@@ -168,6 +172,63 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
   }
 
   return { layout, cabinets, issues };
+}
+
+function applyOwnedCornerBays(
+  cabinet: Cabinet,
+  placement: RunPlacement,
+  corners: SolvedLayout["corners"],
+  thickness: number,
+  settings: DesignSpec["cornerSettings"],
+): Cabinet {
+  const owned = corners.filter((corner) => corner.ownerRunId === placement.runId);
+  if (owned.length === 0 || cabinet.bays.length < 2) return cabinet;
+
+  const start = placeOnRun(placement, 0);
+  const end = placeOnRun(placement, placement.usableLength);
+  const assigned = owned.map((corner) => {
+    const centre = {
+      x: corner.x + (corner.width ?? corner.size) / 2,
+      z: corner.z + (corner.depth ?? corner.size) / 2,
+    };
+    const distance = (point: { x: number; z: number }) => (point.x - centre.x) ** 2 + (point.z - centre.z) ** 2;
+    return { corner, atStart: distance(start) <= distance(end) };
+  });
+
+  const bays = cabinet.bays.map((bay) => ({ ...bay }));
+  const available = cabinet.size.width - (bays.length + 1) * thickness;
+  const reserved = new Map<number, { width: number; corner: (typeof owned)[number] }>();
+  for (const entry of assigned) {
+    const index = entry.atStart ? 0 : bays.length - 1;
+    reserved.set(index, {
+      width: Math.max(0, entry.corner.size - 2 * thickness),
+      corner: entry.corner,
+    });
+  }
+  const reservedWidth = [...reserved.values()].reduce((sum, entry) => sum + entry.width, 0);
+  const ordinary = bays.map((_, index) => index).filter((index) => !reserved.has(index));
+  const oldOrdinary = ordinary.reduce((sum, index) => sum + bays[index]!.width, 0);
+  const remaining = Math.max(0, available - reservedWidth);
+
+  for (const [index, entry] of reserved) {
+    const count = settings?.[entry.corner.id]?.shelves ?? 3;
+    bays[index] = {
+      ...bays[index]!,
+      width: entry.width,
+      door: "none",
+      doorLeaves: 1,
+      fitting: entry.corner.kind === "hanging"
+        ? { kind: "open" }
+        : { kind: "shelves", count, adjustable: true },
+    };
+  }
+  for (const index of ordinary) {
+    bays[index] = {
+      ...bays[index]!,
+      width: oldOrdinary > 0 ? remaining * bays[index]!.width / oldOrdinary : remaining / ordinary.length,
+    };
+  }
+  return { ...cabinet, bays };
 }
 
 /**
