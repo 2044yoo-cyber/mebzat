@@ -526,7 +526,9 @@ export function StudioWorkspace({
                   spec={design.spec}
                   onChange={design.set}
                   onUndo={design.undo}
+                  onRedo={design.redo}
                   canUndo={design.canUndo}
+                  canRedo={design.canRedo}
                   headerHidden={!headerOpen}
                   onShowHeader={() => setHeaderOpen(true)}
                 />

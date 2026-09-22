@@ -22,6 +22,8 @@ import {
 import { boardColour, boardSheen } from "../../services/wardrobe-materials";
 import type { Part } from "../../types/parts";
 import type { Cabinet, DesignSpec } from "../../types/spec";
+import type { SketchAxis, SketchTool } from "../../services/sketch";
+import { findBoard } from "../../types/catalogue";
 
 /**
  * The design in three dimensions.
@@ -52,6 +54,11 @@ export default function Model({
   selectedCabinetId = null,
   onSelectCabinet,
   onResize,
+  selectedSketchId = null,
+  onSelectSketch,
+  sketchTool = "orbit",
+  onPlaceSketch,
+  onMoveSketch,
 }: {
   spec: DesignSpec;
   /** Takes the doors and drawer fronts off, to show what is inside. */
@@ -65,6 +72,11 @@ export default function Model({
   onSelectCabinet?: (id: string | null) => void;
   /** Dragging an edge. Absent means the model is a picture, not an editor. */
   onResize?: (id: string, change: DragChange) => void;
+  selectedSketchId?: string | null;
+  onSelectSketch?: (id: string | null) => void;
+  sketchTool?: SketchTool;
+  onPlaceSketch?: (position: { x: number; y: number; z: number }, axis: SketchAxis, direction: -1 | 1) => void;
+  onMoveSketch?: (position: { x: number; y: number; z: number }) => void;
 }) {
   const parts = useMemo(() => {
     const all = visibleKitchenParts(buildParts(spec).parts, hideCountertop);
@@ -75,7 +87,7 @@ export default function Model({
   }, [spec, hideFronts, hideCountertop]);
 
   const resolved = useMemo(() => resolveDesign(spec), [spec]);
-  const bounds = useMemo(() => designWorldBounds(spec), [spec]);
+  const bounds = useMemo(() => boundsWithSketch(spec), [spec]);
   const { width, height, depth } = bounds;
   const originX = bounds.min.x + width / 2;
   const originZ = bounds.min.z + depth / 2;
@@ -102,6 +114,25 @@ export default function Model({
   // has to stand down. Without this, pulling a cabinet wider also swung the
   // camera and the cabinet appeared to resist.
   const [dragging, setDragging] = useState(false);
+  const drawing = sketchTool === "rectangle" || sketchTool === "line" || sketchTool === "box";
+
+  function designPosition(point: THREE.Vector3) {
+    return {
+      x: point.x / MM + originX,
+      y: point.y / MM,
+      z: originZ - point.z / MM,
+    };
+  }
+
+  function placeSketch(point: THREE.Vector3, normal: THREE.Vector3) {
+    if (!onPlaceSketch || !drawing) return;
+    const designNormal = new THREE.Vector3(normal.x, normal.y, -normal.z);
+    const absolute = [Math.abs(designNormal.x), Math.abs(designNormal.y), Math.abs(designNormal.z)];
+    const index = absolute.indexOf(Math.max(...absolute));
+    const axis: SketchAxis = index === 0 ? "x" : index === 1 ? "y" : "z";
+    const direction = (designNormal[axis] < 0 ? -1 : 1) as -1 | 1;
+    onPlaceSketch(designPosition(point), axis, direction);
+  }
 
   return (
     <Canvas
@@ -120,7 +151,10 @@ export default function Model({
       // Clicking the floor or the sky lets go of the selection. Without this
       // the only way to deselect was to select something else, which makes the
       // highlight feel like something you are stuck with.
-      onPointerMissed={onSelectCabinet ? () => onSelectCabinet(null) : undefined}
+      onPointerMissed={() => {
+        onSelectCabinet?.(null);
+        onSelectSketch?.(null);
+      }}
     >
       <Lighting height={height * MM} reach={reach} />
 
@@ -183,9 +217,21 @@ export default function Model({
                         onSelectCabinet(under?.cabinet.id ?? null);
                       }
               }
+              onDraw={drawing ? placeSketch : undefined}
             />
           )),
         )}
+
+        {spec.sketchObjects.map((object) => (
+          <SketchMesh
+            key={object.id}
+            object={object}
+            selected={object.id === selectedSketchId}
+            colour={findBoard(object.boardId ?? "")?.appearance?.hex ?? object.materialHex ?? spec.finish.hex}
+            onSelect={() => onSelectSketch?.(object.id)}
+            onDraw={drawing ? placeSketch : undefined}
+          />
+        ))}
 
         {positionedSelected ? (
           <>
@@ -221,13 +267,22 @@ export default function Model({
 
       <Reframe />
 
-      <Ground reach={reach} />
+      <Ground
+        reach={reach}
+        onDraw={drawing ? placeSketch : undefined}
+        onMove={sketchTool === "move" && selectedSketchId ? (point) => onMoveSketch?.(designPosition(point)) : undefined}
+      />
       <Frame
         width={width * MM}
         height={height * MM}
         depth={depth * MM}
       />
-      <Controls targetY={(height * MM) / 2} reach={reach} enabled={!dragging} />
+      <Controls
+        targetY={(height * MM) / 2}
+        reach={reach}
+        enabled={!dragging && !drawing && sketchTool !== "push-pull" && sketchTool !== "move"}
+        panOnly={sketchTool === "pan"}
+      />
     </Canvas>
   );
 }
@@ -242,6 +297,7 @@ function PartMesh({
   spec,
   selected,
   onSelect,
+  onDraw,
 }: {
   part: Part;
   placement: { x: number; y: number; z: number };
@@ -249,6 +305,7 @@ function PartMesh({
   selected: boolean;
   /** Given the point in scene space, so a run-wide part can work out which. */
   onSelect?: (point: THREE.Vector3) => void;
+  onDraw?: (point: THREE.Vector3, normal: THREE.Vector3) => void;
 }) {
   const size: [number, number, number] = [
     Math.max(part.size.x * MM, 0.001),
@@ -282,14 +339,19 @@ function PartMesh({
       position={position}
       rotation={[0, partRotationRadians(part), 0]}
       onPointerDown={
-        onSelect
+        onSelect || onDraw
           ? (event) => {
               // Only the nearest panel under the pointer. Without this the ray
               // passes through the door and selects the back of the cabinet
               // behind it as well, and a click on a kitchen selects four
               // cabinets at once.
               event.stopPropagation();
-              onSelect(event.point);
+              if (onDraw && event.face) {
+                const normal = event.face.normal.clone().transformDirection(event.object.matrixWorld);
+                onDraw(event.point, normal);
+              } else {
+                onSelect?.(event.point);
+              }
             }
           : undefined
       }
@@ -307,6 +369,69 @@ function PartMesh({
       />
     </mesh>
   );
+}
+
+function SketchMesh({ object, selected, colour, onSelect, onDraw }: {
+  object: DesignSpec["sketchObjects"][number];
+  selected: boolean;
+  colour: string;
+  onSelect: () => void;
+  onDraw?: (point: THREE.Vector3, normal: THREE.Vector3) => void;
+}) {
+  const size: [number, number, number] = [
+    Math.max(object.size.width * MM, 0.001),
+    Math.max(object.size.height * MM, 0.001),
+    Math.max(object.size.depth * MM, 0.001),
+  ];
+  const position: [number, number, number] = [
+    object.position.x * MM,
+    object.position.y * MM,
+    -object.position.z * MM,
+  ];
+  const rotation: [number, number, number] = [
+    THREE.MathUtils.degToRad(object.rotation.x),
+    -THREE.MathUtils.degToRad(object.rotation.y),
+    THREE.MathUtils.degToRad(object.rotation.z),
+  ];
+  return (
+    <group position={position} rotation={rotation}>
+      <mesh onPointerDown={(event) => {
+        event.stopPropagation();
+        if (onDraw && event.face) {
+          onDraw(event.point, event.face.normal.clone().transformDirection(event.object.matrixWorld));
+        } else onSelect();
+      }}>
+        <boxGeometry args={size} />
+        <meshStandardMaterial color={colour} roughness={0.55} emissive={selected ? SELECTION_GLOW : BLACK} emissiveIntensity={selected ? 0.28 : 0} />
+      </mesh>
+      {selected ? (
+        <lineSegments raycast={() => null} renderOrder={3}>
+          <edgesGeometry args={[new THREE.BoxGeometry(...size)]} />
+          <lineBasicMaterial color="#4c8dff" depthTest={false} />
+        </lineSegments>
+      ) : null}
+    </group>
+  );
+}
+
+function boundsWithSketch(spec: DesignSpec) {
+  const base = designWorldBounds(spec);
+  if (spec.sketchObjects.length === 0) return base;
+  let minX = base.min.x;
+  let minY = 0;
+  let minZ = base.min.z;
+  let maxX = base.min.x + base.width;
+  let maxY = base.height;
+  let maxZ = base.min.z + base.depth;
+  for (const object of spec.sketchObjects) {
+    minX = Math.min(minX, object.position.x - object.size.width / 2);
+    maxX = Math.max(maxX, object.position.x + object.size.width / 2);
+    minY = Math.min(minY, object.position.y - object.size.height / 2);
+    maxY = Math.max(maxY, object.position.y + object.size.height / 2);
+    minZ = Math.min(minZ, object.position.z - object.size.depth / 2);
+    maxZ = Math.max(maxZ, object.position.z + object.size.depth / 2);
+  }
+  return { min: { x: minX, y: minY, z: minZ }, width: maxX - minX, height: maxY - minY, depth: maxZ - minZ };
 }
 
 const SELECTION_GLOW = new THREE.Color("#4c8dff");
@@ -445,7 +570,11 @@ function Lighting({ height, reach }: { height: number; reach: number }) {
  * and it buys one thing: the sense that the unit is standing on something.
  * A blurred dark ellipse buys the same thing for nothing.
  */
-function Ground({ reach }: { reach: number }) {
+function Ground({ reach, onDraw, onMove }: {
+  reach: number;
+  onDraw?: (point: THREE.Vector3, normal: THREE.Vector3) => void;
+  onMove?: (point: THREE.Vector3) => void;
+}) {
   const texture = useMemo(() => {
     const size = 128;
     const canvas = document.createElement("canvas");
@@ -478,7 +607,15 @@ function Ground({ reach }: { reach: number }) {
   if (!texture) return null;
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]}>
+    <mesh
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, 0.002, 0]}
+      onPointerDown={onDraw || onMove ? (event) => {
+        event.stopPropagation();
+        if (onDraw) onDraw(event.point, new THREE.Vector3(0, 1, 0));
+        else onMove?.(event.point);
+      } : undefined}
+    >
       {/* Square and generous. A patch shaped to the unit's own footprint read
           as a hard trapezoid in perspective — a thing on the floor rather than
           a shadow on it. */}
@@ -617,10 +754,12 @@ function Controls({
   targetY,
   reach,
   enabled = true,
+  panOnly = false,
 }: {
   targetY: number;
   reach: number;
   enabled?: boolean;
+  panOnly?: boolean;
 }) {
   const camera = useThree((state) => state.camera);
   const domElement = useThree((state) => state.gl.domElement);
@@ -630,6 +769,11 @@ function Controls({
     const orbit = new OrbitControls(camera, domElement);
     orbit.enabled = enabled;
     orbit.enableDamping = true;
+    if (panOnly) {
+      orbit.enableRotate = false;
+      orbit.mouseButtons.LEFT = THREE.MOUSE.PAN;
+      orbit.touches.ONE = THREE.TOUCH.PAN;
+    }
     orbit.dampingFactor = 0.08;
     orbit.minDistance = reach * 0.6;
     orbit.maxDistance = reach * 6;
@@ -677,7 +821,7 @@ function Controls({
       orbit.removeEventListener("end", onEnd);
       orbit.dispose();
     };
-  }, [camera, domElement, enabled, invalidate, reach, targetY]);
+  }, [camera, domElement, enabled, invalidate, panOnly, reach, targetY]);
 
   return null;
 }

@@ -114,6 +114,8 @@ export function wardrobeExample(): DesignSpec {
     hardware: defaultHardware(),
     finish: { colour: "Walnut", hex: "#6b4a32", sheen: "satin" },
     lighting: { ledStrip: true, colourTemperature: 3000 },
+    sketchObjects: [],
+    sketchMode: false,
     meta: {
       style: "modern",
       prompt: "Design a luxury walnut wardrobe for a 2.4 m wall",
@@ -176,6 +178,8 @@ export function tvUnitExample(): DesignSpec {
     },
     hardware: defaultHardware(),
     finish: { colour: "White", hex: "#f2f2f0", sheen: "matt" },
+    sketchObjects: [],
+    sketchMode: false,
     meta: {
       style: "minimal",
       prompt: "Create a low white TV unit 1.8 m wide",
@@ -286,6 +290,8 @@ export function kitchenExample(): DesignSpec {
     },
     hardware: defaultHardware(),
     finish: { colour: "White", hex: "#f2f0ec", sheen: "satin" },
+    sketchObjects: [],
+    sketchMode: false,
     meta: {
       style: "modern",
       prompt: "A 2.6 m kitchen run with a sink, drawers and an oven housing",
