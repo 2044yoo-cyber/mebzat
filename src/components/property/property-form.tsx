@@ -33,6 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { OwnershipConfirmation } from "@/components/shared/ownership-confirmation";
 import {
   AMENITIES,
   FURNISHING,
@@ -917,9 +918,13 @@ export function PropertyForm() {
         </p>
       )}
 
+      {/* A public listing — photos, plans, a 360 tour if one is attached —
+          is exactly the kind of publish this confirmation exists for. */}
+      <OwnershipConfirmation className="border-t pt-6" />
+
       {/* One button, at the bottom, where somebody who has filled the page in
           expects to find it. */}
-      <div className="flex flex-wrap items-center gap-3 border-t pt-6">
+      <div className="flex flex-wrap items-center gap-3 pt-4">
         <Button type="submit" size="lg" disabled={pending || !ready}>
           <Building2 className="size-4" />
           {pending ? "Publishing…" : "Publish listing"}

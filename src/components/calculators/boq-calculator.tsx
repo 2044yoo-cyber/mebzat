@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Download, Plus, Printer, RotateCcw, Trash2 } from "lucide-react";
 
+import { ContentDisclaimer } from "@/components/shared/content-disclaimer";
 import { Button } from "@/components/ui/button";
 import { BOQ_SECTIONS } from "@/lib/takeoff/boq";
 import { formatNumber, round } from "@/lib/calculators/units";
@@ -257,6 +258,8 @@ export function BoqCalculator({ currency = "ETB" }: { currency?: string }) {
               Reset
             </Button>
           </div>
+
+          <ContentDisclaimer kind="boq" className="mt-4" />
         </div>
       </div>
     </div>

@@ -10,6 +10,7 @@ import {
 import { DigitalFileInput } from "@/components/products/digital-file-input";
 import { ProductImagesInput } from "@/components/products/product-images-input";
 import { SpecsInput } from "@/components/products/specs-input";
+import { OwnershipConfirmation } from "@/components/shared/ownership-confirmation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -551,6 +552,8 @@ export function ProductForm({
           </SelectContent>
         </Select>
       </div>
+
+      <OwnershipConfirmation defaultChecked={Boolean(product)} />
 
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 

@@ -1,0 +1,110 @@
+[
+  {
+    "name": "the deleted account id is read from the request instead of the session",
+    "file": "src/app/(dashboard)/settings/delete-account-actions.ts",
+    "from": "const viewer = await requireViewer(\"/settings\");",
+    "to": "const viewer = { id: \"anyone\" };"
+  },
+  {
+    "name": "the delete call stops reading whose account it is",
+    "file": "src/app/(dashboard)/settings/delete-account-actions.ts",
+    "from": "admin.auth.admin.deleteUser(viewer.id)",
+    "to": "admin.auth.admin.deleteUser(\"someone-elses-id\")"
+  },
+  {
+    "name": "the deletion goes through the anon/authenticated client instead of the service role",
+    "file": "src/app/(dashboard)/settings/delete-account-actions.ts",
+    "from": "const admin = createServiceClient();",
+    "to": "const admin = await createClient();"
+  },
+  {
+    "name": "a failed deletion is redirected as if it succeeded",
+    "file": "src/app/(dashboard)/settings/delete-account-actions.ts",
+    "from": "  if (error) {\n    console.error(`[settings] account deletion failed for ${viewer.id}:`, error.message);\n    return {\n      error:\n        \"Your account could not be deleted. Nothing was removed — try again, or contact support.\",\n    };\n  }",
+    "to": "  if (error) {\n    console.error(`[settings] account deletion failed for ${viewer.id}:`, error.message);\n  }"
+  },
+  {
+    "name": "sign-out moves ahead of the actual deletion",
+    "file": "src/app/(dashboard)/settings/delete-account-actions.ts",
+    "from": "  const admin = createServiceClient();\n  const { error } = await admin.auth.admin.deleteUser(viewer.id);",
+    "to": "  const early = await createClient();\n  await early.auth.signOut();\n  const admin = createServiceClient();\n  const { error } = await admin.auth.admin.deleteUser(viewer.id);"
+  },
+  {
+    "name": "the confirmation checkbox no longer gates the delete button",
+    "file": "src/components/settings/delete-account-section.tsx",
+    "from": "disabled={!understood || pending}",
+    "to": "disabled={pending}"
+  },
+  {
+    "name": "the Amharic translation of the AI disclaimer goes missing",
+    "file": "src/lib/i18n/translations.ts",
+    "from": "      aiDisclaimer: \"በAI የተፈጠረ ይዘት ስህተቶችን ሊይዝ ይችላል። ከመጠቀምዎ በፊት አስፈላጊ መጠኖችን፣ ቁሳቁሶችን እና ቴክኒካዊ መረጃዎችን ያረጋግጡ።\",\n",
+    "to": ""
+  },
+  {
+    "name": "the storage-cleanup gap is quietly dropped from the dialog copy",
+    "file": "src/components/settings/delete-account-section.tsx",
+    "from": "Some previously uploaded files may take\n            longer to be fully removed from storage.",
+    "to": "All of your uploaded files are removed immediately."
+  },
+  {
+    "name": "Delete Account stops being reachable from the settings page",
+    "file": "src/app/(dashboard)/settings/page.tsx",
+    "from": "<DeleteAccountSection />",
+    "to": ""
+  },
+  {
+    "name": "privacy starts claiming a security certification nobody has",
+    "file": "src/app/(info)/privacy/page.tsx",
+    "from": "<Section title=\"Your rights\">",
+    "to": "<Section title=\"Your rights (ISO 27001 certified)\">"
+  },
+  {
+    "name": "terms stops warning that BOQ figures may contain errors",
+    "file": "src/app/(info)/terms/page.tsx",
+    "from": "may contain errors",
+    "to": "are always accurate"
+  },
+  {
+    "name": "terms starts claiming every listing is verified",
+    "file": "src/app/(info)/terms/page.tsx",
+    "from": "unless a listing is explicitly marked as verified",
+    "to": "because every listing is verified"
+  },
+  {
+    "name": "terms drops the upload ownership sentence",
+    "file": "src/app/(info)/terms/page.tsx",
+    "from": "you confirm that you own it or\n          have permission to upload and share it",
+    "to": "you confirm that you accept these terms"
+  },
+  {
+    "name": "the business config invents a country instead of leaving it null",
+    "file": "src/lib/legal/business.ts",
+    "from": "country: null as string | null,",
+    "to": "country: \"Ethiopia\" as string | null,"
+  },
+  {
+    "name": "the contact page goes back to a hardcoded support address",
+    "file": "src/app/(info)/contact/page.tsx",
+    "from": "BUSINESS.supportEmail",
+    "to": "\"support@medosha.net\""
+  },
+  {
+    "name": "DemoBadge stops bailing out when there is nothing to disclose",
+    "file": "src/components/ui/demo-badge.tsx",
+    "from": "if (!demo) return null;",
+    "to": ""
+  },
+  {
+    "name": "OwnershipConfirmation stops being a required field",
+    "file": "src/components/shared/ownership-confirmation.tsx",
+    "from": "name=\"ownershipConfirmed\"",
+    "to": "name=\"ownershipConfirmedX\""
+  },
+  {
+    "name": "the property form drops the ownership confirmation",
+    "file": "src/components/property/property-form.tsx",
+    "from": "<OwnershipConfirmation className=\"border-t pt-6\" />",
+    "to": ""
+  }
+]

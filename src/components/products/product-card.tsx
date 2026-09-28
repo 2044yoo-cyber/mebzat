@@ -4,6 +4,7 @@ import { FileDown, ImageOff, MapPin } from "lucide-react";
 
 import { ConditionBadge } from "@/components/products/condition-badge";
 import { SaveButton } from "@/components/products/save-button";
+import { DemoBadge } from "@/components/ui/demo-badge";
 import {
   DIGITAL_KINDS,
   RENTAL_PERIODS,
@@ -83,14 +84,10 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             grade={product.used_grade}
             className="bg-background/90"
           />
-          {product.is_sample && (
-            <span
-              title="Placed by Medosha to show what this section is for. Not for sale."
-              className="rounded-full border border-transparent bg-amber-500 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-950 uppercase"
-            >
-              Sample
-            </span>
-          )}
+          <DemoBadge
+            demo={product.is_sample}
+            title="Placed by Medosha to show what this section is for. Not for sale."
+          />
         </div>
         <div className="absolute right-3 top-3">
           <SaveButton

@@ -20,6 +20,7 @@ import { FeedActions } from "@/components/feed/feed-actions";
 import { FeedComments } from "@/components/feed/feed-comments";
 import { FeedMedia } from "@/components/feed/feed-media";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DemoBadge } from "@/components/ui/demo-badge";
 import { feedApi } from "@/lib/feed/client";
 import { FILE_LABEL, KIND_LABEL } from "@/lib/feed/constants";
 import type { FeedFile, FeedPost } from "@/lib/feed/types";
@@ -214,7 +215,7 @@ function Header({ post, signedIn }: { post: FeedPost; signedIn: boolean }) {
               {/* Seeded content is labelled. Small, but it should never be
                   possible to mistake demonstration data for a real listing
                   or a real person's work. */}
-              <span className="tracking-wide uppercase">Sample</span>
+              <DemoBadge variant="text" title="Placed by Medosha to show what the feed looks like. Not a real post." />
             </>
           )}
         </p>

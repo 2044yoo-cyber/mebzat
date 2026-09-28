@@ -4,6 +4,7 @@ import { AlertTriangle, ChevronDown, Printer, Sigma } from "lucide-react";
 
 import { ShareResult } from "./share-result";
 
+import { ContentDisclaimer } from "@/components/shared/content-disclaimer";
 import { cn } from "@/lib/utils";
 import { safeText } from "@/lib/calculators/validate";
 import type { CalcOutput } from "@/lib/calculators/types";
@@ -179,6 +180,11 @@ export function ResultsPanel({
         </button>
         <ShareResult title={title} output={output} />
       </div>
+
+      {/* Not `print:hidden` like the buttons above it — a printed or
+          downloaded estimate is exactly the artifact this disclaimer has to
+          travel with. */}
+      <ContentDisclaimer kind="boq" />
     </div>
   );
 }

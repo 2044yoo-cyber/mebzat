@@ -54,6 +54,7 @@ export const translations: Record<Language, Dictionary> = {
       soon: "Soon",
     },
     common: {
+      sampleData: "Sample",
       searchMedosha: "Search Medosha", constructionCost: "Construction Cost", boq: "BOQ", calculators: "Calculators", viewAll: "View All",
       save: "Save", cancel: "Cancel", close: "Close", back: "Back", next: "Next",
       continue: "Continue", submit: "Submit", edit: "Edit", delete: "Delete", remove: "Remove",
@@ -156,6 +157,14 @@ export const translations: Record<Language, Dictionary> = {
       haveAccount: "Already have an account?",
     },
     ai: { ask: "Ask Medosha AI", newChat: "New chat", send: "Send", placeholder: "Ask anything about construction, property or design…" },
+    legal: {
+      aiDisclaimer: "AI-generated content may contain errors. Verify important dimensions, materials and technical information before use.",
+      boqDisclaimer: "Quantities and cost estimates are for planning purposes and may vary from actual construction requirements and market prices. Verify with a qualified professional before construction or purchasing.",
+      uploadOwnership: "I confirm that I own this content or have permission to upload and share it.",
+      deleteAccount: "Delete account",
+      deleteAccountWarning: "This permanently deletes your account and everything in it — profile, projects, listings and messages. This cannot be undone.",
+      deleteAccountConfirm: "Yes, delete my account",
+    },
     footer: {
       explore: "Explore", company: "Company", legal: "Legal", about: "About", careers: "Careers",
       contact: "Contact", privacy: "Privacy", terms: "Terms", rights: "All rights reserved.",
@@ -207,6 +216,7 @@ export const translations: Record<Language, Dictionary> = {
       help: "እገዛ", saved: "የተቀመጡ", allMedosha: "ሁሉም ሜዶሻ", myWorkspace: "የስራ ቦታዬ", soon: "በቅርቡ",
     },
     common: {
+      sampleData: "ናሙና",
       searchMedosha: "መዶሻን ፈልግ", constructionCost: "የግንባታ ወጪ", boq: "የሥራ ዝርዝር", calculators: "ማስሊያዎች", viewAll: "ሁሉንም ይመልከቱ",
       save: "አስቀምጥ", cancel: "ሰርዝ", close: "ዝጋ", back: "ተመለስ", next: "ቀጣይ", continue: "ቀጥል",
       submit: "ላክ", edit: "አስተካክል", delete: "ሰርዝ", remove: "አስወግድ", add: "ጨምር", create: "ፍጠር",
@@ -289,6 +299,14 @@ export const translations: Record<Language, Dictionary> = {
     studio: { designStudio: "ዲዛይን ስቱዲዮ", gallery: "ጋለሪ", professionals: "ባለሙያዎች", materials: "ቁሳቁሶች", dimensions: "መጠኖች", structure: "መዋቅር", estimatedPrice: "የተገመተ ዋጋ", costToMake: "የማምረቻ ወጪ", sendCalculator: "ወደ ማስያ ላክ" },
     auth: { welcome: "እንኳን ደህና መጡ", login: "ግባ", signup: "መለያ ፍጠር", password: "የይለፍ ቃል", confirmPassword: "የይለፍ ቃል ያረጋግጡ", forgotPassword: "የይለፍ ቃል ረሱ?", resetPassword: "የይለፍ ቃል ዳግም ያዘጋጁ", verifyEmail: "ኢሜይልዎን ያረጋግጡ", rememberMe: "አስታውሰኝ", noAccount: "መለያ የለዎትም?", haveAccount: "መለያ አለዎት?" },
     ai: { ask: "Medosha AIን ይጠይቁ", newChat: "አዲስ ውይይት", send: "ላክ", placeholder: "ስለ ግንባታ፣ ንብረት ወይም ዲዛይን ይጠይቁ…" },
+    legal: {
+      aiDisclaimer: "በAI የተፈጠረ ይዘት ስህተቶችን ሊይዝ ይችላል። ከመጠቀምዎ በፊት አስፈላጊ መጠኖችን፣ ቁሳቁሶችን እና ቴክኒካዊ መረጃዎችን ያረጋግጡ።",
+      boqDisclaimer: "መጠኖች እና የወጪ ግምቶች ለዕቅድ ዓላማ ብቻ ናቸው፤ ከትክክለኛው የግንባታ ፍላጎት እና የገበያ ዋጋ ሊለያዩ ይችላሉ። ከመገንባት ወይም ከመግዛትዎ በፊት ብቁ ባለሙያ ያማክሩ።",
+      uploadOwnership: "ይህን ይዘት እንደምወክለው ወይም ለመስቀል እና ለማጋራት ፈቃድ እንዳለኝ አረጋግጣለሁ።",
+      deleteAccount: "መለያ ሰርዝ",
+      deleteAccountWarning: "ይህ መለያዎን እና ውስጡ ያለውን ሁሉ — መገለጫ፣ ፕሮጀክቶች፣ ዝርዝሮች እና መልዕክቶችን — በቋሚነት ይሰርዛል። ይህ መመለስ አይቻልም።",
+      deleteAccountConfirm: "አዎ፣ መለያዬን ሰርዝ",
+    },
     footer: { explore: "ያስሱ", company: "ኩባንያ", legal: "ህጋዊ", about: "ስለ እኛ", careers: "የስራ ዕድሎች", contact: "ያግኙን", privacy: "ግላዊነት", terms: "ውሎች", rights: "መብቱ የተጠበቀ ነው።", description: "ለግንባታ ባለሙያዎች የሙያ አውታረ መረብ እና ገበያ።", ecosystem: "የግንባታ ኢንዱስትሪውን ዲጂታል ስርዓት በመገንባት ላይ።" },
     info: { about: "ስለ ሜዶሻ", howToUse: "እንዴት መጠቀም እንደሚቻል", faq: "ተደጋጋሚ ጥያቄዎች", contact: "ያግኙን", privacy: "የግላዊነት ፖሊሲ", terms: "የአገልግሎት ውሎች" },
   },
@@ -333,6 +351,7 @@ export const translations: Record<Language, Dictionary> = {
       help: "Gargaarsa", saved: "Olkaa'ame", allMedosha: "Medosha Hundaa", myWorkspace: "Iddoo Hojii Koo", soon: "Dhiheenyatti",
     },
     common: {
+      sampleData: "Fakkeenya",
       searchMedosha: "Medosha barbaadi", constructionCost: "Baasii ijaarsaa", boq: "BOQ", calculators: "Shallagduu", viewAll: "Hunda ilaali",
       save: "Olkaa'i", cancel: "Dhiisi", close: "Cufi", back: "Duubatti", next: "Itti aanu", continue: "Itti fufi",
       submit: "Ergi", edit: "Gulaali", delete: "Haqi", remove: "Dhabamsiisi", add: "Dabali", create: "Uumi", update: "Haaromsi",
@@ -415,6 +434,14 @@ export const translations: Record<Language, Dictionary> = {
     studio: { designStudio: "Istuudiyoo Dizaayinii", gallery: "Kuusaa Suuraa", professionals: "Ogeessota", materials: "Meeshaalee", dimensions: "Safaroota", structure: "Caasaa", estimatedPrice: "Gatii tilmaamame", costToMake: "Baasii oomishaa", sendCalculator: "Gara herregduutti ergi" },
     auth: { welcome: "Baga nagaan deebitan", login: "Seeni", signup: "Akkaawuntii uumi", password: "Jecha iccitii", confirmPassword: "Jecha iccitii mirkaneessi", forgotPassword: "Jecha iccitii dagattee?", resetPassword: "Jecha iccitii haaromsi", verifyEmail: "Imeelii kee mirkaneessi", rememberMe: "Na yaadadhu", noAccount: "Akkaawuntii hin qabduu?", haveAccount: "Akkaawuntii qabdaa?" },
     ai: { ask: "Medosha AI gaafadhu", newChat: "Haasa'a haaraa", send: "Ergi", placeholder: "Waa'ee ijaarsaa, qabeenyaa ykn dizaayinii gaafadhu…" },
+    legal: {
+      aiDisclaimer: "Qabiyyeen AI'n uumame dogoggora qabaachuu danda'a. Hanga, meeshaalee fi odeeffannoo teekniikaa barbaachisaa ta'an fayyadamuu keessan dura mirkaneeffadhaa.",
+      boqDisclaimer: "Hangaa fi tilmaamni baasii kaayyoo karoorfannaaf qofa. Barbaachisummaa ijaarsaa dhugaa fi gatii gabaa irraa adda ta'uu danda'a. Ijaaruu ykn bitachuu dura ogeessa mirkaneeffadhaa.",
+      uploadOwnership: "Qabiyyee kana akkan qabu ykn olkaa'uu fi qooduuf hayyama akka qabu mirkaneessa.",
+      deleteAccount: "Herrega haqi",
+      deleteAccountWarning: "Kun herrega keessanii fi waan isa keessa jiru hunda — profaayilii, piroojektoota, tarreewwan fi ergaawwan — bara baraan ni haqa. Kun deebi'uu hin danda'u.",
+      deleteAccountConfirm: "Eeyyee, herrega koo haqi",
+    },
     footer: { explore: "Sakatta'i", company: "Dhaabbata", legal: "Seeraa", about: "Waa'ee keenya", careers: "Carraa hojii", contact: "Nu qunnami", privacy: "Iccitii", terms: "Haaldureewwan", rights: "Mirgi hundi eegameera.", description: "Neetworkii ogummaa fi gabaa ijaarsaaf.", ecosystem: "Sirna dijiitaalaa industirii ijaarsaa ijaaraa jirra." },
     info: { about: "Waa'ee Medosha", howToUse: "Akka itti fayyadaman", faq: "Gaaffilee Yeroo Baay'ee", contact: "Nu qunnami", privacy: "Imaammata Iccitii", terms: "Haaldureewwan Tajaajilaa" },
   },

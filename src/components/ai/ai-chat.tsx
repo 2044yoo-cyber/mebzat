@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { Markdown } from "@/components/ai/markdown";
+import { ContentDisclaimer } from "@/components/shared/content-disclaimer";
 import { SUGGESTED_PROMPTS } from "@/lib/ai/quick-actions";
 import { boundsOf, publishHighlight } from "@/lib/map/ai-highlight";
 import { openPropertyId } from "@/lib/ai/open-property";
@@ -392,9 +393,7 @@ export function AiChat({
             </button>
           )}
         </div>
-        <p className="pt-2 text-center text-[11px] text-muted-foreground">
-          Medosha AI gives planning guidance, not certified engineering sign-off.
-        </p>
+        <ContentDisclaimer kind="ai" className="justify-center pt-2 text-[11px]" />
       </form>
     </div>
   );

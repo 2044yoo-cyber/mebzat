@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Check, Pencil } from "lucide-react";
 
+import { DeleteAccountSection } from "@/components/settings/delete-account-section";
 import { FontSettingsForm } from "@/components/settings/font-settings-form";
 import { RoleSettingsForm } from "@/components/settings/role-settings-form";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
@@ -117,6 +118,8 @@ export default async function SettingsPage() {
           <Pencil className="size-4" /> Edit profile
         </Link>
       </section>
+
+      <DeleteAccountSection />
     </div>
   );
 }

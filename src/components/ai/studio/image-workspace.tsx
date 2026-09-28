@@ -37,6 +37,7 @@ import {
   type QualityMode,
 } from "@/lib/ai/image-models";
 import { QueuePanel } from "@/components/ai/studio/queue-panel";
+import { ContentDisclaimer } from "@/components/shared/content-disclaimer";
 import { cancel as cancelJob, enqueue, useQueue } from "@/lib/ai/image-queue";
 import type { ProviderHealth } from "@/lib/ai/provider-status";
 import {
@@ -731,6 +732,8 @@ export function ImageWorkspace({
                 </figure>
               ))}
             </div>
+
+            <ContentDisclaimer kind="ai" />
 
             {/* What a picture is worth on a construction platform: the next
                 step. Each of these carries the prompt into a real module. */}

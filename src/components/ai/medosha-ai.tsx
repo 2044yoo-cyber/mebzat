@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { Markdown } from "@/components/ai/markdown";
+import { ContentDisclaimer } from "@/components/shared/content-disclaimer";
 import {
   composeAiPrompt,
   routeRequest,
@@ -509,9 +510,7 @@ export function MedoshaAi({
         )}
       </div>
 
-      <p className="pt-2 text-center text-[11px] text-muted-foreground">
-        Medosha AI gives planning guidance, not certified engineering sign-off.
-      </p>
+      <ContentDisclaimer kind="ai" className="justify-center pt-2 text-[11px]" />
     </form>
   );
 

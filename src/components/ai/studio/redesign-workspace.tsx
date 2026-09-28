@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { BeforeAfter } from "@/components/ai/studio/before-after";
 import { ConfigPanel } from "@/components/ai/studio/config-panel";
 import { QueuePanel } from "@/components/ai/studio/queue-panel";
+import { ContentDisclaimer } from "@/components/shared/content-disclaimer";
 import {
   DESIGN_STYLES,
   EDIT_TARGETS,
@@ -395,7 +396,10 @@ export function RedesignWorkspace({
 
       {/* ---- The photo, or the comparison ------------------------------ */}
       {compare ? (
-        <BeforeAfter before={source!} after={compare} />
+        <>
+          <BeforeAfter before={source!} after={compare} />
+          <ContentDisclaimer kind="ai" className="mt-2" />
+        </>
       ) : (
         <div className="relative overflow-hidden rounded-2xl border bg-muted">
           {/* eslint-disable-next-line @next/next/no-img-element */}
