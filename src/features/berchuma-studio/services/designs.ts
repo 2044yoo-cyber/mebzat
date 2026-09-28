@@ -248,6 +248,26 @@ async function postToFeed(
   // button they were not sure had worked.
   if (error && error.code !== "23505") {
     console.error(`[berchuma] feed post failed: ${error.message}`);
+    return;
+  }
+
+  if (design.cover_url) {
+    const { data: post } = await supabase
+      .from("feed_posts")
+      .select("id")
+      .eq("entity_type", "design")
+      .eq("entity_id", design.id)
+      .maybeSingle();
+    if (post) {
+      await supabase.from("feed_media").delete().eq("post_id", post.id);
+      await supabase.from("feed_media").insert({
+        post_id: post.id,
+        kind: "image",
+        url: design.cover_url,
+        alt: design.title,
+        position: 0,
+      });
+    }
   }
 }
 

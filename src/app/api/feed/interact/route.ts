@@ -24,6 +24,7 @@ const ACTIONS = [
   "save",
   "follow",
   "share",
+  "open",
   "hide",
   "unhide",
   "report",
@@ -129,7 +130,22 @@ export async function POST(request: Request) {
         p_post: postId!,
       });
       if (error) return failed(error.message);
+      if (user) {
+        void supabase.rpc("feed_record_interaction" as "feed_record_views", {
+          p_post: postId!,
+          p_kind: "share",
+        } as never);
+      }
       return NextResponse.json({ count: data ?? 0 });
+    }
+
+    case "open": {
+      const { error } = await supabase.rpc("feed_record_interaction" as "feed_record_views", {
+        p_post: postId!,
+        p_kind: body.immersive === true ? "tour_view" : "open",
+      } as never);
+      if (error) return failed(error.message);
+      return NextResponse.json({ recorded: true });
     }
 
     case "download": {
