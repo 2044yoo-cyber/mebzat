@@ -16,7 +16,7 @@ import { COVER_PLACEHOLDER } from "@/lib/constants/placeholders";
 import { EVENT_KIND } from "@/lib/constants/community";
 import { getEvent, getMyAttendance } from "@/lib/data/events";
 import { createClient } from "@/lib/supabase/server";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, safeJsonLd } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -109,7 +109,7 @@ export default async function EventPage(props: {
     <div className="container-page py-10">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
 
       <Link

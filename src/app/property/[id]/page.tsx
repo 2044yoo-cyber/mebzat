@@ -44,7 +44,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { listFloorPlans } from "@/lib/tour/floor-plans";
 import { listToursFor } from "@/lib/tour/queries";
-import { cn, formatPrice } from "@/lib/utils";
+import { cn, formatPrice, safeJsonLd } from "@/lib/utils";
 import { ReportDialog } from "@/components/moderation/report-dialog";
 
 export const dynamic = "force-dynamic";
@@ -204,7 +204,7 @@ export default async function PropertyPage(props: {
     <div className="container-page py-10">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
 
       <Link
