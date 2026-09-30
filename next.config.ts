@@ -4,6 +4,20 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseHost = supabaseUrl ? new URL(supabaseUrl).hostname : undefined;
 
 const nextConfig: NextConfig = {
+  async headers() {
+    // Safe, non-breaking defaults only — no CSP here, since a wrong one
+    // would silently break existing pages rather than fail loudly.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+    ];
+  },
   images: {
     // Allow SVGs (the branded fallback placeholder, and any SVG a user
     // uploads as a company logo) but neutralize them: served as attachments

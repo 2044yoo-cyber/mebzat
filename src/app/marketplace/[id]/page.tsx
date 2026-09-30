@@ -19,7 +19,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { STOCK_STATUS, isSecondHand } from "@/lib/constants/product-categories";
 import { withFavorites } from "@/lib/data/products";
 import { createClient } from "@/lib/supabase/server";
-import { cn, formatPrice } from "@/lib/utils";
+import { cn, formatPrice, safeJsonLd } from "@/lib/utils";
 import type { ProductCardData } from "@/components/products/product-card";
 import type { ProductCondition, UsedGrade } from "@/types/database.types";
 import { MessageButton } from "@/components/messages/message-button";
@@ -182,7 +182,7 @@ export default async function ProductDetailPage(props: {
     <div className="mx-auto w-full max-w-6xl px-6 py-10">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
 
       <nav className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground">

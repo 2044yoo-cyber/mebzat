@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getPublicCompany } from "@/lib/data/company-profile";
 import { getReviews } from "@/lib/data/reviews";
 import { createClient } from "@/lib/supabase/server";
-import { cn } from "@/lib/utils";
+import { cn, safeJsonLd } from "@/lib/utils";
 
 export async function generateMetadata(props: {
   params: Promise<{ slug: string }>;
@@ -80,7 +80,7 @@ export default async function CompanyProfilePage(props: {
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-10">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
 
       <CompanyHeader data={data} />

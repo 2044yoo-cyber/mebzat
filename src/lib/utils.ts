@@ -47,6 +47,14 @@ export function formatRelativeTime(date: string | Date) {
   return "just now"
 }
 
+/** JSON.stringify for a <script type="application/ld+json"> body. Plain
+ * JSON.stringify does not escape `</script>`, so user-controlled fields
+ * (a company or listing name/description) could close the script tag early
+ * and inject markup. Escaping `<` as < keeps the JSON valid and inert. */
+export function safeJsonLd(data: unknown) {
+  return JSON.stringify(data).replace(/</g, "\\u003c")
+}
+
 export function slugify(input: string) {
   return input
     .toLowerCase()
