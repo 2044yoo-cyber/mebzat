@@ -35,8 +35,41 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cat mobile-build/apk.part1.b64 mobile-build/apk.part2.b64 mobile-build/apk.part3.b64 mobile-build/apk.part4.b64 | base64 --decode --ignore-garbage > /tmp/medosha-mobile.zip
-          echo '97f7d26efb968660da663db68b9ad951515ae6e2b6ce03d476ad2e211dc11f2a  /tmp/medosha-mobile.zip' | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, hashlib
+
+          root = Path('mobile-build')
+          p1 = (root / 'apk.part1.b64').read_text().strip()
+          p2 = (root / 'apk.part2.b64').read_text().strip()
+          p3 = (root / 'apk.part3.b64').read_text().strip()
+          bad = (root / 'apk.part4.b64').read_text().strip()
+          expected_part4 = '8598c93ec89fa3c72501f18cb7183977e0ed3b6f905c61df92244f6c6539c694'
+
+          if hashlib.sha256(bad.encode()).hexdigest() == expected_part4:
+              p4 = bad
+          else:
+              p4 = None
+              # The connector transfer added exactly six characters to this chunk.
+              # Recover only a candidate whose SHA-256 matches the original source chunk.
+              for i in range(len(bad) - 5):
+                  candidate = bad[:i] + bad[i+6:]
+                  if hashlib.sha256(candidate.encode()).hexdigest() == expected_part4:
+                      p4 = candidate
+                      print(f'Repaired part 4 by removing six inserted characters at offset {i}.')
+                      break
+              if p4 is None:
+                  raise SystemExit('Unable to reconstruct exact part 4; refusing to build altered source.')
+
+          encoded = p1 + p2 + p3 + p4
+          raw = base64.b64decode(encoded, validate=True)
+          digest = hashlib.sha256(raw).hexdigest()
+          expected_zip = '97f7d26efb968660da663db68b9ad951515ae6e2b6ce03d476ad2e211dc11f2a'
+          if digest != expected_zip:
+              raise SystemExit(f'ZIP checksum mismatch: {digest}')
+          Path('/tmp/medosha-mobile.zip').write_bytes(raw)
+          print('Source ZIP checksum verified:', digest)
+          PY
           rm -rf /tmp/medosha-mobile-src
           mkdir -p /tmp/medosha-mobile-src
           unzip -q /tmp/medosha-mobile.zip -d /tmp/medosha-mobile-src
@@ -58,6 +91,7 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/medosha-mobile-v0.2.apk"
+          sha256sum "$GITHUB_WORKSPACE/medosha-mobile-v0.2.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
