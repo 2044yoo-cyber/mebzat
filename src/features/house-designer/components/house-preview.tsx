@@ -6,15 +6,37 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as THREE from "three";
 
 import { RoomShell } from "@/features/berchuma-studio/components/viewer/room-shell";
+import { roomWalls } from "@/features/berchuma-studio/services/room-geometry";
 import type { Room } from "@/features/berchuma-studio/types/room";
 import { cn } from "@/lib/utils";
 
+import {
+  openingObjectId,
+  wallObjectId,
+  type HouseProject,
+  type HouseRoof,
+  type HouseSelection,
+  type HouseSlab,
+  type HouseStair,
+} from "../types/project";
+
 const MM = 0.001;
+type View = "3d" | "top" | "front" | "back" | "left" | "right";
 
-type View = "3d" | "top" | "front";
-
-export function HousePreview({ room, className }: { room: Room; className?: string }) {
-  const bounds = useMemo(() => roomBounds(room), [room]);
+export function HousePreview({
+  project,
+  visibleLevelIds,
+  selected,
+  onSelect,
+  className,
+}: {
+  project: HouseProject;
+  visibleLevelIds: ReadonlySet<string>;
+  selected: HouseSelection | null;
+  onSelect: (selection: HouseSelection | null) => void;
+  className?: string;
+}) {
+  const bounds = useMemo(() => projectBounds(project), [project]);
   const [view, setView] = useState<View>("3d");
 
   return (
@@ -25,16 +47,51 @@ export function HousePreview({ room, className }: { room: Room; className?: stri
         camera={{ fov: 38, near: 0.02, far: 200 }}
         gl={{ antialias: true, alpha: true }}
         style={{ width: "100%", maxWidth: "100%", minWidth: 0, touchAction: "none" }}
+        onPointerMissed={() => onSelect(null)}
       >
-        <ambientLight intensity={0.75} />
-        <directionalLight position={[8, 12, 9]} intensity={1.35} />
-        <directionalLight position={[-7, 6, -5]} intensity={0.4} />
-        <RoomShell
-          room={room}
-          offset={[-bounds.centreX * MM, 0, bounds.centreY * MM]}
-          showFloor={false}
-        />
-        <HouseFloor room={room} bounds={bounds} />
+        <ambientLight intensity={0.72} />
+        <directionalLight position={[8, 14, 9]} intensity={1.4} />
+        <directionalLight position={[-7, 8, -5]} intensity={0.42} />
+
+        {project.levels.map((level) => {
+          if (!level.plan || !visibleLevelIds.has(level.id)) return null;
+          const selectedWall = selected?.kind === "wall"
+            ? project.walls.find((wall) => wall.id === selected.id && wall.levelId === level.id)
+            : null;
+          return (
+            <group key={level.id}>
+              <RoomShell
+                room={level.plan}
+                offset={[-bounds.centreX * MM, level.elevation * MM, bounds.centreY * MM]}
+                showFloor={false}
+                selectedWallId={selectedWall?.sourceWallId ?? null}
+                onSelectWall={(sourceWallId) =>
+                  onSelect({ kind: "wall", id: wallObjectId(level.id, sourceWallId) })
+                }
+              />
+              <OpeningMeshes
+                project={project}
+                levelId={level.id}
+                room={level.plan}
+                elevation={level.elevation}
+                bounds={bounds}
+                selected={selected}
+                onSelect={onSelect}
+              />
+            </group>
+          );
+        })}
+
+        {project.slabs.filter((slab) => visibleLevelIds.has(slab.levelId)).map((slab) => (
+          <SlabMesh key={slab.id} slab={slab} bounds={bounds} selected={selected?.id === slab.id} onSelect={() => onSelect({ kind: "slab", id: slab.id })} />
+        ))}
+        {project.stairs.filter((stair) => visibleLevelIds.has(stair.levelId)).map((stair) => (
+          <StairMesh key={stair.id} stair={stair} bounds={bounds} selected={selected?.id === stair.id} onSelect={() => onSelect({ kind: "stair", id: stair.id })} />
+        ))}
+        {project.roofs.filter((roof) => visibleLevelIds.has(roof.levelId)).map((roof) => (
+          <RoofMesh key={roof.id} roof={roof} bounds={bounds} selected={selected?.id === roof.id} onSelect={() => onSelect({ kind: "roof", id: roof.id })} />
+        ))}
+
         <CameraRig bounds={bounds} view={view} />
       </Canvas>
       <ViewButtons view={view} onChange={setView} />
@@ -42,28 +99,152 @@ export function HousePreview({ room, className }: { room: Room; className?: stri
   );
 }
 
-function HouseFloor({ room, bounds }: { room: Room; bounds: ReturnType<typeof roomBounds> }) {
-  const shape = useMemo(() => {
-    const next = new THREE.Shape();
-    room.corners.forEach((point, index) => {
-      const x = (point.x - bounds.centreX) * MM;
-      const y = (point.y - bounds.centreY) * MM;
-      if (index === 0) next.moveTo(x, y);
-      else next.lineTo(x, y);
-    });
-    next.closePath();
-    return next;
-  }, [bounds.centreX, bounds.centreY, room.corners]);
+function OpeningMeshes({
+  project,
+  levelId,
+  room,
+  elevation,
+  bounds,
+  selected,
+  onSelect,
+}: {
+  project: HouseProject;
+  levelId: string;
+  room: Room;
+  elevation: number;
+  bounds: Bounds;
+  selected: HouseSelection | null;
+  onSelect: (selection: HouseSelection) => void;
+}) {
+  const walls = roomWalls(room);
+  return room.openings.map((opening) => {
+    const wall = walls.find((item) => item.id === opening.wallId);
+    if (!wall) return null;
+    const dx = (wall.end.x - wall.start.x) / wall.length;
+    const dy = (wall.end.y - wall.start.y) / wall.length;
+    const middle = opening.offset + opening.width / 2;
+    const x = wall.start.x + dx * middle;
+    const y = wall.start.y + dy * middle;
+    const kind = opening.kind === "window" ? "window" : "door";
+    const id = openingObjectId(levelId, opening.kind, opening.id);
+    const record = [...project.doors, ...project.windows].find((item) => item.id === id);
+    const highlighted = selected?.id === id;
+    const passage = opening.kind === "passage";
 
+    return (
+      <mesh
+        key={id}
+        position={[
+          (x - bounds.centreX) * MM,
+          (elevation + opening.sill + opening.height / 2) * MM,
+          -(y - bounds.centreY) * MM,
+        ]}
+        rotation={[0, Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x), 0]}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect({ kind, id });
+        }}
+      >
+        <boxGeometry args={[opening.width * MM, opening.height * MM, Math.max(35, room.wallThickness * 0.35) * MM]} />
+        <meshStandardMaterial
+          color={highlighted ? "#1473e6" : opening.kind === "window" ? "#8ec9e8" : "#8b6847"}
+          transparent={opening.kind === "window" || passage}
+          opacity={passage ? 0.16 : opening.kind === "window" ? 0.5 : 1}
+          roughness={record?.material === "Aluminium" ? 0.3 : 0.75}
+        />
+      </mesh>
+    );
+  });
+}
+
+function SlabMesh({ slab, bounds, selected, onSelect }: { slab: HouseSlab; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const shape = useMemo(() => polygonShape(slab.boundary, bounds), [bounds, slab.boundary]);
   return (
-    <mesh position={[0, -0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <shapeGeometry args={[shape]} />
-      <meshStandardMaterial color="#d8d2c8" roughness={1} side={THREE.DoubleSide} />
+    <mesh
+      position={[0, (slab.elevation - slab.thickness) * MM, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      onClick={(event) => { event.stopPropagation(); onSelect(); }}
+    >
+      <extrudeGeometry args={[shape, { depth: slab.thickness * MM, bevelEnabled: false }]} />
+      <meshStandardMaterial color={selected ? "#1473e6" : "#c9c3b9"} roughness={0.95} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
-function CameraRig({ bounds, view }: { bounds: ReturnType<typeof roomBounds>; view: View }) {
+function StairMesh({ stair, bounds, selected, onSelect }: { stair: HouseStair; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const tread = stair.length / stair.steps;
+  const rise = stair.height / stair.steps;
+  return (
+    <group
+      position={[(stair.x - bounds.centreX) * MM, stair.elevation * MM, -(stair.y - bounds.centreY) * MM]}
+      rotation={[0, (-stair.rotation * Math.PI) / 180, 0]}
+      onClick={(event) => { event.stopPropagation(); onSelect(); }}
+    >
+      {Array.from({ length: stair.steps }, (_, index) => (
+        <mesh
+          key={index}
+          position={[
+            (stair.width / 2) * MM,
+            (rise * (index + 1) / 2) * MM,
+            -(tread * (index + 0.5)) * MM,
+          ]}
+        >
+          <boxGeometry args={[stair.width * MM, rise * (index + 1) * MM, tread * MM]} />
+          <meshStandardMaterial color={selected ? "#1473e6" : "#bdb7ad"} roughness={0.9} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function RoofMesh({ roof, bounds, selected, onSelect }: { roof: HouseRoof; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const roofBounds = boundaryBounds(roof.boundary);
+  const colour = selected ? "#1473e6" : roof.type === "flat" ? "#b8b1a7" : "#7f493b";
+  if (roof.type === "flat") {
+    const shape = polygonShape(roof.boundary, bounds);
+    return (
+      <mesh position={[0, roof.elevation * MM, 0]} rotation={[-Math.PI / 2, 0, 0]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+        <extrudeGeometry args={[shape, { depth: roof.thickness * MM, bevelEnabled: false }]} />
+        <meshStandardMaterial color={colour} roughness={0.88} side={THREE.DoubleSide} />
+      </mesh>
+    );
+  }
+
+  const width = roofBounds.width + roof.overhang * 2;
+  const depth = roofBounds.depth + roof.overhang * 2;
+  const centreX = (roofBounds.minX + roofBounds.maxX) / 2;
+  const centreY = (roofBounds.minY + roofBounds.maxY) / 2;
+  if (roof.type === "hip") {
+    return (
+      <mesh
+        position={[(centreX - bounds.centreX) * MM, (roof.elevation + roof.height / 2) * MM, -(centreY - bounds.centreY) * MM]}
+        rotation={[0, Math.PI / 4, 0]}
+        scale={[width * MM / Math.SQRT2, roof.height * MM, depth * MM / Math.SQRT2]}
+        onClick={(event) => { event.stopPropagation(); onSelect(); }}
+      >
+        <coneGeometry args={[0.5, 1, 4]} />
+        <meshStandardMaterial color={colour} roughness={0.82} />
+      </mesh>
+    );
+  }
+
+  const angle = Math.max(5, roof.slope || 25) * Math.PI / 180;
+  const half = width / 2;
+  const rise = Math.min(roof.height, Math.tan(angle) * half);
+  const span = Math.hypot(half, rise);
+  return (
+    <group position={[(centreX - bounds.centreX) * MM, roof.elevation * MM, -(centreY - bounds.centreY) * MM]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+      {([-1, 1] as const).map((side) => (
+        <mesh key={side} position={[side * half * 0.5 * MM, rise * 0.5 * MM, 0]} rotation={[0, 0, side * -angle]}>
+          <boxGeometry args={[span * MM, roof.thickness * MM, depth * MM]} />
+          <meshStandardMaterial color={colour} roughness={0.82} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function CameraRig({ bounds, view }: { bounds: Bounds; view: View }) {
   const store = useStore();
   const element = useThree((state) => state.gl.domElement);
   const invalidate = useThree((state) => state.invalidate);
@@ -73,12 +254,15 @@ function CameraRig({ bounds, view }: { bounds: ReturnType<typeof roomBounds>; vi
     const { camera } = store.getState();
     if (!(camera instanceof THREE.PerspectiveCamera) || size.width === 0) return;
     const span = Math.max(bounds.width, bounds.depth, bounds.height) * MM;
-    const distance = Math.max(4, span * 1.65);
-    const target = new THREE.Vector3(0, bounds.height * MM * 0.42, 0);
+    const distance = Math.max(4, span * 1.55);
+    const target = new THREE.Vector3(0, bounds.height * MM * 0.45, 0);
     camera.aspect = size.width / size.height;
-    if (view === "top") camera.position.set(0, distance * 1.2, 0.001);
-    else if (view === "front") camera.position.set(0, bounds.height * MM * 0.45, distance);
-    else camera.position.set(distance * 0.72, distance * 0.6, distance);
+    if (view === "top") camera.position.set(0, distance * 1.25, 0.001);
+    else if (view === "front") camera.position.set(0, target.y, distance);
+    else if (view === "back") camera.position.set(0, target.y, -distance);
+    else if (view === "left") camera.position.set(-distance, target.y, 0);
+    else if (view === "right") camera.position.set(distance, target.y, 0);
+    else camera.position.set(distance * 0.72, distance * 0.58, distance);
     camera.near = Math.max(0.01, distance / 100);
     camera.far = distance * 15;
     camera.lookAt(target);
@@ -88,7 +272,7 @@ function CameraRig({ bounds, view }: { bounds: ReturnType<typeof roomBounds>; vi
 
   useEffect(() => {
     const { camera } = store.getState();
-    const target = new THREE.Vector3(0, bounds.height * MM * 0.42, 0);
+    const target = new THREE.Vector3(0, bounds.height * MM * 0.45, 0);
     const orbit = new OrbitControls(camera, element);
     orbit.enableDamping = true;
     orbit.dampingFactor = 0.08;
@@ -111,40 +295,62 @@ function ViewButtons({ view: currentView, onChange }: { view: View; onChange: (v
     { id: "3d", label: "3D" },
     { id: "top", label: "Top" },
     { id: "front", label: "Front" },
+    { id: "back", label: "Back" },
+    { id: "left", label: "Left" },
+    { id: "right", label: "Right" },
   ];
-
   return (
-    <div className="pointer-events-none absolute left-3 top-3 flex rounded-full border bg-background/90 p-1 shadow-sm backdrop-blur">
-      {views.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onChange(item.id)}
-          aria-pressed={item.id === currentView}
-          className={cn(
-            "pointer-events-auto rounded-full px-3 py-1 text-xs",
-            item.id === currentView ? "bg-brand text-brand-foreground" : "text-muted-foreground",
-          )}
-        >
-          {item.label}
-        </button>
-      ))}
+    <div className="pointer-events-none absolute left-3 right-3 top-3 overflow-x-auto">
+      <div className="pointer-events-auto flex w-max rounded-full border bg-background/90 p-1 shadow-sm backdrop-blur">
+        {views.map((item) => (
+          <button key={item.id} type="button" onClick={() => onChange(item.id)} aria-pressed={item.id === currentView} className={cn("rounded-full px-3 py-1 text-xs", item.id === currentView ? "bg-brand text-brand-foreground" : "text-muted-foreground")}>
+            {item.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-function roomBounds(room: Room) {
-  const xs = room.corners.map((point) => point.x);
-  const ys = room.corners.map((point) => point.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
+type Bounds = ReturnType<typeof projectBounds>;
+
+function projectBounds(project: HouseProject) {
+  const points = project.rooms.flatMap((room) => room.boundary);
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs, 0);
+  const maxX = Math.max(...xs, 1);
+  const minY = Math.min(...ys, 0);
+  const maxY = Math.max(...ys, 1);
+  const roofTop = Math.max(...project.roofs.map((roof) => roof.elevation + roof.height), 0);
+  const wallTop = Math.max(...project.levels.map((level) => level.elevation + (level.plan?.ceilingHeight ?? 0)), 1);
   return {
     centreX: (minX + maxX) / 2,
     centreY: (minY + maxY) / 2,
     width: maxX - minX,
     depth: maxY - minY,
-    height: room.ceilingHeight,
+    height: Math.max(roofTop, wallTop),
   };
+}
+
+function polygonShape(points: { x: number; y: number }[], bounds: Bounds) {
+  const shape = new THREE.Shape();
+  points.forEach((point, index) => {
+    const x = (point.x - bounds.centreX) * MM;
+    const y = (point.y - bounds.centreY) * MM;
+    if (index === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  });
+  shape.closePath();
+  return shape;
+}
+
+function boundaryBounds(points: { x: number; y: number }[]) {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  return { minX, maxX, minY, maxY, width: maxX - minX, depth: maxY - minY };
 }

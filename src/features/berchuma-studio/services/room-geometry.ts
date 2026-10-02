@@ -346,6 +346,7 @@ export function toDesignSpace(
 
 export type WallPiece = {
   id: string;
+  wallId: string;
   /** Centre in design space, millimetres. */
   centre: { x: number; y: number };
   centreY: number;
@@ -382,6 +383,7 @@ export function wallPieces(room: Room): WallPiece[] {
       const along = middle / wall.length;
       pieces.push({
         id,
+        wallId: wall.id,
         centre: {
           x: start.x + (end.x - start.x) * along,
           y: start.y + (end.y - start.y) * along,
@@ -414,4 +416,3 @@ export function wallPieces(room: Room): WallPiece[] {
 
   return pieces;
 }
-

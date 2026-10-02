@@ -6,6 +6,8 @@ import {
   Building2,
   CheckCircle2,
   Download,
+  Eye,
+  EyeOff,
   FileUp,
   PencilRuler,
   Save,
@@ -26,6 +28,7 @@ import {
 } from "@/features/berchuma-studio/types/room";
 import { cn } from "@/lib/utils";
 
+import { HouseObjectInspector } from "./house-object-inspector";
 import { HousePreview } from "./house-preview";
 import {
   houseDraftKey,
@@ -34,8 +37,10 @@ import {
 } from "../services/draft";
 import {
   createHouseProject,
+  ensurePhaseTwoProject,
   houseStyles,
   type HouseProject,
+  type HouseSelection,
   type HouseStyle,
 } from "../types/project";
 
@@ -113,7 +118,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
 
   function restore() {
     if (!savedDraft) return;
-    const restored = savedDraft.project;
+    const restored = ensurePhaseTwoProject(savedDraft.project);
     const restoredRoom = restored.levels.find((level) => level.plan)?.plan;
     if (!restoredRoom) return;
     setProject(restored);
@@ -141,6 +146,12 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
         ? "House project saved on this device."
         : "This browser could not save the project.",
     );
+  }
+
+  function updateProject(next: HouseProject) {
+    setProject(next);
+    const groundPlan = next.levels[0]?.plan;
+    if (groundPlan) setRoom(groundPlan);
   }
 
   function download() {
@@ -213,9 +224,9 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       ) : project ? (
         <ModelScreen
           project={project}
-          room={room}
           view={view}
           onView={setView}
+          onProjectChange={updateProject}
           onSave={save}
           onDownload={download}
         />
@@ -401,19 +412,41 @@ function VerifyScreen({ room, source, onDone }: { room: Room; source: Source; on
 
 function ModelScreen({
   project,
-  room,
   view,
   onView,
+  onProjectChange,
   onSave,
   onDownload,
 }: {
   project: HouseProject;
-  room: Room;
   view: WorkspaceView;
   onView: (view: WorkspaceView) => void;
+  onProjectChange: (project: HouseProject) => void;
   onSave: () => void;
   onDownload: () => void;
 }) {
+  const [activeLevelId, setActiveLevelId] = useState(project.levels[0]?.id ?? "ground-floor");
+  const [visibleLevelIds, setVisibleLevelIds] = useState<Set<string>>(
+    () => new Set(project.levels.map((level) => level.id)),
+  );
+  const [selected, setSelected] = useState<HouseSelection | null>(null);
+  const activeLevel = project.levels.find((level) => level.id === activeLevelId) ?? project.levels[0];
+  const activeRoom = activeLevel?.plan;
+
+  function chooseLevel(levelId: string) {
+    setActiveLevelId(levelId);
+    setSelected({ kind: "level", id: levelId });
+  }
+
+  function toggleLevel(levelId: string) {
+    setVisibleLevelIds((current) => {
+      const next = new Set(current);
+      if (next.has(levelId)) next.delete(levelId);
+      else next.add(levelId);
+      return next;
+    });
+  }
+
   return (
     <section className="space-y-3">
       <div className="flex min-w-0 items-center justify-between gap-2 overflow-x-auto rounded-xl border bg-card p-2">
@@ -428,25 +461,56 @@ function ModelScreen({
         </div>
       </div>
 
-      <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
-        {view !== "3d" ? (
-          <div className="relative min-h-[340px] min-w-0 overflow-hidden rounded-xl border bg-background">
-            <div className="pointer-events-none absolute inset-0"><PlanCanvas room={room} onChange={() => undefined} /></div>
-            <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">2D Plan · mm</span>
-          </div>
-        ) : null}
-        {view !== "2d" ? <HousePreview room={room} className="h-[min(620px,62dvh)]" /> : null}
+      <div className="flex min-w-0 gap-2 overflow-x-auto rounded-xl border bg-card p-2">
+        {project.levels.map((level) => {
+          const visible = visibleLevelIds.has(level.id);
+          return (
+            <div key={level.id} className={cn("flex shrink-0 items-center rounded-lg border", activeLevelId === level.id && "border-brand bg-brand/5")}>
+              <button type="button" onClick={() => chooseLevel(level.id)} className="px-3 py-2 text-xs font-medium">{level.name}</button>
+              <button type="button" onClick={() => toggleLevel(level.id)} aria-label={`${visible ? "Hide" : "Show"} ${level.name}`} className="border-l p-2 text-muted-foreground hover:text-foreground">
+                {visible ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
+          {view !== "3d" && activeRoom ? (
+            <div className="relative min-h-[340px] min-w-0 overflow-hidden rounded-xl border bg-background">
+              <div className="pointer-events-none absolute inset-0"><PlanCanvas room={activeRoom} onChange={() => undefined} /></div>
+              <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · mm</span>
+            </div>
+          ) : null}
+          {view !== "2d" ? (
+            <HousePreview
+              project={project}
+              visibleLevelIds={visibleLevelIds}
+              selected={selected}
+              onSelect={setSelected}
+              className="h-[min(620px,62dvh)]"
+            />
+          ) : null}
+        </div>
+        <HouseObjectInspector
+          project={project}
+          activeLevelId={activeLevelId}
+          selected={selected}
+          onSelect={setSelected}
+          onChange={onProjectChange}
+        />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Summary label="Ground area" value={`${floorArea(room).toFixed(2)} m²`} />
+        <Summary label="Level area" value={activeRoom ? `${floorArea(activeRoom).toFixed(2)} m²` : "—"} />
         <Summary label="Structured walls" value={String(project.walls.length)} />
         <Summary label="Openings" value={`${project.doors.length} doors · ${project.windows.length} windows`} />
-        <Summary label="Planned levels" value={String(project.plannedFloorCount)} />
+        <Summary label="Building elements" value={`${project.levels.length} levels · ${project.stairs.length} stairs · ${project.roofs.length} roof`} />
       </div>
 
       <div className="rounded-xl border bg-card p-3 text-xs text-muted-foreground">
-        <strong className="text-foreground">Phase 1 model:</strong> the ground-floor walls and openings are generated from structured millimetre data, not from an image. Upper floors, slabs, roofs, stairs and façade generation remain prepared fields for the next phases.
+        <strong className="text-foreground">Phase 2 model:</strong> levels, openings, slabs, stairs and roofs are generated as editable structured objects. Select them in 3D or from the inspector to change exact dimensions and materials.
       </div>
     </section>
   );

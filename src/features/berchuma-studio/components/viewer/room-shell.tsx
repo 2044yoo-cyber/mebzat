@@ -34,10 +34,14 @@ export function RoomShell({
   /** Where the design's own group sits, so the room lands with it. */
   offset,
   showFloor = true,
+  selectedWallId,
+  onSelectWall,
 }: {
   room: Room;
   offset: [number, number, number];
   showFloor?: boolean;
+  selectedWallId?: string | null;
+  onSelectWall?: (wallId: string) => void;
 }) {
   const pieces = useMemo(() => wallPieces(room), [room]);
 
@@ -50,12 +54,17 @@ export function RoomShell({
           key={piece.id}
           position={[piece.centre.x * MM, piece.centreY * MM, -piece.centre.y * MM]}
           rotation={[0, piece.rotation, 0]}
+          onClick={(event) => {
+            if (!onSelectWall) return;
+            event.stopPropagation();
+            onSelectWall(piece.wallId);
+          }}
         >
           <boxGeometry
             args={[piece.length * MM, piece.height * MM, room.wallThickness * MM]}
           />
           <meshStandardMaterial
-            color="#e7e3dc"
+            color={piece.wallId === selectedWallId ? "#1473e6" : "#e7e3dc"}
             roughness={0.95}
             metalness={0}
             // Seen from outside, a wall would hide the room. Only the inner
