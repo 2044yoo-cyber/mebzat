@@ -59,7 +59,8 @@ jobs:
         run: |
           set -euxo pipefail
           app=/tmp/medosha-mobile-src/medosha-app
-          cp mobile-build/phase6/phase6-overlay.tar.b64 /tmp/phase6-overlay.b64
+          cat mobile-build/phase6/phase6.part0 mobile-build/phase6/phase6.part1 mobile-build/phase6/phase6.part2 mobile-build/phase6/phase6.part3 > /tmp/phase6-overlay.b64
+          echo '3e273616a076253c553ff2a8fc6d9ddd289834dd2bfa73683bc57f535c20d1c2  /tmp/phase6-overlay.b64' | sha256sum -c -
           base64 -d /tmp/phase6-overlay.b64 > /tmp/phase6-overlay.tar.gz
           tar -tzf /tmp/phase6-overlay.tar.gz >/dev/null
           tar -xzf /tmp/phase6-overlay.tar.gz -C "$app"
