@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room.ts";
 import { patchHouseObject } from "../src/features/house-designer/services/project-edit.ts";
+import { applyHouseRemodelCommand } from "../src/features/house-designer/services/remodel.ts";
 import {
   activateFacadeAlternative,
   applyFacadeReference,
@@ -9,6 +10,7 @@ import {
   generateFacadeAlternatives,
 } from "../src/features/house-designer/services/facade.ts";
 import { calculateHouseQuantities, quantityCsv } from "../src/features/house-designer/services/quantities.ts";
+import { createHouseTakeoffPackage, parseHouseTakeoffPackage } from "../src/features/house-designer/services/takeoff-adapter.ts";
 import {
   createHouseProject,
   houseProjectSchema,
@@ -97,6 +99,30 @@ const quantities = calculateHouseQuantities(project);
 assert(quantities.find((item) => item.code === "CON-02")!.quantity > 0);
 assert(quantities.find((item) => item.code === "MAS-01")!.quantity > 0);
 assert(quantityCsv(project).includes("PRELIMINARY"));
+
+const protectedWall = project.walls[0]!;
+const protectedStart = { ...protectedWall.start };
+const strictResult = applyHouseRemodelCommand(project, { kind: "wall", id: protectedWall.id }, {
+  action: "patch_object",
+  patch: { startX: protectedWall.start.x + 500, material: "Local stone" },
+  explanation: "Use local stone without moving the verified wall.",
+});
+assert.deepEqual(strictResult.project.walls.find((wall) => wall.id === protectedWall.id)?.start, protectedStart);
+assert.equal(strictResult.project.walls.find((wall) => wall.id === protectedWall.id)?.material, "Local stone");
+assert.deepEqual(strictResult.blockedFields, ["startX"]);
+
+const editableProject = { ...project, originalPlanStrict: false };
+const editableResult = applyHouseRemodelCommand(editableProject, { kind: "level", id: "ground-floor" }, {
+  action: "patch_object",
+  patch: { floorToFloorHeight: 3_250 },
+  explanation: "Raise the floor-to-floor height.",
+});
+assert.equal(editableResult.project.levels[0]?.floorToFloorHeight, 3_250);
+
+const handoff = createHouseTakeoffPackage(project);
+assert(handoff.elements.some((element) => element.id === protectedWall.id));
+assert(handoff.quantities.some((item) => item.id === "house:MAS-01"));
+assert.equal(parseHouseTakeoffPackage(JSON.stringify(handoff))?.projectId, project.id);
 houseProjectSchema.parse(project);
 
 console.log("House model checks passed");

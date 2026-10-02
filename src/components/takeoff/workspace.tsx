@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, FileUp, Layers, Ruler, Table2 } from "lucide-react";
 
 import dynamic from "next/dynamic";
@@ -8,6 +8,11 @@ import dynamic from "next/dynamic";
 import { PlanView, type PlanEntity } from "@/components/takeoff/plan-view";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  HOUSE_TAKEOFF_SESSION_KEY,
+  parseHouseTakeoffPackage,
+  type HousePreparedQuantity,
+} from "@/features/house-designer/services/takeoff-adapter";
 import { buildBoq, itemFromQuantity, type Boq } from "@/lib/takeoff/boq";
 import { elementsFromDxf, parseDxf, type DxfModel } from "@/lib/takeoff/dxf/parse";
 import { elementsFromIfc, lengthScale } from "@/lib/takeoff/ifc/elements";
@@ -70,7 +75,7 @@ const ModelView = dynamic(
 
 type Loaded = {
   name: string;
-  format: "ifc" | "dxf";
+  format: "ifc" | "dxf" | "house";
   elements: BuildingElement[];
   /** Vector geometry, from a DXF. */
   plan: PlanEntity[];
@@ -78,6 +83,15 @@ type Loaded = {
   meshes: IfcMesh[];
   warnings: string[];
   levels: string[];
+  preparedQuantities?: HousePreparedQuantity[];
+};
+
+type TakeoffRow = {
+  id: string;
+  element: BuildingElement;
+  quantity: Quantity;
+  section?: HousePreparedQuantity["section"];
+  description?: string;
 };
 
 type Tab = "model" | "takeoff" | "boq";
@@ -104,11 +118,53 @@ export function TakeoffWorkspace() {
     [loaded],
   );
 
+  useEffect(() => {
+    const raw = window.sessionStorage.getItem(HOUSE_TAKEOFF_SESSION_KEY);
+    if (!raw) return;
+    const handoff = parseHouseTakeoffPackage(raw);
+    const timer = window.setTimeout(() => {
+      window.sessionStorage.removeItem(HOUSE_TAKEOFF_SESSION_KEY);
+      if (!handoff) {
+        setError("The house quantity handoff could not be read.");
+        return;
+      }
+      setLoaded({
+        name: handoff.name,
+        format: "house",
+        elements: handoff.elements,
+        plan: [],
+        meshes: [],
+        warnings: handoff.warnings,
+        levels: handoff.levels,
+        preparedQuantities: handoff.quantities,
+      });
+      setLines([]);
+      setHistory([]);
+      setSelected(null);
+      setActiveItem(null);
+      setTab("takeoff");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   /** Everything measurable, with its working. */
   const quantities = useMemo(() => {
     if (!loaded) return [];
 
-    const out: { element: BuildingElement; quantity: Quantity }[] = [];
+    if (loaded.preparedQuantities) {
+      return loaded.preparedQuantities.flatMap((prepared): TakeoffRow[] => {
+        const element = index.get(prepared.representativeElementId);
+        return element ? [{
+          id: prepared.id,
+          element,
+          quantity: prepared.quantity,
+          section: prepared.section,
+          description: prepared.description,
+        }] : [];
+      });
+    }
+
+    const out: TakeoffRow[] = [];
     for (const element of loaded.elements) {
       const measurement =
         element.kind === "wall"
@@ -117,7 +173,7 @@ export function TakeoffWorkspace() {
             ? volume(element)
             : grossArea(element);
 
-      if (measurement) out.push({ element, quantity: measurement });
+      if (measurement) out.push({ id: element.id, element, quantity: measurement });
     }
     return out;
   }, [loaded, index]);
@@ -126,8 +182,8 @@ export function TakeoffWorkspace() {
     () =>
       buildBoq(
         loaded?.name ?? "Takeoff",
-        quantities.map(({ element, quantity }) =>
-          itemFromQuantity(sectionFor(element.kind), describe(element), quantity, {
+        quantities.map(({ element, quantity, section, description }) =>
+          itemFromQuantity(section ?? sectionFor(element.kind), description ?? describe(element), quantity, {
             rate: STARTING_RATES[quantity.unit] ?? null,
             drawingRef: element.drawingRef,
           }),
@@ -398,7 +454,7 @@ export function TakeoffWorkspace() {
           <h1 className="truncate text-xl font-semibold">{loaded.name}</h1>
           <p className="text-sm text-muted-foreground">
             {loaded.elements.length} elements ·{" "}
-            {loaded.format === "ifc" ? "IFC" : "DXF"} ·{" "}
+            {formatLabel(loaded.format)} ·{" "}
             {quantities.length} measured
             {loaded.meshes.length > 0 ? ` · ${loaded.meshes.length} drawn in 3D` : ""}
           </p>
@@ -447,7 +503,11 @@ export function TakeoffWorkspace() {
       {tab === "model" && (
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="h-[60vh]">
-            {loaded.meshes.length > 0 ? (
+            {loaded.format === "house" ? (
+              <div className="flex h-full items-center justify-center rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                The editable 3D model remains in House Design. This workspace carries its traceable quantities into BOQ and cost.
+              </div>
+            ) : loaded.meshes.length > 0 ? (
               <ModelView
                 meshes={loaded.meshes}
                 selected={selected}
@@ -583,7 +643,7 @@ function TakeoffSheet({
   selected,
   onSelect,
 }: {
-  rows: { element: BuildingElement; quantity: Quantity }[];
+  rows: TakeoffRow[];
   selected: string | null;
   onSelect: (id: string | null) => void;
 }) {
@@ -600,9 +660,9 @@ function TakeoffSheet({
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ element, quantity }) => (
+          {rows.map(({ id, element, quantity }) => (
             <tr
-              key={element.id}
+              key={id}
               onClick={() => onSelect(element.id === selected ? null : element.id)}
               className={cn(
                 "cursor-pointer border-t",
@@ -782,6 +842,12 @@ function SourceBadge({
 function describe(element: BuildingElement): string {
   const material = element.material ? `${element.material} ` : "";
   return `${material}${element.kind} — ${element.name}`;
+}
+
+function formatLabel(format: Loaded["format"]): string {
+  if (format === "ifc") return "IFC";
+  if (format === "dxf") return "DXF";
+  return "House model";
 }
 
 /** Which BOQ section an element kind belongs in. */

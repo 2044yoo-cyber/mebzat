@@ -28,6 +28,7 @@ import {
 } from "@/features/berchuma-studio/types/room";
 import { cn } from "@/lib/utils";
 
+import { HouseAiRemodelPanel } from "./house-ai-remodel-panel";
 import { HouseFacadePanel } from "./house-facade-panel";
 import { HouseObjectInspector } from "./house-object-inspector";
 import { HousePreview } from "./house-preview";
@@ -480,6 +481,8 @@ function ModelScreen({
       </div>
 
       <HouseFacadePanel project={project} onChange={onProjectChange} />
+
+      <HouseAiRemodelPanel project={project} selected={selected} onChange={onProjectChange} />
 
       <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>

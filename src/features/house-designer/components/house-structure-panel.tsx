@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { Calculator, Download, HardHat, RefreshCw } from "lucide-react";
+import { ArrowUpRight, Calculator, Download, HardHat, RefreshCw } from "lucide-react";
 
 import { calculateHouseQuantities, quantityCsv } from "../services/quantities";
 import { generatePreliminaryStructure } from "../services/structure";
+import { createHouseTakeoffPackage, HOUSE_TAKEOFF_SESSION_KEY } from "../services/takeoff-adapter";
 import type { HouseProject } from "../types/project";
 
 export function HouseStructurePanel({ project, onChange }: { project: HouseProject; onChange: (project: HouseProject) => void }) {
@@ -23,6 +24,11 @@ export function HouseStructurePanel({ project, onChange }: { project: HouseProje
     URL.revokeObjectURL(url);
   }
 
+  function openDetailedBoq() {
+    window.sessionStorage.setItem(HOUSE_TAKEOFF_SESSION_KEY, JSON.stringify(createHouseTakeoffPackage(project)));
+    window.location.assign("/takeoff?source=house-design");
+  }
+
   return (
     <section className="space-y-3 rounded-xl border bg-card p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -30,9 +36,10 @@ export function HouseStructurePanel({ project, onChange }: { project: HouseProje
           <span className="flex size-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300"><HardHat className="size-4" /></span>
           <div><h3 className="text-sm font-semibold">Preliminary structure + BOQ data</h3><p className="text-[11px] text-muted-foreground">Select columns and beams from the object inspector to edit them.</p></div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => onChange(generatePreliminaryStructure(project))} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted"><RefreshCw className="size-3.5" /> Regenerate</button>
           <button type="button" onClick={downloadQuantities} className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-xs font-medium text-brand-foreground"><Download className="size-3.5" /> BOQ data</button>
+          <button type="button" onClick={openDetailedBoq} className="flex items-center gap-1.5 rounded-lg border border-brand/40 px-3 py-2 text-xs font-medium text-brand hover:bg-brand/5"><ArrowUpRight className="size-3.5" /> Detailed BOQ</button>
         </div>
       </div>
 
