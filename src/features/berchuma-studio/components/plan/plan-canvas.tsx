@@ -47,6 +47,17 @@ export function PlanCanvas({
 
   const walls = useMemo(() => roomWalls(room), [room]);
 
+  const contentBounds = useMemo(() => {
+    const xs = room.corners.map((c) => c.x);
+    const ys = room.corners.map((c) => c.y);
+    return {
+      x: Math.min(...xs),
+      y: Math.min(...ys),
+      width: Math.max(...xs) - Math.min(...xs),
+      height: Math.max(...ys) - Math.min(...ys),
+    };
+  }, [room.corners]);
+
   // The drawing is in millimetres and the viewBox does the scaling, so a 2 m
   // cloakroom and a 12 m hall both arrive filling the frame.
   const bounds = useMemo(() => {
@@ -98,10 +109,23 @@ export function PlanCanvas({
       role="application"
       aria-label="Floor plan"
     >
+      {room.reference?.mediaType !== "pdf" && room.reference?.url ? (
+        <image
+          href={room.reference.url}
+          x={contentBounds.x}
+          y={contentBounds.y}
+          width={contentBounds.width}
+          height={contentBounds.height}
+          preserveAspectRatio="xMidYMid meet"
+          opacity={room.reference.opacity}
+          className="pointer-events-none"
+        />
+      ) : null}
+
       {/* The floor, so the inside of the room reads as the inside. */}
       <polygon
         points={room.corners.map((c) => `${c.x},${c.y}`).join(" ")}
-        className="fill-muted/50"
+        className={cn("fill-muted/50", room.reference ? "fill-muted/25" : null)}
       />
 
       {walls.map((wall) => {
@@ -147,7 +171,7 @@ export function PlanCanvas({
               fontSize={Math.max(bounds.width, bounds.height) / 34}
               className="pointer-events-none fill-foreground font-medium"
             >
-              {Math.round(wall.length)}
+              {Number(wall.length.toFixed(2))}
             </text>
           </g>
         );

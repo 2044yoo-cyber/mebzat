@@ -97,6 +97,24 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [],
   },
 
+  {
+    id: "design",
+    label: "Design",
+    emoji: "✏️",
+    icon: Ruler,
+    items: [
+      {
+        id: "house-design",
+        label: "House Design",
+        icon: Building2,
+        href: "/house-design",
+        private: true,
+        hint: "Create an editable house from a verified floor plan",
+        keywords: ["residential", "floor plan", "house", "architecture", "3d building"],
+      },
+    ],
+  },
+
   // Medosha AI first, and now as one row rather than thirteen.
   //
   // This section used to list every design capability separately — Facade

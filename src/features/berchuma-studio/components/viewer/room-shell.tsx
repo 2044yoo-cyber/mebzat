@@ -33,9 +33,11 @@ export function RoomShell({
   room,
   /** Where the design's own group sits, so the room lands with it. */
   offset,
+  showFloor = true,
 }: {
   room: Room;
   offset: [number, number, number];
+  showFloor?: boolean;
 }) {
   const pieces = useMemo(() => wallPieces(room), [room]);
 
@@ -65,13 +67,15 @@ export function RoomShell({
         </mesh>
       ))}
 
-      <mesh
-        position={[floorCentre(room).x * MM, -0.002, -floorCentre(room).y * MM]}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <planeGeometry args={[floorSize(room).x * MM, floorSize(room).y * MM]} />
-        <meshStandardMaterial color="#d8d2c8" roughness={1} />
-      </mesh>
+      {showFloor ? (
+        <mesh
+          position={[floorCentre(room).x * MM, -0.002, -floorCentre(room).y * MM]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <planeGeometry args={[floorSize(room).x * MM, floorSize(room).y * MM]} />
+          <meshStandardMaterial color="#d8d2c8" roughness={1} />
+        </mesh>
+      ) : null}
     </group>
   );
 }

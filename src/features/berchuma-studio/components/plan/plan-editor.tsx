@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { DoorOpen, Grid3x3, Redo2, Square, Undo2 } from "lucide-react";
+import { DoorOpen, Grid3x3, Plus, Redo2, Square, Trash2, Undo2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -33,9 +33,13 @@ const HISTORY_LIMIT = 50;
 export function PlanEditor({
   initial,
   onDone,
+  purpose = "furniture",
+  doneLabel,
 }: {
   initial?: Room;
   onDone?: (room: Room) => void;
+  purpose?: "furniture" | "house";
+  doneLabel?: string;
 }) {
   const [past, setPast] = useState<Room[]>([]);
   const [room, setRoom] = useState<Room>(initial ?? rectangularRoom());
@@ -94,12 +98,41 @@ export function PlanEditor({
         index === endIndex
           ? {
               ...corner,
-              x: Math.round(wall.start.x + dx * length),
-              y: Math.round(wall.start.y + dy * length),
+              x: roundDecimal(wall.start.x + dx * length),
+              y: roundDecimal(wall.start.y + dy * length),
             }
           : corner,
       ),
     });
+  }
+
+  function addWallPoint() {
+    const wall = walls.find((one) => one.id === selected) ?? walls[0];
+    if (!wall) return;
+    const startIndex = room.corners.findIndex((corner) => corner.id === wall.id);
+    if (startIndex < 0) return;
+
+    const id = `c-${Date.now()}`;
+    const next = [...room.corners];
+    next.splice(startIndex + 1, 0, {
+      id,
+      x: roundDecimal((wall.start.x + wall.end.x) / 2),
+      y: roundDecimal((wall.start.y + wall.end.y) / 2),
+    });
+    commit({ ...room, corners: next });
+    setSelected(id);
+  }
+
+  function deleteSelectedWall() {
+    if (!selected || room.corners.length <= 3) return;
+    const next = room.corners.filter((corner) => corner.id !== selected);
+    commit({
+      ...room,
+      corners: next,
+      openings: room.openings.filter((opening) => opening.wallId !== selected),
+      runWalls: room.runWalls.filter((wallId) => wallId !== selected),
+    });
+    setSelected(null);
   }
 
   function addOpening(kind: RoomOpeningKind) {
@@ -125,6 +158,15 @@ export function PlanEditor({
           label: "",
         },
       ],
+    });
+  }
+
+  function updateOpening(id: string, change: Partial<Room["openings"][number]>) {
+    commit({
+      ...room,
+      openings: room.openings.map((opening) =>
+        opening.id === id ? { ...opening, ...change } : opening,
+      ),
     });
   }
 
@@ -167,9 +209,25 @@ export function PlanEditor({
 
       <div className="w-full space-y-3 overflow-y-auto lg:w-80">
         <section className="space-y-2 rounded-xl border p-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Walls
-          </h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Walls
+            </h2>
+            {purpose === "house" ? (
+              <div className="flex gap-1">
+                <IconButton onClick={addWallPoint} label="Add wall point">
+                  <Plus className="size-4" />
+                </IconButton>
+                <IconButton
+                  onClick={deleteSelectedWall}
+                  disabled={!selected || room.corners.length <= 3}
+                  label="Delete selected wall"
+                >
+                  <Trash2 className="size-4" />
+                </IconButton>
+              </div>
+            ) : null}
+          </div>
 
           {walls.map((wall) => (
             <div key={wall.id} className="flex items-center gap-2">
@@ -186,37 +244,80 @@ export function PlanEditor({
 
               <input
                 type="number"
-                value={Math.round(wall.length)}
+                value={roundDecimal(wall.length)}
                 onChange={(event) => setWallLength(wall.id, Number(event.target.value))}
-                step={10}
+                step={purpose === "house" ? 0.1 : 10}
                 min={200}
                 aria-label={`${wall.label} length in millimetres`}
                 className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 text-right text-xs tabular-nums"
               />
 
-              <button
-                type="button"
-                onClick={() => toggleRunWall(wall.id)}
-                aria-pressed={room.runWalls.includes(wall.id)}
-                title="Put cabinets against this wall"
-                className={cn(
-                  "shrink-0 rounded-md border px-2 py-1 text-xs transition-colors",
-                  room.runWalls.includes(wall.id)
-                    ? "border-brand bg-brand text-brand-foreground"
-                    : "hover:bg-muted",
-                )}
-              >
-                {room.runWalls.includes(wall.id)
-                  ? `Run ${room.runWalls.indexOf(wall.id) + 1}`
-                  : "Add run"}
-              </button>
+              {purpose === "furniture" ? (
+                <button
+                  type="button"
+                  onClick={() => toggleRunWall(wall.id)}
+                  aria-pressed={room.runWalls.includes(wall.id)}
+                  title="Put cabinets against this wall"
+                  className={cn(
+                    "shrink-0 rounded-md border px-2 py-1 text-xs transition-colors",
+                    room.runWalls.includes(wall.id)
+                      ? "border-brand bg-brand text-brand-foreground"
+                      : "hover:bg-muted",
+                  )}
+                >
+                  {room.runWalls.includes(wall.id)
+                    ? `Run ${room.runWalls.indexOf(wall.id) + 1}`
+                    : "Add run"}
+                </button>
+              ) : null}
             </div>
           ))}
 
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Drag a corner to reshape, or type a length. The order you add runs is
-            the order the cabinets go round the corner.
+            {purpose === "house"
+              ? "Select a wall, drag its corner, or enter its exact length in mm. Add a point, then drag it to form an L or custom footprint."
+              : "Drag a corner to reshape, or type a length. The order you add runs is the order the cabinets go round the corner."}
           </p>
+
+          {purpose === "house" ? (
+            <div className="space-y-2 border-t pt-2">
+              <div className="grid grid-cols-2 gap-2">
+                <DimensionField
+                  label="Wall thickness"
+                  value={room.wallThickness}
+                  min={50}
+                  max={600}
+                  onChange={(wallThickness) => commit({ ...room, wallThickness })}
+                />
+                <DimensionField
+                  label="Wall height"
+                  value={room.ceilingHeight}
+                  min={1800}
+                  max={6000}
+                  onChange={(ceilingHeight) => commit({ ...room, ceilingHeight })}
+                />
+              </div>
+              {room.reference?.mediaType !== "pdf" && room.reference ? (
+                <label className="block space-y-1 text-[11px] text-muted-foreground">
+                  <span>Plan overlay {Math.round(room.reference.opacity * 100)}%</span>
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={0.9}
+                    step={0.05}
+                    value={room.reference.opacity}
+                    onChange={(event) =>
+                      commit({
+                        ...room,
+                        reference: { ...room.reference!, opacity: Number(event.target.value) },
+                      })
+                    }
+                    className="w-full accent-[var(--brand)]"
+                  />
+                </label>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         <section className="space-y-2 rounded-xl border p-3">
@@ -241,49 +342,37 @@ export function PlanEditor({
             </button>
           </div>
 
-          {room.openings.map((opening) => {
-            const wall = walls.find((one) => one.id === opening.wallId);
-            return (
-              <div key={opening.id} className="flex items-center gap-2 text-xs">
+          {room.openings.map((opening) => (
+            <div key={opening.id} className="space-y-1.5 rounded-lg border p-2 text-xs">
+              <div className="flex items-center gap-2">
                 <span className="w-14 shrink-0 capitalize text-muted-foreground">
                   {opening.kind}
                 </span>
-                <span className="w-10 shrink-0 text-muted-foreground">
-                  {wall?.label.replace("Wall ", "") ?? "—"}
-                </span>
-                <input
-                  type="number"
+                <select
+                  value={opening.wallId}
+                  onChange={(event) => updateOpening(opening.id, { wallId: event.target.value })}
+                  aria-label="Wall"
+                  className="w-12 shrink-0 rounded-md border bg-background px-1 py-1 text-xs"
+                >
+                  {walls.map((wall) => (
+                    <option key={wall.id} value={wall.id}>
+                      {wall.label.replace("Wall ", "")}
+                    </option>
+                  ))}
+                </select>
+                <SmallNumber
+                  label="Offset"
                   value={opening.offset}
-                  onChange={(event) =>
-                    commit({
-                      ...room,
-                      openings: room.openings.map((one) =>
-                        one.id === opening.id
-                          ? { ...one, offset: Math.max(0, Number(event.target.value)) }
-                          : one,
-                      ),
-                    })
-                  }
-                  step={50}
-                  aria-label="Distance from the corner"
-                  className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 text-right tabular-nums"
+                  min={0}
+                  step={purpose === "house" ? 0.1 : 50}
+                  onChange={(offset) => updateOpening(opening.id, { offset })}
                 />
-                <input
-                  type="number"
+                <SmallNumber
+                  label="Width"
                   value={opening.width}
-                  onChange={(event) =>
-                    commit({
-                      ...room,
-                      openings: room.openings.map((one) =>
-                        one.id === opening.id
-                          ? { ...one, width: Math.max(100, Number(event.target.value)) }
-                          : one,
-                      ),
-                    })
-                  }
-                  step={50}
-                  aria-label="Width"
-                  className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 text-right tabular-nums"
+                  min={100}
+                  step={purpose === "house" ? 0.1 : 50}
+                  onChange={(width) => updateOpening(opening.id, { width })}
                 />
                 <button
                   type="button"
@@ -299,8 +388,32 @@ export function PlanEditor({
                   ✕
                 </button>
               </div>
-            );
-          })}
+              {purpose === "house" ? (
+                <div className="grid grid-cols-2 gap-2 pl-16">
+                  <SmallNumber
+                    label="Height"
+                    value={opening.height}
+                    min={100}
+                    step={0.1}
+                    onChange={(height) => updateOpening(opening.id, { height })}
+                  />
+                  <SmallNumber
+                    label="Sill"
+                    value={opening.sill}
+                    min={0}
+                    step={0.1}
+                    onChange={(sill) => updateOpening(opening.id, { sill })}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ))}
+
+          {purpose === "house" && room.openings.length > 0 ? (
+            <p className="text-[11px] text-muted-foreground">
+              All opening dimensions are in millimetres.
+            </p>
+          ) : null}
         </section>
 
         {(faults.length > 0 || clearance.length > 0) && (
@@ -320,17 +433,90 @@ export function PlanEditor({
           <button
             type="button"
             onClick={() => onDone(room)}
-            disabled={room.runWalls.length === 0}
+            disabled={purpose === "furniture" && room.runWalls.length === 0}
             className="w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground disabled:opacity-50"
           >
-            {room.runWalls.length === 0
-              ? "Choose a wall for the cabinets"
-              : `Design against ${room.runWalls.length} wall${room.runWalls.length === 1 ? "" : "s"}`}
+            {doneLabel ??
+              (room.runWalls.length === 0
+                ? "Choose a wall for the cabinets"
+                : `Design against ${room.runWalls.length} wall${room.runWalls.length === 1 ? "" : "s"}`)}
           </button>
         )}
       </div>
     </div>
   );
+}
+
+function DimensionField({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="space-y-1 text-[11px] text-muted-foreground">
+      <span>{label}</span>
+      <span className="flex items-center rounded-md border bg-background px-2">
+        <input
+          type="number"
+          value={value}
+          min={min}
+          max={max}
+          step={0.1}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (Number.isFinite(next) && next >= min && next <= max) onChange(next);
+          }}
+          className="min-w-0 flex-1 bg-transparent py-1 text-right text-xs tabular-nums outline-none"
+        />
+        <span className="ml-1">mm</span>
+      </span>
+    </label>
+  );
+}
+
+function SmallNumber({
+  label,
+  value,
+  min,
+  step,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  step: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="min-w-0 flex-1">
+      <span className="sr-only">{label}</span>
+      <input
+        type="number"
+        value={value}
+        min={min}
+        step={step}
+        placeholder={label}
+        title={`${label} (mm)`}
+        onChange={(event) => {
+          const next = Number(event.target.value);
+          if (Number.isFinite(next)) onChange(Math.max(min, next));
+        }}
+        className="w-full min-w-0 rounded-md border bg-background px-2 py-1 text-right tabular-nums"
+      />
+    </label>
+  );
+}
+
+function roundDecimal(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function IconButton({

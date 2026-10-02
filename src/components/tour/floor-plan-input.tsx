@@ -9,6 +9,7 @@ import {
   signQuarantinePreview,
 } from "@/app/moderation/upload-actions";
 import { createClient } from "@/lib/supabase/client";
+import type { ContentKind } from "@/lib/moderation/types";
 import { sceneName } from "@/lib/tour/panorama-image";
 
 /**
@@ -35,16 +36,28 @@ export type DraftPlan = {
 
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 const MAX_SIZE = 25 * 1024 * 1024;
-const MAX_PLANS = 20;
+const DEFAULT_MAX_PLANS = 20;
 
 export function FloorPlanInput({
   userId,
   plans,
   onChange,
+  maxPlans = DEFAULT_MAX_PLANS,
+  multiple = true,
+  buttonLabel = "Add a floor plan",
+  help = "JPEG, PNG, WebP or PDF, up to 25MB",
+  contentType = "floor_plan",
+  publicBucket = "floor-plans",
 }: {
   userId: string;
   plans: DraftPlan[];
   onChange: (plans: DraftPlan[]) => void;
+  maxPlans?: number;
+  multiple?: boolean;
+  buttonLabel?: string;
+  help?: string;
+  contentType?: ContentKind;
+  publicBucket?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -54,8 +67,8 @@ export function FloorPlanInput({
     event.target.value = "";
     if (files.length === 0) return;
 
-    if (plans.length + files.length > MAX_PLANS) {
-      toast.error(`You can add up to ${MAX_PLANS} plans.`);
+    if (plans.length + files.length > maxPlans) {
+      toast.error(`You can add up to ${maxPlans} file${maxPlans === 1 ? "" : "s"}.`);
       return;
     }
 
@@ -90,8 +103,8 @@ export function FloorPlanInput({
 
       const verdict = await moderateQuarantinedImage({
         quarantinePath: path,
-        contentType: "floor_plan",
-        publicBucket: "floor-plans",
+        contentType,
+        publicBucket,
       });
 
       if (verdict.status === "blocked") {
@@ -196,19 +209,19 @@ export function FloorPlanInput({
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        disabled={busy || plans.length >= MAX_PLANS}
+        disabled={busy || plans.length >= maxPlans}
         className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-6 text-sm text-muted-foreground transition-colors hover:border-brand hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
       >
         {busy ? <Loader2 className="size-5 animate-spin" /> : <Ruler className="size-5" />}
-        {busy ? "Uploading…" : "Add a floor plan"}
-        <span className="text-xs">JPEG, PNG, WebP or PDF, up to 25MB</span>
+        {busy ? "Uploading…" : buttonLabel}
+        <span className="text-xs">{help}</span>
       </button>
 
       <input
         ref={inputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,application/pdf"
-        multiple
+        multiple={multiple}
         className="hidden"
         onChange={handleChange}
       />

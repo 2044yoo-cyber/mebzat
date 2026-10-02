@@ -96,6 +96,8 @@ export const roomSchema = z.object({
   reference: z
     .object({
       url: z.string().min(1),
+      name: z.string().max(160).optional(),
+      mediaType: z.enum(["image", "pdf"]).default("image"),
       opacity: z.number().min(0).max(1).default(0.5),
       /** Millimetres per image pixel, from the calibration step. */
       scale: z.number().positive().optional(),
