@@ -180,14 +180,14 @@ export function ControlPanel({
                 })}
               >
                 {(spec.furnitureType === "wardrobe"
-                  ? ["l_corner", "hanging", "diagonal", "custom"]
+                  ? ["l_corner", "connected_l", "hanging", "diagonal", "custom"]
                   : selectedCornerId.startsWith("upper-")
                     ? ["l_corner", "diagonal"]
                     : ["blind", "l_corner", "diagonal"]
                 ).map((kind) => (
                   <option key={kind} value={kind}>{
                     spec.furnitureType === "wardrobe"
-                      ? ({ l_corner: "L Shelves", hanging: "Hanging Corner", diagonal: "45° Diagonal", custom: "Open Corner" } as Record<string, string>)[kind]
+                      ? ({ l_corner: "L Shelves", connected_l: "Connected L", hanging: "Hanging Corner", diagonal: "45° Diagonal", custom: "Open Corner" } as Record<string, string>)[kind]
                       : selectedCornerId.startsWith("upper-")
                         ? kind === "diagonal" ? "45° Wall Corner" : "L Wall Corner"
                         : kind === "blind" ? "Blind Corner" : kind === "diagonal" ? "45° Diagonal" : "L Corner"
@@ -199,7 +199,7 @@ export function ControlPanel({
               <LengthField label="Width" value={selectedCorner.width ?? selectedCorner.size} min={300} max={3000} step={10} onChange={(width) => updateCorner({ width })} />
               <LengthField label="Depth" value={selectedCorner.depth ?? selectedCorner.size} min={300} max={3000} step={10} onChange={(depth) => updateCorner({ depth })} />
               <LengthField label="Height" value={selectedCorner.height} min={200} max={LIMITS.maxHeight} step={10} onChange={(height) => updateCorner({ height })} />
-              {["l_corner", "custom"].includes(spec.cornerKinds?.[selectedCornerId] ?? spec.cornerKind) ? <label className="space-y-1 text-xs">
+              {["l_corner", "connected_l", "custom"].includes(spec.cornerKinds?.[selectedCornerId] ?? spec.cornerKind) ? <label className="space-y-1 text-xs">
                 <span className="font-medium">Number of shelves</span>
                 <input type="number" min={0} max={20} value={cornerSettings?.shelves ?? 3} onChange={(event) => updateCorner({ shelves: Math.max(0, Math.min(20, Number(event.target.value))) })} className="w-full rounded-md border bg-background px-2 py-2" />
               </label> : null}

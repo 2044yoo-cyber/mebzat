@@ -39,7 +39,7 @@ for (const shape of ["l_shaped", "u_shaped"] as const) {
     const resizedShelf = resized.find(p => p.footprint)!;
     assert.ok(resizedShelf);
     assert.ok(Math.abs(resizedDoor.size.x - Math.hypot(resizedShelf.size.x, resizedShelf.size.z)) < 0.001, "resized diagonal follows both dimensions");
-    for (const kind of ["l_corner", "hanging", "diagonal", "custom"] as const) {
+    for (const kind of ["l_corner", "connected_l", "hanging", "diagonal", "custom"] as const) {
       const edited = { ...spec, cornerKinds: { [id]: kind } };
       const all = buildParts(edited).parts;
       const parts = all.filter(p => p.cabinetId === id);
@@ -67,6 +67,18 @@ for (const shape of ["l_shaped", "u_shaped"] as const) {
     }
   }
 }
+
+const connectedSpec = {
+  ...ownershipSpec,
+  cornerKinds: { "corner-ab": "connected_l" as const },
+};
+const connected = resolveDesign(connectedSpec);
+const connectedParts = buildParts(connectedSpec).parts;
+assert.equal(connected.layout.corners[0]?.ownerRunId, runB?.id, "shorter run owns the DWG connection");
+assert.ok(!connectedParts.some(p => p.id.startsWith("corner-ab/")), "DWG connection is not a third cabinet");
+assert.ok(connectedParts.some(p => p.cabinetId === "corner-ab" && p.role === "shelf"), "connected storage remains selectable");
+assert.ok(!connectedParts.some(p => p.label === "Corner access rear support"), "both terminating cabinets retain full end MDF");
+assert.ok(connectedParts.filter(p => p.role === "gable").every(p => p.size.z > 500), "connection end panels match cabinet depth");
 const model = readFileSync("src/features/berchuma-studio/components/viewer/model.tsx", "utf8");
 assert.match(model, /new THREE\.ExtrudeGeometry\(shape/);
 assert.match(model, /<primitive object=\{shapedGeometry\} attach="geometry"/);

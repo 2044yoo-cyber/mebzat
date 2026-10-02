@@ -118,7 +118,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
   const sizeZ = corner.depth ?? corner.size;
   const height = corner.height;
   const wardrobeCorner = spec.furnitureType === "wardrobe";
-  const wardrobeShelving = wardrobeCorner && (corner.kind === "l_corner" || corner.kind === "custom" || corner.kind === "hanging" || corner.kind === "diagonal");
+  const wardrobeShelving = wardrobeCorner && (corner.kind === "l_corner" || corner.kind === "connected_l" || corner.kind === "custom" || corner.kind === "hanging" || corner.kind === "diagonal");
   const exteriorRight = wardrobeShelving && corner.id !== "corner-left";
 
   // The carcass sits on the plinth like every other base unit, so its panels
@@ -173,7 +173,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
       : [];
 
   const sideStructures: Part[] =
-    corner.kind === "l_corner" || corner.kind === "hanging" || corner.kind === "diagonal" || corner.kind === "custom"
+    corner.kind === "l_corner" || corner.kind === "hanging" || corner.kind === "diagonal" || corner.kind === "connected_l" || corner.kind === "custom"
         ? []
         : [
             // A blind/custom corner has only one front opening, so it retains
@@ -261,7 +261,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
     },
   ];
 
-  if (wardrobeCorner && ["l_corner", "custom", "hanging"].includes(corner.kind)) {
+  if (wardrobeCorner && ["l_corner", "connected_l", "custom", "hanging"].includes(corner.kind)) {
     // A wardrobe corner is an open wraparound, not a square shelf stack. The
     // two arms follow the perpendicular walls and leave the room-facing inner
     // quadrant clear. Mirror that opening for the right-hand corner.
@@ -405,7 +405,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
     });
   }
 
-  if (corner.kind === "l_corner" || corner.kind === "custom") {
+  if (corner.kind === "l_corner" || corner.kind === "connected_l" || corner.kind === "custom") {
     const count = spec.cornerSettings?.[corner.id]?.shelves ?? 3;
     const shelfYs = Array.from({ length: count }, (_, index) => Math.round((carcassHeight - t) * (index + 1) / (count + 1)));
     const shelf = { ...parts.find((part) => part.id === `${corner.id}/bottom`)! };
@@ -451,6 +451,8 @@ function labelFor(corner: CornerBlock): string {
       return "Diagonal corner";
     case "hanging":
       return "Hanging corner";
+    case "connected_l":
+      return "Connected L corner";
     case "custom":
       return "Corner";
   }

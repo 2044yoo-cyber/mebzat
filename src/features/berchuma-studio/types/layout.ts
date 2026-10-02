@@ -90,6 +90,8 @@ export function furnitureLabel(type: FurnitureType): string {
  *   diagonal  — a single door across the 45° face. Elegant, wasteful of the
  *               square's volume, and needs both runs at one depth.
  *   hanging   — a wide inner opening with a rail through the deep corner.
+ *   connected_l — the uploaded DWG connection: the shorter run continues
+ *               through the square and the longer run terminates against it.
  *   custom    — the author has drawn something; the solver leaves it alone.
  */
 export const cornerKinds = [
@@ -97,6 +99,7 @@ export const cornerKinds = [
   "blind",
   "diagonal",
   "hanging",
+  "connected_l",
   "custom",
 ] as const;
 
@@ -121,6 +124,8 @@ export function cornerLabel(kind: CornerKind): string {
       return "Diagonal corner";
     case "hanging":
       return "Hanging corner";
+    case "connected_l":
+      return "Connected L corner";
     case "custom":
       return "Open corner";
   }

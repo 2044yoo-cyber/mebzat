@@ -244,7 +244,7 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
   const fallback = Math.max(a.depth, b.depth);
   const settings = cornerSettings?.["corner-ab"];
   const kind = cornerKinds?.["corner-ab"] ?? cornerKind;
-  const hosted = wardrobeOwnership && ["l_corner", "hanging", "custom"].includes(kind);
+  const hosted = wardrobeOwnership && ["l_corner", "hanging", "connected_l", "custom"].includes(kind);
   const ownerRunId = hosted ? (a.length <= b.length ? a.id : b.id) : undefined;
   const cornerWidth = hosted ? fallback : Math.min(a.length - MIN_RUN, Math.max(b.depth, settings?.width ?? fallback));
   const cornerDepth = hosted ? fallback : Math.min(b.length - MIN_RUN, Math.max(a.depth, settings?.depth ?? fallback));
@@ -345,8 +345,8 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
   const rightSettings = cornerSettings?.["corner-right"];
   const leftKind = cornerKinds?.["corner-left"] ?? cornerKind;
   const rightKind = cornerKinds?.["corner-right"] ?? cornerKind;
-  const leftHosted = wardrobeOwnership && ["l_corner", "hanging", "custom"].includes(leftKind);
-  const rightHosted = wardrobeOwnership && ["l_corner", "hanging", "custom"].includes(rightKind);
+  const leftHosted = wardrobeOwnership && ["l_corner", "hanging", "connected_l", "custom"].includes(leftKind);
+  const rightHosted = wardrobeOwnership && ["l_corner", "hanging", "connected_l", "custom"].includes(rightKind);
   const leftOwner = leftHosted ? (left.length <= back.length ? left.id : back.id) : undefined;
   const rightOwner = rightHosted ? (right.length <= back.length ? right.id : back.id) : undefined;
   const leftWidth = leftHosted ? leftFallback : Math.max(left.depth, leftSettings?.width ?? leftFallback);
