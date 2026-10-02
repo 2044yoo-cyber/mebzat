@@ -64,17 +64,17 @@ jobs:
           base64 -d /tmp/phase6-overlay.b64 > /tmp/phase6-overlay.tar.gz
           tar -tzf /tmp/phase6-overlay.tar.gz >/dev/null
           tar -xzf /tmp/phase6-overlay.tar.gz -C "$app"
-          mkdir -p "$app/src/components"
-          cp mobile-build/phase6/CreateSheet.tsx "$app/src/components/CreateSheet.tsx"
+
+          cat mobile-build/phase6/phase6compat.part0 mobile-build/phase6/phase6compat.part1 > /tmp/phase6compat.b64
+          echo 'd1cce4c0921a18e30c1705adbafbf47ca19520c2681537a481d836dc7ca1a431  /tmp/phase6compat.b64' | sha256sum -c -
+          base64 -d /tmp/phase6compat.b64 > /tmp/phase6compat.tar.gz
+          tar -tzf /tmp/phase6compat.tar.gz >/dev/null
+          tar -xzf /tmp/phase6compat.tar.gz -C "$app"
+
           python3 - <<'PY'
           from pathlib import Path
           import json
           app=Path('/tmp/medosha-mobile-src/medosha-app')
-          p=app/'App.tsx'
-          s=p.read_text()
-          s=s.replace("else if(detail?.kind==='createPost')screen=<CreatePostScreen session={session}", "else if(detail?.kind==='createPost' && session)screen=<CreatePostScreen session={session}")
-          s=s.replace("else if(detail?.kind==='createProperty')screen=<CreatePropertyScreen session={session}", "else if(detail?.kind==='createProperty' && session)screen=<CreatePropertyScreen session={session}")
-          p.write_text(s)
           p=app/'package.json'; d=json.loads(p.read_text()); d['version']='0.6.0'; p.write_text(json.dumps(d,indent=2)+'\n')
           p=app/'app.json'; d=json.loads(p.read_text()); d['expo']['version']='0.6.0'; d['expo']['android']['versionCode']=6; d['expo']['ios']['buildNumber']='6'; p.write_text(json.dumps(d,indent=2)+'\n')
           PY
@@ -85,7 +85,6 @@ jobs:
           test -f "$app/src/screens/ChatScreen.tsx"
           test -f "$app/src/components/CreateSheet.tsx"
           grep -q "kind: 'messages'" "$app/App.tsx"
-          grep -q "createPost' && session" "$app/App.tsx"
           grep -q 'start_direct_conversation' "$app/src/screens/ProfileDetailScreen.tsx"
           grep -q 'list_conversations' "$app/src/screens/MessagesScreen.tsx"
 
