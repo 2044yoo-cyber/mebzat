@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import {
   openingObjectId,
   wallObjectId,
+  type HouseFacadeElement,
   type HouseProject,
   type HouseRoof,
   type HouseSelection,
@@ -65,6 +66,7 @@ export function HousePreview({
                 offset={[-bounds.centreX * MM, level.elevation * MM, bounds.centreY * MM]}
                 showFloor={false}
                 selectedWallId={selectedWall?.sourceWallId ?? null}
+                wallColor={project.facade.primaryColor}
                 onSelectWall={(sourceWallId) =>
                   onSelect({ kind: "wall", id: wallObjectId(level.id, sourceWallId) })
                 }
@@ -89,7 +91,10 @@ export function HousePreview({
           <StairMesh key={stair.id} stair={stair} bounds={bounds} selected={selected?.id === stair.id} onSelect={() => onSelect({ kind: "stair", id: stair.id })} />
         ))}
         {project.roofs.filter((roof) => visibleLevelIds.has(roof.levelId)).map((roof) => (
-          <RoofMesh key={roof.id} roof={roof} bounds={bounds} selected={selected?.id === roof.id} onSelect={() => onSelect({ kind: "roof", id: roof.id })} />
+          <RoofMesh key={roof.id} roof={roof} bounds={bounds} color={project.facade.roofColor} selected={selected?.id === roof.id} onSelect={() => onSelect({ kind: "roof", id: roof.id })} />
+        ))}
+        {project.facadeElements.filter((element) => visibleLevelIds.has(element.levelId)).map((element) => (
+          <FacadeElementMesh key={element.id} element={element} project={project} bounds={bounds} selected={selected?.id === element.wallId} onSelect={() => onSelect({ kind: "wall", id: element.wallId })} />
         ))}
 
         <CameraRig bounds={bounds} view={view} />
@@ -147,7 +152,7 @@ function OpeningMeshes({
       >
         <boxGeometry args={[opening.width * MM, opening.height * MM, Math.max(35, room.wallThickness * 0.35) * MM]} />
         <meshStandardMaterial
-          color={highlighted ? "#1473e6" : opening.kind === "window" ? "#8ec9e8" : "#8b6847"}
+          color={highlighted ? "#1473e6" : opening.kind === "window" ? project.facade.windowFrameColor : project.facade.doorColor}
           transparent={opening.kind === "window" || passage}
           opacity={passage ? 0.16 : opening.kind === "window" ? 0.5 : 1}
           roughness={record?.material === "Aluminium" ? 0.3 : 0.75}
@@ -197,9 +202,9 @@ function StairMesh({ stair, bounds, selected, onSelect }: { stair: HouseStair; b
   );
 }
 
-function RoofMesh({ roof, bounds, selected, onSelect }: { roof: HouseRoof; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+function RoofMesh({ roof, bounds, color, selected, onSelect }: { roof: HouseRoof; bounds: Bounds; color: string; selected: boolean; onSelect: () => void }) {
   const roofBounds = boundaryBounds(roof.boundary);
-  const colour = selected ? "#1473e6" : roof.type === "flat" ? "#b8b1a7" : "#7f493b";
+  const colour = selected ? "#1473e6" : color;
   if (roof.type === "flat") {
     const shape = polygonShape(roof.boundary, bounds);
     return (
@@ -241,6 +246,30 @@ function RoofMesh({ roof, bounds, selected, onSelect }: { roof: HouseRoof; bound
         </mesh>
       ))}
     </group>
+  );
+}
+
+function FacadeElementMesh({ element, project, bounds, selected, onSelect }: { element: HouseFacadeElement; project: HouseProject; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const wall = project.walls.find((item) => item.id === element.wallId);
+  const level = project.levels.find((item) => item.id === element.levelId);
+  if (!wall || !level?.plan) return null;
+  const sourceWall = roomWalls(level.plan).find((item) => item.id === wall.sourceWallId);
+  if (!sourceWall) return null;
+  const dx = (wall.end.x - wall.start.x) / sourceWall.length;
+  const dy = (wall.end.y - wall.start.y) / sourceWall.length;
+  const distance = element.offset + element.width / 2;
+  const projection = wall.thickness / 2 + element.depth / 2;
+  const x = wall.start.x + dx * distance - sourceWall.inward.x * projection;
+  const y = wall.start.y + dy * distance - sourceWall.inward.y * projection;
+  return (
+    <mesh
+      position={[(x - bounds.centreX) * MM, (element.elevation + element.height / 2) * MM, -(y - bounds.centreY) * MM]}
+      rotation={[0, Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x), 0]}
+      onClick={(event) => { event.stopPropagation(); onSelect(); }}
+    >
+      <boxGeometry args={[element.width * MM, element.height * MM, element.depth * MM]} />
+      <meshStandardMaterial color={selected ? "#1473e6" : element.color} roughness={0.86} />
+    </mesh>
   );
 }
 

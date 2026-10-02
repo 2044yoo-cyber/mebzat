@@ -17,10 +17,26 @@ export const houseStyles = [
 export const roofTypes = ["flat", "gable", "hip"] as const;
 export const stairTypes = ["straight", "l-shaped", "u-shaped"] as const;
 export const houseObjectKinds = ["level", "wall", "door", "window", "stair", "slab", "roof"] as const;
+export const facadeElementTypes = ["band", "cornice", "pilaster", "accent", "parapet"] as const;
 
 export type HouseStyle = (typeof houseStyles)[number];
 export type HouseObjectKind = (typeof houseObjectKinds)[number];
 export type HouseSelection = { kind: HouseObjectKind; id: string };
+
+export type HouseFacadeSettings = {
+  source: "style" | "reference";
+  style: HouseStyle;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  roofColor: string;
+  windowFrameColor: string;
+  doorColor: string;
+  wallMaterial: string;
+  roofMaterial: string;
+  windowStyle: string;
+  entranceStyle: string;
+};
 
 const pointSchema = z.object({ x: z.number(), y: z.number() });
 
@@ -96,6 +112,55 @@ const roofSchema = z.object({
   material: z.string(),
 });
 
+const facadeSettingsSchema = z.object({
+  source: z.enum(["style", "reference"]),
+  style: z.enum(houseStyles),
+  primaryColor: z.string(),
+  secondaryColor: z.string(),
+  accentColor: z.string(),
+  roofColor: z.string(),
+  windowFrameColor: z.string(),
+  doorColor: z.string(),
+  wallMaterial: z.string(),
+  roofMaterial: z.string(),
+  windowStyle: z.string(),
+  entranceStyle: z.string(),
+});
+
+const facadeElementSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  wallId: z.string(),
+  type: z.enum(facadeElementTypes),
+  offset: z.number().nonnegative(),
+  elevation: z.number().nonnegative(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+  depth: z.number().positive(),
+  material: z.string(),
+  color: z.string(),
+});
+
+const facadeReferenceAnalysisSchema = z.object({
+  sourceImageId: z.string(),
+  analysedAt: z.string(),
+  currentStyle: z.string(),
+  summary: z.string(),
+  walls: z.string(),
+  windows: z.string(),
+  doors: z.string(),
+  materials: z.array(z.string()),
+});
+
+const facadeAlternativeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  style: z.enum(houseStyles),
+  facade: facadeSettingsSchema.default(facadeSettingsForStyle("modern")),
+  facadeElements: z.array(facadeElementSchema).default([]),
+  createdAt: z.string(),
+});
+
 export const houseProjectSchema = z.object({
   version: z.literal(1),
   id: z.string(),
@@ -107,6 +172,9 @@ export const houseProjectSchema = z.object({
   units: z.literal("mm"),
   designStyle: z.enum(houseStyles),
   originalPlanStrict: z.boolean(),
+  facade: facadeSettingsSchema,
+  facadeReferenceAnalysis: facadeReferenceAnalysisSchema.nullable().default(null),
+  designAlternatives: z.array(facadeAlternativeSchema).default([]),
   plannedFloorCount: z.number().int().min(1).max(6),
   levels: z.array(levelSchema),
   rooms: z.array(
@@ -128,7 +196,7 @@ export const houseProjectSchema = z.object({
   slabs: z.array(slabSchema),
   roofs: z.array(roofSchema),
   balconies: z.array(z.unknown()),
-  facadeElements: z.array(z.unknown()),
+  facadeElements: z.array(facadeElementSchema),
   materials: z.array(z.string()),
   referenceImages: z.array(
     z.object({
@@ -150,6 +218,8 @@ export type HouseOpening = HouseProject["doors"][number];
 export type HouseStair = HouseProject["stairs"][number];
 export type HouseSlab = HouseProject["slabs"][number];
 export type HouseRoof = HouseProject["roofs"][number];
+export type HouseFacadeElement = HouseProject["facadeElements"][number];
+export type HouseFacadeAlternative = HouseProject["designAlternatives"][number];
 
 export type HouseProjectInput = {
   id?: string;
@@ -274,6 +344,8 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
       material: "Reinforced concrete",
     },
   ];
+  const facade = facadeSettingsForStyle(input.style, input.referenceImages?.some((image) => image.kind === "facade") ?? false);
+  const facadeElements = buildFacadeElements(walls, levels, facade);
 
   return houseProjectSchema.parse({
     version: 1,
@@ -286,6 +358,9 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
     units: "mm",
     designStyle: input.style,
     originalPlanStrict: input.strict,
+    facade,
+    facadeReferenceAnalysis: null,
+    designAlternatives: [],
     plannedFloorCount: input.floorCount,
     levels,
     rooms,
@@ -298,7 +373,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
     slabs,
     roofs,
     balconies: [],
-    facadeElements: [],
+    facadeElements,
     materials: ["Masonry", "Reinforced concrete", "Aluminium", "Timber"],
     referenceImages: input.referenceImages ?? [],
     revisions: [
@@ -331,6 +406,60 @@ export function wallObjectId(levelId: string, sourceWallId: string): string {
 
 export function openingObjectId(levelId: string, kind: string, sourceOpeningId: string): string {
   return `${levelId}:${kind}:${sourceOpeningId}`;
+}
+
+export function facadeSettingsForStyle(style: HouseStyle, hasReference = false): HouseFacadeSettings {
+  const profiles: Record<HouseStyle, Omit<HouseFacadeSettings, "source" | "style">> = {
+    modern: { primaryColor: "#ede9e2", secondaryColor: "#303a45", accentColor: "#a87545", roofColor: "#555b62", windowFrameColor: "#202932", doorColor: "#795237", wallMaterial: "Smooth render", roofMaterial: "Reinforced concrete", windowStyle: "large black aluminium", entranceStyle: "recessed modern" },
+    contemporary: { primaryColor: "#e3dfd7", secondaryColor: "#6d7276", accentColor: "#b36e3f", roofColor: "#4b5056", windowFrameColor: "#252a30", doorColor: "#704830", wallMaterial: "Textured render", roofMaterial: "Standing seam", windowStyle: "wide aluminium", entranceStyle: "canopy" },
+    minimal: { primaryColor: "#f3f1ec", secondaryColor: "#c8c4bb", accentColor: "#575c61", roofColor: "#777b7e", windowFrameColor: "#35393d", doorColor: "#4d4037", wallMaterial: "Fine render", roofMaterial: "Reinforced concrete", windowStyle: "flush aluminium", entranceStyle: "flush minimal" },
+    classic: { primaryColor: "#efe5d1", secondaryColor: "#c7ad84", accentColor: "#8c6b48", roofColor: "#70483e", windowFrameColor: "#f3eee4", doorColor: "#68452f", wallMaterial: "Painted plaster", roofMaterial: "Clay tile", windowStyle: "framed traditional", entranceStyle: "framed classic" },
+    "neo-classical": { primaryColor: "#f2ecdf", secondaryColor: "#d3c3a7", accentColor: "#a58b66", roofColor: "#5b5149", windowFrameColor: "#ece6da", doorColor: "#4c3427", wallMaterial: "Painted stucco", roofMaterial: "Concrete tile", windowStyle: "tall framed", entranceStyle: "pilastered" },
+    mediterranean: { primaryColor: "#f0dfc4", secondaryColor: "#c89d70", accentColor: "#8f6544", roofColor: "#a64f38", windowFrameColor: "#544c3e", doorColor: "#6d432d", wallMaterial: "Warm stucco", roofMaterial: "Terracotta tile", windowStyle: "deep reveal", entranceStyle: "arched accent" },
+    "ethiopian-inspired": { primaryColor: "#ddd0ba", secondaryColor: "#6e6152", accentColor: "#a35b35", roofColor: "#514943", windowFrameColor: "#282827", doorColor: "#56392a", wallMaterial: "Mineral render and local stone", roofMaterial: "Coated metal", windowStyle: "deep-set aluminium", entranceStyle: "patterned portal" },
+    "custom-reference": { primaryColor: "#e7e3dc", secondaryColor: "#77736e", accentColor: "#9b704d", roofColor: "#5d5852", windowFrameColor: "#343434", doorColor: "#604430", wallMaterial: "Reference finish", roofMaterial: "Reference roof", windowStyle: "reference proportion", entranceStyle: "reference entrance" },
+  };
+  return {
+    source: hasReference ? "reference" : "style",
+    style,
+    ...profiles[style],
+  };
+}
+
+export function buildFacadeElements(
+  walls: HouseProject["walls"],
+  levels: HouseProject["levels"],
+  facade: HouseFacadeSettings,
+): HouseProject["facadeElements"] {
+  const elements: HouseProject["facadeElements"] = [];
+  for (const level of levels) {
+    const wall = walls.find((item) => item.levelId === level.id);
+    if (!wall) continue;
+    const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+    const wallHeight = wall.height;
+    const add = (type: HouseFacadeElement["type"], offset: number, elevation: number, width: number, height: number, depth: number, color = facade.accentColor) => {
+      elements.push({ id: `${level.id}:facade:${type}:${elements.length + 1}`, levelId: level.id, wallId: wall.id, type, offset, elevation, width, height, depth, material: facade.wallMaterial, color });
+    };
+
+    if (["classic", "neo-classical", "mediterranean"].includes(facade.style)) {
+      add("cornice", 0, level.elevation + wallHeight - 180, length, 180, 130, facade.secondaryColor);
+    }
+    if (["classic", "neo-classical"].includes(facade.style)) {
+      add("pilaster", 80, level.elevation, 260, wallHeight, 110, facade.secondaryColor);
+      add("pilaster", Math.max(80, length - 340), level.elevation, 260, wallHeight, 110, facade.secondaryColor);
+    }
+    if (["modern", "contemporary", "minimal", "ethiopian-inspired", "custom-reference"].includes(facade.style)) {
+      add("band", 0, level.elevation + wallHeight * 0.58, length, 150, 70, facade.secondaryColor);
+    }
+    if (["modern", "contemporary", "ethiopian-inspired", "custom-reference"].includes(facade.style)) {
+      const accentWidth = Math.min(1100, Math.max(450, length * 0.18));
+      add("accent", Math.max(0, length * 0.58), level.elevation + 140, accentWidth, Math.max(600, wallHeight - 280), 95);
+    }
+    if (facade.style === "ethiopian-inspired") {
+      add("band", 0, level.elevation + wallHeight * 0.25, length, 90, 85, facade.accentColor);
+    }
+  }
+  return elements;
 }
 
 function clonePlan(room: Room, keepReference: boolean): Room {

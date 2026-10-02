@@ -36,12 +36,14 @@ export function RoomShell({
   showFloor = true,
   selectedWallId,
   onSelectWall,
+  wallColor = "#e7e3dc",
 }: {
   room: Room;
   offset: [number, number, number];
   showFloor?: boolean;
   selectedWallId?: string | null;
   onSelectWall?: (wallId: string) => void;
+  wallColor?: string;
 }) {
   const pieces = useMemo(() => wallPieces(room), [room]);
 
@@ -64,7 +66,7 @@ export function RoomShell({
             args={[piece.length * MM, piece.height * MM, room.wallThickness * MM]}
           />
           <meshStandardMaterial
-            color={piece.wallId === selectedWallId ? "#1473e6" : "#e7e3dc"}
+            color={piece.wallId === selectedWallId ? "#1473e6" : wallColor}
             roughness={0.95}
             metalness={0}
             // Seen from outside, a wall would hide the room. Only the inner

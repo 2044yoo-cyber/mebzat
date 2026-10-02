@@ -3,6 +3,12 @@ import assert from "node:assert/strict";
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room.ts";
 import { patchHouseObject } from "../src/features/house-designer/services/project-edit.ts";
 import {
+  activateFacadeAlternative,
+  applyFacadeReference,
+  applyFacadeStyle,
+  generateFacadeAlternatives,
+} from "../src/features/house-designer/services/facade.ts";
+import {
   createHouseProject,
   houseProjectSchema,
 } from "../src/features/house-designer/types/project.ts";
@@ -45,6 +51,39 @@ assert.equal(project.stairs[0]?.height, 3200);
 project = patchHouseObject(project, { kind: "roof", id: "main-roof" }, { type: "gable", slope: 25 });
 assert.equal(project.roofs[0]?.type, "gable");
 assert.equal(project.roofs[0]?.slope, 25);
+
+const footprint = project.walls.map(({ start, end }) => ({ start, end }));
+project = applyFacadeStyle(project, "neo-classical");
+assert.equal(project.designStyle, "neo-classical");
+assert.equal(project.roofs[0]?.type, "hip");
+assert(project.facadeElements.some((element) => element.type === "pilaster"));
+assert.deepEqual(project.walls.map(({ start, end }) => ({ start, end })), footprint);
+
+project = generateFacadeAlternatives(project, 4);
+assert.equal(project.designAlternatives.length, 4);
+project = activateFacadeAlternative(project, project.designAlternatives[0]!.id);
+assert.deepEqual(project.walls.map(({ start, end }) => ({ start, end })), footprint);
+
+project = applyFacadeReference(project, "facade-image", {
+  spaceType: "Building facade",
+  estimatedDimensions: null,
+  lighting: "Daylight",
+  walls: "Warm stone and render",
+  windows: "Black aluminium frames",
+  doors: "Recessed timber entry",
+  ceiling: "Not applicable",
+  floor: "Not applicable",
+  surfaces: [{ element: "facade wall", material: "Local stone" }],
+  furniture: [],
+  emptyAreas: [],
+  currentStyle: "Modern",
+  problems: [],
+  summary: "Modern facade with local stone accents.",
+  suggestedStyles: ["modern"],
+});
+assert.equal(project.facade.source, "reference");
+assert.equal(project.facade.wallMaterial, "Local stone");
+assert.deepEqual(project.walls.map(({ start, end }) => ({ start, end })), footprint);
 houseProjectSchema.parse(project);
 
 console.log("House model checks passed");

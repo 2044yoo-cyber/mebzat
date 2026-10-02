@@ -2,6 +2,7 @@ import { roomWalls } from "@/features/berchuma-studio/services/room-geometry";
 import type { Room } from "@/features/berchuma-studio/types/room";
 
 import {
+  buildFacadeElements,
   openingObjectId,
   wallObjectId,
   type HouseProject,
@@ -190,10 +191,12 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
       swing: opening.swing,
     };
   });
+  const levels = project.levels.map((level) => level.id === levelId ? { ...level, plan } : level);
+  const rebuiltWalls = [...project.walls.filter((wall) => wall.levelId !== levelId), ...walls];
 
   return {
     ...project,
-    levels: project.levels.map((level) => level.id === levelId ? { ...level, plan } : level),
+    levels,
     rooms: project.rooms.map((room) =>
       room.levelId === levelId
         ? {
@@ -203,7 +206,7 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
           }
         : room,
     ),
-    walls: [...project.walls.filter((wall) => wall.levelId !== levelId), ...walls],
+    walls: rebuiltWalls,
     doors: [
       ...project.doors.filter((opening) => opening.levelId !== levelId),
       ...openings.filter((opening) => opening.type !== "window"),
@@ -222,6 +225,7 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
         ? { ...roof, boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })) }
         : roof,
     ),
+    facadeElements: buildFacadeElements(rebuiltWalls, levels, project.facade),
   };
 }
 

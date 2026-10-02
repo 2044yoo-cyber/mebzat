@@ -28,6 +28,7 @@ import {
 } from "@/features/berchuma-studio/types/room";
 import { cn } from "@/lib/utils";
 
+import { HouseFacadePanel } from "./house-facade-panel";
 import { HouseObjectInspector } from "./house-object-inspector";
 import { HousePreview } from "./house-preview";
 import {
@@ -35,6 +36,7 @@ import {
   readHouseDraft,
   writeHouseDraft,
 } from "../services/draft";
+import { ensurePhaseThreeProject } from "../services/facade";
 import {
   createHouseProject,
   ensurePhaseTwoProject,
@@ -118,7 +120,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
 
   function restore() {
     if (!savedDraft) return;
-    const restored = ensurePhaseTwoProject(savedDraft.project);
+    const restored = ensurePhaseThreeProject(ensurePhaseTwoProject(savedDraft.project));
     const restoredRoom = restored.levels.find((level) => level.plan)?.plan;
     if (!restoredRoom) return;
     setProject(restored);
@@ -474,6 +476,8 @@ function ModelScreen({
           );
         })}
       </div>
+
+      <HouseFacadePanel project={project} onChange={onProjectChange} />
 
       <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
