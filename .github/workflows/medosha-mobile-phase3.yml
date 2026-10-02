@@ -1,0 +1,157 @@
+name: Medosha Mobile Phase 3 APK
+
+on:
+  push:
+    branches:
+      - chatgpt/medosha-mobile-apk
+    paths:
+      - '.github/workflows/medosha-mobile-phase3.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout mobile build branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Reconstruct verified Medosha mobile v0.2 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf /tmp/medosha-mobile-src
+          mkdir -p /tmp/medosha-mobile-src
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, binascii, hashlib, struct, zlib
+
+          root = Path('mobile-build')
+          expected = {
+              1: '550437b7cab203873ad2a4d6190d6e9a332a0bded327af2782a79be52576cea0',
+              2: 'ae04fa2c540ab81f3fd3a0838e744977bc0e3982cca4e533d4fcbe8924d5a167',
+              3: 'b34850143f321e75f3c20ff1827c4ee67e4fb4a59bba71974147850423ad3efc',
+          }
+          chunks = []
+          for i in (1, 2, 3):
+              text = (root / f'apk.part{i}.b64').read_text().strip()
+              got = hashlib.sha256(text.encode()).hexdigest()
+              if got != expected[i]:
+                  raise SystemExit(f'Part {i} checksum mismatch: {got}')
+              chunks.append(text)
+
+          data = base64.b64decode(''.join(chunks), validate=True)
+          out = Path('/tmp/medosha-mobile-src')
+          pos = 0
+          while pos + 30 <= len(data):
+              if data[pos:pos+4] != b'PK\x03\x04':
+                  break
+              sig, ver, flags, method, mtime, mdate, crc, csize, usize, fnlen, exlen = struct.unpack_from('<IHHHHHIIIHH', data, pos)
+              name_start = pos + 30
+              name_end = name_start + fnlen
+              extra_end = name_end + exlen
+              if extra_end > len(data):
+                  break
+              name = data[name_start:name_end].decode('utf-8')
+              payload_end = extra_end + csize
+              if payload_end > len(data):
+                  break
+              if flags & 0x08:
+                  raise SystemExit(f'Unexpected data-descriptor entry: {name}')
+              compressed = data[extra_end:payload_end]
+              if method == 0:
+                  payload = compressed
+              elif method == 8:
+                  payload = zlib.decompress(compressed, -15)
+              else:
+                  raise SystemExit(f'Unsupported ZIP method {method} for {name}')
+              if len(payload) != usize or (binascii.crc32(payload) & 0xffffffff) != crc:
+                  raise SystemExit(f'ZIP integrity failure for {name}')
+              target = (out / name).resolve()
+              if not str(target).startswith(str(out.resolve())):
+                  raise SystemExit(f'Unsafe ZIP path: {name}')
+              if name.endswith('/'):
+                  target.mkdir(parents=True, exist_ok=True)
+              else:
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(payload)
+              pos = payload_end
+
+          app = out / 'medosha-app'
+          required = ['App.tsx', 'package.json', 'app.json', 'index.ts', 'src/screens/MoreScreen.tsx']
+          missing = [p for p in required if not (app / p).is_file()]
+          if missing:
+              raise SystemExit(f'Missing reconstructed files: {missing}')
+
+          assets = app / 'assets'
+          assets.mkdir(exist_ok=True)
+          def png(path, width, height, rgba):
+              def chunk(kind, payload):
+                  return struct.pack('>I', len(payload)) + kind + payload + struct.pack('>I', binascii.crc32(kind + payload) & 0xffffffff)
+              row = b'\x00' + bytes(rgba) * width
+              raw = row * height
+              blob = b'\x89PNG\r\n\x1a\n'
+              blob += chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0))
+              blob += chunk(b'IDAT', zlib.compress(raw, 9))
+              blob += chunk(b'IEND', b'')
+              path.write_bytes(blob)
+          blue = (37, 99, 235, 255)
+          png(assets / 'icon.png', 1024, 1024, blue)
+          png(assets / 'adaptive-icon.png', 1024, 1024, blue)
+          png(assets / 'splash.png', 1024, 1024, blue)
+          PY
+
+      - name: Apply Phase 3 in-app navigation patch
+        working-directory: /tmp/medosha-mobile-src/medosha-app
+        run: |
+          echo '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' | base64 -d | gzip -d | patch -p2
+          grep -q 'react-native-webview' package.json
+          test -f src/screens/InAppWebScreen.tsx
+
+      - name: Install JavaScript dependencies
+        working-directory: /tmp/medosha-mobile-src/medosha-app
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Type check
+        working-directory: /tmp/medosha-mobile-src/medosha-app
+        run: npx tsc --noEmit
+
+      - name: Generate native Android project
+        working-directory: /tmp/medosha-mobile-src/medosha-app
+        env:
+          CI: '1'
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build standalone Phase 3 release APK
+        working-directory: /tmp/medosha-mobile-src/medosha-app/android
+        env:
+          NODE_ENV: production
+          CI: '1'
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          test -f app/build/outputs/apk/release/app-release.apk
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/medosha-mobile-v0.3-phase3-release.apk"
+          sha256sum "$GITHUB_WORKSPACE/medosha-mobile-v0.3-phase3-release.apk"
+
+      - name: Upload Phase 3 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: medosha-mobile-v0.3-phase3-release-apk
+          path: medosha-mobile-v0.3-phase3-release.apk
+          if-no-files-found: error
+          retention-days: 7
