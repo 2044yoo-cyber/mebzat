@@ -55,8 +55,6 @@ jobs:
                   raise SystemExit(f'Part {i} checksum mismatch: {got}')
               chunks.append(text)
 
-          # The first three verified Base64 chunks contain every source/config file.
-          # Only the original PNG image payloads and ZIP central directory are later.
           data = base64.b64decode(''.join(chunks), validate=True)
           out = Path('/tmp/medosha-mobile-src')
           pos = 0
@@ -109,7 +107,6 @@ jobs:
           if missing:
               raise SystemExit(f'Missing reconstructed files: {missing}')
 
-          # Generate valid local artwork for prebuild; no application logic is changed.
           assets = app / 'assets'
           assets.mkdir(exist_ok=True)
           def png(path, width, height, rgba):
@@ -140,18 +137,22 @@ jobs:
           CI: '1'
         run: npx expo prebuild --platform android --no-install
 
-      - name: Build debug APK
+      - name: Build standalone release APK
         working-directory: /tmp/medosha-mobile-src/medosha-app/android
+        env:
+          NODE_ENV: production
+          CI: '1'
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
-          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/medosha-mobile-v0.2.apk"
-          sha256sum "$GITHUB_WORKSPACE/medosha-mobile-v0.2.apk"
+          ./gradlew assembleRelease --no-daemon
+          test -f app/build/outputs/apk/release/app-release.apk
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/medosha-mobile-v0.2-release.apk"
+          sha256sum "$GITHUB_WORKSPACE/medosha-mobile-v0.2-release.apk"
 
-      - name: Upload APK
+      - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: medosha-mobile-v0.2-apk
-          path: medosha-mobile-v0.2.apk
+          name: medosha-mobile-v0.2-release-apk
+          path: medosha-mobile-v0.2-release.apk
           if-no-files-found: error
           retention-days: 7
