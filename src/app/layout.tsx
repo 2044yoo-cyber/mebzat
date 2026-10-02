@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { Geist, Geist_Mono, Noto_Sans_Ethiopic } from "next/font/google";
 import { Suspense } from "react";
+import { Analytics } from "@vercel/analytics/next";
 
 import { FontPreference } from "@/components/layout/font-preference";
 import { ThemeProvider } from "@/components/layout/theme-provider";
@@ -156,6 +157,7 @@ export default async function RootLayout({
                 touch listener on the document, Safari never applies `:active`
                 to anything that is not an anchor. */}
             <TouchPress />
+            <Analytics />
           </ThemeProvider>
         </LanguageProvider>
       </body>
