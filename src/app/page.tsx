@@ -58,7 +58,7 @@ export default async function Home() {
     // breakpoints cannot do that, because the viewport has not changed.
     <div className="mx-auto flex w-full max-w-[1500px] justify-center gap-6 px-0 py-3 @lg/ws:px-4 @2xl/ws:py-5">
       {/* ---- The feed ------------------------------------------------- */}
-      <div className="min-w-0 flex-1 @5xl/ws:max-w-[820px] @7xl/ws:max-w-[960px]">
+      <div className="min-w-0 flex-1">
         <div className="mb-3 hidden px-3 lg:block @lg/ws:px-0">
           <GlobalSearch />
         </div>
