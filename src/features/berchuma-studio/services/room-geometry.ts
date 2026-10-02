@@ -79,6 +79,28 @@ export function roomWalls(room: Room): Wall[] {
   return walls;
 }
 
+/** Exterior and manually detected/drawn interior walls in one lookup list. */
+export function allRoomWalls(room: Room): Wall[] {
+  return [
+    ...roomWalls(room),
+    ...(room.interiorWalls ?? []).flatMap((wall, index) => {
+      const dx = wall.end.x - wall.start.x;
+      const dy = wall.end.y - wall.start.y;
+      const length = Math.hypot(dx, dy);
+      if (length < EPSILON) return [];
+      return [{
+        id: wall.id,
+        label: wall.label || `Interior wall ${index + 1}`,
+        start: { ...wall.start },
+        end: { ...wall.end },
+        length,
+        angle: (Math.atan2(-dy, dx) * 180) / Math.PI,
+        inward: { x: -dy / length, y: dx / length },
+      }];
+    }),
+  ];
+}
+
 /**
  * Twice the signed area of the polygon — the shoelace sum.
  *
@@ -228,7 +250,7 @@ export function openingClashes(
 /** Doors with something parked in the space they swing into. */
 export function doorClearance(room: Room): string[] {
   const notes: string[] = [];
-  const walls = roomWalls(room);
+  const walls = allRoomWalls(room);
 
   for (const opening of room.openings) {
     if (opening.kind !== "door") continue;
@@ -253,7 +275,7 @@ export function doorClearance(room: Room): string[] {
 /** Openings that do not fit in the wall they are in. */
 export function openingFaults(room: Room): string[] {
   const faults: string[] = [];
-  const walls = roomWalls(room);
+  const walls = allRoomWalls(room);
 
   for (const opening of room.openings) {
     const wall = walls.find((one) => one.id === opening.wallId);

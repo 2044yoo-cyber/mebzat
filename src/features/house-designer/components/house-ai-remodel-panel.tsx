@@ -14,6 +14,7 @@ const suggestions = [
   "Make the façade modern",
   "Use black aluminium windows",
   "Change the roof to flat",
+  "Add a balcony above the entrance",
   "Generate four alternatives",
 ];
 

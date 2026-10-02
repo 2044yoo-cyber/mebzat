@@ -17,14 +17,17 @@ import {
   type HouseCeiling,
   type HouseFacadeElement,
   type HouseProject,
+  type HouseRoom,
   type HouseRoof,
   type HouseSelection,
   type HouseSlab,
   type HouseStair,
   type HouseStructuralBeam,
   type HouseStructuralColumn,
+  type HouseStructuralGrid,
   type HouseSite,
   type HouseVeranda,
+  type HouseWall,
 } from "../types/project";
 
 const MM = 0.001;
@@ -64,6 +67,11 @@ export function HousePreview({
           <SiteMesh site={project.site} bounds={bounds} selected={selected?.id === project.site.id} onSelect={() => onSelect({ kind: "site", id: project.site!.id })} />
         ) : null}
 
+        {project.rooms.filter((room) => visibleLevelIds.has(room.levelId)).map((room) => {
+          const level = project.levels.find((item) => item.id === room.levelId);
+          return <RoomSurfaceMesh key={room.id} room={room} elevation={level?.elevation ?? 0} bounds={bounds} selected={selected?.id === room.id} onSelect={() => onSelect({ kind: "room", id: room.id })} />;
+        })}
+
         {project.levels.map((level) => {
           if (!level.plan || !visibleLevelIds.has(level.id)) return null;
           const selectedWall = selected?.kind === "wall"
@@ -90,6 +98,7 @@ export function HousePreview({
                 selected={selected}
                 onSelect={onSelect}
               />
+              <InteriorWallMeshes project={project} levelId={level.id} bounds={bounds} selected={selected} onSelect={onSelect} />
             </group>
           );
         })}
@@ -115,11 +124,14 @@ export function HousePreview({
         {project.structuralBeams.filter((beam) => visibleLevelIds.has(beam.levelId)).map((beam) => (
           <BeamMesh key={beam.id} beam={beam} bounds={bounds} selected={selected?.id === beam.id} onSelect={() => onSelect({ kind: "beam", id: beam.id })} />
         ))}
+        {project.structuralGrid.filter((grid) => visibleLevelIds.has(grid.levelId)).map((grid) => (
+          <GridMesh key={grid.id} grid={grid} elevation={project.levels.find((level) => level.id === grid.levelId)?.elevation ?? 0} bounds={bounds} selected={selected?.id === grid.id} onSelect={() => onSelect({ kind: "grid", id: grid.id })} />
+        ))}
         {project.roofs.filter((roof) => visibleLevelIds.has(roof.levelId)).map((roof) => (
           <RoofMesh key={roof.id} roof={roof} bounds={bounds} color={project.facade.roofColor} selected={selected?.id === roof.id} onSelect={() => onSelect({ kind: "roof", id: roof.id })} />
         ))}
         {project.facadeElements.filter((element) => visibleLevelIds.has(element.levelId)).map((element) => (
-          <FacadeElementMesh key={element.id} element={element} project={project} bounds={bounds} selected={selected?.id === element.wallId} onSelect={() => onSelect({ kind: "wall", id: element.wallId })} />
+          <FacadeElementMesh key={element.id} element={element} project={project} bounds={bounds} selected={selected?.id === element.id} onSelect={() => onSelect({ kind: "facade", id: element.id })} />
         ))}
 
         <CameraRig bounds={bounds} view={view} />
@@ -146,18 +158,18 @@ function OpeningMeshes({
   selected: HouseSelection | null;
   onSelect: (selection: HouseSelection) => void;
 }) {
-  const walls = roomWalls(room);
   return room.openings.map((opening) => {
-    const wall = walls.find((item) => item.id === opening.wallId);
+    const id = openingObjectId(levelId, opening.kind, opening.id);
+    const record = [...project.doors, ...project.windows].find((item) => item.id === id);
+    const wall = record ? project.walls.find((item) => item.id === record.wallId) : null;
     if (!wall) return null;
-    const dx = (wall.end.x - wall.start.x) / wall.length;
-    const dy = (wall.end.y - wall.start.y) / wall.length;
+    const length = Math.max(1, Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y));
+    const dx = (wall.end.x - wall.start.x) / length;
+    const dy = (wall.end.y - wall.start.y) / length;
     const middle = opening.offset + opening.width / 2;
     const x = wall.start.x + dx * middle;
     const y = wall.start.y + dy * middle;
     const kind = opening.kind === "window" ? "window" : "door";
-    const id = openingObjectId(levelId, opening.kind, opening.id);
-    const record = [...project.doors, ...project.windows].find((item) => item.id === id);
     const highlighted = selected?.id === id;
     const passage = opening.kind === "passage";
 
@@ -175,7 +187,7 @@ function OpeningMeshes({
           onSelect({ kind, id });
         }}
       >
-        <boxGeometry args={[opening.width * MM, opening.height * MM, Math.max(35, room.wallThickness * 0.35) * MM]} />
+        <boxGeometry args={[opening.width * MM, opening.height * MM, Math.max(35, wall.thickness * 0.35) * MM]} />
         <meshStandardMaterial
           color={highlighted ? "#1473e6" : opening.kind === "window" ? project.facade.windowFrameColor : project.facade.doorColor}
           transparent={opening.kind === "window" || passage}
@@ -185,6 +197,59 @@ function OpeningMeshes({
       </mesh>
     );
   });
+}
+
+function RoomSurfaceMesh({ room, elevation, bounds, selected, onSelect }: { room: HouseRoom; elevation: number; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const shape = useMemo(() => polygonShape(room.boundary, bounds), [bounds, room.boundary]);
+  return (
+    <mesh position={[0, (elevation + 2) * MM, 0]} rotation={[-Math.PI / 2, 0, 0]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+      <shapeGeometry args={[shape]} />
+      <meshStandardMaterial color={selected ? "#1473e6" : "#d8d2c8"} roughness={1} transparent opacity={selected ? 0.8 : 0.62} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
+function InteriorWallMeshes({ project, levelId, bounds, selected, onSelect }: { project: HouseProject; levelId: string; bounds: Bounds; selected: HouseSelection | null; onSelect: (selection: HouseSelection) => void }) {
+  const level = project.levels.find((item) => item.id === levelId);
+  const exteriorIds = new Set(level?.plan?.corners.map((corner) => corner.id) ?? []);
+  const walls = project.walls.filter((wall) => wall.levelId === levelId && (!wall.sourceWallId || !exteriorIds.has(wall.sourceWallId)));
+  return walls.flatMap((wall) => wallSegments(wall, [...project.doors, ...project.windows].filter((opening) => opening.wallId === wall.id)).map((segment) => {
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const along = ((segment.from + segment.to) / 2) / length;
+    const x = wall.start.x + dx * along;
+    const y = wall.start.y + dy * along;
+    return (
+      <mesh
+        key={`${wall.id}:${segment.id}`}
+        position={[(x - bounds.centreX) * MM, (segment.bottom + (segment.top - segment.bottom) / 2 + (level?.elevation ?? 0)) * MM, -(y - bounds.centreY) * MM]}
+        rotation={[0, Math.atan2(dy, dx), 0]}
+        onClick={(event) => { event.stopPropagation(); onSelect({ kind: "wall", id: wall.id }); }}
+      >
+        <boxGeometry args={[(segment.to - segment.from) * MM, (segment.top - segment.bottom) * MM, wall.thickness * MM]} />
+        <meshStandardMaterial color={selected?.id === wall.id ? "#1473e6" : "#ddd8cf"} roughness={0.95} side={THREE.DoubleSide} />
+      </mesh>
+    );
+  }));
+}
+
+function wallSegments(wall: HouseWall, openings: HouseProject["doors"]) {
+  const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+  const segments: { id: string; from: number; to: number; bottom: number; top: number }[] = [];
+  const add = (id: string, from: number, to: number, bottom: number, top: number) => {
+    if (to - from > 1 && top - bottom > 1) segments.push({ id, from, to, bottom, top });
+  };
+  let cursor = 0;
+  for (const opening of [...openings].sort((a, b) => a.offset - b.offset)) {
+    add(`before-${opening.id}`, cursor, opening.offset, 0, wall.height);
+    if (opening.sillHeight > 0) add(`under-${opening.id}`, opening.offset, opening.offset + opening.width, 0, opening.sillHeight);
+    const head = opening.sillHeight + opening.height;
+    if (head < wall.height) add(`over-${opening.id}`, opening.offset, opening.offset + opening.width, head, wall.height);
+    cursor = Math.max(cursor, opening.offset + opening.width);
+  }
+  add("end", cursor, length, 0, wall.height);
+  return segments;
 }
 
 function SlabMesh({ slab, bounds, selected, onSelect }: { slab: HouseSlab; bounds: Bounds; selected: boolean; onSelect: () => void }) {
@@ -319,6 +384,18 @@ function BeamMesh({ beam, bounds, selected, onSelect }: { beam: HouseStructuralB
     >
       <boxGeometry args={[length * MM, beam.depth * MM, beam.width * MM]} />
       <meshStandardMaterial color={selected ? "#1473e6" : "#8c8983"} roughness={0.92} transparent opacity={selected ? 1 : 0.76} />
+    </mesh>
+  );
+}
+
+function GridMesh({ grid, elevation, bounds, selected, onSelect }: { grid: HouseStructuralGrid; elevation: number; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const dx = grid.end.x - grid.start.x;
+  const dy = grid.end.y - grid.start.y;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  return (
+    <mesh position={[((grid.start.x + grid.end.x) / 2 - bounds.centreX) * MM, (elevation + 12) * MM, -((grid.start.y + grid.end.y) / 2 - bounds.centreY) * MM]} rotation={[0, Math.atan2(dy, dx), 0]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+      <boxGeometry args={[length * MM, 0.008, 0.012]} />
+      <meshStandardMaterial color={selected ? "#1473e6" : "#d28b26"} transparent opacity={selected ? 1 : 0.65} />
     </mesh>
   );
 }

@@ -16,7 +16,7 @@ export const houseStyles = [
 
 export const roofTypes = ["flat", "gable", "hip"] as const;
 export const stairTypes = ["straight", "l-shaped", "u-shaped"] as const;
-export const houseObjectKinds = ["level", "wall", "door", "window", "stair", "slab", "roof", "column", "beam", "balcony", "veranda", "ceiling", "site"] as const;
+export const houseObjectKinds = ["level", "room", "wall", "door", "window", "stair", "slab", "roof", "column", "beam", "grid", "facade", "balcony", "veranda", "ceiling", "site"] as const;
 export const facadeElementTypes = ["band", "cornice", "pilaster", "accent", "parapet"] as const;
 
 export type HouseStyle = (typeof houseStyles)[number];
@@ -123,6 +123,16 @@ const structuralBeamSchema = z.object({
   width: z.number().positive(),
   depth: z.number().positive(),
   material: z.string(),
+});
+
+const structuralGridSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  axis: z.enum(["x", "y"]),
+  label: z.string(),
+  position: z.number(),
+  start: pointSchema,
+  end: pointSchema,
 });
 
 const roofSchema = z.object({
@@ -262,6 +272,8 @@ export const houseProjectSchema = z.object({
       name: z.string(),
       boundary: z.array(pointSchema),
       floorMaterial: z.string(),
+      wallMaterial: z.string().default("Paint"),
+      ceilingMaterial: z.string().default("Gypsum board"),
       ceilingHeight: z.number().positive(),
     }),
   ),
@@ -271,6 +283,7 @@ export const houseProjectSchema = z.object({
   stairs: z.array(stairSchema),
   structuralColumns: z.array(structuralColumnSchema).default([]),
   structuralBeams: z.array(structuralBeamSchema).default([]),
+  structuralGrid: z.array(structuralGridSchema).default([]),
   slabs: z.array(slabSchema),
   roofs: z.array(roofSchema),
   balconies: z.array(balconySchema).default([]),
@@ -294,6 +307,7 @@ export const houseProjectSchema = z.object({
 });
 
 export type HouseProject = z.infer<typeof houseProjectSchema>;
+export type HouseRoom = HouseProject["rooms"][number];
 export type HouseWall = HouseProject["walls"][number];
 export type HouseOpening = HouseProject["doors"][number];
 export type HouseStair = HouseProject["stairs"][number];
@@ -301,6 +315,7 @@ export type HouseSlab = HouseProject["slabs"][number];
 export type HouseRoof = HouseProject["roofs"][number];
 export type HouseStructuralColumn = HouseProject["structuralColumns"][number];
 export type HouseStructuralBeam = HouseProject["structuralBeams"][number];
+export type HouseStructuralGrid = HouseProject["structuralGrid"][number];
 export type HouseBalcony = HouseProject["balconies"][number];
 export type HouseVeranda = HouseProject["verandas"][number];
 export type HouseCeiling = HouseProject["ceilings"][number];
@@ -333,7 +348,6 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
 
   for (let index = 0; index < input.floorCount; index += 1) {
     const levelId = index === 0 ? "ground-floor" : `floor-${index + 1}`;
-    const roomId = `${levelId}:room-1`;
     const plan = clonePlan(input.room, index === 0);
     const elevation = index * input.floorToFloorHeight;
 
@@ -344,16 +358,24 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
       floorToFloorHeight: input.floorToFloorHeight,
       plan,
     });
-    rooms.push({
-      id: roomId,
-      levelId,
-      name: index === 0 ? "Ground floor" : `${ordinal(index)} floor`,
-      boundary: plan.corners.map(copyPoint),
-      floorMaterial: "Unspecified",
-      ceilingHeight: plan.ceilingHeight,
-    });
+    const planRooms = plan.zones?.length
+      ? plan.zones
+      : [{ id: "room-1", name: index === 0 ? "Ground floor" : `${ordinal(index)} floor`, boundary: plan.corners, floorMaterial: "Unspecified", wallMaterial: "Paint", ceilingMaterial: "Gypsum board" }];
+    for (const room of planRooms) {
+      rooms.push({
+        id: `${levelId}:${room.id}`,
+        levelId,
+        name: room.name,
+        boundary: room.boundary.map(copyPoint),
+        floorMaterial: room.floorMaterial,
+        wallMaterial: room.wallMaterial,
+        ceilingMaterial: room.ceilingMaterial,
+        ceilingHeight: plan.ceilingHeight,
+      });
+    }
+    const roomId = rooms.find((room) => room.levelId === levelId)?.id ?? `${levelId}:room-1`;
 
-    for (const wall of roomWalls(plan)) {
+    for (const wall of housePlanWalls(plan)) {
       walls.push({
         id: wallObjectId(levelId, wall.id),
         sourceWallId: wall.id,
@@ -361,8 +383,8 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
         roomId,
         start: copyPoint(wall.start),
         end: copyPoint(wall.end),
-        thickness: plan.wallThickness,
-        height: plan.ceilingHeight,
+        thickness: wall.thickness,
+        height: wall.height,
         material: "Masonry",
       });
     }
@@ -398,20 +420,23 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
     if (index < input.floorCount - 1) {
       const bounds = planBounds(plan);
       const height = input.floorToFloorHeight;
-      stairs.push({
-        id: `${levelId}:stair`,
-        levelId,
-        x: bounds.minX + Math.min(1200, bounds.width * 0.2),
-        y: bounds.minY + Math.min(1200, bounds.depth * 0.2),
-        elevation,
-        width: Math.min(1000, bounds.width * 0.28),
-        length: Math.min(3200, bounds.depth * 0.58),
-        height,
-        rotation: 0,
-        steps: clampInt(Math.round(height / 175), 12, 24),
-        type: "straight",
-        material: "Reinforced concrete",
-      });
+      const planned = plan.planStairs?.length ? plan.planStairs : [{ id: "stair", x: bounds.minX + Math.min(1200, bounds.width * 0.2), y: bounds.minY + Math.min(1200, bounds.depth * 0.2), width: Math.min(1000, bounds.width * 0.28), length: Math.min(3200, bounds.depth * 0.58), rotation: 0 }];
+      for (const stair of planned) {
+        stairs.push({
+          id: `${levelId}:${stair.id}`,
+          levelId,
+          x: stair.x,
+          y: stair.y,
+          elevation,
+          width: stair.width,
+          length: stair.length,
+          height,
+          rotation: stair.rotation,
+          steps: clampInt(Math.round(height / 175), 12, 24),
+          type: "straight",
+          material: "Reinforced concrete",
+        });
+      }
     }
   }
 
@@ -435,6 +460,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
   const facadeElements = buildFacadeElements(walls, levels, facade);
   const structuralColumns = buildStructuralColumns(levels);
   const structuralBeams = buildStructuralBeams(walls, levels);
+  const structuralGrid = buildStructuralGrid(levels, structuralColumns);
   const ceilings = buildHouseCeilings(rooms, levels);
   const site = buildHouseSite(rooms);
   const verandas = buildHouseVerandas(levels, walls, doors);
@@ -463,6 +489,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
     stairs,
     structuralColumns,
     structuralBeams,
+    structuralGrid,
     slabs,
     roofs,
     balconies,
@@ -470,7 +497,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
     ceilings,
     site,
     facadeElements,
-    materials: ["Masonry", "Reinforced concrete", "Aluminium", "Timber", "Gypsum board", "Paving"],
+    materials: ["Masonry", "Reinforced concrete", "Aluminium", "Timber", "Gypsum board", "Paint", "Paving"],
     referenceImages: input.referenceImages ?? [],
     revisions: [
       { id: crypto.randomUUID(), createdAt: now, note: "Generated editable architectural model" },
@@ -528,31 +555,36 @@ export function buildFacadeElements(
   facade: HouseFacadeSettings,
 ): HouseProject["facadeElements"] {
   const elements: HouseProject["facadeElements"] = [];
-  for (const level of levels) {
-    const wall = walls.find((item) => item.levelId === level.id);
-    if (!wall) continue;
-    const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
-    const wallHeight = wall.height;
-    const add = (type: HouseFacadeElement["type"], offset: number, elevation: number, width: number, height: number, depth: number, color = facade.accentColor) => {
-      elements.push({ id: `${level.id}:facade:${type}:${elements.length + 1}`, levelId: level.id, wallId: wall.id, type, offset, elevation, width, height, depth, material: facade.wallMaterial, color });
-    };
+  for (const [levelIndex, level] of levels.entries()) {
+    const exteriorIds = new Set(level.plan?.corners.map((corner) => corner.id) ?? []);
+    const exteriorWalls = walls.filter((item) => item.levelId === level.id && !!item.sourceWallId && exteriorIds.has(item.sourceWallId));
+    for (const [wallIndex, wall] of exteriorWalls.entries()) {
+      const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+      const wallHeight = wall.height;
+      const add = (type: HouseFacadeElement["type"], offset: number, elevation: number, width: number, height: number, depth: number, color = facade.accentColor) => {
+        elements.push({ id: `${level.id}:facade:${wall.sourceWallId}:${type}:${elements.length + 1}`, levelId: level.id, wallId: wall.id, type, offset, elevation, width, height, depth, material: facade.wallMaterial, color });
+      };
 
-    if (["classic", "neo-classical", "mediterranean"].includes(facade.style)) {
-      add("cornice", 0, level.elevation + wallHeight - 180, length, 180, 130, facade.secondaryColor);
-    }
-    if (["classic", "neo-classical"].includes(facade.style)) {
-      add("pilaster", 80, level.elevation, 260, wallHeight, 110, facade.secondaryColor);
-      add("pilaster", Math.max(80, length - 340), level.elevation, 260, wallHeight, 110, facade.secondaryColor);
-    }
-    if (["modern", "contemporary", "minimal", "ethiopian-inspired", "custom-reference"].includes(facade.style)) {
-      add("band", 0, level.elevation + wallHeight * 0.58, length, 150, 70, facade.secondaryColor);
-    }
-    if (["modern", "contemporary", "ethiopian-inspired", "custom-reference"].includes(facade.style)) {
-      const accentWidth = Math.min(1100, Math.max(450, length * 0.18));
-      add("accent", Math.max(0, length * 0.58), level.elevation + 140, accentWidth, Math.max(600, wallHeight - 280), 95);
-    }
-    if (facade.style === "ethiopian-inspired") {
-      add("band", 0, level.elevation + wallHeight * 0.25, length, 90, 85, facade.accentColor);
+      if (["classic", "neo-classical", "mediterranean"].includes(facade.style)) {
+        add("cornice", 0, level.elevation + wallHeight - 180, length, 180, 130, facade.secondaryColor);
+      }
+      if (["classic", "neo-classical"].includes(facade.style) && wallIndex === 0) {
+        add("pilaster", 80, level.elevation, 260, wallHeight, 110, facade.secondaryColor);
+        add("pilaster", Math.max(80, length - 340), level.elevation, 260, wallHeight, 110, facade.secondaryColor);
+      }
+      if (["modern", "contemporary", "minimal", "ethiopian-inspired", "custom-reference"].includes(facade.style)) {
+        add("band", 0, level.elevation + wallHeight * 0.58, length, 150, 70, facade.secondaryColor);
+      }
+      if (["modern", "contemporary", "ethiopian-inspired", "custom-reference"].includes(facade.style) && wallIndex === 0) {
+        const accentWidth = Math.min(1100, Math.max(450, length * 0.18));
+        add("accent", Math.max(0, length * 0.58), level.elevation + 140, accentWidth, Math.max(600, wallHeight - 280), 95);
+      }
+      if (facade.style === "ethiopian-inspired") {
+        add("band", 0, level.elevation + wallHeight * 0.25, length, 90, 85, facade.accentColor);
+      }
+      if (levelIndex === levels.length - 1 && ["modern", "contemporary", "minimal", "custom-reference", "ethiopian-inspired"].includes(facade.style)) {
+        add("parapet", 0, level.elevation + wallHeight, length, 800, Math.max(120, wall.thickness), facade.primaryColor);
+      }
     }
   }
   return elements;
@@ -566,23 +598,52 @@ export function buildStructuralColumns(
   return levels.flatMap((level) => {
     const plan = level.plan;
     if (!plan) return [];
-    return plan.corners.map((corner) => {
-      const id = `${level.id}:column:${corner.id}`;
+    const points = plan.planColumns?.length
+      ? plan.planColumns.map((column) => ({ id: column.id, x: column.x, y: column.y, width: column.width, depth: column.depth }))
+      : plan.corners.map((corner) => ({ id: corner.id, x: corner.x, y: corner.y, width: 300, depth: 300 }));
+    return points.map((point) => {
+      const id = `${level.id}:column:${point.id}`;
       const old = existing.get(id);
       return {
         id,
         levelId: level.id,
-        sourceCornerId: corner.id,
-        x: corner.x,
-        y: corner.y,
+        sourceCornerId: point.id,
+        x: point.x,
+        y: point.y,
         elevation: level.elevation,
-        width: old?.width ?? 300,
-        depth: old?.depth ?? 300,
+        width: old?.width ?? point.width,
+        depth: old?.depth ?? point.depth,
         height: old?.height ?? plan.ceilingHeight,
         type: old?.type ?? "preliminary reinforced concrete",
         material: old?.material ?? "Reinforced concrete",
       };
     });
+  });
+}
+
+export function buildStructuralGrid(
+  levels: HouseProject["levels"],
+  columns: HouseProject["structuralColumns"],
+  previous: HouseProject["structuralGrid"] = [],
+): HouseProject["structuralGrid"] {
+  const existing = new Map(previous.map((grid) => [grid.id, grid]));
+  return levels.flatMap((level) => {
+    const plan = level.plan;
+    if (!plan) return [];
+    const bounds = planBounds(plan);
+    const levelColumns = columns.filter((column) => column.levelId === level.id);
+    const xs = uniquePositions(levelColumns.map((column) => column.x));
+    const ys = uniquePositions(levelColumns.map((column) => column.y));
+    return [
+      ...xs.map((position, index) => {
+        const id = `${level.id}:grid:x:${index + 1}`;
+        return { id, levelId: level.id, axis: "x" as const, label: existing.get(id)?.label ?? String(index + 1), position, start: { x: position, y: bounds.minY - 500 }, end: { x: position, y: bounds.minY + bounds.depth + 500 } };
+      }),
+      ...ys.map((position, index) => {
+        const id = `${level.id}:grid:y:${index + 1}`;
+        return { id, levelId: level.id, axis: "y" as const, label: existing.get(id)?.label ?? String.fromCharCode(65 + index), position, start: { x: bounds.minX - 500, y: position }, end: { x: bounds.minX + bounds.width + 500, y: position } };
+      }),
+    ];
   });
 }
 
@@ -628,7 +689,7 @@ export function buildHouseCeilings(
       boundary: room.boundary.map(copyPoint),
       elevation: (level?.elevation ?? 0) + room.ceilingHeight,
       thickness: old?.thickness ?? 12,
-      material: old?.material ?? "Gypsum board",
+      material: old?.material ?? room.ceilingMaterial,
     };
   });
 }
@@ -664,6 +725,30 @@ export function buildHouseVerandas(
 ): HouseProject["verandas"] {
   const ground = levels[0];
   if (!ground?.plan) return [];
+  const planned = ground.plan.planPlatforms?.filter((item) => item.kind === "veranda") ?? [];
+  if (planned.length > 0) {
+    return planned.map((platform) => {
+      const id = `${ground.id}:veranda:${platform.id}`;
+      const old = previous.find((item) => item.id === id);
+      const wall = platformWall(ground, walls, platform.wallId);
+      return {
+        id,
+        levelId: ground.id,
+        wallId: wall?.id ?? "",
+        x: old?.x ?? platform.x,
+        y: old?.y ?? platform.y,
+        elevation: old?.elevation ?? ground.elevation,
+        width: old?.width ?? platform.width,
+        depth: old?.depth ?? platform.depth,
+        thickness: old?.thickness ?? 120,
+        rotation: old?.rotation ?? platform.rotation,
+        canopyHeight: old?.canopyHeight ?? 2_700,
+        canopyMaterial: old?.canopyMaterial ?? "Coated metal",
+        postMaterial: old?.postMaterial ?? "Steel",
+        material: old?.material ?? "Paving",
+      };
+    });
+  }
   const door = doors.find((item) => item.levelId === ground.id && item.type !== "passage");
   const wall = door ? walls.find((item) => item.id === door.wallId) : null;
   if (!door || !wall) return [];
@@ -697,7 +782,32 @@ export function buildHouseBalconies(
 ): HouseProject["balconies"] {
   const ground = levels[0];
   const upper = levels[1];
-  if (!ground?.plan || !upper?.plan) return [];
+  if (!ground?.plan) return [];
+  const planned = ground.plan.planPlatforms?.filter((item) => item.kind === "balcony") ?? [];
+  if (planned.length > 0) {
+    const target = upper?.plan ? upper : ground;
+    return planned.map((platform) => {
+      const id = `${target.id}:balcony:${platform.id}`;
+      const old = previous.find((item) => item.id === id);
+      const wall = platformWall(target, walls, platform.wallId);
+      return {
+        id,
+        levelId: target.id,
+        wallId: wall?.id ?? "",
+        x: old?.x ?? platform.x,
+        y: old?.y ?? platform.y,
+        elevation: old?.elevation ?? (upper ? target.elevation : target.elevation + (target.plan?.ceilingHeight ?? 2_700)),
+        width: old?.width ?? platform.width,
+        depth: old?.depth ?? platform.depth,
+        thickness: old?.thickness ?? 150,
+        rotation: old?.rotation ?? platform.rotation,
+        railingHeight: old?.railingHeight ?? 1_050,
+        railingMaterial: old?.railingMaterial ?? "Steel and glass",
+        material: old?.material ?? "Reinforced concrete",
+      };
+    });
+  }
+  if (!upper?.plan) return [];
   const door = doors.find((item) => item.levelId === ground.id && item.type !== "passage");
   const groundWall = door ? walls.find((item) => item.id === door.wallId) : null;
   const wall = groundWall?.sourceWallId
@@ -751,9 +861,27 @@ function clonePlan(room: Room, keepReference: boolean): Room {
     ...room,
     corners: room.corners.map((corner) => ({ ...corner })),
     openings: room.openings.map((opening) => ({ ...opening })),
+    interiorWalls: room.interiorWalls?.map((wall) => ({ ...wall, start: { ...wall.start }, end: { ...wall.end } })),
+    zones: room.zones?.map((zone) => ({ ...zone, boundary: zone.boundary.map(copyPoint) })),
+    planColumns: room.planColumns?.map((column) => ({ ...column })),
+    planStairs: room.planStairs?.map((stair) => ({ ...stair })),
+    dimensions: room.dimensions?.map((dimension) => ({ ...dimension, start: { ...dimension.start }, end: { ...dimension.end } })),
+    planPlatforms: room.planPlatforms?.map((platform) => ({ ...platform })),
     runWalls: [],
     reference: keepReference ? room.reference : undefined,
   };
+}
+
+export function housePlanWalls(room: Room) {
+  return [
+    ...roomWalls(room).map((wall) => ({ ...wall, thickness: room.wallThickness, height: room.ceilingHeight, exterior: true })),
+    ...(room.interiorWalls ?? []).map((wall) => {
+      const dx = wall.end.x - wall.start.x;
+      const dy = wall.end.y - wall.start.y;
+      const length = Math.max(0.5, Math.hypot(dx, dy));
+      return { id: wall.id, label: wall.label, start: { ...wall.start }, end: { ...wall.end }, length, angle: Math.atan2(-dy, dx) * 180 / Math.PI, inward: { x: -dy / length, y: dx / length }, thickness: wall.thickness, height: wall.height, exterior: false };
+    }),
+  ];
 }
 
 function copyPoint(point: { x: number; y: number }) {
@@ -777,4 +905,18 @@ function clampInt(value: number, min: number, max: number) {
 function ordinal(index: number): string {
   const names = ["First", "Second", "Third", "Fourth", "Fifth"];
   return names[index - 1] ?? `Level ${index}`;
+}
+
+function uniquePositions(values: number[]) {
+  const positions: number[] = [];
+  for (const value of [...values].sort((a, b) => a - b)) {
+    if (!positions.some((position) => Math.abs(position - value) < 1)) positions.push(value);
+  }
+  return positions;
+}
+
+function platformWall(level: HouseProject["levels"][number], walls: HouseProject["walls"], sourceWallId?: string) {
+  const exteriorIds = new Set(level.plan?.corners.map((corner) => corner.id) ?? []);
+  return walls.find((wall) => wall.levelId === level.id && wall.sourceWallId === sourceWallId)
+    ?? walls.find((wall) => wall.levelId === level.id && !!wall.sourceWallId && exteriorIds.has(wall.sourceWallId));
 }

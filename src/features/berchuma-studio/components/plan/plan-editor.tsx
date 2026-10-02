@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 import { PlanCanvas } from "./plan-canvas";
 import {
+  allRoomWalls,
   doorClearance,
   floorArea,
   openingFaults,
@@ -48,8 +49,10 @@ export function PlanEditor({
   const [snap, setSnap] = useState(true);
 
   const walls = useMemo(() => roomWalls(room), [room]);
+  const openingWalls = useMemo(() => allRoomWalls(room), [room]);
   const faults = useMemo(() => openingFaults(room), [room]);
   const clearance = useMemo(() => doorClearance(room), [room]);
+  const bounds = useMemo(() => planBounds(room), [room]);
 
   const commit = useCallback((next: Room) => {
     setPast((history) => [...history, room].slice(-HISTORY_LIMIT));
@@ -136,7 +139,7 @@ export function PlanEditor({
   }
 
   function addOpening(kind: RoomOpeningKind) {
-    const wall = walls.find((one) => one.id === selected) ?? walls[0];
+    const wall = openingWalls.find((one) => one.id === selected) ?? walls[0];
     if (!wall) return;
 
     const width = kind === "window" ? 1200 : 900;
@@ -177,6 +180,105 @@ export function PlanEditor({
         ? room.runWalls.filter((id) => id !== wallId)
         : [...room.runWalls, wallId],
     });
+  }
+
+  function addInteriorWall() {
+    const id = `iw-${Date.now()}`;
+    const x = bounds.minX + bounds.width / 2;
+    const margin = Math.min(1_000, bounds.depth * 0.2);
+    commit({
+      ...room,
+      interiorWalls: [...(room.interiorWalls ?? []), {
+        id,
+        start: { x, y: bounds.minY + margin },
+        end: { x, y: bounds.maxY - margin },
+        thickness: room.wallThickness,
+        height: room.ceilingHeight,
+        label: `Interior wall ${(room.interiorWalls?.length ?? 0) + 1}`,
+      }],
+    });
+    setSelected(id);
+  }
+
+  function addZone() {
+    const id = `zone-${Date.now()}`;
+    const width = Math.max(1_000, Math.min(3_500, bounds.width * 0.45));
+    const depth = Math.max(1_000, Math.min(3_500, bounds.depth * 0.45));
+    commit({
+      ...room,
+      zones: [...(room.zones ?? []), {
+        id,
+        name: `Room ${(room.zones?.length ?? 0) + 1}`,
+        boundary: rectangle(bounds.minX + room.wallThickness, bounds.minY + room.wallThickness, width, depth),
+        floorMaterial: "Unspecified",
+        wallMaterial: "Paint",
+        ceilingMaterial: "Gypsum board",
+      }],
+    });
+    setSelected(id);
+  }
+
+  function addColumn() {
+    const id = `column-${Date.now()}`;
+    commit({
+      ...room,
+      planColumns: [...(room.planColumns ?? []), {
+        id,
+        x: bounds.minX + bounds.width / 2,
+        y: bounds.minY + bounds.depth / 2,
+        width: 300,
+        depth: 300,
+        label: `Column ${(room.planColumns?.length ?? 0) + 1}`,
+      }],
+    });
+    setSelected(id);
+  }
+
+  function addStair() {
+    const id = `stair-${Date.now()}`;
+    commit({
+      ...room,
+      planStairs: [...(room.planStairs ?? []), {
+        id,
+        x: bounds.minX + bounds.width / 2,
+        y: bounds.minY + bounds.depth / 2,
+        width: Math.min(1_000, bounds.width * 0.25),
+        length: Math.min(3_200, bounds.depth * 0.55),
+        rotation: 0,
+        label: `Stair ${(room.planStairs?.length ?? 0) + 1}`,
+      }],
+    });
+    setSelected(id);
+  }
+
+  function addDimension() {
+    const wall = walls.find((item) => item.id === selected) ?? walls[0];
+    if (!wall) return;
+    const id = `dimension-${Date.now()}`;
+    commit({
+      ...room,
+      dimensions: [...(room.dimensions ?? []), { id, start: { ...wall.start }, end: { ...wall.end }, label: "" }],
+    });
+    setSelected(id);
+  }
+
+  function addPlatform(kind: "balcony" | "veranda") {
+    const id = `${kind}-${Date.now()}`;
+    commit({
+      ...room,
+      planPlatforms: [...(room.planPlatforms ?? []), {
+        id,
+        kind,
+        x: bounds.minX + bounds.width / 2,
+        y: bounds.maxY + (kind === "balcony" ? 600 : 750),
+        width: Math.min(3_200, bounds.width * 0.45),
+        depth: kind === "balcony" ? 1_200 : 1_500,
+        rotation: 0,
+        wallId: walls[2]?.id ?? walls[0]?.id,
+        label: kind === "balcony" ? "Balcony" : "Veranda",
+      }],
+    });
+    setSelected(id);
   }
 
   return (
@@ -320,6 +422,72 @@ export function PlanEditor({
           ) : null}
         </section>
 
+        {purpose === "house" ? (
+          <section className="space-y-2 rounded-xl border p-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rooms and structure</h2>
+            <div className="grid grid-cols-2 gap-1.5">
+              <PlanTool label="Wall" onClick={addInteriorWall} />
+              <PlanTool label="Room" onClick={addZone} />
+              <PlanTool label="Column" onClick={addColumn} />
+              <PlanTool label="Stair" onClick={addStair} />
+              <PlanTool label="Dimension" onClick={addDimension} />
+              <PlanTool label="Balcony" onClick={() => addPlatform("balcony")} />
+              <PlanTool label="Veranda" onClick={() => addPlatform("veranda")} />
+            </div>
+
+            {(room.interiorWalls ?? []).map((wall) => (
+              <PlanItem key={wall.id} title={wall.label} selected={selected === wall.id} onSelect={() => setSelected(wall.id)} onDelete={() => commit({ ...room, interiorWalls: (room.interiorWalls ?? []).filter((item) => item.id !== wall.id), openings: room.openings.filter((opening) => opening.wallId !== wall.id) })}>
+                <SmallNumber label="Start X" value={wall.start.x} min={-100000} step={0.1} onChange={(x) => commit({ ...room, interiorWalls: (room.interiorWalls ?? []).map((item) => item.id === wall.id ? { ...item, start: { ...item.start, x } } : item) })} />
+                <SmallNumber label="Start Y" value={wall.start.y} min={-100000} step={0.1} onChange={(y) => commit({ ...room, interiorWalls: (room.interiorWalls ?? []).map((item) => item.id === wall.id ? { ...item, start: { ...item.start, y } } : item) })} />
+                <SmallNumber label="End X" value={wall.end.x} min={-100000} step={0.1} onChange={(x) => commit({ ...room, interiorWalls: (room.interiorWalls ?? []).map((item) => item.id === wall.id ? { ...item, end: { ...item.end, x } } : item) })} />
+                <SmallNumber label="End Y" value={wall.end.y} min={-100000} step={0.1} onChange={(y) => commit({ ...room, interiorWalls: (room.interiorWalls ?? []).map((item) => item.id === wall.id ? { ...item, end: { ...item.end, y } } : item) })} />
+                <SmallNumber label="Thickness" value={wall.thickness} min={50} step={0.1} onChange={(thickness) => commit({ ...room, interiorWalls: (room.interiorWalls ?? []).map((item) => item.id === wall.id ? { ...item, thickness } : item) })} />
+              </PlanItem>
+            ))}
+
+            {(room.zones ?? []).map((zone) => {
+              const box = pointBounds(zone.boundary);
+              const replace = (x: number, y: number, width: number, depth: number) => commit({ ...room, zones: (room.zones ?? []).map((item) => item.id === zone.id ? { ...item, boundary: rectangle(x, y, width, depth) } : item) });
+              return (
+                <PlanItem key={zone.id} title={zone.name} selected={selected === zone.id} onSelect={() => setSelected(zone.id)} onDelete={() => commit({ ...room, zones: (room.zones ?? []).filter((item) => item.id !== zone.id) })}>
+                  <input value={zone.name} onChange={(event) => commit({ ...room, zones: (room.zones ?? []).map((item) => item.id === zone.id ? { ...item, name: event.target.value.slice(0, 80) || "Room" } : item) })} aria-label="Room name" className="col-span-2 rounded-md border bg-background px-2 py-1 text-xs" />
+                  <SmallNumber label="X" value={box.minX} min={-100000} step={0.1} onChange={(x) => replace(x, box.minY, box.width, box.depth)} />
+                  <SmallNumber label="Y" value={box.minY} min={-100000} step={0.1} onChange={(y) => replace(box.minX, y, box.width, box.depth)} />
+                  <SmallNumber label="Width" value={box.width} min={300} step={0.1} onChange={(width) => replace(box.minX, box.minY, width, box.depth)} />
+                  <SmallNumber label="Depth" value={box.depth} min={300} step={0.1} onChange={(depth) => replace(box.minX, box.minY, box.width, depth)} />
+                </PlanItem>
+              );
+            })}
+
+            {(room.planColumns ?? []).map((column) => (
+              <PlanItem key={column.id} title={column.label} selected={selected === column.id} onSelect={() => setSelected(column.id)} onDelete={() => commit({ ...room, planColumns: (room.planColumns ?? []).filter((item) => item.id !== column.id) })}>
+                {(["x", "y", "width", "depth"] as const).map((field) => <SmallNumber key={field} label={field} value={column[field]} min={field === "x" || field === "y" ? -100000 : 100} step={0.1} onChange={(value) => commit({ ...room, planColumns: (room.planColumns ?? []).map((item) => item.id === column.id ? { ...item, [field]: value } : item) })} />)}
+              </PlanItem>
+            ))}
+
+            {(room.planStairs ?? []).map((stair) => (
+              <PlanItem key={stair.id} title={stair.label} selected={selected === stair.id} onSelect={() => setSelected(stair.id)} onDelete={() => commit({ ...room, planStairs: (room.planStairs ?? []).filter((item) => item.id !== stair.id) })}>
+                {(["x", "y", "width", "length", "rotation"] as const).map((field) => <SmallNumber key={field} label={field} value={stair[field]} min={field === "x" || field === "y" || field === "rotation" ? -100000 : 300} step={0.1} onChange={(value) => commit({ ...room, planStairs: (room.planStairs ?? []).map((item) => item.id === stair.id ? { ...item, [field]: value } : item) })} />)}
+              </PlanItem>
+            ))}
+
+            {(room.dimensions ?? []).map((dimension) => (
+              <PlanItem key={dimension.id} title={dimension.label || "Dimension"} selected={selected === dimension.id} onSelect={() => setSelected(dimension.id)} onDelete={() => commit({ ...room, dimensions: (room.dimensions ?? []).filter((item) => item.id !== dimension.id) })}>
+                <SmallNumber label="Start X" value={dimension.start.x} min={-100000} step={0.1} onChange={(x) => commit({ ...room, dimensions: (room.dimensions ?? []).map((item) => item.id === dimension.id ? { ...item, start: { ...item.start, x } } : item) })} />
+                <SmallNumber label="Start Y" value={dimension.start.y} min={-100000} step={0.1} onChange={(y) => commit({ ...room, dimensions: (room.dimensions ?? []).map((item) => item.id === dimension.id ? { ...item, start: { ...item.start, y } } : item) })} />
+                <SmallNumber label="End X" value={dimension.end.x} min={-100000} step={0.1} onChange={(x) => commit({ ...room, dimensions: (room.dimensions ?? []).map((item) => item.id === dimension.id ? { ...item, end: { ...item.end, x } } : item) })} />
+                <SmallNumber label="End Y" value={dimension.end.y} min={-100000} step={0.1} onChange={(y) => commit({ ...room, dimensions: (room.dimensions ?? []).map((item) => item.id === dimension.id ? { ...item, end: { ...item.end, y } } : item) })} />
+              </PlanItem>
+            ))}
+
+            {(room.planPlatforms ?? []).map((platform) => (
+              <PlanItem key={platform.id} title={platform.label} selected={selected === platform.id} onSelect={() => setSelected(platform.id)} onDelete={() => commit({ ...room, planPlatforms: (room.planPlatforms ?? []).filter((item) => item.id !== platform.id) })}>
+                {(["x", "y", "width", "depth", "rotation"] as const).map((field) => <SmallNumber key={field} label={field} value={platform[field]} min={field === "x" || field === "y" || field === "rotation" ? -100000 : 300} step={0.1} onChange={(value) => commit({ ...room, planPlatforms: (room.planPlatforms ?? []).map((item) => item.id === platform.id ? { ...item, [field]: value } : item) })} />)}
+              </PlanItem>
+            ))}
+          </section>
+        ) : null}
+
         <section className="space-y-2 rounded-xl border p-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Doors and windows
@@ -354,7 +522,7 @@ export function PlanEditor({
                   aria-label="Wall"
                   className="w-12 shrink-0 rounded-md border bg-background px-1 py-1 text-xs"
                 >
-                  {walls.map((wall) => (
+                  {openingWalls.map((wall) => (
                     <option key={wall.id} value={wall.id}>
                       {wall.label.replace("Wall ", "")}
                     </option>
@@ -517,6 +685,37 @@ function SmallNumber({
 
 function roundDecimal(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function PlanTool({ label, onClick }: { label: string; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="rounded-md border px-2 py-2 text-xs hover:border-brand hover:text-brand">+ {label}</button>;
+}
+
+function PlanItem({ title, selected, onSelect, onDelete, children }: { title: string; selected: boolean; onSelect: () => void; onDelete: () => void; children: React.ReactNode }) {
+  return (
+    <div className={cn("space-y-1.5 rounded-lg border p-2", selected && "border-brand bg-brand/5")}>
+      <div className="flex items-center justify-between gap-2"><button type="button" onClick={onSelect} className="truncate text-left text-xs font-medium">{title}</button><button type="button" onClick={onDelete} className="text-xs text-destructive">Remove</button></div>
+      <div className="grid grid-cols-2 gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function pointBounds(points: { x: number; y: number }[]) {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  return { minX, maxX, minY, maxY, width: maxX - minX, depth: maxY - minY };
+}
+
+function planBounds(room: Room) {
+  return pointBounds(room.corners);
+}
+
+function rectangle(x: number, y: number, width: number, depth: number) {
+  return [{ x, y }, { x: x + width, y }, { x: x + width, y: y + depth }, { x, y: y + depth }];
 }
 
 function IconButton({

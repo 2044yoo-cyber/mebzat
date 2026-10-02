@@ -1,4 +1,3 @@
-import { roomWalls } from "@/features/berchuma-studio/services/room-geometry";
 import type { Room } from "@/features/berchuma-studio/types/room";
 
 import {
@@ -9,6 +8,8 @@ import {
   buildHouseVerandas,
   buildStructuralBeams,
   buildStructuralColumns,
+  buildStructuralGrid,
+  housePlanWalls,
   openingObjectId,
   wallObjectId,
   type HouseProject,
@@ -24,6 +25,8 @@ export function patchHouseObject(
   patch: HousePatch,
 ): HouseProject {
   switch (selection.kind) {
+    case "room":
+      return patchRoom(project, selection.id, patch);
     case "wall":
       return patchWall(project, selection.id, patch);
     case "door":
@@ -39,6 +42,10 @@ export function patchHouseObject(
       return { ...project, structuralColumns: patchList(project.structuralColumns, selection.id, patch) };
     case "beam":
       return patchBeam(project, selection.id, patch);
+    case "grid":
+      return patchGrid(project, selection.id, patch);
+    case "facade":
+      return { ...project, facadeElements: patchList(project.facadeElements, selection.id, patch) };
     case "balcony":
       return { ...project, balconies: patchList(project.balconies, selection.id, patch) };
     case "veranda":
@@ -50,6 +57,44 @@ export function patchHouseObject(
     case "level":
       return patchLevel(project, selection.id, patch);
   }
+}
+
+function patchRoom(project: HouseProject, id: string, patch: HousePatch): HouseProject {
+  const room = project.rooms.find((item) => item.id === id);
+  if (!room) return project;
+  const name = typeof patch.name === "string" ? patch.name : room.name;
+  const floorMaterial = typeof patch.floorMaterial === "string" ? patch.floorMaterial : room.floorMaterial;
+  const wallMaterial = typeof patch.wallMaterial === "string" ? patch.wallMaterial : room.wallMaterial;
+  const ceilingMaterial = typeof patch.ceilingMaterial === "string" ? patch.ceilingMaterial : room.ceilingMaterial;
+  return {
+    ...project,
+    rooms: project.rooms.map((item) => item.id === id ? { ...item, name, floorMaterial, wallMaterial, ceilingMaterial } : item),
+    levels: project.levels.map((level) => level.id === room.levelId && level.plan
+      ? {
+          ...level,
+          plan: {
+            ...level.plan,
+            zones: level.plan.zones?.map((zone) => `${level.id}:${zone.id}` === id ? { ...zone, name, floorMaterial, wallMaterial, ceilingMaterial } : zone),
+          },
+        }
+      : level),
+    ceilings: project.ceilings.map((ceiling) => ceiling.roomId === id ? { ...ceiling, material: ceilingMaterial } : ceiling),
+  };
+}
+
+function patchGrid(project: HouseProject, id: string, patch: HousePatch): HouseProject {
+  return {
+    ...project,
+    structuralGrid: project.structuralGrid.map((grid) => {
+      if (grid.id !== id) return grid;
+      const position = numberOr(patch.position, grid.position);
+      const start = { x: numberOr(patch.startX, grid.start.x), y: numberOr(patch.startY, grid.start.y) };
+      const end = { x: numberOr(patch.endX, grid.end.x), y: numberOr(patch.endY, grid.end.y) };
+      if (grid.axis === "x") { start.x = position; end.x = position; }
+      else { start.y = position; end.y = position; }
+      return { ...grid, label: typeof patch.label === "string" ? patch.label : grid.label, position, start, end };
+    }),
+  };
 }
 
 function patchSite(project: HouseProject, id: string, patch: HousePatch): HouseProject {
@@ -92,11 +137,17 @@ function patchBeam(project: HouseProject, id: string, patch: HousePatch): HouseP
 function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseProject {
   const wall = project.walls.find((item) => item.id === id);
   if (!wall) return project;
+  const effectivePatch = { ...patch };
+  if (typeof patch.length === "number" && Number.isFinite(patch.length) && patch.length >= 200) {
+    const currentLength = Math.max(0.5, Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y));
+    effectivePatch.endX = wall.start.x + ((wall.end.x - wall.start.x) / currentLength) * patch.length;
+    effectivePatch.endY = wall.start.y + ((wall.end.y - wall.start.y) / currentLength) * patch.length;
+  }
   const next: HouseProject = {
     ...project,
     walls: project.walls.map((item) =>
-      item.id === id && typeof patch.material === "string"
-        ? { ...item, material: patch.material }
+      item.id === id && typeof effectivePatch.material === "string"
+        ? { ...item, material: effectivePatch.material }
         : item,
     ),
   };
@@ -106,21 +157,34 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
   if (!level || !plan || !sourceWallId) return next;
 
   const startIndex = plan.corners.findIndex((corner) => corner.id === sourceWallId);
-  if (startIndex < 0) return next;
+  if (startIndex < 0) {
+    const interior = plan.interiorWalls?.find((item) => item.id === sourceWallId);
+    if (!interior) return next;
+    return rebuildLevel(next, level.id, {
+      ...plan,
+      interiorWalls: (plan.interiorWalls ?? []).map((item) => item.id === sourceWallId ? {
+        ...item,
+        start: { x: numberOr(effectivePatch.startX, item.start.x), y: numberOr(effectivePatch.startY, item.start.y) },
+        end: { x: numberOr(effectivePatch.endX, item.end.x), y: numberOr(effectivePatch.endY, item.end.y) },
+        thickness: positiveOr(effectivePatch.thickness, item.thickness),
+        height: positiveOr(effectivePatch.height, item.height),
+      } : item),
+    });
+  }
   const endIndex = (startIndex + 1) % plan.corners.length;
   const corners = plan.corners.map((corner, index) => {
     if (index === startIndex) {
       return {
         ...corner,
-        x: numberOr(patch.startX, corner.x),
-        y: numberOr(patch.startY, corner.y),
+        x: numberOr(effectivePatch.startX, corner.x),
+        y: numberOr(effectivePatch.startY, corner.y),
       };
     }
     if (index === endIndex) {
       return {
         ...corner,
-        x: numberOr(patch.endX, corner.x),
-        y: numberOr(patch.endY, corner.y),
+        x: numberOr(effectivePatch.endX, corner.x),
+        y: numberOr(effectivePatch.endY, corner.y),
       };
     }
     return corner;
@@ -128,8 +192,8 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
   const changedPlan: Room = {
     ...plan,
     corners,
-    wallThickness: positiveOr(patch.thickness, plan.wallThickness),
-    ceilingHeight: positiveOr(patch.height, plan.ceilingHeight),
+    wallThickness: positiveOr(effectivePatch.thickness, plan.wallThickness),
+    ceilingHeight: positiveOr(effectivePatch.height, plan.ceilingHeight),
   };
   return rebuildLevel(next, level.id, changedPlan);
 }
@@ -236,15 +300,15 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
       .map((opening) => [opening.sourceOpeningId ?? opening.id.split(":").at(-1), opening]),
   );
 
-  const walls = roomWalls(plan).map((wall) => ({
+  const walls = housePlanWalls(plan).map((wall) => ({
     id: wallObjectId(levelId, wall.id),
     sourceWallId: wall.id,
     levelId,
     roomId,
     start: { ...wall.start },
     end: { ...wall.end },
-    thickness: plan.wallThickness,
-    height: plan.ceilingHeight,
+    thickness: wall.thickness,
+    height: wall.height,
     material: oldWalls.get(wall.id)?.material ?? "Masonry",
   }));
   const openings = plan.openings.map((opening) => {
@@ -266,15 +330,10 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
   });
   const levels = project.levels.map((level) => level.id === levelId ? { ...level, plan } : level);
   const rebuiltWalls = [...project.walls.filter((wall) => wall.levelId !== levelId), ...walls];
-  const rebuiltRooms = project.rooms.map((room) =>
-    room.levelId === levelId
-      ? {
-          ...room,
-          boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })),
-          ceilingHeight: plan.ceilingHeight,
-        }
-      : room,
-  );
+  const rebuiltRooms = [
+    ...project.rooms.filter((room) => room.levelId !== levelId),
+    ...roomsForPlan(levelId, plan, project.rooms.filter((room) => room.levelId === levelId)),
+  ];
   const rebuiltDoors = [
     ...project.doors.filter((opening) => opening.levelId !== levelId),
     ...openings.filter((opening) => opening.type !== "window"),
@@ -285,6 +344,7 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
   ];
   const structuralColumns = buildStructuralColumns(levels, project.structuralColumns);
   const structuralBeams = buildStructuralBeams(rebuiltWalls, levels, project.structuralBeams);
+  const structuralGrid = buildStructuralGrid(levels, structuralColumns, project.structuralGrid);
 
   return {
     ...project,
@@ -306,6 +366,7 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
     facadeElements: buildFacadeElements(rebuiltWalls, levels, project.facade),
     structuralColumns,
     structuralBeams,
+    structuralGrid,
     ceilings: buildHouseCeilings(rebuiltRooms, levels, project.ceilings),
     site: buildHouseSite(rebuiltRooms, project.site),
     verandas: buildHouseVerandas(levels, rebuiltWalls, rebuiltDoors, project.verandas),
@@ -345,4 +406,34 @@ function rectangleBoundary(x: number, y: number, width: number, depth: number) {
     { x: x + halfWidth, y: y + halfDepth },
     { x: x - halfWidth, y: y + halfDepth },
   ];
+}
+
+function roomsForPlan(levelId: string, plan: Room, previous: HouseProject["rooms"]): HouseProject["rooms"] {
+  if (plan.zones?.length) {
+    return plan.zones.map((zone) => {
+      const id = `${levelId}:${zone.id}`;
+      const old = previous.find((room) => room.id === id);
+      return {
+        id,
+        levelId,
+        name: zone.name,
+        boundary: zone.boundary.map((point) => ({ ...point })),
+        floorMaterial: old?.floorMaterial ?? zone.floorMaterial,
+        wallMaterial: old?.wallMaterial ?? zone.wallMaterial,
+        ceilingMaterial: old?.ceilingMaterial ?? zone.ceilingMaterial,
+        ceilingHeight: plan.ceilingHeight,
+      };
+    });
+  }
+  const old = previous[0];
+  return [{
+    id: old?.id ?? `${levelId}:room-1`,
+    levelId,
+    name: old?.name ?? "Floor",
+    boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })),
+    floorMaterial: old?.floorMaterial ?? "Unspecified",
+    wallMaterial: old?.wallMaterial ?? "Paint",
+    ceilingMaterial: old?.ceilingMaterial ?? "Gypsum board",
+    ceilingHeight: plan.ceilingHeight,
+  }];
 }

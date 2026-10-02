@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { patchHouseObject, type HousePatch } from "../services/project-edit";
 import {
+  facadeElementTypes,
   roofTypes,
   stairTypes,
   type HouseProject,
@@ -88,6 +89,7 @@ function InspectorFields({
     if (!item) return <Missing />;
     return (
       <FieldGrid title="Wall">
+        <NumberInput label="Length" value={Math.hypot(item.end.x - item.start.x, item.end.y - item.start.y)} min={200} max={100000} onChange={(length) => onPatch({ length })} />
         <NumberInput label="Start X" value={item.start.x} min={-100000} max={100000} onChange={(startX) => onPatch({ startX })} />
         <NumberInput label="Start Y" value={item.start.y} min={-100000} max={100000} onChange={(startY) => onPatch({ startY })} />
         <NumberInput label="End X" value={item.end.x} min={-100000} max={100000} onChange={(endX) => onPatch({ endX })} />
@@ -95,6 +97,19 @@ function InspectorFields({
         <NumberInput label="Thickness" value={item.thickness} min={50} max={1000} onChange={(thickness) => onPatch({ thickness })} />
         <NumberInput label="Height" value={item.height} min={1200} max={8000} onChange={(height) => onPatch({ height })} />
         <TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide />
+      </FieldGrid>
+    );
+  }
+
+  if (selected.kind === "room") {
+    const item = project.rooms.find((room) => room.id === selected.id);
+    if (!item) return <Missing />;
+    return (
+      <FieldGrid title="Room / interior finishes">
+        <TextInput label="Name" value={item.name} onChange={(name) => onPatch({ name })} wide />
+        <TextInput label="Floor material" value={item.floorMaterial} onChange={(floorMaterial) => onPatch({ floorMaterial })} wide />
+        <TextInput label="Wall finish" value={item.wallMaterial} onChange={(wallMaterial) => onPatch({ wallMaterial })} wide />
+        <TextInput label="Ceiling finish" value={item.ceilingMaterial} onChange={(ceilingMaterial) => onPatch({ ceilingMaterial })} wide />
       </FieldGrid>
     );
   }
@@ -163,6 +178,38 @@ function InspectorFields({
         <NumberInput label="Depth" value={item.depth} min={100} max={3000} onChange={(depth) => onPatch({ depth })} />
         <NumberInput label="Elevation" value={item.elevation} min={-10000} max={50000} onChange={(elevation) => onPatch({ elevation })} />
         <TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide />
+      </FieldGrid>
+    );
+  }
+
+  if (selected.kind === "grid") {
+    const item = project.structuralGrid.find((grid) => grid.id === selected.id);
+    if (!item) return <Missing />;
+    return (
+      <FieldGrid title={`Structural grid · ${item.axis.toUpperCase()} axis`}>
+        <TextInput label="Label" value={item.label} onChange={(label) => onPatch({ label })} wide />
+        <NumberInput label="Position" value={item.position} min={-100000} max={100000} onChange={(position) => onPatch({ position })} />
+        <NumberInput label="Start X" value={item.start.x} min={-100000} max={100000} onChange={(startX) => onPatch({ startX })} />
+        <NumberInput label="Start Y" value={item.start.y} min={-100000} max={100000} onChange={(startY) => onPatch({ startY })} />
+        <NumberInput label="End X" value={item.end.x} min={-100000} max={100000} onChange={(endX) => onPatch({ endX })} />
+        <NumberInput label="End Y" value={item.end.y} min={-100000} max={100000} onChange={(endY) => onPatch({ endY })} />
+      </FieldGrid>
+    );
+  }
+
+  if (selected.kind === "facade") {
+    const item = project.facadeElements.find((element) => element.id === selected.id);
+    if (!item) return <Missing />;
+    return (
+      <FieldGrid title="Façade element">
+        <SelectInput label="Type" value={item.type} options={facadeElementTypes} onChange={(type) => onPatch({ type })} wide />
+        <NumberInput label="Wall offset" value={item.offset} min={0} max={100000} onChange={(offset) => onPatch({ offset })} />
+        <NumberInput label="Elevation" value={item.elevation} min={0} max={50000} onChange={(elevation) => onPatch({ elevation })} />
+        <NumberInput label="Width" value={item.width} min={20} max={100000} onChange={(width) => onPatch({ width })} />
+        <NumberInput label="Height" value={item.height} min={20} max={20000} onChange={(height) => onPatch({ height })} />
+        <NumberInput label="Depth" value={item.depth} min={10} max={5000} onChange={(depth) => onPatch({ depth })} />
+        <TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide />
+        <TextInput label="Colour" value={item.color} onChange={(color) => onPatch({ color })} wide />
       </FieldGrid>
     );
   }
@@ -317,17 +364,20 @@ function objectOptions(project: HouseProject, levelId: string) {
   const options: { label: string; selection: HouseSelection }[] = [];
   const level = project.levels.find((item) => item.id === levelId);
   if (level) options.push({ label: level.name, selection: { kind: "level", id: level.id } });
+  addOptions(options, project.rooms.filter((item) => item.levelId === levelId), "room", "Room");
   addOptions(options, project.walls.filter((item) => item.levelId === levelId), "wall", "Wall");
   addOptions(options, project.doors.filter((item) => item.levelId === levelId), "door", "Door");
   addOptions(options, project.windows.filter((item) => item.levelId === levelId), "window", "Window");
   addOptions(options, project.stairs.filter((item) => item.levelId === levelId), "stair", "Stair");
   addOptions(options, project.structuralColumns.filter((item) => item.levelId === levelId), "column", "Column");
   addOptions(options, project.structuralBeams.filter((item) => item.levelId === levelId), "beam", "Beam");
+  addOptions(options, project.structuralGrid.filter((item) => item.levelId === levelId), "grid", "Grid");
   addOptions(options, project.slabs.filter((item) => item.levelId === levelId), "slab", "Slab");
   addOptions(options, project.roofs.filter((item) => item.levelId === levelId), "roof", "Roof");
   addOptions(options, project.balconies.filter((item) => item.levelId === levelId), "balcony", "Balcony");
   addOptions(options, project.verandas.filter((item) => item.levelId === levelId), "veranda", "Veranda");
   addOptions(options, project.ceilings.filter((item) => item.levelId === levelId), "ceiling", "Ceiling");
+  addOptions(options, project.facadeElements.filter((item) => item.levelId === levelId), "facade", "Façade element");
   if (project.site?.levelId === levelId) options.push({ label: "Site / ground", selection: { kind: "site", id: project.site.id } });
   return options;
 }

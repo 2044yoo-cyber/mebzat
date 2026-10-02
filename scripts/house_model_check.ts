@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room.ts";
 import { patchHouseObject } from "../src/features/house-designer/services/project-edit.ts";
 import { applyHouseRemodelCommand } from "../src/features/house-designer/services/remodel.ts";
+import { detectedPlanToRoom } from "../src/features/house-designer/services/plan-analysis.ts";
 import {
   activateFacadeAlternative,
   applyFacadeReference,
@@ -144,5 +145,71 @@ assert.equal(handoff.quantities.find((item) => item.id === "house:FIN-05")?.sect
 assert.equal(handoff.quantities.find((item) => item.id === "house:EXT-01")?.section, "W");
 assert.equal(parseHouseTakeoffPackage(JSON.stringify(handoff))?.projectId, project.id);
 houseProjectSchema.parse(project);
+
+const detected = detectedPlanToRoom({
+  outerBoundary: [
+    { id: "outer-a", x: 0, y: 0 },
+    { id: "outer-b", x: 8000, y: 0 },
+    { id: "outer-c", x: 8000, y: 6500 },
+    { id: "outer-d", x: 0, y: 6500 },
+  ],
+  wallThickness: 200,
+  interiorWalls: [{ id: "partition", start: { x: 4000, y: 0 }, end: { x: 4000, y: 6500 }, thickness: 120, label: "Hall wall" }],
+  rooms: [
+    { id: "living", name: "Living", boundary: [{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 4000, y: 6500 }, { x: 0, y: 6500 }] },
+    { id: "bed", name: "Bedroom", boundary: [{ x: 4000, y: 0 }, { x: 8000, y: 0 }, { x: 8000, y: 6500 }, { x: 4000, y: 6500 }] },
+  ],
+  openings: [{ id: "inside-door", kind: "door", wallId: "partition", offset: 900, width: 900 }],
+  columns: [{ id: "column-a", x: 4000, y: 3250, width: 300, depth: 350 }],
+  stairs: [{ id: "stair-a", x: 6000, y: 3000, width: 1000, length: 3200, rotation: 90 }],
+  dimensions: [{ id: "dim-a", start: { x: 0, y: 0 }, end: { x: 8000, y: 0 }, label: "8000" }],
+  platforms: [{ id: "balcony-a", kind: "balcony", x: 4000, y: -600, width: 2800, depth: 1200, wallId: "outer-a" }],
+  confidence: 0.9,
+  notes: ["Verified test plan"],
+}, { ceilingHeight: 3000 });
+assert.equal(detected.room.interiorWalls?.length, 1);
+assert.equal(detected.room.openings[0]?.wallId, "iw1");
+assert.equal(detected.room.zones?.length, 2);
+assert.equal(detected.room.planPlatforms?.[0]?.wallId, "c1");
+
+let detailedProject = createHouseProject({
+  title: "Structured plan check",
+  room: detected.room,
+  style: "modern",
+  strict: false,
+  floorCount: 2,
+  floorToFloorHeight: 3000,
+});
+assert.equal(detailedProject.rooms.length, 4);
+assert.equal(detailedProject.walls.filter((item) => item.levelId === "ground-floor").length, 5);
+assert.equal(detailedProject.structuralColumns.filter((item) => item.levelId === "ground-floor").length, 1);
+assert.equal(detailedProject.stairs[0]?.x, 6000);
+assert.equal(detailedProject.balconies[0]?.width, 2800);
+assert(detailedProject.structuralGrid.length >= 4);
+assert(detailedProject.facadeElements.some((item) => item.type === "parapet"));
+
+const roomId = detailedProject.rooms[0]!.id;
+detailedProject = patchHouseObject(detailedProject, { kind: "room", id: roomId }, { floorMaterial: "Timber", wallMaterial: "Stone" });
+assert.equal(detailedProject.rooms[0]?.floorMaterial, "Timber");
+const gridId = detailedProject.structuralGrid[0]!.id;
+detailedProject = patchHouseObject(detailedProject, { kind: "grid", id: gridId }, { label: "A1" });
+assert.equal(detailedProject.structuralGrid[0]?.label, "A1");
+const facadeId = detailedProject.facadeElements[0]!.id;
+detailedProject = patchHouseObject(detailedProject, { kind: "facade", id: facadeId }, { color: "#123456", depth: 125 });
+assert.equal(detailedProject.facadeElements[0]?.color, "#123456");
+const balconyCount = detailedProject.balconies.length;
+const withAddedBalcony = applyHouseRemodelCommand(detailedProject, { kind: "wall", id: "ground-floor:wall:c1" }, {
+  action: "add_object",
+  objectType: "balcony",
+  explanation: "Add a balcony above the selected wall.",
+});
+assert.equal(withAddedBalcony.project.balconies.length, balconyCount + 1);
+
+const strictAdd = applyHouseRemodelCommand({ ...detailedProject, originalPlanStrict: true }, null, {
+  action: "add_object",
+  objectType: "stair",
+  explanation: "Add a stair.",
+});
+assert.deepEqual(strictAdd.blockedFields, ["stair"]);
 
 console.log("House model checks passed");

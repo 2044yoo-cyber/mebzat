@@ -64,6 +64,64 @@ export const roomOpeningSchema = z.object({
 
 export type RoomOpening = z.infer<typeof roomOpeningSchema>;
 
+const planPointSchema = z.object({ x: z.number(), y: z.number() });
+
+export const interiorWallSchema = z.object({
+  id: z.string().min(1),
+  start: planPointSchema,
+  end: planPointSchema,
+  thickness: z.number().positive().max(600),
+  height: z.number().positive().max(6_000),
+  label: z.string().max(60).default("Interior wall"),
+});
+
+export const planZoneSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(80),
+  boundary: z.array(planPointSchema).min(3).max(16),
+  floorMaterial: z.string().max(100).default("Unspecified"),
+  wallMaterial: z.string().max(100).default("Paint"),
+  ceilingMaterial: z.string().max(100).default("Gypsum board"),
+});
+
+export const planColumnSchema = z.object({
+  id: z.string().min(1),
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive().max(3_000),
+  depth: z.number().positive().max(3_000),
+  label: z.string().max(60).default("Column"),
+});
+
+export const planStairSchema = z.object({
+  id: z.string().min(1),
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive().max(5_000),
+  length: z.number().positive().max(15_000),
+  rotation: z.number(),
+  label: z.string().max(60).default("Stair"),
+});
+
+export const planDimensionSchema = z.object({
+  id: z.string().min(1),
+  start: planPointSchema,
+  end: planPointSchema,
+  label: z.string().max(60).default(""),
+});
+
+export const planPlatformSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(["balcony", "veranda"]),
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive().max(20_000),
+  depth: z.number().positive().max(10_000),
+  rotation: z.number().default(0),
+  wallId: z.string().optional(),
+  label: z.string().max(60).default("Platform"),
+});
+
 export const roomSchema = z.object({
   version: z.literal(1),
 
@@ -91,6 +149,14 @@ export const roomSchema = z.object({
    * list means the room is drawn but nothing is placed against it yet.
    */
   runWalls: z.array(z.string()).max(8).default([]),
+
+  /** Optional house-plan detail. Furniture plans can ignore these fields. */
+  interiorWalls: z.array(interiorWallSchema).max(80).optional(),
+  zones: z.array(planZoneSchema).max(40).optional(),
+  planColumns: z.array(planColumnSchema).max(80).optional(),
+  planStairs: z.array(planStairSchema).max(20).optional(),
+  dimensions: z.array(planDimensionSchema).max(80).optional(),
+  planPlatforms: z.array(planPlatformSchema).max(20).optional(),
 
   /** An uploaded plan traced over. Phase 1 stores it; tracing comes later. */
   reference: z
@@ -141,6 +207,12 @@ export function rectangularRoom(width = 4200, length = 3600): Room {
     ceilingHeight: 2700,
     openings: [],
     runWalls: [],
+    interiorWalls: [],
+    zones: [],
+    planColumns: [],
+    planStairs: [],
+    dimensions: [],
+    planPlatforms: [],
   };
 }
 

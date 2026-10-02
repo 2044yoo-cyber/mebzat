@@ -9,6 +9,7 @@ import {
   Eye,
   EyeOff,
   FileUp,
+  Loader2,
   PencilRuler,
   Save,
   ShieldCheck,
@@ -24,6 +25,7 @@ import { PlanEditor } from "@/features/berchuma-studio/components/plan/plan-edit
 import { floorArea } from "@/features/berchuma-studio/services/room-geometry";
 import {
   rectangularRoom,
+  roomSchema,
   type Room,
 } from "@/features/berchuma-studio/types/room";
 import { cn } from "@/lib/utils";
@@ -69,6 +71,8 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
   const [strict, setStrict] = useState(true);
   const [project, setProject] = useState<HouseProject | null>(null);
   const [view, setView] = useState<WorkspaceView>("split");
+  const [analysingPlan, setAnalysingPlan] = useState(false);
+  const [planAnalysis, setPlanAnalysis] = useState<string | null>(null);
 
   const draftKey = houseDraftKey(userId);
   const stored = useSyncExternalStore(
@@ -97,12 +101,39 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
     }));
   }
 
-  function openVerification(nextSource: Source) {
+  async function openVerification(nextSource: Source) {
     setSource(nextSource);
     setRoom((current) => ({
       ...current,
       ceilingHeight: clamp(floorHeight, 1800, 6000),
     }));
+    setPlanAnalysis(null);
+    const plan = floorPlans[0];
+    if (nextSource === "upload" && plan?.mediaType === "image") {
+      setAnalysingPlan(true);
+      try {
+        const response = await fetch("/api/house-design/analyze-plan", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ imageUrl: plan.url, ceilingHeight: floorHeight }),
+        });
+        const payload = (await response.json()) as { plan?: unknown; confidence?: number; notes?: string[]; error?: string };
+        const parsed = roomSchema.safeParse(payload.plan);
+        if (!response.ok || !parsed.success) throw new Error(payload.error ?? "Automatic plan detection could not be verified.");
+        setRoom({
+          ...parsed.data,
+          reference: { url: plan.url, name: plan.title, mediaType: plan.mediaType, opacity: 0.45 },
+        });
+        const confidence = typeof payload.confidence === "number" ? `${Math.round(payload.confidence * 100)}% confidence` : "detected";
+        setPlanAnalysis(`Plan geometry ${confidence}. Verify every wall and opening before generation.`);
+        toast.success("Floor-plan objects detected. Please verify them.");
+      } catch (error) {
+        setPlanAnalysis("Automatic detection was unavailable. Trace and verify the uploaded plan manually.");
+        toast.info(error instanceof Error ? error.message : "Continue with manual plan verification.");
+      } finally {
+        setAnalysingPlan(false);
+      }
+    }
     setStage("verify");
   }
 
@@ -218,13 +249,15 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           onStyle={setStyle}
           strict={strict}
           onStrict={setStrict}
-          onContinue={() => openVerification(source)}
+          analysingPlan={analysingPlan}
+          onContinue={() => void openVerification(source)}
           onRestore={savedDraft ? restore : undefined}
         />
       ) : stage === "verify" ? (
         <VerifyScreen
           room={room}
           source={source}
+          analysis={planAnalysis}
           onDone={generate}
         />
       ) : project ? (
@@ -258,6 +291,7 @@ function StartScreen({
   style,
   onStyle,
   strict,
+  analysingPlan,
   onStrict,
   onContinue,
   onRestore,
@@ -278,6 +312,7 @@ function StartScreen({
   style: HouseStyle;
   onStyle: (value: HouseStyle) => void;
   strict: boolean;
+  analysingPlan: boolean;
   onStrict: (value: boolean) => void;
   onContinue: () => void;
   onRestore?: () => void;
@@ -377,17 +412,17 @@ function StartScreen({
         <button
           type="button"
           onClick={onContinue}
-          disabled={source === "upload" && floorPlans.length === 0}
+          disabled={analysingPlan || (source === "upload" && floorPlans.length === 0)}
           className="w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground disabled:opacity-40"
         >
-          {source === "upload" ? "Verify floor plan" : "Draw floor plan"}
+          {analysingPlan ? <span className="flex items-center justify-center gap-2"><Loader2 className="size-4 animate-spin" /> Detecting plan…</span> : source === "upload" ? "Detect & verify floor plan" : "Draw floor plan"}
         </button>
       </aside>
     </div>
   );
 }
 
-function VerifyScreen({ room, source, onDone }: { room: Room; source: Source; onDone: (room: Room) => void }) {
+function VerifyScreen({ room, source, analysis, onDone }: { room: Room; source: Source; analysis: string | null; onDone: (room: Room) => void }) {
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3">
@@ -404,6 +439,7 @@ function VerifyScreen({ room, source, onDone }: { room: Room; source: Source; on
           PDF uploaded. Use the visible filename as reference and enter the verified dimensions here; image overlay is available for JPG and PNG plans.
         </p>
       ) : null}
+      {analysis ? <p className="rounded-xl border border-brand/25 bg-brand/5 p-3 text-xs text-foreground">{analysis}</p> : null}
       <div className="h-[min(760px,calc(100dvh-220px))] min-h-[560px]">
         <PlanEditor
           initial={room}
@@ -436,6 +472,7 @@ function ModelScreen({
     () => new Set(project.levels.map((level) => level.id)),
   );
   const [selected, setSelected] = useState<HouseSelection | null>(null);
+  const [viewportOpen, setViewportOpen] = useState(true);
   const activeLevel = project.levels.find((level) => level.id === activeLevelId) ?? project.levels[0];
   const activeRoom = activeLevel?.plan;
 
@@ -462,6 +499,9 @@ function ModelScreen({
           ))}
         </div>
         <div className="flex shrink-0 gap-2">
+          <button type="button" onClick={() => setViewportOpen((open) => !open)} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted">
+            {viewportOpen ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />} {viewportOpen ? "Hide view" : "Show view"}
+          </button>
           <button type="button" onClick={onDownload} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted"><Download className="size-3.5" /> Data</button>
           <button type="button" onClick={onSave} className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-xs font-medium text-brand-foreground"><Save className="size-3.5" /> Save</button>
         </div>
@@ -486,7 +526,7 @@ function ModelScreen({
       <HouseAiRemodelPanel project={project} selected={selected} onChange={onProjectChange} />
 
       <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
+        {viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
           {view !== "3d" && activeRoom ? (
             <div className="relative min-h-[340px] min-w-0 overflow-hidden rounded-xl border bg-background">
               <div className="pointer-events-none absolute inset-0"><PlanCanvas room={activeRoom} onChange={() => undefined} /></div>
@@ -502,7 +542,7 @@ function ModelScreen({
               className="h-[min(620px,62dvh)]"
             />
           ) : null}
-        </div>
+        </div> : <button type="button" onClick={() => setViewportOpen(true)} className="min-h-16 rounded-xl border border-dashed bg-muted/20 text-sm text-muted-foreground hover:border-brand hover:text-brand">Show 2D / 3D viewport</button>}
         <HouseObjectInspector
           project={project}
           activeLevelId={activeLevelId}
