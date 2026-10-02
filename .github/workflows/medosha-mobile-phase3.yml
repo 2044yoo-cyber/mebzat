@@ -128,7 +128,9 @@ jobs:
 
       - name: Type check
         working-directory: /tmp/medosha-mobile-src/medosha-app
-        run: npx tsc --noEmit
+        run: |
+          npm install --save-dev @types/node --no-audit --no-fund
+          npx tsc --noEmit --types react,node
 
       - name: Generate native Android project
         working-directory: /tmp/medosha-mobile-src/medosha-app
