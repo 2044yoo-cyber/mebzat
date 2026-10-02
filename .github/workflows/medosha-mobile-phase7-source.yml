@@ -1,0 +1,54 @@
+name: Medosha Mobile Phase 7 Source
+
+on:
+  push:
+    branches:
+      - chatgpt/medosha-mobile-apk
+    paths:
+      - '.github/workflows/medosha-mobile-phase7-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconstruct-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct Phase 6 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf /tmp/medosha-mobile-src
+          mkdir -p /tmp/medosha-mobile-src/medosha-app
+          cat mobile-build/v04.part0 mobile-build/v04.part1 mobile-build/v04.part2 > /tmp/v04.b64
+          echo '1f03eca91f5ca7720e08680b9c8bfc3e860be70f9eec45c7ef1303424611676b  /tmp/v04.b64' | sha256sum -c -
+          base64 -d /tmp/v04.b64 > /tmp/v04.tar.gz
+          tar -xzf /tmp/v04.tar.gz -C /tmp/medosha-mobile-src/medosha-app
+
+          app=/tmp/medosha-mobile-src/medosha-app
+          cp mobile-build/phase5/HomeScreen.tsx "$app/src/screens/HomeScreen.tsx"
+          cp mobile-build/phase5/FeedDetailScreen.tsx "$app/src/screens/FeedDetailScreen.tsx"
+
+          cat mobile-build/phase6/phase6.part0 mobile-build/phase6/phase6.part1 mobile-build/phase6/phase6.part2 mobile-build/phase6/phase6.part3 > /tmp/phase6-overlay.b64
+          echo '3e273616a076253c553ff2a8fc6d9ddd289834dd2bfa73683bc57f535c20d1c2  /tmp/phase6-overlay.b64' | sha256sum -c -
+          base64 -d /tmp/phase6-overlay.b64 > /tmp/phase6-overlay.tar.gz
+          tar -xzf /tmp/phase6-overlay.tar.gz -C "$app"
+
+          cat mobile-build/phase6/phase6compat.part0 mobile-build/phase6/phase6compat.part1 > /tmp/phase6compat.b64
+          echo 'd1cce4c0921a18e30c1705adbafbf47ca19520c2681537a481d836dc7ca1a431  /tmp/phase6compat.b64' | sha256sum -c -
+          base64 -d /tmp/phase6compat.b64 > /tmp/phase6compat.tar.gz
+          tar -xzf /tmp/phase6compat.tar.gz -C "$app"
+
+          tar -czf "$GITHUB_WORKSPACE/medosha-mobile-v0.6-source.tar.gz" -C /tmp/medosha-mobile-src medosha-app
+          sha256sum "$GITHUB_WORKSPACE/medosha-mobile-v0.6-source.tar.gz"
+
+      - name: Upload reconstructed source
+        uses: actions/upload-artifact@v4
+        with:
+          name: medosha-mobile-v0.6-source
+          path: medosha-mobile-v0.6-source.tar.gz
+          if-no-files-found: error
+          retention-days: 2
