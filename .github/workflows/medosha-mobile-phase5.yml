@@ -32,32 +32,37 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Reconstruct Phase 4 source
+      - name: Reconstruct verified Phase 4 source
         shell: bash
         run: |
           set -euxo pipefail
           rm -rf /tmp/medosha-mobile-src
-          mkdir -p /tmp/medosha-mobile-src
+          mkdir -p /tmp/medosha-mobile-src/medosha-app
           cat mobile-build/v04.part0 mobile-build/v04.part1 mobile-build/v04.part2 > /tmp/v04.b64
           echo '1f03eca91f5ca7720e08680b9c8bfc3e860be70f9eec45c7ef1303424611676b  /tmp/v04.b64' | sha256sum -c -
           base64 -d /tmp/v04.b64 > /tmp/v04.tar.gz
-          mkdir -p /tmp/medosha-mobile-src/medosha-app
           tar -xzf /tmp/v04.tar.gz -C /tmp/medosha-mobile-src/medosha-app
+          test -f /tmp/medosha-mobile-src/medosha-app/App.tsx
 
-      - name: Apply Phase 5 personalized feed patch
+      - name: Apply Phase 5 social and personalized feed
         shell: bash
         run: |
           set -euxo pipefail
-          cp mobile-build/phase5/HomeScreen.tsx /tmp/medosha-mobile-src/medosha-app/src/screens/HomeScreen.tsx
-          cp mobile-build/phase5/App.tsx /tmp/medosha-mobile-src/medosha-app/App.tsx
-          cd /tmp/medosha-mobile-src/medosha-app
-          node - <<'NODE'
-          const fs=require('fs'); const p=require('./package.json'); p.version='0.5.0'; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
-          NODE
+          app=/tmp/medosha-mobile-src/medosha-app
+          cp mobile-build/phase5/HomeScreen.tsx "$app/src/screens/HomeScreen.tsx"
+          cp mobile-build/phase5/FeedDetailScreen.tsx "$app/src/screens/FeedDetailScreen.tsx"
+          cp mobile-build/phase5/feedRanking.ts "$app/src/lib/feedRanking.ts"
           python3 - <<'PY'
+          from pathlib import Path
           import json
-          p='app.json'; d=json.load(open(p)); d['expo']['version']='0.5.0'; d['expo']['android']['versionCode']=5; d['expo']['ios']['buildNumber']='5'; json.dump(d,open(p,'w'),indent=2); open(p,'a').write('\n')
+          app=Path('/tmp/medosha-mobile-src/medosha-app')
+          p=app/'App.tsx'; s=p.read_text(); s=s.replace('<HomeScreen onOpenPost=', '<HomeScreen session={session} onOpenPost='); p.write_text(s)
+          p=app/'package.json'; d=json.loads(p.read_text()); d['version']='0.5.0'; p.write_text(json.dumps(d,indent=2)+'\n')
+          p=app/'app.json'; d=json.loads(p.read_text()); d['expo']['version']='0.5.0'; d['expo']['android']['versionCode']=5; d['expo']['ios']['buildNumber']='5'; p.write_text(json.dumps(d,indent=2)+'\n')
           PY
+          grep -q 'session={session} onOpenPost' "$app/App.tsx"
+          grep -q 'rankFeed' "$app/src/screens/HomeScreen.tsx"
+          grep -q 'toggleFollow' "$app/src/screens/FeedDetailScreen.tsx"
 
       - name: Install dependencies
         working-directory: /tmp/medosha-mobile-src/medosha-app
@@ -65,7 +70,9 @@ jobs:
 
       - name: Type check
         working-directory: /tmp/medosha-mobile-src/medosha-app
-        run: npx tsc --noEmit
+        run: |
+          npm install --save-dev @types/node --legacy-peer-deps --no-audit --no-fund
+          npx tsc --noEmit
 
       - name: Generate Android project
         working-directory: /tmp/medosha-mobile-src/medosha-app
@@ -73,7 +80,7 @@ jobs:
           CI: '1'
         run: npx expo prebuild --platform android --no-install
 
-      - name: Build standalone release APK
+      - name: Build standalone Phase 5 release APK
         working-directory: /tmp/medosha-mobile-src/medosha-app/android
         env:
           NODE_ENV: production
@@ -85,7 +92,7 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/medosha-mobile-v0.5-phase5-release.apk"
           sha256sum "$GITHUB_WORKSPACE/medosha-mobile-v0.5-phase5-release.apk"
 
-      - name: Upload APK
+      - name: Upload Phase 5 APK
         uses: actions/upload-artifact@v4
         with:
           name: medosha-mobile-v0.5-phase5-release-apk
