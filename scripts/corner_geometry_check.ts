@@ -71,10 +71,13 @@ for (const shape of ["l_shaped", "u_shaped"] as const) {
 const connectedSpec = {
   ...ownershipSpec,
   cornerKinds: { "corner-ab": "connected_l" as const },
+  cornerSettings: { "corner-ab": { width: 700, depth: 800, shelves: 5 } },
 };
 const connected = resolveDesign(connectedSpec);
 const connectedParts = buildParts(connectedSpec).parts;
 assert.equal(connected.layout.corners[0]?.ownerRunId, runB?.id, "shorter run owns the DWG connection");
+assert.equal(connected.layout.corners[0]?.width, 700, "connected width remains editable");
+assert.equal(connected.layout.corners[0]?.depth, 800, "connected depth remains editable");
 assert.ok(!connectedParts.some(p => p.id.startsWith("corner-ab/")), "DWG connection is not a third cabinet");
 assert.ok(connectedParts.some(p => p.cabinetId === "corner-ab" && p.role === "shelf"), "connected storage remains selectable");
 assert.equal(connectedParts.filter(p => p.label === "Corner access rear support").length, 1, "terminating run opens into the connected corner");

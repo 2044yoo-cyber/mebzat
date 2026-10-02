@@ -200,8 +200,12 @@ function applyOwnedCornerBays(
   const reserved = new Map<number, { width: number; corner: (typeof owned)[number] }>();
   for (const entry of assigned) {
     const index = entry.atStart ? 0 : bays.length - 1;
+    const radians = placement.rotation * Math.PI / 180;
+    const cornerSpan = Math.abs(Math.sin(radians)) > 0.5
+      ? entry.corner.depth ?? entry.corner.size
+      : entry.corner.width ?? entry.corner.size;
     reserved.set(index, {
-      width: Math.max(0, entry.corner.size - 2 * thickness),
+      width: Math.max(0, cornerSpan - 2 * thickness),
       corner: entry.corner,
     });
   }

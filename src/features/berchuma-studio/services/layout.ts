@@ -246,8 +246,13 @@ function solveL(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
   const kind = cornerKinds?.["corner-ab"] ?? cornerKind;
   const hosted = wardrobeOwnership && ["l_corner", "hanging", "connected_l", "custom"].includes(kind);
   const ownerRunId = hosted ? (a.length <= b.length ? a.id : b.id) : undefined;
-  const cornerWidth = hosted ? fallback : Math.min(a.length - MIN_RUN, Math.max(b.depth, settings?.width ?? fallback));
-  const cornerDepth = hosted ? fallback : Math.min(b.length - MIN_RUN, Math.max(a.depth, settings?.depth ?? fallback));
+  const adjustableConnection = hosted && kind === "connected_l";
+  const cornerWidth = hosted
+    ? adjustableConnection ? Math.min(a.length - MIN_RUN, Math.max(fallback, settings?.width ?? fallback)) : fallback
+    : Math.min(a.length - MIN_RUN, Math.max(b.depth, settings?.width ?? fallback));
+  const cornerDepth = hosted
+    ? adjustableConnection ? Math.min(b.length - MIN_RUN, Math.max(fallback, settings?.depth ?? fallback)) : fallback
+    : Math.min(b.length - MIN_RUN, Math.max(a.depth, settings?.depth ?? fallback));
 
   const usableA = a.length - (ownerRunId === a.id ? 0 : cornerWidth);
   const usableB = b.length - (ownerRunId === b.id ? 0 : cornerDepth);
@@ -349,16 +354,26 @@ function solveU(runs: RunSpec[], cornerKind: CornerKind, cornerKinds?: Record<st
   const rightHosted = wardrobeOwnership && ["l_corner", "hanging", "connected_l", "custom"].includes(rightKind);
   const leftOwner = leftHosted ? (left.length <= back.length ? left.id : back.id) : undefined;
   const rightOwner = rightHosted ? (right.length <= back.length ? right.id : back.id) : undefined;
-  const leftWidth = leftHosted ? leftFallback : Math.max(left.depth, leftSettings?.width ?? leftFallback);
-  const rightWidth = rightHosted ? rightFallback : Math.max(right.depth, rightSettings?.width ?? rightFallback);
+  const leftRequested = Math.max(leftFallback, leftSettings?.width ?? leftFallback);
+  const rightRequested = Math.max(rightFallback, rightSettings?.width ?? rightFallback);
+  const leftWidth = leftHosted
+    ? leftKind === "connected_l" ? Math.min(Math.max(leftFallback, back.length - MIN_RUN - rightFallback), leftRequested) : leftFallback
+    : leftRequested;
+  const rightWidth = rightHosted
+    ? rightKind === "connected_l" ? Math.min(Math.max(rightFallback, back.length - MIN_RUN - leftWidth), rightRequested) : rightFallback
+    : rightRequested;
   const totalWidth = leftWidth + rightWidth;
   const widthScale = totalWidth > back.length - MIN_RUN ? (back.length - MIN_RUN) / totalWidth : 1;
   // A hosted wardrobe corner is a real depth × depth square. Never squeeze it
   // into a rectangle merely to hide an undersized room; report the short run.
   const leftCorner = leftHosted ? leftWidth : leftWidth * widthScale;
   const rightCorner = rightHosted ? rightWidth : rightWidth * widthScale;
-  const leftCornerDepth = leftHosted ? leftFallback : Math.min(left.length - MIN_RUN, Math.max(back.depth, leftSettings?.depth ?? leftFallback));
-  const rightCornerDepth = rightHosted ? rightFallback : Math.min(right.length - MIN_RUN, Math.max(back.depth, rightSettings?.depth ?? rightFallback));
+  const leftCornerDepth = leftHosted
+    ? leftKind === "connected_l" ? Math.min(left.length - MIN_RUN, Math.max(leftFallback, leftSettings?.depth ?? leftFallback)) : leftFallback
+    : Math.min(left.length - MIN_RUN, Math.max(back.depth, leftSettings?.depth ?? leftFallback));
+  const rightCornerDepth = rightHosted
+    ? rightKind === "connected_l" ? Math.min(right.length - MIN_RUN, Math.max(rightFallback, rightSettings?.depth ?? rightFallback)) : rightFallback
+    : Math.min(right.length - MIN_RUN, Math.max(back.depth, rightSettings?.depth ?? rightFallback));
 
   const backStopsAtLeft = !leftHosted || leftOwner === left.id;
   const backStopsAtRight = !rightHosted || rightOwner === right.id;

@@ -104,6 +104,9 @@ export function ControlPanel({
   const selectedCorner = selectedCornerId
     ? resolveDesign(spec).layout.corners.find((corner) => corner.id === selectedCornerId) ?? null
     : null;
+  const selectedCornerMinimum = selectedCorner
+    ? Math.max(...selectedCorner.between.map((runId) => spec.runs.find((run) => run.id === runId)?.depth ?? 0), 300)
+    : 300;
   const cornerSettings = selectedCornerId ? spec.cornerSettings?.[selectedCornerId] : undefined;
   const updateCorner = (change: Partial<NonNullable<DesignSpec["cornerSettings"]>[string]>) => {
     if (!selectedCornerId) return;
@@ -196,8 +199,8 @@ export function ControlPanel({
               </select>
             </label>
             {spec.furnitureType === "wardrobe" && selectedCorner ? <>
-              <LengthField label="Width" value={selectedCorner.width ?? selectedCorner.size} min={300} max={3000} step={10} onChange={(width) => updateCorner({ width })} />
-              <LengthField label="Depth" value={selectedCorner.depth ?? selectedCorner.size} min={300} max={3000} step={10} onChange={(depth) => updateCorner({ depth })} />
+              <LengthField label="Width" value={selectedCorner.width ?? selectedCorner.size} min={selectedCornerMinimum} max={3000} step={10} onChange={(width) => updateCorner({ width })} />
+              <LengthField label="Depth" value={selectedCorner.depth ?? selectedCorner.size} min={selectedCornerMinimum} max={3000} step={10} onChange={(depth) => updateCorner({ depth })} />
               <LengthField label="Height" value={selectedCorner.height} min={200} max={LIMITS.maxHeight} step={10} onChange={(height) => updateCorner({ height })} />
               {["l_corner", "connected_l", "custom"].includes(spec.cornerKinds?.[selectedCornerId] ?? spec.cornerKind) ? <label className="space-y-1 text-xs">
                 <span className="font-medium">Number of shelves</span>
