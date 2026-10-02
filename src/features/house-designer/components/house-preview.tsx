@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useStore, useThree } from "@react-three/fiber";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as THREE from "three";
@@ -37,39 +37,55 @@ export function HousePreview({
   project,
   visibleLevelIds,
   selected,
+  selectedIds,
+  hiddenKinds = new Set(),
+  hiddenIds = new Set(),
+  initialView,
   onSelect,
   className,
 }: {
   project: HouseProject;
   visibleLevelIds: ReadonlySet<string>;
   selected: HouseSelection | null;
-  onSelect: (selection: HouseSelection | null) => void;
+  selectedIds?: ReadonlySet<string>;
+  hiddenKinds?: ReadonlySet<HouseSelection["kind"]>;
+  hiddenIds?: ReadonlySet<string>;
+  initialView?: View;
+  onSelect: (selection: HouseSelection | null, mode?: "replace" | "add" | "remove") => void;
   className?: string;
 }) {
   const bounds = useMemo(() => projectBounds(project), [project]);
-  const [view, setView] = useState<View>("3d");
+  const [view, setView] = useState<View>(() => initialView ?? "3d");
+  const selectionMode = useRef<"replace" | "add" | "remove">("replace");
+  const highlighted = selectedIds ?? new Set(selected ? [selected.id] : []);
+  const visible = (kind: HouseSelection["kind"], id: string, levelId: string) => visibleLevelIds.has(levelId) && !hiddenKinds.has(kind) && !hiddenIds.has(id);
+  const choose = (selection: HouseSelection | null) => onSelect(selection, selectionMode.current);
+
 
   return (
-    <div className={cn("relative min-h-[320px] w-full min-w-0 overflow-hidden rounded-xl border bg-muted/25", className)}>
+    <div
+      className={cn("relative min-h-[320px] w-full min-w-0 overflow-hidden rounded-xl border bg-muted/25", className)}
+      onPointerDownCapture={(event) => { selectionMode.current = event.shiftKey ? "remove" : event.ctrlKey || event.metaKey ? "add" : "replace"; }}
+    >
       <Canvas
         frameloop="demand"
         dpr={[1, 2]}
         camera={{ fov: 38, near: 0.02, far: 200 }}
         gl={{ antialias: true, alpha: true }}
         style={{ width: "100%", maxWidth: "100%", minWidth: 0, touchAction: "none" }}
-        onPointerMissed={() => onSelect(null)}
+        onPointerMissed={() => choose(null)}
       >
         <ambientLight intensity={0.72} />
         <directionalLight position={[8, 14, 9]} intensity={1.4} />
         <directionalLight position={[-7, 8, -5]} intensity={0.42} />
 
-        {project.site && visibleLevelIds.has(project.site.levelId) ? (
-          <SiteMesh site={project.site} bounds={bounds} selected={selected?.id === project.site.id} onSelect={() => onSelect({ kind: "site", id: project.site!.id })} />
+        {project.site && visible("site", project.site.id, project.site.levelId) ? (
+          <SiteMesh site={project.site} bounds={bounds} selected={highlighted.has(project.site.id)} onSelect={() => choose({ kind: "site", id: project.site!.id })} />
         ) : null}
 
-        {project.rooms.filter((room) => visibleLevelIds.has(room.levelId)).map((room) => {
+        {project.rooms.filter((room) => visible("room", room.id, room.levelId)).map((room) => {
           const level = project.levels.find((item) => item.id === room.levelId);
-          return <RoomSurfaceMesh key={room.id} room={room} elevation={level?.elevation ?? 0} bounds={bounds} selected={selected?.id === room.id} onSelect={() => onSelect({ kind: "room", id: room.id })} />;
+          return <RoomSurfaceMesh key={room.id} room={room} elevation={level?.elevation ?? 0} bounds={bounds} selected={highlighted.has(room.id)} onSelect={() => choose({ kind: "room", id: room.id })} />;
         })}
 
         {project.levels.map((level) => {
@@ -77,62 +93,73 @@ export function HousePreview({
           const selectedWall = selected?.kind === "wall"
             ? project.walls.find((wall) => wall.id === selected.id && wall.levelId === level.id)
             : null;
+          const selectedWallIds = new Set(project.walls.filter((wall) => wall.levelId === level.id && highlighted.has(wall.id) && wall.sourceWallId).map((wall) => wall.sourceWallId!));
+          const hiddenWallIds = new Set(project.walls.filter((wall) => wall.levelId === level.id && hiddenIds.has(wall.id) && wall.sourceWallId).map((wall) => wall.sourceWallId!));
           return (
             <group key={level.id}>
-              <RoomShell
+              {!hiddenKinds.has("wall") ? <RoomShell
                 room={level.plan}
                 offset={[-bounds.centreX * MM, level.elevation * MM, bounds.centreY * MM]}
                 showFloor={false}
                 selectedWallId={selectedWall?.sourceWallId ?? null}
+                selectedWallIds={selectedWallIds}
+                hiddenWallIds={hiddenWallIds}
                 wallColor={project.facade.primaryColor}
                 onSelectWall={(sourceWallId) =>
-                  onSelect({ kind: "wall", id: wallObjectId(level.id, sourceWallId) })
+                  choose({ kind: "wall", id: wallObjectId(level.id, sourceWallId) })
                 }
-              />
+              /> : null}
               <OpeningMeshes
                 project={project}
                 levelId={level.id}
                 room={level.plan}
                 elevation={level.elevation}
                 bounds={bounds}
-                selected={selected}
-                onSelect={onSelect}
+                selectedIds={highlighted}
+                hiddenKinds={hiddenKinds}
+                hiddenIds={hiddenIds}
+                onSelect={choose}
               />
-              <InteriorWallMeshes project={project} levelId={level.id} bounds={bounds} selected={selected} onSelect={onSelect} />
+              {!hiddenKinds.has("wall") ? <InteriorWallMeshes project={project} levelId={level.id} bounds={bounds} selectedIds={highlighted} hiddenIds={hiddenIds} onSelect={choose} /> : null}
             </group>
           );
         })}
 
-        {project.slabs.filter((slab) => visibleLevelIds.has(slab.levelId)).map((slab) => (
-          <SlabMesh key={slab.id} slab={slab} bounds={bounds} selected={selected?.id === slab.id} onSelect={() => onSelect({ kind: "slab", id: slab.id })} />
+        {!hiddenKinds.has("slab") && project.slabs.filter((slab) => visible("slab", slab.id, slab.levelId)).map((slab) => (
+          <SlabMesh key={slab.id} slab={slab} bounds={bounds} selected={highlighted.has(slab.id)} onSelect={() => choose({ kind: "slab", id: slab.id })} />
         ))}
-        {project.ceilings.filter((ceiling) => visibleLevelIds.has(ceiling.levelId)).map((ceiling) => (
-          <CeilingMesh key={ceiling.id} ceiling={ceiling} bounds={bounds} selected={selected?.id === ceiling.id} onSelect={() => onSelect({ kind: "ceiling", id: ceiling.id })} />
+        {!hiddenKinds.has("ceiling") && project.ceilings.filter((ceiling) => visible("ceiling", ceiling.id, ceiling.levelId)).map((ceiling) => (
+          <CeilingMesh key={ceiling.id} ceiling={ceiling} bounds={bounds} selected={highlighted.has(ceiling.id)} onSelect={() => choose({ kind: "ceiling", id: ceiling.id })} />
         ))}
-        {project.verandas.filter((veranda) => visibleLevelIds.has(veranda.levelId)).map((veranda) => (
-          <VerandaMesh key={veranda.id} veranda={veranda} bounds={bounds} selected={selected?.id === veranda.id} onSelect={() => onSelect({ kind: "veranda", id: veranda.id })} />
+        {!hiddenKinds.has("veranda") && project.verandas.filter((veranda) => visible("veranda", veranda.id, veranda.levelId)).map((veranda) => (
+          <VerandaMesh key={veranda.id} veranda={veranda} bounds={bounds} selected={highlighted.has(veranda.id)} onSelect={() => choose({ kind: "veranda", id: veranda.id })} />
         ))}
-        {project.balconies.filter((balcony) => visibleLevelIds.has(balcony.levelId)).map((balcony) => (
-          <BalconyMesh key={balcony.id} balcony={balcony} bounds={bounds} selected={selected?.id === balcony.id} onSelect={() => onSelect({ kind: "balcony", id: balcony.id })} />
+        {!hiddenKinds.has("balcony") && project.balconies.filter((balcony) => visible("balcony", balcony.id, balcony.levelId)).map((balcony) => (
+          <BalconyMesh key={balcony.id} balcony={balcony} bounds={bounds} selected={highlighted.has(balcony.id)} onSelect={() => choose({ kind: "balcony", id: balcony.id })} />
         ))}
-        {project.stairs.filter((stair) => visibleLevelIds.has(stair.levelId)).map((stair) => (
-          <StairMesh key={stair.id} stair={stair} bounds={bounds} selected={selected?.id === stair.id} onSelect={() => onSelect({ kind: "stair", id: stair.id })} />
+        {!hiddenKinds.has("stair") && project.stairs.filter((stair) => visible("stair", stair.id, stair.levelId)).map((stair) => (
+          <StairMesh key={stair.id} stair={stair} bounds={bounds} selected={highlighted.has(stair.id)} onSelect={() => choose({ kind: "stair", id: stair.id })} />
         ))}
-        {project.structuralColumns.filter((column) => visibleLevelIds.has(column.levelId)).map((column) => (
-          <ColumnMesh key={column.id} column={column} bounds={bounds} selected={selected?.id === column.id} onSelect={() => onSelect({ kind: "column", id: column.id })} />
+        {!hiddenKinds.has("column") && project.structuralColumns.filter((column) => visible("column", column.id, column.levelId)).map((column) => (
+          <ColumnMesh key={column.id} column={column} bounds={bounds} selected={highlighted.has(column.id)} onSelect={() => choose({ kind: "column", id: column.id })} />
         ))}
-        {project.structuralBeams.filter((beam) => visibleLevelIds.has(beam.levelId)).map((beam) => (
-          <BeamMesh key={beam.id} beam={beam} bounds={bounds} selected={selected?.id === beam.id} onSelect={() => onSelect({ kind: "beam", id: beam.id })} />
+        {!hiddenKinds.has("beam") && project.structuralBeams.filter((beam) => visible("beam", beam.id, beam.levelId)).map((beam) => (
+          <BeamMesh key={beam.id} beam={beam} bounds={bounds} selected={highlighted.has(beam.id)} onSelect={() => choose({ kind: "beam", id: beam.id })} />
         ))}
-        {project.structuralGrid.filter((grid) => visibleLevelIds.has(grid.levelId)).map((grid) => (
-          <GridMesh key={grid.id} grid={grid} elevation={project.levels.find((level) => level.id === grid.levelId)?.elevation ?? 0} bounds={bounds} selected={selected?.id === grid.id} onSelect={() => onSelect({ kind: "grid", id: grid.id })} />
+        {!hiddenKinds.has("grid") && project.structuralGrid.filter((grid) => visible("grid", grid.id, grid.levelId)).map((grid) => (
+          <GridMesh key={grid.id} grid={grid} elevation={project.levels.find((level) => level.id === grid.levelId)?.elevation ?? 0} bounds={bounds} selected={highlighted.has(grid.id)} onSelect={() => choose({ kind: "grid", id: grid.id })} />
         ))}
-        {project.roofs.filter((roof) => visibleLevelIds.has(roof.levelId)).map((roof) => (
-          <RoofMesh key={roof.id} roof={roof} bounds={bounds} color={project.facade.roofColor} selected={selected?.id === roof.id} onSelect={() => onSelect({ kind: "roof", id: roof.id })} />
+        {!hiddenKinds.has("roof") && project.roofs.filter((roof) => visible("roof", roof.id, roof.levelId)).map((roof) => (
+          <RoofMesh key={roof.id} roof={roof} bounds={bounds} color={project.facade.roofColor} selected={highlighted.has(roof.id)} onSelect={() => choose({ kind: "roof", id: roof.id })} />
         ))}
-        {project.facadeElements.filter((element) => visibleLevelIds.has(element.levelId)).map((element) => (
-          <FacadeElementMesh key={element.id} element={element} project={project} bounds={bounds} selected={selected?.id === element.id} onSelect={() => onSelect({ kind: "facade", id: element.id })} />
+        {!hiddenKinds.has("facade") && project.facadeElements.filter((element) => visible("facade", element.id, element.levelId)).map((element) => (
+          <FacadeElementMesh key={element.id} element={element} project={project} bounds={bounds} selected={highlighted.has(element.id)} onSelect={() => choose({ kind: "facade", id: element.id })} />
         ))}
+
+        {!hiddenKinds.has("foundation") && project.foundations.filter((item) => visible("foundation", item.id, item.levelId)).map((item) => <BoxObjectMesh key={item.id} x={item.x} y={item.y} elevation={item.elevation} width={item.width} height={item.thickness} depth={item.depth} bounds={bounds} selected={highlighted.has(item.id)} color="#8f969e" onSelect={() => choose({ kind: "foundation", id: item.id })} />)}
+        {!hiddenKinds.has("component") && project.components.filter((item) => visible("component", item.id, item.levelId)).map((item) => <BoxObjectMesh key={item.id} x={item.x} y={item.y} elevation={item.elevation} width={item.width} height={item.height} depth={item.depth} rotation={item.rotation} bounds={bounds} selected={highlighted.has(item.id)} color={item.material.toLowerCase().includes("wood") ? "#9d7350" : "#d5d0c8"} onSelect={() => choose({ kind: "component", id: item.id })} />)}
+        {!hiddenKinds.has("railing") && project.railings.filter((item) => visible("railing", item.id, item.levelId)).map((item) => <LineObjectMesh key={item.id} start={item.start} end={item.end} elevation={item.elevation} height={item.height} bounds={bounds} selected={highlighted.has(item.id)} color="#56616c" onSelect={() => choose({ kind: "railing", id: item.id })} />)}
+        {!hiddenKinds.has("reference-plane") && project.referencePlanes.filter((item) => visible("reference-plane", item.id, item.levelId)).map((item) => <LineObjectMesh key={item.id} start={item.start} end={item.end} elevation={project.levels.find((level) => level.id === item.levelId)?.elevation ?? 0} height={25} bounds={bounds} selected={highlighted.has(item.id)} color="#de3c8d" onSelect={() => choose({ kind: "reference-plane", id: item.id })} />)}
 
         <CameraRig bounds={bounds} view={view} />
       </Canvas>
@@ -147,7 +174,9 @@ function OpeningMeshes({
   room,
   elevation,
   bounds,
-  selected,
+  selectedIds,
+  hiddenKinds,
+  hiddenIds,
   onSelect,
 }: {
   project: HouseProject;
@@ -155,7 +184,9 @@ function OpeningMeshes({
   room: Room;
   elevation: number;
   bounds: Bounds;
-  selected: HouseSelection | null;
+  selectedIds: ReadonlySet<string>;
+  hiddenKinds: ReadonlySet<HouseSelection["kind"]>;
+  hiddenIds: ReadonlySet<string>;
   onSelect: (selection: HouseSelection) => void;
 }) {
   return room.openings.map((opening) => {
@@ -170,7 +201,8 @@ function OpeningMeshes({
     const x = wall.start.x + dx * middle;
     const y = wall.start.y + dy * middle;
     const kind = opening.kind === "window" ? "window" : "door";
-    const highlighted = selected?.id === id;
+    if (hiddenKinds.has(kind) || hiddenIds.has(id)) return null;
+    const highlighted = selectedIds.has(id);
     const passage = opening.kind === "passage";
 
     return (
@@ -209,10 +241,10 @@ function RoomSurfaceMesh({ room, elevation, bounds, selected, onSelect }: { room
   );
 }
 
-function InteriorWallMeshes({ project, levelId, bounds, selected, onSelect }: { project: HouseProject; levelId: string; bounds: Bounds; selected: HouseSelection | null; onSelect: (selection: HouseSelection) => void }) {
+function InteriorWallMeshes({ project, levelId, bounds, selectedIds, hiddenIds, onSelect }: { project: HouseProject; levelId: string; bounds: Bounds; selectedIds: ReadonlySet<string>; hiddenIds: ReadonlySet<string>; onSelect: (selection: HouseSelection) => void }) {
   const level = project.levels.find((item) => item.id === levelId);
   const exteriorIds = new Set(level?.plan?.corners.map((corner) => corner.id) ?? []);
-  const walls = project.walls.filter((wall) => wall.levelId === levelId && (!wall.sourceWallId || !exteriorIds.has(wall.sourceWallId)));
+  const walls = project.walls.filter((wall) => wall.levelId === levelId && !hiddenIds.has(wall.id) && (!wall.sourceWallId || !exteriorIds.has(wall.sourceWallId)));
   return walls.flatMap((wall) => wallSegments(wall, [...project.doors, ...project.windows].filter((opening) => opening.wallId === wall.id)).map((segment) => {
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
@@ -228,7 +260,7 @@ function InteriorWallMeshes({ project, levelId, bounds, selected, onSelect }: { 
         onClick={(event) => { event.stopPropagation(); onSelect({ kind: "wall", id: wall.id }); }}
       >
         <boxGeometry args={[(segment.to - segment.from) * MM, (segment.top - segment.bottom) * MM, wall.thickness * MM]} />
-        <meshStandardMaterial color={selected?.id === wall.id ? "#1473e6" : "#ddd8cf"} roughness={0.95} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={selectedIds.has(wall.id) ? "#1473e6" : "#ddd8cf"} roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
     );
   }));
@@ -467,6 +499,27 @@ function FacadeElementMesh({ element, project, bounds, selected, onSelect }: { e
     >
       <boxGeometry args={[element.width * MM, element.height * MM, element.depth * MM]} />
       <meshStandardMaterial color={selected ? "#1473e6" : element.color} roughness={0.86} />
+    </mesh>
+  );
+}
+
+function BoxObjectMesh({ x, y, elevation, width, height, depth, rotation = 0, bounds, selected, color, onSelect }: { x: number; y: number; elevation: number; width: number; height: number; depth: number; rotation?: number; bounds: Bounds; selected: boolean; color: string; onSelect: () => void }) {
+  return (
+    <mesh position={[(x - bounds.centreX) * MM, (elevation + height / 2) * MM, -(y - bounds.centreY) * MM]} rotation={[0, rotation * Math.PI / 180, 0]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+      <boxGeometry args={[width * MM, height * MM, depth * MM]} />
+      <meshStandardMaterial color={selected ? "#1473e6" : color} roughness={0.78} />
+    </mesh>
+  );
+}
+
+function LineObjectMesh({ start, end, elevation, height, bounds, selected, color, onSelect }: { start: { x: number; y: number }; end: { x: number; y: number }; elevation: number; height: number; bounds: Bounds; selected: boolean; color: string; onSelect: () => void }) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  return (
+    <mesh position={[((start.x + end.x) / 2 - bounds.centreX) * MM, (elevation + height / 2) * MM, -((start.y + end.y) / 2 - bounds.centreY) * MM]} rotation={[0, Math.atan2(dy, dx), 0]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+      <boxGeometry args={[length * MM, Math.max(20, height) * MM, 24 * MM]} />
+      <meshStandardMaterial color={selected ? "#1473e6" : color} roughness={0.6} />
     </mesh>
   );
 }

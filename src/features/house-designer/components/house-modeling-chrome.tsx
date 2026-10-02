@@ -1,0 +1,218 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  BoxSelect,
+  Columns3,
+  Copy,
+  DoorOpen,
+  Grid3X3,
+  HelpCircle,
+  Layers3,
+  MousePointer2,
+  Move,
+  Redo2,
+  RotateCw,
+  Search,
+  Sparkles,
+  Square,
+  Trash2,
+  Undo2,
+} from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+import {
+  houseCommand,
+  houseCommandCategories,
+  searchHouseCommands,
+  type HouseCommandCategory,
+  type HouseCommandId,
+} from "../services/command-registry";
+import { calculateHouseQuantities } from "../services/quantities";
+import type { HouseProject, HouseViewState } from "../types/project";
+
+const ribbonCommands: Record<HouseCommandCategory, HouseCommandId[]> = {
+  General: ["select", "undo", "redo", "delete"],
+  Architecture: ["wall", "door", "window", "room", "floor", "ceiling", "roof", "stair", "railing", "component"],
+  Structure: ["column", "grid", "level", "reference-plane"],
+  Modify: ["move", "copy", "rotate", "align", "offset", "mirror-pick", "array", "split", "trim", "pin"],
+  Annotate: ["dimension", "text", "tag", "section", "elevation"],
+  View: ["default-3d", "visibility", "hide", "isolate", "reset-hide", "zoom-fit"],
+  AI: ["ai-remodel", "alternatives", "estimate", "boq"],
+};
+
+const icons: Partial<Record<HouseCommandId, React.ComponentType<{ className?: string }>>> = {
+  select: MousePointer2,
+  undo: Undo2,
+  redo: Redo2,
+  delete: Trash2,
+  wall: Square,
+  door: DoorOpen,
+  window: Columns3,
+  column: Columns3,
+  grid: Grid3X3,
+  move: Move,
+  copy: Copy,
+  rotate: RotateCw,
+  "ai-remodel": Sparkles,
+};
+
+export function HouseRibbon({ activeCategory, activeTool, selectionCount, canUndo, canRedo, onCategory, onCommand, onSearch, onHelp }: {
+  activeCategory: HouseCommandCategory;
+  activeTool: HouseCommandId | null;
+  selectionCount: number;
+  canUndo: boolean;
+  canRedo: boolean;
+  onCategory: (category: HouseCommandCategory) => void;
+  onCommand: (command: HouseCommandId) => void;
+  onSearch: () => void;
+  onHelp: () => void;
+}) {
+  return (
+    <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
+      <div className="flex min-w-0 items-center gap-1 overflow-x-auto border-b px-2 pt-1.5">
+        {houseCommandCategories.map((category) => (
+          <button key={category} type="button" onClick={() => onCategory(category)} className={cn("shrink-0 border-b-2 px-2 py-2 text-xs font-medium", activeCategory === category ? "border-brand text-brand" : "border-transparent text-muted-foreground hover:text-foreground")}>{category}</button>
+        ))}
+        <span className="ml-auto flex shrink-0 gap-1 pb-1">
+          <button type="button" onClick={onSearch} aria-label="Command search" className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"><Search className="size-4" /></button>
+          <button type="button" onClick={onHelp} aria-label="Keyboard shortcuts" className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"><HelpCircle className="size-4" /></button>
+        </span>
+      </div>
+      <div className="flex min-w-0 gap-1 overflow-x-auto p-2">
+        {ribbonCommands[activeCategory].map((id) => {
+          const item = houseCommand(id);
+          const Icon = icons[id] ?? BoxSelect;
+          const disabled = item.selection && selectionCount === 0 || id === "undo" && !canUndo || id === "redo" && !canRedo;
+          return (
+            <button key={id} type="button" disabled={disabled} onClick={() => onCommand(id)} title={`${item.label}${item.shortcut ? ` (${item.shortcut})` : ""}`} className={cn("flex min-w-[58px] shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-35", activeTool === id && "bg-brand/10 text-brand")}>
+              <Icon className="size-4" />
+              <span className="max-w-20 whitespace-nowrap">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function HouseProjectBrowser({ project, activeLevelId, activeViewId, onLevel, onView, onSchedule }: {
+  project: HouseProject;
+  activeLevelId: string;
+  activeViewId: string | null;
+  onLevel: (id: string) => void;
+  onView: (view: HouseViewState) => void;
+  onSchedule: (kind: "doors" | "windows" | "rooms" | "quantities") => void;
+}) {
+  return (
+    <aside className="min-w-0 rounded-xl border bg-card p-2 text-xs xl:sticky xl:top-3 xl:max-h-[75dvh] xl:overflow-y-auto">
+      <div className="mb-2 flex items-center gap-2 px-1"><Layers3 className="size-4 text-brand" /><strong>Project Browser</strong></div>
+      <BrowserGroup label="Floor Plans">
+        {project.levels.map((level) => <BrowserButton key={level.id} active={activeLevelId === level.id} onClick={() => onLevel(level.id)}>{level.name}</BrowserButton>)}
+      </BrowserGroup>
+      <BrowserGroup label="3D Views">
+        {project.views.filter((item) => item.kind === "3d").map((item) => <BrowserButton key={item.id} active={activeViewId === item.id} onClick={() => onView(item)}>{item.name}</BrowserButton>)}
+      </BrowserGroup>
+      <BrowserGroup label="Elevations">
+        {project.views.filter((item) => item.kind === "elevation").map((item) => <BrowserButton key={item.id} active={activeViewId === item.id} onClick={() => onView(item)}>{item.name}</BrowserButton>)}
+      </BrowserGroup>
+      <BrowserGroup label="Schedules">
+        <BrowserButton onClick={() => onSchedule("doors")}>Door Schedule</BrowserButton>
+        <BrowserButton onClick={() => onSchedule("windows")}>Window Schedule</BrowserButton>
+        <BrowserButton onClick={() => onSchedule("rooms")}>Room Schedule</BrowserButton>
+        <BrowserButton onClick={() => onSchedule("quantities")}>Preliminary Quantities</BrowserButton>
+      </BrowserGroup>
+      <BrowserGroup label="Families / Components">
+        <p className="px-2 py-1 text-muted-foreground">{project.components.length} placed · {project.objectTypes.length} types</p>
+      </BrowserGroup>
+    </aside>
+  );
+}
+
+export function HouseStatusBar({ selectionCount, snap, level, units, mode, saveState }: { selectionCount: number; snap: string; level: string; units: string; mode: string; saveState: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 overflow-x-auto rounded-lg border bg-card px-3 py-2 text-[11px] text-muted-foreground">
+      <span className="shrink-0">Selected: <strong className="text-foreground">{selectionCount}</strong></span>
+      <span className="shrink-0">Snap: <strong className="text-foreground">{snap}</strong></span>
+      <span className="shrink-0">Level: <strong className="text-foreground">{level}</strong></span>
+      <span className="shrink-0">Units: <strong className="text-foreground">{units}</strong></span>
+      <span className="shrink-0">Mode: <strong className="text-foreground">{mode}</strong></span>
+      <span className="ml-auto shrink-0 text-emerald-600 dark:text-emerald-400">{saveState}</span>
+    </div>
+  );
+}
+
+export function HouseCommandPalette({ open, onClose, onCommand }: { open: boolean; onClose: () => void; onCommand: (id: HouseCommandId) => void }) {
+  const [query, setQuery] = useState("");
+  const results = useMemo(() => searchHouseCommands(query).slice(0, 24), [query]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/45 px-3 pt-[12dvh]" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-label="Command search" className="w-full max-w-xl overflow-hidden rounded-2xl border bg-card shadow-2xl">
+        <label className="flex items-center gap-2 border-b px-4"><Search className="size-4 text-muted-foreground" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search commands…" className="min-w-0 flex-1 bg-transparent py-4 text-sm outline-none" /></label>
+        <div className="max-h-[55dvh] overflow-y-auto p-2">
+          {results.map((item) => <button key={item.id} type="button" onClick={() => { onCommand(item.id); onClose(); setQuery(""); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"><span><strong>{item.label}</strong><span className="ml-2 text-xs text-muted-foreground">{item.category}</span></span>{item.shortcut ? <kbd className="rounded border bg-background px-1.5 py-0.5 text-[10px]">{item.shortcut}</kbd> : null}</button>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function HouseShortcutHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [query, setQuery] = useState("");
+  if (!open) return null;
+  const items = searchHouseCommands(query).filter((item) => item.shortcut);
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-3" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" className="w-full max-w-2xl rounded-2xl border bg-card p-4 shadow-2xl">
+        <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold">Keyboard Shortcuts</h2><p className="text-xs text-muted-foreground">Revit-style commands, available outside input fields.</p></div><button type="button" onClick={onClose} className="rounded-lg border px-3 py-1.5 text-xs">Close</button></div>
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search shortcuts" className="mb-3 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none" />
+        <div className="grid max-h-[58dvh] gap-2 overflow-y-auto sm:grid-cols-2">
+          {items.map((item) => <div key={item.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-xs"><span>{item.label}</span><kbd className="rounded border bg-background px-1.5 py-0.5">{item.shortcut}</kbd></div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export type HouseContextMenuState = { x: number; y: number } | null;
+
+export function HouseContextMenu({ state, selectionCount, onClose, onCommand }: { state: HouseContextMenuState; selectionCount: number; onClose: () => void; onCommand: (id: HouseCommandId) => void }) {
+  if (!state || selectionCount === 0) return null;
+  const commands: HouseCommandId[] = ["move", "copy", "rotate", "mirror-pick", "duplicate", "create-similar", "match-type", "hide", "isolate", "delete", "ai-remodel", "alternatives", "estimate", "boq"];
+  return (
+    <div className="fixed inset-0 z-[90]" onMouseDown={onClose} onContextMenu={(event) => event.preventDefault()}>
+      <div role="menu" style={{ left: Math.min(state.x, window.innerWidth - 230), top: Math.min(state.y, window.innerHeight - 430) }} className="fixed w-56 rounded-xl border bg-card p-1.5 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
+        {commands.map((id) => <button key={id} role="menuitem" type="button" onClick={() => { onCommand(id); onClose(); }} className={cn("flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs hover:bg-muted", id === "delete" && "text-destructive")}><span>{houseCommand(id).label}</span>{houseCommand(id).shortcut ? <kbd className="text-[10px] text-muted-foreground">{houseCommand(id).shortcut}</kbd> : null}</button>)}
+      </div>
+    </div>
+  );
+}
+
+export function HouseSchedulePanel({ project, kind, onClose }: { project: HouseProject; kind: "doors" | "windows" | "rooms" | "quantities"; onClose: () => void }) {
+  const rows = kind === "quantities" ? calculateHouseQuantities(project).map((item) => [item.code, item.description, item.unit, item.quantity.toFixed(3)])
+    : kind === "rooms" ? project.rooms.map((item) => [item.id, item.name, item.floorMaterial, `${polygonArea(item.boundary).toFixed(2)} m²`])
+      : (kind === "doors" ? project.doors : project.windows).map((item) => [item.id, item.style, `${item.width} × ${item.height}`, item.material]);
+  const headers = kind === "quantities" ? ["Code", "Description", "Unit", "Quantity"] : kind === "rooms" ? ["ID", "Room", "Finish", "Area"] : ["ID", "Type", "Size (mm)", "Material"];
+  return (
+    <section className="overflow-hidden rounded-xl border bg-card">
+      <div className="flex items-center justify-between border-b p-3"><div><p className="text-[11px] uppercase tracking-wide text-brand">Live schedule</p><h3 className="font-semibold capitalize">{kind}</h3></div><button type="button" onClick={onClose} className="rounded-lg border px-3 py-1.5 text-xs">Close</button></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-xs"><thead className="bg-muted/60"><tr>{headers.map((header) => <th key={header} className="px-3 py-2 font-medium">{header}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="border-t">{row.map((value, cell) => <td key={cell} className="px-3 py-2">{value}</td>)}</tr>)}</tbody></table></div>
+    </section>
+  );
+}
+
+function BrowserGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return <details open className="border-t py-1 first:border-0"><summary className="cursor-pointer px-2 py-1 font-medium text-muted-foreground">{label}</summary><div className="space-y-0.5">{children}</div></details>;
+}
+
+function BrowserButton({ active, children, onClick }: { active?: boolean; children: React.ReactNode; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={cn("block w-full rounded-md px-2 py-1.5 text-left hover:bg-muted", active && "bg-brand/10 text-brand")}>{children}</button>;
+}
+
+function polygonArea(points: { x: number; y: number }[]) {
+  let sum = 0;
+  for (let index = 0; index < points.length; index += 1) { const a = points[index]!; const b = points[(index + 1) % points.length]!; sum += a.x * b.y - b.x * a.y; }
+  return Math.abs(sum) / 2_000_000;
+}

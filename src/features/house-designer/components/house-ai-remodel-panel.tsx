@@ -21,16 +21,19 @@ const suggestions = [
 export function HouseAiRemodelPanel({
   project,
   selected,
+  selections = selected ? [selected] : [],
   onChange,
 }: {
   project: HouseProject;
   selected: HouseSelection | null;
+  selections?: readonly HouseSelection[];
   onChange: (project: HouseProject) => void;
 }) {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ project: HouseProject; explanation: string; blocked: string[] } | null>(null);
 
   async function apply() {
     const requestText = prompt.trim();
@@ -38,6 +41,7 @@ export function HouseAiRemodelPanel({
     setBusy(true);
     setMessage(null);
     setError(null);
+    setPreview(null);
     try {
       const response = await fetch("/api/house-design/remodel", {
         method: "POST",
@@ -55,13 +59,18 @@ export function HouseAiRemodelPanel({
       const parsed = houseRemodelCommandSchema.safeParse(payload.command);
       if (!parsed.success) throw new Error("The AI returned an unsafe change, so nothing was applied.");
 
-      const result = applyHouseRemodelCommand(project, selected, parsed.data);
-      onChange(result.project);
-      const blocked = result.blockedFields.length > 0
-        ? ` Protected by Strict: ${result.blockedFields.join(", ")}.`
-        : "";
-      setMessage(`${parsed.data.explanation}${blocked}`);
-      setPrompt("");
+      let result = applyHouseRemodelCommand(project, selected, parsed.data);
+      const blocked = [...result.blockedFields];
+      if (parsed.data.action === "patch_object" && selections.length > 1) {
+        let next = result.project;
+        for (const target of selections.slice(0, -1)) {
+          const batch = applyHouseRemodelCommand(next, target, parsed.data);
+          next = batch.project;
+          blocked.push(...batch.blockedFields);
+        }
+        result = { project: next, blockedFields: blocked };
+      }
+      setPreview({ project: result.project, explanation: parsed.data.explanation, blocked });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "AI remodeling failed.");
     } finally {
@@ -100,12 +109,13 @@ export function HouseAiRemodelPanel({
         />
         <button type="submit" disabled={busy || !prompt.trim()} className="flex items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-xs font-medium text-brand-foreground disabled:opacity-45">
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-          {busy ? "Applying…" : "Apply"}
+          {busy ? "Preparing…" : "Preview"}
         </button>
       </form>
 
       {message ? <p className="rounded-lg bg-emerald-500/10 p-2 text-xs text-emerald-800 dark:text-emerald-300">{message}</p> : null}
       {error ? <p role="alert" className="rounded-lg bg-destructive/10 p-2 text-xs text-destructive">{error}</p> : null}
+      {preview ? <div className="rounded-lg border border-brand/30 bg-brand/5 p-3 text-xs"><strong>Review AI change</strong><p className="mt-1 text-muted-foreground">{preview.explanation}{preview.blocked.length ? ` Protected by Strict: ${[...new Set(preview.blocked)].join(", ")}.` : ""}</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => { onChange(preview.project); setMessage("AI change applied to the structured model."); setPreview(null); setPrompt(""); }} className="rounded-lg bg-brand px-3 py-2 font-medium text-brand-foreground">Apply change</button><button type="button" onClick={() => setPreview(null)} className="rounded-lg border px-3 py-2">Cancel</button></div></div> : null}
     </section>
   );
 }

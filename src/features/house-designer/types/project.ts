@@ -16,12 +16,15 @@ export const houseStyles = [
 
 export const roofTypes = ["flat", "gable", "hip"] as const;
 export const stairTypes = ["straight", "l-shaped", "u-shaped"] as const;
-export const houseObjectKinds = ["level", "room", "wall", "door", "window", "stair", "slab", "roof", "column", "beam", "grid", "facade", "balcony", "veranda", "ceiling", "site"] as const;
+export const houseObjectKinds = ["level", "room", "wall", "door", "window", "stair", "slab", "roof", "column", "beam", "grid", "facade", "balcony", "veranda", "ceiling", "site", "foundation", "railing", "reference-plane", "annotation", "component"] as const;
 export const facadeElementTypes = ["band", "cornice", "pilaster", "accent", "parapet"] as const;
 
 export type HouseStyle = (typeof houseStyles)[number];
 export type HouseObjectKind = (typeof houseObjectKinds)[number];
 export type HouseSelection = { kind: HouseObjectKind; id: string };
+
+export const houseViewKinds = ["floor-plan", "ceiling-plan", "3d", "elevation", "section", "schedule"] as const;
+export type HouseViewKind = (typeof houseViewKinds)[number];
 
 export type HouseFacadeSettings = {
   source: "style" | "reference";
@@ -39,6 +42,93 @@ export type HouseFacadeSettings = {
 };
 
 const pointSchema = z.object({ x: z.number(), y: z.number() });
+const editableValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+
+const objectTypeSchema = z.object({
+  id: z.string(),
+  kind: z.enum(houseObjectKinds),
+  name: z.string(),
+  properties: z.record(z.string(), editableValueSchema),
+});
+
+const objectInstanceSchema = z.object({
+  typeId: z.string().nullable().default(null),
+  mark: z.string().default(""),
+  pinned: z.boolean().default(false),
+  groupId: z.string().nullable().default(null),
+  flipped: z.boolean().default(false),
+  properties: z.record(z.string(), editableValueSchema).default({}),
+});
+
+const referencePlaneSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  name: z.string(),
+  start: pointSchema,
+  end: pointSchema,
+});
+
+const foundationSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  x: z.number(),
+  y: z.number(),
+  elevation: z.number(),
+  width: z.number().positive(),
+  depth: z.number().positive(),
+  thickness: z.number().positive(),
+  material: z.string(),
+});
+
+const railingSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  hostId: z.string().nullable().default(null),
+  start: pointSchema,
+  end: pointSchema,
+  elevation: z.number(),
+  height: z.number().positive(),
+  material: z.string(),
+});
+
+const annotationSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  kind: z.enum(["dimension", "text", "tag", "section", "elevation"]),
+  text: z.string(),
+  start: pointSchema,
+  end: pointSchema.nullable().default(null),
+  value: z.number().nullable().default(null),
+});
+
+const componentSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  family: z.string(),
+  name: z.string(),
+  x: z.number(),
+  y: z.number(),
+  elevation: z.number(),
+  width: z.number().positive(),
+  depth: z.number().positive(),
+  height: z.number().positive(),
+  rotation: z.number(),
+  material: z.string(),
+  source: z.enum(["library", "berchuma", "custom"]),
+});
+
+const viewStateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(houseViewKinds),
+  levelId: z.string().nullable().default(null),
+  hiddenCategories: z.array(z.enum(houseObjectKinds)).default([]),
+  temporaryHiddenIds: z.array(z.string()).default([]),
+  isolatedIds: z.array(z.string()).default([]),
+  cutPlane: z.number().default(1200),
+  topOffset: z.number().default(2300),
+  bottomOffset: z.number().default(0),
+});
 
 const levelSchema = z.object({
   id: z.string(),
@@ -291,6 +381,14 @@ export const houseProjectSchema = z.object({
   ceilings: z.array(ceilingSchema).default([]),
   site: siteSchema.nullable().default(null),
   facadeElements: z.array(facadeElementSchema),
+  objectTypes: z.array(objectTypeSchema).default([]),
+  objectInstances: z.record(z.string(), objectInstanceSchema).default({}),
+  referencePlanes: z.array(referencePlaneSchema).default([]),
+  foundations: z.array(foundationSchema).default([]),
+  railings: z.array(railingSchema).default([]),
+  annotations: z.array(annotationSchema).default([]),
+  components: z.array(componentSchema).default([]),
+  views: z.array(viewStateSchema).default([]),
   materials: z.array(z.string()),
   referenceImages: z.array(
     z.object({
@@ -322,6 +420,14 @@ export type HouseCeiling = HouseProject["ceilings"][number];
 export type HouseSite = NonNullable<HouseProject["site"]>;
 export type HouseFacadeElement = HouseProject["facadeElements"][number];
 export type HouseFacadeAlternative = HouseProject["designAlternatives"][number];
+export type HouseObjectType = HouseProject["objectTypes"][number];
+export type HouseObjectInstance = HouseProject["objectInstances"][string];
+export type HouseReferencePlane = HouseProject["referencePlanes"][number];
+export type HouseFoundation = HouseProject["foundations"][number];
+export type HouseRailing = HouseProject["railings"][number];
+export type HouseAnnotation = HouseProject["annotations"][number];
+export type HouseComponent = HouseProject["components"][number];
+export type HouseViewState = HouseProject["views"][number];
 
 export type HouseProjectInput = {
   id?: string;
@@ -497,6 +603,24 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
     ceilings,
     site,
     facadeElements,
+    objectTypes: defaultObjectTypes(input.floorToFloorHeight),
+    objectInstances: buildObjectInstances({ walls, doors, windows, stairs, structuralColumns, structuralBeams, slabs, roofs, rooms }),
+    referencePlanes: [],
+    foundations: structuralColumns.filter((column) => column.levelId === levels[0]?.id).map((column) => ({
+      id: `foundation:${column.id}`,
+      levelId: column.levelId,
+      x: column.x,
+      y: column.y,
+      elevation: -450,
+      width: Math.max(900, column.width * 3),
+      depth: Math.max(900, column.depth * 3),
+      thickness: 450,
+      material: "Reinforced concrete",
+    })),
+    railings: [],
+    annotations: [],
+    components: [],
+    views: defaultHouseViews(levels),
     materials: ["Masonry", "Reinforced concrete", "Aluminium", "Timber", "Gypsum board", "Paint", "Paving"],
     referenceImages: input.referenceImages ?? [],
     revisions: [
@@ -854,6 +978,56 @@ function entrancePlacement(
     y: wall.start.y + dy * along - inward.y * projection,
     rotation: Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x) * 180 / Math.PI,
   };
+}
+
+function defaultObjectTypes(floorHeight: number): HouseProject["objectTypes"] {
+  return [
+    { id: "wall-exterior-200", kind: "wall", name: "200 mm Exterior Block", properties: { thickness: 200, height: floorHeight, material: "Masonry", loadBearing: true } },
+    { id: "wall-interior-120", kind: "wall", name: "120 mm Interior Block", properties: { thickness: 120, height: floorHeight, material: "Masonry", loadBearing: false } },
+    { id: "door-single-900x2100", kind: "door", name: "Single 900 × 2100", properties: { width: 900, height: 2100, material: "Timber", panelCount: 1 } },
+    { id: "window-sliding-1200x1500", kind: "window", name: "Aluminium Sliding 1200 × 1500", properties: { width: 1200, height: 1500, material: "Aluminium", panelCount: 2 } },
+    { id: "column-300x300", kind: "column", name: "RC Column 300 × 300", properties: { width: 300, depth: 300, material: "Reinforced concrete", structural: true } },
+    { id: "beam-250x450", kind: "beam", name: "RC Beam 250 × 450", properties: { width: 250, depth: 450, material: "Reinforced concrete", structural: true } },
+    { id: "slab-150", kind: "slab", name: "RC Slab 150", properties: { thickness: 150, material: "Reinforced concrete" } },
+    { id: "roof-flat-180", kind: "roof", name: "Flat RC Roof 180", properties: { thickness: 180, slope: 0, material: "Reinforced concrete" } },
+  ];
+}
+
+function buildObjectInstances(input: {
+  walls: HouseProject["walls"];
+  doors: HouseProject["doors"];
+  windows: HouseProject["windows"];
+  stairs: HouseProject["stairs"];
+  structuralColumns: HouseProject["structuralColumns"];
+  structuralBeams: HouseProject["structuralBeams"];
+  slabs: HouseProject["slabs"];
+  roofs: HouseProject["roofs"];
+  rooms: HouseProject["rooms"];
+}): HouseProject["objectInstances"] {
+  const result: HouseProject["objectInstances"] = {};
+  const add = (id: string, typeId: string | null, mark: string) => {
+    result[id] = { typeId, mark, pinned: false, groupId: null, flipped: false, properties: {} };
+  };
+  input.walls.forEach((item, index) => add(item.id, item.sourceWallId?.startsWith("interior") ? "wall-interior-120" : "wall-exterior-200", `W-${index + 1}`));
+  input.doors.forEach((item, index) => add(item.id, "door-single-900x2100", `D-${index + 1}`));
+  input.windows.forEach((item, index) => add(item.id, "window-sliding-1200x1500", `WN-${index + 1}`));
+  input.stairs.forEach((item, index) => add(item.id, null, `ST-${index + 1}`));
+  input.structuralColumns.forEach((item, index) => add(item.id, "column-300x300", `C-${index + 1}`));
+  input.structuralBeams.forEach((item, index) => add(item.id, "beam-250x450", `B-${index + 1}`));
+  input.slabs.forEach((item, index) => add(item.id, "slab-150", `S-${index + 1}`));
+  input.roofs.forEach((item, index) => add(item.id, "roof-flat-180", `RF-${index + 1}`));
+  input.rooms.forEach((item, index) => add(item.id, null, `RM-${index + 1}`));
+  return result;
+}
+
+function defaultHouseViews(levels: HouseProject["levels"]): HouseProject["views"] {
+  return [
+    ...levels.map((level) => ({ id: `view:plan:${level.id}`, name: level.name, kind: "floor-plan" as const, levelId: level.id, hiddenCategories: [], temporaryHiddenIds: [], isolatedIds: [], cutPlane: 1200, topOffset: 2300, bottomOffset: 0 })),
+    { id: "view:3d:default", name: "Default 3D", kind: "3d", levelId: null, hiddenCategories: [], temporaryHiddenIds: [], isolatedIds: [], cutPlane: 1200, topOffset: 2300, bottomOffset: 0 },
+    ...(["Front", "Rear", "Left", "Right"] as const).map((name) => ({ id: `view:elevation:${name.toLowerCase()}`, name, kind: "elevation" as const, levelId: null, hiddenCategories: [], temporaryHiddenIds: [], isolatedIds: [], cutPlane: 1200, topOffset: 2300, bottomOffset: 0 })),
+    { id: "schedule:doors", name: "Door Schedule", kind: "schedule", levelId: null, hiddenCategories: [], temporaryHiddenIds: [], isolatedIds: [], cutPlane: 1200, topOffset: 2300, bottomOffset: 0 },
+    { id: "schedule:windows", name: "Window Schedule", kind: "schedule", levelId: null, hiddenCategories: [], temporaryHiddenIds: [], isolatedIds: [], cutPlane: 1200, topOffset: 2300, bottomOffset: 0 },
+  ];
 }
 
 function clonePlan(room: Room, keepReference: boolean): Room {

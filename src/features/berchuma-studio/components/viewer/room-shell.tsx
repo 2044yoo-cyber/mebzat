@@ -35,6 +35,8 @@ export function RoomShell({
   offset,
   showFloor = true,
   selectedWallId,
+  selectedWallIds,
+  hiddenWallIds,
   onSelectWall,
   wallColor = "#e7e3dc",
 }: {
@@ -42,6 +44,8 @@ export function RoomShell({
   offset: [number, number, number];
   showFloor?: boolean;
   selectedWallId?: string | null;
+  selectedWallIds?: ReadonlySet<string>;
+  hiddenWallIds?: ReadonlySet<string>;
   onSelectWall?: (wallId: string) => void;
   wallColor?: string;
 }) {
@@ -51,7 +55,7 @@ export function RoomShell({
 
   return (
     <group position={offset}>
-      {pieces.map((piece) => (
+      {pieces.filter((piece) => !hiddenWallIds?.has(piece.wallId)).map((piece) => (
         <mesh
           key={piece.id}
           position={[piece.centre.x * MM, piece.centreY * MM, -piece.centre.y * MM]}
@@ -66,7 +70,7 @@ export function RoomShell({
             args={[piece.length * MM, piece.height * MM, room.wallThickness * MM]}
           />
           <meshStandardMaterial
-            color={piece.wallId === selectedWallId ? "#1473e6" : wallColor}
+            color={piece.wallId === selectedWallId || selectedWallIds?.has(piece.wallId) ? "#1473e6" : wallColor}
             roughness={0.95}
             metalness={0}
             // Seen from outside, a wall would hide the room. Only the inner

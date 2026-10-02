@@ -80,6 +80,11 @@ const editableFields: Record<HouseObjectKind, readonly string[]> = {
   veranda: ["x", "y", "width", "depth", "elevation", "thickness", "rotation", "canopyHeight", "canopyMaterial", "postMaterial", "material"],
   ceiling: ["elevation", "thickness", "material"],
   site: ["x", "y", "width", "depth", "elevation", "thickness", "material"],
+  foundation: ["x", "y", "width", "depth", "elevation", "thickness", "material"],
+  railing: ["startX", "startY", "endX", "endY", "elevation", "height", "material"],
+  "reference-plane": ["name", "startX", "startY", "endX", "endY"],
+  annotation: ["text", "startX", "startY", "endX", "endY", "value"],
+  component: ["name", "x", "y", "width", "depth", "height", "rotation", "material"],
 };
 
 /** Appearance/construction edits that cannot move verified plan geometry. */
@@ -100,6 +105,11 @@ const strictFields: Record<HouseObjectKind, readonly string[]> = {
   veranda: ["x", "y", "width", "depth", "elevation", "thickness", "rotation", "canopyHeight", "canopyMaterial", "postMaterial", "material"],
   ceiling: ["thickness", "material"],
   site: ["x", "y", "width", "depth", "elevation", "thickness", "material"],
+  foundation: ["width", "depth", "thickness", "material"],
+  railing: ["height", "material"],
+  "reference-plane": [],
+  annotation: ["text"],
+  component: ["name", "x", "y", "width", "depth", "height", "rotation", "material"],
 };
 
 const bounds: Partial<Record<HouseObjectKind, Record<string, readonly [number, number]>>> = {
@@ -113,6 +123,11 @@ const bounds: Partial<Record<HouseObjectKind, Record<string, readonly [number, n
   column: { x: [-100_000, 100_000], y: [-100_000, 100_000], width: [100, 3_000], depth: [100, 3_000], height: [500, 12_000], elevation: [-10_000, 50_000] },
   beam: { startX: [-100_000, 100_000], startY: [-100_000, 100_000], endX: [-100_000, 100_000], endY: [-100_000, 100_000], width: [100, 3_000], depth: [100, 3_000], elevation: [-10_000, 50_000] },
   grid: { position: [-100_000, 100_000], startX: [-100_000, 100_000], startY: [-100_000, 100_000], endX: [-100_000, 100_000], endY: [-100_000, 100_000] },
+  foundation: { x: [-100_000, 100_000], y: [-100_000, 100_000], width: [200, 10_000], depth: [200, 10_000], elevation: [-20_000, 50_000], thickness: [100, 3_000] },
+  railing: { startX: [-100_000, 100_000], startY: [-100_000, 100_000], endX: [-100_000, 100_000], endY: [-100_000, 100_000], elevation: [-10_000, 50_000], height: [100, 3_000] },
+  "reference-plane": { startX: [-100_000, 100_000], startY: [-100_000, 100_000], endX: [-100_000, 100_000], endY: [-100_000, 100_000] },
+  annotation: { startX: [-100_000, 100_000], startY: [-100_000, 100_000], endX: [-100_000, 100_000], endY: [-100_000, 100_000], value: [-1_000_000, 1_000_000] },
+  component: { x: [-100_000, 100_000], y: [-100_000, 100_000], width: [10, 50_000], depth: [10, 50_000], height: [10, 50_000], rotation: [-360, 360] },
   facade: { offset: [0, 100_000], elevation: [0, 50_000], width: [20, 100_000], height: [20, 20_000], depth: [10, 5_000] },
   balcony: { x: [-100_000, 100_000], y: [-100_000, 100_000], width: [300, 20_000], depth: [300, 10_000], elevation: [-10_000, 50_000], thickness: [50, 1_000], rotation: [-360, 360], railingHeight: [0, 3_000] },
   veranda: { x: [-100_000, 100_000], y: [-100_000, 100_000], width: [300, 20_000], depth: [300, 10_000], elevation: [-10_000, 50_000], thickness: [50, 1_000], rotation: [-360, 360], canopyHeight: [1_800, 6_000] },
@@ -186,6 +201,11 @@ export function selectedObjectSnapshot(project: HouseProject, selection: HouseSe
     case "veranda": return project.verandas.find((item) => item.id === selection.id) ?? null;
     case "ceiling": return project.ceilings.find((item) => item.id === selection.id) ?? null;
     case "site": return project.site?.id === selection.id ? project.site : null;
+    case "foundation": return project.foundations.find((item) => item.id === selection.id) ?? null;
+    case "railing": return project.railings.find((item) => item.id === selection.id) ?? null;
+    case "reference-plane": return project.referencePlanes.find((item) => item.id === selection.id) ?? null;
+    case "annotation": return project.annotations.find((item) => item.id === selection.id) ?? null;
+    case "component": return project.components.find((item) => item.id === selection.id) ?? null;
   }
 }
 

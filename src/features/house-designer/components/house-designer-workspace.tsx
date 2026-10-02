@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   ArrowLeft,
   Building2,
@@ -32,7 +32,18 @@ import { cn } from "@/lib/utils";
 
 import { HouseAiRemodelPanel } from "./house-ai-remodel-panel";
 import { HouseFacadePanel } from "./house-facade-panel";
+import {
+  HouseCommandPalette,
+  HouseContextMenu,
+  HouseProjectBrowser,
+  HouseRibbon,
+  HouseSchedulePanel,
+  HouseShortcutHelp,
+  HouseStatusBar,
+  type HouseContextMenuState,
+} from "./house-modeling-chrome";
 import { HouseObjectInspector } from "./house-object-inspector";
+import { HousePlanSelectionOverlay } from "./house-plan-selection-overlay";
 import { HousePreview } from "./house-preview";
 import { HouseStructurePanel } from "./house-structure-panel";
 import {
@@ -44,12 +55,42 @@ import { ensurePhaseThreeProject } from "../services/facade";
 import { ensureHouseEnvelopeProject } from "../services/envelope";
 import { ensurePhaseFourProject } from "../services/structure";
 import {
+  commandFromChord,
+  commandFromKeyboard,
+  houseCommand,
+  isModelTextInput,
+  type HouseCommandCategory,
+  type HouseCommandId,
+} from "../services/command-registry";
+import {
+  alignHouseSelections,
+  createDefaultHouseObject,
+  deleteHouseSelections,
+  duplicateHouseSelections,
+  groupHouseSelections,
+  joinHouseSelections,
+  mirrorHouseSelections,
+  moveHouseSelections,
+  pinHouseSelections,
+  rotateHouseSelections,
+  setHouseObjectType,
+  splitHouseSelection,
+  type HouseClipboard,
+} from "../services/model-commands";
+import {
+  allHouseSelections,
+  ensureHouseBimState,
+  sameSelection,
+} from "../services/model-state";
+import {
   createHouseProject,
   ensurePhaseTwoProject,
   houseStyles,
   type HouseProject,
+  type HouseObjectKind,
   type HouseSelection,
   type HouseStyle,
+  type HouseViewState,
 } from "../types/project";
 
 type Stage = "start" | "verify" | "model";
@@ -73,6 +114,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
   const [view, setView] = useState<WorkspaceView>("split");
   const [analysingPlan, setAnalysingPlan] = useState(false);
   const [planAnalysis, setPlanAnalysis] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState("Saved");
 
   const draftKey = houseDraftKey(userId);
   const stored = useSyncExternalStore(
@@ -84,6 +126,15 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
     () => (stored ? readHouseDraft(window.localStorage, draftKey) : null),
     [draftKey, stored],
   );
+
+  useEffect(() => {
+    if (!project || stage !== "model") return;
+    const timer = window.setTimeout(() => {
+      const saved = writeHouseDraft(window.localStorage, draftKey, project);
+      setSaveState(saved ? "Autosaved" : "Save failed");
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [draftKey, project, stage]);
 
   function choosePlans(next: DraftPlan[]) {
     const selected = next.slice(-1);
@@ -149,13 +200,13 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       referenceImages: references(floorPlans, facades),
     });
     setRoom(verified);
-    setProject(next);
+    setProject(ensureHouseBimState(next));
     setStage("model");
   }
 
   function restore() {
     if (!savedDraft) return;
-    const restored = ensureHouseEnvelopeProject(ensurePhaseFourProject(ensurePhaseThreeProject(ensurePhaseTwoProject(savedDraft.project))));
+    const restored = ensureHouseBimState(ensureHouseEnvelopeProject(ensurePhaseFourProject(ensurePhaseThreeProject(ensurePhaseTwoProject(savedDraft.project)))));
     const restoredRoom = restored.levels.find((level) => level.plan)?.plan;
     if (!restoredRoom) return;
     setProject(restored);
@@ -178,6 +229,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
     };
     setProject(next);
     const saved = writeHouseDraft(window.localStorage, draftKey, next);
+    setSaveState(saved ? "Saved" : "Save failed");
     toast[saved ? "success" : "error"](
       saved
         ? "House project saved on this device."
@@ -186,8 +238,10 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
   }
 
   function updateProject(next: HouseProject) {
-    setProject(next);
-    const groundPlan = next.levels[0]?.plan;
+    const updated = { ...next, metadata: { ...next.metadata, updatedAt: new Date().toISOString() } };
+    setSaveState("Saving…");
+    setProject(updated);
+    const groundPlan = updated.levels[0]?.plan;
     if (groundPlan) setRoom(groundPlan);
   }
 
@@ -267,6 +321,13 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           onView={setView}
           onProjectChange={updateProject}
           onSave={save}
+          onSaveAs={() => {
+            const copy = ensureHouseBimState({ ...project, id: crypto.randomUUID(), metadata: { ...project.metadata, title: `${project.metadata.title} Copy`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, revisions: [...project.revisions, { id: crypto.randomUUID(), createdAt: new Date().toISOString(), note: "Saved as a new design" }] });
+            setProject(copy);
+            writeHouseDraft(window.localStorage, draftKey, copy);
+            setSaveState("Saved as copy");
+          }}
+          saveState={saveState}
           onDownload={download}
         />
       ) : null}
@@ -458,6 +519,8 @@ function ModelScreen({
   onView,
   onProjectChange,
   onSave,
+  onSaveAs,
+  saveState,
   onDownload,
 }: {
   project: HouseProject;
@@ -465,20 +528,49 @@ function ModelScreen({
   onView: (view: WorkspaceView) => void;
   onProjectChange: (project: HouseProject) => void;
   onSave: () => void;
+  onSaveAs: () => void;
+  saveState: string;
   onDownload: () => void;
 }) {
   const [activeLevelId, setActiveLevelId] = useState(project.levels[0]?.id ?? "ground-floor");
   const [visibleLevelIds, setVisibleLevelIds] = useState<Set<string>>(
     () => new Set(project.levels.map((level) => level.id)),
   );
-  const [selected, setSelected] = useState<HouseSelection | null>(null);
+  const [selections, setSelections] = useState<HouseSelection[]>([]);
   const [viewportOpen, setViewportOpen] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<HouseCommandCategory>("Architecture");
+  const [activeTool, setActiveTool] = useState<HouseCommandId | null>("select");
+  const [past, setPast] = useState<HouseProject[]>([]);
+  const [future, setFuture] = useState<HouseProject[]>([]);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [visibilityOpen, setVisibilityOpen] = useState(false);
+  const [hiddenKinds, setHiddenKinds] = useState<Set<HouseObjectKind>>(() => new Set());
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
+  const [isolatedIds, setIsolatedIds] = useState<Set<string>>(() => new Set());
+  const [activeViewId, setActiveViewId] = useState<string | null>("view:3d:default");
+  const [schedule, setSchedule] = useState<"doors" | "windows" | "rooms" | "quantities" | null>(null);
+  const [contextMenu, setContextMenu] = useState<HouseContextMenuState>(null);
+  const [guidance, setGuidance] = useState("Select an object or start a command");
+  const clipboard = useRef<HouseClipboard | null>(null);
+  const commandRef = useRef<(id: HouseCommandId) => void>(() => undefined);
+  const keyboardRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
+  const chordRef = useRef({ value: "", at: 0 });
+  const escapeRef = useRef(0);
+  const selected = selections.at(-1) ?? null;
+  const selectedIds = useMemo(() => new Set(selections.map((item) => item.id)), [selections]);
   const activeLevel = project.levels.find((level) => level.id === activeLevelId) ?? project.levels[0];
   const activeRoom = activeLevel?.plan;
+  const effectiveHiddenIds = useMemo(() => {
+    const result = new Set(hiddenIds);
+    if (isolatedIds.size) for (const item of allHouseSelections(project)) if (!isolatedIds.has(item.id)) result.add(item.id);
+    return result;
+  }, [hiddenIds, isolatedIds, project]);
 
   function chooseLevel(levelId: string) {
     setActiveLevelId(levelId);
-    setSelected({ kind: "level", id: levelId });
+    setActiveViewId(`view:plan:${levelId}`);
+    setSelections([{ kind: "level", id: levelId }]);
   }
 
   function toggleLevel(levelId: string) {
@@ -490,8 +582,219 @@ function ModelScreen({
     });
   }
 
+  function commit(next: HouseProject, label: string) {
+    if (next === project) return;
+    setPast((items) => [...items, project].slice(-60));
+    setFuture([]);
+    onProjectChange(next);
+    setGuidance(label);
+  }
+
+  function applyMutation(result: ReturnType<typeof deleteHouseSelections>, label: string) {
+    if (result.project !== project) commit(result.project, label);
+    setSelections(result.selections);
+    if (result.blocked.length) toast.info(result.blocked.join(". "));
+  }
+
+  function undo() {
+    const previous = past.at(-1);
+    if (!previous) return;
+    setPast((items) => items.slice(0, -1));
+    setFuture((items) => [project, ...items].slice(0, 60));
+    onProjectChange(previous);
+    setGuidance("Undid last model command");
+  }
+
+  function redo() {
+    const next = future[0];
+    if (!next) return;
+    setFuture((items) => items.slice(1));
+    setPast((items) => [...items, project].slice(-60));
+    onProjectChange(next);
+    setGuidance("Redid model command");
+  }
+
+  function choose(selection: HouseSelection | null, mode: "replace" | "add" | "remove" = "replace") {
+    if (!selection) {
+      if (mode === "replace") setSelections([]);
+      return;
+    }
+    const groupId = project.objectInstances[selection.id]?.groupId;
+    const targets = groupId
+      ? allHouseSelections(project).filter((item) => project.objectInstances[item.id]?.groupId === groupId)
+      : [selection];
+    setSelections((current) => {
+      if (mode === "replace") return targets;
+      if (mode === "remove") return current.filter((item) => !targets.some((target) => sameSelection(item, target)));
+      const next = [...current];
+      for (const target of targets) if (!next.some((item) => sameSelection(item, target))) next.push(target);
+      return next;
+    });
+  }
+
+  function chooseMany(items: HouseSelection[], mode: "replace" | "add" | "remove") {
+    setSelections((current) => {
+      if (mode === "replace") return items;
+      if (mode === "remove") return current.filter((item) => !items.some((target) => sameSelection(item, target)));
+      const next = [...current];
+      for (const target of items) if (!next.some((item) => sameSelection(item, target))) next.push(target);
+      return next;
+    });
+  }
+
+  function selectView(next: HouseViewState) {
+    setActiveViewId(next.id);
+    if (next.levelId) setActiveLevelId(next.levelId);
+    onView(next.kind === "floor-plan" || next.kind === "ceiling-plan" ? "2d" : "3d");
+    setGuidance(`Opened ${next.name}`);
+  }
+
+  function createFromCommand(id: HouseCommandId) {
+    const kinds: Partial<Record<HouseCommandId, HouseObjectKind>> = {
+      wall: "wall", door: "door", window: "window", column: "column", floor: "slab", ceiling: "ceiling", roof: "roof", stair: "stair", railing: "railing", component: "component", furniture: "component", grid: "grid", "reference-plane": "reference-plane", dimension: "annotation", text: "annotation", tag: "annotation", section: "annotation", elevation: "annotation",
+    };
+    const kind = kinds[id];
+    if (!kind) return false;
+    setActiveTool(id);
+    applyMutation(createDefaultHouseObject(project, kind, activeLevelId), `${houseCommand(id).label} placed — edit exact values in Properties`);
+    return true;
+  }
+
+  function runCommand(id: HouseCommandId) {
+    setContextMenu(null);
+    switch (id) {
+      case "undo": undo(); return;
+      case "redo": redo(); return;
+      case "save": onSave(); setGuidance("Project saved"); return;
+      case "save-as": onSaveAs(); setGuidance("Saved as a new project copy"); return;
+      case "command-search": setPaletteOpen(true); return;
+      case "shortcut-help": setHelpOpen(true); return;
+      case "select": setActiveTool("select"); setGuidance("Select objects · Ctrl adds · Shift removes"); return;
+      case "cancel": {
+        const now = Date.now();
+        if (activeTool && activeTool !== "select" && now - escapeRef.current < 700) {
+          setActiveTool("select");
+          setGuidance("Tool exited");
+        } else if (activeTool && activeTool !== "select") {
+          setGuidance("Current step cancelled · press Esc again to exit tool");
+        } else {
+          setSelections([]);
+          setGuidance("Selection cleared");
+        }
+        escapeRef.current = now;
+        return;
+      }
+      case "finish": setActiveTool("select"); setGuidance("Action finished"); return;
+      case "delete": applyMutation(deleteHouseSelections(project, selections), "Deleted selection"); return;
+      case "copy": clipboard.current = { sourceProjectId: project.id, selections: [...selections] }; setGuidance(`Copied ${selections.length} object${selections.length === 1 ? "" : "s"}`); return;
+      case "cut": clipboard.current = { sourceProjectId: project.id, selections: [...selections] }; applyMutation(deleteHouseSelections(project, selections), "Cut selection"); return;
+      case "paste": {
+        if (!clipboard.current || clipboard.current.sourceProjectId !== project.id) { toast.info("Nothing from this model is ready to paste."); return; }
+        applyMutation(duplicateHouseSelections(project, clipboard.current.selections, 250), "Pasted copy"); return;
+      }
+      case "duplicate": applyMutation(duplicateHouseSelections(project, selections), "Duplicated selection"); return;
+      case "rotate": applyMutation(rotateHouseSelections(project, selections), "Rotated selection 90°"); return;
+      case "mirror-pick": case "mirror-draw": case "flip": applyMutation(mirrorHouseSelections(project, selections), "Flipped selection"); return;
+      case "offset": applyMutation(moveHouseSelections(project, selections, 100, 100), "Offset selection 100 mm"); return;
+      case "array": {
+        let nextProject = project;
+        let created: HouseSelection[] = [];
+        const blocked: string[] = [];
+        for (const distance of [250, 500, 750]) {
+          const result = duplicateHouseSelections(nextProject, selections, distance);
+          nextProject = result.project;
+          created = [...created, ...result.selections];
+          blocked.push(...result.blocked);
+        }
+        applyMutation({ project: nextProject, selections: created, blocked }, "Created a 4-item array");
+        return;
+      }
+      case "align": applyMutation(alignHouseSelections(project, selections), "Aligned selection to primary object"); return;
+      case "split": applyMutation(splitHouseSelection(project, selected), "Split object at midpoint"); return;
+      case "join": commit(joinHouseSelections(project, selections, true), "Joined selected objects"); return;
+      case "unjoin": commit(joinHouseSelections(project, selections, false), "Unjoined selected objects"); return;
+      case "pin": commit(pinHouseSelections(project, selections, true), "Pinned selection"); return;
+      case "unpin": commit(pinHouseSelections(project, selections, false), "Unpinned selection"); return;
+      case "group": commit(groupHouseSelections(project, selections, true), "Grouped selection"); return;
+      case "ungroup": commit(groupHouseSelections(project, selections, false), "Ungrouped selection"); return;
+      case "create-similar": applyMutation(duplicateHouseSelections(project, selected ? [selected] : [], 200), "Created similar object"); return;
+      case "match-type": {
+        const sourceTypeId = selected ? project.objectInstances[selected.id]?.typeId : null;
+        if (!sourceTypeId) { toast.info("The primary object has no reusable type."); return; }
+        commit(setHouseObjectType(project, selections.slice(0, -1), sourceTypeId), "Matched type and properties");
+        return;
+      }
+      case "select-all": setSelections(allHouseSelections(project, activeLevelId).filter((item) => item.kind !== "level")); setGuidance("Selected all objects on active level"); return;
+      case "cycle-selection": {
+        const items = allHouseSelections(project, activeLevelId).filter((item) => item.kind !== "level");
+        const index = selected ? items.findIndex((item) => sameSelection(item, selected)) : -1;
+        if (items.length) setSelections([items[(index + 1) % items.length]!]);
+        return;
+      }
+      case "hide": setHiddenIds((current) => new Set([...current, ...selections.map((item) => item.id)])); setSelections([]); setGuidance("Selection temporarily hidden"); return;
+      case "isolate": setIsolatedIds(new Set(selections.map((item) => item.id))); setGuidance("Selection temporarily isolated"); return;
+      case "reset-hide": setHiddenIds(new Set()); setIsolatedIds(new Set()); setGuidance("Temporary visibility reset"); return;
+      case "visibility": setVisibilityOpen((open) => !open); return;
+      case "default-3d": onView("3d"); setActiveViewId("view:3d:default"); return;
+      case "zoom-fit": case "zoom-extents": setGuidance("View refitted to model extents"); return;
+      case "move": case "trim": case "scale": setActiveTool(id); setGuidance(`${houseCommand(id).label}: select the target, then use exact Properties or arrow keys`); return;
+      case "ai-remodel": document.getElementById("house-ai-remodel")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
+      case "alternatives": document.getElementById("house-facade")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
+      case "estimate": case "boq": setSchedule("quantities"); setGuidance("Live preliminary quantities opened"); return;
+      default:
+        if (createFromCommand(id)) return;
+        setActiveTool(id);
+        setGuidance(`${houseCommand(id).label} is ready for the active view`);
+    }
+  }
+
+  useEffect(() => {
+    commandRef.current = runCommand;
+    keyboardRef.current = (event) => {
+      if (isModelTextInput(event.target)) return;
+      if (event.key.startsWith("Arrow") && selections.length) {
+        event.preventDefault();
+        const amount = event.shiftKey ? 100 : 10;
+        const dx = event.key === "ArrowLeft" ? -amount : event.key === "ArrowRight" ? amount : 0;
+        const dy = event.key === "ArrowUp" ? -amount : event.key === "ArrowDown" ? amount : 0;
+        applyMutation(moveHouseSelections(project, selections, dx, dy), `Moved selection ${amount} mm`);
+        return;
+      }
+      const direct = commandFromKeyboard(event);
+      if (direct) {
+        event.preventDefault();
+        commandRef.current(direct);
+        return;
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1 || !/[a-z0-9]/i.test(event.key)) return;
+      const now = Date.now();
+      const first = now - chordRef.current.at < 900 ? chordRef.current.value : "";
+      const chord = `${first}${event.key.toUpperCase()}`.slice(-2);
+      const command = commandFromChord(chord);
+      chordRef.current = command ? { value: "", at: 0 } : { value: event.key.toUpperCase(), at: now };
+      if (command) { event.preventDefault(); commandRef.current(command); }
+    };
+  });
+
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => keyboardRef.current(event);
+    window.addEventListener("keydown", keydown);
+    return () => window.removeEventListener("keydown", keydown);
+  }, []);
+
   return (
     <section className="space-y-3">
+      <HouseRibbon
+        activeCategory={activeCategory}
+        activeTool={activeTool}
+        selectionCount={selections.length}
+        canUndo={past.length > 0}
+        canRedo={future.length > 0}
+        onCategory={setActiveCategory}
+        onCommand={runCommand}
+        onSearch={() => setPaletteOpen(true)}
+        onHelp={() => setHelpOpen(true)}
+      />
       <div className="flex min-w-0 items-center justify-between gap-2 overflow-x-auto rounded-xl border bg-card p-2">
         <div className="flex shrink-0 rounded-lg bg-muted p-1">
           {(["2d", "3d", "split"] as const).map((item) => (
@@ -521,38 +824,50 @@ function ModelScreen({
         })}
       </div>
 
-      <HouseFacadePanel project={project} onChange={onProjectChange} />
+      {visibilityOpen ? (
+        <div className="rounded-xl border bg-card p-3">
+          <div className="mb-2 flex items-center justify-between"><div><p className="text-[11px] uppercase tracking-wide text-brand">Visibility / Graphics</p><h3 className="text-sm font-semibold">Model categories</h3></div><button type="button" onClick={() => setHiddenKinds(new Set())} className="rounded-lg border px-3 py-1.5 text-xs">Show all</button></div>
+          <div className="flex flex-wrap gap-2">{(["wall", "door", "window", "room", "slab", "ceiling", "roof", "stair", "railing", "column", "beam", "grid", "foundation", "component", "facade", "balcony", "veranda", "site"] as HouseObjectKind[]).map((kind) => <label key={kind} className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs capitalize"><input type="checkbox" checked={!hiddenKinds.has(kind)} onChange={(event) => setHiddenKinds((current) => { const next = new Set(current); if (event.target.checked) next.delete(kind); else next.add(kind); return next; })} />{kind.replace("-", " ")}</label>)}</div>
+        </div>
+      ) : null}
 
-      <HouseAiRemodelPanel project={project} selected={selected} onChange={onProjectChange} />
+      <div id="house-facade"><HouseFacadePanel project={project} onChange={(next) => commit(next, "Façade updated")} /></div>
 
-      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-        {viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
-          {view !== "3d" && activeRoom ? (
-            <div className="relative min-h-[340px] min-w-0 overflow-hidden rounded-xl border bg-background">
-              <div className="pointer-events-none absolute inset-0"><PlanCanvas room={activeRoom} onChange={() => undefined} /></div>
-              <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · mm</span>
-            </div>
-          ) : null}
-          {view !== "2d" ? (
-            <HousePreview
-              project={project}
-              visibleLevelIds={visibleLevelIds}
-              selected={selected}
-              onSelect={setSelected}
-              className="h-[min(620px,62dvh)]"
-            />
-          ) : null}
-        </div> : <button type="button" onClick={() => setViewportOpen(true)} className="min-h-16 rounded-xl border border-dashed bg-muted/20 text-sm text-muted-foreground hover:border-brand hover:text-brand">Show 2D / 3D viewport</button>}
-        <HouseObjectInspector
-          project={project}
-          activeLevelId={activeLevelId}
-          selected={selected}
-          onSelect={setSelected}
-          onChange={onProjectChange}
-        />
+      <div id="house-ai-remodel"><HouseAiRemodelPanel project={project} selected={selected} selections={selections} onChange={(next) => commit(next, "AI model change applied")} /></div>
+
+      {schedule ? <HouseSchedulePanel project={project} kind={schedule} onClose={() => setSchedule(null)} /> : null}
+
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[210px_minmax(0,1fr)_320px]">
+        <HouseProjectBrowser project={project} activeLevelId={activeLevelId} activeViewId={activeViewId} onLevel={chooseLevel} onView={selectView} onSchedule={setSchedule} />
+        <div className="min-w-0" onContextMenu={(event) => { event.preventDefault(); if (selections.length) setContextMenu({ x: event.clientX, y: event.clientY }); }}>
+          {viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
+            {view !== "3d" && activeRoom ? (
+              <div className="relative min-h-[340px] min-w-0 overflow-hidden rounded-xl border bg-background">
+                <div className="pointer-events-none absolute inset-0"><PlanCanvas room={activeRoom} onChange={() => undefined} /></div>
+                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} onSelect={chooseMany} />
+                <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · mm</span>
+              </div>
+            ) : null}
+            {view !== "2d" ? (
+              <HousePreview
+                key={activeViewId ?? "model-view"}
+                project={project}
+                visibleLevelIds={visibleLevelIds}
+                selected={selected}
+                selectedIds={selectedIds}
+                hiddenKinds={hiddenKinds}
+                hiddenIds={effectiveHiddenIds}
+                initialView={previewView(activeViewId)}
+                onSelect={choose}
+                className="h-[min(620px,62dvh)]"
+              />
+            ) : null}
+          </div> : <button type="button" onClick={() => setViewportOpen(true)} className="min-h-16 w-full rounded-xl border border-dashed bg-muted/20 text-sm text-muted-foreground hover:border-brand hover:text-brand">Show 2D / 3D viewport</button>}
+        </div>
+        <HouseObjectInspector project={project} activeLevelId={activeLevelId} selected={selected} selections={selections} onSelect={(selection) => choose(selection)} onChange={(next) => commit(next, "Properties updated")} />
       </div>
 
-      <HouseStructurePanel project={project} onChange={onProjectChange} />
+      <HouseStructurePanel project={project} onChange={(next) => commit(next, "Structure updated")} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Summary label="Level area" value={activeRoom ? `${floorArea(activeRoom).toFixed(2)} m²` : "—"} />
@@ -564,6 +879,11 @@ function ModelScreen({
       <div className="rounded-xl border bg-card p-3 text-xs text-muted-foreground">
         <strong className="text-foreground">Structured house model:</strong> verified architecture, façade options and preliminary structural objects remain editable and reproducible from millimetre data. BOQ-ready quantities update from the same source objects.
       </div>
+
+      <HouseStatusBar selectionCount={selections.length} snap="Endpoint · Midpoint · Grid" level={activeLevel?.name ?? "—"} units={project.units} mode={activeTool ? houseCommand(activeTool).label : "Select"} saveState={`${saveState} · ${guidance}`} />
+      <HouseCommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onCommand={runCommand} />
+      <HouseShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <HouseContextMenu state={contextMenu} selectionCount={selections.length} onClose={() => setContextMenu(null)} onCommand={runCommand} />
     </section>
   );
 }
@@ -614,3 +934,11 @@ function clamp(value: number, min: number, max: number) { return Math.min(max, M
 function slug(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 
 function labelStyle(value: HouseStyle) { return value.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" "); }
+
+function previewView(viewId: string | null): "3d" | "front" | "back" | "left" | "right" {
+  if (viewId?.endsWith(":front")) return "front";
+  if (viewId?.endsWith(":rear")) return "back";
+  if (viewId?.endsWith(":left")) return "left";
+  if (viewId?.endsWith(":right")) return "right";
+  return "3d";
+}

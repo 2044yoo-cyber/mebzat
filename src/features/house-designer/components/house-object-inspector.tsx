@@ -1,8 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { patchHouseObject, type HousePatch } from "../services/project-edit";
+import { duplicateHouseType, setHouseObjectType, updateHouseType } from "../services/model-commands";
 import {
   facadeElementTypes,
   roofTypes,
@@ -15,12 +16,14 @@ export function HouseObjectInspector({
   project,
   activeLevelId,
   selected,
+  selections = selected ? [selected] : [],
   onSelect,
   onChange,
 }: {
   project: HouseProject;
   activeLevelId: string;
   selected: HouseSelection | null;
+  selections?: readonly HouseSelection[];
   onSelect: (selection: HouseSelection | null) => void;
   onChange: (project: HouseProject) => void;
 }) {
@@ -34,7 +37,8 @@ export function HouseObjectInspector({
     <aside className="min-w-0 space-y-3 rounded-xl border bg-card p-3">
       <div>
         <p className="text-[11px] font-medium uppercase tracking-wide text-brand">Object inspector</p>
-        <h3 className="mt-0.5 font-semibold">Exact dimensions</h3>
+        <h3 className="mt-0.5 font-semibold">Properties</h3>
+        {selections.length > 1 ? <p className="text-xs text-muted-foreground">{selections.length} objects selected</p> : null}
       </div>
 
       <label className="block space-y-1.5 text-xs text-muted-foreground">
@@ -54,13 +58,47 @@ export function HouseObjectInspector({
       </label>
 
       {selected ? (
-        <InspectorFields project={project} selected={selected} onPatch={patch} />
+        <>
+          <TypeInstanceFields project={project} selected={selected} selections={selections} onChange={onChange} />
+          <InspectorFields project={project} selected={selected} onPatch={patch} />
+        </>
       ) : (
         <p className="rounded-lg bg-muted/60 p-3 text-xs leading-5 text-muted-foreground">
           Tap a wall, opening, stair, slab, roof or exterior object—or choose one above—to edit its exact millimetre values.
         </p>
       )}
     </aside>
+  );
+}
+
+function TypeInstanceFields({ project, selected, selections, onChange }: { project: HouseProject; selected: HouseSelection; selections: readonly HouseSelection[]; onChange: (project: HouseProject) => void }) {
+  const [showType, setShowType] = useState(false);
+  const instance = project.objectInstances[selected.id];
+  const available = project.objectTypes.filter((item) => item.kind === selected.kind);
+  const type = available.find((item) => item.id === instance?.typeId) ?? null;
+
+  function patchInstance(change: Partial<NonNullable<typeof instance>>) {
+    const current = project.objectInstances[selected.id] ?? { typeId: null, mark: "", pinned: false, groupId: null, flipped: false, properties: {} };
+    onChange({ ...project, objectInstances: { ...project.objectInstances, [selected.id]: { ...current, ...change } } });
+  }
+
+  function duplicateType() {
+    if (!type) return;
+    const name = window.prompt("New type name", `${type.name} Copy`);
+    if (name === null) return;
+    const result = duplicateHouseType(project, type.id, name);
+    onChange(setHouseObjectType(result.project, selections, result.typeId));
+  }
+
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <div className="flex items-center justify-between"><p className="text-sm font-semibold">Type + Instance</p>{type ? <button type="button" onClick={() => setShowType((value) => !value)} className="text-[11px] font-medium text-brand">{showType ? "Hide type" : "Edit type"}</button> : null}</div>
+      {available.length ? <label className="block space-y-1 text-[11px] text-muted-foreground"><span>Type</span><select value={type?.id ?? ""} onChange={(event) => onChange(setHouseObjectType(project, selections, event.target.value))} className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground">{available.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label> : <p className="text-[11px] text-muted-foreground">This object has instance properties only.</p>}
+      {type ? <button type="button" onClick={duplicateType} className="w-full rounded-lg border px-3 py-2 text-xs hover:bg-muted">Duplicate Type</button> : null}
+      <label className="block space-y-1 text-[11px] text-muted-foreground"><span>Instance mark</span><input value={instance?.mark ?? ""} onChange={(event) => patchInstance({ mark: event.target.value })} className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground" /></label>
+      <div className="grid grid-cols-2 gap-2 text-xs"><label className="flex items-center gap-2 rounded-lg border p-2"><input type="checkbox" checked={instance?.pinned ?? false} onChange={(event) => patchInstance({ pinned: event.target.checked })} />Pinned</label><label className="flex items-center gap-2 rounded-lg border p-2"><input type="checkbox" checked={instance?.flipped ?? false} onChange={(event) => patchInstance({ flipped: event.target.checked })} />Flipped</label></div>
+      {showType && type ? <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/40 p-2">{Object.entries(type.properties).map(([key, value]) => typeof value === "boolean" ? <label key={key} className="flex items-center gap-2 text-[11px]"><input type="checkbox" checked={value} onChange={(event) => onChange(updateHouseType(project, type.id, { [key]: event.target.checked }))} />{labelProperty(key)}</label> : typeof value === "number" ? <NumberInput key={key} label={labelProperty(key)} value={value} min={0} max={100000} onChange={(next) => onChange(updateHouseType(project, type.id, { [key]: next }))} /> : <TextInput key={key} label={labelProperty(key)} value={value} onChange={(next) => onChange(updateHouseType(project, type.id, { [key]: next }))} />)}</div> : null}
+    </div>
   );
 }
 
@@ -294,6 +332,37 @@ function InspectorFields({
     );
   }
 
+  if (selected.kind === "foundation") {
+    const item = project.foundations.find((entry) => entry.id === selected.id);
+    if (!item) return <Missing />;
+    return <FieldGrid title="Foundation · preliminary"><NumberInput label="X" value={item.x} min={-100000} max={100000} onChange={(x) => onPatch({ x })} /><NumberInput label="Y" value={item.y} min={-100000} max={100000} onChange={(y) => onPatch({ y })} /><NumberInput label="Width" value={item.width} min={200} max={10000} onChange={(width) => onPatch({ width })} /><NumberInput label="Depth" value={item.depth} min={200} max={10000} onChange={(depth) => onPatch({ depth })} /><NumberInput label="Thickness" value={item.thickness} min={100} max={3000} onChange={(thickness) => onPatch({ thickness })} /><NumberInput label="Elevation" value={item.elevation} min={-10000} max={50000} onChange={(elevation) => onPatch({ elevation })} /><TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide /></FieldGrid>;
+  }
+
+  if (selected.kind === "component") {
+    const item = project.components.find((entry) => entry.id === selected.id);
+    if (!item) return <Missing />;
+    return <FieldGrid title={item.name}><TextInput label="Name" value={item.name} onChange={(name) => onPatch({ name })} wide /><NumberInput label="X" value={item.x} min={-100000} max={100000} onChange={(x) => onPatch({ x })} /><NumberInput label="Y" value={item.y} min={-100000} max={100000} onChange={(y) => onPatch({ y })} /><NumberInput label="Width" value={item.width} min={10} max={50000} onChange={(width) => onPatch({ width })} /><NumberInput label="Depth" value={item.depth} min={10} max={50000} onChange={(depth) => onPatch({ depth })} /><NumberInput label="Height" value={item.height} min={10} max={50000} onChange={(height) => onPatch({ height })} /><NumberInput label="Rotation" value={item.rotation} min={-360} max={360} suffix="°" onChange={(rotation) => onPatch({ rotation })} /><TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide /></FieldGrid>;
+  }
+
+  if (selected.kind === "railing") {
+    const item = project.railings.find((entry) => entry.id === selected.id);
+    if (!item) return <Missing />;
+    return <FieldGrid title="Railing"><NumberInput label="Start X" value={item.start.x} min={-100000} max={100000} onChange={(startX) => onPatch({ startX })} /><NumberInput label="Start Y" value={item.start.y} min={-100000} max={100000} onChange={(startY) => onPatch({ startY })} /><NumberInput label="End X" value={item.end.x} min={-100000} max={100000} onChange={(endX) => onPatch({ endX })} /><NumberInput label="End Y" value={item.end.y} min={-100000} max={100000} onChange={(endY) => onPatch({ endY })} /><NumberInput label="Height" value={item.height} min={100} max={3000} onChange={(height) => onPatch({ height })} /><TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide /></FieldGrid>;
+  }
+
+  if (selected.kind === "reference-plane") {
+    const item = project.referencePlanes.find((entry) => entry.id === selected.id);
+    if (!item) return <Missing />;
+    return <FieldGrid title="Reference Plane"><TextInput label="Name" value={item.name} onChange={(name) => onPatch({ name })} wide /><NumberInput label="Start X" value={item.start.x} min={-100000} max={100000} onChange={(startX) => onPatch({ startX })} /><NumberInput label="Start Y" value={item.start.y} min={-100000} max={100000} onChange={(startY) => onPatch({ startY })} /><NumberInput label="End X" value={item.end.x} min={-100000} max={100000} onChange={(endX) => onPatch({ endX })} /><NumberInput label="End Y" value={item.end.y} min={-100000} max={100000} onChange={(endY) => onPatch({ endY })} /></FieldGrid>;
+  }
+
+  if (selected.kind === "annotation") {
+    const item = project.annotations.find((entry) => entry.id === selected.id);
+    if (!item) return <Missing />;
+    return <FieldGrid title={`${labelProperty(item.kind)} annotation`}><TextInput label="Text" value={item.text} onChange={(text) => onPatch({ text })} wide /><NumberInput label="Start X" value={item.start.x} min={-100000} max={100000} onChange={(startX) => onPatch({ startX })} /><NumberInput label="Start Y" value={item.start.y} min={-100000} max={100000} onChange={(startY) => onPatch({ startY })} />{item.value !== null ? <NumberInput label="Value" value={item.value} min={0} max={1000000} onChange={(value) => onPatch({ value })} /> : null}</FieldGrid>;
+  }
+
+  if (selected.kind !== "roof") return <Missing />;
   const item = project.roofs.find((roof) => roof.id === selected.id);
   if (!item) return <Missing />;
   return (
@@ -378,6 +447,11 @@ function objectOptions(project: HouseProject, levelId: string) {
   addOptions(options, project.verandas.filter((item) => item.levelId === levelId), "veranda", "Veranda");
   addOptions(options, project.ceilings.filter((item) => item.levelId === levelId), "ceiling", "Ceiling");
   addOptions(options, project.facadeElements.filter((item) => item.levelId === levelId), "facade", "Façade element");
+  addOptions(options, project.foundations.filter((item) => item.levelId === levelId), "foundation", "Foundation");
+  addOptions(options, project.railings.filter((item) => item.levelId === levelId), "railing", "Railing");
+  addOptions(options, project.referencePlanes.filter((item) => item.levelId === levelId), "reference-plane", "Reference plane");
+  addOptions(options, project.annotations.filter((item) => item.levelId === levelId), "annotation", "Annotation");
+  addOptions(options, project.components.filter((item) => item.levelId === levelId), "component", "Component");
   if (project.site?.levelId === levelId) options.push({ label: "Site / ground", selection: { kind: "site", id: project.site.id } });
   return options;
 }
@@ -399,6 +473,10 @@ function parseSelection(value: string): HouseSelection | null {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function labelProperty(value: string) {
+  return value.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("-", " ").replace(/^./, (letter) => letter.toUpperCase());
 }
 
 function boundaryBounds(points: { x: number; y: number }[]) {

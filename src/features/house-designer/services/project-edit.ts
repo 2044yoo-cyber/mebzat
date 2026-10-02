@@ -54,9 +54,58 @@ export function patchHouseObject(
       return { ...project, ceilings: patchList(project.ceilings, selection.id, patch) };
     case "site":
       return patchSite(project, selection.id, patch);
+    case "foundation":
+      return { ...project, foundations: patchList(project.foundations, selection.id, patch) };
+    case "component":
+      return { ...project, components: patchList(project.components, selection.id, patch) };
+    case "railing":
+      return patchRailing(project, selection.id, patch);
+    case "reference-plane":
+      return patchReferencePlane(project, selection.id, patch);
+    case "annotation":
+      return patchAnnotation(project, selection.id, patch);
     case "level":
       return patchLevel(project, selection.id, patch);
   }
+}
+
+function patchRailing(project: HouseProject, id: string, patch: HousePatch): HouseProject {
+  return {
+    ...project,
+    railings: project.railings.map((item) => item.id === id ? {
+      ...item,
+      start: { x: numberOr(patch.startX, item.start.x), y: numberOr(patch.startY, item.start.y) },
+      end: { x: numberOr(patch.endX, item.end.x), y: numberOr(patch.endY, item.end.y) },
+      elevation: numberOr(patch.elevation, item.elevation),
+      height: positiveOr(patch.height, item.height),
+      material: typeof patch.material === "string" ? patch.material : item.material,
+    } : item),
+  };
+}
+
+function patchReferencePlane(project: HouseProject, id: string, patch: HousePatch): HouseProject {
+  return {
+    ...project,
+    referencePlanes: project.referencePlanes.map((item) => item.id === id ? {
+      ...item,
+      name: typeof patch.name === "string" ? patch.name : item.name,
+      start: { x: numberOr(patch.startX, item.start.x), y: numberOr(patch.startY, item.start.y) },
+      end: { x: numberOr(patch.endX, item.end.x), y: numberOr(patch.endY, item.end.y) },
+    } : item),
+  };
+}
+
+function patchAnnotation(project: HouseProject, id: string, patch: HousePatch): HouseProject {
+  return {
+    ...project,
+    annotations: project.annotations.map((item) => item.id === id ? {
+      ...item,
+      text: typeof patch.text === "string" ? patch.text : item.text,
+      start: { x: numberOr(patch.startX, item.start.x), y: numberOr(patch.startY, item.start.y) },
+      end: item.end ? { x: numberOr(patch.endX, item.end.x), y: numberOr(patch.endY, item.end.y) } : item.end,
+      value: typeof patch.value === "number" && Number.isFinite(patch.value) ? patch.value : item.value,
+    } : item),
+  };
 }
 
 function patchRoom(project: HouseProject, id: string, patch: HousePatch): HouseProject {
@@ -146,8 +195,15 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
   const next: HouseProject = {
     ...project,
     walls: project.walls.map((item) =>
-      item.id === id && typeof effectivePatch.material === "string"
-        ? { ...item, material: effectivePatch.material }
+      item.id === id
+        ? {
+            ...item,
+            start: { x: numberOr(effectivePatch.startX, item.start.x), y: numberOr(effectivePatch.startY, item.start.y) },
+            end: { x: numberOr(effectivePatch.endX, item.end.x), y: numberOr(effectivePatch.endY, item.end.y) },
+            thickness: positiveOr(effectivePatch.thickness, item.thickness),
+            height: positiveOr(effectivePatch.height, item.height),
+            material: typeof effectivePatch.material === "string" ? effectivePatch.material : item.material,
+          }
         : item,
     ),
   };
