@@ -133,6 +133,40 @@ function InspectorFields({
     );
   }
 
+  if (selected.kind === "column") {
+    const item = project.structuralColumns.find((column) => column.id === selected.id);
+    if (!item) return <Missing />;
+    return (
+      <FieldGrid title="Preliminary column">
+        <NumberInput label="X" value={item.x} min={-100000} max={100000} onChange={(x) => onPatch({ x })} />
+        <NumberInput label="Y" value={item.y} min={-100000} max={100000} onChange={(y) => onPatch({ y })} />
+        <NumberInput label="Width" value={item.width} min={100} max={3000} onChange={(width) => onPatch({ width })} />
+        <NumberInput label="Depth" value={item.depth} min={100} max={3000} onChange={(depth) => onPatch({ depth })} />
+        <NumberInput label="Height" value={item.height} min={500} max={12000} onChange={(height) => onPatch({ height })} />
+        <NumberInput label="Elevation" value={item.elevation} min={-10000} max={50000} onChange={(elevation) => onPatch({ elevation })} />
+        <TextInput label="Type" value={item.type} onChange={(type) => onPatch({ type })} wide />
+        <TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide />
+      </FieldGrid>
+    );
+  }
+
+  if (selected.kind === "beam") {
+    const item = project.structuralBeams.find((beam) => beam.id === selected.id);
+    if (!item) return <Missing />;
+    return (
+      <FieldGrid title="Preliminary beam">
+        <NumberInput label="Start X" value={item.start.x} min={-100000} max={100000} onChange={(startX) => onPatch({ startX })} />
+        <NumberInput label="Start Y" value={item.start.y} min={-100000} max={100000} onChange={(startY) => onPatch({ startY })} />
+        <NumberInput label="End X" value={item.end.x} min={-100000} max={100000} onChange={(endX) => onPatch({ endX })} />
+        <NumberInput label="End Y" value={item.end.y} min={-100000} max={100000} onChange={(endY) => onPatch({ endY })} />
+        <NumberInput label="Width" value={item.width} min={100} max={3000} onChange={(width) => onPatch({ width })} />
+        <NumberInput label="Depth" value={item.depth} min={100} max={3000} onChange={(depth) => onPatch({ depth })} />
+        <NumberInput label="Elevation" value={item.elevation} min={-10000} max={50000} onChange={(elevation) => onPatch({ elevation })} />
+        <TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide />
+      </FieldGrid>
+    );
+  }
+
   if (selected.kind === "slab") {
     const item = project.slabs.find((slab) => slab.id === selected.id);
     if (!item) return <Missing />;
@@ -219,6 +253,8 @@ function objectOptions(project: HouseProject, levelId: string) {
   addOptions(options, project.doors.filter((item) => item.levelId === levelId), "door", "Door");
   addOptions(options, project.windows.filter((item) => item.levelId === levelId), "window", "Window");
   addOptions(options, project.stairs.filter((item) => item.levelId === levelId), "stair", "Stair");
+  addOptions(options, project.structuralColumns.filter((item) => item.levelId === levelId), "column", "Column");
+  addOptions(options, project.structuralBeams.filter((item) => item.levelId === levelId), "beam", "Beam");
   addOptions(options, project.slabs.filter((item) => item.levelId === levelId), "slab", "Slab");
   addOptions(options, project.roofs.filter((item) => item.levelId === levelId), "roof", "Roof");
   return options;

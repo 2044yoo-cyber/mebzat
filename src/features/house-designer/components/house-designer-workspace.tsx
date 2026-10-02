@@ -31,12 +31,14 @@ import { cn } from "@/lib/utils";
 import { HouseFacadePanel } from "./house-facade-panel";
 import { HouseObjectInspector } from "./house-object-inspector";
 import { HousePreview } from "./house-preview";
+import { HouseStructurePanel } from "./house-structure-panel";
 import {
   houseDraftKey,
   readHouseDraft,
   writeHouseDraft,
 } from "../services/draft";
 import { ensurePhaseThreeProject } from "../services/facade";
+import { ensurePhaseFourProject } from "../services/structure";
 import {
   createHouseProject,
   ensurePhaseTwoProject,
@@ -120,7 +122,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
 
   function restore() {
     if (!savedDraft) return;
-    const restored = ensurePhaseThreeProject(ensurePhaseTwoProject(savedDraft.project));
+    const restored = ensurePhaseFourProject(ensurePhaseThreeProject(ensurePhaseTwoProject(savedDraft.project)));
     const restoredRoom = restored.levels.find((level) => level.plan)?.plan;
     if (!restoredRoom) return;
     setProject(restored);
@@ -506,15 +508,17 @@ function ModelScreen({
         />
       </div>
 
+      <HouseStructurePanel project={project} onChange={onProjectChange} />
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Summary label="Level area" value={activeRoom ? `${floorArea(activeRoom).toFixed(2)} m²` : "—"} />
         <Summary label="Structured walls" value={String(project.walls.length)} />
         <Summary label="Openings" value={`${project.doors.length} doors · ${project.windows.length} windows`} />
-        <Summary label="Building elements" value={`${project.levels.length} levels · ${project.stairs.length} stairs · ${project.roofs.length} roof`} />
+        <Summary label="Structure" value={`${project.structuralColumns.length} columns · ${project.structuralBeams.length} beams`} />
       </div>
 
       <div className="rounded-xl border bg-card p-3 text-xs text-muted-foreground">
-        <strong className="text-foreground">Phase 2 model:</strong> levels, openings, slabs, stairs and roofs are generated as editable structured objects. Select them in 3D or from the inspector to change exact dimensions and materials.
+        <strong className="text-foreground">Structured house model:</strong> verified architecture, façade options and preliminary structural objects remain editable and reproducible from millimetre data. BOQ-ready quantities update from the same source objects.
       </div>
     </section>
   );

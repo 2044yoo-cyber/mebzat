@@ -3,6 +3,8 @@ import type { Room } from "@/features/berchuma-studio/types/room";
 
 import {
   buildFacadeElements,
+  buildStructuralBeams,
+  buildStructuralColumns,
   openingObjectId,
   wallObjectId,
   type HouseProject,
@@ -29,9 +31,30 @@ export function patchHouseObject(
       return { ...project, slabs: patchList(project.slabs, selection.id, patch) };
     case "roof":
       return { ...project, roofs: patchList(project.roofs, selection.id, patch) };
+    case "column":
+      return { ...project, structuralColumns: patchList(project.structuralColumns, selection.id, patch) };
+    case "beam":
+      return patchBeam(project, selection.id, patch);
     case "level":
       return patchLevel(project, selection.id, patch);
   }
+}
+
+function patchBeam(project: HouseProject, id: string, patch: HousePatch): HouseProject {
+  return {
+    ...project,
+    structuralBeams: project.structuralBeams.map((beam) => beam.id === id
+      ? {
+          ...beam,
+          start: { x: numberOr(patch.startX, beam.start.x), y: numberOr(patch.startY, beam.start.y) },
+          end: { x: numberOr(patch.endX, beam.end.x), y: numberOr(patch.endY, beam.end.y) },
+          elevation: numberOr(patch.elevation, beam.elevation),
+          width: positiveOr(patch.width, beam.width),
+          depth: positiveOr(patch.depth, beam.depth),
+          material: typeof patch.material === "string" ? patch.material : beam.material,
+        }
+      : beam),
+  };
 }
 
 function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseProject {
@@ -147,6 +170,12 @@ function patchLevel(project: HouseProject, id: string, patch: HousePatch): House
     roofs: project.roofs.map((item) =>
       item.levelId === id ? { ...item, elevation: item.elevation + delta } : item,
     ),
+    structuralColumns: project.structuralColumns.map((item) =>
+      item.levelId === id ? { ...item, elevation: item.elevation + delta } : item,
+    ),
+    structuralBeams: project.structuralBeams.map((item) =>
+      item.levelId === id ? { ...item, elevation: item.elevation + delta } : item,
+    ),
   };
 }
 
@@ -193,6 +222,8 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
   });
   const levels = project.levels.map((level) => level.id === levelId ? { ...level, plan } : level);
   const rebuiltWalls = [...project.walls.filter((wall) => wall.levelId !== levelId), ...walls];
+  const structuralColumns = buildStructuralColumns(levels, project.structuralColumns);
+  const structuralBeams = buildStructuralBeams(rebuiltWalls, levels, project.structuralBeams);
 
   return {
     ...project,
@@ -226,6 +257,8 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
         : roof,
     ),
     facadeElements: buildFacadeElements(rebuiltWalls, levels, project.facade),
+    structuralColumns,
+    structuralBeams,
   };
 }
 

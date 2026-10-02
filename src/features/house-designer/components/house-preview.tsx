@@ -19,6 +19,8 @@ import {
   type HouseSelection,
   type HouseSlab,
   type HouseStair,
+  type HouseStructuralBeam,
+  type HouseStructuralColumn,
 } from "../types/project";
 
 const MM = 0.001;
@@ -89,6 +91,12 @@ export function HousePreview({
         ))}
         {project.stairs.filter((stair) => visibleLevelIds.has(stair.levelId)).map((stair) => (
           <StairMesh key={stair.id} stair={stair} bounds={bounds} selected={selected?.id === stair.id} onSelect={() => onSelect({ kind: "stair", id: stair.id })} />
+        ))}
+        {project.structuralColumns.filter((column) => visibleLevelIds.has(column.levelId)).map((column) => (
+          <ColumnMesh key={column.id} column={column} bounds={bounds} selected={selected?.id === column.id} onSelect={() => onSelect({ kind: "column", id: column.id })} />
+        ))}
+        {project.structuralBeams.filter((beam) => visibleLevelIds.has(beam.levelId)).map((beam) => (
+          <BeamMesh key={beam.id} beam={beam} bounds={bounds} selected={selected?.id === beam.id} onSelect={() => onSelect({ kind: "beam", id: beam.id })} />
         ))}
         {project.roofs.filter((roof) => visibleLevelIds.has(roof.levelId)).map((roof) => (
           <RoofMesh key={roof.id} roof={roof} bounds={bounds} color={project.facade.roofColor} selected={selected?.id === roof.id} onSelect={() => onSelect({ kind: "roof", id: roof.id })} />
@@ -199,6 +207,35 @@ function StairMesh({ stair, bounds, selected, onSelect }: { stair: HouseStair; b
         </mesh>
       ))}
     </group>
+  );
+}
+
+function ColumnMesh({ column, bounds, selected, onSelect }: { column: HouseStructuralColumn; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  return (
+    <mesh position={[(column.x - bounds.centreX) * MM, (column.elevation + column.height / 2) * MM, -(column.y - bounds.centreY) * MM]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+      <boxGeometry args={[column.width * MM, column.height * MM, column.depth * MM]} />
+      <meshStandardMaterial color={selected ? "#1473e6" : "#9e9a92"} roughness={0.92} transparent opacity={selected ? 1 : 0.72} />
+    </mesh>
+  );
+}
+
+function BeamMesh({ beam, bounds, selected, onSelect }: { beam: HouseStructuralBeam; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const dx = beam.end.x - beam.start.x;
+  const dy = beam.end.y - beam.start.y;
+  const length = Math.hypot(dx, dy);
+  return (
+    <mesh
+      position={[
+        ((beam.start.x + beam.end.x) / 2 - bounds.centreX) * MM,
+        (beam.elevation + beam.depth / 2) * MM,
+        -((beam.start.y + beam.end.y) / 2 - bounds.centreY) * MM,
+      ]}
+      rotation={[0, Math.atan2(dy, dx), 0]}
+      onClick={(event) => { event.stopPropagation(); onSelect(); }}
+    >
+      <boxGeometry args={[length * MM, beam.depth * MM, beam.width * MM]} />
+      <meshStandardMaterial color={selected ? "#1473e6" : "#8c8983"} roughness={0.92} transparent opacity={selected ? 1 : 0.76} />
+    </mesh>
   );
 }
 

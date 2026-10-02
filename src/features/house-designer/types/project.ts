@@ -16,7 +16,7 @@ export const houseStyles = [
 
 export const roofTypes = ["flat", "gable", "hip"] as const;
 export const stairTypes = ["straight", "l-shaped", "u-shaped"] as const;
-export const houseObjectKinds = ["level", "wall", "door", "window", "stair", "slab", "roof"] as const;
+export const houseObjectKinds = ["level", "wall", "door", "window", "stair", "slab", "roof", "column", "beam"] as const;
 export const facadeElementTypes = ["band", "cornice", "pilaster", "accent", "parapet"] as const;
 
 export type HouseStyle = (typeof houseStyles)[number];
@@ -96,6 +96,32 @@ const slabSchema = z.object({
   boundary: z.array(pointSchema).min(3),
   thickness: z.number().positive(),
   elevation: z.number(),
+  material: z.string(),
+});
+
+const structuralColumnSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  sourceCornerId: z.string().optional(),
+  x: z.number(),
+  y: z.number(),
+  elevation: z.number(),
+  width: z.number().positive(),
+  depth: z.number().positive(),
+  height: z.number().positive(),
+  type: z.string(),
+  material: z.string(),
+});
+
+const structuralBeamSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  sourceWallId: z.string().optional(),
+  start: pointSchema,
+  end: pointSchema,
+  elevation: z.number(),
+  width: z.number().positive(),
+  depth: z.number().positive(),
   material: z.string(),
 });
 
@@ -191,8 +217,8 @@ export const houseProjectSchema = z.object({
   doors: z.array(openingSchema),
   windows: z.array(openingSchema),
   stairs: z.array(stairSchema),
-  structuralColumns: z.array(z.unknown()),
-  structuralBeams: z.array(z.unknown()),
+  structuralColumns: z.array(structuralColumnSchema).default([]),
+  structuralBeams: z.array(structuralBeamSchema).default([]),
   slabs: z.array(slabSchema),
   roofs: z.array(roofSchema),
   balconies: z.array(z.unknown()),
@@ -218,6 +244,8 @@ export type HouseOpening = HouseProject["doors"][number];
 export type HouseStair = HouseProject["stairs"][number];
 export type HouseSlab = HouseProject["slabs"][number];
 export type HouseRoof = HouseProject["roofs"][number];
+export type HouseStructuralColumn = HouseProject["structuralColumns"][number];
+export type HouseStructuralBeam = HouseProject["structuralBeams"][number];
 export type HouseFacadeElement = HouseProject["facadeElements"][number];
 export type HouseFacadeAlternative = HouseProject["designAlternatives"][number];
 
@@ -346,6 +374,8 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
   ];
   const facade = facadeSettingsForStyle(input.style, input.referenceImages?.some((image) => image.kind === "facade") ?? false);
   const facadeElements = buildFacadeElements(walls, levels, facade);
+  const structuralColumns = buildStructuralColumns(levels);
+  const structuralBeams = buildStructuralBeams(walls, levels);
 
   return houseProjectSchema.parse({
     version: 1,
@@ -368,8 +398,8 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
     doors,
     windows,
     stairs,
-    structuralColumns: [],
-    structuralBeams: [],
+    structuralColumns,
+    structuralBeams,
     slabs,
     roofs,
     balconies: [],
@@ -460,6 +490,59 @@ export function buildFacadeElements(
     }
   }
   return elements;
+}
+
+export function buildStructuralColumns(
+  levels: HouseProject["levels"],
+  previous: HouseProject["structuralColumns"] = [],
+): HouseProject["structuralColumns"] {
+  const existing = new Map(previous.map((column) => [column.id, column]));
+  return levels.flatMap((level) => {
+    const plan = level.plan;
+    if (!plan) return [];
+    return plan.corners.map((corner) => {
+      const id = `${level.id}:column:${corner.id}`;
+      const old = existing.get(id);
+      return {
+        id,
+        levelId: level.id,
+        sourceCornerId: corner.id,
+        x: corner.x,
+        y: corner.y,
+        elevation: level.elevation,
+        width: old?.width ?? 300,
+        depth: old?.depth ?? 300,
+        height: old?.height ?? plan.ceilingHeight,
+        type: old?.type ?? "preliminary reinforced concrete",
+        material: old?.material ?? "Reinforced concrete",
+      };
+    });
+  });
+}
+
+export function buildStructuralBeams(
+  walls: HouseProject["walls"],
+  levels: HouseProject["levels"],
+  previous: HouseProject["structuralBeams"] = [],
+): HouseProject["structuralBeams"] {
+  const existing = new Map(previous.map((beam) => [beam.id, beam]));
+  return walls.map((wall) => {
+    const level = levels.find((item) => item.id === wall.levelId);
+    const id = `${wall.levelId}:beam:${wall.sourceWallId ?? wall.id}`;
+    const old = existing.get(id);
+    const depth = old?.depth ?? 400;
+    return {
+      id,
+      levelId: wall.levelId,
+      sourceWallId: wall.sourceWallId,
+      start: { ...wall.start },
+      end: { ...wall.end },
+      elevation: (level?.elevation ?? 0) + wall.height - depth,
+      width: old?.width ?? Math.max(200, wall.thickness),
+      depth,
+      material: old?.material ?? "Reinforced concrete",
+    };
+  });
 }
 
 function clonePlan(room: Room, keepReference: boolean): Room {

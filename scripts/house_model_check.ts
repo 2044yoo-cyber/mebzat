@@ -8,6 +8,7 @@ import {
   applyFacadeStyle,
   generateFacadeAlternatives,
 } from "../src/features/house-designer/services/facade.ts";
+import { calculateHouseQuantities, quantityCsv } from "../src/features/house-designer/services/quantities.ts";
 import {
   createHouseProject,
   houseProjectSchema,
@@ -37,6 +38,8 @@ assert.equal(project.windows.length, 2);
 assert.equal(project.slabs.length, 2);
 assert.equal(project.stairs.length, 1);
 assert.equal(project.roofs.length, 1);
+assert.equal(project.structuralColumns.length, 8);
+assert.equal(project.structuralBeams.length, 8);
 
 project = patchHouseObject(project, { kind: "wall", id: "ground-floor:wall:c1" }, { endX: 8200, thickness: 200 });
 assert.equal(project.levels[0]?.plan?.corners[1]?.x, 8200);
@@ -84,6 +87,16 @@ project = applyFacadeReference(project, "facade-image", {
 assert.equal(project.facade.source, "reference");
 assert.equal(project.facade.wallMaterial, "Local stone");
 assert.deepEqual(project.walls.map(({ start, end }) => ({ start, end })), footprint);
+
+project = patchHouseObject(project, { kind: "column", id: "ground-floor:column:c1" }, { width: 350, depth: 400 });
+assert.equal(project.structuralColumns.find((column) => column.id === "ground-floor:column:c1")?.width, 350);
+project = patchHouseObject(project, { kind: "beam", id: "ground-floor:beam:c1" }, { width: 250, depth: 450 });
+assert.equal(project.structuralBeams.find((beam) => beam.id === "ground-floor:beam:c1")?.depth, 450);
+
+const quantities = calculateHouseQuantities(project);
+assert(quantities.find((item) => item.code === "CON-02")!.quantity > 0);
+assert(quantities.find((item) => item.code === "MAS-01")!.quantity > 0);
+assert(quantityCsv(project).includes("PRELIMINARY"));
 houseProjectSchema.parse(project);
 
 console.log("House model checks passed");
