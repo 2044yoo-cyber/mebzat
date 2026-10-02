@@ -1,0 +1,142 @@
+name: Medosha Mobile Phase 6 APK
+
+on:
+  push:
+    branches:
+      - chatgpt/medosha-mobile-apk
+    paths:
+      - '.github/workflows/medosha-mobile-phase6.yml'
+      - 'mobile-build/phase6/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPO_PUBLIC_SUPABASE_URL: https://wtjykebkwxcwdtauqzsu.supabase.co
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_mWZoYBC9zICbE0Coa4OGNQ_tB2GLX41
+  EXPO_PUBLIC_MEDOSHA_WEB_URL: https://medosha.net
+  EXPO_PUBLIC_MEDOSHA_AI_URL: https://medosha.net
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Reconstruct verified Phase 4 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf /tmp/medosha-mobile-src
+          mkdir -p /tmp/medosha-mobile-src/medosha-app
+          cat mobile-build/v04.part0 mobile-build/v04.part1 mobile-build/v04.part2 > /tmp/v04.b64
+          echo '1f03eca91f5ca7720e08680b9c8bfc3e860be70f9eec45c7ef1303424611676b  /tmp/v04.b64' | sha256sum -c -
+          base64 -d /tmp/v04.b64 > /tmp/v04.tar.gz
+          tar -xzf /tmp/v04.tar.gz -C /tmp/medosha-mobile-src/medosha-app
+          test -f /tmp/medosha-mobile-src/medosha-app/App.tsx
+
+      - name: Apply Phase 5 feed
+        shell: bash
+        run: |
+          set -euxo pipefail
+          app=/tmp/medosha-mobile-src/medosha-app
+          cp mobile-build/phase5/HomeScreen.tsx "$app/src/screens/HomeScreen.tsx"
+          cp mobile-build/phase5/FeedDetailScreen.tsx "$app/src/screens/FeedDetailScreen.tsx"
+          grep -q "mode === 'forYou'" "$app/src/screens/HomeScreen.tsx"
+          grep -q 'toggleFollow' "$app/src/screens/FeedDetailScreen.tsx"
+
+      - name: Apply Phase 6 profiles and messaging
+        shell: bash
+        run: |
+          set -euxo pipefail
+          app=/tmp/medosha-mobile-src/medosha-app
+          cp mobile-build/phase6/phase6-overlay.tar.b64 /tmp/phase6-overlay.b64
+          echo '3e273616a076253c553ff2a8fc6d9ddd289834dd2bfa73683bc57f535c20d1c2  /tmp/phase6-overlay.b64' | sha256sum -c -
+          base64 -d /tmp/phase6-overlay.b64 > /tmp/phase6-overlay.tar.gz
+          tar -xzf /tmp/phase6-overlay.tar.gz -C "$app"
+          test -f "$app/src/screens/ProfileDetailScreen.tsx"
+          test -f "$app/src/screens/ProfileEditScreen.tsx"
+          test -f "$app/src/screens/CompanyDetailScreen.tsx"
+          test -f "$app/src/screens/MessagesScreen.tsx"
+          test -f "$app/src/screens/ChatScreen.tsx"
+          grep -q "kind: 'messages'" "$app/App.tsx"
+          grep -q 'start_direct_conversation' "$app/src/screens/ProfileDetailScreen.tsx"
+          grep -q 'list_conversations' "$app/src/screens/MessagesScreen.tsx"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          app=Path('/tmp/medosha-mobile-src/medosha-app')
+          p=app/'package.json'; d=json.loads(p.read_text()); d['version']='0.6.0'; p.write_text(json.dumps(d,indent=2)+'\n')
+          p=app/'app.json'; d=json.loads(p.read_text()); d['expo']['version']='0.6.0'; d['expo']['android']['versionCode']=6; d['expo']['ios']['buildNumber']='6'; p.write_text(json.dumps(d,indent=2)+'\n')
+          PY
+
+      - name: Restore generated app artwork
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd /tmp/medosha-mobile-src/medosha-app
+          mkdir -p assets
+          python3 - <<'PY'
+          from pathlib import Path
+          import binascii, struct, zlib
+          assets=Path('assets')
+          def png(path,width,height,rgba):
+              def chunk(kind,payload):
+                  return struct.pack('>I',len(payload))+kind+payload+struct.pack('>I',binascii.crc32(kind+payload)&0xffffffff)
+              row=b'\x00'+bytes(rgba)*width
+              raw=row*height
+              blob=b'\x89PNG\r\n\x1a\n'
+              blob+=chunk(b'IHDR',struct.pack('>IIBBBBB',width,height,8,6,0,0,0))
+              blob+=chunk(b'IDAT',zlib.compress(raw,9))
+              blob+=chunk(b'IEND',b'')
+              path.write_bytes(blob)
+          blue=(37,99,235,255)
+          png(assets/'icon.png',1024,1024,blue)
+          png(assets/'adaptive-icon.png',1024,1024,blue)
+          png(assets/'splash.png',1024,1024,blue)
+          PY
+
+      - name: Install dependencies
+        working-directory: /tmp/medosha-mobile-src/medosha-app
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Type check
+        working-directory: /tmp/medosha-mobile-src/medosha-app
+        run: |
+          npm install --save-dev @types/node --legacy-peer-deps --no-audit --no-fund
+          npx tsc --noEmit
+
+      - name: Generate Android project
+        working-directory: /tmp/medosha-mobile-src/medosha-app
+        env:
+          CI: '1'
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build standalone Phase 6 release APK
+        working-directory: /tmp/medosha-mobile-src/medosha-app/android
+        env:
+          NODE_ENV: production
+          CI: '1'
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          test -f app/build/outputs/apk/release/app-release.apk
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/medosha-mobile-v0.6-phase6-release.apk"
+          sha256sum "$GITHUB_WORKSPACE/medosha-mobile-v0.6-phase6-release.apk"
+
+      - name: Upload Phase 6 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: medosha-mobile-v0.6-phase6-release-apk
+          path: medosha-mobile-v0.6-phase6-release.apk
+          if-no-files-found: error
+          retention-days: 7
