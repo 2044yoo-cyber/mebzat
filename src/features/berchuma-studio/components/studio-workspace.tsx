@@ -133,6 +133,10 @@ export function StudioWorkspace({
   const [tab, setTab] = useState<Tab>(
     editing || opening?.kind === "kitchen" ? "design" : "chat",
   );
+  // `tab` defaults to "chat" so a phone opens on the conversational entry
+  // point — that default says nothing about whether a desktop reader asked
+  // for the rail. This does: it starts false and only `onOpenChat` sets it.
+  const [chatRequested, setChatRequested] = useState(false);
 
   // ---- the draft ---------------------------------------------------------
   //
@@ -305,6 +309,12 @@ export function StudioWorkspace({
   // desktop.
   const flowing = tab === "design";
 
+  // The rail is for talking about a design. Before one exists it has nothing
+  // to do, so it stays off the desktop grid and the picker gets its width —
+  // until "Or describe it in your own words" asks for it by name, same as it
+  // already does on a phone via the same tab switch.
+  const chatVisible = design.spec !== null || chatRequested;
+
   return (
     <div
       className={cn(
@@ -396,7 +406,14 @@ export function StudioWorkspace({
       */}
       <div
         className={cn(
-          "grid w-full min-w-0 max-w-full flex-1 overflow-x-hidden @4xl/ws:min-h-0 @4xl/ws:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] @6xl/ws:grid-cols-[minmax(300px,360px)_minmax(0,1fr)_minmax(300px,360px)]",
+          "grid w-full min-w-0 max-w-full flex-1 overflow-x-hidden @4xl/ws:min-h-0",
+          // Nothing to chat about yet: before a design exists, the picker is
+          // the whole point of the screen, so the chat rail stands down and
+          // the grid collapses to just the columns still doing something —
+          // the design panel alone below @6xl, design and price above it.
+          chatVisible
+            ? "@4xl/ws:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] @6xl/ws:grid-cols-[minmax(300px,360px)_minmax(0,1fr)_minmax(300px,360px)]"
+            : "@6xl/ws:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]",
           // `min-h-0` lets a flex child be shorter than its content so the
           // child can scroll instead. That is right for the two columns that
           // scroll inside themselves and wrong for the one that is meant to
@@ -405,10 +422,12 @@ export function StudioWorkspace({
           flowing ? "" : "min-h-0",
         )}
       >
-        {/* Chat */}
+        {/* Chat — desktop only once there is a design to discuss; the picker
+            still reaches it through StartPanel's onOpenChat, same as a phone. */}
         <div
           className={cn(
-            "min-h-0 @4xl/ws:block @4xl/ws:border-r",
+            "min-h-0",
+            chatVisible ? "@4xl/ws:block @4xl/ws:border-r" : "@4xl/ws:hidden",
             tab === "chat" ? "block" : "hidden",
           )}
         >
@@ -544,7 +563,10 @@ export function StudioWorkspace({
                 replace(spec, []);
                 setTab("design");
               }}
-              onOpenChat={() => setTab("chat")}
+              onOpenChat={() => {
+                setTab("chat");
+                setChatRequested(true);
+              }}
             />
           )}
         </div>
