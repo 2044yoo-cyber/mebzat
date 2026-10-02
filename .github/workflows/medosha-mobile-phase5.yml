@@ -63,6 +63,28 @@ jobs:
           grep -q "mode === 'forYou'" "$app/src/screens/HomeScreen.tsx"
           grep -q 'toggleFollow' "$app/src/screens/FeedDetailScreen.tsx"
 
+      - name: Restore generated app artwork
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import binascii, struct, zlib
+          assets=Path('/tmp/medosha-mobile-src/medosha-app/assets')
+          assets.mkdir(parents=True, exist_ok=True)
+          def png(path,width,height,rgba):
+              def chunk(kind,payload):
+                  return struct.pack('>I',len(payload))+kind+payload+struct.pack('>I',binascii.crc32(kind+payload)&0xffffffff)
+              row=b'\x00'+bytes(rgba)*width
+              raw=row*height
+              blob=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',width,height,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
+              path.write_bytes(blob)
+          blue=(37,99,235,255)
+          png(assets/'icon.png',1024,1024,blue)
+          png(assets/'adaptive-icon.png',1024,1024,blue)
+          png(assets/'splash.png',1024,1024,blue)
+          PY
+          test -f /tmp/medosha-mobile-src/medosha-app/assets/icon.png
+
       - name: Install dependencies
         working-directory: /tmp/medosha-mobile-src/medosha-app
         run: npm install --legacy-peer-deps --no-audit --no-fund
