@@ -1,0 +1,146 @@
+name: Medosha Mobile Phase 4 APK
+
+on:
+  push:
+    branches:
+      - chatgpt/medosha-mobile-apk
+    paths:
+      - '.github/workflows/medosha-mobile-phase4.yml'
+      - 'mobile-build/v04.part0'
+      - 'mobile-build/v04.part1'
+      - 'mobile-build/v04.part2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout mobile build branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Reconstruct existing verified mobile base
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf /tmp/medosha-mobile-src
+          mkdir -p /tmp/medosha-mobile-src
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, binascii, hashlib, struct, zlib
+          root = Path('mobile-build')
+          expected = {
+              1: '550437b7cab203873ad2a4d6190d6e9a332a0bded327af2782a79be52576cea0',
+              2: 'ae04fa2c540ab81f3fd3a0838e744977bc0e3982cca4e533d4fcbe8924d5a167',
+              3: 'b34850143f321e75f3c20ff1827c4ee67e4fb4a59bba71974147850423ad3efc',
+          }
+          chunks=[]
+          for i in (1,2,3):
+              text=(root/f'apk.part{i}.b64').read_text().strip()
+              got=hashlib.sha256(text.encode()).hexdigest()
+              if got != expected[i]: raise SystemExit(f'Base part {i} checksum mismatch: {got}')
+              chunks.append(text)
+          data=base64.b64decode(''.join(chunks),validate=True)
+          out=Path('/tmp/medosha-mobile-src')
+          pos=0
+          while pos+30 <= len(data):
+              if data[pos:pos+4] != b'PK\x03\x04': break
+              sig,ver,flags,method,mtime,mdate,crc,csize,usize,fnlen,exlen=struct.unpack_from('<IHHHHHIIIHH',data,pos)
+              ns=pos+30; ne=ns+fnlen; ee=ne+exlen
+              if ee>len(data): break
+              name=data[ns:ne].decode('utf-8'); pe=ee+csize
+              if pe>len(data): break
+              if flags & 0x08: raise SystemExit(f'Unexpected descriptor: {name}')
+              compressed=data[ee:pe]
+              payload=compressed if method==0 else zlib.decompress(compressed,-15) if method==8 else None
+              if payload is None: raise SystemExit(f'Unsupported ZIP method {method}: {name}')
+              if len(payload)!=usize or (binascii.crc32(payload)&0xffffffff)!=crc: raise SystemExit(f'ZIP integrity failure: {name}')
+              target=(out/name).resolve()
+              if not str(target).startswith(str(out.resolve())): raise SystemExit(f'Unsafe ZIP path: {name}')
+              if name.endswith('/'): target.mkdir(parents=True,exist_ok=True)
+              else:
+                  target.parent.mkdir(parents=True,exist_ok=True)
+                  target.write_bytes(payload)
+              pos=pe
+          app=out/'medosha-app'
+          required=['App.tsx','package.json','app.json','index.ts','src/lib/supabase.ts']
+          missing=[p for p in required if not (app/p).is_file()]
+          if missing: raise SystemExit(f'Missing reconstructed base files: {missing}')
+          assets=app/'assets'; assets.mkdir(exist_ok=True)
+          def png(path,width,height,rgba):
+              def chunk(kind,payload):
+                  return struct.pack('>I',len(payload))+kind+payload+struct.pack('>I',binascii.crc32(kind+payload)&0xffffffff)
+              row=b'\x00'+bytes(rgba)*width; raw=row*height
+              blob=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',width,height,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
+              path.write_bytes(blob)
+          blue=(37,99,235,255)
+          png(assets/'icon.png',1024,1024,blue)
+          png(assets/'adaptive-icon.png',1024,1024,blue)
+          png(assets/'splash.png',1024,1024,blue)
+          PY
+
+      - name: Overlay sanitized Phase 4 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat mobile-build/v04.part0 mobile-build/v04.part1 mobile-build/v04.part2 > /tmp/v04.b64
+          echo '1f03eca91f5ca7720e08680b9c8bfc3e860be70f9eec45c7ef1303424611676b  /tmp/v04.b64' | sha256sum -c -
+          base64 -d /tmp/v04.b64 > /tmp/v04.tar.gz
+          tar -xzf /tmp/v04.tar.gz -C /tmp/medosha-mobile-src/medosha-app
+          test -f /tmp/medosha-mobile-src/medosha-app/src/screens/CreateHubScreen.tsx
+          test -f /tmp/medosha-mobile-src/medosha-app/src/screens/CreatePostScreen.tsx
+          test -f /tmp/medosha-mobile-src/medosha-app/src/screens/CreatePropertyScreen.tsx
+          test -f /tmp/medosha-mobile-src/medosha-app/src/screens/CreateProjectScreen.tsx
+          test -f /tmp/medosha-mobile-src/medosha-app/src/screens/CreateTourScreen.tsx
+          grep -q '"version": "0.4.0"' /tmp/medosha-mobile-src/medosha-app/package.json
+          grep -q 'expo-image-picker' /tmp/medosha-mobile-src/medosha-app/package.json
+
+      - name: Install JavaScript dependencies
+        working-directory: /tmp/medosha-mobile-src/medosha-app
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Type check
+        working-directory: /tmp/medosha-mobile-src/medosha-app
+        run: |
+          npm install --save-dev @types/node --legacy-peer-deps --no-audit --no-fund
+          npx tsc --noEmit
+
+      - name: Generate native Android project
+        working-directory: /tmp/medosha-mobile-src/medosha-app
+        env:
+          CI: '1'
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build standalone Phase 4 release APK
+        working-directory: /tmp/medosha-mobile-src/medosha-app/android
+        env:
+          NODE_ENV: production
+          CI: '1'
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          test -f app/build/outputs/apk/release/app-release.apk
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/medosha-mobile-v0.4-phase4-release.apk"
+          sha256sum "$GITHUB_WORKSPACE/medosha-mobile-v0.4-phase4-release.apk"
+
+      - name: Upload Phase 4 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: medosha-mobile-v0.4-phase4-release-apk
+          path: medosha-mobile-v0.4-phase4-release.apk
+          if-no-files-found: error
+          retention-days: 7
