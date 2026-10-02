@@ -51,7 +51,6 @@ jobs:
           app=/tmp/medosha-mobile-src/medosha-app
           cp mobile-build/phase5/HomeScreen.tsx "$app/src/screens/HomeScreen.tsx"
           cp mobile-build/phase5/FeedDetailScreen.tsx "$app/src/screens/FeedDetailScreen.tsx"
-          cp mobile-build/phase5/feedRanking.ts "$app/src/lib/feedRanking.ts"
           python3 - <<'PY'
           from pathlib import Path
           import json
@@ -61,7 +60,7 @@ jobs:
           p=app/'app.json'; d=json.loads(p.read_text()); d['expo']['version']='0.5.0'; d['expo']['android']['versionCode']=5; d['expo']['ios']['buildNumber']='5'; p.write_text(json.dumps(d,indent=2)+'\n')
           PY
           grep -q 'session={session} onOpenPost' "$app/App.tsx"
-          grep -q 'rankFeed' "$app/src/screens/HomeScreen.tsx"
+          grep -q "mode === 'forYou'" "$app/src/screens/HomeScreen.tsx"
           grep -q 'toggleFollow' "$app/src/screens/FeedDetailScreen.tsx"
 
       - name: Install dependencies
