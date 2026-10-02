@@ -83,6 +83,30 @@ export function createHouseTakeoffPackage(project: HouseProject): HouseTakeoffPa
       material: stair.material,
       properties: { rise: stair.height, steps: stair.steps, type: stair.type },
     })),
+    ...project.balconies.map((balcony, index) => ({
+      id: balcony.id,
+      kind: "slab" as const,
+      name: `Balcony ${index + 1}`,
+      level: level(balcony.levelId),
+      length: measured(balcony.width, "user"),
+      width: measured(balcony.depth, "user"),
+      thickness: measured(balcony.thickness, "user"),
+      material: balcony.material,
+      properties: { x: balcony.x, y: balcony.y, elevation: balcony.elevation, rotation: balcony.rotation, railingHeight: balcony.railingHeight, railingMaterial: balcony.railingMaterial },
+    })),
+    ...project.verandas.map((veranda, index) => ({
+      id: veranda.id,
+      kind: "floor" as const,
+      name: `Veranda ${index + 1}`,
+      level: level(veranda.levelId),
+      length: measured(veranda.width, "user"),
+      width: measured(veranda.depth, "user"),
+      thickness: measured(veranda.thickness, "user"),
+      material: veranda.material,
+      properties: { x: veranda.x, y: veranda.y, elevation: veranda.elevation, rotation: veranda.rotation, canopyHeight: veranda.canopyHeight, canopyMaterial: veranda.canopyMaterial, postMaterial: veranda.postMaterial },
+    })),
+    ...project.ceilings.map((ceiling, index) => areaElement(ceiling.id, "ceiling", `Ceiling ${index + 1}`, level(ceiling.levelId), polygonArea(ceiling.boundary), ceiling.material, { thickness: ceiling.thickness, elevation: ceiling.elevation, roomId: ceiling.roomId })),
+    ...(project.site ? [areaElement(project.site.id, "floor", "Site / ground", level(project.site.levelId), polygonArea(project.site.boundary), project.site.material, { thickness: project.site.thickness, elevation: project.site.elevation, external: 1 })] : []),
   ];
 
   const quantities: HousePreparedQuantity[] = calculateHouseQuantities(project)
@@ -144,7 +168,7 @@ function openingElement(opening: HouseProject["doors"][number], kind: "door" | "
   };
 }
 
-function areaElement(id: string, kind: "slab" | "room" | "roof", name: string, level: string, area: number, material: string, properties: Record<string, string | number>): BuildingElement {
+function areaElement(id: string, kind: "slab" | "room" | "roof" | "floor" | "ceiling", name: string, level: string, area: number, material: string, properties: Record<string, string | number>): BuildingElement {
   const side = Math.sqrt(Math.max(0, area));
   return { id, kind, name, level, length: measured(side, "user"), height: measured(side, "user"), material, properties: { ...properties, areaMm2: area } };
 }
@@ -167,6 +191,9 @@ function sectionFor(code: string): BoqSectionCode {
   if (code === "FIN-01") return "M";
   if (code === "FIN-02") return "K";
   if (code === "FIN-03") return "H";
+  if (code === "FIN-04") return "K";
+  if (code === "FIN-05") return "N";
+  if (code.startsWith("EXT")) return "W";
   if (code.startsWith("OPN")) return "I";
   return "A";
 }

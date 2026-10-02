@@ -42,6 +42,10 @@ assert.equal(project.stairs.length, 1);
 assert.equal(project.roofs.length, 1);
 assert.equal(project.structuralColumns.length, 8);
 assert.equal(project.structuralBeams.length, 8);
+assert.equal(project.ceilings.length, 2);
+assert(project.site);
+assert.equal(project.verandas.length, 1);
+assert.equal(project.balconies.length, 1);
 
 project = patchHouseObject(project, { kind: "wall", id: "ground-floor:wall:c1" }, { endX: 8200, thickness: 200 });
 assert.equal(project.levels[0]?.plan?.corners[1]?.x, 8200);
@@ -95,9 +99,22 @@ assert.equal(project.structuralColumns.find((column) => column.id === "ground-fl
 project = patchHouseObject(project, { kind: "beam", id: "ground-floor:beam:c1" }, { width: 250, depth: 450 });
 assert.equal(project.structuralBeams.find((beam) => beam.id === "ground-floor:beam:c1")?.depth, 450);
 
+const balconyId = project.balconies[0]!.id;
+project = patchHouseObject(project, { kind: "balcony", id: balconyId }, { width: 2600, railingHeight: 1100 });
+assert.equal(project.balconies[0]?.width, 2600);
+assert.equal(project.balconies[0]?.railingHeight, 1100);
+project = patchHouseObject(project, { kind: "site", id: project.site!.id }, { width: 15000, depth: 12000 });
+const siteXs = project.site!.boundary.map((point) => point.x);
+const siteYs = project.site!.boundary.map((point) => point.y);
+assert.equal(Math.max(...siteXs) - Math.min(...siteXs), 15000);
+assert.equal(Math.max(...siteYs) - Math.min(...siteYs), 12000);
+
 const quantities = calculateHouseQuantities(project);
 assert(quantities.find((item) => item.code === "CON-02")!.quantity > 0);
+assert(quantities.find((item) => item.code === "CON-05")!.quantity > 0);
 assert(quantities.find((item) => item.code === "MAS-01")!.quantity > 0);
+assert(quantities.find((item) => item.code === "FIN-05")!.quantity > 0);
+assert(quantities.find((item) => item.code === "EXT-01")!.quantity > 0);
 assert(quantityCsv(project).includes("PRELIMINARY"));
 
 const protectedWall = project.walls[0]!;
@@ -121,7 +138,10 @@ assert.equal(editableResult.project.levels[0]?.floorToFloorHeight, 3_250);
 
 const handoff = createHouseTakeoffPackage(project);
 assert(handoff.elements.some((element) => element.id === protectedWall.id));
+assert(handoff.elements.some((element) => element.id === balconyId));
 assert(handoff.quantities.some((item) => item.id === "house:MAS-01"));
+assert.equal(handoff.quantities.find((item) => item.id === "house:FIN-05")?.section, "N");
+assert.equal(handoff.quantities.find((item) => item.id === "house:EXT-01")?.section, "W");
 assert.equal(parseHouseTakeoffPackage(JSON.stringify(handoff))?.projectId, project.id);
 houseProjectSchema.parse(project);
 

@@ -3,6 +3,10 @@ import type { Room } from "@/features/berchuma-studio/types/room";
 
 import {
   buildFacadeElements,
+  buildHouseBalconies,
+  buildHouseCeilings,
+  buildHouseSite,
+  buildHouseVerandas,
   buildStructuralBeams,
   buildStructuralColumns,
   openingObjectId,
@@ -35,9 +39,37 @@ export function patchHouseObject(
       return { ...project, structuralColumns: patchList(project.structuralColumns, selection.id, patch) };
     case "beam":
       return patchBeam(project, selection.id, patch);
+    case "balcony":
+      return { ...project, balconies: patchList(project.balconies, selection.id, patch) };
+    case "veranda":
+      return { ...project, verandas: patchList(project.verandas, selection.id, patch) };
+    case "ceiling":
+      return { ...project, ceilings: patchList(project.ceilings, selection.id, patch) };
+    case "site":
+      return patchSite(project, selection.id, patch);
     case "level":
       return patchLevel(project, selection.id, patch);
   }
+}
+
+function patchSite(project: HouseProject, id: string, patch: HousePatch): HouseProject {
+  const site = project.site;
+  if (!site || site.id !== id) return project;
+  const bounds = boundaryBounds(site.boundary);
+  const centreX = numberOr(patch.x, (bounds.minX + bounds.maxX) / 2);
+  const centreY = numberOr(patch.y, (bounds.minY + bounds.maxY) / 2);
+  const width = positiveOr(patch.width, bounds.maxX - bounds.minX);
+  const depth = positiveOr(patch.depth, bounds.maxY - bounds.minY);
+  return {
+    ...project,
+    site: {
+      ...site,
+      boundary: rectangleBoundary(centreX, centreY, width, depth),
+      elevation: numberOr(patch.elevation, site.elevation),
+      thickness: positiveOr(patch.thickness, site.thickness),
+      material: typeof patch.material === "string" ? patch.material : site.material,
+    },
+  };
 }
 
 function patchBeam(project: HouseProject, id: string, patch: HousePatch): HouseProject {
@@ -176,6 +208,18 @@ function patchLevel(project: HouseProject, id: string, patch: HousePatch): House
     structuralBeams: project.structuralBeams.map((item) =>
       item.levelId === id ? { ...item, elevation: item.elevation + delta } : item,
     ),
+    balconies: project.balconies.map((item) =>
+      item.levelId === id ? { ...item, elevation: item.elevation + delta } : item,
+    ),
+    verandas: project.verandas.map((item) =>
+      item.levelId === id ? { ...item, elevation: item.elevation + delta } : item,
+    ),
+    ceilings: project.ceilings.map((item) =>
+      item.levelId === id ? { ...item, elevation: item.elevation + delta } : item,
+    ),
+    site: project.site?.levelId === id
+      ? { ...project.site, elevation: project.site.elevation + delta }
+      : project.site,
   };
 }
 
@@ -222,30 +266,33 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
   });
   const levels = project.levels.map((level) => level.id === levelId ? { ...level, plan } : level);
   const rebuiltWalls = [...project.walls.filter((wall) => wall.levelId !== levelId), ...walls];
+  const rebuiltRooms = project.rooms.map((room) =>
+    room.levelId === levelId
+      ? {
+          ...room,
+          boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })),
+          ceilingHeight: plan.ceilingHeight,
+        }
+      : room,
+  );
+  const rebuiltDoors = [
+    ...project.doors.filter((opening) => opening.levelId !== levelId),
+    ...openings.filter((opening) => opening.type !== "window"),
+  ];
+  const rebuiltWindows = [
+    ...project.windows.filter((opening) => opening.levelId !== levelId),
+    ...openings.filter((opening) => opening.type === "window"),
+  ];
   const structuralColumns = buildStructuralColumns(levels, project.structuralColumns);
   const structuralBeams = buildStructuralBeams(rebuiltWalls, levels, project.structuralBeams);
 
   return {
     ...project,
     levels,
-    rooms: project.rooms.map((room) =>
-      room.levelId === levelId
-        ? {
-            ...room,
-            boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })),
-            ceilingHeight: plan.ceilingHeight,
-          }
-        : room,
-    ),
+    rooms: rebuiltRooms,
     walls: rebuiltWalls,
-    doors: [
-      ...project.doors.filter((opening) => opening.levelId !== levelId),
-      ...openings.filter((opening) => opening.type !== "window"),
-    ],
-    windows: [
-      ...project.windows.filter((opening) => opening.levelId !== levelId),
-      ...openings.filter((opening) => opening.type === "window"),
-    ],
+    doors: rebuiltDoors,
+    windows: rebuiltWindows,
     slabs: project.slabs.map((slab) =>
       slab.levelId === levelId
         ? { ...slab, boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })) }
@@ -259,6 +306,10 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
     facadeElements: buildFacadeElements(rebuiltWalls, levels, project.facade),
     structuralColumns,
     structuralBeams,
+    ceilings: buildHouseCeilings(rebuiltRooms, levels, project.ceilings),
+    site: buildHouseSite(rebuiltRooms, project.site),
+    verandas: buildHouseVerandas(levels, rebuiltWalls, rebuiltDoors, project.verandas),
+    balconies: buildHouseBalconies(levels, rebuiltWalls, rebuiltDoors, project.balconies),
   };
 }
 
@@ -277,4 +328,21 @@ function positiveOr(value: string | number | undefined, fallback: number) {
 
 function nonNegativeOr(value: string | number | undefined, fallback: number) {
   return Math.max(0, numberOr(value, fallback));
+}
+
+function boundaryBounds(points: { x: number; y: number }[]) {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+}
+
+function rectangleBoundary(x: number, y: number, width: number, depth: number) {
+  const halfWidth = width / 2;
+  const halfDepth = depth / 2;
+  return [
+    { x: x - halfWidth, y: y - halfDepth },
+    { x: x + halfWidth, y: y - halfDepth },
+    { x: x + halfWidth, y: y + halfDepth },
+    { x: x - halfWidth, y: y + halfDepth },
+  ];
 }

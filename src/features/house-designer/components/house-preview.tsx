@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import {
   openingObjectId,
   wallObjectId,
+  type HouseBalcony,
+  type HouseCeiling,
   type HouseFacadeElement,
   type HouseProject,
   type HouseRoof,
@@ -21,6 +23,8 @@ import {
   type HouseStair,
   type HouseStructuralBeam,
   type HouseStructuralColumn,
+  type HouseSite,
+  type HouseVeranda,
 } from "../types/project";
 
 const MM = 0.001;
@@ -56,6 +60,10 @@ export function HousePreview({
         <directionalLight position={[8, 14, 9]} intensity={1.4} />
         <directionalLight position={[-7, 8, -5]} intensity={0.42} />
 
+        {project.site && visibleLevelIds.has(project.site.levelId) ? (
+          <SiteMesh site={project.site} bounds={bounds} selected={selected?.id === project.site.id} onSelect={() => onSelect({ kind: "site", id: project.site!.id })} />
+        ) : null}
+
         {project.levels.map((level) => {
           if (!level.plan || !visibleLevelIds.has(level.id)) return null;
           const selectedWall = selected?.kind === "wall"
@@ -88,6 +96,15 @@ export function HousePreview({
 
         {project.slabs.filter((slab) => visibleLevelIds.has(slab.levelId)).map((slab) => (
           <SlabMesh key={slab.id} slab={slab} bounds={bounds} selected={selected?.id === slab.id} onSelect={() => onSelect({ kind: "slab", id: slab.id })} />
+        ))}
+        {project.ceilings.filter((ceiling) => visibleLevelIds.has(ceiling.levelId)).map((ceiling) => (
+          <CeilingMesh key={ceiling.id} ceiling={ceiling} bounds={bounds} selected={selected?.id === ceiling.id} onSelect={() => onSelect({ kind: "ceiling", id: ceiling.id })} />
+        ))}
+        {project.verandas.filter((veranda) => visibleLevelIds.has(veranda.levelId)).map((veranda) => (
+          <VerandaMesh key={veranda.id} veranda={veranda} bounds={bounds} selected={selected?.id === veranda.id} onSelect={() => onSelect({ kind: "veranda", id: veranda.id })} />
+        ))}
+        {project.balconies.filter((balcony) => visibleLevelIds.has(balcony.levelId)).map((balcony) => (
+          <BalconyMesh key={balcony.id} balcony={balcony} bounds={bounds} selected={selected?.id === balcony.id} onSelect={() => onSelect({ kind: "balcony", id: balcony.id })} />
         ))}
         {project.stairs.filter((stair) => visibleLevelIds.has(stair.levelId)).map((stair) => (
           <StairMesh key={stair.id} stair={stair} bounds={bounds} selected={selected?.id === stair.id} onSelect={() => onSelect({ kind: "stair", id: stair.id })} />
@@ -181,6 +198,73 @@ function SlabMesh({ slab, bounds, selected, onSelect }: { slab: HouseSlab; bound
       <extrudeGeometry args={[shape, { depth: slab.thickness * MM, bevelEnabled: false }]} />
       <meshStandardMaterial color={selected ? "#1473e6" : "#c9c3b9"} roughness={0.95} side={THREE.DoubleSide} />
     </mesh>
+  );
+}
+
+function SiteMesh({ site, bounds, selected, onSelect }: { site: HouseSite; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const shape = useMemo(() => polygonShape(site.boundary, bounds), [bounds, site.boundary]);
+  return (
+    <mesh position={[0, (site.elevation - site.thickness) * MM, 0]} rotation={[-Math.PI / 2, 0, 0]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+      <extrudeGeometry args={[shape, { depth: site.thickness * MM, bevelEnabled: false }]} />
+      <meshStandardMaterial color={selected ? "#1473e6" : "#8b9b72"} roughness={1} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
+function CeilingMesh({ ceiling, bounds, selected, onSelect }: { ceiling: HouseCeiling; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const shape = useMemo(() => polygonShape(ceiling.boundary, bounds), [bounds, ceiling.boundary]);
+  return (
+    <mesh position={[0, (ceiling.elevation - ceiling.thickness) * MM, 0]} rotation={[-Math.PI / 2, 0, 0]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+      <extrudeGeometry args={[shape, { depth: ceiling.thickness * MM, bevelEnabled: false }]} />
+      <meshStandardMaterial color={selected ? "#1473e6" : "#f1efe8"} roughness={0.92} transparent opacity={selected ? 0.9 : 0.42} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
+function BalconyMesh({ balcony, bounds, selected, onSelect }: { balcony: HouseBalcony; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const colour = selected ? "#1473e6" : "#a7adb4";
+  const railThickness = 45;
+  const railY = balcony.thickness / 2 + balcony.railingHeight / 2;
+  return (
+    <group
+      position={[(balcony.x - bounds.centreX) * MM, (balcony.elevation - balcony.thickness / 2) * MM, -(balcony.y - bounds.centreY) * MM]}
+      rotation={[0, balcony.rotation * Math.PI / 180, 0]}
+      onClick={(event) => { event.stopPropagation(); onSelect(); }}
+    >
+      <mesh><boxGeometry args={[balcony.width * MM, balcony.thickness * MM, balcony.depth * MM]} /><meshStandardMaterial color={colour} roughness={0.88} /></mesh>
+      <mesh position={[0, railY * MM, (balcony.depth / 2 - railThickness / 2) * MM]}><boxGeometry args={[balcony.width * MM, balcony.railingHeight * MM, railThickness * MM]} /><meshStandardMaterial color={colour} roughness={0.45} transparent opacity={selected ? 1 : 0.68} /></mesh>
+      {([-1, 1] as const).map((side) => (
+        <mesh key={side} position={[side * (balcony.width / 2 - railThickness / 2) * MM, railY * MM, 0]}>
+          <boxGeometry args={[railThickness * MM, balcony.railingHeight * MM, balcony.depth * MM]} />
+          <meshStandardMaterial color={colour} roughness={0.45} transparent opacity={selected ? 1 : 0.68} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function VerandaMesh({ veranda, bounds, selected, onSelect }: { veranda: HouseVeranda; bounds: Bounds; selected: boolean; onSelect: () => void }) {
+  const colour = selected ? "#1473e6" : "#9d8c78";
+  const post = 90;
+  const canopyThickness = 90;
+  return (
+    <group
+      position={[(veranda.x - bounds.centreX) * MM, (veranda.elevation - veranda.thickness / 2) * MM, -(veranda.y - bounds.centreY) * MM]}
+      rotation={[0, veranda.rotation * Math.PI / 180, 0]}
+      onClick={(event) => { event.stopPropagation(); onSelect(); }}
+    >
+      <mesh><boxGeometry args={[veranda.width * MM, veranda.thickness * MM, veranda.depth * MM]} /><meshStandardMaterial color={colour} roughness={0.95} /></mesh>
+      <mesh position={[0, (veranda.canopyHeight + veranda.thickness / 2) * MM, 0]}>
+        <boxGeometry args={[veranda.width * MM, canopyThickness * MM, veranda.depth * MM]} />
+        <meshStandardMaterial color={selected ? "#1473e6" : "#747b80"} roughness={0.72} />
+      </mesh>
+      {([-1, 1] as const).map((side) => (
+        <mesh key={side} position={[side * (veranda.width / 2 - post / 2) * MM, (veranda.canopyHeight / 2 + veranda.thickness / 2) * MM, (veranda.depth / 2 - post / 2) * MM]}>
+          <boxGeometry args={[post * MM, veranda.canopyHeight * MM, post * MM]} />
+          <meshStandardMaterial color={colour} roughness={0.68} />
+        </mesh>
+      ))}
+    </group>
   );
 }
 
@@ -381,7 +465,13 @@ function ViewButtons({ view: currentView, onChange }: { view: View; onChange: (v
 type Bounds = ReturnType<typeof projectBounds>;
 
 function projectBounds(project: HouseProject) {
-  const points = project.rooms.flatMap((room) => room.boundary);
+  const platforms = [...project.balconies, ...project.verandas];
+  const platformPoints = platforms.flatMap((item) => rotatedRectanglePoints(item.x, item.y, item.width, item.depth, item.rotation));
+  const points = [
+    ...project.rooms.flatMap((room) => room.boundary),
+    ...(project.site?.boundary ?? []),
+    ...platformPoints,
+  ];
   const xs = points.map((point) => point.x);
   const ys = points.map((point) => point.y);
   const minX = Math.min(...xs, 0);
@@ -390,13 +480,27 @@ function projectBounds(project: HouseProject) {
   const maxY = Math.max(...ys, 1);
   const roofTop = Math.max(...project.roofs.map((roof) => roof.elevation + roof.height), 0);
   const wallTop = Math.max(...project.levels.map((level) => level.elevation + (level.plan?.ceilingHeight ?? 0)), 1);
+  const balconyTop = Math.max(...project.balconies.map((item) => item.elevation + item.railingHeight), 0);
+  const verandaTop = Math.max(...project.verandas.map((item) => item.elevation + item.canopyHeight), 0);
+  const ceilingTop = Math.max(...project.ceilings.map((item) => item.elevation), 0);
   return {
     centreX: (minX + maxX) / 2,
     centreY: (minY + maxY) / 2,
     width: maxX - minX,
     depth: maxY - minY,
-    height: Math.max(roofTop, wallTop),
+    height: Math.max(roofTop, wallTop, balconyTop, verandaTop, ceilingTop),
   };
+}
+
+function rotatedRectanglePoints(x: number, y: number, width: number, depth: number, rotation: number) {
+  const angle = rotation * Math.PI / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return ([-1, 1] as const).flatMap((sideX) => ([-1, 1] as const).map((sideY) => {
+    const localX = sideX * width / 2;
+    const localY = sideY * depth / 2;
+    return { x: x + localX * cos - localY * sin, y: y + localX * sin + localY * cos };
+  }));
 }
 
 function polygonShape(points: { x: number; y: number }[], bounds: Bounds) {

@@ -66,6 +66,10 @@ const editableFields: Record<HouseObjectKind, readonly string[]> = {
   roof: ["type", "elevation", "height", "slope", "overhang", "thickness", "material"],
   column: ["x", "y", "width", "depth", "height", "elevation", "type", "material"],
   beam: ["startX", "startY", "endX", "endY", "width", "depth", "elevation", "material"],
+  balcony: ["x", "y", "width", "depth", "elevation", "thickness", "rotation", "railingHeight", "railingMaterial", "material"],
+  veranda: ["x", "y", "width", "depth", "elevation", "thickness", "rotation", "canopyHeight", "canopyMaterial", "postMaterial", "material"],
+  ceiling: ["elevation", "thickness", "material"],
+  site: ["x", "y", "width", "depth", "elevation", "thickness", "material"],
 };
 
 /** Appearance/construction edits that cannot move verified plan geometry. */
@@ -79,6 +83,10 @@ const strictFields: Record<HouseObjectKind, readonly string[]> = {
   roof: ["type", "height", "slope", "overhang", "thickness", "material"],
   column: ["width", "depth", "height", "type", "material"],
   beam: ["width", "depth", "material"],
+  balcony: ["x", "y", "width", "depth", "elevation", "thickness", "rotation", "railingHeight", "railingMaterial", "material"],
+  veranda: ["x", "y", "width", "depth", "elevation", "thickness", "rotation", "canopyHeight", "canopyMaterial", "postMaterial", "material"],
+  ceiling: ["thickness", "material"],
+  site: ["x", "y", "width", "depth", "elevation", "thickness", "material"],
 };
 
 const bounds: Partial<Record<HouseObjectKind, Record<string, readonly [number, number]>>> = {
@@ -91,6 +99,10 @@ const bounds: Partial<Record<HouseObjectKind, Record<string, readonly [number, n
   roof: { elevation: [0, 50_000], height: [100, 8_000], slope: [0, 60], overhang: [0, 3_000], thickness: [30, 1_000] },
   column: { x: [-100_000, 100_000], y: [-100_000, 100_000], width: [100, 3_000], depth: [100, 3_000], height: [500, 12_000], elevation: [-10_000, 50_000] },
   beam: { startX: [-100_000, 100_000], startY: [-100_000, 100_000], endX: [-100_000, 100_000], endY: [-100_000, 100_000], width: [100, 3_000], depth: [100, 3_000], elevation: [-10_000, 50_000] },
+  balcony: { x: [-100_000, 100_000], y: [-100_000, 100_000], width: [300, 20_000], depth: [300, 10_000], elevation: [-10_000, 50_000], thickness: [50, 1_000], rotation: [-360, 360], railingHeight: [0, 3_000] },
+  veranda: { x: [-100_000, 100_000], y: [-100_000, 100_000], width: [300, 20_000], depth: [300, 10_000], elevation: [-10_000, 50_000], thickness: [50, 1_000], rotation: [-360, 360], canopyHeight: [1_800, 6_000] },
+  ceiling: { elevation: [-10_000, 50_000], thickness: [3, 500] },
+  site: { x: [-100_000, 100_000], y: [-100_000, 100_000], width: [1_000, 200_000], depth: [1_000, 200_000], elevation: [-10_000, 50_000], thickness: [20, 5_000] },
 };
 
 export function applyHouseRemodelCommand(
@@ -146,6 +158,10 @@ export function selectedObjectSnapshot(project: HouseProject, selection: HouseSe
     case "roof": return project.roofs.find((item) => item.id === selection.id) ?? null;
     case "column": return project.structuralColumns.find((item) => item.id === selection.id) ?? null;
     case "beam": return project.structuralBeams.find((item) => item.id === selection.id) ?? null;
+    case "balcony": return project.balconies.find((item) => item.id === selection.id) ?? null;
+    case "veranda": return project.verandas.find((item) => item.id === selection.id) ?? null;
+    case "ceiling": return project.ceilings.find((item) => item.id === selection.id) ?? null;
+    case "site": return project.site?.id === selection.id ? project.site : null;
   }
 }
 

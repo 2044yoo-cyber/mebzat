@@ -2,7 +2,7 @@ import type { HouseProject } from "../types/project";
 
 export type HouseQuantityRow = {
   code: string;
-  category: "concrete" | "masonry" | "finishes" | "openings";
+  category: "concrete" | "masonry" | "finishes" | "openings" | "ceilings" | "external";
   description: string;
   unit: "m³" | "m²" | "No.";
   quantity: number;
@@ -35,7 +35,11 @@ export function calculateHouseQuantities(project: HouseProject): HouseQuantityRo
   const columnConcrete = project.structuralColumns.reduce((sum, column) => sum + column.width * column.depth * column.height / 1_000_000_000, 0);
   const beamConcrete = project.structuralBeams.reduce((sum, beam) => sum + Math.hypot(beam.end.x - beam.start.x, beam.end.y - beam.start.y) * beam.width * beam.depth / 1_000_000_000, 0);
   const stairConcrete = project.stairs.reduce((sum, stair) => sum + stair.width * stair.length * stair.height * 0.5 / 1_000_000_000, 0);
+  const balconyConcrete = project.balconies.reduce((sum, balcony) => sum + balcony.width * balcony.depth * balcony.thickness / 1_000_000_000, 0);
   const floorFinish = project.rooms.reduce((sum, room) => sum + polygonArea(room.boundary) / 1_000_000, 0);
+  const verandaFloor = project.verandas.reduce((sum, veranda) => sum + veranda.width * veranda.depth / 1_000_000, 0);
+  const ceilingArea = project.ceilings.reduce((sum, ceiling) => sum + polygonArea(ceiling.boundary) / 1_000_000, 0);
+  const siteArea = project.site ? polygonArea(project.site.boundary) / 1_000_000 : 0;
   const roofArea = project.roofs.reduce((sum, roof) => {
     const planArea = polygonArea(roof.boundary) / 1_000_000;
     const slope = roof.type === "flat" ? 0 : Math.max(0, roof.slope) * Math.PI / 180;
@@ -49,10 +53,14 @@ export function calculateHouseQuantities(project: HouseProject): HouseQuantityRo
     row("CON-02", "concrete", "Preliminary columns", "m³", columnConcrete, project.structuralColumns.map((item) => item.id)),
     row("CON-03", "concrete", "Preliminary beams", "m³", beamConcrete, project.structuralBeams.map((item) => item.id)),
     row("CON-04", "concrete", "Preliminary stairs", "m³", stairConcrete, project.stairs.map((item) => item.id)),
+    row("CON-05", "concrete", "Balcony slabs", "m³", balconyConcrete, project.balconies.map((item) => item.id)),
     row("MAS-01", "masonry", "Net wall construction", "m³", masonryVolume, project.walls.map((item) => item.id)),
     row("FIN-01", "finishes", "Wall finish / paint, both faces", "m²", netWallArea * 2, project.walls.map((item) => item.id)),
     row("FIN-02", "finishes", "Floor finishes", "m²", floorFinish, project.rooms.map((item) => item.id)),
     row("FIN-03", "finishes", "Roof covering", "m²", roofArea, project.roofs.map((item) => item.id)),
+    row("FIN-04", "finishes", "Veranda flooring", "m²", verandaFloor, project.verandas.map((item) => item.id)),
+    row("FIN-05", "ceilings", "Ceiling finishes", "m²", ceilingArea, project.ceilings.map((item) => item.id)),
+    row("EXT-01", "external", "Site / ground finish", "m²", siteArea, project.site ? [project.site.id] : []),
     row("OPN-01", "openings", "Doors", "No.", project.doors.length, project.doors.map((item) => item.id)),
     row("OPN-02", "openings", "Door area", "m²", doorArea, project.doors.map((item) => item.id)),
     row("OPN-03", "openings", "Windows", "No.", project.windows.length, project.windows.map((item) => item.id)),

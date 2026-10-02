@@ -56,7 +56,7 @@ export function HouseObjectInspector({
         <InspectorFields project={project} selected={selected} onPatch={patch} />
       ) : (
         <p className="rounded-lg bg-muted/60 p-3 text-xs leading-5 text-muted-foreground">
-          Tap a wall, opening, stair, slab or roof—or choose one above—to edit its exact millimetre values.
+          Tap a wall, opening, stair, slab, roof or exterior object—or choose one above—to edit its exact millimetre values.
         </p>
       )}
     </aside>
@@ -179,6 +179,74 @@ function InspectorFields({
     );
   }
 
+  if (selected.kind === "balcony") {
+    const item = project.balconies.find((balcony) => balcony.id === selected.id);
+    if (!item) return <Missing />;
+    return (
+      <FieldGrid title="Balcony">
+        <NumberInput label="X" value={item.x} min={-100000} max={100000} onChange={(x) => onPatch({ x })} />
+        <NumberInput label="Y" value={item.y} min={-100000} max={100000} onChange={(y) => onPatch({ y })} />
+        <NumberInput label="Width" value={item.width} min={300} max={20000} onChange={(width) => onPatch({ width })} />
+        <NumberInput label="Depth" value={item.depth} min={300} max={10000} onChange={(depth) => onPatch({ depth })} />
+        <NumberInput label="Elevation" value={item.elevation} min={-10000} max={50000} onChange={(elevation) => onPatch({ elevation })} />
+        <NumberInput label="Thickness" value={item.thickness} min={50} max={1000} onChange={(thickness) => onPatch({ thickness })} />
+        <NumberInput label="Rotation" value={item.rotation} min={-360} max={360} suffix="°" onChange={(rotation) => onPatch({ rotation })} />
+        <NumberInput label="Railing height" value={item.railingHeight} min={0} max={3000} onChange={(railingHeight) => onPatch({ railingHeight })} />
+        <TextInput label="Railing material" value={item.railingMaterial} onChange={(railingMaterial) => onPatch({ railingMaterial })} wide />
+        <TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide />
+      </FieldGrid>
+    );
+  }
+
+  if (selected.kind === "veranda") {
+    const item = project.verandas.find((veranda) => veranda.id === selected.id);
+    if (!item) return <Missing />;
+    return (
+      <FieldGrid title="Veranda">
+        <NumberInput label="X" value={item.x} min={-100000} max={100000} onChange={(x) => onPatch({ x })} />
+        <NumberInput label="Y" value={item.y} min={-100000} max={100000} onChange={(y) => onPatch({ y })} />
+        <NumberInput label="Width" value={item.width} min={300} max={20000} onChange={(width) => onPatch({ width })} />
+        <NumberInput label="Depth" value={item.depth} min={300} max={10000} onChange={(depth) => onPatch({ depth })} />
+        <NumberInput label="Elevation" value={item.elevation} min={-10000} max={50000} onChange={(elevation) => onPatch({ elevation })} />
+        <NumberInput label="Thickness" value={item.thickness} min={50} max={1000} onChange={(thickness) => onPatch({ thickness })} />
+        <NumberInput label="Rotation" value={item.rotation} min={-360} max={360} suffix="°" onChange={(rotation) => onPatch({ rotation })} />
+        <NumberInput label="Canopy height" value={item.canopyHeight} min={1800} max={6000} onChange={(canopyHeight) => onPatch({ canopyHeight })} />
+        <TextInput label="Canopy material" value={item.canopyMaterial} onChange={(canopyMaterial) => onPatch({ canopyMaterial })} wide />
+        <TextInput label="Post material" value={item.postMaterial} onChange={(postMaterial) => onPatch({ postMaterial })} wide />
+        <TextInput label="Floor material" value={item.material} onChange={(material) => onPatch({ material })} wide />
+      </FieldGrid>
+    );
+  }
+
+  if (selected.kind === "ceiling") {
+    const item = project.ceilings.find((ceiling) => ceiling.id === selected.id);
+    if (!item) return <Missing />;
+    return (
+      <FieldGrid title="Ceiling">
+        <NumberInput label="Elevation" value={item.elevation} min={-10000} max={50000} onChange={(elevation) => onPatch({ elevation })} />
+        <NumberInput label="Thickness" value={item.thickness} min={3} max={500} onChange={(thickness) => onPatch({ thickness })} />
+        <TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide />
+      </FieldGrid>
+    );
+  }
+
+  if (selected.kind === "site") {
+    const item = project.site?.id === selected.id ? project.site : null;
+    if (!item) return <Missing />;
+    const bounds = boundaryBounds(item.boundary);
+    return (
+      <FieldGrid title="Site / ground">
+        <NumberInput label="Centre X" value={(bounds.minX + bounds.maxX) / 2} min={-100000} max={100000} onChange={(x) => onPatch({ x })} />
+        <NumberInput label="Centre Y" value={(bounds.minY + bounds.maxY) / 2} min={-100000} max={100000} onChange={(y) => onPatch({ y })} />
+        <NumberInput label="Width" value={bounds.maxX - bounds.minX} min={1000} max={200000} onChange={(width) => onPatch({ width })} />
+        <NumberInput label="Depth" value={bounds.maxY - bounds.minY} min={1000} max={200000} onChange={(depth) => onPatch({ depth })} />
+        <NumberInput label="Elevation" value={item.elevation} min={-10000} max={50000} onChange={(elevation) => onPatch({ elevation })} />
+        <NumberInput label="Thickness" value={item.thickness} min={20} max={5000} onChange={(thickness) => onPatch({ thickness })} />
+        <TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide />
+      </FieldGrid>
+    );
+  }
+
   const item = project.roofs.find((roof) => roof.id === selected.id);
   if (!item) return <Missing />;
   return (
@@ -257,6 +325,10 @@ function objectOptions(project: HouseProject, levelId: string) {
   addOptions(options, project.structuralBeams.filter((item) => item.levelId === levelId), "beam", "Beam");
   addOptions(options, project.slabs.filter((item) => item.levelId === levelId), "slab", "Slab");
   addOptions(options, project.roofs.filter((item) => item.levelId === levelId), "roof", "Roof");
+  addOptions(options, project.balconies.filter((item) => item.levelId === levelId), "balcony", "Balcony");
+  addOptions(options, project.verandas.filter((item) => item.levelId === levelId), "veranda", "Veranda");
+  addOptions(options, project.ceilings.filter((item) => item.levelId === levelId), "ceiling", "Ceiling");
+  if (project.site?.levelId === levelId) options.push({ label: "Site / ground", selection: { kind: "site", id: project.site.id } });
   return options;
 }
 
@@ -277,4 +349,10 @@ function parseSelection(value: string): HouseSelection | null {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function boundaryBounds(points: { x: number; y: number }[]) {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
 }

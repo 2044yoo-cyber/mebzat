@@ -39,6 +39,7 @@ import {
   writeHouseDraft,
 } from "../services/draft";
 import { ensurePhaseThreeProject } from "../services/facade";
+import { ensureHouseEnvelopeProject } from "../services/envelope";
 import { ensurePhaseFourProject } from "../services/structure";
 import {
   createHouseProject,
@@ -123,7 +124,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
 
   function restore() {
     if (!savedDraft) return;
-    const restored = ensurePhaseFourProject(ensurePhaseThreeProject(ensurePhaseTwoProject(savedDraft.project)));
+    const restored = ensureHouseEnvelopeProject(ensurePhaseFourProject(ensurePhaseThreeProject(ensurePhaseTwoProject(savedDraft.project))));
     const restoredRoom = restored.levels.find((level) => level.plan)?.plan;
     if (!restoredRoom) return;
     setProject(restored);

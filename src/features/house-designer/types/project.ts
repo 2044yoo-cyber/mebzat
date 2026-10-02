@@ -16,7 +16,7 @@ export const houseStyles = [
 
 export const roofTypes = ["flat", "gable", "hip"] as const;
 export const stairTypes = ["straight", "l-shaped", "u-shaped"] as const;
-export const houseObjectKinds = ["level", "wall", "door", "window", "stair", "slab", "roof", "column", "beam"] as const;
+export const houseObjectKinds = ["level", "wall", "door", "window", "stair", "slab", "roof", "column", "beam", "balcony", "veranda", "ceiling", "site"] as const;
 export const facadeElementTypes = ["band", "cornice", "pilaster", "accent", "parapet"] as const;
 
 export type HouseStyle = (typeof houseStyles)[number];
@@ -138,6 +138,58 @@ const roofSchema = z.object({
   material: z.string(),
 });
 
+const balconySchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  wallId: z.string(),
+  x: z.number(),
+  y: z.number(),
+  elevation: z.number(),
+  width: z.number().positive(),
+  depth: z.number().positive(),
+  thickness: z.number().positive(),
+  rotation: z.number(),
+  railingHeight: z.number().nonnegative(),
+  railingMaterial: z.string(),
+  material: z.string(),
+});
+
+const verandaSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  wallId: z.string(),
+  x: z.number(),
+  y: z.number(),
+  elevation: z.number(),
+  width: z.number().positive(),
+  depth: z.number().positive(),
+  thickness: z.number().positive(),
+  rotation: z.number(),
+  canopyHeight: z.number().positive(),
+  canopyMaterial: z.string(),
+  postMaterial: z.string(),
+  material: z.string(),
+});
+
+const ceilingSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  roomId: z.string(),
+  boundary: z.array(pointSchema).min(3),
+  elevation: z.number(),
+  thickness: z.number().positive(),
+  material: z.string(),
+});
+
+const siteSchema = z.object({
+  id: z.string(),
+  levelId: z.string(),
+  boundary: z.array(pointSchema).min(3),
+  elevation: z.number(),
+  thickness: z.number().positive(),
+  material: z.string(),
+});
+
 const facadeSettingsSchema = z.object({
   source: z.enum(["style", "reference"]),
   style: z.enum(houseStyles),
@@ -221,7 +273,10 @@ export const houseProjectSchema = z.object({
   structuralBeams: z.array(structuralBeamSchema).default([]),
   slabs: z.array(slabSchema),
   roofs: z.array(roofSchema),
-  balconies: z.array(z.unknown()),
+  balconies: z.array(balconySchema).default([]),
+  verandas: z.array(verandaSchema).default([]),
+  ceilings: z.array(ceilingSchema).default([]),
+  site: siteSchema.nullable().default(null),
   facadeElements: z.array(facadeElementSchema),
   materials: z.array(z.string()),
   referenceImages: z.array(
@@ -246,6 +301,10 @@ export type HouseSlab = HouseProject["slabs"][number];
 export type HouseRoof = HouseProject["roofs"][number];
 export type HouseStructuralColumn = HouseProject["structuralColumns"][number];
 export type HouseStructuralBeam = HouseProject["structuralBeams"][number];
+export type HouseBalcony = HouseProject["balconies"][number];
+export type HouseVeranda = HouseProject["verandas"][number];
+export type HouseCeiling = HouseProject["ceilings"][number];
+export type HouseSite = NonNullable<HouseProject["site"]>;
 export type HouseFacadeElement = HouseProject["facadeElements"][number];
 export type HouseFacadeAlternative = HouseProject["designAlternatives"][number];
 
@@ -376,6 +435,10 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
   const facadeElements = buildFacadeElements(walls, levels, facade);
   const structuralColumns = buildStructuralColumns(levels);
   const structuralBeams = buildStructuralBeams(walls, levels);
+  const ceilings = buildHouseCeilings(rooms, levels);
+  const site = buildHouseSite(rooms);
+  const verandas = buildHouseVerandas(levels, walls, doors);
+  const balconies = buildHouseBalconies(levels, walls, doors);
 
   return houseProjectSchema.parse({
     version: 1,
@@ -402,9 +465,12 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
     structuralBeams,
     slabs,
     roofs,
-    balconies: [],
+    balconies,
+    verandas,
+    ceilings,
+    site,
     facadeElements,
-    materials: ["Masonry", "Reinforced concrete", "Aluminium", "Timber"],
+    materials: ["Masonry", "Reinforced concrete", "Aluminium", "Timber", "Gypsum board", "Paving"],
     referenceImages: input.referenceImages ?? [],
     revisions: [
       { id: crypto.randomUUID(), createdAt: now, note: "Generated editable architectural model" },
@@ -543,6 +609,141 @@ export function buildStructuralBeams(
       material: old?.material ?? "Reinforced concrete",
     };
   });
+}
+
+export function buildHouseCeilings(
+  rooms: HouseProject["rooms"],
+  levels: HouseProject["levels"],
+  previous: HouseProject["ceilings"] = [],
+): HouseProject["ceilings"] {
+  const existing = new Map(previous.map((ceiling) => [ceiling.id, ceiling]));
+  return rooms.map((room) => {
+    const id = `${room.id}:ceiling`;
+    const old = existing.get(id);
+    const level = levels.find((item) => item.id === room.levelId);
+    return {
+      id,
+      levelId: room.levelId,
+      roomId: room.id,
+      boundary: room.boundary.map(copyPoint),
+      elevation: (level?.elevation ?? 0) + room.ceilingHeight,
+      thickness: old?.thickness ?? 12,
+      material: old?.material ?? "Gypsum board",
+    };
+  });
+}
+
+export function buildHouseSite(
+  rooms: HouseProject["rooms"],
+  previous: HouseProject["site"] = null,
+): HouseProject["site"] {
+  if (rooms.length === 0) return null;
+  const points = rooms.flatMap((room) => room.boundary);
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const margin = 2_500;
+  const minX = Math.min(...xs) - margin;
+  const maxX = Math.max(...xs) + margin;
+  const minY = Math.min(...ys) - margin;
+  const maxY = Math.max(...ys) + margin;
+  return {
+    id: "site-ground",
+    levelId: rooms[0]!.levelId,
+    boundary: [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }],
+    elevation: previous?.elevation ?? -150,
+    thickness: previous?.thickness ?? 150,
+    material: previous?.material ?? "Paving",
+  };
+}
+
+export function buildHouseVerandas(
+  levels: HouseProject["levels"],
+  walls: HouseProject["walls"],
+  doors: HouseProject["doors"],
+  previous: HouseProject["verandas"] = [],
+): HouseProject["verandas"] {
+  const ground = levels[0];
+  if (!ground?.plan) return [];
+  const door = doors.find((item) => item.levelId === ground.id && item.type !== "passage");
+  const wall = door ? walls.find((item) => item.id === door.wallId) : null;
+  if (!door || !wall) return [];
+  const id = `${ground.id}:veranda:entry`;
+  const old = previous.find((item) => item.id === id);
+  const depth = old?.depth ?? 1_500;
+  const placement = entrancePlacement(ground.plan, wall, door.offset, door.width, depth);
+  const wallLength = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+  const width = Math.min(wallLength, old?.width ?? Math.min(3_200, Math.max(2_000, door.width + 1_000)));
+  return [{
+    id,
+    levelId: ground.id,
+    wallId: wall.id,
+    ...placement,
+    elevation: ground.elevation,
+    width,
+    depth,
+    thickness: old?.thickness ?? 120,
+    canopyHeight: old?.canopyHeight ?? 2_700,
+    canopyMaterial: old?.canopyMaterial ?? "Coated metal",
+    postMaterial: old?.postMaterial ?? "Steel",
+    material: old?.material ?? "Paving",
+  }];
+}
+
+export function buildHouseBalconies(
+  levels: HouseProject["levels"],
+  walls: HouseProject["walls"],
+  doors: HouseProject["doors"],
+  previous: HouseProject["balconies"] = [],
+): HouseProject["balconies"] {
+  const ground = levels[0];
+  const upper = levels[1];
+  if (!ground?.plan || !upper?.plan) return [];
+  const door = doors.find((item) => item.levelId === ground.id && item.type !== "passage");
+  const groundWall = door ? walls.find((item) => item.id === door.wallId) : null;
+  const wall = groundWall?.sourceWallId
+    ? walls.find((item) => item.levelId === upper.id && item.sourceWallId === groundWall.sourceWallId)
+    : null;
+  if (!door || !wall) return [];
+  const id = `${upper.id}:balcony:entry`;
+  const old = previous.find((item) => item.id === id);
+  const depth = old?.depth ?? 1_200;
+  const placement = entrancePlacement(upper.plan, wall, door.offset, door.width, depth);
+  const wallLength = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+  const width = Math.min(wallLength, old?.width ?? Math.min(3_400, Math.max(2_200, door.width + 1_200)));
+  return [{
+    id,
+    levelId: upper.id,
+    wallId: wall.id,
+    ...placement,
+    elevation: upper.elevation,
+    width,
+    depth,
+    thickness: old?.thickness ?? 150,
+    railingHeight: old?.railingHeight ?? 1_050,
+    railingMaterial: old?.railingMaterial ?? "Steel and glass",
+    material: old?.material ?? "Reinforced concrete",
+  }];
+}
+
+function entrancePlacement(
+  plan: Room,
+  wall: HouseProject["walls"][number],
+  openingOffset: number,
+  openingWidth: number,
+  depth: number,
+) {
+  const source = roomWalls(plan).find((item) => item.id === wall.sourceWallId);
+  const length = Math.max(1, Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y));
+  const dx = (wall.end.x - wall.start.x) / length;
+  const dy = (wall.end.y - wall.start.y) / length;
+  const along = Math.min(length, Math.max(0, openingOffset + openingWidth / 2));
+  const projection = wall.thickness / 2 + depth / 2;
+  const inward = source?.inward ?? { x: -dy, y: dx };
+  return {
+    x: wall.start.x + dx * along - inward.x * projection,
+    y: wall.start.y + dy * along - inward.y * projection,
+    rotation: Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x) * 180 / Math.PI,
+  };
 }
 
 function clonePlan(room: Room, keepReference: boolean): Room {
