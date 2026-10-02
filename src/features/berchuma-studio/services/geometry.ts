@@ -126,7 +126,7 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
       const endX = part.id === "gable-left" ? 0 : part.id === "gable-right" ? cabinet.size.width : null;
       const end = endX === null ? null : rotateThenPlace({ x: endX, y: 0, z: cabinet.size.depth / 2 }, rotation, placed.x, 0, placed.z);
       const joinsWardrobeCorner = spec.furnitureType === "wardrobe" && end && resolved.layout.corners.some((corner) =>
-        !corner.ownerRunId &&
+        (!corner.ownerRunId || (corner.kind === "connected_l" && corner.ownerRunId !== placed.runId)) &&
         corner.between.includes(placed.runId ?? "") &&
         end.x >= corner.x - 0.01 && end.x <= corner.x + (corner.width ?? corner.size) + 0.01 &&
         end.z >= corner.z - 0.01 && end.z <= corner.z + (corner.depth ?? corner.size) + 0.01);
