@@ -64,21 +64,30 @@ jobs:
           base64 -d /tmp/phase6-overlay.b64 > /tmp/phase6-overlay.tar.gz
           tar -tzf /tmp/phase6-overlay.tar.gz >/dev/null
           tar -xzf /tmp/phase6-overlay.tar.gz -C "$app"
+          mkdir -p "$app/src/components"
+          cp mobile-build/phase6/CreateSheet.tsx "$app/src/components/CreateSheet.tsx"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          app=Path('/tmp/medosha-mobile-src/medosha-app')
+          p=app/'App.tsx'
+          s=p.read_text()
+          s=s.replace("else if(detail?.kind==='createPost')screen=<CreatePostScreen session={session}", "else if(detail?.kind==='createPost' && session)screen=<CreatePostScreen session={session}")
+          s=s.replace("else if(detail?.kind==='createProperty')screen=<CreatePropertyScreen session={session}", "else if(detail?.kind==='createProperty' && session)screen=<CreatePropertyScreen session={session}")
+          p.write_text(s)
+          p=app/'package.json'; d=json.loads(p.read_text()); d['version']='0.6.0'; p.write_text(json.dumps(d,indent=2)+'\n')
+          p=app/'app.json'; d=json.loads(p.read_text()); d['expo']['version']='0.6.0'; d['expo']['android']['versionCode']=6; d['expo']['ios']['buildNumber']='6'; p.write_text(json.dumps(d,indent=2)+'\n')
+          PY
           test -f "$app/src/screens/ProfileDetailScreen.tsx"
           test -f "$app/src/screens/ProfileEditScreen.tsx"
           test -f "$app/src/screens/CompanyDetailScreen.tsx"
           test -f "$app/src/screens/MessagesScreen.tsx"
           test -f "$app/src/screens/ChatScreen.tsx"
+          test -f "$app/src/components/CreateSheet.tsx"
           grep -q "kind: 'messages'" "$app/App.tsx"
+          grep -q "createPost' && session" "$app/App.tsx"
           grep -q 'start_direct_conversation' "$app/src/screens/ProfileDetailScreen.tsx"
           grep -q 'list_conversations' "$app/src/screens/MessagesScreen.tsx"
-          python3 - <<'PY'
-          from pathlib import Path
-          import json
-          app=Path('/tmp/medosha-mobile-src/medosha-app')
-          p=app/'package.json'; d=json.loads(p.read_text()); d['version']='0.6.0'; p.write_text(json.dumps(d,indent=2)+'\n')
-          p=app/'app.json'; d=json.loads(p.read_text()); d['expo']['version']='0.6.0'; d['expo']['android']['versionCode']=6; d['expo']['ios']['buildNumber']='6'; p.write_text(json.dumps(d,indent=2)+'\n')
-          PY
 
       - name: Restore generated app artwork
         shell: bash
