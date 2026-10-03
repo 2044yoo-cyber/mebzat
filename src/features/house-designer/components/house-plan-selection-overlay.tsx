@@ -7,22 +7,25 @@ import { PlanCanvas } from "@/features/berchuma-studio/components/plan/plan-canv
 import { useHouseUnits } from "./house-units";
 import { displayLength, modelLength } from "../services/workspace-options";
 import type { HouseCommandId } from "../services/command-registry";
+import { roomOutline, type HouseRoomShape } from "../services/model-commands";
 import type { HouseProject, HouseSelection } from "../types/project";
 
 export type HousePlanPoint = { x: number; y: number };
 type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
 type SnapPoint = HousePlanPoint & { label: string };
 
-const lineTools = new Set<HouseCommandId>(["wall", "structural-wall", "room-separator", "beam", "railing", "grid", "reference-plane", "dimension", "section", "elevation", "strip-footing"]);
-const pointTools = new Set<HouseCommandId>(["door", "window", "column", "room", "floor", "structural-slab", "ceiling", "roof", "stair", "opening", "component", "furniture", "kitchen", "wardrobe", "plumbing-fixture", "foundation", "isolated-footing", "foundation-slab", "level", "text", "room-tag", "tag", "move"]);
+const lineTools = new Set<HouseCommandId>(["room", "wall", "structural-wall", "room-separator", "beam", "railing", "grid", "reference-plane", "dimension", "section", "elevation", "strip-footing"]);
+const pointTools = new Set<HouseCommandId>(["door", "window", "column", "floor", "structural-slab", "ceiling", "roof", "stair", "opening", "component", "furniture", "kitchen", "wardrobe", "plumbing-fixture", "foundation", "isolated-footing", "foundation-slab", "level", "text", "room-tag", "tag", "move"]);
 
 // Grid-snap lands on the same points the background grid draws, so "snap to
 // grid" and "the visible grid" are the same thing rather than two grids that
 // happen to coexist.
 const MINOR_GRID = 1000;
 const MAJOR_GRID = MINOR_GRID * 5;
+const chainTools = new Set<HouseCommandId>(["wall", "structural-wall", "room-separator"]);
+const DIRECTIONS = [{ label: "→", x: 1, y: 0 }, { label: "↓", x: 0, y: 1 }, { label: "←", x: -1, y: 0 }, { label: "↑", x: 0, y: -1 }] as const;
 
-export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
+export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, roomShape = "rectangle", onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
   project: HouseProject;
   levelId: string;
   activeTool: HouseCommandId | null;
@@ -33,6 +36,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   /** Bumped by the "Zoom to Fit" command — re-fits the view on top of the
    * usual reset when switching floors. */
   viewRevision?: number;
+  roomShape?: HouseRoomShape;
   onDraftStart: (point: HousePlanPoint | null) => void;
   onDraft: (start: HousePlanPoint, end: HousePlanPoint) => void;
   onSelect: (items: HouseSelection[], mode: "replace" | "add" | "remove") => void;
@@ -42,8 +46,14 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
 }) {
   const svg = useRef<SVGSVGElement | null>(null);
   const gridId = useId();
+  const unit = useHouseUnits();
   const [dragStart, setDragStart] = useState<HousePlanPoint | null>(null);
   const [current, setCurrent] = useState<SnapPoint | null>(null);
+  // A room can be dragged out in one press as well as tapped corner-to-corner.
+  const roomPress = useRef<{ pointerId: number; start: HousePlanPoint } | null>(null);
+  // Which way a typed length runs. On a phone there is no hovering pointer to
+  // aim with, so it can be picked; otherwise it follows the pointer.
+  const [typedDirection, setTypedDirection] = useState<{ x: number; y: number } | null>(null);
   const bounds = useMemo(() => levelBounds(project, levelId), [levelId, project]);
   const objects = useMemo(() => selectableBounds(project, levelId), [levelId, project]);
   const candidates = useMemo(() => snapCandidates(project, levelId), [levelId, project]);
@@ -226,10 +236,17 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     if (activeTool && lineTools.has(activeTool)) {
       if (!draftStart) {
         onDraftStart(point);
-        onGuidance(`${toolName(activeTool)} Tool · Pick end point or type length`);
+        setTypedDirection(null);
+        if (activeTool === "room") {
+          roomPress.current = { pointerId: event.pointerId, start: point };
+          svg.current?.setPointerCapture(event.pointerId);
+          onGuidance("Room · Drag to the opposite corner, tap it, or type the size");
+        } else {
+          onGuidance(`${toolName(activeTool)} Tool · Pick end point or type length`);
+        }
       } else {
         onDraft(draftStart, point);
-        onDraftStart(chain && ["wall", "structural-wall", "room-separator"].includes(activeTool) ? point : null);
+        onDraftStart(chain && chainTools.has(activeTool) ? point : null);
       }
       return;
     }
@@ -239,6 +256,18 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   function pointerUp(event: React.PointerEvent<SVGSVGElement>) {
     pointers.current.delete(event.pointerId);
     if (pointers.current.size >= 1) return;
+    const press = roomPress.current;
+    roomPress.current = null;
+    if (press && press.pointerId === event.pointerId && activeTool === "room") {
+      const raw = modelPoint(event);
+      const end = raw ? snapped(raw) : null;
+      // A drag finishes the room; a tap leaves the first corner waiting.
+      if (end && Math.hypot(end.x - press.start.x, end.y - press.start.y) > 500) {
+        onDraft(press.start, end);
+        onDraftStart(null);
+      }
+      return;
+    }
     const held = longPress.current?.fired;
     cancelLongPress();
     if (held) { swallowRelease.current = true; setDragStart(null); return; }
@@ -297,13 +326,71 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       })}
       {project.annotations.filter((item) => item.levelId === levelId).map((item) => item.end ? <g key={item.id}><line x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke={selectedIds.has(item.id) ? "#1473e6" : "#7c3aed"} strokeWidth={2} strokeDasharray={item.kind === "dimension" ? undefined : "80 45"} vectorEffect="non-scaling-stroke" /><text x={(item.start.x + item.end.x) / 2} y={(item.start.y + item.end.y) / 2 - 80} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#334155">{item.kind === "dimension" && item.value !== null ? `${displayLength(item.value, project.displayUnits ?? "mm")} ${project.displayUnits ?? "mm"}` : item.text}</text></g> : <text key={item.id} x={item.start.x} y={item.start.y} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill={selectedIds.has(item.id) ? "#1473e6" : "#7c3aed"}>{item.text}</text>)}
       {selectionBox ? <rect x={selectionBox.minX} y={selectionBox.minY} width={selectionBox.maxX - selectionBox.minX} height={selectionBox.maxY - selectionBox.minY} fill={crossing ? "rgba(20,115,230,.10)" : "rgba(20,115,230,.06)"} stroke="#1473e6" strokeWidth={2} strokeDasharray={crossing ? `${margin * 0.08} ${margin * 0.05}` : undefined} vectorEffect="non-scaling-stroke" /> : null}
-      {draftStart && current && activeTool && lineTools.has(activeTool) ? <g><line x1={draftStart.x} y1={draftStart.y} x2={current.x} y2={current.y} stroke="#1473e6" strokeWidth={2} strokeDasharray="80 40" vectorEffect="non-scaling-stroke" /><text x={(draftStart.x + current.x) / 2} y={(draftStart.y + current.y) / 2 - 100} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#1473e6">{displayLength(Math.hypot(current.x - draftStart.x, current.y - draftStart.y), project.displayUnits ?? "mm")} {project.displayUnits ?? "mm"}</text></g> : null}
+      {draftStart && current && activeTool === "room" ? <g pointerEvents="none"><polygon points={roomOutline(roomShape, draftStart, current).map((point) => `${point.x},${point.y}`).join(" ")} fill="rgba(20,115,230,.08)" stroke="#1473e6" strokeWidth={2} strokeDasharray="80 40" vectorEffect="non-scaling-stroke" /><text x={(draftStart.x + current.x) / 2} y={Math.min(draftStart.y, current.y) - 100} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#1473e6">{displayLength(Math.abs(current.x - draftStart.x), unit)} × {displayLength(Math.abs(current.y - draftStart.y), unit)} {unit}</text></g> : null}
+      {draftStart && current && activeTool && activeTool !== "room" && lineTools.has(activeTool) ? <g><line x1={draftStart.x} y1={draftStart.y} x2={current.x} y2={current.y} stroke="#1473e6" strokeWidth={2} strokeDasharray="80 40" vectorEffect="non-scaling-stroke" /><text x={(draftStart.x + current.x) / 2} y={(draftStart.y + current.y) / 2 - 100} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#1473e6">{displayLength(Math.hypot(current.x - draftStart.x, current.y - draftStart.y), project.displayUnits ?? "mm")} {project.displayUnits ?? "mm"}</text></g> : null}
       {!selectMode && current ? <g pointerEvents="none"><circle cx={current.x} cy={current.y} r={Math.max(45, margin * 0.035)} fill="white" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><path d={`M ${current.x - 65} ${current.y} H ${current.x + 65} M ${current.x} ${current.y - 65} V ${current.y + 65}`} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={current.x + 100} y={current.y - 80} fontSize={Math.max(100, margin * 0.12)} fill="#1473e6">{current.label}</text></g> : null}
       {selectedWall ? <WallTemporaryDimension wall={selectedWall} margin={margin} selection={selections[0]!} onChange={(selection, length) => onDimensionChange(selection, { length })} /> : null}
       {selectedOpening ? <OpeningTemporaryDimension project={project} opening={selectedOpening} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
       {selectedColumn ? <ColumnTemporaryDimensions column={selectedColumn} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
     </svg>
+    {draftStart && activeTool && (activeTool === "room" || lineTools.has(activeTool)) ? <TypedDraft
+      key={`${draftStart.x},${draftStart.y}`}
+      room={activeTool === "room"}
+      unit={unit}
+      live={current ? [Math.abs(current.x - draftStart.x), Math.abs(current.y - draftStart.y), Math.hypot(current.x - draftStart.x, current.y - draftStart.y)] : null}
+      direction={typedDirection}
+      onDirection={setTypedDirection}
+      onCancel={() => onDraftStart(null)}
+      onLength={(length) => {
+        const aim = typedDirection ?? (current && Math.hypot(current.x - draftStart.x, current.y - draftStart.y) > 1
+          ? { x: (current.x - draftStart.x) / Math.hypot(current.x - draftStart.x, current.y - draftStart.y), y: (current.y - draftStart.y) / Math.hypot(current.x - draftStart.x, current.y - draftStart.y) }
+          : DIRECTIONS[0]);
+        const end = { x: draftStart.x + aim.x * length, y: draftStart.y + aim.y * length };
+        onDraft(draftStart, end);
+        onDraftStart(chain && chainTools.has(activeTool) ? end : null);
+      }}
+      onSize={(width, depth) => {
+        const sx = current && current.x < draftStart.x ? -1 : 1;
+        const sy = current && current.y < draftStart.y ? -1 : 1;
+        onDraft(draftStart, { x: draftStart.x + sx * width, y: draftStart.y + sy * depth });
+        onDraftStart(null);
+      }}
+    /> : null}
     </>
+  );
+}
+
+/** Exact numbers while drafting: a length for a wall, a size for a room. */
+function TypedDraft({ room, unit, live, direction, onDirection, onCancel, onLength, onSize }: {
+  room: boolean;
+  unit: ReturnType<typeof useHouseUnits>;
+  /** Width, depth and length to the pointer, shown until a number is typed —
+   * at a size a phone can read, which the drawing's own labels are not. */
+  live: [number, number, number] | null;
+  direction: { x: number; y: number } | null;
+  onDirection: (direction: { x: number; y: number } | null) => void;
+  onCancel: () => void;
+  onLength: (length: number) => void;
+  onSize: (width: number, depth: number) => void;
+}) {
+  const [first, setFirst] = useState("");
+  const [second, setSecond] = useState("");
+  const a = modelLength(Number(first), unit);
+  const b = modelLength(Number(second), unit);
+  const ready = first !== "" && Number.isFinite(a) && a > 0 && (!room || second !== "" && Number.isFinite(b) && b > 0);
+  const submit = () => { if (!ready) return; if (room) onSize(a, b); else onLength(a); };
+  const field = (label: string, value: string, set: (value: string) => void, shown?: number) => (
+    <input aria-label={`Typed ${label.toLowerCase()}`} placeholder={shown ? `${displayLength(shown, unit)}` : `${label} ${unit}`} inputMode="decimal" type="number" step="any" min={0} value={value} onChange={(event) => set(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") submit(); if (event.key === "Escape") onCancel(); }} className="w-[4.25rem] rounded-md border bg-background px-1.5 py-1.5 text-right text-sm text-foreground" />
+  );
+  return (
+    <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="absolute inset-x-2 top-12 z-10 flex flex-wrap items-center justify-center gap-1 rounded-xl border bg-card/95 p-1 shadow-sm backdrop-blur">
+      {room ? <>{field("Width", first, setFirst, live?.[0])}<span className="text-xs text-muted-foreground">×</span>{field("Depth", second, setSecond, live?.[1])}</> : <>
+        {field("Length", first, setFirst, live?.[2])}
+        <span className="flex">{DIRECTIONS.map((item) => <button key={item.label} type="button" aria-label={`Run ${item.label}`} aria-pressed={direction?.x === item.x && direction?.y === item.y} onClick={() => onDirection(direction?.x === item.x && direction?.y === item.y ? null : { x: item.x, y: item.y })} className="size-7 rounded-md text-sm text-muted-foreground aria-pressed:bg-brand/15 aria-pressed:text-brand">{item.label}</button>)}</span>
+      </>}
+      <button type="submit" disabled={!ready} className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-medium text-brand-foreground disabled:opacity-40">{room ? "Create" : "Add"}</button>
+      <button type="button" onClick={onCancel} aria-label="Cancel drafting" className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted">✕</button>
+    </form>
   );
 }
 

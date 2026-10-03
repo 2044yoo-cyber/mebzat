@@ -627,6 +627,62 @@ function offsetObject<T extends Record<string, unknown>>(item: T, id: string, of
 }
 
 function offsetPoint(point: { x: number; y: number }, value: number) { return { x: point.x + value, y: point.y + value }; }
+export type HouseRoomShape = "rectangle" | "l-shape";
+
+/** The outline a room drag describes: start and end are opposite corners. An
+ * L-shape gives up the quarter at the end corner, so you drag from the
+ * elbow's outside toward the notch. */
+export function roomOutline(shape: HouseRoomShape, start: HouseDraftPoint, end: HouseDraftPoint): HouseDraftPoint[] {
+  if (shape === "l-shape") {
+    const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+    return [start, { x: end.x, y: start.y }, { x: end.x, y: mid.y }, mid, { x: mid.x, y: end.y }, { x: start.x, y: end.y }];
+  }
+  return [start, { x: end.x, y: start.y }, end, { x: start.x, y: end.y }];
+}
+
+/**
+ * Room-first drawing: walls round the outline plus the room itself, in one
+ * undoable step. An edge already lying along an existing wall — the house's
+ * outside wall, or the room next door — reuses that wall instead of getting a
+ * second one drawn on top of it.
+ */
+export function createRoomFromGesture(
+  project: HouseProject,
+  levelId: string,
+  start: HouseDraftPoint,
+  end: HouseDraftPoint,
+  shape: HouseRoomShape,
+  options: HousePlacementOptions = {},
+): HouseCommandMutation {
+  const level = project.levels.find((item) => item.id === levelId);
+  if (!level?.plan) return { project, selections: [], blocked: ["Create a level first"] };
+  if (Math.abs(end.x - start.x) < 500 || Math.abs(end.y - start.y) < 500) {
+    return { project, selections: [], blocked: ["Drag out the room — at least 500 mm each way"] };
+  }
+  const boundary = roomOutline(shape, start, end);
+  let next = project;
+  const created: HouseSelection[] = [];
+  boundary.forEach((corner, index) => {
+    const following = boundary[(index + 1) % boundary.length]!;
+    const covered = project.walls.some((wall) => wall.levelId === levelId
+      && pointSegmentDistance(corner, wall.start, wall.end) <= wall.thickness / 2 + 20
+      && pointSegmentDistance(following, wall.start, wall.end) <= wall.thickness / 2 + 20);
+    if (covered) return;
+    const result = createHouseObjectFromGesture(next, "wall", levelId, corner, following, options);
+    next = result.project;
+    created.push(...result.selections);
+  });
+  const zoneId = `zone-${crypto.randomUUID()}`;
+  const roomId = `${level.id}:${zoneId}`;
+  const name = `Room ${next.rooms.filter((item) => item.levelId === level.id).length + 1}`;
+  next = {
+    ...next,
+    rooms: [...next.rooms, { id: roomId, levelId: level.id, name, boundary, floorMaterial: "Unspecified", wallMaterial: "Paint", ceilingMaterial: "Gypsum board", ceilingHeight: level.plan.ceilingHeight ?? level.floorToFloorHeight }],
+    levels: next.levels.map((item) => item.id === level.id && item.plan ? { ...item, plan: { ...item.plan, zones: [...(item.plan.zones ?? []), { id: zoneId, name, boundary, floorMaterial: "Unspecified", wallMaterial: "Paint", ceilingMaterial: "Gypsum board" }] } } : item),
+  };
+  return { project: next, selections: [{ kind: "room", id: roomId }, ...created], blocked: [] };
+}
+
 function rectangleAt(point: HouseDraftPoint, width: number, depth: number) {
   return [
     { x: point.x - width / 2, y: point.y - depth / 2 },

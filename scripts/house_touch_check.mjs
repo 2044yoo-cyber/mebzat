@@ -180,6 +180,53 @@ try {
     assert.equal(await page.getByRole("menu").isVisible().catch(() => false), true, `${at}: the long-press menu survives the finger lifting`);
     assert.equal(await scrollTop(), 0, `${at}: lifting the finger clicked something`);
 
+    // Room-first drawing and typed sizes, from a fresh plan.
+    await page.reload();
+    await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+    await page.locator(PLAN).waitFor();
+    await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
+    const count = (pattern) => page.evaluate((source) => [...document.querySelectorAll("#house-properties option")].filter((option) => new RegExp(source).test(option.textContent)).length, pattern);
+    const rooms = () => count("^Room \\d+$");
+    const startWalls = await walls();
+    const startRooms = await rooms();
+    await page.getByRole("button", { name: "Room", exact: true }).click();
+    assert.ok(await page.getByRole("radiogroup", { name: "Room shape" }).isVisible(), `${at}: the room tool offers shapes`);
+    const [ax, ay] = await screen(1000, 1000);
+    const [bx, by] = await screen(4000, 3500);
+    await touch("touchStart", [[ax, ay]]);
+    for (let step = 1; step <= 8; step += 1) await touch("touchMove", [[ax + (bx - ax) * step / 8, ay + (by - ay) * step / 8]]);
+    assert.equal(await page.locator(`${PLAN} polygon[stroke="#1473e6"]`).count(), 1, `${at}: the room previews while dragging`);
+    assert.match(await page.getByLabel("Typed width").getAttribute("placeholder"), /^\d+$/, `${at}: the live width is readable in the panel`);
+    await touch("touchEnd", []);
+    await page.waitForFunction((expected) => [...document.querySelectorAll("#house-properties option")].filter((option) => /^Wall \d+$/.test(option.textContent)).length === expected, startWalls + 4);
+    assert.equal(await rooms(), startRooms + 1, `${at}: dragging made one room`);
+
+    const [rx, ry] = await screen(5000, 1000);
+    await page.touchscreen.tap(rx, ry);
+    const panel = page.locator("form").filter({ has: page.getByLabel("Typed width") });
+    assert.ok(await panel.evaluate((element) => { const box = element.getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth; }), `${at}: the size panel fits the screen`);
+    await page.getByLabel("Typed width").fill("2000");
+    await page.getByLabel("Typed depth").fill("2000");
+    await page.getByRole("button", { name: "Create" }).click();
+    assert.equal(await walls(), startWalls + 8, `${at}: a typed room adds its four walls`);
+    assert.equal(await rooms(), startRooms + 2);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    assert.equal(await walls(), startWalls + 4, `${at}: one undo takes the whole room back`);
+    assert.equal(await rooms(), startRooms + 1);
+
+    await page.getByRole("button", { name: "Wall", exact: true }).click();
+    const [wx, wy] = await screen(6000, 3000);
+    await page.touchscreen.tap(wx, wy);
+    await page.getByRole("button", { name: "Run ↓" }).click();
+    await page.getByLabel("Typed length").fill("2500");
+    await page.getByLabel("Typed length").press("Enter");
+    assert.equal(await walls(), startWalls + 5, `${at}: a typed length adds a wall`);
+    assert.equal(await page.locator('input[aria-label="Selected object temporary length"]').inputValue(), "2500", `${at}: exactly the length typed`);
+    const run = await page.locator(`${PLAN} line[stroke-opacity="0.28"]`).evaluate((line) => ["x1", "y1", "x2", "y2"].map((name) => Number(line.getAttribute(name))));
+    assert.ok(Math.abs(run[0] - run[2]) < 1 && Math.abs(run[3] - run[1] - 2500) < 1, `${at}: the wall runs the way picked (${run.map(Math.round)})`);
+    assert.ok(await page.getByLabel("Typed length").isVisible(), `${at}: the chain carries on from the new end`);
+    assert.equal(await page.locator("div.absolute.inset-x-2.bottom-2").isVisible(), false, `${at}: no selection bar while drawing`);
+
     assert.deepEqual(errors, [], `${at}: page errors`);
     await page.close();
   }
@@ -187,4 +234,4 @@ try {
   await browser.close();
   server.close();
 }
-console.log("House designer touch: layout, pinch, pan, tap, delete/undo and long-press passed at 360–430px");
+console.log("House designer touch: layout, pinch, pan, tap, delete/undo, long-press, room drawing and typed lengths passed at 360–430px");

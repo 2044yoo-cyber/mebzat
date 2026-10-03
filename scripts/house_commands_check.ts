@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room";
 import { commandFromChord, commandFromKeyboard, isModelTextInput } from "../src/features/house-designer/services/command-registry";
 import {
+  createRoomFromGesture,
+  roomOutline,
   alignHouseSelections,
   createHouseObjectFromGesture,
   createDefaultHouseObject,
@@ -90,5 +92,37 @@ assert.equal(editable.project.roofs[0]!.boundary.length, 3, "the roof boundary f
 assert.ok(houseProjectSchema.safeParse(editable.project).success, "the shorter footprint is still a valid project");
 const triangleWall = { kind: "wall" as const, id: editable.project.walls.find((item) => item.levelId === "ground-floor")!.id };
 assert.ok(deleteHouseSelections(editable.project, [triangleWall], { footprintEditable: true }).blocked.length > 0, "refuses to shrink a footprint below three walls");
+
+{
+  // Room-first drawing. The default house is 0..8000 x 0..6500 with 200 mm
+  // outside walls, so a room in its corner shares two edges with them.
+  const base = ensureHouseBimState(createHouseProject({ title: "Rooms", room: rectangularRoom(8000, 6500), style: "modern", strict: false, floorCount: 1, floorToFloorHeight: 3000 }));
+  const level = base.levels[0]!.id;
+  const wallsOn = (value: typeof base) => value.walls.filter((wall) => wall.levelId === level).length;
+  const before = wallsOn(base);
+
+  const free = createRoomFromGesture(base, level, { x: 2000, y: 2000 }, { x: 5000, y: 4500 }, "rectangle", { wallThickness: 120 });
+  assert.deepEqual(free.blocked, []);
+  assert.equal(wallsOn(free.project) - before, 4, "a free-standing room gets four walls");
+  const room = free.project.rooms.find((item) => item.id === free.selections[0]?.id);
+  assert.ok(room, "the room itself is created and selected first");
+  assert.equal(room.boundary.length, 4);
+  assert.equal(free.project.levels[0]!.plan!.zones!.at(-1)!.boundary.length, 4, "and recorded in the verified plan");
+  assert.ok(houseProjectSchema.safeParse(free.project).success, "the result is a valid project");
+
+  const corner = createRoomFromGesture(base, level, { x: 0, y: 0 }, { x: 3000, y: 2500 }, "rectangle", { wallThickness: 120 });
+  assert.equal(wallsOn(corner.project) - before, 2, "edges on the outside walls reuse them");
+
+  const shared = createRoomFromGesture(free.project, level, { x: 5000, y: 2000 }, { x: 7000, y: 4500 }, "rectangle", { wallThickness: 120 });
+  assert.equal(wallsOn(shared.project) - wallsOn(free.project), 3, "a room next door shares the wall between them");
+
+  const ell = createRoomFromGesture(base, level, { x: 1000, y: 1000 }, { x: 5000, y: 5000 }, "l-shape", { wallThickness: 120 });
+  assert.equal(wallsOn(ell.project) - before, 6, "an L-shape has six walls");
+  assert.deepEqual(roomOutline("l-shape", { x: 0, y: 0 }, { x: 4000, y: 2000 }), [{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 4000, y: 1000 }, { x: 2000, y: 1000 }, { x: 2000, y: 2000 }, { x: 0, y: 2000 }]);
+
+  const tiny = createRoomFromGesture(base, level, { x: 1000, y: 1000 }, { x: 1200, y: 3000 }, "rectangle");
+  assert.equal(tiny.project, base, "a slip of the finger creates nothing");
+  assert.equal(tiny.blocked.length, 1);
+}
 
 console.log("house command checks passed");
