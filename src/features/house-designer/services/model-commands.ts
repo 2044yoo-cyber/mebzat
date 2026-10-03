@@ -19,8 +19,9 @@ export function deleteHouseSelections(project: HouseProject, selections: readonl
   let next = project;
   const blocked: string[] = [];
   for (const selection of selections) {
-    if (next.objectInstances[selection.id]?.pinned) {
-      blocked.push(`${selection.kind} ${selection.id} is pinned`);
+    const conflict = lockConflict(next, selection);
+    if (conflict) {
+      blocked.push(conflict);
       continue;
     }
     if (selection.kind === "level") {
@@ -106,17 +107,35 @@ export function duplicateHouseSelections(project: HouseProject, selections: read
   return { project: next, selections: created, blocked };
 }
 
-export function moveHouseSelections(project: HouseProject, selections: readonly HouseSelection[], dx: number, dy: number): HouseCommandMutation {
+/**
+ * Why an edit to this object would break a lock, or null if it would not.
+ * Locking a wall freezes its geometry, and that includes being stretched by a
+ * neighbour: moving an outside wall moves the corners it shares, so a locked
+ * wall either side of it has to say no too.
+ */
+export function lockConflict(project: HouseProject, selection: HouseSelection): string | null {
+  if (project.objectInstances[selection.id]?.pinned) return `This ${selection.kind} is locked — unlock it to change it`;
+  if (selection.kind !== "wall") return null;
+  const wall = project.walls.find((item) => item.id === selection.id);
+  const corners = project.levels.find((item) => item.id === wall?.levelId)?.plan?.corners ?? [];
+  const index = corners.findIndex((corner) => corner.id === wall?.sourceWallId);
+  if (!wall || index < 0) return null;
+  const neighbours = [corners[(index - 1 + corners.length) % corners.length]!.id, corners[(index + 1) % corners.length]!.id];
+  const locked = project.walls.some((item) => item.levelId === wall.levelId && item.id !== wall.id && neighbours.includes(item.sourceWallId ?? "") && project.objectInstances[item.id]?.pinned);
+  return locked ? "A locked wall next to it would have to change — unlock it first" : null;
+}
+
+export function moveHouseSelections(project: HouseProject, selections: readonly HouseSelection[], dx: number, dy: number, options?: { footprintEditable?: boolean }): HouseCommandMutation {
   let next = project;
   const blocked: string[] = [];
   for (const selection of selections) {
-    const instance = next.objectInstances[selection.id];
-    if (instance?.pinned) { blocked.push(`${selection.kind} ${selection.id} is pinned`); continue; }
+    const conflict = lockConflict(next, selection);
+    if (conflict) { blocked.push(conflict); continue; }
     if (selection.kind === "wall") {
       const wall = next.walls.find((item) => item.id === selection.id);
       const level = wall ? next.levels.find((item) => item.id === wall.levelId) : null;
       if (!wall) continue;
-      if (next.originalPlanStrict && wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId)) {
+      if (!options?.footprintEditable && next.originalPlanStrict && wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId)) {
         blocked.push("Original Floor Plan Strict protects exterior walls");
         continue;
       }

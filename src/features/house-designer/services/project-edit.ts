@@ -285,6 +285,14 @@ function patchOpening(
   const list = kind === "door" ? project.doors : project.windows;
   const opening = list.find((item) => item.id === id);
   if (!opening) return project;
+  // An opening stays inside its wall: dragging or typing past the end stops
+  // at the end, rather than leaving a door hanging off the corner.
+  const host = project.walls.find((item) => item.id === opening.wallId);
+  if (host && (patch.offset !== undefined || patch.width !== undefined)) {
+    const length = Math.hypot(host.end.x - host.start.x, host.end.y - host.start.y);
+    const width = Math.min(positiveOr(patch.width, opening.width), length);
+    patch = { ...patch, width, offset: Math.min(Math.max(0, numberOr(patch.offset, opening.offset)), Math.max(0, length - width)) };
+  }
   const changed = patchList(list, id, patch);
   const next: HouseProject = kind === "door"
     ? { ...project, doors: changed }
@@ -363,6 +371,59 @@ function patchLevel(project: HouseProject, id: string, patch: HousePatch): House
       ? { ...project.site, elevation: project.site.elevation + delta }
       : project.site,
   };
+}
+
+/**
+ * A new floor on top, the way a two-storey project starts out: the top
+ * floor's plan carried up, its walls, rooms and slab built from it, the roof
+ * moved up to cover it, and a stair added on the floor below so the two are
+ * joined. The new floor's geometry comes from the same rebuild every plan
+ * edit goes through, so it is the same model in 2D and 3D from the start.
+ */
+export function addHouseFloor(project: HouseProject): { project: HouseProject; levelId: string | null } {
+  const top = [...project.levels].sort((a, b) => b.elevation - a.elevation)[0];
+  if (!top?.plan) return { project, levelId: null };
+  const taken = new Set(project.levels.map((level) => level.id));
+  let number = project.levels.length + 1;
+  while (taken.has(`floor-${number}`)) number += 1;
+  const levelId = `floor-${number}`;
+  const name = `${ordinalFloor(project.levels.length)} Floor`;
+  const elevation = top.elevation + top.floorToFloorHeight;
+  const plan: Room = { ...structuredClone(top.plan), reference: undefined, runWalls: [] };
+
+  const hasStair = project.stairs.some((stair) => stair.levelId === top.id);
+  const xs = plan.corners.map((corner) => corner.x);
+  const ys = plan.corners.map((corner) => corner.y);
+  const stair: HouseProject["stairs"][number] = {
+    id: `${top.id}:stair`,
+    levelId: top.id,
+    x: Math.min(...xs) + Math.min(1200, (Math.max(...xs) - Math.min(...xs)) * 0.2),
+    y: Math.min(...ys) + Math.min(1200, (Math.max(...ys) - Math.min(...ys)) * 0.2),
+    elevation: top.elevation,
+    width: 1000,
+    length: 3000,
+    height: top.floorToFloorHeight,
+    rotation: 0,
+    steps: Math.min(24, Math.max(12, Math.round(top.floorToFloorHeight / 175))),
+    type: "straight",
+    material: "Reinforced concrete",
+  };
+
+  const next: HouseProject = {
+    ...project,
+    levels: [...project.levels, { id: levelId, name, elevation, floorToFloorHeight: top.floorToFloorHeight, plan }],
+    views: [...project.views, { id: `view:plan:${levelId}`, name, kind: "floor-plan", levelId, hiddenCategories: [], temporaryHiddenIds: [], isolatedIds: [], cutPlane: 1200, topOffset: 2300, bottomOffset: 0 }],
+    slabs: [...project.slabs, { id: `${levelId}:slab`, levelId, boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })), thickness: 150, elevation, material: "Reinforced concrete" }],
+    roofs: project.roofs.map((roof) => roof.levelId === top.id ? { ...roof, levelId, elevation: roof.elevation + top.floorToFloorHeight } : roof),
+    stairs: hasStair ? project.stairs : [...project.stairs, stair],
+    plannedFloorCount: Math.max(project.plannedFloorCount, project.levels.length + 1),
+  };
+  return { project: rebuildLevel(next, levelId, plan), levelId };
+}
+
+function ordinalFloor(index: number) {
+  const suffix = index % 100 >= 11 && index % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[index % 10] ?? "th";
+  return `${index}${suffix}`;
 }
 
 function rebuildLevel(project: HouseProject, levelId: string, plan: Room): HouseProject {

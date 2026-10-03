@@ -41,8 +41,9 @@ assert.ok(css.length, "Run `npm run build` first: the check styles the editor wi
 const out = mkdtempSync(join(tmpdir(), "house_touch_"));
 writeFileSync(join(out, "entry.tsx"), `
 import { createRoot } from "react-dom/client";
+import { Toaster } from "sonner";
 import { HouseDesignerWorkspace } from "@/features/house-designer/components/house-designer-workspace";
-createRoot(document.getElementById("root")!).render(<HouseDesignerWorkspace userId="touch-check" />);
+createRoot(document.getElementById("root")!).render(<><HouseDesignerWorkspace userId="touch-check" /><Toaster /></>);
 `);
 // The start screen's upload field talks to Supabase; nothing here uploads.
 writeFileSync(join(out, "stub.ts"), `
@@ -227,6 +228,75 @@ try {
     assert.ok(await page.getByLabel("Typed length").isVisible(), `${at}: the chain carries on from the new end`);
     assert.equal(await page.locator("div.absolute.inset-x-2.bottom-2").isVisible(), false, `${at}: no selection bar while drawing`);
 
+    // Phase 2, from a fresh plan: doors slide and take exact distances, walls
+    // move and drag their neighbours, locks hold, floors are added.
+    await page.reload();
+    await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+    await page.locator(PLAN).waitFor();
+    await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
+    const drag = async (from, to) => {
+      const [ax, ay] = await screen(...from);
+      const [bx, by] = await screen(...to);
+      await touch("touchStart", [[ax, ay]]);
+      for (let step = 1; step <= 8; step += 1) await touch("touchMove", [[ax + (bx - ax) * step / 8, ay + (by - ay) * step / 8]]);
+      await touch("touchEnd", []);
+      await page.waitForTimeout(150);
+    };
+    const tapAt = async (x, y) => { const [sx, sy] = await screen(x, y); await page.touchscreen.tap(sx, sy); await page.waitForTimeout(150); };
+    const field = (label) => page.locator(`input[aria-label="Selected object temporary ${label}"]`);
+    const toasts = () => page.evaluate(() => [...document.querySelectorAll("[data-sonner-toast]")].map((toast) => toast.textContent).join(" | "));
+
+    await page.getByRole("button", { name: "Door", exact: true }).click();
+    await tapAt(4000, 0);
+    await page.getByRole("button", { name: "Select", exact: true }).click();
+    assert.equal(await field("distance from start").inputValue(), "3550", `${at}: a door shows its distance from each end`);
+    assert.equal(await field("distance to end").inputValue(), "3550");
+    await drag([4000, 0], [5000, 0]);
+    assert.equal(await field("distance from start").inputValue(), "4550", `${at}: dragging slides the door along its wall`);
+    assert.equal(await field("distance to end").inputValue(), "2550");
+    await field("distance from start").fill("500");
+    await field("distance from start").press("Enter");
+    assert.equal(await field("distance to end").inputValue(), "6600", `${at}: a typed distance places it exactly`);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    assert.equal(await field("distance from start").inputValue(), "4550", `${at}: undo steps back one edit`);
+    await tapAt(2000, 0);
+    await page.getByText("Wall Properties").waitFor();
+    await tapAt(4550 + 450, 0);
+    await page.getByText("Door Properties").waitFor({ timeout: 2000 });
+
+    await tapAt(2000, 0);
+    await drag([2000, 0], [2000, -500]);
+    await tapAt(0, 1500);
+    assert.equal(await field("length").inputValue(), "7000", `${at}: moving a wall stretches the one beside it`);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await tapAt(0, 1500);
+    assert.equal(await field("length").inputValue(), "6500");
+
+    await page.locator("div.absolute.inset-x-2.bottom-2").getByRole("button", { name: "Lock" }).click();
+    assert.equal(await page.locator(`${PLAN} text`, { hasText: "Locked" }).count(), 1, `${at}: a locked wall says so`);
+    // Its fields sit off the wall, so a finger anywhere along it reaches the
+    // wall: a field lying across a vertical wall took touches meant for it.
+    for (const y of [2000, 2600, 3250, 3900, 4500]) {
+      const [sx, sy] = await screen(0, y);
+      const covering = await page.evaluate(([x, y]) => [-8, 0, 8].map((dx) => document.elementFromPoint(x + dx, y)?.tagName).filter((tag) => tag === "INPUT").length, [sx, sy]);
+      assert.equal(covering, 0, `${at}: an editing field lies on the wall at y=${y}`);
+    }
+    await drag([0, 3000], [600, 3000]);
+    assert.match(await toasts(), /This wall is locked/, `${at}: a locked wall refuses to move`);
+    await field("length").fill("7000");
+    await field("length").press("Enter");
+    assert.equal(await field("length").inputValue(), "6500", `${at}: or to take a typed length`);
+    await tapAt(2000, 0);
+    await drag([2000, 0], [2000, -500]);
+    assert.match(await toasts(), /locked wall next to it/, `${at}: and so does its neighbour`);
+    await tapAt(0, 1500);
+    assert.equal(await field("length").inputValue(), "6500", `${at}: nothing moved`);
+
+    await page.getByRole("button", { name: /Ground Floor/ }).first().click();
+    await page.getByRole("menuitem", { name: "+ Add floor" }).click();
+    await page.waitForFunction(() => document.querySelector("div.sticky button[aria-expanded]")?.textContent?.includes("1st Floor"));
+    assert.equal(await walls(), 4, `${at}: the new floor has its walls`);
+
     assert.deepEqual(errors, [], `${at}: page errors`);
     await page.close();
   }
@@ -234,4 +304,4 @@ try {
   await browser.close();
   server.close();
 }
-console.log("House designer touch: layout, pinch, pan, tap, delete/undo, long-press, room drawing and typed lengths passed at 360–430px");
+console.log("House designer touch: layout, pinch, pan, tap, delete/undo, long-press, room drawing, typed lengths, doors, wall moves, locks and floors passed at 360–430px");

@@ -70,6 +70,7 @@ import {
   alignHouseSelections,
   createHouseObjectFromGesture,
   createRoomFromGesture,
+  lockConflict,
   type HouseRoomShape,
   deleteHouseSelections,
   duplicateHouseSelections,
@@ -85,7 +86,7 @@ import {
   splitHouseSelection,
   type HouseClipboard,
 } from "../services/model-commands";
-import { patchHouseObject } from "../services/project-edit";
+import { addHouseFloor, patchHouseObject } from "../services/project-edit";
 import {
   allHouseSelections,
   ensureHouseBimState,
@@ -629,6 +630,15 @@ function ModelScreen({
     setSelections([{ kind: "level", id: levelId }]);
   }
 
+  function addFloor() {
+    const result = addHouseFloor(project);
+    if (!result.levelId) { toast.info("The top floor needs a plan before another can go on it."); return; }
+    const levelId = result.levelId;
+    commit(result.project, "Floor added");
+    setVisibleLevelIds((current) => new Set([...current, levelId]));
+    chooseLevel(levelId);
+  }
+
   function toggleLevel(levelId: string) {
     setVisibleLevelIds((current) => {
       const next = new Set(current);
@@ -884,6 +894,7 @@ function ModelScreen({
         levels={project.levels}
         activeLevelId={activeLevelId}
         onLevel={chooseLevel}
+        onAddFloor={addFloor}
         view={view}
         onView={onView}
         canUndo={past.length > 0}
@@ -925,6 +936,7 @@ function ModelScreen({
             </div>
           );
         })}
+        <button type="button" onClick={addFloor} className="shrink-0 rounded-lg border border-dashed px-3 py-2 text-xs font-medium text-brand hover:bg-muted">+ Add floor</button>
       </div>
 
       {visibilityOpen ? (
@@ -958,13 +970,13 @@ function ModelScreen({
           <div className="min-w-0 flex-1">{viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
             {view !== "3d" && activeRoom ? (
               <div className="relative h-[calc(100dvh-10rem)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 lg:h-[min(680px,68dvh)] dark:bg-background">
-                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => commit(patchHouseObject(project, selection, patch), "Temporary dimension updated")} onGuidance={setGuidance} />
+                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} onMoveSelection={(selection, dx, dy) => applyMutation(moveHouseSelections(project, [selection], dx, dy, { footprintEditable: verification }), "Moved wall")} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch), "Temporary dimension updated"); }} onGuidance={setGuidance} />
                 <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>
                 {activeTool === "room" && !draftStart ? <div role="radiogroup" aria-label="Room shape" className="absolute left-1/2 top-12 z-10 flex -translate-x-1/2 gap-1 rounded-xl border bg-card/95 p-1 text-xs shadow-sm backdrop-blur">
                   {([["rectangle", "Rectangle"], ["l-shape", "L shape"]] as const).map(([shape, label]) => <button key={shape} type="button" role="radio" aria-checked={roomShape === shape} onClick={() => setRoomShape(shape)} className={cn("rounded-lg px-3 py-1.5", roomShape === shape ? "bg-brand/15 text-brand" : "text-muted-foreground hover:bg-muted")}>{label}</button>)}
                   <button type="button" onClick={() => runCommand("wall")} className="rounded-lg px-3 py-1.5 text-muted-foreground hover:bg-muted">Free draw</button>
                 </div> : null}
-                <div className="absolute inset-x-2 bottom-2 lg:hidden"><HouseSelectionActions selected={selected?.kind === "level" || activeTool && activeTool !== "select" ? null : selected} onCommand={runCommand} onMore={() => setContextMenu({ x: 0, y: 0 })} /></div>
+                <div className="absolute inset-x-2 bottom-2 lg:hidden"><HouseSelectionActions selected={selected?.kind === "level" || activeTool && activeTool !== "select" ? null : selected} locked={Boolean(selected && project.objectInstances[selected.id]?.pinned)} onToggleLock={() => runCommand(selected && project.objectInstances[selected.id]?.pinned ? "unpin" : "pin")} onCommand={runCommand} onMore={() => setContextMenu({ x: 0, y: 0 })} /></div>
               </div>
             ) : null}
             {view !== "2d" ? (

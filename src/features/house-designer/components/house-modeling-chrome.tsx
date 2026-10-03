@@ -12,6 +12,8 @@ import {
   Grid3X3,
   HelpCircle,
   Layers3,
+  Lock,
+  LockOpen,
   LayoutGrid,
   Magnet,
   MoreHorizontal,
@@ -151,12 +153,13 @@ export function HouseMobileTools({ activeTool, selectionCount, onCommand, onMore
  * snap, save, level visibility, tool options) the caller already renders —
  * this component only orchestrates, it does not duplicate that chrome.
  */
-export function HouseMobileTopBar({ onBack, backLabel, levels, activeLevelId, onLevel, view, onView, canUndo, canRedo, onUndo, onRedo, moreOpen, onToggleMore }: {
+export function HouseMobileTopBar({ onBack, backLabel, levels, activeLevelId, onLevel, onAddFloor, view, onView, canUndo, canRedo, onUndo, onRedo, moreOpen, onToggleMore }: {
   onBack?: () => void;
   backLabel?: string;
   levels: { id: string; name: string }[];
   activeLevelId: string;
   onLevel: (id: string) => void;
+  onAddFloor?: () => void;
   view: "2d" | "3d" | "split";
   onView: (view: "2d" | "3d" | "split") => void;
   canUndo: boolean;
@@ -181,6 +184,7 @@ export function HouseMobileTopBar({ onBack, backLabel, levels, activeLevelId, on
             {levels.map((level) => (
               <button key={level.id} type="button" role="menuitem" onClick={() => { onLevel(level.id); setFloorOpen(false); }} className={cn("block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted", level.id === activeLevelId && "bg-brand/10 text-brand")}>{level.name}</button>
             ))}
+            {onAddFloor ? <button type="button" role="menuitem" onClick={() => { onAddFloor(); setFloorOpen(false); }} className="mt-1 block w-full rounded-md border-t px-2 py-1.5 text-left text-xs text-brand hover:bg-muted">+ Add floor</button> : null}
           </div>
         ) : null}
       </div>
@@ -269,12 +273,12 @@ export function HouseProjectBrowser({ project, activeLevelId, activeViewId, onLe
   );
 }
 
-export function HouseSelectionActions({ selected, onCommand, onMore }: { selected: HouseSelection | null; onCommand: (id: HouseCommandId) => void; onMore?: () => void }) {
+export function HouseSelectionActions({ selected, locked = false, onToggleLock, onCommand, onMore }: { selected: HouseSelection | null; locked?: boolean; onToggleLock?: () => void; onCommand: (id: HouseCommandId) => void; onMore?: () => void }) {
   if (!selected) return null;
   const commands: HouseCommandId[] = selected.kind === "window" || selected.kind === "door"
     ? ["move", "copy", "flip", "match-type", "delete"]
     : ["move", "copy", "rotate", "align", "offset", "split", "delete"];
-  return <div className="flex min-w-0 gap-1 overflow-x-auto rounded-lg border bg-background/95 p-1 shadow-sm">{commands.map((id) => <button key={id} type="button" onClick={() => onCommand(id)} className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]">{id === "match-type" ? "Change Type" : houseCommand(id).label}</button>)}<button type="button" onClick={() => document.getElementById("house-properties")?.scrollIntoView({ behavior: "smooth", block: "nearest" })} className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]">Properties</button>{onMore ? <button type="button" onClick={onMore} aria-label="More actions for selection" className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]"><MoreHorizontal className="size-3.5" /></button> : null}</div>;
+  return <div className="flex min-w-0 gap-1 overflow-x-auto rounded-lg border bg-background/95 p-1 shadow-sm">{commands.map((id) => <button key={id} type="button" onClick={() => onCommand(id)} className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]">{id === "match-type" ? "Change Type" : houseCommand(id).label}</button>)}<button type="button" onClick={() => document.getElementById("house-properties")?.scrollIntoView({ behavior: "smooth", block: "nearest" })} className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]">Properties</button>{onToggleLock ? <button type="button" onClick={onToggleLock} aria-pressed={locked} className={cn("flex shrink-0 items-center gap-1 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]", locked && "text-brand")}>{locked ? <Lock className="size-3.5" /> : <LockOpen className="size-3.5" />}{locked ? "Unlock" : "Lock"}</button> : null}{onMore ? <button type="button" onClick={onMore} aria-label="More actions for selection" className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]"><MoreHorizontal className="size-3.5" /></button> : null}</div>;
 }
 
 export function HouseStatusBar({ selectionCount, snap, snapEnabled = true, onToggleSnap, level, units, mode, saveState }: { selectionCount: number; snap: string; snapEnabled?: boolean; onToggleSnap?: () => void; level: string; units: string; mode: string; saveState: string }) {

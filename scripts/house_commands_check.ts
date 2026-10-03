@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room";
 import { commandFromChord, commandFromKeyboard, isModelTextInput } from "../src/features/house-designer/services/command-registry";
 import {
+  lockConflict,
+  pinHouseSelections,
   createRoomFromGesture,
   roomOutline,
   alignHouseSelections,
@@ -14,6 +16,7 @@ import {
   setHouseObjectType,
   splitHouseSelection,
 } from "../src/features/house-designer/services/model-commands";
+import { addHouseFloor, patchHouseObject } from "../src/features/house-designer/services/project-edit";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
 import { calculateHouseQuantities } from "../src/features/house-designer/services/quantities";
 import { createHouseProject, houseProjectSchema } from "../src/features/house-designer/types/project";
@@ -92,6 +95,90 @@ assert.equal(editable.project.roofs[0]!.boundary.length, 3, "the roof boundary f
 assert.ok(houseProjectSchema.safeParse(editable.project).success, "the shorter footprint is still a valid project");
 const triangleWall = { kind: "wall" as const, id: editable.project.walls.find((item) => item.levelId === "ground-floor")!.id };
 assert.ok(deleteHouseSelections(editable.project, [triangleWall], { footprintEditable: true }).blocked.length > 0, "refuses to shrink a footprint below three walls");
+
+{
+  // Add Floor builds what a two-storey project would have started with.
+  const make = (floorCount: number) => ensureHouseBimState(createHouseProject({ title: "Floors", room: rectangularRoom(8000, 6500), style: "modern", strict: false, floorCount, floorToFloorHeight: 3000 }));
+  const one = make(1);
+  const two = make(2);
+  const added = addHouseFloor(one);
+  assert.ok(added.levelId);
+  const on = <T extends { levelId: string }>(items: readonly T[], id: string) => items.filter((item) => item.levelId === id);
+  const [ground] = one.levels;
+  const upper = added.project.levels.find((level) => level.id === added.levelId)!;
+  assert.equal(added.project.levels.length, 2);
+  assert.equal(upper.elevation, 3000, "the new floor sits on top");
+  assert.equal(upper.name, "1st Floor");
+  assert.equal(on(added.project.walls, upper.id).length, on(two.walls, two.levels[1]!.id).length, "with the walls a two-storey house has upstairs");
+  assert.equal(on(added.project.rooms, upper.id).length, on(two.rooms, two.levels[1]!.id).length, "and its rooms");
+  assert.equal(on(added.project.slabs, upper.id).length, 1, "and a floor slab");
+  assert.equal(on(added.project.roofs, upper.id).length, one.roofs.length, "the roof moves up to the new top floor");
+  assert.equal(on(added.project.roofs, ground!.id).length, 0);
+  assert.equal(added.project.roofs[0]!.elevation, one.roofs[0]!.elevation + 3000, "and up by a storey");
+  assert.equal(on(added.project.stairs, ground!.id).length, 1, "a stair joins the two floors");
+  assert.ok(added.project.views.some((view) => view.levelId === upper.id), "the floor has its own plan view");
+  assert.ok(houseProjectSchema.safeParse(added.project).success, "the result is a valid project");
+  const third = addHouseFloor(added.project);
+  assert.equal(new Set(third.project.levels.map((level) => level.id)).size, 3, "every floor gets its own id");
+  assert.equal(third.project.levels.at(-1)!.name, "2nd Floor");
+  assert.equal(on(third.project.stairs, upper.id).length, 1, "and the floor below a new one gets its stair");
+}
+
+{
+  // Moving a wall drags its corners, so the walls either side stretch; a lock
+  // stops that from either end.
+  const base = ensureHouseBimState(createHouseProject({ title: "Locks", room: rectangularRoom(8000, 6500), style: "modern", strict: true, floorCount: 1, floorToFloorHeight: 3000 }));
+  const level = base.levels[0]!.id;
+  const outside = (value: typeof base) => value.walls.filter((wall) => wall.levelId === level && value.levels[0]!.plan!.corners.some((corner) => corner.id === wall.sourceWallId));
+  const find = (value: typeof base, test: (wall: (typeof base)["walls"][number]) => boolean) => outside(value).find(test)!;
+  const isTop = (wall: (typeof base)["walls"][number]) => wall.start.y === 0 && wall.end.y === 0;
+  const isLeft = (wall: (typeof base)["walls"][number]) => wall.start.x === 0 && wall.end.x === 0;
+  const isRight = (wall: (typeof base)["walls"][number]) => wall.start.x === 8000 && wall.end.x === 8000;
+  const top = { kind: "wall" as const, id: find(base, isTop).id };
+  const left = { kind: "wall" as const, id: find(base, isLeft).id };
+  const right = { kind: "wall" as const, id: find(base, isRight).id };
+  const span = (wall: (typeof base)["walls"][number]) => Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+
+  assert.ok(moveHouseSelections(base, [top], 0, -500).blocked.length, "strict plans protect outside walls outside verification");
+  const moved = moveHouseSelections(base, [top], 0, -500, { footprintEditable: true });
+  assert.deepEqual(moved.blocked, []);
+  assert.equal(span(moved.project.walls.find((wall) => wall.id === left.id)!), 7000, "the wall beside it stretches to follow");
+  assert.equal(moved.project.levels[0]!.plan!.corners.filter((corner) => corner.y === -500).length, 2, "both corners of the moved wall move");
+
+  const lockedLeft = pinHouseSelections(base, [left], true);
+  assert.ok(lockConflict(lockedLeft, left), "a locked wall reports itself");
+  const refused = moveHouseSelections(lockedLeft, [top], 0, -500, { footprintEditable: true });
+  assert.equal(refused.project, lockedLeft, "a move that would stretch a locked wall does nothing");
+  assert.match(refused.blocked.join(" "), /locked wall next to it/);
+  assert.equal(lockConflict(lockedLeft, right), null, "the lock reaches only the walls it touches");
+  assert.deepEqual(moveHouseSelections(lockedLeft, [right], 300, 0, { footprintEditable: true }).blocked, []);
+  const kept = deleteHouseSelections(pinHouseSelections(base, [top], true), [top], { footprintEditable: true });
+  assert.equal(kept.project.walls.length, pinHouseSelections(base, [top], true).walls.length, "a locked wall cannot be deleted");
+  assert.equal(deleteHouseSelections(lockedLeft, [top], { footprintEditable: true }).blocked.length, 1, "nor one whose removal would bend a locked neighbour");
+}
+
+{
+  // A door slides along its wall but never off it.
+  const base = ensureHouseBimState(createHouseProject({ title: "Doors", room: rectangularRoom(8000, 6500), style: "modern", strict: false, floorCount: 1, floorToFloorHeight: 3000 }));
+  const level = base.levels[0]!.id;
+  const placed = createHouseObjectFromGesture(base, "door", level, { x: 4000, y: 0 }, { x: 4000, y: 0 }, { width: 900, height: 2100 });
+  const door = placed.selections[0]!;
+  const doorOf = (value: typeof base) => value.doors.find((item) => item.id === door.id)!;
+  const host = placed.project.walls.find((item) => item.id === doorOf(placed.project).wallId)!;
+  const length = Math.hypot(host.end.x - host.start.x, host.end.y - host.start.y);
+  const planOffset = (value: typeof base) => value.levels[0]!.plan!.openings.find((item) => item.id === doorOf(value).sourceOpeningId)?.offset;
+
+  const moved = patchHouseObject(placed.project, door, { offset: 1250 });
+  assert.equal(doorOf(moved).offset, 1250, "an offset inside the wall is kept exactly");
+  assert.equal(planOffset(moved), 1250, "and written to the verified plan");
+  const past = patchHouseObject(placed.project, door, { offset: length + 5000 });
+  assert.equal(doorOf(past).offset, length - 900, "dragging past the end stops at the end");
+  assert.equal(planOffset(past), length - 900);
+  assert.equal(doorOf(patchHouseObject(placed.project, door, { offset: -400 })).offset, 0, "and before the start stops at the start");
+  const wide = patchHouseObject(placed.project, door, { width: length + 1000 });
+  assert.equal(doorOf(wide).width, length, "an opening is never wider than its wall");
+  assert.equal(doorOf(wide).offset, 0);
+}
 
 {
   // Room-first drawing. The default house is 0..8000 x 0..6500 with 200 mm
