@@ -309,7 +309,8 @@ export function HouseSelectionActions({ selected, locked = false, onToggleLock, 
   if (!selected) return null;
   const commands: HouseCommandId[] = selected.kind === "window" || selected.kind === "door"
     ? ["move", "copy", "flip", "match-type", "delete"]
-    : ["move", "copy", "rotate", "align", "offset", "split", "delete"];
+    : selected.kind === "room" ? ["merge-rooms", "move", "copy", "delete"]
+      : ["move", "copy", "rotate", "align", "offset", "split", "delete"];
   return <div className="flex min-w-0 gap-1 overflow-x-auto rounded-lg border bg-background/95 p-1 shadow-sm">{commands.map((id) => <button key={id} type="button" onClick={() => onCommand(id)} className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]">{id === "match-type" ? "Change Type" : houseCommand(id).label}</button>)}<button type="button" onClick={() => document.getElementById("house-properties")?.scrollIntoView({ behavior: "smooth", block: "nearest" })} className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]">Properties</button>{onToggleLock ? <button type="button" onClick={onToggleLock} aria-pressed={locked} className={cn("flex shrink-0 items-center gap-1 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]", locked && "text-brand")}>{locked ? <Lock className="size-3.5" /> : <LockOpen className="size-3.5" />}{locked ? "Unlock" : "Lock"}</button> : null}{onMore ? <button type="button" onClick={onMore} aria-label="More actions for selection" className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]"><MoreHorizontal className="size-3.5" /></button> : null}</div>;
 }
 

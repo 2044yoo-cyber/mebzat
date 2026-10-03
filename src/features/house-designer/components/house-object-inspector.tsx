@@ -1,5 +1,6 @@
 "use client";
 
+import { pitchedRise } from "./house-preview";
 import { useHouseUnits } from "./house-units";
 import { displayLength, modelLength, unitScale } from "../services/workspace-options";
 
@@ -380,18 +381,23 @@ function InspectorFields({
   if (selected.kind !== "roof") return <Missing />;
   const item = project.roofs.find((roof) => roof.id === selected.id);
   if (!item) return <Missing />;
+  // A pitched roof's height follows from its slope; keep the number shown
+  // the one the 3D view draws.
+  const xs = item.boundary.map((point) => point.x);
+  const ys = item.boundary.map((point) => point.y);
+  const riseFor = (type: string, slope: number) => type === "flat" ? Math.min(item.height, 450) : Math.round(pitchedRise({ slope, height: item.height }, Math.max(...xs) - Math.min(...xs) + item.overhang * 2, Math.max(...ys) - Math.min(...ys) + item.overhang * 2));
   return (
     <FieldGrid title="Roof">
       <SelectInput
         label="Type"
         value={item.type}
         options={roofTypes}
-        onChange={(type) => onPatch({ type, slope: type === "flat" ? 0 : item.slope || 25 })}
+        onChange={(type) => { const slope = type === "flat" ? 0 : item.slope || 25; onPatch({ type, slope, height: riseFor(type, slope) }); }}
         wide
       />
       <NumberInput label="Elevation" value={item.elevation} min={0} max={50000} onChange={(elevation) => onPatch({ elevation })} />
       <NumberInput label="Height" value={item.height} min={100} max={8000} onChange={(height) => onPatch({ height })} />
-      <NumberInput label="Slope" value={item.slope} min={0} max={60} suffix="°" onChange={(slope) => onPatch({ slope })} />
+      <NumberInput label="Slope" value={item.slope} min={0} max={60} suffix="°" onChange={(slope) => onPatch({ slope, height: item.type === "flat" ? item.height : riseFor(item.type, slope) })} />
       <NumberInput label="Overhang" value={item.overhang} min={0} max={3000} onChange={(overhang) => onPatch({ overhang })} />
       <NumberInput label="Thickness" value={item.thickness} min={30} max={1000} onChange={(thickness) => onPatch({ thickness })} />
       <TextInput label="Material" value={item.material} onChange={(material) => onPatch({ material })} wide />

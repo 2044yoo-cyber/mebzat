@@ -98,7 +98,7 @@ try {
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(url);
-    await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+    await newHouse(page);
     await page.locator(PLAN).waitFor();
     await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
     const at = `${width}px`;
@@ -158,7 +158,7 @@ try {
 
     // Back to the fitted view for the editing checks.
     await page.reload();
-    await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+    await newHouse(page);
     await page.locator(PLAN).waitFor();
     await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
 
@@ -189,7 +189,7 @@ try {
 
     // Room-first drawing and typed sizes, from a fresh plan.
     await page.reload();
-    await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+    await newHouse(page);
     await page.locator(PLAN).waitFor();
     await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
     const count = (pattern) => page.evaluate((source) => [...document.querySelectorAll("#house-properties option")].filter((option) => new RegExp(source).test(option.textContent)).length, pattern);
@@ -238,7 +238,7 @@ try {
     // Phase 2, from a fresh plan: doors slide and take exact distances, walls
     // move and drag their neighbours, locks hold, floors are added.
     await page.reload();
-    await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+    await newHouse(page);
     await page.locator(PLAN).waitFor();
     await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
     const drag = async (from, to) => {
@@ -307,6 +307,7 @@ try {
     if (width === 360) await checkStart(page, at);
     if (width === 390) await checkThreeD(page, at, { screen, touch, tapAt });
     if (width === 390) await checkSuggestions(page, at, { touch });
+    if (width === 390) await checkRoomsAndRoofs(page, at, { touch });
 
     assert.deepEqual(errors, [], `${at}: page errors`);
     await page.close();
@@ -317,13 +318,155 @@ try {
 }
 
 /**
+ * From a blank project: split a room with a wall, move an inside wall and
+ * watch what is attached to it follow, merge two rooms, snap a wall parallel
+ * to a diagonal one, and read a pitched and a hipped roof back from 3D.
+ */
+async function checkRoomsAndRoofs(page, at, { touch }) {
+  await page.reload();
+  await newHouse(page);
+  const rail = page.locator('nav[aria-label="Modeling tools"]');
+  const screenOf = (x, y) => page.evaluate(([selector, x, y]) => { const point = new DOMPoint(x, y).matrixTransform(document.querySelector(selector).getScreenCTM()); return [point.x, point.y]; }, [PLAN, x, y]);
+  const tap = async (x, y) => { const [sx, sy] = await screenOf(x, y); await page.touchscreen.tap(sx, sy); await page.waitForTimeout(120); };
+  const drag = async (from, to) => {
+    const [ax, ay] = await screenOf(...from);
+    const [bx, by] = await screenOf(...to);
+    await touch("touchStart", [[ax, ay]]);
+    for (let step = 1; step <= 8; step += 1) await touch("touchMove", [[ax + (bx - ax) * step / 8, ay + (by - ay) * step / 8]]);
+    await touch("touchEnd", []);
+    await page.waitForTimeout(200);
+  };
+  const rooms = () => page.evaluate(() => [...document.querySelectorAll('svg[aria-label="Floor plan"] polygon')]
+    .filter((polygon) => (polygon.getAttribute("class") ?? "").includes("fill-sky"))
+    .map((polygon) => { const points = polygon.getAttribute("points").trim().split(/\s+/).map((pair) => pair.split(",").map(Number)); const xs = points.map((point) => point[0]); const ys = points.map((point) => point[1]); return `${Math.min(...xs)}..${Math.max(...xs)} x ${Math.min(...ys)}..${Math.max(...ys)}`; })
+    .sort());
+  const walls = () => page.evaluate(() => [...document.querySelectorAll("#house-properties option")].filter((option) => /^Wall \d+$/.test(option.textContent)).length);
+  const selectedLine = () => page.locator(`${PLAN} line[stroke-opacity="0.28"]`).first().evaluate((line) => ["x1", "y1", "x2", "y2"].map((name) => Math.round(Number(line.getAttribute(name)) * 10) / 10));
+  const snapOn = async (on) => {
+    await page.getByRole("button", { name: "More actions", exact: true }).click();
+    const snap = page.getByRole("button", { name: "Snap", exact: true });
+    if ((await snap.getAttribute("aria-pressed")) !== String(on)) await snap.click();
+    await page.getByRole("button", { name: "More actions", exact: true }).click();
+  };
+
+  assert.deepEqual(await rooms(), ["0..8000 x 0..6500"], `${at}: the outline drawn on blank space is one room`);
+
+  // Split: a wall right across the house divides it.
+  await rail.getByRole("button", { name: "Wall", exact: true }).click();
+  await tap(3000, 0);
+  await tap(3000, 6500);
+  await rail.getByRole("button", { name: "Select", exact: true }).click();
+  const split = await rooms();
+  assert.deepEqual(split, ["0..3000 x 0..6500", "3000..8000 x 0..6500"], `${at}: a wall across a room splits it (${split.join(" | ")}; ${await walls()} walls)`);
+  await rail.getByRole("button", { name: "Wall", exact: true }).click();
+  await tap(3000, 3000);
+  await tap(8000, 3000);
+  await rail.getByRole("button", { name: "Select", exact: true }).click();
+  assert.deepEqual(await rooms(), ["0..3000 x 0..6500", "3000..8000 x 0..3000", "3000..8000 x 3000..6500"], `${at}: and a wall from wall to wall splits again`);
+  const before = await walls();
+
+  // Move: the inside wall goes to x = 4000; the wall butting into it and the
+  // rooms either side follow; the outside walls do not move.
+  await tap(3000, 1500);
+  await drag([3000, 1500], [4000, 1500]);
+  await tap(4000, 1500);
+  assert.deepEqual(await selectedLine(), [4000, 0, 4000, 6500], `${at}: the inside wall moved`);
+  await tap(6000, 3000);
+  assert.deepEqual(await selectedLine(), [4000, 3000, 8000, 3000], `${at}: the wall joined to it followed`);
+  const followed = await rooms();
+  assert.deepEqual(followed, ["0..4000 x 0..6500", "4000..8000 x 0..3000", "4000..8000 x 3000..6500"], `${at}: and so did the rooms (${followed.join(" | ")})`);
+
+  // Merge: the two right-hand rooms become one; the wall between them goes.
+  await tap(6000, 1500);
+  await page.locator("div.absolute.inset-x-2.bottom-2").getByRole("button", { name: "Merge Rooms" }).click();
+  await tap(6000, 5000);
+  assert.deepEqual(await rooms(), ["0..4000 x 0..6500", "4000..8000 x 0..6500"], `${at}: two rooms merge into one`);
+  assert.equal(await walls(), before - 1, `${at}: losing the wall between them`);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  assert.equal((await rooms()).length, 3, `${at}: and undo divides them again`);
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+
+  // Parallel: a diagonal wall drawn freehand, then one aimed 1.5° off it.
+  await snapOn(false);
+  await rail.getByRole("button", { name: "Wall", exact: true }).click();
+  await tap(500, 5900);
+  await tap(2600, 4700);
+  const diagonal = await selectedLine();
+  await rail.getByRole("button", { name: "Select", exact: true }).click();
+  await snapOn(true);
+  await rail.getByRole("button", { name: "Wall", exact: true }).click();
+  const angle = Math.atan2(diagonal[3] - diagonal[1], diagonal[2] - diagonal[0]);
+  await tap(1000, 5000);
+  await tap(1000 + Math.cos(angle + 0.026) * 2200, 5000 + Math.sin(angle + 0.026) * 2200);
+  const parallel = await selectedLine();
+  const difference = Math.abs(Math.atan2(parallel[3] - parallel[1], parallel[2] - parallel[0]) - angle) * 180 / Math.PI;
+  assert.ok(difference < 0.01, `${at}: aimed 1.5° off, the wall lands parallel (${difference.toFixed(4)}°)`);
+  assert.ok(parallel[2] % 1000 !== 0 || parallel[3] % 1000 !== 0, `${at}: on the parallel, not on the grid`);
+  await rail.getByRole("button", { name: "Select", exact: true }).click();
+
+  // Pitched and hipped roofs, read back from 3D.
+  await page.getByRole("button", { name: "Both", exact: true }).click();
+  await page.waitForFunction(() => [...window.__scenes].some((scene) => scene.getObjectByName("main-roof")), null, { timeout: 15000 });
+  const object = page.locator("#house-properties select").first();
+  await object.selectOption(await object.locator("option", { hasText: /^Roof/ }).first().getAttribute("value"));
+  const roofType = page.locator("#house-properties select").filter({ has: page.locator('option[value="gable"]') });
+  const roof = () => page.evaluate(() => {
+    const scene = [...window.__scenes].filter((item) => item.getObjectByName("main-roof")).at(-1);
+    scene.updateMatrixWorld(true);
+    const points = [];
+    scene.getObjectByName("main-roof").traverse((mesh) => { if (mesh.isMesh) { const position = mesh.geometry.attributes.position; for (let index = 0; index < position.count; index += 1) points.push(new window.__THREE.Vector3(position.getX(index), position.getY(index), position.getZ(index)).applyMatrix4(mesh.matrixWorld)); } });
+    const walls = new window.__THREE.Box3().setFromObject(scene.getObjectByName("walls:ground-floor"));
+    const top = Math.max(...points.map((point) => point.y));
+    const ridge = points.filter((point) => Math.abs(point.y - top) < 1e-4);
+    const span = (values) => Math.max(...values) - Math.min(...values);
+    return { width: span(points.map((point) => point.x)), depth: span(points.map((point) => point.z)), eaves: Math.min(...points.map((point) => point.y)), top, ridge: span(ridge.map((point) => point.x)), wallTop: walls.max.y };
+  });
+  const near = (a, b) => Math.abs(a - b) < 0.005;
+  const rise = Math.tan(25 * Math.PI / 180) * 7.3 / 2;
+  await roofType.selectOption("gable");
+  const gable = await roof();
+  assert.ok(near(gable.width, 8.8) && near(gable.depth, 7.3), `${at}: a gable roof covers the house and its overhang (${gable.width} x ${gable.depth})`);
+  assert.ok(near(gable.eaves, gable.wallTop), `${at}: its eaves sit on the walls`);
+  assert.ok(near(gable.top - gable.eaves, rise), `${at}: and it rises at its 25° slope`);
+  assert.ok(near(gable.ridge, 8.8), `${at}: with a ridge the full length — gable ends`);
+  await roofType.selectOption("hip");
+  const hip = await roof();
+  assert.ok(near(hip.width, 8.8) && near(hip.depth, 7.3) && near(hip.eaves, hip.wallTop) && near(hip.top - hip.eaves, rise), `${at}: a hipped roof the same size and pitch`);
+  assert.ok(near(hip.ridge, 1.5), `${at}: but its ridge stops short, every side sloping (${hip.ridge})`);
+}
+
+/**
+ * A new house, the way a person makes one: Draw manually opens genuinely
+ * empty space — nothing but the grid and coordinates — and the outline is
+ * drawn wall by wall with typed lengths, closing on its first point.
+ */
+async function newHouse(page) {
+  await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+  await page.locator(PLAN).waitFor();
+  await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
+  const objects = await page.evaluate(() => [...document.querySelectorAll("#house-properties option")].map((option) => option.textContent).filter((text) => /^(Wall|Room|Slab|Roof|Column|Beam|Door|Window|Stair|Grid)/.test(text)));
+  assert.deepEqual(objects, [], "a new project starts with nothing in it");
+  assert.equal(await page.locator('svg[aria-label="Floor plan"]').count(), 0, "not even an outline");
+  assert.equal(await page.locator(`${PLAN} [aria-label="Coordinates"]`).count(), 1, "only the grid and its coordinates");
+  const [x, y] = await page.evaluate((selector) => { const point = new DOMPoint(0, 0).matrixTransform(document.querySelector(selector).getScreenCTM()); return [point.x, point.y]; }, PLAN);
+  await page.touchscreen.tap(x, y);
+  for (const [direction, length] of [["→", 8000], ["↓", 6500], ["←", 8000], ["↑", 6500]]) {
+    await page.getByRole("button", { name: `Run ${direction}` }).click();
+    await page.getByLabel("Typed length").fill(String(length));
+    await page.getByLabel("Typed length").press("Enter");
+  }
+  await page.locator('svg[aria-label="Floor plan"]').waitFor();
+  await page.locator('nav[aria-label="Modeling tools"]').getByRole("button", { name: "Select", exact: true }).click();
+}
+
+/**
  * 2D and 3D are one model. Edits made on the plan are read back from the live
  * three.js scene: the walls' size, a door's position, a room's walls, a new
  * floor and its roof — and undo takes each back out of 3D too.
  */
 async function checkThreeD(page, at, { touch, tapAt }) {
   await page.reload();
-  await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+  await newHouse(page);
   await page.locator(PLAN).waitFor();
   await page.getByRole("button", { name: "Both", exact: true }).click();
   await page.waitForFunction(() => [...window.__scenes].some((scene) => scene.getObjectByName("level:ground-floor")), null, { timeout: 15000 });
@@ -438,7 +581,7 @@ async function checkStart(page, at) {
  */
 async function checkSuggestions(page, at, { touch }) {
   await page.reload();
-  await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+  await newHouse(page);
   await page.locator(PLAN).waitFor();
   await page.getByRole("button", { name: "Both", exact: true }).click();
   await page.waitForFunction(() => [...window.__scenes].some((scene) => scene.getObjectByName("level:ground-floor")), null, { timeout: 15000 });
@@ -494,4 +637,4 @@ async function checkSuggestions(page, at, { touch }) {
   assert.equal((await live()).columns, start.columns + 1, `${at}: without touching the model`);
 }
 
-console.log("House designer touch + 3D: layout, pinch, pan, tap, delete/undo, long-press, room drawing, typed lengths, doors, wall moves, locks, floors, 2D/3D sync, column suggestions and the start choices passed at 360–430px");
+console.log("House designer touch + 3D: layout, pinch, pan, tap, delete/undo, long-press, room drawing, typed lengths, doors, wall moves, locks, floors, 2D/3D sync, column suggestions, the start choices, split/merge rooms, inside-wall moves, parallel snapping and pitched/hipped roofs passed at 360–430px");

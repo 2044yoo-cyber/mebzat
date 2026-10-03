@@ -37,7 +37,7 @@ function fieldClearance(normal: { x: number; y: number }, px: number) {
 const chainTools = new Set<HouseCommandId>(["wall", "structural-wall", "room-separator"]);
 const DIRECTIONS = [{ label: "→", x: 1, y: 0 }, { label: "↓", x: 0, y: 1 }, { label: "←", x: -1, y: 0 }, { label: "↑", x: 0, y: -1 }] as const;
 
-export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, roomShape = "rectangle", proposals = null, chosenProposal = null, onProposalChoose, onProposalMove, onMoveSelection, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
+export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, roomShape = "rectangle", sketch = [], onCancelDraft, proposals = null, chosenProposal = null, onProposalChoose, onProposalMove, onMoveSelection, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
   project: HouseProject;
   levelId: string;
   activeTool: HouseCommandId | null;
@@ -49,6 +49,9 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
    * usual reset when switching floors. */
   viewRevision?: number;
   roomShape?: HouseRoomShape;
+  /** Walls sketched on an empty floor, not yet a closed outline. */
+  sketch?: readonly HousePlanPoint[];
+  onCancelDraft?: () => void;
   /** Suggested columns: drawn as outlines, not part of the model until accepted. */
   proposals?: readonly ColumnProposal[] | null;
   chosenProposal?: string | null;
@@ -211,6 +214,9 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     if (!snapEnabled) return { ...raw, label: "Nearest" };
     let best: SnapPoint = { x: Math.round(raw.x / MINOR_GRID) * MINOR_GRID, y: Math.round(raw.y / MINOR_GRID) * MINOR_GRID, label: "Grid" };
     let distance = Math.hypot(best.x - raw.x, best.y - raw.y);
+    // The sketch's own corners, the first above all, so the outline closes
+    // exactly where it began.
+    for (const [index, point] of sketch.entries()) { const next = Math.hypot(point.x - raw.x, point.y - raw.y); if (next < distance && next <= Math.max(140, 16 * mmPerPx)) { best = { ...point, label: index === 0 ? "Close outline" : "Endpoint" }; distance = next; } }
     for (const candidate of candidates) {
       const next = Math.hypot(candidate.x - raw.x, candidate.y - raw.y);
       if (next < distance && next <= 140) { best = candidate; distance = next; }
@@ -226,6 +232,28 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
         { x: centre.x + dy / length * wall.thickness / 2, y: centre.y - dx / length * wall.thickness / 2, label: "Wall Face" },
       ];
       for (const candidate of candidatesOnWall) { const next = Math.hypot(candidate.x - raw.x, candidate.y - raw.y); if (next < distance && next <= 140) { best = candidate; distance = next; } }
+    }
+    // A point on a wall that is also a grid point is the grid point: the same
+    // place, without a finger's fraction of a millimetre in its numbers.
+    if (best.label.startsWith("Wall")) {
+      const grid = { x: Math.round(raw.x / MINOR_GRID) * MINOR_GRID, y: Math.round(raw.y / MINOR_GRID) * MINOR_GRID };
+      if (Math.hypot(grid.x - best.x, grid.y - best.y) < 1) best = { ...grid, label: best.label };
+    }
+    // Parallel: drawing within 3° of an existing wall's direction lands the
+    // end exactly on the parallel line. It outranks the grid — the grid is
+    // what you get for not aiming — but not a real point on a wall.
+    if (draftStart && (best.label === "Grid" || best.label === "Nearest")) {
+      const run = Math.hypot(raw.x - draftStart.x, raw.y - draftStart.y);
+      let closest = Math.sin((3 * Math.PI) / 180);
+      for (const wall of project.walls.filter((item) => item.levelId === levelId)) {
+        const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+        if (run < 300 || length < 1) continue;
+        const ux = (wall.end.x - wall.start.x) / length;
+        const uy = (wall.end.y - wall.start.y) / length;
+        const along = (raw.x - draftStart.x) * ux + (raw.y - draftStart.y) * uy;
+        const sine = Math.abs((raw.x - draftStart.x) * uy - (raw.y - draftStart.y) * ux) / run;
+        if (sine < closest) { closest = sine; best = { x: draftStart.x + ux * along, y: draftStart.y + uy * along, label: "Parallel" }; distance = Math.hypot(best.x - raw.x, best.y - raw.y); }
+      }
     }
     if (draftStart) {
       const perpendicular: SnapPoint[] = [{ x: raw.x, y: draftStart.y, label: "Perpendicular" }, { x: draftStart.x, y: raw.y, label: "Perpendicular" }];
@@ -432,6 +460,11 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
         </pattern>
       </defs>
       <rect x={gridBounds.minX} y={gridBounds.minY} width={gridBounds.maxX - gridBounds.minX} height={gridBounds.maxY - gridBounds.minY} fill={`url(#${gridId}-major)`} pointerEvents="none" />
+      <MmPerPx.Provider value={mmPerPx}><Coordinates view={effective} unit={unit} /></MmPerPx.Provider>
+      {sketch.length ? <g pointerEvents="none">
+        <polyline points={sketch.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke="#1473e6" strokeWidth={3} vectorEffect="non-scaling-stroke" />
+        {sketch.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r={Math.max(40, (index === 0 ? 7 : 4) * mmPerPx)} fill={index === 0 ? "#1473e6" : "white"} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" aria-label={index === 0 ? "Outline start" : undefined} />)}
+      </g> : null}
       <ModelPlanGeometry project={project} levelId={levelId} />
       {objects.filter((object) => selectedIds.has(object.selection.id)).map((object) => {
         const line = lineGeometry(project, levelId, object.selection);
@@ -463,6 +496,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       {selectMode && selectedColumn ? <ColumnTemporaryDimensions column={selectedColumn} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
       </MmPerPx.Provider>
     </svg>
+    {current ? <span aria-label="Pointer coordinates" className="pointer-events-none absolute right-2 top-3 z-10 rounded-md border bg-background/90 px-2 py-0.5 font-mono text-[11px] tabular-nums">X {displayLength(current.x, unit)} · Y {displayLength(current.y, unit)} {unit}</span> : null}
     {draftStart && activeTool && (activeTool === "room" || lineTools.has(activeTool)) ? <TypedDraft
       key={`${draftStart.x},${draftStart.y}`}
       room={activeTool === "room"}
@@ -470,7 +504,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       live={current ? [Math.abs(current.x - draftStart.x), Math.abs(current.y - draftStart.y), Math.hypot(current.x - draftStart.x, current.y - draftStart.y)] : null}
       direction={typedDirection}
       onDirection={setTypedDirection}
-      onCancel={() => onDraftStart(null)}
+      onCancel={() => (onCancelDraft ?? (() => onDraftStart(null)))()}
       onLength={(length) => {
         const aim = typedDirection ?? (current && Math.hypot(current.x - draftStart.x, current.y - draftStart.y) > 1
           ? { x: (current.x - draftStart.x) / Math.hypot(current.x - draftStart.x, current.y - draftStart.y), y: (current.y - draftStart.y) / Math.hypot(current.x - draftStart.x, current.y - draftStart.y) }
@@ -527,6 +561,33 @@ function TypedDraft({ room, unit, live, direction, onDirection, onCancel, onLeng
 /** On the wall itself, a quarter of the way along: clear of the length field
  * and the plan's own label at the middle, and never off the edge of the
  * canvas the way a badge beside an outside wall was on a phone. */
+/**
+ * Where things are: the origin with its X and Y axes, and the coordinate of
+ * each major grid line along the top and left edges of the view — the only
+ * things on an empty floor besides the grid.
+ */
+function Coordinates({ view, unit }: { view: Bounds; unit: ReturnType<typeof useHouseUnits> }) {
+  const px = useContext(MmPerPx) || 10;
+  const arm = 48 * px;
+  const span = Math.max(view.maxX - view.minX, view.maxY - view.minY);
+  const step = MAJOR_GRID * Math.max(1, 2 ** Math.ceil(Math.log2(Math.max(1, (span / MAJOR_GRID) / 6))));
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let x = Math.ceil(view.minX / step) * step; x <= view.maxX; x += step) xs.push(x);
+  for (let y = Math.ceil(view.minY / step) * step; y <= view.maxY; y += step) ys.push(y);
+  const label = (value: number) => `${displayLength(value, unit)}`;
+  return <g pointerEvents="none" aria-label="Coordinates">
+    <line x1={0} y1={0} x2={arm} y2={0} stroke="#dc2626" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />
+    <line x1={0} y1={0} x2={0} y2={arm} stroke="#16a34a" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />
+    <circle cx={0} cy={0} r={3.5 * px} fill="#0f172a" />
+    <text x={arm + 4 * px} y={4 * px} fontSize={11 * px} fontWeight={700} fill="#dc2626">X</text>
+    <text x={-4 * px} y={arm + 13 * px} fontSize={11 * px} fontWeight={700} fill="#16a34a" textAnchor="end">Y</text>
+    <text x={5 * px} y={-6 * px} fontSize={10 * px} fill="#334155">0,0</text>
+    {xs.map((x) => <text key={`x${x}`} x={x} y={view.minY + 12 * px} textAnchor="middle" fontSize={10 * px} fill="#475569" aria-label="X coordinate">{label(x)}</text>)}
+    {ys.map((y) => <text key={`y${y}`} x={view.minX + 4 * px} y={y + 3.5 * px} fontSize={10 * px} fill="#475569" aria-label="Y coordinate">{label(y)}</text>)}
+  </g>;
+}
+
 function ProposalMark({ proposal, number, chosen }: { proposal: ColumnProposal; number: number; chosen: boolean }) {
   const px = useContext(MmPerPx) || 10;
   const size = Math.max(proposal.width, 16 * px);

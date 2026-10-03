@@ -74,6 +74,7 @@ import {
   alignHouseSelections,
   createHouseObjectFromGesture,
   createRoomFromGesture,
+  roomOutline,
   lockConflict,
   type HouseRoomShape,
   deleteHouseSelections,
@@ -90,7 +91,7 @@ import {
   splitHouseSelection,
   type HouseClipboard,
 } from "../services/model-commands";
-import { addHouseFloor, patchHouseObject } from "../services/project-edit";
+import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong } from "../services/project-edit";
 import { PLAN_TEMPLATES } from "../services/plan-templates";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
 import {
@@ -193,7 +194,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       ceilingHeight: clamp(floorHeight, 1800, 6000),
     };
     setPlanAnalysis(null);
-    setStartTool(nextSource === "rooms" ? "room" : "select");
+    setStartTool(nextSource === "rooms" ? "room" : nextSource === "manual" ? "wall" : "select");
     const plan = floorPlans[0];
     const uploaded = nextSource === "upload" || nextSource === "sketch";
     if (uploaded && !ai) {
@@ -227,7 +228,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       }
     }
     setRoom(verifiedRoom);
-    setProject(ensureHouseBimState({ ...applyModelingOptions(createHouseProject({
+    const built = ensureHouseBimState({ ...applyModelingOptions(createHouseProject({
       id: project?.id,
       title,
       room: verifiedRoom,
@@ -236,7 +237,10 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       floorCount,
       floorToFloorHeight: floorHeight,
       referenceImages: references(floorPlans, facades),
-    }), modelingOptions), displayUnits }));
+    }), modelingOptions), displayUnits });
+    // Drawing from scratch starts on genuinely open space: the project's
+    // floors and settings, and nothing on them until it is drawn.
+    setProject(nextSource === "manual" || nextSource === "rooms" ? openSpace(built) : built);
     setView("2d");
     setStage("verify");
   }
@@ -245,11 +249,10 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
     if (!savedDraft) return;
     const restored = ensureHouseBimState(ensureHouseEnvelopeProject(ensurePhaseFourProject(ensurePhaseThreeProject(ensurePhaseTwoProject(savedDraft.project)))));
     const restoredRoom = restored.levels.find((level) => level.plan)?.plan;
-    if (!restoredRoom) return;
     setProject(restored);
     setDisplayUnits(restored.displayUnits ?? "mm");
     setModelingOptions(restored.modelingOptions ?? modelingPreset("house"));
-    setRoom(restoredRoom);
+    if (restoredRoom) setRoom(restoredRoom);
     setTitle(restored.metadata.title);
     setFloorCount(restored.plannedFloorCount);
     setFloorHeight(restored.levels[0]?.floorToFloorHeight ?? 3000);
@@ -462,7 +465,7 @@ function StartScreen({
 
         <div role="radiogroup" aria-label="How to start" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {([
-            ["manual", <PencilRuler key="manual" className="size-5" />, "Draw manually", "Start from an outline and shape it"],
+            ["manual", <PencilRuler key="manual" className="size-5" />, "Draw manually", "An empty grid; draw the walls yourself"],
             ["rooms", <LayoutGrid key="rooms" className="size-5" />, "Draw rooms", "Drag out each room; walls join up"],
             ["upload", <FileUp key="upload" className="size-5" />, "Upload floor plan", "JPG, PNG or PDF — trace it or convert it"],
             ["sketch", <PenLine key="sketch" className="size-5" />, "Upload hand sketch", "A photo of a drawing on paper"],
@@ -495,7 +498,7 @@ function StartScreen({
           <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
             {source === "rooms"
               ? "The plan opens with the Room tool ready: drag from corner to corner for each room, or type its size. Rooms that touch share their wall."
-              : `Begin with a ${displayLength(8000, displayUnits)} × ${displayLength(6500, displayUnits)} ${displayUnits} outline, then drag corners and walls, and add doors and windows.`}
+              : "An empty grid. Draw walls and close them on the first point, or drag out a Room."}
           </div>
         )}
 
@@ -638,6 +641,14 @@ function ModelScreen({
   const [viewRevision, setViewRevision] = useState(0);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [roomShape, setRoomShape] = useState<HouseRoomShape>("rectangle");
+  // Walls drawn on an empty floor: a sketch of its outline, kept here until
+  // it closes on its first point and becomes the floor's outline.
+  const [outlineSketch, setOutlineSketch] = useState<HousePlanPoint[]>([]);
+  // Set when a sketch closes: the overlay asks to carry the chain on from the
+  // last point straight afterwards, and a closed outline has nowhere to go.
+  const chainEnded = useRef(false);
+  // Merge Rooms with one room chosen: the next room tapped is merged into it.
+  const [mergeFrom, setMergeFrom] = useState<string | null>(null);
   // Suggested columns live here, outside the model, until one is accepted.
   const [proposals, setProposals] = useState<{ levelId: string; maxSpan: number; items: ColumnProposal[]; chosen: string | null } | null>(null);
   const [toolSettings, setToolSettings] = useState<HouseToolSettings>({
@@ -669,6 +680,7 @@ function ModelScreen({
   }, [hiddenIds, isolatedIds, project]);
 
   function chooseLevel(levelId: string) {
+    setOutlineSketch([]);
     if (proposals && proposals.levelId !== levelId) setProposals(null);
     setActiveLevelId(levelId);
     setActiveViewId(`view:plan:${levelId}`);
@@ -765,7 +777,17 @@ function ModelScreen({
     });
   }
 
+  function mergeInto(firstId: string, secondId: string) {
+    setMergeFrom(null);
+    const result = mergeRooms(project, firstId, secondId);
+    if (result.blocked) { toast.info(result.blocked); return; }
+    commit(result.project, "Rooms merged");
+    setSelections([{ kind: "room", id: firstId }]);
+  }
+
   function chooseMany(items: HouseSelection[], mode: "replace" | "add" | "remove") {
+    if (mergeFrom && items[0]?.kind === "room" && items[0].id !== mergeFrom) { mergeInto(mergeFrom, items[0].id); return; }
+    if (mergeFrom) setMergeFrom(null);
     setSelections((current) => {
       if (mode === "replace") return items;
       if (mode === "remove") return current.filter((item) => !items.some((target) => sameSelection(item, target)));
@@ -808,19 +830,44 @@ function ModelScreen({
       if (!toolSettings.multiple) setActiveTool("select");
       return;
     }
+    if (!activeLevel?.plan && activeTool === "room") {
+      const outlined = establishLevelOutline(project, activeLevelId, roomOutline(roomShape, start, end));
+      if (!outlined) { toast.info("Drag out the room — at least 500 mm each way"); return; }
+      commit(outlined, "Outline created — this is the house; draw rooms inside it");
+      return;
+    }
+    if (!activeLevel?.plan && activeTool === "wall") {
+      const sketch = outlineSketch.length ? outlineSketch : [start];
+      const closes = sketch.length >= 3 && Math.hypot(end.x - sketch[0]!.x, end.y - sketch[0]!.y) < 1;
+      if (!closes) {
+        setOutlineSketch([...sketch, end]);
+        setGuidance(`${sketch.length} wall${sketch.length === 1 ? "" : "s"} sketched · close on the first point to make the outline`);
+        return;
+      }
+      const outlined = establishLevelOutline(project, activeLevelId, sketch);
+      setOutlineSketch([]);
+      setDraftStart(null);
+      chainEnded.current = true;
+      if (!outlined) { toast.info("That shape encloses no floor — draw it again"); return; }
+      commit(outlined, "Outline closed — this is the house");
+      return;
+    }
     if (activeTool === "room") {
       applyMutation(createRoomFromGesture(project, activeLevelId, start, end, roomShape, { wallThickness: 120, height: toolSettings.height }), `${roomShape === "l-shape" ? "L-shaped room" : "Room"} created`);
       return;
     }
     const wallThickness = activeTool === "room-separator" ? 25 : activeTool === "structural-wall" || toolSettings.wallType.includes("200") ? 200 : 120;
     const gesture = ["wall", "structural-wall", "room-separator"].includes(activeTool) ? offsetDraftSegment(start, end, toolSettings.offset) : { start, end };
-    applyMutation(createHouseObjectFromGesture(project, activeTool, activeLevelId, gesture.start, gesture.end, {
+    const created = createHouseObjectFromGesture(project, activeTool, activeLevelId, gesture.start, gesture.end, {
       width: toolSettings.width,
       depth: toolSettings.depth,
       height: activeTool === "window" || activeTool === "door" ? toolSettings.height : toolSettings.height,
       sillHeight: toolSettings.sillHeight,
       wallThickness,
-    }), `${houseCommand(activeTool).label} created`);
+    });
+    // A wall drawn right across a room divides it, in the same undo step.
+    if (activeTool === "wall" && !created.blocked.length) created.project = splitRoomAlong(created.project, activeLevelId, gesture.start, gesture.end);
+    applyMutation(created, `${houseCommand(activeTool).label} created`);
   }
 
   function runCommand(id: HouseCommandId) {
@@ -835,8 +882,9 @@ function ModelScreen({
       case "select": setActiveTool("select"); setDraftStart(null); setGuidance("Select objects · Ctrl adds · Shift removes"); return;
       case "cancel": {
         const now = Date.now();
-        if (draftStart) {
+        if (draftStart || outlineSketch.length) {
           setDraftStart(null);
+          setOutlineSketch([]);
           setGuidance("Current tool step cancelled · press Esc again to exit tool");
           escapeRef.current = now;
           return;
@@ -916,6 +964,15 @@ function ModelScreen({
       case "generate-facade": case "alternatives": commit(generateFacadeAlternatives(project, 3), "Generated façade alternatives"); document.getElementById("house-facade")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
       case "generate-structure": commit(generatePreliminaryStructure(project), "Preliminary structure generated"); return;
       case "suggest-columns": suggest(proposals?.maxSpan ?? 4500); return;
+      case "merge-rooms": {
+        const rooms = selections.filter((item) => item.kind === "room");
+        if (rooms.length >= 2) { mergeInto(rooms[0]!.id, rooms[1]!.id); return; }
+        if (!rooms[0]) { toast.info("Select a room first"); return; }
+        setMergeFrom(rooms[0].id);
+        setGuidance("Tap the room to merge with");
+        toast.info("Tap the room to merge with");
+        return;
+      }
       case "analyze-plan": setGuidance(`Plan analysis: ${project.walls.filter((item) => item.levelId === activeLevelId).length} walls · ${project.rooms.filter((item) => item.levelId === activeLevelId).length} rooms · ${project.doors.filter((item) => item.levelId === activeLevelId).length + project.windows.filter((item) => item.levelId === activeLevelId).length} openings`); return;
       case "estimate": case "boq": setSchedule("quantities"); setGuidance("Live preliminary quantities opened"); return;
       default:
@@ -1041,9 +1098,9 @@ function ModelScreen({
           <div className="hidden lg:block"><HouseSelectionActions selected={selected} onCommand={runCommand} /></div>
           <div className="flex min-w-0 gap-1"><HouseMobileTools activeTool={activeTool} selectionCount={selections.length} onCommand={runCommand} onMore={() => setPaletteOpen(true)} />
           <div className="min-w-0 flex-1">{viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
-            {view !== "3d" && activeRoom ? (
+            {view !== "3d" && activeLevel ? (
               <div className="relative h-[calc(100dvh-10rem)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 lg:h-[min(680px,68dvh)] dark:bg-background">
-                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => applyMutation(moveHouseSelections(project, [selection], dx, dy, { footprintEditable: verification }), "Moved wall")} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch), "Temporary dimension updated"); }} onGuidance={setGuidance} />
+                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} sketch={outlineSketch} onCancelDraft={() => { setDraftStart(null); setOutlineSketch([]); }} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => applyMutation(moveHouseSelections(project, [selection], dx, dy, { footprintEditable: verification }), "Moved wall")} onDraftStart={(point) => { if (chainEnded.current) { chainEnded.current = false; setDraftStart(null); return; } setDraftStart(point); }} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch), "Temporary dimension updated"); }} onGuidance={setGuidance} />
                 <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>
                 {activeTool === "room" && !draftStart ? <div role="radiogroup" aria-label="Room shape" className="absolute left-1/2 top-12 z-10 flex -translate-x-1/2 gap-1 rounded-xl border bg-card/95 p-1 text-xs shadow-sm backdrop-blur">
                   {([["rectangle", "Rectangle"], ["l-shape", "L shape"]] as const).map(([shape, label]) => <button key={shape} type="button" role="radio" aria-checked={roomShape === shape} onClick={() => setRoomShape(shape)} className={cn("rounded-lg px-3 py-1.5", roomShape === shape ? "bg-brand/15 text-brand" : "text-muted-foreground hover:bg-muted")}>{label}</button>)}

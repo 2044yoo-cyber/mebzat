@@ -450,34 +450,57 @@ function RoofMesh({ roof, bounds, color, selected, onSelect }: { roof: HouseRoof
   const depth = roofBounds.depth + roof.overhang * 2;
   const centreX = (roofBounds.minX + roofBounds.maxX) / 2;
   const centreY = (roofBounds.minY + roofBounds.maxY) / 2;
-  if (roof.type === "hip") {
-    return (
-      <mesh
-        position={[(centreX - bounds.centreX) * MM, (roof.elevation + roof.height / 2) * MM, -(centreY - bounds.centreY) * MM]}
-        rotation={[0, Math.PI / 4, 0]}
-        scale={[width * MM / Math.SQRT2, roof.height * MM, depth * MM / Math.SQRT2]}
-        onClick={(event) => { event.stopPropagation(); onSelect(); }}
-      >
-        <coneGeometry args={[0.5, 1, 4]} />
-        <meshStandardMaterial color={colour} roughness={0.82} />
-      </mesh>
-    );
-  }
-
-  const angle = Math.max(5, roof.slope || 25) * Math.PI / 180;
-  const half = width / 2;
-  const rise = Math.min(roof.height, Math.tan(angle) * half);
-  const span = Math.hypot(half, rise);
   return (
-    <group position={[(centreX - bounds.centreX) * MM, roof.elevation * MM, -(centreY - bounds.centreY) * MM]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
-      {([-1, 1] as const).map((side) => (
-        <mesh key={side} position={[side * half * 0.5 * MM, rise * 0.5 * MM, 0]} rotation={[0, 0, side * -angle]}>
-          <boxGeometry args={[span * MM, roof.thickness * MM, depth * MM]} />
-          <meshStandardMaterial color={colour} roughness={0.82} />
-        </mesh>
-      ))}
-    </group>
+    <mesh
+      position={[(centreX - bounds.centreX) * MM, roof.elevation * MM, -(centreY - bounds.centreY) * MM]}
+      onClick={(event) => { event.stopPropagation(); onSelect(); }}
+    >
+      <PitchedRoofGeometry width={width * MM} depth={depth * MM} rise={pitchedRise(roof, width, depth) * MM} hip={roof.type === "hip"} />
+      <meshStandardMaterial color={colour} roughness={0.82} side={THREE.DoubleSide} />
+    </mesh>
   );
+}
+
+/** How high a pitched roof rises over its eaves: the slope across the
+ * shorter span decides it, so the planes meet at the ridge whatever the
+ * span; a roof with no slope falls back to its stated height. */
+export function pitchedRise(roof: Pick<HouseRoof, "slope" | "height">, width: number, depth: number) {
+  const half = Math.min(width, depth) / 2;
+  return roof.slope > 0 ? Math.tan((Math.min(roof.slope, 60) * Math.PI) / 180) * half : roof.height;
+}
+
+/**
+ * A gable or hip roof over a rectangle, eaves at y = 0, ridge along the
+ * longer side. Gable: the ridge runs the full length and the ends are
+ * vertical triangles. Hip: the ridge is shortened by half the span at each
+ * end, so all four sides slope — on a square it becomes a pyramid.
+ */
+function PitchedRoofGeometry({ width, depth, rise, hip }: { width: number; depth: number; rise: number; hip: boolean }) {
+  const geometry = useMemo(() => {
+    const alongX = width >= depth;
+    const long = alongX ? width : depth;
+    const short = alongX ? depth : width;
+    const ridge = hip ? Math.max(0, (long - short) / 2) : long / 2;
+    const at = (along: number, across: number, y: number) => alongX ? [along, y, across] : [across, y, along];
+    const a = at(-long / 2, -short / 2, 0);
+    const b = at(long / 2, -short / 2, 0);
+    const c = at(long / 2, short / 2, 0);
+    const d = at(-long / 2, short / 2, 0);
+    const r1 = at(-ridge, 0, rise);
+    const r2 = at(ridge, 0, rise);
+    const triangles = [
+      a, b, r2, a, r2, r1,
+      c, d, r1, c, r1, r2,
+      d, a, r1,
+      b, c, r2,
+    ].flat();
+    const result = new THREE.BufferGeometry();
+    result.setAttribute("position", new THREE.Float32BufferAttribute(triangles, 3));
+    result.computeVertexNormals();
+    return result;
+  }, [width, depth, rise, hip]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <primitive object={geometry} attach="geometry" />;
 }
 
 function FacadeElementMesh({ element, project, bounds, selected, onSelect }: { element: HouseFacadeElement; project: HouseProject; bounds: Bounds; selected: boolean; onSelect: () => void }) {
