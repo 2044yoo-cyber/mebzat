@@ -36,6 +36,7 @@ import {
   HouseContextMenu,
   HouseProjectBrowser,
   HouseRibbon,
+  HouseMobileTools,
   HouseSchedulePanel,
   HouseSelectionActions,
   HouseShortcutHelp,
@@ -100,6 +101,9 @@ import {
 import { generateFacadeAlternatives } from "../services/facade";
 import { generatePreliminaryStructure } from "../services/structure";
 
+import { HouseUnitsContext } from "./house-units";
+import { applyModelingOptions, modelingPreset, displayLength, modelLength, type DisplayUnits, type ModelingOptions } from "../services/workspace-options";
+
 type Stage = "start" | "verify" | "model";
 type Source = "upload" | "manual";
 type WorkspaceView = "2d" | "3d" | "split";
@@ -120,6 +124,8 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
   const [facades, setFacades] = useState<DraftPlan[]>([]);
   const [title, setTitle] = useState("My house");
   const [floorCount, setFloorCount] = useState(1);
+  const [displayUnits, setDisplayUnits] = useState<DisplayUnits>("mm");
+  const [modelingOptions, setModelingOptions] = useState<ModelingOptions>(() => modelingPreset("house"));
   const [floorHeight, setFloorHeight] = useState(3000);
   const [style, setStyle] = useState<HouseStyle>("modern");
   const [strict, setStrict] = useState(true);
@@ -199,7 +205,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       }
     }
     setRoom(verifiedRoom);
-    setProject(ensureHouseBimState(createHouseProject({
+    setProject(ensureHouseBimState({ ...applyModelingOptions(createHouseProject({
       id: project?.id,
       title,
       room: verifiedRoom,
@@ -208,7 +214,8 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       floorCount,
       floorToFloorHeight: floorHeight,
       referenceImages: references(floorPlans, facades),
-    })));
+    }), modelingOptions), displayUnits }));
+    setView("2d");
     setStage("verify");
   }
 
@@ -218,6 +225,8 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
     const restoredRoom = restored.levels.find((level) => level.plan)?.plan;
     if (!restoredRoom) return;
     setProject(restored);
+    setDisplayUnits(restored.displayUnits ?? "mm");
+    setModelingOptions(restored.modelingOptions ?? modelingPreset("house"));
     setRoom(restoredRoom);
     setTitle(restored.metadata.title);
     setFloorCount(restored.plannedFloorCount);
@@ -303,6 +312,8 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           onFacades={(plans) => setFacades(plans.slice(-1))}
           title={title}
           onTitle={setTitle}
+          displayUnits={displayUnits} onDisplayUnits={setDisplayUnits}
+          modelingOptions={modelingOptions} onModelingOptions={setModelingOptions}
           floorCount={floorCount}
           onFloorCount={setFloorCount}
           floorHeight={floorHeight}
@@ -323,7 +334,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           view={view}
           onView={setView}
           onProjectChange={updateProject}
-          onDone={() => setStage("model")}
+          onDone={() => { setStage("model"); setView("3d"); }}
           onSave={save}
           saveState={saveState}
           onDownload={download}
@@ -350,6 +361,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
 }
 
 function StartScreen({
+  displayUnits, onDisplayUnits, modelingOptions, onModelingOptions,
   userId,
   source,
   onSource,
@@ -371,6 +383,8 @@ function StartScreen({
   onContinue,
   onRestore,
 }: {
+  displayUnits: DisplayUnits; onDisplayUnits: (unit: DisplayUnits) => void;
+  modelingOptions: ModelingOptions; onModelingOptions: (options: ModelingOptions) => void;
   userId: string;
   source: Source;
   onSource: (source: Source) => void;
@@ -399,7 +413,7 @@ function StartScreen({
           <p className="text-xs font-semibold uppercase tracking-widest text-brand">Create from</p>
           <h2 className="mt-1 text-2xl font-semibold">Start with a measured plan</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Upload a drawing to trace and verify, or draw the building footprint with exact millimetre dimensions.
+            Upload a drawing to trace and verify, or draw the building footprint with exact dimensions in your preferred units.
           </p>
         </div>
 
@@ -443,20 +457,23 @@ function StartScreen({
           />
         ) : (
           <div className="rounded-xl border border-dashed bg-muted/20 p-5 text-sm text-muted-foreground">
-            Begin with an 8000 × 6500 mm footprint, then drag corners, add wall points, doors and windows.
+            Begin with a {displayLength(8000, displayUnits)} × {displayLength(6500, displayUnits)} {displayUnits} footprint, then drag corners, add wall points, doors and windows.
           </div>
         )}
       </section>
 
       <aside className="space-y-4 rounded-2xl border bg-card p-4">
-        <h2 className="font-semibold">House information</h2>
+        <h2 className="font-semibold">Design setup</h2>
+        <label className="block text-xs">What are you modeling?<select aria-label="Design scope" value={modelingOptions.mode} onChange={(event) => { const mode = event.target.value as ModelingOptions["mode"]; onModelingOptions(modelingPreset(mode)); if (mode !== "house") onFloorCount(1); }} className="mt-1 w-full rounded-lg border bg-background p-2"><option value="house">Full house</option><option value="apartment">Apartment interior</option><option value="room">Single room</option></select></label>
+        <label className="block text-xs">Units<select aria-label="Setup units" value={displayUnits} onChange={(event) => onDisplayUnits(event.target.value as DisplayUnits)} className="mt-1 w-full rounded-lg border bg-background p-2"><option value="mm">Millimetres (mm)</option><option value="cm">Centimetres (cm)</option><option value="m">Metres (m)</option></select></label>
+        <fieldset className="grid grid-cols-2 gap-2 rounded-lg border p-3 text-xs"><legend className="px-1">Include in model</legend>{([["structure", "Columns / beams"], ["foundations", "Footings"], ["roof", "Roof"], ["stairs", "Stairs"], ["site", "Site / exterior"], ["floors", "Floors"], ["ceilings", "Ceilings"]] as const).map(([key, label]) => <label key={key} className="flex items-center gap-2"><input type="checkbox" checked={modelingOptions[key]} onChange={(event) => onModelingOptions({ ...modelingOptions, [key]: event.target.checked })} />{label}</label>)}</fieldset>
         <label className="block space-y-1.5 text-xs text-muted-foreground">
           <span>Project name</span>
           <input value={title} onChange={(event) => onTitle(event.target.value)} maxLength={100} className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground" />
         </label>
         <div className="grid grid-cols-2 gap-2">
           <NumberField label="Floors" value={floorCount} min={1} max={6} step={1} onChange={onFloorCount} />
-          <NumberField label="Floor-to-floor" value={floorHeight} min={2200} max={6000} step={0.1} suffix="mm" onChange={onFloorHeight} />
+          <NumberField label="Floor-to-floor" value={displayLength(floorHeight, displayUnits)} min={displayLength(2200, displayUnits)} max={displayLength(6000, displayUnits)} step={0.001} suffix={displayUnits} onChange={(value) => onFloorHeight(modelLength(value, displayUnits))} />
         </div>
         <label className="block space-y-1.5 text-xs text-muted-foreground">
           <span>Architectural style</span>
@@ -844,28 +861,14 @@ function ModelScreen({
   }, []);
 
   return (
-    <section className="space-y-3">
-      <div className="sticky top-2 z-30 space-y-2 bg-background/95 pb-1 backdrop-blur">
-        <HouseRibbon
-          activeCategory={activeCategory}
-          activeTool={activeTool}
-          selectionCount={selections.length}
-          canUndo={past.length > 0}
-          canRedo={future.length > 0}
-          onCategory={setActiveCategory}
-          onCommand={runCommand}
-          onSearch={() => setPaletteOpen(true)}
-          onHelp={() => setHelpOpen(true)}
-        />
-        <HouseToolOptions activeTool={activeTool} project={project} levelId={activeLevelId} settings={toolSettings} onChange={(change) => setToolSettings((current) => ({ ...current, ...change }))} />
-      </div>
-      {verification ? <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/30 bg-brand/5 p-3"><div><strong className="text-sm">Plan verification workspace</strong><p className="text-xs text-muted-foreground">Draw and edit with the ribbon. Confirm when the plan is correct.</p></div><button type="button" onClick={onFinish} className="rounded-lg bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground">Plan Correct — Generate House</button></div> : null}
+    <HouseUnitsContext.Provider value={project.displayUnits ?? "mm"}><section className="min-w-0 space-y-3">
       <div className="flex min-w-0 items-center justify-between gap-2 overflow-x-auto rounded-xl border bg-card p-2">
         <div className="flex shrink-0 rounded-lg bg-muted p-1">
           {(["2d", "3d", "split"] as const).map((item) => (
             <button key={item} type="button" onClick={() => onView(item)} className={cn("rounded-md px-3 py-1.5 text-xs font-medium uppercase", view === item ? "bg-background text-brand shadow-sm" : "text-muted-foreground")}>{item === "split" ? "Split" : item}</button>
           ))}
         </div>
+        <label className="flex shrink-0 items-center gap-1 text-xs">Units<select aria-label="Drawing units" value={project.displayUnits ?? "mm"} onChange={(event) => commit({ ...project, displayUnits: event.target.value as DisplayUnits }, "Display units updated")} className="rounded-lg border bg-background p-2"><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option></select></label>
         <div className="flex shrink-0 gap-2">
           <button type="button" onClick={() => setViewportOpen((open) => !open)} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted">
             {viewportOpen ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />} {viewportOpen ? "Hide view" : "Show view"}
@@ -899,15 +902,30 @@ function ModelScreen({
       {schedule ? <HouseSchedulePanel project={project} kind={schedule} onClose={() => setSchedule(null)} /> : null}
 
       <div className="grid min-w-0 gap-3 xl:grid-cols-[auto_minmax(0,1fr)_320px]">
-        <HouseProjectBrowser project={project} activeLevelId={activeLevelId} activeViewId={activeViewId} onLevel={chooseLevel} onView={selectView} onSchedule={setSchedule} />
+        <div className="hidden xl:block"><HouseProjectBrowser project={project} activeLevelId={activeLevelId} activeViewId={activeViewId} onLevel={chooseLevel} onView={selectView} onSchedule={setSchedule} /></div>
         <div className="min-w-0" onContextMenu={(event) => { event.preventDefault(); if (selections.length) setContextMenu({ x: event.clientX, y: event.clientY }); }}>
-          <HouseSelectionActions selected={selected} onCommand={runCommand} />
-          {viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
+      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-30 space-y-2 bg-background/95 pb-1 backdrop-blur">
+        <HouseRibbon
+          activeCategory={activeCategory}
+          activeTool={activeTool}
+          selectionCount={selections.length}
+          canUndo={past.length > 0}
+          canRedo={future.length > 0}
+          onCategory={setActiveCategory}
+          onCommand={runCommand}
+          onSearch={() => setPaletteOpen(true)}
+          onHelp={() => setHelpOpen(true)}
+        />
+        <HouseToolOptions activeTool={activeTool} project={project} levelId={activeLevelId} settings={toolSettings} onChange={(change) => setToolSettings((current) => ({ ...current, ...change }))} />
+      </div>
+          <div className="hidden lg:block"><HouseSelectionActions selected={selected} onCommand={runCommand} /></div>
+          <div className="flex min-w-0 gap-1"><HouseMobileTools activeCategory={activeCategory} activeTool={activeTool} selectionCount={selections.length} canUndo={past.length > 0} canRedo={future.length > 0} onCommand={runCommand} />
+          <div className="min-w-0 flex-1">{viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
             {view !== "3d" && activeRoom ? (
               <div className="relative h-[min(680px,68dvh)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-background">
-                <div className="pointer-events-none absolute inset-0"><PlanCanvas room={activeRoom} onChange={() => undefined} /></div>
-                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onDimensionChange={(selection, patch) => commit(patchHouseObject(project, selection, patch), "Temporary dimension updated")} onGuidance={setGuidance} />
-                <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · mm</span>
+                <div className="pointer-events-none absolute inset-0"><PlanCanvas room={activeRoom} onChange={() => undefined} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} /></div>
+                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => commit(patchHouseObject(project, selection, patch), "Temporary dimension updated")} onGuidance={setGuidance} />
+                <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>
               </div>
             ) : null}
             {view !== "2d" ? (
@@ -924,7 +942,9 @@ function ModelScreen({
                 className="h-[min(620px,62dvh)]"
               />
             ) : null}
-          </div> : <button type="button" onClick={() => setViewportOpen(true)} className="min-h-16 w-full rounded-xl border border-dashed bg-muted/20 text-sm text-muted-foreground hover:border-brand hover:text-brand">Show 2D / 3D viewport</button>}
+          </div> : <button type="button" onClick={() => setViewportOpen(true)} className="min-h-16 w-full rounded-xl border border-dashed bg-muted/20 text-sm text-muted-foreground hover:border-brand hover:text-brand">Show 2D / 3D viewport</button>}</div></div>
+          {verification ? <button type="button" onClick={onFinish} className="mt-3 w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground">Finish design → 3D</button> : null}
+          <details className="mt-2 rounded-lg border p-2 text-xs xl:hidden"><summary className="cursor-pointer py-1">Views / project browser</summary><HouseProjectBrowser project={project} activeLevelId={activeLevelId} activeViewId={activeViewId} onLevel={chooseLevel} onView={selectView} onSchedule={setSchedule} /></details>
         </div>
         <HouseObjectInspector project={project} activeLevelId={activeLevelId} selected={selected} selections={selections} onSelect={(selection) => choose(selection)} onChange={(next) => commit(next, "Properties updated")} />
       </div>
@@ -944,11 +964,11 @@ function ModelScreen({
         <strong className="text-foreground">Structured house model:</strong> verified architecture, façade options and preliminary structural objects remain editable and reproducible from millimetre data. BOQ-ready quantities update from the same source objects.
       </div>
 
-      <HouseStatusBar selectionCount={selections.length} snap="Endpoint · Midpoint · Intersection · Perpendicular · Nearest · Grid · Wall · Column" snapEnabled={snapEnabled} onToggleSnap={() => setSnapEnabled((value) => !value)} level={activeLevel?.name ?? "—"} units={project.units} mode={activeTool ? houseCommand(activeTool).label : "Select"} saveState={`${saveState} · ${guidance}`} />
+      <HouseStatusBar selectionCount={selections.length} snap="Endpoint · Midpoint · Intersection · Perpendicular · Nearest · Grid · Wall · Column" snapEnabled={snapEnabled} onToggleSnap={() => setSnapEnabled((value) => !value)} level={activeLevel?.name ?? "—"} units={project.displayUnits ?? "mm"} mode={activeTool ? houseCommand(activeTool).label : "Select"} saveState={`${saveState} · ${guidance}`} />
       <HouseCommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onCommand={runCommand} />
       <HouseShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       <HouseContextMenu state={contextMenu} selectionCount={selections.length} onClose={() => setContextMenu(null)} onCommand={runCommand} />
-    </section>
+    </section></HouseUnitsContext.Provider>
   );
 }
 

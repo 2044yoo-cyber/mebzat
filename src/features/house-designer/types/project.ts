@@ -348,6 +348,12 @@ export const houseProjectSchema = z.object({
     updatedAt: z.string(),
   }),
   units: z.literal("mm"),
+  displayUnits: z.enum(["mm", "cm", "m"]).optional(),
+  modelingOptions: z.object({
+    mode: z.enum(["house", "apartment", "room"]),
+    structure: z.boolean(), foundations: z.boolean(), roof: z.boolean(),
+    stairs: z.boolean(), site: z.boolean(), floors: z.boolean(), ceilings: z.boolean(),
+  }).optional(),
   designStyle: z.enum(houseStyles),
   originalPlanStrict: z.boolean(),
   facade: facadeSettingsSchema,
@@ -631,6 +637,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
 
 /** Upgrade a Phase 1 draft without changing its identity or references. */
 export function ensurePhaseTwoProject(project: HouseProject): HouseProject {
+  if (project.modelingOptions) return project;
   if (project.slabs.length > 0 && project.roofs.length > 0) return project;
   const room = project.levels.find((level) => level.plan)?.plan;
   if (!room) return project;

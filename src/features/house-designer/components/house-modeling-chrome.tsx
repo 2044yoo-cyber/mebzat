@@ -22,6 +22,8 @@ import {
   Undo2,
 } from "lucide-react";
 
+import { useHouseUnits } from "./house-units";
+import { displayLength, modelLength } from "../services/workspace-options";
 import { cn } from "@/lib/utils";
 
 import {
@@ -74,7 +76,7 @@ export function HouseRibbon({ activeCategory, activeTool, selectionCount, canUnd
 }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
-      <div className="flex min-w-0 items-center gap-1 overflow-x-auto border-b px-2 pt-1.5">
+      <div className="hidden min-w-0 items-center gap-1 overflow-x-auto border-b px-2 pt-1.5 lg:flex">
         {ribbonCategories.map((category) => (
           <button key={category} type="button" onClick={() => onCategory(category)} className={cn("shrink-0 border-b-2 px-2 py-2 text-xs font-medium", activeCategory === category ? "border-brand text-brand" : "border-transparent text-muted-foreground hover:text-foreground")}>{category}</button>
         ))}
@@ -83,7 +85,8 @@ export function HouseRibbon({ activeCategory, activeTool, selectionCount, canUnd
           <button type="button" onClick={onHelp} aria-label="Keyboard shortcuts" className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"><HelpCircle className="size-4" /></button>
         </span>
       </div>
-      <div className="flex min-w-0 gap-1 overflow-x-auto p-2">
+      <div className="flex items-center gap-2 p-2 lg:hidden"><select aria-label="Tool category" value={activeCategory} onChange={(event) => onCategory(event.target.value as HouseCommandCategory)} className="min-w-0 flex-1 rounded-lg border bg-background px-2 py-2 text-xs">{ribbonCategories.map((category) => <option key={category}>{category}</option>)}</select><span className="truncate text-xs text-brand">{houseCommand(activeTool ?? "select").label}</span><button type="button" onClick={onSearch} aria-label="All tools" className="p-2"><Search className="size-4" /></button></div>
+      <div className="hidden min-w-0 gap-1 overflow-x-auto p-2 lg:flex">
         {(["select", "undo", "redo", ...ribbonCommands[activeCategory]] as HouseCommandId[])
           .filter((id, index, items) => items.indexOf(id) === index)
           .map((id) => {
@@ -101,6 +104,17 @@ export function HouseRibbon({ activeCategory, activeTool, selectionCount, canUnd
       </div>
     </div>
   );
+}
+
+export function HouseMobileTools({ activeCategory, activeTool, selectionCount, canUndo, canRedo, onCommand }: {
+  activeCategory: HouseCommandCategory; activeTool: HouseCommandId | null; selectionCount: number;
+  canUndo: boolean; canRedo: boolean; onCommand: (id: HouseCommandId) => void;
+}) {
+  const commands = [...new Set<HouseCommandId>(["select", "undo", "redo", ...ribbonCommands[activeCategory]])];
+  return <nav aria-label="Modeling tools" className="sticky top-40 flex max-h-[62dvh] w-11 shrink-0 flex-col gap-1 self-start overflow-y-auto rounded-lg border bg-card p-0.5 lg:hidden">{commands.map((id) => {
+    const command = houseCommand(id); const Icon = icons[id] ?? BoxSelect;
+    return <button key={id} type="button" aria-label={command.label} title={command.label} aria-pressed={activeTool === id} disabled={Boolean(command.selection && !selectionCount || id === "undo" && !canUndo || id === "redo" && !canRedo)} onClick={() => onCommand(id)} className={cn("flex min-h-11 shrink-0 flex-col items-center justify-center rounded-md text-muted-foreground active:bg-brand/20 disabled:opacity-30", activeTool === id && "bg-brand/15 text-brand")}><Icon className="size-4" /><span className="text-[8px] leading-3">{command.shortcut ?? command.label.slice(0, 5)}</span></button>;
+  })}</nav>;
 }
 
 export type HouseToolSettings = {
@@ -124,9 +138,10 @@ export function HouseToolOptions({ activeTool, project, levelId, settings, onCha
   settings: HouseToolSettings;
   onChange: (change: Partial<HouseToolSettings>) => void;
 }) {
+  const unit = useHouseUnits();
   const level = project.levels.find((item) => item.id === levelId);
   const numeric = (label: string, key: keyof Pick<HouseToolSettings, "height" | "offset" | "width" | "depth" | "sillHeight">) => (
-    <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground"><span>{label}</span><input type="number" step="0.1" value={settings[key]} onChange={(event) => onChange({ [key]: Number(event.target.value) })} className="w-24 rounded-md border bg-background px-2 py-1 text-right text-xs text-foreground" /><span>mm</span></label>
+    <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground"><span>{label}</span><input type="number" step="any" value={displayLength(settings[key], unit)} onChange={(event) => onChange({ [key]: modelLength(Number(event.target.value), unit) })} className="w-24 rounded-md border bg-background px-2 py-1 text-right text-xs text-foreground" /><span>{unit}</span></label>
   );
   let controls: React.ReactNode = <span className="text-xs text-muted-foreground">Select objects to edit their instance properties.</span>;
   if (activeTool === "wall" || activeTool === "structural-wall" || activeTool === "room-separator") controls = <><label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">Wall Type<select value={settings.wallType} onChange={(event) => onChange({ wallType: event.target.value })} className="rounded-md border bg-background px-2 py-1 text-xs text-foreground"><option>200 mm Exterior</option><option>120 mm Interior</option><option>Structural RC</option></select></label><label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">Location Line<select value={settings.locationLine} onChange={(event) => onChange({ locationLine: event.target.value })} className="rounded-md border bg-background px-2 py-1 text-xs text-foreground"><option>Wall Centerline</option><option>Finish Face: Exterior</option><option>Finish Face: Interior</option></select></label><span className="shrink-0 text-[11px] text-muted-foreground">Base: <strong className="text-foreground">{level?.name ?? "—"}</strong></span><span className="shrink-0 text-[11px] text-muted-foreground">Top: <strong className="text-foreground">{project.levels[project.levels.findIndex((item) => item.id === levelId) + 1]?.name ?? "Unconnected"}</strong></span>{numeric("Height", "height")}<label className="flex shrink-0 items-center gap-1 text-xs"><input type="checkbox" checked={settings.chain} onChange={(event) => onChange({ chain: event.target.checked })} />Chain</label>{numeric("Offset", "offset")}</>;
@@ -233,10 +248,12 @@ export type HouseContextMenuState = { x: number; y: number } | null;
 
 export function HouseContextMenu({ state, selectionCount, onClose, onCommand }: { state: HouseContextMenuState; selectionCount: number; onClose: () => void; onCommand: (id: HouseCommandId) => void }) {
   if (!state || selectionCount === 0) return null;
-  const commands: HouseCommandId[] = ["move", "copy", "rotate", "mirror-pick", "duplicate", "create-similar", "match-type", "hide", "isolate", "delete", "ai-remodel", "alternatives", "estimate", "boq"];
+  const commands: HouseCommandId[] = ["move", "delete", "copy", "rotate", "mirror-pick", "duplicate", "create-similar", "match-type", "hide", "isolate", "ai-remodel", "alternatives", "estimate", "boq"];
   return (
-    <div className="fixed inset-0 z-[90]" onMouseDown={onClose} onContextMenu={(event) => event.preventDefault()}>
-      <div role="menu" style={{ left: Math.min(state.x, window.innerWidth - 230), top: Math.min(state.y, window.innerHeight - 430) }} className="fixed w-56 rounded-xl border bg-card p-1.5 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-[90]" onPointerDown={onClose} onContextMenu={(event) => event.preventDefault()}>
+      <div role="menu" style={window.innerWidth >= 1024 ? { left: Math.max(8, Math.min(state.x, window.innerWidth - 240)), top: Math.max(8, Math.min(state.y, window.innerHeight - 460)) } : undefined} className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+88px)] grid max-h-[48dvh] grid-cols-2 gap-1 overflow-y-auto rounded-xl border bg-card p-2 shadow-xl lg:inset-x-auto lg:bottom-auto lg:block lg:w-56 lg:max-h-[80dvh]" onPointerDown={(event) => event.stopPropagation()}>
+        <button type="button" onClick={onClose} className="col-span-2 w-full rounded-lg border p-2 text-xs lg:mb-1">Close actions</button>
+        <button type="button" role="menuitem" onClick={() => { onClose(); document.getElementById("house-properties")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-lg px-3 py-2 text-left text-xs hover:bg-muted">Properties</button>
         {commands.map((id) => <button key={id} role="menuitem" type="button" onClick={() => { onCommand(id); onClose(); }} className={cn("flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs hover:bg-muted", id === "delete" && "text-destructive")}><span>{houseCommand(id).label}</span>{houseCommand(id).shortcut ? <kbd className="text-[10px] text-muted-foreground">{houseCommand(id).shortcut}</kbd> : null}</button>)}
       </div>
     </div>

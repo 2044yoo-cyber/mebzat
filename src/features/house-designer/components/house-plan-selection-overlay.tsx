@@ -2,6 +2,8 @@
 
 import { useId, useMemo, useRef, useState } from "react";
 
+import { useHouseUnits } from "./house-units";
+import { displayLength, modelLength } from "../services/workspace-options";
 import type { HouseCommandId } from "../services/command-registry";
 import type { HouseProject, HouseSelection } from "../types/project";
 
@@ -12,7 +14,7 @@ type SnapPoint = HousePlanPoint & { label: string };
 const lineTools = new Set<HouseCommandId>(["wall", "structural-wall", "room-separator", "beam", "railing", "grid", "reference-plane", "dimension", "section", "elevation", "strip-footing"]);
 const pointTools = new Set<HouseCommandId>(["door", "window", "column", "room", "floor", "structural-slab", "ceiling", "roof", "stair", "opening", "component", "furniture", "kitchen", "wardrobe", "plumbing-fixture", "foundation", "isolated-footing", "foundation-slab", "level", "text", "room-tag", "tag", "move"]);
 
-export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance }: {
+export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
   project: HouseProject;
   levelId: string;
   activeTool: HouseCommandId | null;
@@ -25,6 +27,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   onSelect: (items: HouseSelection[], mode: "replace" | "add" | "remove") => void;
   onDimensionChange: (selection: HouseSelection, patch: Record<string, number>) => void;
   onGuidance: (message: string) => void;
+  onSelectionMenu: (point: { x: number; y: number } | null) => void;
 }) {
   const svg = useRef<SVGSVGElement | null>(null);
   const gridId = useId();
@@ -105,6 +108,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     if (distance < Math.max(35, margin * 0.025)) {
       const hits = objects.filter((object) => containsPoint(expand(object.bounds, 80), end)).sort((a, b) => area(a.bounds) - area(b.bounds));
       onSelect(hits[0] ? [hits[0].selection] : [], mode);
+      if (event.pointerType !== "mouse") onSelectionMenu(hits.length ? { x: event.clientX, y: event.clientY } : null);
     } else {
       const box = normalized(dragStart, end);
       const crossing = end.x < dragStart.x;
@@ -138,18 +142,18 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
           const grip = Math.max(90, margin * 0.07);
           return (
             <g key={object.selection.id} pointerEvents="none">
-              <line x1={line.start.x} y1={line.start.y} x2={line.end.x} y2={line.end.y} stroke="#1473e6" strokeOpacity={0.28} strokeWidth={Math.max(line.thickness + 16, 28)} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+              <line x1={line.start.x} y1={line.start.y} x2={line.end.x} y2={line.end.y} stroke="#1473e6" strokeOpacity={0.28} strokeWidth={Math.max(line.thickness + 16, 28)} strokeLinecap="round" />
               <line x1={line.start.x} y1={line.start.y} x2={line.end.x} y2={line.end.y} stroke="#1473e6" strokeWidth={4} vectorEffect="non-scaling-stroke" />
-              {[line.start, line.end].map((point, index) => <rect key={index} x={point.x - grip / 2} y={point.y - grip / 2} width={grip} height={grip} fill="white" stroke="#1473e6" strokeWidth={6} vectorEffect="non-scaling-stroke" />)}
+              {[line.start, line.end].map((point, index) => <rect key={index} x={point.x - grip / 2} y={point.y - grip / 2} width={grip} height={grip} fill="white" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
             </g>
           );
         }
         return <rect key={object.selection.id} x={object.bounds.minX} y={object.bounds.minY} width={Math.max(1, object.bounds.maxX - object.bounds.minX)} height={Math.max(1, object.bounds.maxY - object.bounds.minY)} fill="rgba(20,115,230,.10)" stroke="#1473e6" strokeWidth={10} vectorEffect="non-scaling-stroke" />;
       })}
-      {project.annotations.filter((item) => item.levelId === levelId).map((item) => item.end ? <g key={item.id}><line x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke={selectedIds.has(item.id) ? "#1473e6" : "#7c3aed"} strokeWidth={12} strokeDasharray={item.kind === "dimension" ? undefined : "80 45"} vectorEffect="non-scaling-stroke" /><text x={(item.start.x + item.end.x) / 2} y={(item.start.y + item.end.y) / 2 - 80} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#334155">{item.text}</text></g> : <text key={item.id} x={item.start.x} y={item.start.y} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill={selectedIds.has(item.id) ? "#1473e6" : "#7c3aed"}>{item.text}</text>)}
-      {selectionBox ? <rect x={selectionBox.minX} y={selectionBox.minY} width={selectionBox.maxX - selectionBox.minX} height={selectionBox.maxY - selectionBox.minY} fill={crossing ? "rgba(20,115,230,.10)" : "rgba(20,115,230,.06)"} stroke="#1473e6" strokeWidth={12} strokeDasharray={crossing ? `${margin * 0.08} ${margin * 0.05}` : undefined} vectorEffect="non-scaling-stroke" /> : null}
-      {draftStart && current && activeTool && lineTools.has(activeTool) ? <g><line x1={draftStart.x} y1={draftStart.y} x2={current.x} y2={current.y} stroke="#1473e6" strokeWidth={16} strokeDasharray="80 40" vectorEffect="non-scaling-stroke" /><text x={(draftStart.x + current.x) / 2} y={(draftStart.y + current.y) / 2 - 100} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#1473e6">{Math.hypot(current.x - draftStart.x, current.y - draftStart.y).toFixed(1)} mm</text></g> : null}
-      {!selectMode && current ? <g pointerEvents="none"><circle cx={current.x} cy={current.y} r={Math.max(45, margin * 0.035)} fill="white" stroke="#1473e6" strokeWidth={10} vectorEffect="non-scaling-stroke" /><path d={`M ${current.x - 65} ${current.y} H ${current.x + 65} M ${current.x} ${current.y - 65} V ${current.y + 65}`} stroke="#1473e6" strokeWidth={8} vectorEffect="non-scaling-stroke" /><text x={current.x + 100} y={current.y - 80} fontSize={Math.max(100, margin * 0.12)} fill="#1473e6">{current.label}</text></g> : null}
+      {project.annotations.filter((item) => item.levelId === levelId).map((item) => item.end ? <g key={item.id}><line x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke={selectedIds.has(item.id) ? "#1473e6" : "#7c3aed"} strokeWidth={2} strokeDasharray={item.kind === "dimension" ? undefined : "80 45"} vectorEffect="non-scaling-stroke" /><text x={(item.start.x + item.end.x) / 2} y={(item.start.y + item.end.y) / 2 - 80} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#334155">{item.kind === "dimension" && item.value !== null ? `${displayLength(item.value, project.displayUnits ?? "mm")} ${project.displayUnits ?? "mm"}` : item.text}</text></g> : <text key={item.id} x={item.start.x} y={item.start.y} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill={selectedIds.has(item.id) ? "#1473e6" : "#7c3aed"}>{item.text}</text>)}
+      {selectionBox ? <rect x={selectionBox.minX} y={selectionBox.minY} width={selectionBox.maxX - selectionBox.minX} height={selectionBox.maxY - selectionBox.minY} fill={crossing ? "rgba(20,115,230,.10)" : "rgba(20,115,230,.06)"} stroke="#1473e6" strokeWidth={2} strokeDasharray={crossing ? `${margin * 0.08} ${margin * 0.05}` : undefined} vectorEffect="non-scaling-stroke" /> : null}
+      {draftStart && current && activeTool && lineTools.has(activeTool) ? <g><line x1={draftStart.x} y1={draftStart.y} x2={current.x} y2={current.y} stroke="#1473e6" strokeWidth={2} strokeDasharray="80 40" vectorEffect="non-scaling-stroke" /><text x={(draftStart.x + current.x) / 2} y={(draftStart.y + current.y) / 2 - 100} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#1473e6">{displayLength(Math.hypot(current.x - draftStart.x, current.y - draftStart.y), project.displayUnits ?? "mm")} {project.displayUnits ?? "mm"}</text></g> : null}
+      {!selectMode && current ? <g pointerEvents="none"><circle cx={current.x} cy={current.y} r={Math.max(45, margin * 0.035)} fill="white" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><path d={`M ${current.x - 65} ${current.y} H ${current.x + 65} M ${current.x} ${current.y - 65} V ${current.y + 65}`} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={current.x + 100} y={current.y - 80} fontSize={Math.max(100, margin * 0.12)} fill="#1473e6">{current.label}</text></g> : null}
       {selectedWall ? <WallTemporaryDimension wall={selectedWall} margin={margin} selection={selections[0]!} onChange={(selection, length) => onDimensionChange(selection, { length })} /> : null}
       {selectedOpening ? <OpeningTemporaryDimension project={project} opening={selectedOpening} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
       {selectedColumn ? <ColumnTemporaryDimensions column={selectedColumn} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
@@ -169,28 +173,29 @@ function ColumnTemporaryDimensions({ column, margin, selection, onChange }: { co
 }
 
 function InlineDimensionInput({ x, y, margin, label, value, onChange }: { x: number; y: number; margin: number; label: string; value: number; onChange: (value: number) => void }) {
+  const unit = useHouseUnits();
   const fieldWidth = Math.max(700, margin * 0.75);
   const fieldHeight = Math.max(300, margin * 0.3);
-  return <foreignObject x={x - fieldWidth / 2} y={y - fieldHeight * 1.45} width={fieldWidth} height={fieldHeight}><input key={`${label}-${value}`} aria-label={`Selected object temporary ${label.toLowerCase()}`} type="number" step="0.1" defaultValue={Number(value.toFixed(1))} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key === "Enter") { const next = Number(event.currentTarget.value); if (Number.isFinite(next) && next > 0) onChange(next); event.currentTarget.blur(); } }} style={{ width: "100%", height: "100%", border: "2px solid #1473e6", borderRadius: 8, background: "white", color: "#0f172a", textAlign: "center", fontWeight: 700 }} /></foreignObject>;
+  return <foreignObject x={x - fieldWidth / 2} y={y - fieldHeight * 1.45} width={fieldWidth} height={fieldHeight}><input key={`${label}-${value}-${unit}`} aria-label={`Selected object temporary ${label.toLowerCase()}`} type="number" step="any" defaultValue={displayLength(value, unit)} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key === "Enter") { const next = modelLength(Number(event.currentTarget.value), unit); if (Number.isFinite(next) && next > 0) onChange(next); event.currentTarget.blur(); } }} style={{ width: "100%", height: "100%", border: "2px solid #1473e6", borderRadius: 8, background: "white", color: "#0f172a", textAlign: "center", fontWeight: 700, fontSize: fieldHeight * 0.45 }} /></foreignObject>;
 }
 
 function ModelPlanGeometry({ project, levelId }: { project: HouseProject; levelId: string }) {
   return <g pointerEvents="none">
-    {project.structuralGrid.filter((item) => item.levelId === levelId).map((item) => <line key={item.id} x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke="#64748b" strokeWidth={8} strokeDasharray="90 45" vectorEffect="non-scaling-stroke" />)}
-    {project.referencePlanes.filter((item) => item.levelId === levelId).map((item) => <line key={item.id} x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke="#db2777" strokeWidth={8} strokeDasharray="60 35" vectorEffect="non-scaling-stroke" />)}
+    {project.structuralGrid.filter((item) => item.levelId === levelId).map((item) => <line key={item.id} x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke="#64748b" strokeWidth={2} strokeDasharray="90 45" vectorEffect="non-scaling-stroke" />)}
+    {project.referencePlanes.filter((item) => item.levelId === levelId).map((item) => <line key={item.id} x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke="#db2777" strokeWidth={2} strokeDasharray="60 35" vectorEffect="non-scaling-stroke" />)}
     {project.structuralBeams.filter((item) => item.levelId === levelId).map((item) => <line key={item.id} x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke="#b7791f" strokeWidth={Math.max(30, item.width)} opacity={0.72} />)}
-    {project.railings.filter((item) => item.levelId === levelId).map((item) => <line key={item.id} x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke="#475569" strokeWidth={18} vectorEffect="non-scaling-stroke" />)}
-    {project.foundations.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} fill="rgba(100,116,139,.12)" stroke="#64748b" strokeWidth={10} vectorEffect="non-scaling-stroke" />)}
+    {project.railings.filter((item) => item.levelId === levelId).map((item) => <line key={item.id} x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke="#475569" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
+    {project.foundations.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} fill="rgba(100,116,139,.12)" stroke="#64748b" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
     {project.structuralColumns.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} fill="#64748b" />)}
-    {project.stairs.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.length / 2} width={item.width} height={item.length} fill="rgba(71,85,105,.16)" stroke="#475569" strokeWidth={10} vectorEffect="non-scaling-stroke" />)}
-    {project.components.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} fill="rgba(20,115,230,.10)" stroke="#1473e6" strokeWidth={10} vectorEffect="non-scaling-stroke" />)}
+    {project.stairs.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.length / 2} width={item.width} height={item.length} fill="rgba(71,85,105,.16)" stroke="#475569" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
+    {project.components.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} fill="rgba(20,115,230,.10)" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
   </g>;
 }
 
 function WallTemporaryDimension({ wall, margin, selection, onChange }: { wall: HouseProject["walls"][number]; margin: number; selection: HouseSelection; onChange: (selection: HouseSelection, length: number) => void }) {
   const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
   const middle = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
-  return <g><line x1={wall.start.x} y1={wall.start.y} x2={wall.end.x} y2={wall.end.y} stroke="#1473e6" strokeWidth={18} vectorEffect="non-scaling-stroke" /><InlineDimensionInput x={middle.x} y={middle.y} margin={margin} label="Length" value={length} onChange={(value) => { if (value >= 200) onChange(selection, value); }} /></g>;
+  return <g><line x1={wall.start.x} y1={wall.start.y} x2={wall.end.x} y2={wall.end.y} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><InlineDimensionInput x={middle.x} y={middle.y} margin={margin} label="Length" value={length} onChange={(value) => { if (value >= 200) onChange(selection, value); }} /></g>;
 }
 
 /**

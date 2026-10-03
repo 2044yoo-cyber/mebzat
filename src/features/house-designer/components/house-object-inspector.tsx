@@ -1,5 +1,8 @@
 "use client";
 
+import { useHouseUnits } from "./house-units";
+import { displayLength, modelLength, unitScale } from "../services/workspace-options";
+
 import { useState, type ReactNode } from "react";
 
 import { patchHouseObject, type HousePatch } from "../services/project-edit";
@@ -406,12 +409,14 @@ function FieldGrid({ title, children }: { title: string; children: ReactNode }) 
 }
 
 function NumberInput({ label, value, min, max, step = 0.1, suffix = "mm", onChange }: { label: string; value: number; min: number; max: number; step?: number; suffix?: string; onChange: (value: number) => void }) {
+  const unit = useHouseUnits();
+  const factor = suffix === "mm" ? unitScale(unit) : 1;
   return (
     <label className="space-y-1 text-[11px] text-muted-foreground">
       <span>{label}</span>
       <span className="flex rounded-lg border bg-background px-2">
-        <input type="number" value={value} min={min} max={max} step={step} onChange={(event) => { const next = Number(event.target.value); if (Number.isFinite(next)) onChange(clamp(next, min, max)); }} className="min-w-0 flex-1 bg-transparent py-2 text-right text-sm tabular-nums text-foreground outline-none" />
-        {suffix ? <span className="ml-1 self-center">{suffix}</span> : null}
+        <input type="number" value={suffix === "mm" ? displayLength(value, unit) : value} min={min / factor} max={max / factor} step={step / factor} onChange={(event) => { const next = suffix === "mm" ? modelLength(Number(event.target.value), unit) : Number(event.target.value); if (Number.isFinite(next)) onChange(clamp(next, min, max)); }} className="min-w-0 flex-1 bg-transparent py-2 text-right text-sm tabular-nums text-foreground outline-none" />
+        {suffix ? <span className="ml-1 self-center">{suffix === "mm" ? unit : suffix}</span> : null}
       </span>
     </label>
   );

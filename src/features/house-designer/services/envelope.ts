@@ -8,6 +8,7 @@ import {
 
 /** Add Phase 6 envelope objects to older saved projects without changing plan geometry. */
 export function ensureHouseEnvelopeProject(project: HouseProject): HouseProject {
+  if (project.modelingOptions) return project;
   const ground = project.levels[0];
   const hasEntrance = ground
     ? project.doors.some((door) => door.levelId === ground.id && door.type !== "passage")

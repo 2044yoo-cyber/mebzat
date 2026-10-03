@@ -33,6 +33,7 @@ export function PlanCanvas({
   selectedWallId,
   onSelectWall,
   snap = true,
+  formatLength = (value: number) => Number(value.toFixed(2)),
   className,
 }: {
   room: Room;
@@ -40,6 +41,7 @@ export function PlanCanvas({
   selectedWallId?: string | null;
   onSelectWall?: (wallId: string | null) => void;
   snap?: boolean;
+  formatLength?: (value: number) => number | string;
   className?: string;
 }) {
   const svg = useRef<SVGSVGElement>(null);
@@ -245,7 +247,7 @@ export function PlanCanvas({
               fontSize={Math.max(bounds.width, bounds.height) / 34}
               className="pointer-events-none fill-foreground font-medium"
             >
-              {Number(wall.length.toFixed(2))}
+              {formatLength(wall.length)}
             </text>
           </g>
         );
@@ -299,7 +301,7 @@ export function PlanCanvas({
         return (
           <g key={dimension.id} className="pointer-events-none">
             <line x1={dimension.start.x} y1={dimension.start.y} x2={dimension.end.x} y2={dimension.end.y} strokeWidth={stroke * 0.65} strokeDasharray={`${stroke * 3} ${stroke * 2}`} className="stroke-brand" />
-            <text x={(dimension.start.x + dimension.end.x) / 2} y={(dimension.start.y + dimension.end.y) / 2} textAnchor="middle" fontSize={Math.max(bounds.width, bounds.height) / 42} className="fill-brand">{dimension.label || Number(length.toFixed(2))}</text>
+            <text x={(dimension.start.x + dimension.end.x) / 2} y={(dimension.start.y + dimension.end.y) / 2} textAnchor="middle" fontSize={Math.max(bounds.width, bounds.height) / 42} className="fill-brand">{dimension.label || formatLength(length)}</text>
           </g>
         );
       })}

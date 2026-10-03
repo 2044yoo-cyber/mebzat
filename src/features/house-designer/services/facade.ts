@@ -100,6 +100,7 @@ export function activateFacadeAlternative(project: HouseProject, alternativeId: 
 }
 
 export function ensurePhaseThreeProject(project: HouseProject): HouseProject {
+  if (project.modelingOptions) return project;
   const styleUsesParapet = ["modern", "contemporary", "minimal", "ethiopian-inspired", "custom-reference"].includes(project.designStyle);
   if (project.facadeElements.length > 0 && (!styleUsesParapet || project.facadeElements.some((element) => element.type === "parapet"))) return project;
   return applyFacadeStyle(project, project.designStyle, project.referenceImages.some((image) => image.kind === "facade") ? "reference" : "style");

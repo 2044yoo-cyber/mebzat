@@ -21,6 +21,7 @@ export function generatePreliminaryStructure(project: HouseProject): HouseProjec
 }
 
 export function ensurePhaseFourProject(project: HouseProject): HouseProject {
+  if (project.modelingOptions) return project;
   if (project.structuralColumns.length > 0 && project.structuralBeams.length > 0 && project.structuralGrid.length > 0) return project;
   return generatePreliminaryStructure(project);
 }
