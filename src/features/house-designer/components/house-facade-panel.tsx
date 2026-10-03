@@ -14,7 +14,7 @@ import {
   generateFacadeAlternatives,
   patchFacade,
 } from "../services/facade";
-import { houseStyles, type HouseProject, type HouseStyle } from "../types/project";
+import { HOUSE_STYLE_LABELS, houseStyles, type HouseProject, type HouseStyle } from "../types/project";
 
 export function HouseFacadePanel({ project, onChange }: { project: HouseProject; onChange: (project: HouseProject) => void }) {
   const [count, setCount] = useState<2 | 3 | 4>(3);
@@ -57,7 +57,7 @@ export function HouseFacadePanel({ project, onChange }: { project: HouseProject;
         <label className="shrink-0 space-y-1 text-[11px] text-muted-foreground">
           <span>Style</span>
           <select value={project.designStyle} onChange={(event) => onChange(applyFacadeStyle(project, event.target.value as HouseStyle))} className="block min-w-44 rounded-lg border bg-background px-3 py-2 text-sm capitalize text-foreground">
-            {houseStyles.map((style) => <option key={style} value={style}>{labelStyle(style)}</option>)}
+            {houseStyles.map((style) => <option key={style} value={style}>{HOUSE_STYLE_LABELS[style]}</option>)}
           </select>
         </label>
         <ColourField label="Main" value={project.facade.primaryColor} onChange={(primaryColor) => onChange(patchFacade(project, { primaryColor }))} />
@@ -109,8 +109,4 @@ function ColourField({ label, value, onChange }: { label: string; value: string;
       </span>
     </label>
   );
-}
-
-function labelStyle(value: string) {
-  return value.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 }

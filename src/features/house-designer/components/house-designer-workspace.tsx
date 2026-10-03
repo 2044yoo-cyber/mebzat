@@ -101,6 +101,7 @@ import {
 import {
   createHouseProject,
   ensurePhaseTwoProject,
+  HOUSE_STYLE_LABELS,
   houseStyles,
   type HouseProject,
   type HouseObjectKind,
@@ -1141,7 +1142,7 @@ function clamp(value: number, min: number, max: number) { return Math.min(max, M
 
 function slug(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 
-function labelStyle(value: HouseStyle) { return value.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" "); }
+function labelStyle(value: HouseStyle) { return HOUSE_STYLE_LABELS[value]; }
 
 function previewView(viewId: string | null): "3d" | "top" | "front" | "back" | "left" | "right" {
   if (viewId?.endsWith(":top")) return "top";

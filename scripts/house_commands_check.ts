@@ -19,7 +19,8 @@ import {
 import { addHouseFloor, patchHouseObject } from "../src/features/house-designer/services/project-edit";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
 import { calculateHouseQuantities } from "../src/features/house-designer/services/quantities";
-import { createHouseProject, houseProjectSchema } from "../src/features/house-designer/types/project";
+import { HOUSE_STYLE_LABELS, createHouseProject, houseProjectSchema, houseStyles } from "../src/features/house-designer/types/project";
+import { applyFacadeStyle } from "../src/features/house-designer/services/facade";
 
 let project = ensureHouseBimState(createHouseProject({ title: "Command check", room: rectangularRoom(8000, 6500), style: "modern", strict: true, floorCount: 2, floorToFloorHeight: 3000 }));
 assert.ok(project.foundations.length > 0, "foundation suggestions are structured objects");
@@ -95,6 +96,25 @@ assert.equal(editable.project.roofs[0]!.boundary.length, 3, "the roof boundary f
 assert.ok(houseProjectSchema.safeParse(editable.project).success, "the shorter footprint is still a valid project");
 const triangleWall = { kind: "wall" as const, id: editable.project.walls.find((item) => item.levelId === "ground-floor")!.id };
 assert.ok(deleteHouseSelections(editable.project, [triangleWall], { footprintEditable: true }).blocked.length > 0, "refuses to shrink a footprint below three walls");
+
+{
+  // Styles change appearance only; Luxury is one of them.
+  const base = ensureHouseBimState(createHouseProject({ title: "Style", room: rectangularRoom(8000, 6500), style: "modern", strict: false, floorCount: 2, floorToFloorHeight: 3000 }));
+  const luxury = applyFacadeStyle(base, "luxury");
+  assert.equal(luxury.designStyle, "luxury");
+  assert.ok(houseProjectSchema.safeParse(luxury).success, "a luxury house is a valid project");
+  const geometry = (value: typeof base) => JSON.stringify([value.walls.map((wall) => [wall.id, wall.start, wall.end, wall.thickness]), [...value.doors, ...value.windows].map((item) => [item.id, item.offset, item.width])]);
+  assert.equal(geometry(luxury), geometry(base), "restyling moves no wall, door or window");
+  assert.ok(luxury.roofs.every((roof) => roof.type === "flat"), "on a flat roof");
+  const top = luxury.levels.at(-1)!.id;
+  assert.ok(luxury.facadeElements.some((item) => item.type === "parapet" && item.levelId === top), "behind a parapet");
+  for (const level of luxury.levels) {
+    assert.ok(luxury.facadeElements.some((item) => item.type === "band" && item.levelId === level.id && item.elevation === level.elevation), `with a stone plinth on ${level.name}`);
+    assert.equal(luxury.facadeElements.filter((item) => item.type === "pilaster" && item.levelId === level.id).length, 2, `and an entrance feature on ${level.name}`);
+  }
+  assert.ok(houseStyles.every((style) => HOUSE_STYLE_LABELS[style]?.length), "every style has a name people read");
+  assert.equal(HOUSE_STYLE_LABELS["ethiopian-inspired"], "Traditional Ethiopian");
+}
 
 {
   // Floor, ceiling and roof cover the room you tap, once.

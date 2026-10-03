@@ -12,7 +12,21 @@ export const houseStyles = [
   "mediterranean",
   "ethiopian-inspired",
   "custom-reference",
+  "luxury",
 ] as const;
+
+/** What a person sees for each style; the ids are stored and stay as they are. */
+export const HOUSE_STYLE_LABELS: Record<HouseStyle, string> = {
+  modern: "Modern",
+  contemporary: "Contemporary",
+  minimal: "Minimal",
+  classic: "Classic",
+  "neo-classical": "Neo-classical",
+  mediterranean: "Mediterranean",
+  "ethiopian-inspired": "Traditional Ethiopian",
+  "custom-reference": "Custom (from a reference photo)",
+  luxury: "Luxury",
+};
 
 export const roofTypes = ["flat", "gable", "hip"] as const;
 export const stairTypes = ["straight", "l-shaped", "u-shaped"] as const;
@@ -671,6 +685,7 @@ export function facadeSettingsForStyle(style: HouseStyle, hasReference = false):
     "neo-classical": { primaryColor: "#f2ecdf", secondaryColor: "#d3c3a7", accentColor: "#a58b66", roofColor: "#5b5149", windowFrameColor: "#ece6da", doorColor: "#4c3427", wallMaterial: "Painted stucco", roofMaterial: "Concrete tile", windowStyle: "tall framed", entranceStyle: "pilastered" },
     mediterranean: { primaryColor: "#f0dfc4", secondaryColor: "#c89d70", accentColor: "#8f6544", roofColor: "#a64f38", windowFrameColor: "#544c3e", doorColor: "#6d432d", wallMaterial: "Warm stucco", roofMaterial: "Terracotta tile", windowStyle: "deep reveal", entranceStyle: "arched accent" },
     "ethiopian-inspired": { primaryColor: "#ddd0ba", secondaryColor: "#6e6152", accentColor: "#a35b35", roofColor: "#514943", windowFrameColor: "#282827", doorColor: "#56392a", wallMaterial: "Mineral render and local stone", roofMaterial: "Coated metal", windowStyle: "deep-set aluminium", entranceStyle: "patterned portal" },
+    luxury: { primaryColor: "#ece6dc", secondaryColor: "#8a7a66", accentColor: "#8c6a3f", roofColor: "#2f3236", windowFrameColor: "#1f2226", doorColor: "#3b2a1e", wallMaterial: "Natural stone cladding and fine render", roofMaterial: "Reinforced concrete", windowStyle: "floor-to-ceiling bronze aluminium", entranceStyle: "double-height pivot door" },
     "custom-reference": { primaryColor: "#e7e3dc", secondaryColor: "#77736e", accentColor: "#9b704d", roofColor: "#5d5852", windowFrameColor: "#343434", doorColor: "#604430", wallMaterial: "Reference finish", roofMaterial: "Reference roof", windowStyle: "reference proportion", entranceStyle: "reference entrance" },
   };
   return {
@@ -703,17 +718,26 @@ export function buildFacadeElements(
         add("pilaster", 80, level.elevation, 260, wallHeight, 110, facade.secondaryColor);
         add("pilaster", Math.max(80, length - 340), level.elevation, 260, wallHeight, 110, facade.secondaryColor);
       }
-      if (["modern", "contemporary", "minimal", "ethiopian-inspired", "custom-reference"].includes(facade.style)) {
+      if (["modern", "contemporary", "minimal", "ethiopian-inspired", "custom-reference", "luxury"].includes(facade.style)) {
         add("band", 0, level.elevation + wallHeight * 0.58, length, 150, 70, facade.secondaryColor);
       }
-      if (["modern", "contemporary", "ethiopian-inspired", "custom-reference"].includes(facade.style) && wallIndex === 0) {
+      if (["modern", "contemporary", "ethiopian-inspired", "custom-reference", "luxury"].includes(facade.style) && wallIndex === 0) {
         const accentWidth = Math.min(1100, Math.max(450, length * 0.18));
         add("accent", Math.max(0, length * 0.58), level.elevation + 140, accentWidth, Math.max(600, wallHeight - 280), 95);
+      }
+      // Luxury: a stone plinth along every outside wall and a full-height
+      // feature either side of the entrance.
+      if (facade.style === "luxury") {
+        add("band", 0, level.elevation, length, 450, 60, facade.secondaryColor);
+        if (wallIndex === 0) {
+          add("pilaster", Math.max(0, length * 0.58 - 320), level.elevation, 220, wallHeight, 120, facade.accentColor);
+          add("pilaster", Math.min(length - 220, length * 0.58 + Math.min(1100, Math.max(450, length * 0.18)) + 100), level.elevation, 220, wallHeight, 120, facade.accentColor);
+        }
       }
       if (facade.style === "ethiopian-inspired") {
         add("band", 0, level.elevation + wallHeight * 0.25, length, 90, 85, facade.accentColor);
       }
-      if (levelIndex === levels.length - 1 && ["modern", "contemporary", "minimal", "custom-reference", "ethiopian-inspired"].includes(facade.style)) {
+      if (levelIndex === levels.length - 1 && ["modern", "contemporary", "minimal", "custom-reference", "ethiopian-inspired", "luxury"].includes(facade.style)) {
         add("parapet", 0, level.elevation + wallHeight, length, 800, Math.max(120, wall.thickness), facade.primaryColor);
       }
     }

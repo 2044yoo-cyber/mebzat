@@ -19,6 +19,7 @@ const alternativeNames: Record<HouseStyle, string> = {
   mediterranean: "Mediterranean Warmth",
   "ethiopian-inspired": "Ethiopian Contemporary",
   "custom-reference": "Reference Interpretation",
+  luxury: "Luxury Stone",
 };
 
 /** Change appearance while preserving every verified plan coordinate. */
@@ -101,7 +102,7 @@ export function activateFacadeAlternative(project: HouseProject, alternativeId: 
 
 export function ensurePhaseThreeProject(project: HouseProject): HouseProject {
   if (project.modelingOptions) return project;
-  const styleUsesParapet = ["modern", "contemporary", "minimal", "ethiopian-inspired", "custom-reference"].includes(project.designStyle);
+  const styleUsesParapet = ["modern", "contemporary", "minimal", "ethiopian-inspired", "custom-reference", "luxury"].includes(project.designStyle);
   if (project.facadeElements.length > 0 && (!styleUsesParapet || project.facadeElements.some((element) => element.type === "parapet"))) return project;
   return applyFacadeStyle(project, project.designStyle, project.referenceImages.some((image) => image.kind === "facade") ? "reference" : "style");
 }
@@ -135,7 +136,7 @@ function applyFacade(project: HouseProject, facade: HouseFacadeSettings, note: s
 }
 
 function alternativeStyles(current: HouseStyle): HouseStyle[] {
-  const preferred: HouseStyle[] = ["modern", "contemporary", "minimal", "neo-classical", "classic", "mediterranean", "ethiopian-inspired", "custom-reference"];
+  const preferred: HouseStyle[] = ["modern", "contemporary", "luxury", "minimal", "neo-classical", "classic", "mediterranean", "ethiopian-inspired", "custom-reference"];
   return preferred.filter((style) => style !== current && houseStyles.includes(style));
 }
 
