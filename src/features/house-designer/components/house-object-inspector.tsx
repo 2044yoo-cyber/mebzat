@@ -34,10 +34,10 @@ export function HouseObjectInspector({
   };
 
   return (
-    <aside className="min-w-0 space-y-3 rounded-xl border bg-card p-3">
+    <aside id="house-properties" className="min-w-0 space-y-3 rounded-xl border bg-card p-3">
       <div>
-        <p className="text-[11px] font-medium uppercase tracking-wide text-brand">Object inspector</p>
-        <h3 className="mt-0.5 font-semibold">Properties</h3>
+        <p className="text-[11px] font-medium uppercase tracking-wide text-brand">Properties</p>
+        <h3 className="mt-0.5 font-semibold">{selections.length > 1 ? "Common Properties" : selected ? `${propertyTitle(selected.kind)} Properties` : "View Properties"}</h3>
         {selections.length > 1 ? <p className="text-xs text-muted-foreground">{selections.length} objects selected</p> : null}
       </div>
 
@@ -48,7 +48,7 @@ export function HouseObjectInspector({
           onChange={(event) => onSelect(parseSelection(event.target.value))}
           className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-brand"
         >
-          <option value="">Tap an object in 3D</option>
+          <option value="">Select a model object</option>
           {options.map((option) => (
             <option key={selectionValue(option.selection)} value={selectionValue(option.selection)}>
               {option.label}
@@ -58,17 +58,29 @@ export function HouseObjectInspector({
       </label>
 
       {selected ? (
-        <>
-          <TypeInstanceFields project={project} selected={selected} selections={selections} onChange={onChange} />
-          <InspectorFields project={project} selected={selected} onPatch={patch} />
-        </>
+        selections.length > 1 ? <MultiSelectionFields project={project} selections={selections} onChange={onChange} /> : <><TypeInstanceFields project={project} selected={selected} selections={selections} onChange={onChange} /><InspectorFields project={project} selected={selected} onPatch={patch} /></>
       ) : (
-        <p className="rounded-lg bg-muted/60 p-3 text-xs leading-5 text-muted-foreground">
-          Tap a wall, opening, stair, slab, roof or exterior object—or choose one above—to edit its exact millimetre values.
-        </p>
+        <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/60 p-3 text-xs"><span className="text-muted-foreground">View</span><strong>Floor Plan</strong><span className="text-muted-foreground">Level</span><strong>{project.levels.find((item) => item.id === activeLevelId)?.name ?? "—"}</strong><span className="text-muted-foreground">Units</span><strong>{project.units}</strong><span className="text-muted-foreground">Detail</span><strong>Medium</strong></div>
       )}
     </aside>
   );
+}
+
+function MultiSelectionFields({ project, selections, onChange }: { project: HouseProject; selections: readonly HouseSelection[]; onChange: (project: HouseProject) => void }) {
+  const commonKind = selections.every((item) => item.kind === selections[0]?.kind) ? selections[0]?.kind : null;
+  const types = commonKind ? project.objectTypes.filter((item) => item.kind === commonKind) : [];
+  const typeIds = new Set(selections.map((item) => project.objectInstances[item.id]?.typeId ?? null));
+  const allPinned = selections.every((item) => project.objectInstances[item.id]?.pinned);
+  function pin(pinned: boolean) {
+    const objectInstances = { ...project.objectInstances };
+    for (const selection of selections) objectInstances[selection.id] = { ...(objectInstances[selection.id] ?? { typeId: null, mark: "", pinned: false, groupId: null, flipped: false, properties: {} }), pinned };
+    onChange({ ...project, objectInstances });
+  }
+  return <div className="space-y-2 border-t pt-3"><p className="text-xs text-muted-foreground">Editing {selections.length} selected objects{commonKind ? ` · ${propertyTitle(commonKind)}` : ""}</p>{types.length ? <label className="block space-y-1 text-[11px] text-muted-foreground"><span>Common type</span><select value={typeIds.size === 1 ? [...typeIds][0] ?? "" : ""} onChange={(event) => onChange(setHouseObjectType(project, selections, event.target.value))} className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground"><option value="" disabled>{typeIds.size === 1 ? "Choose type" : "Multiple types"}</option>{types.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label> : null}<label className="flex items-center gap-2 rounded-lg border p-2 text-xs"><input type="checkbox" checked={allPinned} onChange={(event) => pin(event.target.checked)} />Pinned</label></div>;
+}
+
+function propertyTitle(kind: HouseSelection["kind"]) {
+  return kind.split("-").map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`).join(" ");
 }
 
 function TypeInstanceFields({ project, selected, selections, onChange }: { project: HouseProject; selected: HouseSelection; selections: readonly HouseSelection[]; onChange: (project: HouseProject) => void }) {

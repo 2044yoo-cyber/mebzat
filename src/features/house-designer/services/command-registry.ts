@@ -6,13 +6,18 @@ export type HouseCommandId =
   | "copy" | "paste" | "cut" | "duplicate" | "select-all" | "cycle-selection" | "flip"
   | "wall" | "door" | "window" | "column" | "room" | "room-separator" | "floor" | "ceiling"
   | "roof" | "stair" | "railing" | "opening" | "component" | "furniture" | "kitchen"
-  | "wardrobe" | "plumbing-fixture" | "move" | "rotate" | "align" | "offset" | "array"
+  | "wardrobe" | "plumbing-fixture" | "structural-wall" | "beam" | "structural-slab"
+  | "foundation" | "isolated-footing" | "strip-footing" | "foundation-slab"
+  | "move" | "rotate" | "align" | "offset" | "array"
   | "trim" | "split" | "join" | "unjoin" | "mirror-pick" | "mirror-draw" | "scale"
   | "pin" | "unpin" | "create-similar" | "match-type" | "group" | "ungroup"
   | "hide" | "isolate" | "reset-hide" | "visibility" | "zoom-fit" | "zoom-extents"
-  | "default-3d" | "tile-views" | "dimension" | "text" | "room-tag" | "tag" | "section"
+  | "floor-plan" | "default-3d" | "split-view" | "view-top" | "view-front" | "view-back"
+  | "view-left" | "view-right" | "view-isometric" | "view-perspective" | "tile-views"
+  | "dimension" | "text" | "room-tag" | "tag" | "section"
   | "elevation" | "grid" | "level" | "reference-plane" | "command-search" | "shortcut-help"
-  | "ai-remodel" | "alternatives" | "estimate" | "boq";
+  | "ask-ai" | "ai-remodel" | "generate-facade" | "alternatives" | "generate-structure"
+  | "analyze-plan" | "estimate" | "boq";
 
 export type HouseCommandDefinition = {
   id: HouseCommandId;
@@ -35,7 +40,7 @@ export const houseCommandRegistry: readonly HouseCommandDefinition[] = [
   command("redo", "Redo", "General", "Ctrl+Y"),
   command("save", "Save", "General", "Ctrl+S"),
   command("save-as", "Save As", "General", "Ctrl+Shift+S"),
-  command("copy", "Copy", "Modify", "Ctrl+C", true),
+  command("copy", "Copy", "Modify", "CO", true),
   command("paste", "Paste", "Modify", "Ctrl+V"),
   command("cut", "Cut", "Modify", "Ctrl+X", true),
   command("duplicate", "Duplicate", "Modify", "Ctrl+D", true),
@@ -59,6 +64,13 @@ export const houseCommandRegistry: readonly HouseCommandDefinition[] = [
   command("kitchen", "Kitchen", "Architecture", "KT", false, true),
   command("wardrobe", "Wardrobe", "Architecture", "WD", false, true),
   command("plumbing-fixture", "Plumbing Fixture", "Architecture", "PF", false, true),
+  command("structural-wall", "Structural Wall", "Structure", "SW", false, true),
+  command("beam", "Beam", "Structure", "BM", false, true),
+  command("structural-slab", "Structural Slab", "Structure", "SF", false, true),
+  command("foundation", "Foundation", "Structure", "FD", false, true),
+  command("isolated-footing", "Isolated Footing", "Structure", "IF", false, true),
+  command("strip-footing", "Strip Footing", "Structure", "WF", false, true),
+  command("foundation-slab", "Foundation Slab", "Structure", "FS", false, true),
   command("move", "Move", "Modify", "MV", true, true),
   command("rotate", "Rotate 90°", "Modify", "RO", true),
   command("align", "Align", "Modify", "AL", true, true),
@@ -83,7 +95,16 @@ export const houseCommandRegistry: readonly HouseCommandDefinition[] = [
   command("visibility", "Visibility / Graphics", "View", "VG"),
   command("zoom-fit", "Zoom Fit", "View", "ZF"),
   command("zoom-extents", "Zoom Extents", "View", "ZE"),
-  command("default-3d", "Default 3D View", "View", "3D"),
+  command("floor-plan", "2D Plan", "View"),
+  command("default-3d", "3D", "View", "3D"),
+  command("split-view", "Split View", "View"),
+  command("view-top", "Top", "View"),
+  command("view-front", "Front", "View"),
+  command("view-back", "Back", "View"),
+  command("view-left", "Left", "View"),
+  command("view-right", "Right", "View"),
+  command("view-isometric", "Isometric", "View"),
+  command("view-perspective", "Perspective", "View"),
   command("tile-views", "Tile Views", "View", "WT"),
   command("dimension", "Dimension", "Annotate", "DI", false, true),
   command("text", "Text", "Annotate", "TX", false, true),
@@ -96,8 +117,12 @@ export const houseCommandRegistry: readonly HouseCommandDefinition[] = [
   command("reference-plane", "Reference Plane", "Structure", "RP", false, true),
   command("command-search", "Command Search", "General", "Ctrl+K"),
   command("shortcut-help", "Keyboard Shortcuts", "General", "?"),
-  command("ai-remodel", "Ask Medosha AI", "AI", undefined, true),
+  command("ask-ai", "Ask Medosha AI", "AI"),
+  command("ai-remodel", "AI Remodel", "AI"),
+  command("generate-facade", "Generate Façade", "AI"),
   command("alternatives", "Generate Alternatives", "AI", undefined, false),
+  command("generate-structure", "Generate Preliminary Structure", "AI"),
+  command("analyze-plan", "Analyze Floor Plan", "AI"),
   command("estimate", "Estimate Cost", "AI", undefined, true),
   command("boq", "Show in BOQ", "AI", undefined, true),
 ];
@@ -130,7 +155,7 @@ export function commandFromKeyboard(event: Pick<KeyboardEvent, "key" | "ctrlKey"
     if (key === "k") return "command-search";
     return null;
   }
-  if (event.key === "Delete" || event.key === "Backspace") return "delete";
+  if (event.key === "Delete") return "delete";
   if (event.key === "Escape") return "cancel";
   if (event.key === "Enter") return "finish";
   if (event.key === " ") return "flip";

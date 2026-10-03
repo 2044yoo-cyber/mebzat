@@ -9,6 +9,8 @@ import {
   Grid3X3,
   HelpCircle,
   Layers3,
+  PanelLeftClose,
+  PanelLeftOpen,
   MousePointer2,
   Move,
   Redo2,
@@ -24,23 +26,24 @@ import { cn } from "@/lib/utils";
 
 import {
   houseCommand,
-  houseCommandCategories,
   searchHouseCommands,
   type HouseCommandCategory,
   type HouseCommandId,
 } from "../services/command-registry";
 import { calculateHouseQuantities } from "../services/quantities";
-import type { HouseProject, HouseViewState } from "../types/project";
+import type { HouseProject, HouseSelection, HouseViewState } from "../types/project";
 
 const ribbonCommands: Record<HouseCommandCategory, HouseCommandId[]> = {
   General: ["select", "undo", "redo", "delete"],
-  Architecture: ["wall", "door", "window", "room", "floor", "ceiling", "roof", "stair", "railing", "component"],
-  Structure: ["column", "grid", "level", "reference-plane"],
-  Modify: ["move", "copy", "rotate", "align", "offset", "mirror-pick", "array", "split", "trim", "pin"],
-  Annotate: ["dimension", "text", "tag", "section", "elevation"],
-  View: ["default-3d", "visibility", "hide", "isolate", "reset-hide", "zoom-fit"],
-  AI: ["ai-remodel", "alternatives", "estimate", "boq"],
+  Architecture: ["wall", "door", "window", "floor", "roof", "ceiling", "room", "room-separator", "stair", "railing", "opening", "component", "furniture", "kitchen", "wardrobe"],
+  Structure: ["column", "beam", "structural-wall", "structural-slab", "foundation", "isolated-footing", "strip-footing", "foundation-slab", "grid", "level", "reference-plane"],
+  Modify: ["move", "copy", "rotate", "align", "offset", "trim", "split", "mirror-pick", "array", "join", "unjoin", "scale", "pin", "unpin", "create-similar", "match-type", "delete"],
+  Annotate: ["dimension", "text", "room-tag", "tag", "section", "elevation"],
+  View: ["floor-plan", "default-3d", "split-view", "view-top", "view-front", "view-back", "view-left", "view-right", "view-isometric", "view-perspective", "visibility", "zoom-fit", "hide", "isolate", "reset-hide"],
+  AI: ["ask-ai", "ai-remodel", "generate-facade", "alternatives", "generate-structure", "analyze-plan"],
 };
+
+const ribbonCategories: HouseCommandCategory[] = ["Architecture", "Modify", "Structure", "Annotate", "View", "AI"];
 
 const icons: Partial<Record<HouseCommandId, React.ComponentType<{ className?: string }>>> = {
   select: MousePointer2,
@@ -72,7 +75,7 @@ export function HouseRibbon({ activeCategory, activeTool, selectionCount, canUnd
   return (
     <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
       <div className="flex min-w-0 items-center gap-1 overflow-x-auto border-b px-2 pt-1.5">
-        {houseCommandCategories.map((category) => (
+        {ribbonCategories.map((category) => (
           <button key={category} type="button" onClick={() => onCategory(category)} className={cn("shrink-0 border-b-2 px-2 py-2 text-xs font-medium", activeCategory === category ? "border-brand text-brand" : "border-transparent text-muted-foreground hover:text-foreground")}>{category}</button>
         ))}
         <span className="ml-auto flex shrink-0 gap-1 pb-1">
@@ -81,7 +84,9 @@ export function HouseRibbon({ activeCategory, activeTool, selectionCount, canUnd
         </span>
       </div>
       <div className="flex min-w-0 gap-1 overflow-x-auto p-2">
-        {ribbonCommands[activeCategory].map((id) => {
+        {(["select", "undo", "redo", ...ribbonCommands[activeCategory]] as HouseCommandId[])
+          .filter((id, index, items) => items.indexOf(id) === index)
+          .map((id) => {
           const item = houseCommand(id);
           const Icon = icons[id] ?? BoxSelect;
           const disabled = item.selection && selectionCount === 0 || id === "undo" && !canUndo || id === "redo" && !canRedo;
@@ -89,12 +94,46 @@ export function HouseRibbon({ activeCategory, activeTool, selectionCount, canUnd
             <button key={id} type="button" disabled={disabled} onClick={() => onCommand(id)} title={`${item.label}${item.shortcut ? ` (${item.shortcut})` : ""}`} className={cn("flex min-w-[58px] shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-35", activeTool === id && "bg-brand/10 text-brand")}>
               <Icon className="size-4" />
               <span className="max-w-20 whitespace-nowrap">{item.label}</span>
+              {item.shortcut ? <kbd className="text-[9px] leading-none text-muted-foreground">{item.shortcut}</kbd> : null}
             </button>
           );
         })}
       </div>
     </div>
   );
+}
+
+export type HouseToolSettings = {
+  wallType: string;
+  locationLine: string;
+  height: number;
+  chain: boolean;
+  offset: number;
+  width: number;
+  depth: number;
+  sillHeight: number;
+  constrain: boolean;
+  disjoin: boolean;
+  multiple: boolean;
+};
+
+export function HouseToolOptions({ activeTool, project, levelId, settings, onChange }: {
+  activeTool: HouseCommandId | null;
+  project: HouseProject;
+  levelId: string;
+  settings: HouseToolSettings;
+  onChange: (change: Partial<HouseToolSettings>) => void;
+}) {
+  const level = project.levels.find((item) => item.id === levelId);
+  const numeric = (label: string, key: keyof Pick<HouseToolSettings, "height" | "offset" | "width" | "depth" | "sillHeight">) => (
+    <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground"><span>{label}</span><input type="number" step="0.1" value={settings[key]} onChange={(event) => onChange({ [key]: Number(event.target.value) })} className="w-24 rounded-md border bg-background px-2 py-1 text-right text-xs text-foreground" /><span>mm</span></label>
+  );
+  let controls: React.ReactNode = <span className="text-xs text-muted-foreground">Select objects to edit their instance properties.</span>;
+  if (activeTool === "wall" || activeTool === "structural-wall" || activeTool === "room-separator") controls = <><label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">Wall Type<select value={settings.wallType} onChange={(event) => onChange({ wallType: event.target.value })} className="rounded-md border bg-background px-2 py-1 text-xs text-foreground"><option>200 mm Exterior</option><option>120 mm Interior</option><option>Structural RC</option></select></label><label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">Location Line<select value={settings.locationLine} onChange={(event) => onChange({ locationLine: event.target.value })} className="rounded-md border bg-background px-2 py-1 text-xs text-foreground"><option>Wall Centerline</option><option>Finish Face: Exterior</option><option>Finish Face: Interior</option></select></label><span className="shrink-0 text-[11px] text-muted-foreground">Base: <strong className="text-foreground">{level?.name ?? "—"}</strong></span><span className="shrink-0 text-[11px] text-muted-foreground">Top: <strong className="text-foreground">{project.levels[project.levels.findIndex((item) => item.id === levelId) + 1]?.name ?? "Unconnected"}</strong></span>{numeric("Height", "height")}<label className="flex shrink-0 items-center gap-1 text-xs"><input type="checkbox" checked={settings.chain} onChange={(event) => onChange({ chain: event.target.checked })} />Chain</label>{numeric("Offset", "offset")}</>;
+  else if (activeTool === "door" || activeTool === "window") controls = <><span className="shrink-0 text-xs font-medium capitalize">{activeTool} Type: Standard</span>{numeric("Width", "width")}{numeric("Height", "height")}{activeTool === "window" ? numeric("Sill", "sillHeight") : null}<span className="shrink-0 text-[11px] text-muted-foreground">Level: {level?.name ?? "—"}</span></>;
+  else if (activeTool === "move") controls = <>{["constrain", "disjoin", "multiple"].map((key) => <label key={key} className="flex shrink-0 items-center gap-1 text-xs capitalize"><input type="checkbox" checked={settings[key as "constrain" | "disjoin" | "multiple"]} onChange={(event) => onChange({ [key]: event.target.checked })} />{key}</label>)}</>;
+  else if (activeTool && activeTool !== "select") controls = <><span className="shrink-0 text-xs font-medium">{houseCommand(activeTool).label}</span>{["column", "beam", "stair", "component", "furniture", "kitchen", "wardrobe", "foundation", "isolated-footing", "strip-footing", "foundation-slab"].includes(activeTool) ? <>{numeric("Width", "width")}{numeric("Depth", "depth")}{numeric("Height", "height")}</> : null}</>;
+  return <div className="flex min-w-0 items-center gap-3 overflow-x-auto rounded-xl border bg-card px-3 py-2 whitespace-nowrap"><span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-brand">Options</span>{controls}</div>;
 }
 
 export function HouseProjectBrowser({ project, activeLevelId, activeViewId, onLevel, onView, onSchedule }: {
@@ -105,9 +144,11 @@ export function HouseProjectBrowser({ project, activeLevelId, activeViewId, onLe
   onView: (view: HouseViewState) => void;
   onSchedule: (kind: "doors" | "windows" | "rooms" | "quantities") => void;
 }) {
+  const [open, setOpen] = useState(true);
+  if (!open) return <button type="button" onClick={() => setOpen(true)} title="Open Project Browser" className="flex h-10 items-center justify-center rounded-xl border bg-card text-muted-foreground hover:text-foreground xl:sticky xl:top-3"><PanelLeftOpen className="size-4" /></button>;
   return (
-    <aside className="min-w-0 rounded-xl border bg-card p-2 text-xs xl:sticky xl:top-3 xl:max-h-[75dvh] xl:overflow-y-auto">
-      <div className="mb-2 flex items-center gap-2 px-1"><Layers3 className="size-4 text-brand" /><strong>Project Browser</strong></div>
+    <aside className="min-w-0 rounded-xl border bg-card p-2 text-xs xl:sticky xl:top-3 xl:max-h-[75dvh] xl:w-[210px] xl:overflow-y-auto">
+      <div className="mb-2 flex items-center gap-2 px-1"><Layers3 className="size-4 text-brand" /><strong>Project Browser</strong><button type="button" onClick={() => setOpen(false)} aria-label="Collapse Project Browser" className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted"><PanelLeftClose className="size-3.5" /></button></div>
       <BrowserGroup label="Floor Plans">
         {project.levels.map((level) => <BrowserButton key={level.id} active={activeLevelId === level.id} onClick={() => onLevel(level.id)}>{level.name}</BrowserButton>)}
       </BrowserGroup>
@@ -115,7 +156,11 @@ export function HouseProjectBrowser({ project, activeLevelId, activeViewId, onLe
         {project.views.filter((item) => item.kind === "3d").map((item) => <BrowserButton key={item.id} active={activeViewId === item.id} onClick={() => onView(item)}>{item.name}</BrowserButton>)}
       </BrowserGroup>
       <BrowserGroup label="Elevations">
-        {project.views.filter((item) => item.kind === "elevation").map((item) => <BrowserButton key={item.id} active={activeViewId === item.id} onClick={() => onView(item)}>{item.name}</BrowserButton>)}
+        {project.views.filter((item) => item.kind === "elevation").map((item) => <BrowserButton key={item.id} active={activeViewId === item.id} onClick={() => onView(item)}>{item.name === "Rear" ? "Back" : item.name}</BrowserButton>)}
+      </BrowserGroup>
+      <BrowserGroup label="Sections">
+        {project.views.filter((item) => item.kind === "section").map((item) => <BrowserButton key={item.id} active={activeViewId === item.id} onClick={() => onView(item)}>{item.name}</BrowserButton>)}
+        {project.views.every((item) => item.kind !== "section") ? <p className="px-2 py-1 text-muted-foreground">Create with Section (SE)</p> : null}
       </BrowserGroup>
       <BrowserGroup label="Schedules">
         <BrowserButton onClick={() => onSchedule("doors")}>Door Schedule</BrowserButton>
@@ -130,11 +175,19 @@ export function HouseProjectBrowser({ project, activeLevelId, activeViewId, onLe
   );
 }
 
-export function HouseStatusBar({ selectionCount, snap, level, units, mode, saveState }: { selectionCount: number; snap: string; level: string; units: string; mode: string; saveState: string }) {
+export function HouseSelectionActions({ selected, onCommand }: { selected: HouseSelection | null; onCommand: (id: HouseCommandId) => void }) {
+  if (!selected) return null;
+  const commands: HouseCommandId[] = selected.kind === "window" || selected.kind === "door"
+    ? ["move", "copy", "flip", "match-type", "delete"]
+    : ["move", "copy", "rotate", "align", "offset", "split", "delete"];
+  return <div className="flex min-w-0 gap-1 overflow-x-auto rounded-lg border bg-background/95 p-1 shadow-sm">{commands.map((id) => <button key={id} type="button" onClick={() => onCommand(id)} className="shrink-0 rounded-md px-2 py-1 text-[10px] hover:bg-muted">{id === "match-type" ? "Change Type" : houseCommand(id).label}</button>)}<button type="button" onClick={() => document.getElementById("house-properties")?.scrollIntoView({ behavior: "smooth", block: "nearest" })} className="shrink-0 rounded-md px-2 py-1 text-[10px] hover:bg-muted">Properties</button></div>;
+}
+
+export function HouseStatusBar({ selectionCount, snap, snapEnabled = true, onToggleSnap, level, units, mode, saveState }: { selectionCount: number; snap: string; snapEnabled?: boolean; onToggleSnap?: () => void; level: string; units: string; mode: string; saveState: string }) {
   return (
-    <div className="flex min-w-0 items-center gap-3 overflow-x-auto rounded-lg border bg-card px-3 py-2 text-[11px] text-muted-foreground">
+    <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex min-w-0 items-center gap-3 overflow-x-auto rounded-lg border bg-card/95 px-3 py-2 text-[11px] text-muted-foreground shadow-sm backdrop-blur md:bottom-2">
       <span className="shrink-0">Selected: <strong className="text-foreground">{selectionCount}</strong></span>
-      <span className="shrink-0">Snap: <strong className="text-foreground">{snap}</strong></span>
+      <button type="button" onClick={onToggleSnap} className="shrink-0 rounded px-1 hover:bg-muted">Snap: <strong className={snapEnabled ? "text-foreground" : "text-muted-foreground line-through"}>{snap}</strong></button>
       <span className="shrink-0">Level: <strong className="text-foreground">{level}</strong></span>
       <span className="shrink-0">Units: <strong className="text-foreground">{units}</strong></span>
       <span className="shrink-0">Mode: <strong className="text-foreground">{mode}</strong></span>

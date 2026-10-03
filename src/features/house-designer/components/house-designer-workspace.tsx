@@ -21,7 +21,6 @@ import {
   type DraftPlan,
 } from "@/components/tour/floor-plan-input";
 import { PlanCanvas } from "@/features/berchuma-studio/components/plan/plan-canvas";
-import { PlanEditor } from "@/features/berchuma-studio/components/plan/plan-editor";
 import { floorArea } from "@/features/berchuma-studio/services/room-geometry";
 import {
   rectangularRoom,
@@ -38,12 +37,15 @@ import {
   HouseProjectBrowser,
   HouseRibbon,
   HouseSchedulePanel,
+  HouseSelectionActions,
   HouseShortcutHelp,
   HouseStatusBar,
+  HouseToolOptions,
+  type HouseToolSettings,
   type HouseContextMenuState,
 } from "./house-modeling-chrome";
 import { HouseObjectInspector } from "./house-object-inspector";
-import { HousePlanSelectionOverlay } from "./house-plan-selection-overlay";
+import { HousePlanSelectionOverlay, type HousePlanPoint } from "./house-plan-selection-overlay";
 import { HousePreview } from "./house-preview";
 import { HouseStructurePanel } from "./house-structure-panel";
 import {
@@ -64,19 +66,22 @@ import {
 } from "../services/command-registry";
 import {
   alignHouseSelections,
-  createDefaultHouseObject,
+  createHouseObjectFromGesture,
   deleteHouseSelections,
   duplicateHouseSelections,
   groupHouseSelections,
   joinHouseSelections,
   mirrorHouseSelections,
   moveHouseSelections,
+  moveHouseSelectionsTo,
   pinHouseSelections,
   rotateHouseSelections,
+  scaleHouseSelections,
   setHouseObjectType,
   splitHouseSelection,
   type HouseClipboard,
 } from "../services/model-commands";
+import { patchHouseObject } from "../services/project-edit";
 import {
   allHouseSelections,
   ensureHouseBimState,
@@ -92,10 +97,18 @@ import {
   type HouseStyle,
   type HouseViewState,
 } from "../types/project";
+import { generateFacadeAlternatives } from "../services/facade";
+import { generatePreliminaryStructure } from "../services/structure";
 
 type Stage = "start" | "verify" | "model";
 type Source = "upload" | "manual";
 type WorkspaceView = "2d" | "3d" | "split";
+
+const drawingCommands = new Set<HouseCommandId>([
+  "wall", "door", "window", "room", "room-separator", "floor", "ceiling", "roof", "stair", "railing", "opening", "component", "furniture", "kitchen", "wardrobe", "plumbing-fixture",
+  "column", "beam", "structural-wall", "structural-slab", "foundation", "isolated-footing", "strip-footing", "foundation-slab", "grid", "level", "reference-plane",
+  "dimension", "text", "room-tag", "tag", "section", "elevation",
+]);
 
 const noSubscription = () => () => undefined;
 
@@ -154,10 +167,10 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
 
   async function openVerification(nextSource: Source) {
     setSource(nextSource);
-    setRoom((current) => ({
-      ...current,
+    let verifiedRoom: Room = {
+      ...room,
       ceilingHeight: clamp(floorHeight, 1800, 6000),
-    }));
+    };
     setPlanAnalysis(null);
     const plan = floorPlans[0];
     if (nextSource === "upload" && plan?.mediaType === "image") {
@@ -171,10 +184,10 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
         const payload = (await response.json()) as { plan?: unknown; confidence?: number; notes?: string[]; error?: string };
         const parsed = roomSchema.safeParse(payload.plan);
         if (!response.ok || !parsed.success) throw new Error(payload.error ?? "Automatic plan detection could not be verified.");
-        setRoom({
+        verifiedRoom = {
           ...parsed.data,
           reference: { url: plan.url, name: plan.title, mediaType: plan.mediaType, opacity: 0.45 },
-        });
+        };
         const confidence = typeof payload.confidence === "number" ? `${Math.round(payload.confidence * 100)}% confidence` : "detected";
         setPlanAnalysis(`Plan geometry ${confidence}. Verify every wall and opening before generation.`);
         toast.success("Floor-plan objects detected. Please verify them.");
@@ -185,23 +198,18 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
         setAnalysingPlan(false);
       }
     }
-    setStage("verify");
-  }
-
-  function generate(verified: Room) {
-    const next = createHouseProject({
+    setRoom(verifiedRoom);
+    setProject(ensureHouseBimState(createHouseProject({
       id: project?.id,
       title,
-      room: verified,
+      room: verifiedRoom,
       style,
       strict,
       floorCount,
       floorToFloorHeight: floorHeight,
       referenceImages: references(floorPlans, facades),
-    });
-    setRoom(verified);
-    setProject(ensureHouseBimState(next));
-    setStage("model");
+    })));
+    setStage("verify");
   }
 
   function restore() {
@@ -307,12 +315,18 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           onContinue={() => void openVerification(source)}
           onRestore={savedDraft ? restore : undefined}
         />
-      ) : stage === "verify" ? (
+      ) : stage === "verify" && project ? (
         <VerifyScreen
-          room={room}
+          project={project}
           source={source}
           analysis={planAnalysis}
-          onDone={generate}
+          view={view}
+          onView={setView}
+          onProjectChange={updateProject}
+          onDone={() => setStage("model")}
+          onSave={save}
+          saveState={saveState}
+          onDownload={download}
         />
       ) : project ? (
         <ModelScreen
@@ -483,7 +497,7 @@ function StartScreen({
   );
 }
 
-function VerifyScreen({ room, source, analysis, onDone }: { room: Room; source: Source; analysis: string | null; onDone: (room: Room) => void }) {
+function VerifyScreen({ project, source, analysis, view, onView, onProjectChange, onDone, onSave, saveState, onDownload }: { project: HouseProject; source: Source; analysis: string | null; view: WorkspaceView; onView: (view: WorkspaceView) => void; onProjectChange: (project: HouseProject) => void; onDone: () => void; onSave: () => void; saveState: string; onDownload: () => void }) {
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3">
@@ -495,20 +509,13 @@ function VerifyScreen({ room, source, analysis, onDone }: { room: Room; source: 
           {source === "upload" ? "Uploaded plan" : "Manual plan"}
         </span>
       </div>
-      {room.reference?.mediaType === "pdf" ? (
+      {project.levels[0]?.plan?.reference?.mediaType === "pdf" ? (
         <p className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300">
           PDF uploaded. Use the visible filename as reference and enter the verified dimensions here; image overlay is available for JPG and PNG plans.
         </p>
       ) : null}
       {analysis ? <p className="rounded-xl border border-brand/25 bg-brand/5 p-3 text-xs text-foreground">{analysis}</p> : null}
-      <div className="h-[min(760px,calc(100dvh-220px))] min-h-[560px]">
-        <PlanEditor
-          initial={room}
-          purpose="house"
-          doneLabel="Plan Correct — Generate House"
-          onDone={onDone}
-        />
-      </div>
+      <ModelScreen project={project} view={view} onView={onView} onProjectChange={onProjectChange} onSave={onSave} onSaveAs={onSave} saveState={saveState} onDownload={onDownload} verification onFinish={onDone} />
     </section>
   );
 }
@@ -522,6 +529,8 @@ function ModelScreen({
   onSaveAs,
   saveState,
   onDownload,
+  verification = false,
+  onFinish,
 }: {
   project: HouseProject;
   view: WorkspaceView;
@@ -531,6 +540,8 @@ function ModelScreen({
   onSaveAs: () => void;
   saveState: string;
   onDownload: () => void;
+  verification?: boolean;
+  onFinish?: () => void;
 }) {
   const [activeLevelId, setActiveLevelId] = useState(project.levels[0]?.id ?? "ground-floor");
   const [visibleLevelIds, setVisibleLevelIds] = useState<Set<string>>(
@@ -552,6 +563,22 @@ function ModelScreen({
   const [schedule, setSchedule] = useState<"doors" | "windows" | "rooms" | "quantities" | null>(null);
   const [contextMenu, setContextMenu] = useState<HouseContextMenuState>(null);
   const [guidance, setGuidance] = useState("Select an object or start a command");
+  const [draftStart, setDraftStart] = useState<HousePlanPoint | null>(null);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [viewRevision, setViewRevision] = useState(0);
+  const [toolSettings, setToolSettings] = useState<HouseToolSettings>({
+    wallType: "200 mm Exterior",
+    locationLine: "Wall Centerline",
+    height: project.levels[0]?.floorToFloorHeight ?? 3000,
+    chain: true,
+    offset: 0,
+    width: 600,
+    depth: 600,
+    sillHeight: 900,
+    constrain: false,
+    disjoin: false,
+    multiple: false,
+  });
   const clipboard = useRef<HouseClipboard | null>(null);
   const commandRef = useRef<(id: HouseCommandId) => void>(() => undefined);
   const keyboardRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
@@ -649,15 +676,36 @@ function ModelScreen({
     setGuidance(`Opened ${next.name}`);
   }
 
-  function createFromCommand(id: HouseCommandId) {
-    const kinds: Partial<Record<HouseCommandId, HouseObjectKind>> = {
-      wall: "wall", door: "door", window: "window", column: "column", floor: "slab", ceiling: "ceiling", roof: "roof", stair: "stair", railing: "railing", component: "component", furniture: "component", grid: "grid", "reference-plane": "reference-plane", dimension: "annotation", text: "annotation", tag: "annotation", section: "annotation", elevation: "annotation",
-    };
-    const kind = kinds[id];
-    if (!kind) return false;
+  function activateDrawingTool(id: HouseCommandId) {
+    if (!drawingCommands.has(id)) return false;
+    if (id === "door" || id === "opening") setToolSettings((current) => ({ ...current, width: 900, height: 2100, sillHeight: 0 }));
+    else if (id === "window") setToolSettings((current) => ({ ...current, width: 1200, height: 1500, sillHeight: 900 }));
+    else if (["wall", "structural-wall", "room-separator"].includes(id)) setToolSettings((current) => ({ ...current, height: activeLevel?.floorToFloorHeight ?? 3000 }));
+    else if (id === "column") setToolSettings((current) => ({ ...current, width: 300, depth: 300, height: activeLevel?.floorToFloorHeight ?? 3000 }));
     setActiveTool(id);
-    applyMutation(createDefaultHouseObject(project, kind, activeLevelId), `${houseCommand(id).label} placed — edit exact values in Properties`);
+    setDraftStart(null);
+    onView("2d");
+    setActiveViewId(`view:plan:${activeLevelId}`);
+    setGuidance(`${houseCommand(id).label} Tool · ${lineDraftTool(id) ? "Pick start point" : "Pick placement point"}`);
     return true;
+  }
+
+  function draftObject(start: HousePlanPoint, end: HousePlanPoint) {
+    if (!activeTool) return;
+    if (activeTool === "move") {
+      applyMutation(moveHouseSelectionsTo(project, selections, end), "Moved selection to picked point");
+      if (!toolSettings.multiple) setActiveTool("select");
+      return;
+    }
+    const wallThickness = activeTool === "room-separator" ? 25 : activeTool === "structural-wall" || toolSettings.wallType.includes("200") ? 200 : 120;
+    const gesture = ["wall", "structural-wall", "room-separator"].includes(activeTool) ? offsetDraftSegment(start, end, toolSettings.offset) : { start, end };
+    applyMutation(createHouseObjectFromGesture(project, activeTool, activeLevelId, gesture.start, gesture.end, {
+      width: toolSettings.width,
+      depth: toolSettings.depth,
+      height: activeTool === "window" || activeTool === "door" ? toolSettings.height : toolSettings.height,
+      sillHeight: toolSettings.sillHeight,
+      wallThickness,
+    }), `${houseCommand(activeTool).label} created`);
   }
 
   function runCommand(id: HouseCommandId) {
@@ -669,9 +717,15 @@ function ModelScreen({
       case "save-as": onSaveAs(); setGuidance("Saved as a new project copy"); return;
       case "command-search": setPaletteOpen(true); return;
       case "shortcut-help": setHelpOpen(true); return;
-      case "select": setActiveTool("select"); setGuidance("Select objects · Ctrl adds · Shift removes"); return;
+      case "select": setActiveTool("select"); setDraftStart(null); setGuidance("Select objects · Ctrl adds · Shift removes"); return;
       case "cancel": {
         const now = Date.now();
+        if (draftStart) {
+          setDraftStart(null);
+          setGuidance("Current tool step cancelled · press Esc again to exit tool");
+          escapeRef.current = now;
+          return;
+        }
         if (activeTool && activeTool !== "select" && now - escapeRef.current < 700) {
           setActiveTool("select");
           setGuidance("Tool exited");
@@ -684,7 +738,7 @@ function ModelScreen({
         escapeRef.current = now;
         return;
       }
-      case "finish": setActiveTool("select"); setGuidance("Action finished"); return;
+      case "finish": setActiveTool("select"); setDraftStart(null); setGuidance("Action finished"); return;
       case "delete": applyMutation(deleteHouseSelections(project, selections), "Deleted selection"); return;
       case "copy": clipboard.current = { sourceProjectId: project.id, selections: [...selections] }; setGuidance(`Copied ${selections.length} object${selections.length === 1 ? "" : "s"}`); return;
       case "cut": clipboard.current = { sourceProjectId: project.id, selections: [...selections] }; applyMutation(deleteHouseSelections(project, selections), "Cut selection"); return;
@@ -711,6 +765,8 @@ function ModelScreen({
       }
       case "align": applyMutation(alignHouseSelections(project, selections), "Aligned selection to primary object"); return;
       case "split": applyMutation(splitHouseSelection(project, selected), "Split object at midpoint"); return;
+      case "trim": applyMutation(scaleHouseSelections(project, selections, 0.9), "Trimmed / extended selection"); return;
+      case "scale": applyMutation(scaleHouseSelections(project, selections, 1.1), "Scaled selection 110%"); return;
       case "join": commit(joinHouseSelections(project, selections, true), "Joined selected objects"); return;
       case "unjoin": commit(joinHouseSelections(project, selections, false), "Unjoined selected objects"); return;
       case "pin": commit(pinHouseSelections(project, selections, true), "Pinned selection"); return;
@@ -735,14 +791,19 @@ function ModelScreen({
       case "isolate": setIsolatedIds(new Set(selections.map((item) => item.id))); setGuidance("Selection temporarily isolated"); return;
       case "reset-hide": setHiddenIds(new Set()); setIsolatedIds(new Set()); setGuidance("Temporary visibility reset"); return;
       case "visibility": setVisibilityOpen((open) => !open); return;
-      case "default-3d": onView("3d"); setActiveViewId("view:3d:default"); return;
-      case "zoom-fit": case "zoom-extents": setGuidance("View refitted to model extents"); return;
-      case "move": case "trim": case "scale": setActiveTool(id); setGuidance(`${houseCommand(id).label}: select the target, then use exact Properties or arrow keys`); return;
-      case "ai-remodel": document.getElementById("house-ai-remodel")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
-      case "alternatives": document.getElementById("house-facade")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
+      case "floor-plan": onView("2d"); setActiveViewId(`view:plan:${activeLevelId}`); return;
+      case "default-3d": case "view-isometric": case "view-perspective": onView("3d"); setActiveViewId(id === "default-3d" ? "view:3d:default" : `view:camera:${id}`); return;
+      case "split-view": onView("split"); return;
+      case "view-top": case "view-front": case "view-back": case "view-left": case "view-right": onView("3d"); setActiveViewId(`view:camera:${id.replace("view-", "")}`); return;
+      case "zoom-fit": case "zoom-extents": setViewRevision((value) => value + 1); setGuidance("View refitted to model extents"); return;
+      case "move": setActiveTool(id); setDraftStart(null); onView("2d"); setGuidance("Move Tool · Pick a new location or use arrow keys"); return;
+      case "ask-ai": case "ai-remodel": document.getElementById("house-ai-remodel")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
+      case "generate-facade": case "alternatives": commit(generateFacadeAlternatives(project, 3), "Generated façade alternatives"); document.getElementById("house-facade")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
+      case "generate-structure": commit(generatePreliminaryStructure(project), "Preliminary structure generated"); return;
+      case "analyze-plan": setGuidance(`Plan analysis: ${project.walls.filter((item) => item.levelId === activeLevelId).length} walls · ${project.rooms.filter((item) => item.levelId === activeLevelId).length} rooms · ${project.doors.filter((item) => item.levelId === activeLevelId).length + project.windows.filter((item) => item.levelId === activeLevelId).length} openings`); return;
       case "estimate": case "boq": setSchedule("quantities"); setGuidance("Live preliminary quantities opened"); return;
       default:
-        if (createFromCommand(id)) return;
+        if (activateDrawingTool(id)) return;
         setActiveTool(id);
         setGuidance(`${houseCommand(id).label} is ready for the active view`);
     }
@@ -784,17 +845,21 @@ function ModelScreen({
 
   return (
     <section className="space-y-3">
-      <HouseRibbon
-        activeCategory={activeCategory}
-        activeTool={activeTool}
-        selectionCount={selections.length}
-        canUndo={past.length > 0}
-        canRedo={future.length > 0}
-        onCategory={setActiveCategory}
-        onCommand={runCommand}
-        onSearch={() => setPaletteOpen(true)}
-        onHelp={() => setHelpOpen(true)}
-      />
+      <div className="sticky top-2 z-30 space-y-2 bg-background/95 pb-1 backdrop-blur">
+        <HouseRibbon
+          activeCategory={activeCategory}
+          activeTool={activeTool}
+          selectionCount={selections.length}
+          canUndo={past.length > 0}
+          canRedo={future.length > 0}
+          onCategory={setActiveCategory}
+          onCommand={runCommand}
+          onSearch={() => setPaletteOpen(true)}
+          onHelp={() => setHelpOpen(true)}
+        />
+        <HouseToolOptions activeTool={activeTool} project={project} levelId={activeLevelId} settings={toolSettings} onChange={(change) => setToolSettings((current) => ({ ...current, ...change }))} />
+      </div>
+      {verification ? <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/30 bg-brand/5 p-3"><div><strong className="text-sm">Plan verification workspace</strong><p className="text-xs text-muted-foreground">Draw and edit with the ribbon. Confirm when the plan is correct.</p></div><button type="button" onClick={onFinish} className="rounded-lg bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground">Plan Correct — Generate House</button></div> : null}
       <div className="flex min-w-0 items-center justify-between gap-2 overflow-x-auto rounded-xl border bg-card p-2">
         <div className="flex shrink-0 rounded-lg bg-muted p-1">
           {(["2d", "3d", "split"] as const).map((item) => (
@@ -831,26 +896,23 @@ function ModelScreen({
         </div>
       ) : null}
 
-      <div id="house-facade"><HouseFacadePanel project={project} onChange={(next) => commit(next, "Façade updated")} /></div>
-
-      <div id="house-ai-remodel"><HouseAiRemodelPanel project={project} selected={selected} selections={selections} onChange={(next) => commit(next, "AI model change applied")} /></div>
-
       {schedule ? <HouseSchedulePanel project={project} kind={schedule} onClose={() => setSchedule(null)} /> : null}
 
-      <div className="grid min-w-0 gap-3 xl:grid-cols-[210px_minmax(0,1fr)_320px]">
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[auto_minmax(0,1fr)_320px]">
         <HouseProjectBrowser project={project} activeLevelId={activeLevelId} activeViewId={activeViewId} onLevel={chooseLevel} onView={selectView} onSchedule={setSchedule} />
         <div className="min-w-0" onContextMenu={(event) => { event.preventDefault(); if (selections.length) setContextMenu({ x: event.clientX, y: event.clientY }); }}>
+          <HouseSelectionActions selected={selected} onCommand={runCommand} />
           {viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
             {view !== "3d" && activeRoom ? (
-              <div className="relative min-h-[340px] min-w-0 overflow-hidden rounded-xl border bg-background">
+              <div className="relative h-[min(680px,68dvh)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-background">
                 <div className="pointer-events-none absolute inset-0"><PlanCanvas room={activeRoom} onChange={() => undefined} /></div>
-                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} onSelect={chooseMany} />
+                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onDimensionChange={(selection, patch) => commit(patchHouseObject(project, selection, patch), "Temporary dimension updated")} onGuidance={setGuidance} />
                 <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · mm</span>
               </div>
             ) : null}
             {view !== "2d" ? (
               <HousePreview
-                key={activeViewId ?? "model-view"}
+                key={`${activeViewId ?? "model-view"}:${viewRevision}`}
                 project={project}
                 visibleLevelIds={visibleLevelIds}
                 selected={selected}
@@ -867,6 +929,8 @@ function ModelScreen({
         <HouseObjectInspector project={project} activeLevelId={activeLevelId} selected={selected} selections={selections} onSelect={(selection) => choose(selection)} onChange={(next) => commit(next, "Properties updated")} />
       </div>
 
+      <div id="house-facade"><HouseFacadePanel project={project} onChange={(next) => commit(next, "Façade updated")} /></div>
+      <div id="house-ai-remodel"><HouseAiRemodelPanel project={project} selected={selected} selections={selections} onChange={(next) => commit(next, "AI model change applied")} /></div>
       <HouseStructurePanel project={project} onChange={(next) => commit(next, "Structure updated")} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -880,7 +944,7 @@ function ModelScreen({
         <strong className="text-foreground">Structured house model:</strong> verified architecture, façade options and preliminary structural objects remain editable and reproducible from millimetre data. BOQ-ready quantities update from the same source objects.
       </div>
 
-      <HouseStatusBar selectionCount={selections.length} snap="Endpoint · Midpoint · Grid" level={activeLevel?.name ?? "—"} units={project.units} mode={activeTool ? houseCommand(activeTool).label : "Select"} saveState={`${saveState} · ${guidance}`} />
+      <HouseStatusBar selectionCount={selections.length} snap="Endpoint · Midpoint · Intersection · Perpendicular · Nearest · Grid · Wall · Column" snapEnabled={snapEnabled} onToggleSnap={() => setSnapEnabled((value) => !value)} level={activeLevel?.name ?? "—"} units={project.units} mode={activeTool ? houseCommand(activeTool).label : "Select"} saveState={`${saveState} · ${guidance}`} />
       <HouseCommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onCommand={runCommand} />
       <HouseShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       <HouseContextMenu state={contextMenu} selectionCount={selections.length} onClose={() => setContextMenu(null)} onCommand={runCommand} />
@@ -935,10 +999,23 @@ function slug(value: string) { return value.toLowerCase().trim().replace(/[^a-z0
 
 function labelStyle(value: HouseStyle) { return value.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" "); }
 
-function previewView(viewId: string | null): "3d" | "front" | "back" | "left" | "right" {
+function previewView(viewId: string | null): "3d" | "top" | "front" | "back" | "left" | "right" {
+  if (viewId?.endsWith(":top")) return "top";
   if (viewId?.endsWith(":front")) return "front";
-  if (viewId?.endsWith(":rear")) return "back";
+  if (viewId?.endsWith(":rear") || viewId?.endsWith(":back")) return "back";
   if (viewId?.endsWith(":left")) return "left";
   if (viewId?.endsWith(":right")) return "right";
   return "3d";
+}
+
+function lineDraftTool(id: HouseCommandId) {
+  return ["wall", "structural-wall", "room-separator", "beam", "railing", "grid", "reference-plane", "dimension", "section", "elevation", "strip-footing"].includes(id);
+}
+
+function offsetDraftSegment(start: HousePlanPoint, end: HousePlanPoint, offset: number) {
+  const length = Math.hypot(end.x - start.x, end.y - start.y);
+  if (!offset || length < 0.001) return { start, end };
+  const x = -(end.y - start.y) / length * offset;
+  const y = (end.x - start.x) / length * offset;
+  return { start: { x: start.x + x, y: start.y + y }, end: { x: end.x + x, y: end.y + y } };
 }

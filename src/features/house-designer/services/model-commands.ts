@@ -1,9 +1,19 @@
 import { patchHouseObject } from "./project-edit";
 import { allHouseSelections, sameSelection } from "./model-state";
+import { houseCommand, type HouseCommandId } from "./command-registry";
 import { wallObjectId, openingObjectId, type HouseObjectKind, type HouseProject, type HouseSelection } from "../types/project";
 
 export type HouseClipboard = { sourceProjectId: string; selections: HouseSelection[] };
 export type HouseCommandMutation = { project: HouseProject; selections: HouseSelection[]; blocked: string[] };
+export type HouseDraftPoint = { x: number; y: number };
+export type HousePlacementOptions = {
+  width?: number;
+  depth?: number;
+  height?: number;
+  sillHeight?: number;
+  wallThickness?: number;
+  material?: string;
+};
 
 export function deleteHouseSelections(project: HouseProject, selections: readonly HouseSelection[]): HouseCommandMutation {
   let next = project;
@@ -105,6 +115,38 @@ export function moveHouseSelections(project: HouseProject, selections: readonly 
       continue;
     }
     next = moveSimpleObject(next, selection, dx, dy);
+  }
+  return { project: next, selections: [...selections], blocked };
+}
+
+export function moveHouseSelectionsTo(project: HouseProject, selections: readonly HouseSelection[], point: HouseDraftPoint): HouseCommandMutation {
+  const anchor = selections[0] ? objectAnchor(project, selections[0]) : null;
+  if (!anchor) return { project, selections: [...selections], blocked: ["Select a movable object first"] };
+  return moveHouseSelections(project, selections, point.x - anchor.x, point.y - anchor.y);
+}
+
+export function scaleHouseSelections(project: HouseProject, selections: readonly HouseSelection[], factor = 1.1): HouseCommandMutation {
+  if (!Number.isFinite(factor) || factor <= 0) return { project, selections: [...selections], blocked: ["Scale factor must be greater than zero"] };
+  let next = project;
+  const blocked: string[] = [];
+  for (const selection of selections) {
+    if (next.objectInstances[selection.id]?.pinned) { blocked.push(`${selection.kind} ${selection.id} is pinned`); continue; }
+    if (selection.kind === "wall") {
+      const item = next.walls.find((entry) => entry.id === selection.id);
+      if (item) next = patchHouseObject(next, selection, { length: Math.hypot(item.end.x - item.start.x, item.end.y - item.start.y) * factor });
+      continue;
+    }
+    if (selection.kind === "door" || selection.kind === "window") {
+      const item = next[`${selection.kind}s`].find((entry) => entry.id === selection.id);
+      if (item) next = patchHouseObject(next, selection, { width: item.width * factor, height: item.height * factor });
+      continue;
+    }
+    const item = findObject(next, selection) as Record<string, unknown> | null;
+    if (!item) continue;
+    const patch: Record<string, number> = {};
+    for (const key of ["width", "depth", "height", "length", "thickness"] as const) if (typeof item[key] === "number") patch[key] = (item[key] as number) * factor;
+    if (Object.keys(patch).length) next = patchHouseObject(next, selection, patch);
+    else blocked.push(`Scale is not available for ${selection.kind}`);
   }
   return { project: next, selections: [...selections], blocked };
 }
@@ -235,6 +277,126 @@ export function updateHouseType(project: HouseProject, typeId: string, propertie
     if (instance.typeId === typeId) next = patchHouseObject(next, { kind: definition.kind, id }, patch);
   }
   return next;
+}
+
+/** Create model geometry from an actual canvas gesture instead of a form button. */
+export function createHouseObjectFromGesture(
+  project: HouseProject,
+  tool: HouseCommandId,
+  levelId: string,
+  start: HouseDraftPoint,
+  end: HouseDraftPoint = start,
+  options: HousePlacementOptions = {},
+): HouseCommandMutation {
+  const level = project.levels.find((item) => item.id === levelId) ?? project.levels[0];
+  if (!level) return { project, selections: [], blocked: ["Create a level first"] };
+  const width = Math.max(1, options.width ?? 600);
+  const depth = Math.max(1, options.depth ?? 600);
+  const height = Math.max(1, options.height ?? level.floorToFloorHeight);
+  const wallThickness = Math.max(1, options.wallThickness ?? (tool === "room-separator" ? 25 : tool === "structural-wall" ? 200 : 120));
+  const lineLength = Math.hypot(end.x - start.x, end.y - start.y);
+  const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+  const id = `${tool}:${crypto.randomUUID()}`;
+  let next = project;
+  let selection: HouseSelection | null = null;
+
+  if (["wall", "structural-wall", "room-separator"].includes(tool)) {
+    if (lineLength < 50) return { project, selections: [], blocked: ["Wall length must be at least 50 mm"] };
+    const sourceWallId = `interior-${crypto.randomUUID()}`;
+    const objectId = wallObjectId(level.id, sourceWallId);
+    const material = tool === "structural-wall" ? "Reinforced concrete" : tool === "room-separator" ? "Room separator" : options.material ?? "Masonry";
+    next = {
+      ...next,
+      walls: [...next.walls, { id: objectId, sourceWallId, levelId: level.id, roomId: next.rooms.find((item) => item.levelId === level.id)?.id ?? `${level.id}:room-1`, start, end, thickness: wallThickness, height, material }],
+      levels: next.levels.map((item) => item.id === level.id && item.plan ? { ...item, plan: { ...item.plan, interiorWalls: [...(item.plan.interiorWalls ?? []), { id: sourceWallId, start, end, thickness: wallThickness, height, label: tool === "room-separator" ? "Room separator" : tool === "structural-wall" ? "Structural wall" : "Interior wall" }] } } : item),
+    };
+    selection = { kind: "wall", id: objectId };
+  } else if (tool === "door" || tool === "window" || tool === "opening") {
+    const wall = nearestWall(next, level.id, start);
+    if (!wall?.sourceWallId || !level.plan) return { project, selections: [], blocked: ["Tap a wall to place the opening"] };
+    const kind = tool === "window" ? "window" as const : "door" as const;
+    const planKind = tool === "opening" ? "passage" as const : kind;
+    const sourceOpeningId = `${planKind}-${crypto.randomUUID()}`;
+    const objectId = openingObjectId(level.id, planKind, sourceOpeningId);
+    const openingWidth = Math.min(width || (kind === "door" ? 900 : 1200), Math.max(200, Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y) - 100));
+    const openingHeight = options.height ?? (kind === "door" ? 2100 : 1500);
+    const sillHeight = kind === "door" ? 0 : Math.max(0, options.sillHeight ?? 900);
+    const offset = wallOffsetAtPoint(wall, start, openingWidth);
+    const opening: HouseProject["doors"][number] = { id: objectId, sourceOpeningId, levelId: level.id, wallId: wall.id, width: openingWidth, height: openingHeight, sillHeight, offset, type: planKind, style: tool === "opening" ? "open" : "standard", material: kind === "door" ? "Timber" : "Aluminium", swing: tool === "door" ? "in-right" : "none" };
+    next = {
+      ...next,
+      doors: kind === "door" ? [...next.doors, opening] : next.doors,
+      windows: kind === "window" ? [...next.windows, opening] : next.windows,
+      levels: next.levels.map((item) => item.id === level.id && item.plan ? { ...item, plan: { ...item.plan, openings: [...item.plan.openings, { id: sourceOpeningId, kind: planKind, wallId: wall.sourceWallId!, offset, width: openingWidth, height: openingHeight, sill: sillHeight, swing: tool === "door" ? "in-right" as const : "none" as const, label: tool }] } } : item),
+    };
+    selection = { kind, id: objectId };
+  } else if (tool === "column") {
+    next = { ...next, structuralColumns: [...next.structuralColumns, { id, levelId: level.id, x: start.x, y: start.y, elevation: level.elevation, width, depth, height, type: "rectangular", material: "Reinforced concrete" }] };
+    selection = { kind: "column", id };
+  } else if (tool === "beam") {
+    if (lineLength < 50) return { project, selections: [], blocked: ["Beam length must be at least 50 mm"] };
+    next = { ...next, structuralBeams: [...next.structuralBeams, { id, levelId: level.id, start, end, elevation: level.elevation + level.floorToFloorHeight, width, depth, material: "Reinforced concrete" }] };
+    selection = { kind: "beam", id };
+  } else if (tool === "railing") {
+    if (lineLength < 50) return { project, selections: [], blocked: ["Railing length must be at least 50 mm"] };
+    next = { ...next, railings: [...next.railings, { id, levelId: level.id, hostId: null, start, end, elevation: level.elevation, height: options.height ?? 1050, material: "Steel" }] };
+    selection = { kind: "railing", id };
+  } else if (tool === "grid") {
+    if (lineLength < 50) return { project, selections: [], blocked: ["Draw the grid line between two points"] };
+    const axis = Math.abs(end.x - start.x) <= Math.abs(end.y - start.y) ? "x" as const : "y" as const;
+    next = { ...next, structuralGrid: [...next.structuralGrid, { id, levelId: level.id, axis, label: String(next.structuralGrid.length + 1), position: axis === "x" ? midpoint.x : midpoint.y, start, end }] };
+    selection = { kind: "grid", id };
+  } else if (tool === "reference-plane") {
+    if (lineLength < 50) return { project, selections: [], blocked: ["Draw the reference plane between two points"] };
+    next = { ...next, referencePlanes: [...next.referencePlanes, { id, levelId: level.id, name: `Reference Plane ${next.referencePlanes.length + 1}`, start, end }] };
+    selection = { kind: "reference-plane", id };
+  } else if (["dimension", "text", "room-tag", "tag", "section", "elevation"].includes(tool)) {
+    const annotationKind = tool === "room-tag" ? "tag" : tool as "dimension" | "text" | "tag" | "section" | "elevation";
+    const value = tool === "dimension" ? lineLength : null;
+    const text = tool === "dimension" ? `${lineLength.toFixed(1)} mm` : houseCommand(tool).label;
+    next = { ...next, annotations: [...next.annotations, { id, levelId: level.id, kind: annotationKind, text, start, end: lineLength >= 1 ? end : null, value }] };
+    if (tool === "section" || tool === "elevation") next = { ...next, views: [...next.views, { id: `view:${tool}:${crypto.randomUUID()}`, name: `${houseCommand(tool).label} ${next.views.filter((item) => item.kind === tool).length + 1}`, kind: tool, levelId: level.id, hiddenCategories: [], temporaryHiddenIds: [], isolatedIds: [], cutPlane: 1200, topOffset: 2300, bottomOffset: 0 }] };
+    selection = { kind: "annotation", id };
+  } else if (["foundation", "isolated-footing", "strip-footing", "foundation-slab"].includes(tool)) {
+    const strip = tool === "strip-footing" && lineLength >= 50;
+    const foundationThickness = options.height && options.height <= 1200 ? Math.max(150, options.height) : 450;
+    next = { ...next, foundations: [...next.foundations, { id, levelId: level.id, x: strip ? midpoint.x : start.x, y: strip ? midpoint.y : start.y, elevation: level.elevation - foundationThickness, width: strip ? Math.max(width, Math.abs(end.x - start.x)) : width, depth: strip ? Math.max(width, Math.abs(end.y - start.y)) : depth, thickness: foundationThickness, material: "Reinforced concrete" }] };
+    selection = { kind: "foundation", id };
+  } else if (["component", "furniture", "kitchen", "wardrobe", "plumbing-fixture"].includes(tool)) {
+    const name = ({ component: "Generic Component", furniture: "Furniture", kitchen: "Kitchen Unit", wardrobe: "Wardrobe", "plumbing-fixture": "Plumbing Fixture" } as Record<string, string>)[tool]!;
+    next = { ...next, components: [...next.components, { id, levelId: level.id, family: name, name, x: start.x, y: start.y, elevation: level.elevation, width, depth, height, rotation: 0, material: options.material ?? (tool === "wardrobe" || tool === "kitchen" ? "MDF" : "Generic"), source: tool === "wardrobe" || tool === "kitchen" ? "berchuma" : "library" }] };
+    selection = { kind: "component", id };
+  } else if (tool === "stair") {
+    next = { ...next, stairs: [...next.stairs, { id, levelId: level.id, x: start.x, y: start.y, elevation: level.elevation, width, length: Math.max(depth, 1000), height, rotation: 0, steps: Math.max(3, Math.min(40, Math.round(height / 175))), type: "straight", material: "Reinforced concrete" }] };
+    selection = { kind: "stair", id };
+  } else if (tool === "room") {
+    const zoneId = `zone-${crypto.randomUUID()}`;
+    const boundary = rectangleAt(start, Math.max(width, 1000), Math.max(depth, 1000));
+    const roomId = `${level.id}:${zoneId}`;
+    next = {
+      ...next,
+      rooms: [...next.rooms, { id: roomId, levelId: level.id, name: `Room ${next.rooms.filter((item) => item.levelId === level.id).length + 1}`, boundary, floorMaterial: "Unspecified", wallMaterial: "Paint", ceilingMaterial: "Gypsum board", ceilingHeight: level.plan?.ceilingHeight ?? height }],
+      levels: next.levels.map((item) => item.id === level.id && item.plan ? { ...item, plan: { ...item.plan, zones: [...(item.plan.zones ?? []), { id: zoneId, name: `Room ${(item.plan.zones?.length ?? 0) + 1}`, boundary, floorMaterial: "Unspecified", wallMaterial: "Paint", ceilingMaterial: "Gypsum board" }] } } : item),
+    };
+    selection = { kind: "room", id: roomId };
+  } else if (tool === "level") {
+    const elevation = Math.max(...project.levels.map((item) => item.elevation + item.floorToFloorHeight));
+    const levelIdNew = `level-${crypto.randomUUID()}`;
+    next = { ...next, levels: [...next.levels, { id: levelIdNew, name: `Level ${next.levels.length + 1}`, elevation, floorToFloorHeight: level.floorToFloorHeight, plan: level.plan ? structuredClone(level.plan) : null }], views: [...next.views, { id: `view:plan:${levelIdNew}`, name: `Level ${next.levels.length + 1}`, kind: "floor-plan", levelId: levelIdNew, hiddenCategories: [], temporaryHiddenIds: [], isolatedIds: [], cutPlane: 1200, topOffset: 2300, bottomOffset: 0 }] };
+    selection = { kind: "level", id: levelIdNew };
+  } else if (["floor", "structural-slab"].includes(tool)) {
+    return createDefaultHouseObject(project, "slab", level.id);
+  } else if (tool === "ceiling") {
+    return createDefaultHouseObject(project, "ceiling", level.id);
+  } else if (tool === "roof") {
+    return createDefaultHouseObject(project, "roof", level.id);
+  } else {
+    return { project, selections: [], blocked: [`${houseCommand(tool).label} is not available in this view`] };
+  }
+
+  if (!selection) return { project: next, selections: [], blocked: [] };
+  next = { ...next, objectInstances: { ...next.objectInstances, [selection.id]: { ...emptyInstance(), typeId: defaultType(selection.kind), mark: `${selection.kind.slice(0, 2).toUpperCase()}-${allHouseSelections(next).length}` } } };
+  return { project: next, selections: [selection], blocked: [] };
 }
 
 export function createDefaultHouseObject(project: HouseProject, kind: HouseObjectKind, levelId: string): HouseCommandMutation {
@@ -451,6 +613,38 @@ function offsetObject<T extends Record<string, unknown>>(item: T, id: string, of
 }
 
 function offsetPoint(point: { x: number; y: number }, value: number) { return { x: point.x + value, y: point.y + value }; }
+function rectangleAt(point: HouseDraftPoint, width: number, depth: number) {
+  return [
+    { x: point.x - width / 2, y: point.y - depth / 2 },
+    { x: point.x + width / 2, y: point.y - depth / 2 },
+    { x: point.x + width / 2, y: point.y + depth / 2 },
+    { x: point.x - width / 2, y: point.y + depth / 2 },
+  ];
+}
+function nearestWall(project: HouseProject, levelId: string, point: HouseDraftPoint): HouseProject["walls"][number] | null {
+  let closest: HouseProject["walls"][number] | null = null;
+  let distance = Number.POSITIVE_INFINITY;
+  for (const wall of project.walls.filter((item) => item.levelId === levelId)) {
+    const candidate = pointSegmentDistance(point, wall.start, wall.end);
+    if (candidate < distance) { closest = wall; distance = candidate; }
+  }
+  return closest;
+}
+function wallOffsetAtPoint(wall: HouseProject["walls"][number], point: HouseDraftPoint, openingWidth: number) {
+  const dx = wall.end.x - wall.start.x;
+  const dy = wall.end.y - wall.start.y;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const centre = ((point.x - wall.start.x) * dx + (point.y - wall.start.y) * dy) / length;
+  return Math.max(0, Math.min(length - openingWidth, centre - openingWidth / 2));
+}
+function pointSegmentDistance(point: HouseDraftPoint, start: HouseDraftPoint, end: HouseDraftPoint) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y);
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+}
 function emptyInstance(): HouseProject["objectInstances"][string] { return { typeId: null, mark: "", pinned: false, groupId: null, flipped: false, properties: {} }; }
 function omitKeys<T>(record: Record<string, T>, keys: string[]) { const next = { ...record }; keys.forEach((key) => delete next[key]); return next; }
 function normalizeAngle(value: number) { return ((value % 360) + 360) % 360; }
