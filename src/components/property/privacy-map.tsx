@@ -84,13 +84,23 @@ export function PrivacyMap({
           id: "area-fill",
           type: "fill",
           source: "area",
-          paint: { "fill-color": "#2563eb", "fill-opacity": 0.16 },
+          paint: { "fill-color": "#2563eb", "fill-opacity": 0.2 },
+        });
+        // A white halo under the line, because a 2px blue line reads fine on
+        // a plain basemap and disappears on a busy one — satellite imagery,
+        // or an OSM tile with its own red clinic/pharmacy icons right on the
+        // boundary. The halo is what keeps the line visible underneath them.
+        map.addLayer({
+          id: "area-line-halo",
+          type: "line",
+          source: "area",
+          paint: { "line-color": "#ffffff", "line-width": 5, "line-opacity": 0.85 },
         });
         map.addLayer({
           id: "area-line",
           type: "line",
           source: "area",
-          paint: { "line-color": "#2563eb", "line-width": 2 },
+          paint: { "line-color": "#2563eb", "line-width": 3 },
         });
       } else if (!marker) {
         marker = new maplibregl.Marker({ color: "#2563eb" })

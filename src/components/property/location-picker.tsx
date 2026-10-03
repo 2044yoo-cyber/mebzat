@@ -159,7 +159,15 @@ export function LocationPicker({
         id: "privacy-fill",
         type: "fill",
         source: "privacy-circle",
-        paint: { "fill-color": "#2563eb", "fill-opacity": 0.14 },
+        paint: { "fill-color": "#2563eb", "fill-opacity": 0.18 },
+      });
+      // Same halo as the buyer-facing circle: a thin dashed line alone was
+      // hard to see against satellite imagery or a busy street tile.
+      map.addLayer({
+        id: "privacy-line-halo",
+        type: "line",
+        source: "privacy-circle",
+        paint: { "line-color": "#ffffff", "line-width": 4.5, "line-opacity": 0.85 },
       });
       map.addLayer({
         id: "privacy-line",
@@ -167,7 +175,7 @@ export function LocationPicker({
         source: "privacy-circle",
         paint: {
           "line-color": "#2563eb",
-          "line-width": 1.5,
+          "line-width": 2.5,
           "line-dasharray": [2, 2],
         },
       });
