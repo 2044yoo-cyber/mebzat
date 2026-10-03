@@ -201,8 +201,14 @@ export default async function JobsPage(props: {
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+      {/* Side by side at every width, not just lg: and up — a phone screen
+          spent entirely on the filter list, with the roles themselves a
+          scroll away, was worse than a cramped filter column next to results
+          you can actually see. Percentage columns below lg: so the split
+          holds its shape on any phone; a fixed 240px above it so the filter
+          column does not keep growing on a wide desktop. */}
+      <div className="grid min-w-0 grid-cols-[30%_1fr] gap-4 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
+        <aside className="min-w-0 space-y-6 self-start lg:sticky lg:top-6">
           <div>
             <h2 className="mb-2 text-sm font-medium">Trade</h2>
             <ul className="space-y-3">
@@ -278,7 +284,7 @@ export default async function JobsPage(props: {
           )}
         </aside>
 
-        <div>
+        <div className="min-w-0">
           {!result.available ? (
             <Empty
               title="Jobs are not set up yet"
