@@ -417,12 +417,8 @@ export function createHouseObjectFromGesture(
     const levelIdNew = `level-${crypto.randomUUID()}`;
     next = { ...next, levels: [...next.levels, { id: levelIdNew, name: `Level ${next.levels.length + 1}`, elevation, floorToFloorHeight: level.floorToFloorHeight, plan: level.plan ? structuredClone(level.plan) : null }], views: [...next.views, { id: `view:plan:${levelIdNew}`, name: `Level ${next.levels.length + 1}`, kind: "floor-plan", levelId: levelIdNew, hiddenCategories: [], temporaryHiddenIds: [], isolatedIds: [], cutPlane: 1200, topOffset: 2300, bottomOffset: 0 }] };
     selection = { kind: "level", id: levelIdNew };
-  } else if (["floor", "structural-slab"].includes(tool)) {
-    return createDefaultHouseObject(project, "slab", level.id);
-  } else if (tool === "ceiling") {
-    return createDefaultHouseObject(project, "ceiling", level.id);
-  } else if (tool === "roof") {
-    return createDefaultHouseObject(project, "roof", level.id);
+  } else if (["floor", "structural-slab", "ceiling", "roof"].includes(tool)) {
+    return coverRoomAt(project, level.id, tool === "roof" ? "roof" : tool === "ceiling" ? "ceiling" : "slab", start);
   } else {
     return { project, selections: [], blocked: [`${houseCommand(tool).label} is not available in this view`] };
   }
@@ -646,6 +642,61 @@ function offsetObject<T extends Record<string, unknown>>(item: T, id: string, of
 }
 
 function offsetPoint(point: { x: number; y: number }, value: number) { return { x: point.x + value, y: point.y + value }; }
+/**
+ * Floor, ceiling or roof for the room under the finger. These tools used to
+ * ignore where you tapped and lay a copy of the whole footprint on top of
+ * the one already there; now they cover the room you point at, and say so
+ * when something already covers it.
+ */
+export function coverRoomAt(project: HouseProject, levelId: string, kind: "slab" | "ceiling" | "roof", point: HouseDraftPoint): HouseCommandMutation {
+  const level = project.levels.find((item) => item.id === levelId);
+  const what = kind === "slab" ? "floor" : kind;
+  if (!level) return { project, selections: [], blocked: ["Create a level first"] };
+  const room = project.rooms
+    .filter((item) => item.levelId === levelId && insidePolygon(point, item.boundary))
+    .sort((a, b) => Math.abs(polygonArea(a.boundary)) - Math.abs(polygonArea(b.boundary)))[0];
+  if (!room) return { project, selections: [], blocked: [`Tap inside a room to give it a ${what}`] };
+  const covers = (boundary: readonly HouseDraftPoint[]) => room.boundary.every((corner) => onOrInsidePolygon(corner, boundary));
+  const existing = kind === "slab" ? project.slabs.filter((item) => item.levelId === levelId)
+    : kind === "ceiling" ? project.ceilings.filter((item) => item.levelId === levelId)
+      : project.roofs.filter((item) => item.levelId === levelId);
+  if (existing.some((item) => covers(item.boundary))) {
+    return { project, selections: [], blocked: [kind === "roof" ? `${room.name} is already under a roof` : `${room.name} already has a ${what}`] };
+  }
+  const id = `${kind}:${crypto.randomUUID()}`;
+  const boundary = room.boundary.map((corner) => ({ x: corner.x, y: corner.y }));
+  const ceilingHeight = room.ceilingHeight || level.plan?.ceilingHeight || level.floorToFloorHeight;
+  if (kind === "slab") {
+    return { project: { ...project, slabs: [...project.slabs, { id, levelId, boundary, thickness: 150, elevation: level.elevation, material: "Reinforced concrete" }] }, selections: [{ kind: "slab", id }], blocked: [] };
+  }
+  if (kind === "ceiling") {
+    return { project: { ...project, ceilings: [...project.ceilings, { id, levelId, roomId: room.id, boundary, elevation: level.elevation + ceilingHeight, thickness: 12.5, material: "Gypsum board" }] }, selections: [{ kind: "ceiling", id }], blocked: [] };
+  }
+  return { project: { ...project, roofs: [...project.roofs, { id, levelId, boundary, elevation: level.elevation + ceilingHeight, type: "flat", height: 300, slope: 0, overhang: 400, thickness: 180, material: "Reinforced concrete" }] }, selections: [{ kind: "roof", id }], blocked: [] };
+}
+
+function insidePolygon(point: HouseDraftPoint, polygon: readonly HouseDraftPoint[]) {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const a = polygon[index]!;
+    const b = polygon[previous]!;
+    if ((a.y > point.y) !== (b.y > point.y) && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+/** Inside, or on an edge: a room drawn against the outside wall shares its
+ * edges with the footprint, and the slab under the footprint still covers it. */
+function onOrInsidePolygon(point: HouseDraftPoint, polygon: readonly HouseDraftPoint[]) {
+  return insidePolygon(point, polygon) || polygon.some((corner, index) => pointSegmentDistance(point, corner, polygon[(index + 1) % polygon.length]!) <= 1);
+}
+
+function polygonArea(points: readonly HouseDraftPoint[]) {
+  let sum = 0;
+  for (let index = 0; index < points.length; index += 1) { const a = points[index]!; const b = points[(index + 1) % points.length]!; sum += a.x * b.y - b.x * a.y; }
+  return sum / 2;
+}
+
 export type HouseRoomShape = "rectangle" | "l-shape";
 
 /** The outline a room drag describes: start and end are opposite corners. An

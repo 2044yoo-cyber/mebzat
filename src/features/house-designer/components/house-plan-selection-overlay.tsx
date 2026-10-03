@@ -421,9 +421,11 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       <MmPerPx.Provider value={mmPerPx}>
       {project.walls.filter((wall) => wall.levelId === levelId && project.objectInstances[wall.id]?.pinned).map((wall) => <LockBadge key={wall.id} wall={wall} />)}
       {wallDrag && selectedWall && wallDrag.distance !== 0 ? <WallMovePreview wall={selectedWall} normal={wallDrag.normal} distance={wallDrag.distance} unit={unit} /> : null}
-      {selectedWall ? <WallTemporaryDimension wall={selectedWall} margin={margin} selection={selections[0]!} onChange={(selection, length) => onDimensionChange(selection, { length })} /> : null}
-      {selectedOpening ? <OpeningTemporaryDimension project={project} opening={openingDrag ? { ...selectedOpening, offset: openingDrag.offset } : selectedOpening} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
-      {selectedColumn ? <ColumnTemporaryDimensions column={selectedColumn} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
+      {/* Editing fields belong to Select. While drawing, they sat where the
+          next room or wall was being started and took the touch. */}
+      {selectMode && selectedWall ? <WallTemporaryDimension wall={selectedWall} margin={margin} selection={selections[0]!} onChange={(selection, length) => onDimensionChange(selection, { length })} /> : null}
+      {selectMode && selectedOpening ? <OpeningTemporaryDimension project={project} opening={openingDrag ? { ...selectedOpening, offset: openingDrag.offset } : selectedOpening} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
+      {selectMode && selectedColumn ? <ColumnTemporaryDimensions column={selectedColumn} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
       </MmPerPx.Provider>
     </svg>
     {draftStart && activeTool && (activeTool === "room" || lineTools.has(activeTool)) ? <TypedDraft

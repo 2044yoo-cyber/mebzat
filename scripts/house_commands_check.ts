@@ -97,6 +97,41 @@ const triangleWall = { kind: "wall" as const, id: editable.project.walls.find((i
 assert.ok(deleteHouseSelections(editable.project, [triangleWall], { footprintEditable: true }).blocked.length > 0, "refuses to shrink a footprint below three walls");
 
 {
+  // Floor, ceiling and roof cover the room you tap, once.
+  const base = ensureHouseBimState(createHouseProject({ title: "Cover", room: rectangularRoom(8000, 6500), style: "modern", strict: false, floorCount: 1, floorToFloorHeight: 3000 }));
+  const level = base.levels[0]!.id;
+  const inside = { x: 4000, y: 3000 };
+  for (const tool of ["floor", "ceiling", "roof"] as const) {
+    const result = createHouseObjectFromGesture(base, tool, level, inside);
+    assert.equal(result.project, base, `the house already has a ${tool}: nothing is added`);
+    assert.equal(result.blocked.length, 1, `and it says so (${tool})`);
+  }
+  assert.match(createHouseObjectFromGesture(base, "floor", level, { x: 20000, y: 20000 }).blocked[0] ?? "", /Tap inside a room/);
+
+  const extension = createRoomFromGesture(base, level, { x: 8000, y: 0 }, { x: 11000, y: 3000 }, "rectangle", { wallThickness: 120 }).project;
+  const middle = { x: 9500, y: 1500 };
+  const floored = createHouseObjectFromGesture(extension, "floor", level, middle);
+  assert.equal(floored.project.slabs.length, extension.slabs.length + 1, "an uncovered room gets its floor");
+  const slab = floored.project.slabs.at(-1)!;
+  assert.deepEqual(slab.boundary.map((point) => [point.x, point.y]), [[8000, 0], [11000, 0], [11000, 3000], [8000, 3000]], "exactly the room tapped");
+  assert.equal(createHouseObjectFromGesture(floored.project, "floor", level, middle).blocked.length, 1, "and only once");
+  const roofed = createHouseObjectFromGesture(floored.project, "roof", level, middle);
+  assert.equal(roofed.project.roofs.length, floored.project.roofs.length + 1, "and a roof of its own");
+  assert.ok(extension.rooms.at(-1)!.ceilingHeight > 0);
+  assert.equal(roofed.project.roofs.at(-1)!.elevation, extension.rooms.at(-1)!.ceilingHeight, "at the top of the room");
+  const ceiled = createHouseObjectFromGesture(roofed.project, "ceiling", level, middle);
+  assert.equal(ceiled.project.ceilings.at(-1)!.roomId, extension.rooms.at(-1)!.id, "a ceiling belongs to the room tapped");
+  assert.ok(houseProjectSchema.safeParse(ceiled.project).success);
+
+  const nested = createRoomFromGesture(extension, level, { x: 8500, y: 500 }, { x: 10000, y: 2500 }, "rectangle", { wallThickness: 120 }).project;
+  const nestedFloor = createHouseObjectFromGesture(nested, "floor", level, { x: 9000, y: 1500 }).project.slabs.at(-1)!;
+  assert.deepEqual(nestedFloor.boundary.map((point) => [point.x, point.y]), [[8500, 500], [10000, 500], [10000, 2500], [8500, 2500]], "a room within a room: the one under the finger, the smaller");
+
+  const innerRoom = createRoomFromGesture(base, level, { x: 1000, y: 1000 }, { x: 3000, y: 3000 }, "rectangle", { wallThickness: 120 }).project;
+  assert.equal(createHouseObjectFromGesture(innerRoom, "floor", level, { x: 2000, y: 2000 }).blocked.length, 1, "a room inside the house is already on its slab");
+}
+
+{
   // Add Floor builds what a two-storey project would have started with.
   const make = (floorCount: number) => ensureHouseBimState(createHouseProject({ title: "Floors", room: rectangularRoom(8000, 6500), style: "modern", strict: false, floorCount, floorToFloorHeight: 3000 }));
   const one = make(1);

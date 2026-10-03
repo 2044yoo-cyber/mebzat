@@ -42,7 +42,12 @@ const out = mkdtempSync(join(tmpdir(), "house_touch_"));
 writeFileSync(join(out, "entry.tsx"), `
 import { createRoot } from "react-dom/client";
 import { Toaster } from "sonner";
+import * as THREE from "three";
 import { HouseDesignerWorkspace } from "@/features/house-designer/components/house-designer-workspace";
+// Every scene the renderer draws, so the check can read the 3D model back.
+const scenes = new Set<THREE.Scene>();
+Object.assign(window, { __scenes: scenes, __THREE: THREE });
+THREE.Scene.prototype.onBeforeRender = function () { scenes.add(this); };
 createRoot(document.getElementById("root")!).render(<><HouseDesignerWorkspace userId="touch-check" /><Toaster /></>);
 `);
 // The start screen's upload field talks to Supabase; nothing here uploads.
@@ -81,7 +86,8 @@ const server = createServer((request, response) => {
 }).listen(0);
 const url = `http://localhost:${server.address().port}/`;
 const executablePath = existsSync("/opt/pw-browsers/chromium-1194/chrome-linux/chrome") ? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" : undefined;
-const browser = await chromium.launch({ executablePath });
+// SwiftShader: WebGL without a GPU, so the 3D view renders headless.
+const browser = await chromium.launch({ executablePath, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
 
 const PLAN = 'svg[aria-label="House plan modeling canvas"]';
 const UNDER = 'svg[aria-label="Floor plan"]';
@@ -222,9 +228,10 @@ try {
     await page.getByLabel("Typed length").fill("2500");
     await page.getByLabel("Typed length").press("Enter");
     assert.equal(await walls(), startWalls + 5, `${at}: a typed length adds a wall`);
-    assert.equal(await page.locator('input[aria-label="Selected object temporary length"]').inputValue(), "2500", `${at}: exactly the length typed`);
     const run = await page.locator(`${PLAN} line[stroke-opacity="0.28"]`).evaluate((line) => ["x1", "y1", "x2", "y2"].map((name) => Number(line.getAttribute(name))));
-    assert.ok(Math.abs(run[0] - run[2]) < 1 && Math.abs(run[3] - run[1] - 2500) < 1, `${at}: the wall runs the way picked (${run.map(Math.round)})`);
+    assert.ok(Math.abs(run[0] - run[2]) < 1, `${at}: the wall runs the way picked (${run.map(Math.round)})`);
+    assert.ok(Math.abs(run[3] - run[1] - 2500) < 0.01, `${at}: exactly the length typed (${run.map(Math.round)})`);
+    assert.equal(await page.locator('input[aria-label^="Selected object temporary"]').count(), 0, `${at}: no editing fields while drawing`);
     assert.ok(await page.getByLabel("Typed length").isVisible(), `${at}: the chain carries on from the new end`);
     assert.equal(await page.locator("div.absolute.inset-x-2.bottom-2").isVisible(), false, `${at}: no selection bar while drawing`);
 
@@ -297,6 +304,8 @@ try {
     await page.waitForFunction(() => document.querySelector("div.sticky button[aria-expanded]")?.textContent?.includes("1st Floor"));
     assert.equal(await walls(), 4, `${at}: the new floor has its walls`);
 
+    if (width === 390) await checkThreeD(page, at, { screen, touch, tapAt });
+
     assert.deepEqual(errors, [], `${at}: page errors`);
     await page.close();
   }
@@ -304,4 +313,98 @@ try {
   await browser.close();
   server.close();
 }
-console.log("House designer touch: layout, pinch, pan, tap, delete/undo, long-press, room drawing, typed lengths, doors, wall moves, locks and floors passed at 360–430px");
+
+/**
+ * 2D and 3D are one model. Edits made on the plan are read back from the live
+ * three.js scene: the walls' size, a door's position, a room's walls, a new
+ * floor and its roof — and undo takes each back out of 3D too.
+ */
+async function checkThreeD(page, at, { touch, tapAt }) {
+  await page.reload();
+  await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+  await page.locator(PLAN).waitFor();
+  await page.getByRole("button", { name: "Both", exact: true }).click();
+  await page.waitForFunction(() => [...window.__scenes].some((scene) => scene.getObjectByName("level:ground-floor")), null, { timeout: 15000 });
+  await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
+  const screenOf = (x, y) => page.evaluate(([selector, x, y]) => { const point = new DOMPoint(x, y).matrixTransform(document.querySelector(selector).getScreenCTM()); return [point.x, point.y]; }, [PLAN, x, y]);
+  const drag = async (from, to) => {
+    const [ax, ay] = await screenOf(...from);
+    const [bx, by] = await screenOf(...to);
+    await touch("touchStart", [[ax, ay]]);
+    for (let step = 1; step <= 8; step += 1) await touch("touchMove", [[ax + (bx - ax) * step / 8, ay + (by - ay) * step / 8]]);
+    await touch("touchEnd", []);
+    await page.waitForTimeout(250);
+  };
+  const undo = async () => { await page.getByRole("button", { name: "Undo", exact: true }).click(); await page.waitForTimeout(250); };
+  const scene = () => page.evaluate(() => {
+    const live = [...window.__scenes].filter((item) => item.getObjectByName("level:ground-floor")).at(-1);
+    live.updateMatrixWorld(true);
+    const boxes = {};
+    live.traverse((object) => { if (object.name) { const box = new window.__THREE.Box3().setFromObject(object); boxes[object.name] = { min: box.min.toArray(), max: box.max.toArray() }; } });
+    let meshes = 0;
+    live.getObjectByName("level:ground-floor").traverse((object) => { if (object.isMesh) meshes += 1; });
+    return { boxes, meshes };
+  });
+  const depth = (box) => box.max[2] - box.min[2];
+  const near = (a, b) => Math.abs(a - b) < 0.005;
+
+  const rail = page.locator('nav[aria-label="Modeling tools"]');
+  const start = await scene();
+  await tapAt(2000, 0);
+  await drag([2000, 0], [2000, -500]);
+  assert.ok(near(depth((await scene()).boxes["walls:ground-floor"]) - depth(start.boxes["walls:ground-floor"]), 0.5), `${at}: a wall moved on the plan moves in 3D`);
+  await undo();
+  assert.ok(near(depth((await scene()).boxes["walls:ground-floor"]), depth(start.boxes["walls:ground-floor"])), `${at}: and undo moves it back in 3D`);
+
+  await rail.getByRole("button", { name: "Door", exact: true }).click();
+  assert.ok(await page.locator("canvas").count(), `${at}: picking a tool keeps the 3D beside the plan`);
+  await tapAt(4000, 0);
+  await rail.getByRole("button", { name: "Select", exact: true }).click();
+  const doorAt = (state) => { const name = Object.keys(state.boxes).find((key) => key.includes(":door:")); return state.boxes[name].min[0] - state.boxes["walls:ground-floor"].min[0]; };
+  const placed = await scene();
+  assert.ok(Object.keys(placed.boxes).some((key) => key.includes(":door:")), `${at}: a door placed on the plan appears in 3D`);
+  await drag([4000, 0], [5000, 0]);
+  assert.ok(near(doorAt(await scene()) - doorAt(placed), 1), `${at}: and slides with it`);
+
+  const before = (await scene()).meshes;
+  await rail.getByRole("button", { name: "Room", exact: true }).click();
+  await drag([1000, 1000], [4000, 4000]);
+  assert.equal((await scene()).meshes - before, 4, `${at}: a room drawn on the plan raises its four walls`);
+  await undo();
+  assert.equal((await scene()).meshes, before, `${at}: undo takes them down`);
+
+  const roof = (await scene()).boxes["main-roof"];
+  await page.getByRole("button", { name: /Ground Floor/ }).first().click();
+  await page.getByRole("menuitem", { name: "+ Add floor" }).click();
+  await page.waitForTimeout(300);
+  const raised = await scene();
+  assert.ok(raised.boxes["walls:floor-2"] && near(raised.boxes["walls:floor-2"].min[1], 3), `${at}: a new floor stands on the one below`);
+  assert.ok(near(raised.boxes["main-roof"].min[1] - roof.min[1], 3), `${at}: the roof goes up with it`);
+  assert.ok(raised.boxes["floor-2:slab"], `${at}: on its own slab`);
+  await undo();
+  assert.equal((await scene()).boxes["walls:floor-2"], undefined, `${at}: undo removes the floor from 3D`);
+  assert.match(await page.locator("div.sticky button[aria-expanded]").first().innerText(), /Ground Floor/, `${at}: and the editor goes back to a floor that exists`);
+
+  // Floor and roof cover the room tapped, once.
+  const toasts = () => page.evaluate(() => [...document.querySelectorAll("[data-sonner-toast]")].map((toast) => toast.textContent).join(" | "));
+  const slabs = async () => Object.keys((await scene()).boxes).filter((key) => key.startsWith("slab:"));
+  await rail.getByRole("button", { name: "Floor", exact: true }).click();
+  await tapAt(6000, 4500);
+  assert.equal((await slabs()).length, 0, `${at}: no second floor under the house`);
+  assert.match(await toasts(), /already has a floor/, `${at}: and it says why`);
+  await rail.getByRole("button", { name: "Room", exact: true }).click();
+  await tapAt(8000, 0);
+  await page.getByLabel("Typed width").fill("3000");
+  await page.getByLabel("Typed depth").fill("3000");
+  await page.getByRole("button", { name: "Create" }).click();
+  await rail.getByRole("button", { name: "Floor", exact: true }).click();
+  await tapAt(8800, 1500);
+  const extension = (await scene()).boxes[(await slabs())[0]];
+  assert.ok(extension && near(extension.max[0] - extension.min[0], 3) && near(extension.max[2] - extension.min[2], 3), `${at}: an extension gets a floor its own size`);
+  await rail.getByRole("button", { name: "Stair", exact: true }).click();
+  await tapAt(2000, 3000);
+  const stair = Object.entries((await scene()).boxes).find(([key]) => key.startsWith("stair:"))?.[1];
+  assert.ok(stair && near(stair.max[0] - stair.min[0], 1), `${at}: a stair is a stair's width, whatever tool came before`);
+}
+
+console.log("House designer touch + 3D: layout, pinch, pan, tap, delete/undo, long-press, room drawing, typed lengths, doors, wall moves, locks, floors and 2D/3D sync passed at 360–430px");

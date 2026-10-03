@@ -96,8 +96,8 @@ export function HousePreview({
           const selectedWallIds = new Set(project.walls.filter((wall) => wall.levelId === level.id && highlighted.has(wall.id) && wall.sourceWallId).map((wall) => wall.sourceWallId!));
           const hiddenWallIds = new Set(project.walls.filter((wall) => wall.levelId === level.id && hiddenIds.has(wall.id) && wall.sourceWallId).map((wall) => wall.sourceWallId!));
           return (
-            <group key={level.id}>
-              {!hiddenKinds.has("wall") ? <RoomShell
+            <group key={level.id} name={`level:${level.id}`}>
+              {!hiddenKinds.has("wall") ? <group name={`walls:${level.id}`}><RoomShell
                 room={level.plan}
                 offset={[-bounds.centreX * MM, level.elevation * MM, bounds.centreY * MM]}
                 showFloor={false}
@@ -108,7 +108,7 @@ export function HousePreview({
                 onSelectWall={(sourceWallId) =>
                   choose({ kind: "wall", id: wallObjectId(level.id, sourceWallId) })
                 }
-              /> : null}
+              /></group> : null}
               <OpeningMeshes
                 project={project}
                 levelId={level.id}
@@ -126,10 +126,10 @@ export function HousePreview({
         })}
 
         {!hiddenKinds.has("slab") && project.slabs.filter((slab) => visible("slab", slab.id, slab.levelId)).map((slab) => (
-          <SlabMesh key={slab.id} slab={slab} bounds={bounds} selected={highlighted.has(slab.id)} onSelect={() => choose({ kind: "slab", id: slab.id })} />
+          <group key={slab.id} name={slab.id}><SlabMesh slab={slab} bounds={bounds} selected={highlighted.has(slab.id)} onSelect={() => choose({ kind: "slab", id: slab.id })} /></group>
         ))}
         {!hiddenKinds.has("ceiling") && project.ceilings.filter((ceiling) => visible("ceiling", ceiling.id, ceiling.levelId)).map((ceiling) => (
-          <CeilingMesh key={ceiling.id} ceiling={ceiling} bounds={bounds} selected={highlighted.has(ceiling.id)} onSelect={() => choose({ kind: "ceiling", id: ceiling.id })} />
+          <group key={ceiling.id} name={ceiling.id}><CeilingMesh ceiling={ceiling} bounds={bounds} selected={highlighted.has(ceiling.id)} onSelect={() => choose({ kind: "ceiling", id: ceiling.id })} /></group>
         ))}
         {!hiddenKinds.has("veranda") && project.verandas.filter((veranda) => visible("veranda", veranda.id, veranda.levelId)).map((veranda) => (
           <VerandaMesh key={veranda.id} veranda={veranda} bounds={bounds} selected={highlighted.has(veranda.id)} onSelect={() => choose({ kind: "veranda", id: veranda.id })} />
@@ -138,19 +138,19 @@ export function HousePreview({
           <BalconyMesh key={balcony.id} balcony={balcony} bounds={bounds} selected={highlighted.has(balcony.id)} onSelect={() => choose({ kind: "balcony", id: balcony.id })} />
         ))}
         {!hiddenKinds.has("stair") && project.stairs.filter((stair) => visible("stair", stair.id, stair.levelId)).map((stair) => (
-          <StairMesh key={stair.id} stair={stair} bounds={bounds} selected={highlighted.has(stair.id)} onSelect={() => choose({ kind: "stair", id: stair.id })} />
+          <group key={stair.id} name={stair.id}><StairMesh stair={stair} bounds={bounds} selected={highlighted.has(stair.id)} onSelect={() => choose({ kind: "stair", id: stair.id })} /></group>
         ))}
         {!hiddenKinds.has("column") && project.structuralColumns.filter((column) => visible("column", column.id, column.levelId)).map((column) => (
-          <ColumnMesh key={column.id} column={column} bounds={bounds} selected={highlighted.has(column.id)} onSelect={() => choose({ kind: "column", id: column.id })} />
+          <group key={column.id} name={column.id}><ColumnMesh column={column} bounds={bounds} selected={highlighted.has(column.id)} onSelect={() => choose({ kind: "column", id: column.id })} /></group>
         ))}
         {!hiddenKinds.has("beam") && project.structuralBeams.filter((beam) => visible("beam", beam.id, beam.levelId)).map((beam) => (
-          <BeamMesh key={beam.id} beam={beam} bounds={bounds} selected={highlighted.has(beam.id)} onSelect={() => choose({ kind: "beam", id: beam.id })} />
+          <group key={beam.id} name={beam.id}><BeamMesh beam={beam} bounds={bounds} selected={highlighted.has(beam.id)} onSelect={() => choose({ kind: "beam", id: beam.id })} /></group>
         ))}
         {!hiddenKinds.has("grid") && project.structuralGrid.filter((grid) => visible("grid", grid.id, grid.levelId)).map((grid) => (
           <GridMesh key={grid.id} grid={grid} elevation={project.levels.find((level) => level.id === grid.levelId)?.elevation ?? 0} bounds={bounds} selected={highlighted.has(grid.id)} onSelect={() => choose({ kind: "grid", id: grid.id })} />
         ))}
         {!hiddenKinds.has("roof") && project.roofs.filter((roof) => visible("roof", roof.id, roof.levelId)).map((roof) => (
-          <RoofMesh key={roof.id} roof={roof} bounds={bounds} color={project.facade.roofColor} selected={highlighted.has(roof.id)} onSelect={() => choose({ kind: "roof", id: roof.id })} />
+          <group key={roof.id} name={roof.id}><RoofMesh roof={roof} bounds={bounds} color={project.facade.roofColor} selected={highlighted.has(roof.id)} onSelect={() => choose({ kind: "roof", id: roof.id })} /></group>
         ))}
         {!hiddenKinds.has("facade") && project.facadeElements.filter((element) => visible("facade", element.id, element.levelId)).map((element) => (
           <FacadeElementMesh key={element.id} element={element} project={project} bounds={bounds} selected={highlighted.has(element.id)} onSelect={() => choose({ kind: "facade", id: element.id })} />
@@ -208,6 +208,7 @@ function OpeningMeshes({
     return (
       <mesh
         key={id}
+        name={id}
         position={[
           (x - bounds.centreX) * MM,
           (elevation + opening.sill + opening.height / 2) * MM,

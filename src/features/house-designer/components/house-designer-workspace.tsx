@@ -571,7 +571,10 @@ function ModelScreen({
   onBack?: () => void;
   backLabel?: string;
 }) {
-  const [activeLevelId, setActiveLevelId] = useState(project.levels[0]?.id ?? "ground-floor");
+  const [chosenLevelId, setActiveLevelId] = useState(project.levels[0]?.id ?? "ground-floor");
+  // Undoing Add Floor deletes the floor being looked at; everything that
+  // reads the active level must then fall back to one that still exists.
+  const activeLevelId = project.levels.some((level) => level.id === chosenLevelId) ? chosenLevelId : project.levels[0]?.id ?? chosenLevelId;
   const [visibleLevelIds, setVisibleLevelIds] = useState<Set<string>>(
     () => new Set(project.levels.map((level) => level.id)),
   );
@@ -721,9 +724,14 @@ function ModelScreen({
     else if (id === "window") setToolSettings((current) => ({ ...current, width: 1200, height: 1500, sillHeight: 900 }));
     else if (["wall", "structural-wall", "room-separator"].includes(id)) setToolSettings((current) => ({ ...current, height: activeLevel?.floorToFloorHeight ?? 3000 }));
     else if (id === "column") setToolSettings((current) => ({ ...current, width: 300, depth: 300, height: activeLevel?.floorToFloorHeight ?? 3000 }));
+    // A stair has its own size; inheriting the last column's 300 mm made it
+    // a stair nobody could climb.
+    else if (id === "stair") setToolSettings((current) => ({ ...current, width: 1000, depth: 3000, height: activeLevel?.floorToFloorHeight ?? 3000 }));
     setActiveTool(id);
     setDraftStart(null);
-    onView("2d");
+    // Drawing happens on the plan, so 3D alone gives way to it — but side by
+    // side already shows the plan, and the 3D beside it is the point.
+    if (view === "3d") onView("2d");
     setActiveViewId(`view:plan:${activeLevelId}`);
     setGuidance(`${houseCommand(id).label} Tool · ${lineDraftTool(id) ? "Pick start point" : "Pick placement point"}`);
     return true;
@@ -839,7 +847,7 @@ function ModelScreen({
       case "split-view": onView("split"); return;
       case "view-top": case "view-front": case "view-back": case "view-left": case "view-right": onView("3d"); setActiveViewId(`view:camera:${id.replace("view-", "")}`); return;
       case "zoom-fit": case "zoom-extents": setViewRevision((value) => value + 1); setGuidance("View refitted to model extents"); return;
-      case "move": setActiveTool(id); setDraftStart(null); onView("2d"); setGuidance("Move Tool · Pick a new location or use arrow keys"); return;
+      case "move": setActiveTool(id); setDraftStart(null); if (view === "3d") onView("2d"); setGuidance("Move Tool · Pick a new location or use arrow keys"); return;
       case "ask-ai": case "ai-remodel": document.getElementById("house-ai-remodel")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
       case "generate-facade": case "alternatives": commit(generateFacadeAlternatives(project, 3), "Generated façade alternatives"); document.getElementById("house-facade")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
       case "generate-structure": commit(generatePreliminaryStructure(project), "Preliminary structure generated"); return;
