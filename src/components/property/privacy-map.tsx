@@ -73,44 +73,68 @@ export function PrivacyMap({
 
     let marker: maplibregl.Marker | null = null;
 
+    // Source and each layer are added independently and guarded on their own
+    // id, rather than one check gating all four calls. `addLayer` can throw
+    // if it lands a tick before the style is fully ready — `styledata` fires
+    // several times during a single load, not just once — and a one-guard
+    // version that threw partway through would leave the source in place
+    // with no layers on it, and never try again: `getSource` would already
+    // be truthy, so every later retry bailed out before reaching `addLayer`.
+    // Per-id guards mean whatever didn't land gets finished on the next
+    // `styledata`, and the try/catch means a too-early attempt is a retry,
+    // not a silently abandoned map.
     const draw = () => {
-      if (showCircle) {
-        if (map.getSource("area")) return;
-        map.addSource("area", {
-          type: "geojson",
-          data: circlePolygon(latitude, longitude, radiusM),
-        });
-        map.addLayer({
-          id: "area-fill",
-          type: "fill",
-          source: "area",
-          paint: { "fill-color": "#2563eb", "fill-opacity": 0.2 },
-        });
-        // A white halo under the line, because a 2px blue line reads fine on
-        // a plain basemap and disappears on a busy one — satellite imagery,
-        // or an OSM tile with its own red clinic/pharmacy icons right on the
-        // boundary. The halo is what keeps the line visible underneath them.
-        map.addLayer({
-          id: "area-line-halo",
-          type: "line",
-          source: "area",
-          paint: { "line-color": "#ffffff", "line-width": 5, "line-opacity": 0.85 },
-        });
-        map.addLayer({
-          id: "area-line",
-          type: "line",
-          source: "area",
-          paint: { "line-color": "#2563eb", "line-width": 3 },
-        });
-      } else if (!marker) {
-        marker = new maplibregl.Marker({ color: "#2563eb" })
-          .setLngLat([longitude, latitude])
-          .addTo(map);
+      try {
+        if (showCircle) {
+          if (!map.getSource("area")) {
+            map.addSource("area", {
+              type: "geojson",
+              data: circlePolygon(latitude, longitude, radiusM),
+            });
+          }
+          if (!map.getLayer("area-fill")) {
+            map.addLayer({
+              id: "area-fill",
+              type: "fill",
+              source: "area",
+              paint: { "fill-color": "#2563eb", "fill-opacity": 0.2 },
+            });
+          }
+          // A white halo under the line, because a 2px blue line reads fine
+          // on a plain basemap and disappears on a busy one — satellite
+          // imagery, or an OSM tile with its own red clinic/pharmacy icons
+          // right on the boundary. The halo is what keeps the line visible
+          // underneath them.
+          if (!map.getLayer("area-line-halo")) {
+            map.addLayer({
+              id: "area-line-halo",
+              type: "line",
+              source: "area",
+              paint: { "line-color": "#ffffff", "line-width": 5, "line-opacity": 0.85 },
+            });
+          }
+          if (!map.getLayer("area-line")) {
+            map.addLayer({
+              id: "area-line",
+              type: "line",
+              source: "area",
+              paint: { "line-color": "#2563eb", "line-width": 3 },
+            });
+          }
+        } else if (!marker) {
+          marker = new maplibregl.Marker({ color: "#2563eb" })
+            .setLngLat([longitude, latitude])
+            .addTo(map);
+        }
+      } catch (error) {
+        console.warn("[medosha:map] privacy circle not ready yet, retrying:", error);
       }
     };
 
     map.on("load", draw);
-    // Changing basemap discards every layer, so they are put back.
+    // Changing basemap discards every layer, so they are put back — and the
+    // first few `styledata` events of the initial load are exactly the ones
+    // the try/catch above exists for.
     map.on("styledata", draw);
 
     return () => {

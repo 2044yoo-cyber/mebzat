@@ -145,40 +145,57 @@ export function LocationPicker({
       commit(position.lat, position.lng);
     });
 
+    // Source and each layer are guarded on their own id, not behind one
+    // check gating all three — see the matching comment in privacy-map.tsx.
+    // `styledata` fires several times during a single load, and a too-early
+    // `addLayer` can throw; one broad guard would leave the source added
+    // with no layers on it and never retry, since `getSource` would already
+    // be truthy next time round.
     const draw = () => {
-      if (map.getSource("privacy-circle")) return;
-      map.addSource("privacy-circle", {
-        type: "geojson",
-        data: circlePolygon(
-          marker.getLngLat().lat,
-          marker.getLngLat().lng,
-          radius,
-        ),
-      });
-      map.addLayer({
-        id: "privacy-fill",
-        type: "fill",
-        source: "privacy-circle",
-        paint: { "fill-color": "#2563eb", "fill-opacity": 0.18 },
-      });
-      // Same halo as the buyer-facing circle: a thin dashed line alone was
-      // hard to see against satellite imagery or a busy street tile.
-      map.addLayer({
-        id: "privacy-line-halo",
-        type: "line",
-        source: "privacy-circle",
-        paint: { "line-color": "#ffffff", "line-width": 4.5, "line-opacity": 0.85 },
-      });
-      map.addLayer({
-        id: "privacy-line",
-        type: "line",
-        source: "privacy-circle",
-        paint: {
-          "line-color": "#2563eb",
-          "line-width": 2.5,
-          "line-dasharray": [2, 2],
-        },
-      });
+      try {
+        if (!map.getSource("privacy-circle")) {
+          map.addSource("privacy-circle", {
+            type: "geojson",
+            data: circlePolygon(
+              marker.getLngLat().lat,
+              marker.getLngLat().lng,
+              radius,
+            ),
+          });
+        }
+        if (!map.getLayer("privacy-fill")) {
+          map.addLayer({
+            id: "privacy-fill",
+            type: "fill",
+            source: "privacy-circle",
+            paint: { "fill-color": "#2563eb", "fill-opacity": 0.18 },
+          });
+        }
+        // Same halo as the buyer-facing circle: a thin dashed line alone was
+        // hard to see against satellite imagery or a busy street tile.
+        if (!map.getLayer("privacy-line-halo")) {
+          map.addLayer({
+            id: "privacy-line-halo",
+            type: "line",
+            source: "privacy-circle",
+            paint: { "line-color": "#ffffff", "line-width": 4.5, "line-opacity": 0.85 },
+          });
+        }
+        if (!map.getLayer("privacy-line")) {
+          map.addLayer({
+            id: "privacy-line",
+            type: "line",
+            source: "privacy-circle",
+            paint: {
+              "line-color": "#2563eb",
+              "line-width": 2.5,
+              "line-dasharray": [2, 2],
+            },
+          });
+        }
+      } catch (error) {
+        console.warn("[medosha:map] privacy circle not ready yet, retrying:", error);
+      }
     };
 
     map.on("load", draw);
