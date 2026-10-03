@@ -1,4 +1,4 @@
-import { patchHouseObject } from "./project-edit";
+import { patchHouseObject, removeFootprintCorner } from "./project-edit";
 import { allHouseSelections, sameSelection } from "./model-state";
 import { houseCommand, type HouseCommandId } from "./command-registry";
 import { wallObjectId, openingObjectId, type HouseObjectKind, type HouseProject, type HouseSelection } from "../types/project";
@@ -15,7 +15,7 @@ export type HousePlacementOptions = {
   material?: string;
 };
 
-export function deleteHouseSelections(project: HouseProject, selections: readonly HouseSelection[]): HouseCommandMutation {
+export function deleteHouseSelections(project: HouseProject, selections: readonly HouseSelection[], options?: { footprintEditable?: boolean }): HouseCommandMutation {
   let next = project;
   const blocked: string[] = [];
   for (const selection of selections) {
@@ -35,8 +35,22 @@ export function deleteHouseSelections(project: HouseProject, selections: readonl
       const wall = next.walls.find((item) => item.id === selection.id);
       const level = wall ? next.levels.find((item) => item.id === wall.levelId) : null;
       const sourceId = wall?.sourceWallId;
-      if (sourceId && level?.plan?.corners.some((corner) => corner.id === sourceId)) {
-        blocked.push("Exterior footprint walls must be removed in plan verification");
+      const isFootprintWall = Boolean(sourceId && level?.plan?.corners.some((corner) => corner.id === sourceId));
+      if (isFootprintWall) {
+        if (!options?.footprintEditable) {
+          blocked.push("Exterior footprint walls must be removed in plan verification");
+          continue;
+        }
+        // Deleting one side of a closed footprint means deleting the corner
+        // it starts from — there is no such thing as erasing a single wall
+        // and leaving the shape open. removeFootprintCorner regenerates
+        // every object that was derived from the footprint.
+        const result = removeFootprintCorner(next, level!.id, sourceId!);
+        if (!result.ok) {
+          blocked.push("A footprint needs at least three walls");
+          continue;
+        }
+        next = result.project;
         continue;
       }
       const openingIds = [...next.doors, ...next.windows].filter((item) => item.wallId === selection.id).map((item) => item.id);

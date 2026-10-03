@@ -757,9 +757,9 @@ function ModelScreen({
         return;
       }
       case "finish": setActiveTool("select"); setDraftStart(null); setGuidance("Action finished"); return;
-      case "delete": applyMutation(deleteHouseSelections(project, selections), "Deleted selection"); return;
+      case "delete": applyMutation(deleteHouseSelections(project, selections, { footprintEditable: verification }), "Deleted selection"); return;
       case "copy": clipboard.current = { sourceProjectId: project.id, selections: [...selections] }; setGuidance(`Copied ${selections.length} object${selections.length === 1 ? "" : "s"}`); return;
-      case "cut": clipboard.current = { sourceProjectId: project.id, selections: [...selections] }; applyMutation(deleteHouseSelections(project, selections), "Cut selection"); return;
+      case "cut": clipboard.current = { sourceProjectId: project.id, selections: [...selections] }; applyMutation(deleteHouseSelections(project, selections, { footprintEditable: verification }), "Cut selection"); return;
       case "paste": {
         if (!clipboard.current || clipboard.current.sourceProjectId !== project.id) { toast.info("Nothing from this model is ready to paste."); return; }
         applyMutation(duplicateHouseSelections(project, clipboard.current.selections, 250), "Pasted copy"); return;

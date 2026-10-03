@@ -75,4 +75,20 @@ assert.equal(isModelTextInput({ tagName: "INPUT", isContentEditable: false } as 
 assert.ok(calculateHouseQuantities(project).some((row) => row.code === "CON-06"), "foundations reach live quantities");
 assert.ok(houseProjectSchema.safeParse(project).success, "edited model remains persistable");
 
+// Deleting an exterior wall means deleting the corner it starts from — not
+// blocked outright, and not left as a hole in the footprint either.
+const footprintProject = ensureHouseBimState(createHouseProject({ title: "Footprint delete check", room: rectangularRoom(8000, 6500), style: "modern", strict: true, floorCount: 1, floorToFloorHeight: 3000 }));
+const footprintWall = { kind: "wall" as const, id: footprintProject.walls.find((item) => item.sourceWallId === "c1")!.id };
+const stillBlocked = deleteHouseSelections(footprintProject, [footprintWall]);
+assert.equal(stillBlocked.blocked.length, 1, "footprint wall delete is still refused outside plan verification");
+const editable = deleteHouseSelections(footprintProject, [footprintWall], { footprintEditable: true });
+assert.equal(editable.blocked.length, 0, "footprint wall delete is allowed during plan verification");
+assert.equal(editable.project.levels[0]!.plan!.corners.length, 3, "the corner the wall started from is gone");
+assert.equal(editable.project.walls.some((item) => item.id === footprintWall.id), false, "the deleted wall itself is gone");
+assert.equal(editable.project.slabs[0]!.boundary.length, 3, "the slab boundary follows the shorter footprint");
+assert.equal(editable.project.roofs[0]!.boundary.length, 3, "the roof boundary follows the shorter footprint");
+assert.ok(houseProjectSchema.safeParse(editable.project).success, "the shorter footprint is still a valid project");
+const triangleWall = { kind: "wall" as const, id: editable.project.walls.find((item) => item.levelId === "ground-floor")!.id };
+assert.ok(deleteHouseSelections(editable.project, [triangleWall], { footprintEditable: true }).blocked.length > 0, "refuses to shrink a footprint below three walls");
+
 console.log("house command checks passed");

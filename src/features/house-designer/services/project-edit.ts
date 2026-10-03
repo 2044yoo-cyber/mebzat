@@ -18,6 +18,28 @@ import {
 
 export type HousePatch = Record<string, string | number>;
 
+/**
+ * Deleting an exterior wall means deleting the corner it starts from — there
+ * is no such thing as erasing one side of a closed footprint and leaving the
+ * rest alone. Reuses `rebuildLevel`, the same regeneration a dragged corner
+ * already goes through, so walls, rooms, slabs, roofs, structure and the
+ * rest stay consistent with the new, shorter footprint. Refused below a
+ * triangle, for the same reason a `Room` itself refuses it.
+ */
+export function removeFootprintCorner(
+  project: HouseProject,
+  levelId: string,
+  cornerId: string,
+): { project: HouseProject; ok: boolean } {
+  const level = project.levels.find((item) => item.id === levelId);
+  const plan = level?.plan;
+  if (!plan || plan.corners.length <= 3 || !plan.corners.some((corner) => corner.id === cornerId)) {
+    return { project, ok: false };
+  }
+  const corners = plan.corners.filter((corner) => corner.id !== cornerId);
+  return { project: rebuildLevel(project, levelId, { ...plan, corners }), ok: true };
+}
+
 /** Apply one inspector edit and keep the level plan and normalized objects aligned. */
 export function patchHouseObject(
   project: HouseProject,
