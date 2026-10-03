@@ -14,6 +14,12 @@ type SnapPoint = HousePlanPoint & { label: string };
 const lineTools = new Set<HouseCommandId>(["wall", "structural-wall", "room-separator", "beam", "railing", "grid", "reference-plane", "dimension", "section", "elevation", "strip-footing"]);
 const pointTools = new Set<HouseCommandId>(["door", "window", "column", "room", "floor", "structural-slab", "ceiling", "roof", "stair", "opening", "component", "furniture", "kitchen", "wardrobe", "plumbing-fixture", "foundation", "isolated-footing", "foundation-slab", "level", "text", "room-tag", "tag", "move"]);
 
+// Grid-snap lands on the same points the background grid draws, so "snap to
+// grid" and "the visible grid" are the same thing rather than two grids that
+// happen to coexist.
+const MINOR_GRID = 1000;
+const MAJOR_GRID = MINOR_GRID * 5;
+
 export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
   project: HouseProject;
   levelId: string;
@@ -50,7 +56,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
 
   function snapped(raw: HousePlanPoint): SnapPoint {
     if (!snapEnabled) return { ...raw, label: "Nearest" };
-    let best: SnapPoint = { x: Math.round(raw.x / 100) * 100, y: Math.round(raw.y / 100) * 100, label: "Grid" };
+    let best: SnapPoint = { x: Math.round(raw.x / MINOR_GRID) * MINOR_GRID, y: Math.round(raw.y / MINOR_GRID) * MINOR_GRID, label: "Grid" };
     let distance = Math.hypot(best.x - raw.x, best.y - raw.y);
     for (const candidate of candidates) {
       const next = Math.hypot(candidate.x - raw.x, candidate.y - raw.y);
@@ -126,12 +132,12 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   return (
     <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onPointerCancel={() => setDragStart(null)}>
       <defs>
-        <pattern id={`${gridId}-minor`} width={1000} height={1000} patternUnits="userSpaceOnUse">
-          <path d="M 1000 0 L 0 0 0 1000" fill="none" stroke="#eef2f7" strokeWidth={6} />
+        <pattern id={`${gridId}-minor`} width={MINOR_GRID} height={MINOR_GRID} patternUnits="userSpaceOnUse">
+          <path d={`M ${MINOR_GRID} 0 L 0 0 0 ${MINOR_GRID}`} fill="none" strokeWidth={6} className="stroke-slate-300 dark:stroke-[#eef2f7]" />
         </pattern>
-        <pattern id={`${gridId}-major`} width={5000} height={5000} patternUnits="userSpaceOnUse">
-          <rect width={5000} height={5000} fill={`url(#${gridId}-minor)`} />
-          <path d="M 5000 0 L 0 0 0 5000" fill="none" stroke="#dbe3ec" strokeWidth={10} />
+        <pattern id={`${gridId}-major`} width={MAJOR_GRID} height={MAJOR_GRID} patternUnits="userSpaceOnUse">
+          <rect width={MAJOR_GRID} height={MAJOR_GRID} fill={`url(#${gridId}-minor)`} />
+          <path d={`M ${MAJOR_GRID} 0 L 0 0 0 ${MAJOR_GRID}`} fill="none" strokeWidth={10} className="stroke-slate-400 dark:stroke-[#dbe3ec]" />
         </pattern>
       </defs>
       <rect x={bounds.minX} y={bounds.minY} width={bounds.maxX - bounds.minX} height={bounds.maxY - bounds.minY} fill={`url(#${gridId}-major)`} pointerEvents="none" />

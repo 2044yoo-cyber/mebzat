@@ -10,6 +10,7 @@ import {
   EyeOff,
   FileUp,
   Loader2,
+  Magnet,
   PencilRuler,
   Save,
   ShieldCheck,
@@ -870,6 +871,9 @@ function ModelScreen({
         </div>
         <label className="flex shrink-0 items-center gap-1 text-xs">Units<select aria-label="Drawing units" value={project.displayUnits ?? "mm"} onChange={(event) => commit({ ...project, displayUnits: event.target.value as DisplayUnits }, "Display units updated")} className="rounded-lg border bg-background p-2"><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option></select></label>
         <div className="flex shrink-0 gap-2">
+          <button type="button" onClick={() => setSnapEnabled((value) => !value)} aria-pressed={snapEnabled} title="Toggle snap to grid, endpoints and intersections" className={cn("flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs", snapEnabled ? "border-brand/40 bg-brand/10 text-brand" : "hover:bg-muted")}>
+            <Magnet className="size-3.5" /> Snap
+          </button>
           <button type="button" onClick={() => setViewportOpen((open) => !open)} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted">
             {viewportOpen ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />} {viewportOpen ? "Hide view" : "Show view"}
           </button>
@@ -922,7 +926,7 @@ function ModelScreen({
           <div className="flex min-w-0 gap-1"><HouseMobileTools activeCategory={activeCategory} activeTool={activeTool} selectionCount={selections.length} canUndo={past.length > 0} canRedo={future.length > 0} onCommand={runCommand} />
           <div className="min-w-0 flex-1">{viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
             {view !== "3d" && activeRoom ? (
-              <div className="relative h-[min(680px,68dvh)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-background">
+              <div className="relative h-[min(680px,68dvh)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 dark:bg-background">
                 <div className="pointer-events-none absolute inset-0"><PlanCanvas room={activeRoom} onChange={() => undefined} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} /></div>
                 <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => commit(patchHouseObject(project, selection, patch), "Temporary dimension updated")} onGuidance={setGuidance} />
                 <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>

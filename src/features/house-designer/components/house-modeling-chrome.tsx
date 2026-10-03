@@ -9,6 +9,7 @@ import {
   Grid3X3,
   HelpCircle,
   Layers3,
+  Magnet,
   PanelLeftClose,
   PanelLeftOpen,
   MousePointer2,
@@ -202,7 +203,7 @@ export function HouseStatusBar({ selectionCount, snap, snapEnabled = true, onTog
   return (
     <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex min-w-0 items-center gap-3 overflow-x-auto rounded-lg border bg-card/95 px-3 py-2 text-[11px] text-muted-foreground shadow-sm backdrop-blur md:bottom-2">
       <span className="shrink-0">Selected: <strong className="text-foreground">{selectionCount}</strong></span>
-      <button type="button" onClick={onToggleSnap} className="shrink-0 rounded px-1 hover:bg-muted">Snap: <strong className={snapEnabled ? "text-foreground" : "text-muted-foreground line-through"}>{snap}</strong></button>
+      <button type="button" onClick={onToggleSnap} aria-pressed={snapEnabled} title="Toggle snap to grid, endpoints and intersections" className={cn("flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5", snapEnabled ? "border-brand/40 bg-brand/10 text-brand" : "border-transparent hover:bg-muted")}><Magnet className="size-3" /> Snap: <strong className={snapEnabled ? "" : "text-muted-foreground line-through"}>{snap}</strong></button>
       <span className="shrink-0">Level: <strong className="text-foreground">{level}</strong></span>
       <span className="shrink-0">Units: <strong className="text-foreground">{units}</strong></span>
       <span className="shrink-0">Mode: <strong className="text-foreground">{mode}</strong></span>
