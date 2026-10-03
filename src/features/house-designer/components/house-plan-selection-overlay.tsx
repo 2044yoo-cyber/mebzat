@@ -2,6 +2,8 @@
 
 import { useId, useMemo, useRef, useState } from "react";
 
+import { PlanCanvas } from "@/features/berchuma-studio/components/plan/plan-canvas";
+
 import { useHouseUnits } from "./house-units";
 import { displayLength, modelLength } from "../services/workspace-options";
 import type { HouseCommandId } from "../services/command-registry";
@@ -61,6 +63,15 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   // recognised as "start pinching" rather than "place a second wall point".
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ midX: number; midY: number; dist: number } | null>(null);
+  // Touch: a tap selects, holding still opens the full action menu.
+  const longPress = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
+  // Lifting the finger after a long press would otherwise "click" whichever
+  // menu item has just appeared under it — Delete, as often as not.
+  const swallowRelease = useRef(false);
+  function cancelLongPress() {
+    if (longPress.current) window.clearTimeout(longPress.current.timer);
+    longPress.current = null;
+  }
 
   const margin = Math.max(500, Math.max(effective.maxX - effective.minX, effective.maxY - effective.minY) * 0.08);
   const viewBox = `${effective.minX} ${effective.minY} ${effective.maxX - effective.minX} ${effective.maxY - effective.minY}`;
@@ -95,7 +106,12 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     if (!next || !prev || !svg.current) return;
     const rect = svg.current.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return;
-    const base = view ?? bounds;
+    // Two fingers move as two pointer events, usually in one batch, so this
+    // has to build on the previous event's result rather than this render's.
+    setView((current) => pinchView(current ?? bounds, prev, next, rect));
+  }
+
+  function pinchView(base: Bounds, prev: { midX: number; midY: number; dist: number }, next: { midX: number; midY: number; dist: number }, rect: DOMRect): Bounds {
     const width = base.maxX - base.minX;
     const height = base.maxY - base.minY;
     const span = Math.max(width, height, 1);
@@ -111,7 +127,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     const panY = (next.midY - prev.midY) * (newHeight / rect.height);
     const minX = anchorX - fracX * newWidth - panX;
     const minY = anchorY - fracY * newHeight - panY;
-    setView({ minX, minY, maxX: minX + newWidth, maxY: minY + newHeight });
+    return { minX, minY, maxX: minX + newWidth, maxY: minY + newHeight };
   }
 
   /** Mouse wheel zoom at the cursor; trackpad two-finger scroll pans (and a
@@ -121,7 +137,11 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     if (!svg.current) return;
     const rect = svg.current.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return;
-    const base = view ?? bounds;
+    const { ctrlKey, deltaX, deltaY, clientX, clientY } = event;
+    setView((current) => wheelView(current ?? bounds, { ctrlKey, deltaX, deltaY, clientX, clientY }, rect));
+  }
+
+  function wheelView(base: Bounds, event: { ctrlKey: boolean; deltaX: number; deltaY: number; clientX: number; clientY: number }, rect: DOMRect): Bounds {
     const width = base.maxX - base.minX;
     const height = base.maxY - base.minY;
     if (event.ctrlKey) {
@@ -136,12 +156,11 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       const newHeight = height * factor;
       const minX = anchorX - fracX * newWidth;
       const minY = anchorY - fracY * newHeight;
-      setView({ minX, minY, maxX: minX + newWidth, maxY: minY + newHeight });
-    } else {
-      const dx = event.deltaX * (width / rect.width);
-      const dy = event.deltaY * (height / rect.height);
-      setView({ minX: base.minX + dx, minY: base.minY + dy, maxX: base.maxX + dx, maxY: base.maxY + dy });
+      return { minX, minY, maxX: minX + newWidth, maxY: minY + newHeight };
     }
+    const dx = event.deltaX * (width / rect.width);
+    const dy = event.deltaY * (height / rect.height);
+    return { minX: base.minX + dx, minY: base.minY + dy, maxX: base.maxX + dx, maxY: base.maxY + dy };
   }
 
   function snapped(raw: HousePlanPoint): SnapPoint {
@@ -177,6 +196,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       // A second finger landing mid-drag means "I want to pan", not "place
       // the next wall point" — the marquee it interrupted was never finished.
       setDragStart(null);
+      cancelLongPress();
       pinch.current = pinchState();
       return;
     }
@@ -184,6 +204,18 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     const raw = modelPoint(event);
     if (!raw) return;
     svg.current?.focus();
+    if (selectMode && event.pointerType !== "mouse") {
+      const { clientX, clientY } = event;
+      const entry = { x: clientX, y: clientY, fired: false, timer: 0 };
+      entry.timer = window.setTimeout(() => {
+        entry.fired = true;
+        const hit = pickHouseObject(objects, raw);
+        if (!hit) return;
+        onSelect([hit], "replace");
+        onSelectionMenu({ x: clientX, y: clientY });
+      }, 500);
+      longPress.current = entry;
+    }
     const point = snapped(raw);
     setCurrent(point);
     if (selectMode) {
@@ -207,14 +239,16 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   function pointerUp(event: React.PointerEvent<SVGSVGElement>) {
     pointers.current.delete(event.pointerId);
     if (pointers.current.size >= 1) return;
+    const held = longPress.current?.fired;
+    cancelLongPress();
+    if (held) { swallowRelease.current = true; setDragStart(null); return; }
     if (!selectMode || !dragStart) return;
     const end = modelPoint(event) ?? dragStart;
     const distance = Math.hypot(end.x - dragStart.x, end.y - dragStart.y);
     const mode = event.shiftKey ? "remove" : event.ctrlKey || event.metaKey ? "add" : "replace";
     if (distance < Math.max(35, margin * 0.025)) {
-      const hits = objects.filter((object) => containsPoint(expand(object.bounds, 80), end)).sort((a, b) => area(a.bounds) - area(b.bounds));
-      onSelect(hits[0] ? [hits[0].selection] : [], mode);
-      if (event.pointerType !== "mouse") onSelectionMenu(hits.length ? { x: event.clientX, y: event.clientY } : null);
+      const hit = pickHouseObject(objects, end);
+      onSelect(hit ? [hit] : [], mode);
     } else {
       const box = normalized(dragStart, end);
       const crossing = end.x < dragStart.x;
@@ -229,8 +263,13 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   const selectedOpening = selections.length === 1 && (selections[0]?.kind === "door" || selections[0]?.kind === "window") ? [...project.doors, ...project.windows].find((item) => item.id === selections[0]?.id) : null;
   const selectedColumn = selections.length === 1 && selections[0]?.kind === "column" ? project.structuralColumns.find((item) => item.id === selections[0]?.id) : null;
 
+  const plan = project.levels.find((level) => level.id === levelId)?.plan;
   return (
-    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); setDragStart(null); }} onWheel={wheel}>
+    <>
+    {/* The verified plan underneath, in the same frame, so it pans and zooms
+        with the model rather than staying put behind it. */}
+    {plan ? <div className="pointer-events-none absolute inset-0"><PlanCanvas room={plan} onChange={noop} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} viewBox={{ x: effective.minX, y: effective.minY, width: effective.maxX - effective.minX, height: effective.maxY - effective.minY }} /></div> : null}
+    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => { if (swallowRelease.current) { swallowRelease.current = false; event.preventDefault(); } }} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); cancelLongPress(); setDragStart(null); }} onWheel={wheel}>
       <defs>
         <pattern id={`${gridId}-minor`} width={MINOR_GRID} height={MINOR_GRID} patternUnits="userSpaceOnUse">
           <path d={`M ${MINOR_GRID} 0 L 0 0 0 ${MINOR_GRID}`} fill="none" strokeWidth={6} className="stroke-slate-300 dark:stroke-[#eef2f7]" />
@@ -264,8 +303,11 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       {selectedOpening ? <OpeningTemporaryDimension project={project} opening={selectedOpening} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
       {selectedColumn ? <ColumnTemporaryDimensions column={selectedColumn} margin={margin} selection={selections[0]!} onChange={onDimensionChange} /> : null}
     </svg>
+    </>
   );
 }
+
+function noop() {}
 
 function OpeningTemporaryDimension({ project, opening, margin, selection, onChange }: { project: HouseProject; opening: HouseProject["doors"][number]; margin: number; selection: HouseSelection; onChange: (selection: HouseSelection, patch: Record<string, number>) => void }) {
   const wall = project.walls.find((item) => item.id === opening.wallId);
@@ -320,7 +362,26 @@ function lineGeometry(project: HouseProject, levelId: string, selection: HouseSe
   return null;
 }
 
-function selectableBounds(project: HouseProject, levelId: string): { selection: HouseSelection; bounds: Bounds }[] {
+// What a tap means when several things are under the finger. Area alone let a
+// structural grid line — 40 mm wide, drawn exactly on the wall — beat the
+// wall a person was actually pointing at.
+const PICK_TIER: Partial<Record<HouseSelection["kind"], number>> = {
+  door: 0, window: 0, column: 0, component: 0, stair: 0, annotation: 0, foundation: 0,
+  wall: 1, railing: 1,
+  beam: 2,
+  grid: 3, "reference-plane": 3,
+  room: 4, slab: 4, ceiling: 4, roof: 4,
+};
+
+export function pickHouseObject(objects: readonly { selection: HouseSelection; bounds: Bounds }[], point: HousePlanPoint): HouseSelection | null {
+  const tier = (kind: HouseSelection["kind"]) => PICK_TIER[kind] ?? 2;
+  const hits = objects
+    .filter((object) => containsPoint(expand(object.bounds, 80), point))
+    .sort((a, b) => tier(a.selection.kind) - tier(b.selection.kind) || area(a.bounds) - area(b.bounds));
+  return hits[0]?.selection ?? null;
+}
+
+export function selectableBounds(project: HouseProject, levelId: string): { selection: HouseSelection; bounds: Bounds }[] {
   const result: { selection: HouseSelection; bounds: Bounds }[] = [];
   for (const wall of project.walls.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "wall", id: wall.id }, bounds: expand(pointsBounds([wall.start, wall.end]), wall.thickness / 2) });
   for (const room of project.rooms.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "room", id: room.id }, bounds: pointsBounds(room.boundary) });

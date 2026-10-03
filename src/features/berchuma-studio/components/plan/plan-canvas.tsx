@@ -35,6 +35,7 @@ export function PlanCanvas({
   snap = true,
   formatLength = (value: number) => Number(value.toFixed(2)),
   className,
+  viewBox,
 }: {
   room: Room;
   onChange: (room: Room) => void;
@@ -43,6 +44,9 @@ export function PlanCanvas({
   snap?: boolean;
   formatLength?: (value: number) => number | string;
   className?: string;
+  /** A host that pans and zooms draws this under its own layer, so it hands
+   * over the frame instead of letting the plan fit itself. */
+  viewBox?: { x: number; y: number; width: number; height: number };
 }) {
   const svg = useRef<SVGSVGElement>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -99,14 +103,15 @@ export function PlanCanvas({
       height: Math.max(...ys) - Math.min(...ys) + pad * 2,
     };
   }, [planPoints]);
+  const frame = viewBox ?? bounds;
 
   /** Screen pixels to millimetres, through the viewBox. */
   function toRoom(event: React.PointerEvent): { x: number; y: number } | null {
     const node = svg.current;
     if (!node) return null;
     const rect = node.getBoundingClientRect();
-    const x = bounds.x + ((event.clientX - rect.left) / rect.width) * bounds.width;
-    const y = bounds.y + ((event.clientY - rect.top) / rect.height) * bounds.height;
+    const x = frame.x + ((event.clientX - rect.left) / rect.width) * frame.width;
+    const y = frame.y + ((event.clientY - rect.top) / rect.height) * frame.height;
     return snap
       ? { x: Math.round(x / GRID) * GRID, y: Math.round(y / GRID) * GRID }
       : { x, y };
@@ -166,7 +171,7 @@ export function PlanCanvas({
   return (
     <svg
       ref={svg}
-      viewBox={`${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`}
+      viewBox={`${frame.x} ${frame.y} ${frame.width} ${frame.height}`}
       className={cn("size-full touch-none select-none", className)}
       onPointerMove={moveElement}
       onPointerUp={() => setDragging(null)}

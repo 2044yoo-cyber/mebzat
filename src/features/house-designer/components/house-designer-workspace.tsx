@@ -21,7 +21,6 @@ import {
   FloorPlanInput,
   type DraftPlan,
 } from "@/components/tour/floor-plan-input";
-import { PlanCanvas } from "@/features/berchuma-studio/components/plan/plan-canvas";
 import { floorArea } from "@/features/berchuma-studio/services/room-geometry";
 import {
   rectangularRoom,
@@ -279,7 +278,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
 
   return (
     <main className="mx-auto w-full min-w-0 max-w-[1500px] overflow-x-hidden px-3 pb-6 pt-3 sm:px-5 md:pb-8">
-      <header className="mb-2 flex min-w-0 items-center justify-between gap-3 rounded-2xl border bg-card p-2 sm:mb-4 sm:p-4">
+      <header className={cn("mb-2 min-w-0 items-center justify-between gap-3 rounded-2xl border bg-card p-2 sm:mb-4 sm:flex sm:p-4", stage === "start" ? "flex" : "hidden")}>
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand sm:size-10">
             <Building2 className="size-4 sm:size-5" />
@@ -337,6 +336,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           onView={setView}
           onProjectChange={updateProject}
           onDone={() => { setStage("model"); setView("3d"); }}
+          onBack={() => setStage("start")}
           onSave={save}
           saveState={saveState}
           onDownload={download}
@@ -356,6 +356,8 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           }}
           saveState={saveState}
           onDownload={download}
+          onBack={() => setStage("verify")}
+          backLabel="Edit plan"
         />
       ) : null}
     </main>
@@ -516,10 +518,10 @@ function StartScreen({
   );
 }
 
-function VerifyScreen({ project, source, analysis, view, onView, onProjectChange, onDone, onSave, saveState, onDownload }: { project: HouseProject; source: Source; analysis: string | null; view: WorkspaceView; onView: (view: WorkspaceView) => void; onProjectChange: (project: HouseProject) => void; onDone: () => void; onSave: () => void; saveState: string; onDownload: () => void }) {
+function VerifyScreen({ project, source, analysis, view, onView, onProjectChange, onDone, onBack, onSave, saveState, onDownload }: { project: HouseProject; source: Source; analysis: string | null; view: WorkspaceView; onView: (view: WorkspaceView) => void; onProjectChange: (project: HouseProject) => void; onDone: () => void; onBack: () => void; onSave: () => void; saveState: string; onDownload: () => void }) {
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3">
+      <div className="hidden flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3 sm:flex">
         <div>
           <h2 className="font-semibold">Verify the plan before 3D</h2>
           <p className="text-xs text-muted-foreground">Correct the outline, wall thickness, dimensions, doors and windows.</p>
@@ -534,7 +536,7 @@ function VerifyScreen({ project, source, analysis, view, onView, onProjectChange
         </p>
       ) : null}
       {analysis ? <p className="rounded-xl border border-brand/25 bg-brand/5 p-3 text-xs text-foreground">{analysis}</p> : null}
-      <ModelScreen project={project} view={view} onView={onView} onProjectChange={onProjectChange} onSave={onSave} onSaveAs={onSave} saveState={saveState} onDownload={onDownload} verification onFinish={onDone} />
+      <ModelScreen project={project} view={view} onView={onView} onProjectChange={onProjectChange} onSave={onSave} onSaveAs={onSave} saveState={saveState} onDownload={onDownload} verification onFinish={onDone} onBack={onBack} backLabel="Start" />
     </section>
   );
 }
@@ -550,6 +552,8 @@ function ModelScreen({
   onDownload,
   verification = false,
   onFinish,
+  onBack,
+  backLabel,
 }: {
   project: HouseProject;
   view: WorkspaceView;
@@ -561,6 +565,8 @@ function ModelScreen({
   onDownload: () => void;
   verification?: boolean;
   onFinish?: () => void;
+  onBack?: () => void;
+  backLabel?: string;
 }) {
   const [activeLevelId, setActiveLevelId] = useState(project.levels[0]?.id ?? "ground-floor");
   const [visibleLevelIds, setVisibleLevelIds] = useState<Set<string>>(
@@ -866,6 +872,8 @@ function ModelScreen({
   return (
     <HouseUnitsContext.Provider value={project.displayUnits ?? "mm"}><section className="min-w-0 space-y-3">
       <HouseMobileTopBar
+        onBack={onBack}
+        backLabel={backLabel}
         levels={project.levels}
         activeLevelId={activeLevelId}
         onLevel={chooseLevel}
@@ -924,8 +932,8 @@ function ModelScreen({
       <div className="grid min-w-0 gap-3 xl:grid-cols-[auto_minmax(0,1fr)_320px]">
         <div className="hidden xl:block"><HouseProjectBrowser project={project} activeLevelId={activeLevelId} activeViewId={activeViewId} onLevel={chooseLevel} onView={selectView} onSchedule={setSchedule} /></div>
         <div className="min-w-0" onContextMenu={(event) => { event.preventDefault(); if (selections.length) setContextMenu({ x: event.clientX, y: event.clientY }); }}>
-      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-30 space-y-2 bg-background/95 pb-1 backdrop-blur">
-        <HouseRibbon
+      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-30 space-y-2 bg-background/95 backdrop-blur lg:pb-1">
+        <div className="hidden lg:block"><HouseRibbon
           activeCategory={activeCategory}
           activeTool={activeTool}
           selectionCount={selections.length}
@@ -935,17 +943,17 @@ function ModelScreen({
           onCommand={runCommand}
           onSearch={() => setPaletteOpen(true)}
           onHelp={() => setHelpOpen(true)}
-        />
+        /></div>
         <div className={cn(mobileMoreOpen ? "block" : "hidden lg:block")}><HouseToolOptions activeTool={activeTool} project={project} levelId={activeLevelId} settings={toolSettings} onChange={(change) => setToolSettings((current) => ({ ...current, ...change }))} /></div>
       </div>
           <div className="hidden lg:block"><HouseSelectionActions selected={selected} onCommand={runCommand} /></div>
           <div className="flex min-w-0 gap-1"><HouseMobileTools activeTool={activeTool} selectionCount={selections.length} onCommand={runCommand} onMore={() => setPaletteOpen(true)} />
           <div className="min-w-0 flex-1">{viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
             {view !== "3d" && activeRoom ? (
-              <div className="relative h-[min(680px,68dvh)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 dark:bg-background">
-                <div className="pointer-events-none absolute inset-0"><PlanCanvas room={activeRoom} onChange={() => undefined} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} /></div>
+              <div className="relative h-[calc(100dvh-10rem)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 lg:h-[min(680px,68dvh)] dark:bg-background">
                 <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} viewRevision={viewRevision} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => commit(patchHouseObject(project, selection, patch), "Temporary dimension updated")} onGuidance={setGuidance} />
                 <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>
+                <div className="absolute inset-x-2 bottom-2 lg:hidden"><HouseSelectionActions selected={selected?.kind === "level" ? null : selected} onCommand={runCommand} onMore={() => setContextMenu({ x: 0, y: 0 })} /></div>
               </div>
             ) : null}
             {view !== "2d" ? (

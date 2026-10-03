@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  ArrowLeft,
   BoxSelect,
   ChevronDown,
   Columns3,
@@ -136,7 +137,7 @@ export function HouseRibbon({ activeCategory, activeTool, selectionCount, canUnd
 export function HouseMobileTools({ activeTool, selectionCount, onCommand, onMore }: {
   activeTool: HouseCommandId | null; selectionCount: number; onCommand: (id: HouseCommandId) => void; onMore: () => void;
 }) {
-  return <nav aria-label="Modeling tools" className="sticky top-[calc(env(safe-area-inset-top)+7.5rem)] flex max-h-[70dvh] w-11 shrink-0 flex-col gap-1 self-start overflow-y-auto rounded-lg border bg-card p-0.5 lg:hidden">{MOBILE_PRIMARY_TOOLS.map((id) => {
+  return <nav aria-label="Modeling tools" className="sticky top-[calc(env(safe-area-inset-top)+3.5rem)] flex max-h-[calc(100dvh-10rem)] w-11 shrink-0 flex-col gap-1 self-start overflow-y-auto rounded-lg border bg-card p-0.5 lg:hidden">{MOBILE_PRIMARY_TOOLS.map((id) => {
     const command = houseCommand(id); const Icon = icons[id] ?? BoxSelect;
     return <button key={id} type="button" aria-label={command.label} title={command.label} aria-pressed={activeTool === id} disabled={Boolean(command.selection && !selectionCount)} onClick={() => onCommand(id)} className={cn("flex min-h-11 shrink-0 flex-col items-center justify-center rounded-md text-muted-foreground active:bg-brand/20 disabled:opacity-30", activeTool === id && "bg-brand/15 text-brand")}><Icon className="size-4" /><span className="text-[8px] leading-3">{command.shortcut ?? command.label.slice(0, 5)}</span></button>;
   })}
@@ -150,7 +151,9 @@ export function HouseMobileTools({ activeTool, selectionCount, onCommand, onMore
  * snap, save, level visibility, tool options) the caller already renders —
  * this component only orchestrates, it does not duplicate that chrome.
  */
-export function HouseMobileTopBar({ levels, activeLevelId, onLevel, view, onView, canUndo, canRedo, onUndo, onRedo, moreOpen, onToggleMore }: {
+export function HouseMobileTopBar({ onBack, backLabel, levels, activeLevelId, onLevel, view, onView, canUndo, canRedo, onUndo, onRedo, moreOpen, onToggleMore }: {
+  onBack?: () => void;
+  backLabel?: string;
   levels: { id: string; name: string }[];
   activeLevelId: string;
   onLevel: (id: string) => void;
@@ -167,6 +170,7 @@ export function HouseMobileTopBar({ levels, activeLevelId, onLevel, view, onView
   const activeLevel = levels.find((level) => level.id === activeLevelId);
   return (
     <div className="sticky top-[calc(env(safe-area-inset-top)+0.25rem)] z-30 flex min-w-0 items-center gap-1 rounded-xl border bg-card p-1.5 lg:hidden">
+      {onBack ? <button type="button" onClick={onBack} aria-label={backLabel ?? "Back"} title={backLabel ?? "Back"} className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted"><ArrowLeft className="size-4" /></button> : null}
       <div className="relative shrink-0">
         <button type="button" onClick={() => setFloorOpen((value) => !value)} aria-expanded={floorOpen} className="flex items-center gap-0.5 rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-muted">
           <span className="max-w-20 truncate">{activeLevel?.name ?? "Floor"}</span>
@@ -265,12 +269,12 @@ export function HouseProjectBrowser({ project, activeLevelId, activeViewId, onLe
   );
 }
 
-export function HouseSelectionActions({ selected, onCommand }: { selected: HouseSelection | null; onCommand: (id: HouseCommandId) => void }) {
+export function HouseSelectionActions({ selected, onCommand, onMore }: { selected: HouseSelection | null; onCommand: (id: HouseCommandId) => void; onMore?: () => void }) {
   if (!selected) return null;
   const commands: HouseCommandId[] = selected.kind === "window" || selected.kind === "door"
     ? ["move", "copy", "flip", "match-type", "delete"]
     : ["move", "copy", "rotate", "align", "offset", "split", "delete"];
-  return <div className="flex min-w-0 gap-1 overflow-x-auto rounded-lg border bg-background/95 p-1 shadow-sm">{commands.map((id) => <button key={id} type="button" onClick={() => onCommand(id)} className="shrink-0 rounded-md px-2 py-1 text-[10px] hover:bg-muted">{id === "match-type" ? "Change Type" : houseCommand(id).label}</button>)}<button type="button" onClick={() => document.getElementById("house-properties")?.scrollIntoView({ behavior: "smooth", block: "nearest" })} className="shrink-0 rounded-md px-2 py-1 text-[10px] hover:bg-muted">Properties</button></div>;
+  return <div className="flex min-w-0 gap-1 overflow-x-auto rounded-lg border bg-background/95 p-1 shadow-sm">{commands.map((id) => <button key={id} type="button" onClick={() => onCommand(id)} className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]">{id === "match-type" ? "Change Type" : houseCommand(id).label}</button>)}<button type="button" onClick={() => document.getElementById("house-properties")?.scrollIntoView({ behavior: "smooth", block: "nearest" })} className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]">Properties</button>{onMore ? <button type="button" onClick={onMore} aria-label="More actions for selection" className="shrink-0 rounded-md px-2.5 py-2 text-xs hover:bg-muted lg:px-2 lg:py-1 lg:text-[10px]"><MoreHorizontal className="size-3.5" /></button> : null}</div>;
 }
 
 export function HouseStatusBar({ selectionCount, snap, snapEnabled = true, onToggleSnap, level, units, mode, saveState }: { selectionCount: number; snap: string; snapEnabled?: boolean; onToggleSnap?: () => void; level: string; units: string; mode: string; saveState: string }) {
