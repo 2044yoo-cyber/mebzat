@@ -8,7 +8,7 @@ import { generatePreliminaryStructure } from "../services/structure";
 import { createHouseTakeoffPackage, HOUSE_TAKEOFF_SESSION_KEY } from "../services/takeoff-adapter";
 import type { HouseProject } from "../types/project";
 
-export function HouseStructurePanel({ project, onChange }: { project: HouseProject; onChange: (project: HouseProject) => void }) {
+export function HouseStructurePanel({ project, onChange, onSuggest }: { project: HouseProject; onChange: (project: HouseProject) => void; onSuggest?: () => void }) {
   const quantities = useMemo(() => calculateHouseQuantities(project), [project]);
   const concrete = quantities.filter((item) => item.category === "concrete").reduce((sum, item) => sum + item.quantity, 0);
   const masonry = quantities.find((item) => item.code === "MAS-01")?.quantity ?? 0;
@@ -37,6 +37,7 @@ export function HouseStructurePanel({ project, onChange }: { project: HouseProje
           <div><h3 className="text-sm font-semibold">Preliminary structure + BOQ data</h3><p className="text-[11px] text-muted-foreground">Select columns and beams from the object inspector to edit them.</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {onSuggest ? <button type="button" onClick={onSuggest} className="flex items-center gap-1.5 rounded-lg border border-amber-500/40 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-500/5 dark:text-amber-300"><HardHat className="size-3.5" /> Suggest columns</button> : null}
           <button type="button" onClick={() => onChange(generatePreliminaryStructure(project))} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted"><RefreshCw className="size-3.5" /> Regenerate</button>
           <button type="button" onClick={downloadQuantities} className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-xs font-medium text-brand-foreground"><Download className="size-3.5" /> BOQ data</button>
           <button type="button" onClick={openDetailedBoq} className="flex items-center gap-1.5 rounded-lg border border-brand/40 px-3 py-2 text-xs font-medium text-brand hover:bg-brand/5"><ArrowUpRight className="size-3.5" /> Detailed BOQ</button>

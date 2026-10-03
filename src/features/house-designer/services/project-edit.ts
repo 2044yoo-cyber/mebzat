@@ -481,9 +481,24 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
     ...project.windows.filter((opening) => opening.levelId !== levelId),
     ...openings.filter((opening) => opening.type === "window"),
   ];
-  const structuralColumns = buildStructuralColumns(levels, project.structuralColumns);
-  const structuralBeams = buildStructuralBeams(rebuiltWalls, levels, project.structuralBeams);
-  const structuralGrid = buildStructuralGrid(levels, structuralColumns, project.structuralGrid);
+  // Only this floor's automatic structure follows the plan. Columns, beams
+  // and grid lines somebody placed by hand — and every other floor's — are
+  // kept: rebuilding them all from corners used to delete a hand-placed
+  // column the moment a door was slid. With structure switched off (an
+  // apartment or a single room) nothing is generated at all.
+  const generate = project.modelingOptions?.structure ?? true;
+  const thisLevel = levels.filter((level) => level.id === levelId);
+  const automatic = (id: string, kind: "column" | "beam" | "grid") => id.startsWith(`${levelId}:${kind}:`);
+  const keptColumns = project.structuralColumns.filter((item) => !automatic(item.id, "column"));
+  const structuralColumns = generate ? [...keptColumns, ...buildStructuralColumns(thisLevel, project.structuralColumns)] : keptColumns;
+  const keptBeams = project.structuralBeams.filter((item) => !automatic(item.id, "beam"));
+  const structuralBeams = generate ? [...keptBeams, ...buildStructuralBeams(walls, thisLevel, project.structuralBeams)] : keptBeams;
+  const keptGrid = project.structuralGrid.filter((item) => !automatic(item.id, "grid"));
+  const structuralGrid = generate ? [...keptGrid, ...buildStructuralGrid(thisLevel, structuralColumns, project.structuralGrid)] : keptGrid;
+  // A slab or roof that followed the outline follows it still; one laid over
+  // a single room (an extension's own floor) keeps its own shape.
+  const oldOutline = project.levels.find((level) => level.id === levelId)?.plan?.corners ?? [];
+  const followsOutline = (boundary: readonly { x: number; y: number }[]) => boundary.length === oldOutline.length && boundary.every((point, index) => Math.hypot(point.x - oldOutline[index]!.x, point.y - oldOutline[index]!.y) < 1);
 
   return {
     ...project,
@@ -493,12 +508,12 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
     doors: rebuiltDoors,
     windows: rebuiltWindows,
     slabs: project.slabs.map((slab) =>
-      slab.levelId === levelId
+      slab.levelId === levelId && followsOutline(slab.boundary)
         ? { ...slab, boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })) }
         : slab,
     ),
     roofs: project.roofs.map((roof) =>
-      roof.levelId === levelId
+      roof.levelId === levelId && followsOutline(roof.boundary)
         ? { ...roof, boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })) }
         : roof,
     ),

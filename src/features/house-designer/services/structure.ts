@@ -8,12 +8,15 @@ import {
 /** Preliminary layout only; a licensed engineer must verify it before construction. */
 export function generatePreliminaryStructure(project: HouseProject): HouseProject {
   const now = new Date().toISOString();
-  const structuralColumns = buildStructuralColumns(project.levels, project.structuralColumns);
+  // Regenerating replaces the automatic layout only. Columns, beams and grid
+  // lines placed by hand — or accepted from Suggest Columns — stay.
+  const automatic = (id: string, kind: string) => project.levels.some((level) => id.startsWith(`${level.id}:${kind}:`));
+  const structuralColumns = [...project.structuralColumns.filter((item) => !automatic(item.id, "column")), ...buildStructuralColumns(project.levels, project.structuralColumns)];
   return {
     ...project,
     structuralColumns,
-    structuralBeams: buildStructuralBeams(project.walls, project.levels, project.structuralBeams),
-    structuralGrid: buildStructuralGrid(project.levels, structuralColumns, project.structuralGrid),
+    structuralBeams: [...project.structuralBeams.filter((item) => !automatic(item.id, "beam")), ...buildStructuralBeams(project.walls, project.levels, project.structuralBeams)],
+    structuralGrid: [...project.structuralGrid.filter((item) => !automatic(item.id, "grid")), ...buildStructuralGrid(project.levels, structuralColumns, project.structuralGrid)],
     materials: [...new Set([...project.materials, "Reinforced concrete"])],
     metadata: { ...project.metadata, updatedAt: now },
     revisions: [...project.revisions, { id: crypto.randomUUID(), createdAt: now, note: "Regenerated preliminary structural layout" }],

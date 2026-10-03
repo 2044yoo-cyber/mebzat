@@ -16,7 +16,7 @@ export type HouseCommandId =
   | "view-left" | "view-right" | "view-isometric" | "view-perspective" | "tile-views"
   | "dimension" | "text" | "room-tag" | "tag" | "section"
   | "elevation" | "grid" | "level" | "reference-plane" | "command-search" | "shortcut-help"
-  | "ask-ai" | "ai-remodel" | "generate-facade" | "alternatives" | "generate-structure"
+  | "ask-ai" | "ai-remodel" | "generate-facade" | "alternatives" | "generate-structure" | "suggest-columns"
   | "analyze-plan" | "estimate" | "boq";
 
 export type HouseCommandDefinition = {
@@ -122,6 +122,7 @@ export const houseCommandRegistry: readonly HouseCommandDefinition[] = [
   command("generate-facade", "Generate Façade", "AI"),
   command("alternatives", "Generate Alternatives", "AI", undefined, false),
   command("generate-structure", "Generate Preliminary Structure", "AI"),
+  command("suggest-columns", "Suggest Columns", "Structure"),
   command("analyze-plan", "Analyze Floor Plan", "AI"),
   command("estimate", "Estimate Cost", "AI", undefined, true),
   command("boq", "Show in BOQ", "AI", undefined, true),

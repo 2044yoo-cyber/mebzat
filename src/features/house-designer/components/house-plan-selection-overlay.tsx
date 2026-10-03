@@ -8,6 +8,7 @@ import { useHouseUnits } from "./house-units";
 import { displayLength, modelLength } from "../services/workspace-options";
 import type { HouseCommandId } from "../services/command-registry";
 import { roomOutline, type HouseRoomShape } from "../services/model-commands";
+import type { ColumnProposal } from "../services/column-suggestions";
 import type { HouseProject, HouseSelection } from "../types/project";
 
 export type HousePlanPoint = { x: number; y: number };
@@ -36,7 +37,7 @@ function fieldClearance(normal: { x: number; y: number }, px: number) {
 const chainTools = new Set<HouseCommandId>(["wall", "structural-wall", "room-separator"]);
 const DIRECTIONS = [{ label: "→", x: 1, y: 0 }, { label: "↓", x: 0, y: 1 }, { label: "←", x: -1, y: 0 }, { label: "↑", x: 0, y: -1 }] as const;
 
-export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, roomShape = "rectangle", onMoveSelection, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
+export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, roomShape = "rectangle", proposals = null, chosenProposal = null, onProposalChoose, onProposalMove, onMoveSelection, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
   project: HouseProject;
   levelId: string;
   activeTool: HouseCommandId | null;
@@ -48,6 +49,11 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
    * usual reset when switching floors. */
   viewRevision?: number;
   roomShape?: HouseRoomShape;
+  /** Suggested columns: drawn as outlines, not part of the model until accepted. */
+  proposals?: readonly ColumnProposal[] | null;
+  chosenProposal?: string | null;
+  onProposalChoose?: (id: string) => void;
+  onProposalMove?: (id: string, x: number, y: number) => void;
   /** Dragging a selected wall square to itself. */
   onMoveSelection?: (selection: HouseSelection, dx: number, dy: number) => void;
   onDraftStart: (point: HousePlanPoint | null) => void;
@@ -68,6 +74,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   // aim with, so it can be picked; otherwise it follows the pointer.
   const [typedDirection, setTypedDirection] = useState<{ x: number; y: number } | null>(null);
   // A door or window being slid along its wall: the offset it would land at.
+  const [proposalDrag, setProposalDrag] = useState<{ pointerId: number; id: string; grab: HousePlanPoint; x: number; y: number; moved: boolean } | null>(null);
   const [wallDrag, setWallDrag] = useState<{ pointerId: number; selection: HouseSelection; origin: HousePlanPoint; normal: HousePlanPoint; distance: number } | null>(null);
   const [openingDrag, setOpeningDrag] = useState<{ pointerId: number; selection: HouseSelection; grab: number; offset: number; from: number } | null>(null);
   const bounds = useMemo(() => levelBounds(project, levelId), [levelId, project]);
@@ -260,6 +267,16 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     }
     const point = snapped(raw);
     setCurrent(point);
+    if (selectMode && proposals?.length) {
+      const reach = 18 * mmPerPx;
+      const hit = proposals.find((item) => Math.abs(raw.x - item.x) <= item.width / 2 + reach && Math.abs(raw.y - item.y) <= item.depth / 2 + reach);
+      if (hit) {
+        cancelLongPress();
+        svg.current?.setPointerCapture(event.pointerId);
+        setProposalDrag({ pointerId: event.pointerId, id: hit.id, grab: { x: raw.x - hit.x, y: raw.y - hit.y }, x: hit.x, y: hit.y, moved: false });
+        return;
+      }
+    }
     if (selectMode && selectedOpening && selectedOpeningWall && selections[0]) {
       const centre = pointAlongWall(selectedOpeningWall, selectedOpening.offset + selectedOpening.width / 2);
       const reach = Math.max(selectedOpening.width / 2, 300, 24 * mmPerPx) + selectedOpeningWall.thickness;
@@ -305,6 +322,17 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     if (activeTool && pointTools.has(activeTool)) onDraft(point, point);
   }
 
+  function moveProposal(event: React.PointerEvent<SVGSVGElement>) {
+    if (!proposalDrag || proposalDrag.pointerId !== event.pointerId) return false;
+    const raw = modelPoint(event);
+    if (!raw) return true;
+    const step = snapEnabled ? 50 : 10;
+    const x = Math.round((raw.x - proposalDrag.grab.x) / step) * step;
+    const y = Math.round((raw.y - proposalDrag.grab.y) / step) * step;
+    if (x !== proposalDrag.x || y !== proposalDrag.y) setProposalDrag({ ...proposalDrag, x, y, moved: true });
+    return true;
+  }
+
   function moveWall(event: React.PointerEvent<SVGSVGElement>) {
     if (!wallDrag || wallDrag.pointerId !== event.pointerId) return false;
     const raw = modelPoint(event);
@@ -330,6 +358,12 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     pointers.current.delete(event.pointerId);
     // A press on the selected wall or opening that never moved is a tap, and
     // a tap picks — otherwise a door in the selected wall could not be chosen.
+    if (proposalDrag && proposalDrag.pointerId === event.pointerId) {
+      if (proposalDrag.moved) onProposalMove?.(proposalDrag.id, proposalDrag.x, proposalDrag.y);
+      onProposalChoose?.(proposalDrag.id);
+      setProposalDrag(null);
+      return;
+    }
     const tapped = () => { const end = modelPoint(event); if (end) onSelect(pickHouseObject(objects, end) ? [pickHouseObject(objects, end)!] : [], "replace"); };
     if (wallDrag && wallDrag.pointerId === event.pointerId) {
       if (wallDrag.distance !== 0) onMoveSelection?.(wallDrag.selection, wallDrag.normal.x * wallDrag.distance, wallDrag.normal.y * wallDrag.distance);
@@ -387,7 +421,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     {/* The verified plan underneath, in the same frame, so it pans and zooms
         with the model rather than staying put behind it. */}
     {plan ? <div className="pointer-events-none absolute inset-0"><PlanCanvas room={plan} onChange={noop} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} viewBox={{ x: effective.minX, y: effective.minY, width: effective.maxX - effective.minX, height: effective.maxY - effective.minY }} /></div> : null}
-    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => { if (swallowRelease.current) { swallowRelease.current = false; event.preventDefault(); } }} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); cancelLongPress(); setDragStart(null); setOpeningDrag(null); setWallDrag(null); }} onWheel={wheel}>
+    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (moveProposal(event) || moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => { if (swallowRelease.current) { swallowRelease.current = false; event.preventDefault(); } }} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); cancelLongPress(); setDragStart(null); setOpeningDrag(null); setWallDrag(null); setProposalDrag(null); }} onWheel={wheel}>
       <defs>
         <pattern id={`${gridId}-minor`} width={MINOR_GRID} height={MINOR_GRID} patternUnits="userSpaceOnUse">
           <path d={`M ${MINOR_GRID} 0 L 0 0 0 ${MINOR_GRID}`} fill="none" strokeWidth={6} className="stroke-slate-300 dark:stroke-[#eef2f7]" />
@@ -419,6 +453,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       {draftStart && current && activeTool && activeTool !== "room" && lineTools.has(activeTool) ? <g><line x1={draftStart.x} y1={draftStart.y} x2={current.x} y2={current.y} stroke="#1473e6" strokeWidth={2} strokeDasharray="80 40" vectorEffect="non-scaling-stroke" /><text x={(draftStart.x + current.x) / 2} y={(draftStart.y + current.y) / 2 - 100} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#1473e6">{displayLength(Math.hypot(current.x - draftStart.x, current.y - draftStart.y), project.displayUnits ?? "mm")} {project.displayUnits ?? "mm"}</text></g> : null}
       {!selectMode && current ? <g pointerEvents="none"><circle cx={current.x} cy={current.y} r={Math.max(45, margin * 0.035)} fill="white" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><path d={`M ${current.x - 65} ${current.y} H ${current.x + 65} M ${current.x} ${current.y - 65} V ${current.y + 65}`} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={current.x + 100} y={current.y - 80} fontSize={Math.max(100, margin * 0.12)} fill="#1473e6">{current.label}</text></g> : null}
       <MmPerPx.Provider value={mmPerPx}>
+      {proposals?.map((item, index) => <ProposalMark key={item.id} proposal={proposalDrag?.id === item.id ? { ...item, x: proposalDrag.x, y: proposalDrag.y } : item} number={index + 1} chosen={chosenProposal === item.id} />)}
       {project.walls.filter((wall) => wall.levelId === levelId && project.objectInstances[wall.id]?.pinned).map((wall) => <LockBadge key={wall.id} wall={wall} />)}
       {wallDrag && selectedWall && wallDrag.distance !== 0 ? <WallMovePreview wall={selectedWall} normal={wallDrag.normal} distance={wallDrag.distance} unit={unit} /> : null}
       {/* Editing fields belong to Select. While drawing, they sat where the
@@ -492,6 +527,17 @@ function TypedDraft({ room, unit, live, direction, onDirection, onCancel, onLeng
 /** On the wall itself, a quarter of the way along: clear of the length field
  * and the plan's own label at the middle, and never off the edge of the
  * canvas the way a badge beside an outside wall was on a phone. */
+function ProposalMark({ proposal, number, chosen }: { proposal: ColumnProposal; number: number; chosen: boolean }) {
+  const px = useContext(MmPerPx) || 10;
+  const size = Math.max(proposal.width, 16 * px);
+  const colour = chosen ? "#1473e6" : "#d97706";
+  return <g pointerEvents="none" aria-label={`Suggested column ${number}`}>
+    <rect x={proposal.x - size / 2} y={proposal.y - size / 2} width={size} height={size} fill={chosen ? "rgba(20,115,230,.18)" : "rgba(217,119,6,.14)"} stroke={colour} strokeWidth={2} strokeDasharray="6 4" vectorEffect="non-scaling-stroke" />
+    <circle cx={proposal.x + size / 2} cy={proposal.y - size / 2} r={8 * px} fill={colour} />
+    <text x={proposal.x + size / 2} y={proposal.y - size / 2 + 3.5 * px} textAnchor="middle" fontSize={10 * px} fontWeight={700} fill="white">{number}</text>
+  </g>;
+}
+
 function LockBadge({ wall }: { wall: HouseProject["walls"][number] }) {
   const px = useContext(MmPerPx) || 10;
   const at = { x: wall.start.x + (wall.end.x - wall.start.x) * 0.25, y: wall.start.y + (wall.end.y - wall.start.y) * 0.25 };

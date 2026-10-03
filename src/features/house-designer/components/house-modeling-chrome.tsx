@@ -45,13 +45,14 @@ import {
   type HouseCommandCategory,
   type HouseCommandId,
 } from "../services/command-registry";
+import type { ColumnProposal } from "../services/column-suggestions";
 import { calculateHouseQuantities } from "../services/quantities";
 import type { HouseProject, HouseSelection, HouseViewState } from "../types/project";
 
 const ribbonCommands: Record<HouseCommandCategory, HouseCommandId[]> = {
   General: ["select", "undo", "redo", "delete"],
   Architecture: ["wall", "door", "window", "floor", "roof", "ceiling", "room", "room-separator", "stair", "railing", "opening", "component", "furniture", "kitchen", "wardrobe"],
-  Structure: ["column", "beam", "structural-wall", "structural-slab", "foundation", "isolated-footing", "strip-footing", "foundation-slab", "grid", "level", "reference-plane"],
+  Structure: ["suggest-columns", "column", "beam", "structural-wall", "structural-slab", "foundation", "isolated-footing", "strip-footing", "foundation-slab", "grid", "level", "reference-plane"],
   Modify: ["move", "copy", "rotate", "align", "offset", "trim", "split", "mirror-pick", "array", "join", "unjoin", "scale", "pin", "unpin", "create-similar", "match-type", "delete"],
   Annotate: ["dimension", "text", "room-tag", "tag", "section", "elevation"],
   View: ["floor-plan", "default-3d", "split-view", "view-top", "view-front", "view-back", "view-left", "view-right", "view-isometric", "view-perspective", "visibility", "zoom-fit", "hide", "isolate", "reset-hide"],
@@ -196,6 +197,37 @@ export function HouseMobileTopBar({ onBack, backLabel, levels, activeLevelId, on
       <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30"><Undo2 className="size-4" /></button>
       <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30"><Redo2 className="size-4" /></button>
       <button type="button" onClick={onToggleMore} aria-pressed={moreOpen} aria-label="More actions" className={cn("ml-auto shrink-0 rounded-lg p-1.5", moreOpen ? "bg-brand/15 text-brand" : "text-muted-foreground hover:bg-muted")}><MoreHorizontal className="size-4" /></button>
+    </div>
+  );
+}
+
+/** Suggested columns, over the plan: nothing here changes the model until
+ * Accept, and nothing at all touches a wall, door or window. */
+export function HouseColumnSuggestions({ items, chosen, maxSpan, onSpan, onRegenerate, onAccept, onRemove, onClear }: {
+  items: ColumnProposal[];
+  chosen: string | null;
+  maxSpan: number;
+  onSpan: (maxSpan: number) => void;
+  onRegenerate: () => void;
+  onAccept: (items: ColumnProposal[]) => void;
+  onRemove: (item: ColumnProposal) => void;
+  onClear: () => void;
+}) {
+  const picked = items.find((item) => item.id === chosen);
+  return (
+    <div role="region" aria-label="Suggested columns" className="absolute inset-x-2 bottom-2 z-20 space-y-1.5 rounded-xl border bg-card/95 p-2 text-xs shadow-lg backdrop-blur">
+      <div className="flex items-center justify-between gap-2">
+        <strong>{items.length} column{items.length === 1 ? "" : "s"} suggested</strong>
+        <label className="flex items-center gap-1 text-muted-foreground">Max span<select aria-label="Maximum span" value={maxSpan} onChange={(event) => onSpan(Number(event.target.value))} className="rounded-md border bg-background px-1 py-1 text-xs text-foreground">{[3000, 4500, 6000].map((span) => <option key={span} value={span}>{span / 1000} m</option>)}</select></label>
+      </div>
+      {picked
+        ? <div className="flex items-center gap-1.5 rounded-lg bg-muted/60 p-1.5"><span className="min-w-0 flex-1 truncate">Column {items.indexOf(picked) + 1} · {picked.reason}</span><button type="button" onClick={() => onAccept([picked])} className="rounded-md bg-brand px-2 py-1 font-medium text-brand-foreground">Accept</button><button type="button" onClick={() => onRemove(picked)} className="rounded-md border px-2 py-1">Remove</button></div>
+        : <p className="text-muted-foreground">Tap one to choose it, drag to move it. Nothing changes until you accept.</p>}
+      <div className="flex gap-1.5">
+        <button type="button" onClick={() => onAccept(items)} className="flex-1 rounded-md bg-brand px-2 py-1.5 font-medium text-brand-foreground">Accept all</button>
+        <button type="button" onClick={onRegenerate} className="rounded-md border px-2 py-1.5">Regenerate</button>
+        <button type="button" onClick={onClear} className="rounded-md border px-2 py-1.5">Clear</button>
+      </div>
     </div>
   );
 }

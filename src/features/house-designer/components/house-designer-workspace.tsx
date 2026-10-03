@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { HouseAiRemodelPanel } from "./house-ai-remodel-panel";
 import { HouseFacadePanel } from "./house-facade-panel";
 import {
+  HouseColumnSuggestions,
   HouseCommandPalette,
   HouseContextMenu,
   HouseProjectBrowser,
@@ -87,6 +88,7 @@ import {
   type HouseClipboard,
 } from "../services/model-commands";
 import { addHouseFloor, patchHouseObject } from "../services/project-edit";
+import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
 import {
   allHouseSelections,
   ensureHouseBimState,
@@ -599,6 +601,8 @@ function ModelScreen({
   const [viewRevision, setViewRevision] = useState(0);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [roomShape, setRoomShape] = useState<HouseRoomShape>("rectangle");
+  // Suggested columns live here, outside the model, until one is accepted.
+  const [proposals, setProposals] = useState<{ levelId: string; maxSpan: number; items: ColumnProposal[]; chosen: string | null } | null>(null);
   const [toolSettings, setToolSettings] = useState<HouseToolSettings>({
     wallType: "200 mm Exterior",
     locationLine: "Wall Centerline",
@@ -628,9 +632,32 @@ function ModelScreen({
   }, [hiddenIds, isolatedIds, project]);
 
   function chooseLevel(levelId: string) {
+    if (proposals && proposals.levelId !== levelId) setProposals(null);
     setActiveLevelId(levelId);
     setActiveViewId(`view:plan:${levelId}`);
     setSelections([{ kind: "level", id: levelId }]);
+  }
+
+  function suggest(maxSpan: number) {
+    const items = suggestColumns(project, activeLevelId, maxSpan);
+    setActiveTool("select");
+    setDraftStart(null);
+    setSelections([]);
+    if (view === "3d") onView("2d");
+    if (!items.length) {
+      setProposals(null);
+      toast.info("Every corner, junction and span on this floor already has a column.");
+      return;
+    }
+    setProposals({ levelId: activeLevelId, maxSpan, items, chosen: null });
+    setGuidance(`${items.length} column${items.length === 1 ? "" : "s"} suggested · tap one to choose it, drag to move it`);
+  }
+
+  function acceptProposals(items: ColumnProposal[]) {
+    if (!proposals || !items.length) return;
+    commit(acceptColumnProposals(project, proposals.levelId, items), `Accepted ${items.length} suggested column${items.length === 1 ? "" : "s"}`);
+    const left = proposals.items.filter((item) => !items.includes(item));
+    setProposals(left.length ? { ...proposals, items: left, chosen: null } : null);
   }
 
   function addFloor() {
@@ -851,6 +878,7 @@ function ModelScreen({
       case "ask-ai": case "ai-remodel": document.getElementById("house-ai-remodel")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
       case "generate-facade": case "alternatives": commit(generateFacadeAlternatives(project, 3), "Generated façade alternatives"); document.getElementById("house-facade")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
       case "generate-structure": commit(generatePreliminaryStructure(project), "Preliminary structure generated"); return;
+      case "suggest-columns": suggest(proposals?.maxSpan ?? 4500); return;
       case "analyze-plan": setGuidance(`Plan analysis: ${project.walls.filter((item) => item.levelId === activeLevelId).length} walls · ${project.rooms.filter((item) => item.levelId === activeLevelId).length} rooms · ${project.doors.filter((item) => item.levelId === activeLevelId).length + project.windows.filter((item) => item.levelId === activeLevelId).length} openings`); return;
       case "estimate": case "boq": setSchedule("quantities"); setGuidance("Live preliminary quantities opened"); return;
       default:
@@ -978,13 +1006,14 @@ function ModelScreen({
           <div className="min-w-0 flex-1">{viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
             {view !== "3d" && activeRoom ? (
               <div className="relative h-[calc(100dvh-10rem)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 lg:h-[min(680px,68dvh)] dark:bg-background">
-                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} onMoveSelection={(selection, dx, dy) => applyMutation(moveHouseSelections(project, [selection], dx, dy, { footprintEditable: verification }), "Moved wall")} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch), "Temporary dimension updated"); }} onGuidance={setGuidance} />
+                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => applyMutation(moveHouseSelections(project, [selection], dx, dy, { footprintEditable: verification }), "Moved wall")} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch), "Temporary dimension updated"); }} onGuidance={setGuidance} />
                 <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>
                 {activeTool === "room" && !draftStart ? <div role="radiogroup" aria-label="Room shape" className="absolute left-1/2 top-12 z-10 flex -translate-x-1/2 gap-1 rounded-xl border bg-card/95 p-1 text-xs shadow-sm backdrop-blur">
                   {([["rectangle", "Rectangle"], ["l-shape", "L shape"]] as const).map(([shape, label]) => <button key={shape} type="button" role="radio" aria-checked={roomShape === shape} onClick={() => setRoomShape(shape)} className={cn("rounded-lg px-3 py-1.5", roomShape === shape ? "bg-brand/15 text-brand" : "text-muted-foreground hover:bg-muted")}>{label}</button>)}
                   <button type="button" onClick={() => runCommand("wall")} className="rounded-lg px-3 py-1.5 text-muted-foreground hover:bg-muted">Free draw</button>
                 </div> : null}
-                <div className="absolute inset-x-2 bottom-2 lg:hidden"><HouseSelectionActions selected={selected?.kind === "level" || activeTool && activeTool !== "select" ? null : selected} locked={Boolean(selected && project.objectInstances[selected.id]?.pinned)} onToggleLock={() => runCommand(selected && project.objectInstances[selected.id]?.pinned ? "unpin" : "pin")} onCommand={runCommand} onMore={() => setContextMenu({ x: 0, y: 0 })} /></div>
+                {proposals && proposals.levelId === activeLevelId ? <HouseColumnSuggestions items={proposals.items} chosen={proposals.chosen} maxSpan={proposals.maxSpan} onSpan={suggest} onRegenerate={() => suggest(proposals.maxSpan)} onAccept={acceptProposals} onRemove={(item) => setProposals({ ...proposals, items: proposals.items.filter((entry) => entry !== item), chosen: null })} onClear={() => setProposals(null)} /> : null}
+                <div className="absolute inset-x-2 bottom-2 lg:hidden"><HouseSelectionActions selected={selected?.kind === "level" || proposals || activeTool && activeTool !== "select" ? null : selected} locked={Boolean(selected && project.objectInstances[selected.id]?.pinned)} onToggleLock={() => runCommand(selected && project.objectInstances[selected.id]?.pinned ? "unpin" : "pin")} onCommand={runCommand} onMore={() => setContextMenu({ x: 0, y: 0 })} /></div>
               </div>
             ) : null}
             {view !== "2d" ? (
@@ -1010,7 +1039,7 @@ function ModelScreen({
 
       <div id="house-facade"><HouseFacadePanel project={project} onChange={(next) => commit(next, "Façade updated")} /></div>
       <div id="house-ai-remodel"><HouseAiRemodelPanel project={project} selected={selected} selections={selections} onChange={(next) => commit(next, "AI model change applied")} /></div>
-      <HouseStructurePanel project={project} onChange={(next) => commit(next, "Structure updated")} />
+      <HouseStructurePanel project={project} onChange={(next) => commit(next, "Structure updated")} onSuggest={() => runCommand("suggest-columns")} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Summary label="Level area" value={activeRoom ? `${floorArea(activeRoom).toFixed(2)} m²` : "—"} />

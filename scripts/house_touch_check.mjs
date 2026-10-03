@@ -305,6 +305,7 @@ try {
     assert.equal(await walls(), 4, `${at}: the new floor has its walls`);
 
     if (width === 390) await checkThreeD(page, at, { screen, touch, tapAt });
+    if (width === 390) await checkSuggestions(page, at, { touch });
 
     assert.deepEqual(errors, [], `${at}: page errors`);
     await page.close();
@@ -407,4 +408,66 @@ async function checkThreeD(page, at, { touch, tapAt }) {
   assert.ok(stair && near(stair.max[0] - stair.min[0], 1), `${at}: a stair is a stair's width, whatever tool came before`);
 }
 
-console.log("House designer touch + 3D: layout, pinch, pan, tap, delete/undo, long-press, room drawing, typed lengths, doors, wall moves, locks, floors and 2D/3D sync passed at 360–430px");
+/**
+ * Suggest Columns proposes; only Accept changes the model. Read back from
+ * the 3D scene so "nothing changed" means nothing changed in the model.
+ */
+async function checkSuggestions(page, at, { touch }) {
+  await page.reload();
+  await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
+  await page.locator(PLAN).waitFor();
+  await page.getByRole("button", { name: "Both", exact: true }).click();
+  await page.waitForFunction(() => [...window.__scenes].some((scene) => scene.getObjectByName("level:ground-floor")), null, { timeout: 15000 });
+  await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
+  const screenOf = (x, y) => page.evaluate(([selector, x, y]) => { const point = new DOMPoint(x, y).matrixTransform(document.querySelector(selector).getScreenCTM()); return [point.x, point.y]; }, [PLAN, x, y]);
+  const live = () => page.evaluate(() => {
+    const scene = [...window.__scenes].filter((item) => item.getObjectByName("level:ground-floor")).at(-1);
+    scene.updateMatrixWorld(true);
+    let columns = 0;
+    scene.traverse((object) => { if (object.name && /column:/.test(object.name)) columns += 1; });
+    const walls = new window.__THREE.Box3().setFromObject(scene.getObjectByName("walls:ground-floor"));
+    return { columns, walls: [...walls.min.toArray(), ...walls.max.toArray()].map((value) => value.toFixed(3)).join() };
+  });
+  const marks = () => page.evaluate((selector) => [...document.querySelectorAll(`${selector} [aria-label^="Suggested column"] rect`)].map((rect) => `${Math.round(+rect.getAttribute("x") + +rect.getAttribute("width") / 2)}:${Math.round(+rect.getAttribute("y") + +rect.getAttribute("height") / 2)}`).sort(), PLAN);
+  const panel = page.getByRole("region", { name: "Suggested columns" });
+  const open = async () => {
+    await page.locator('nav[aria-label="Modeling tools"]').getByRole("button", { name: "More tools" }).click();
+    await page.getByPlaceholder("Search commands…").fill("suggest");
+    await page.getByRole("button", { name: /Suggest Columns/ }).click();
+  };
+
+  const start = await live();
+  await open();
+  assert.deepEqual(await marks(), ["0:3250", "4000:0", "4000:6500", "8000:3250"], `${at}: a column is suggested mid-span on each long wall`);
+  assert.deepEqual(await live(), start, `${at}: suggesting changes nothing in the model`);
+
+  const [gx, gy] = await screenOf(4000, 0);
+  await page.touchscreen.tap(gx, gy);
+  assert.match(await panel.innerText(), /8\.0 m span/, `${at}: a chosen suggestion says why`);
+  await panel.getByRole("button", { name: "Accept", exact: true }).click();
+  assert.equal((await live()).columns, start.columns + 1, `${at}: accepting one adds one`);
+
+  const [ax, ay] = await screenOf(0, 3250);
+  const [, by] = await screenOf(0, 2250);
+  await touch("touchStart", [[ax, ay]]);
+  for (let step = 1; step <= 6; step += 1) await touch("touchMove", [[ax, ay + (by - ay) * step / 6]]);
+  await touch("touchEnd", []);
+  await page.waitForTimeout(150);
+  assert.deepEqual(await marks(), ["0:2250", "4000:6500", "8000:3250"], `${at}: a suggestion drags to where you want it`);
+  await page.getByRole("button", { name: "Accept all" }).click();
+  const accepted = await live();
+  assert.equal(accepted.columns, start.columns + 4, `${at}: accept all adds the rest`);
+  assert.equal(accepted.walls, start.walls, `${at}: and no wall moves`);
+  assert.equal(await panel.count(), 0, `${at}: nothing is left to suggest`);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  assert.equal((await live()).columns, start.columns + 1, `${at}: one undo takes accept-all back`);
+
+  await open();
+  await page.getByLabel("Maximum span").selectOption("3000");
+  assert.ok((await marks()).length > 3, `${at}: a shorter span asks for more columns`);
+  await panel.getByRole("button", { name: "Clear" }).click();
+  assert.equal((await marks()).length, 0, `${at}: and Clear takes the suggestions away`);
+  assert.equal((await live()).columns, start.columns + 1, `${at}: without touching the model`);
+}
+
+console.log("House designer touch + 3D: layout, pinch, pan, tap, delete/undo, long-press, room drawing, typed lengths, doors, wall moves, locks, floors, 2D/3D sync and column suggestions passed at 360–430px");
