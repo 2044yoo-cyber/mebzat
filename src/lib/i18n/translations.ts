@@ -1,3 +1,5 @@
+import { amharicPhrases } from "./amharic-phrases";
+
 export const LANGUAGES = ["en", "am", "om"] as const;
 export type Language = (typeof LANGUAGES)[number];
 
@@ -475,10 +477,14 @@ function flatten(dictionary: Dictionary, prefix = "", target = new Map<string, s
 }
 
 const ENGLISH_PHRASES = flatten(translations.en);
+const NORMALIZED_PHRASES = new Map([...ENGLISH_PHRASES].map(([phrase, key]) => [phrase.toLocaleLowerCase("en"), key]));
+const AMHARIC_PHRASES = new Map(Object.entries(amharicPhrases).map(([phrase, value]) => [phrase.toLocaleLowerCase("en"), value]));
 
 /** Compatibility lookup for existing server-rendered labels during migration. */
 export function translatePhrase(language: Language, phrase: string): string {
   if (language === "en") return phrase;
-  const key = ENGLISH_PHRASES.get(phrase.trim());
+  const normalized = phrase.trim().toLocaleLowerCase("en");
+  if (language === "am" && AMHARIC_PHRASES.has(normalized)) return AMHARIC_PHRASES.get(normalized)!;
+  const key = ENGLISH_PHRASES.get(phrase.trim()) ?? NORMALIZED_PHRASES.get(normalized);
   return key ? translate(language, key) : phrase;
 }

@@ -104,6 +104,7 @@ export function useWriter() {
       const decoder = new TextDecoder();
       let buffer = "";
       let streamed = "";
+      let completed: string | undefined;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -133,6 +134,7 @@ export function useWriter() {
             setState((previous) => ({ ...previous, draft: shown }));
           } else if (event === "done") {
             const finished = payload as { text: string; latencyMs: number };
+            completed = finished.text;
             setState((previous) => ({
               ...previous,
               // The server's cleaned text supersedes what was streamed: code
@@ -164,6 +166,7 @@ export function useWriter() {
             }
           : previous,
       );
+      return completed;
     } catch (error) {
       if ((error as Error)?.name === "AbortError") return;
       setState({

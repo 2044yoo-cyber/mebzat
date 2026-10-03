@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { PostText } from "@/components/feed/post-text";
 import { FeedActions } from "@/components/feed/feed-actions";
 import { FeedComments } from "@/components/feed/feed-comments";
 import { FeedMedia } from "@/components/feed/feed-media";
@@ -57,12 +58,10 @@ export function FeedCard({
    */
   onHidden?: (postId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
 
   const media = samplePostMedia(post);
   const hasGeneratedPhoto = media.some((item, index) => item.url !== post.media[index]?.url);
-  const long = (post.body?.length ?? 0) > 220;
   const recordOpen = () => void feedApi.open(post.id, post.kind === "tour_360");
 
   return (
@@ -72,38 +71,7 @@ export function FeedCard({
     >
       <Header post={post} signedIn={signedIn} />
 
-      <div className="px-3 pb-2">
-        <h2 className="text-[15px] leading-snug font-semibold text-foreground">
-          {post.linkHref ? (
-            <Link href={post.linkHref} onClick={recordOpen} className="hover:underline">
-              {post.title}
-            </Link>
-          ) : (
-            post.title
-          )}
-        </h2>
-
-        {post.body && (
-          <p
-            className={cn(
-              "mt-1 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground",
-              !expanded && long && "line-clamp-5",
-            )}
-          >
-            {post.body}
-          </p>
-        )}
-
-        {long && (
-          <button
-            type="button"
-            onClick={() => setExpanded((value) => !value)}
-            className="mt-1 h-8 text-sm font-medium text-brand"
-          >
-            {expanded ? "Show less" : "Show more"}
-          </button>
-        )}
-      </div>
+      <PostText post={post} signedIn={signedIn} onOpen={recordOpen} />
 
       {post.media.length > 0 && (
         <FeedMedia media={media} priority={priority} />

@@ -30,7 +30,7 @@ export function LegacyTranslationBridge() {
       if (scope.nodeType === Node.TEXT_NODE) nodes.push(scope as Text);
       while (walker.nextNode()) nodes.push(walker.currentNode as Text);
       for (const node of nodes) {
-        if (node.parentElement?.closest("[data-i18n-managed], script, style, textarea")) continue;
+        if (node.parentElement?.closest("[data-i18n-managed], [contenteditable], script, style, textarea")) continue;
         const current = node.data;
         const last = lastText.current.get(node);
         if (!originalText.current.has(node) || (last !== undefined && current !== last)) {
