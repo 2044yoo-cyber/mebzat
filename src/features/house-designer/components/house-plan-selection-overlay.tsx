@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import type { HouseCommandId } from "../services/command-registry";
 import type { HouseProject, HouseSelection } from "../types/project";
@@ -27,6 +27,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   onGuidance: (message: string) => void;
 }) {
   const svg = useRef<SVGSVGElement | null>(null);
+  const gridId = useId();
   const [dragStart, setDragStart] = useState<HousePlanPoint | null>(null);
   const [current, setCurrent] = useState<SnapPoint | null>(null);
   const bounds = useMemo(() => levelBounds(project, levelId), [levelId, project]);
@@ -120,8 +121,31 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
 
   return (
     <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onPointerCancel={() => setDragStart(null)}>
+      <defs>
+        <pattern id={`${gridId}-minor`} width={1000} height={1000} patternUnits="userSpaceOnUse">
+          <path d="M 1000 0 L 0 0 0 1000" fill="none" stroke="#eef2f7" strokeWidth={6} />
+        </pattern>
+        <pattern id={`${gridId}-major`} width={5000} height={5000} patternUnits="userSpaceOnUse">
+          <rect width={5000} height={5000} fill={`url(#${gridId}-minor)`} />
+          <path d="M 5000 0 L 0 0 0 5000" fill="none" stroke="#dbe3ec" strokeWidth={10} />
+        </pattern>
+      </defs>
+      <rect x={bounds.minX} y={bounds.minY} width={bounds.maxX - bounds.minX} height={bounds.maxY - bounds.minY} fill={`url(#${gridId}-major)`} pointerEvents="none" />
       <ModelPlanGeometry project={project} levelId={levelId} />
-      {objects.filter((object) => selectedIds.has(object.selection.id)).map((object) => <rect key={object.selection.id} x={object.bounds.minX} y={object.bounds.minY} width={Math.max(1, object.bounds.maxX - object.bounds.minX)} height={Math.max(1, object.bounds.maxY - object.bounds.minY)} fill="rgba(20,115,230,.10)" stroke="#1473e6" strokeWidth={16} vectorEffect="non-scaling-stroke" />)}
+      {objects.filter((object) => selectedIds.has(object.selection.id)).map((object) => {
+        const line = lineGeometry(project, levelId, object.selection);
+        if (line) {
+          const grip = Math.max(90, margin * 0.07);
+          return (
+            <g key={object.selection.id} pointerEvents="none">
+              <line x1={line.start.x} y1={line.start.y} x2={line.end.x} y2={line.end.y} stroke="#1473e6" strokeOpacity={0.28} strokeWidth={Math.max(line.thickness + 16, 28)} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+              <line x1={line.start.x} y1={line.start.y} x2={line.end.x} y2={line.end.y} stroke="#1473e6" strokeWidth={4} vectorEffect="non-scaling-stroke" />
+              {[line.start, line.end].map((point, index) => <rect key={index} x={point.x - grip / 2} y={point.y - grip / 2} width={grip} height={grip} fill="white" stroke="#1473e6" strokeWidth={6} vectorEffect="non-scaling-stroke" />)}
+            </g>
+          );
+        }
+        return <rect key={object.selection.id} x={object.bounds.minX} y={object.bounds.minY} width={Math.max(1, object.bounds.maxX - object.bounds.minX)} height={Math.max(1, object.bounds.maxY - object.bounds.minY)} fill="rgba(20,115,230,.10)" stroke="#1473e6" strokeWidth={10} vectorEffect="non-scaling-stroke" />;
+      })}
       {project.annotations.filter((item) => item.levelId === levelId).map((item) => item.end ? <g key={item.id}><line x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke={selectedIds.has(item.id) ? "#1473e6" : "#7c3aed"} strokeWidth={12} strokeDasharray={item.kind === "dimension" ? undefined : "80 45"} vectorEffect="non-scaling-stroke" /><text x={(item.start.x + item.end.x) / 2} y={(item.start.y + item.end.y) / 2 - 80} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#334155">{item.text}</text></g> : <text key={item.id} x={item.start.x} y={item.start.y} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill={selectedIds.has(item.id) ? "#1473e6" : "#7c3aed"}>{item.text}</text>)}
       {selectionBox ? <rect x={selectionBox.minX} y={selectionBox.minY} width={selectionBox.maxX - selectionBox.minX} height={selectionBox.maxY - selectionBox.minY} fill={crossing ? "rgba(20,115,230,.10)" : "rgba(20,115,230,.06)"} stroke="#1473e6" strokeWidth={12} strokeDasharray={crossing ? `${margin * 0.08} ${margin * 0.05}` : undefined} vectorEffect="non-scaling-stroke" /> : null}
       {draftStart && current && activeTool && lineTools.has(activeTool) ? <g><line x1={draftStart.x} y1={draftStart.y} x2={current.x} y2={current.y} stroke="#1473e6" strokeWidth={16} strokeDasharray="80 40" vectorEffect="non-scaling-stroke" /><text x={(draftStart.x + current.x) / 2} y={(draftStart.y + current.y) / 2 - 100} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#1473e6">{Math.hypot(current.x - draftStart.x, current.y - draftStart.y).toFixed(1)} mm</text></g> : null}
@@ -167,6 +191,22 @@ function WallTemporaryDimension({ wall, margin, selection, onChange }: { wall: H
   const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
   const middle = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
   return <g><line x1={wall.start.x} y1={wall.start.y} x2={wall.end.x} y2={wall.end.y} stroke="#1473e6" strokeWidth={18} vectorEffect="non-scaling-stroke" /><InlineDimensionInput x={middle.x} y={middle.y} margin={margin} label="Length" value={length} onChange={(value) => { if (value >= 200) onChange(selection, value); }} /></g>;
+}
+
+/**
+ * The real line a wall, beam, grid line, railing or reference plane was
+ * drawn along — not the axis-aligned box around it, which is what made a
+ * selected wall look like a slab rather than a highlighted line. `null` for
+ * every other kind, which keeps its bounding-box highlight: a room, a door,
+ * a column are areas or points, and a box is the right outline for those.
+ */
+function lineGeometry(project: HouseProject, levelId: string, selection: HouseSelection): { start: HousePlanPoint; end: HousePlanPoint; thickness: number } | null {
+  if (selection.kind === "wall") { const item = project.walls.find((wall) => wall.id === selection.id && wall.levelId === levelId); return item ? { start: item.start, end: item.end, thickness: item.thickness } : null; }
+  if (selection.kind === "beam") { const item = project.structuralBeams.find((beam) => beam.id === selection.id && beam.levelId === levelId); return item ? { start: item.start, end: item.end, thickness: item.width } : null; }
+  if (selection.kind === "railing") { const item = project.railings.find((railing) => railing.id === selection.id && railing.levelId === levelId); return item ? { start: item.start, end: item.end, thickness: 30 } : null; }
+  if (selection.kind === "grid") { const item = project.structuralGrid.find((grid) => grid.id === selection.id && grid.levelId === levelId); return item ? { start: item.start, end: item.end, thickness: 20 } : null; }
+  if (selection.kind === "reference-plane") { const item = project.referencePlanes.find((plane) => plane.id === selection.id && plane.levelId === levelId); return item ? { start: item.start, end: item.end, thickness: 20 } : null; }
+  return null;
 }
 
 function selectableBounds(project: HouseProject, levelId: string): { selection: HouseSelection; bounds: Bounds }[] {
