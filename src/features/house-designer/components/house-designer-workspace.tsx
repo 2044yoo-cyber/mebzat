@@ -9,6 +9,9 @@ import {
   Eye,
   EyeOff,
   FileUp,
+  House,
+  LayoutGrid,
+  PenLine,
   Loader2,
   Magnet,
   PencilRuler,
@@ -88,6 +91,7 @@ import {
   type HouseClipboard,
 } from "../services/model-commands";
 import { addHouseFloor, patchHouseObject } from "../services/project-edit";
+import { PLAN_TEMPLATES } from "../services/plan-templates";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
 import {
   allHouseSelections,
@@ -111,7 +115,8 @@ import { HouseUnitsContext } from "./house-units";
 import { applyModelingOptions, modelingPreset, displayLength, modelLength, type DisplayUnits, type ModelingOptions } from "../services/workspace-options";
 
 type Stage = "start" | "verify" | "model";
-type Source = "upload" | "manual";
+type Source = "manual" | "rooms" | "upload" | "sketch" | "template";
+const SOURCE_LABEL: Record<Source, string> = { manual: "Manual plan", rooms: "Drawn room by room", upload: "Uploaded plan", sketch: "Hand sketch", template: "Template" };
 type WorkspaceView = "2d" | "3d" | "split";
 
 const drawingCommands = new Set<HouseCommandId>([
@@ -125,6 +130,8 @@ const noSubscription = () => () => undefined;
 export function HouseDesignerWorkspace({ userId }: { userId: string }) {
   const [stage, setStage] = useState<Stage>("start");
   const [source, setSource] = useState<Source>("manual");
+  const [templateId, setTemplateId] = useState(PLAN_TEMPLATES[1]!.id);
+  const [startTool, setStartTool] = useState<HouseCommandId>("select");
   const [room, setRoom] = useState<Room>(() => rectangularRoom(8000, 6500));
   const [floorPlans, setFloorPlans] = useState<DraftPlan[]>([]);
   const [facades, setFacades] = useState<DraftPlan[]>([]);
@@ -177,21 +184,29 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
     }));
   }
 
-  async function openVerification(nextSource: Source) {
+  async function openVerification(nextSource: Source, ai = false) {
     setSource(nextSource);
+    const template = nextSource === "template" ? PLAN_TEMPLATES.find((item) => item.id === templateId) : null;
     let verifiedRoom: Room = {
-      ...room,
+      ...(template ? template.build() : room),
       ceilingHeight: clamp(floorHeight, 1800, 6000),
     };
     setPlanAnalysis(null);
+    setStartTool(nextSource === "rooms" ? "room" : "select");
     const plan = floorPlans[0];
-    if (nextSource === "upload" && plan?.mediaType === "image") {
+    const uploaded = nextSource === "upload" || nextSource === "sketch";
+    if (uploaded && !ai) {
+      setPlanAnalysis(plan?.mediaType === "image"
+        ? "Your drawing is under the plan. Drag the corners and walls onto its lines, then type the exact lengths."
+        : "Enter the walls from your drawing with their exact lengths.");
+    }
+    if (uploaded && ai && plan?.mediaType === "image") {
       setAnalysingPlan(true);
       try {
         const response = await fetch("/api/house-design/analyze-plan", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ imageUrl: plan.url, ceilingHeight: floorHeight }),
+          body: JSON.stringify({ imageUrl: plan.url, ceilingHeight: floorHeight, kind: nextSource === "sketch" ? "sketch" : "plan" }),
         });
         const payload = (await response.json()) as { plan?: unknown; confidence?: number; notes?: string[]; error?: string };
         const parsed = roomSchema.safeParse(payload.plan);
@@ -329,7 +344,9 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           strict={strict}
           onStrict={setStrict}
           analysingPlan={analysingPlan}
-          onContinue={() => void openVerification(source)}
+          templateId={templateId}
+          onTemplate={setTemplateId}
+          onContinue={(ai) => void openVerification(source, ai)}
           onRestore={savedDraft ? restore : undefined}
         />
       ) : stage === "verify" && project ? (
@@ -342,6 +359,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           onProjectChange={updateProject}
           onDone={() => { setStage("model"); setView("3d"); }}
           onBack={() => setStage("start")}
+          initialTool={startTool}
           onSave={save}
           saveState={saveState}
           onDownload={download}
@@ -391,6 +409,8 @@ function StartScreen({
   onStrict,
   onContinue,
   onRestore,
+  templateId,
+  onTemplate,
 }: {
   displayUnits: DisplayUnits; onDisplayUnits: (unit: DisplayUnits) => void;
   modelingOptions: ModelingOptions; onModelingOptions: (options: ModelingOptions) => void;
@@ -412,17 +432,19 @@ function StartScreen({
   strict: boolean;
   analysingPlan: boolean;
   onStrict: (value: boolean) => void;
-  onContinue: () => void;
+  onContinue: (ai: boolean) => void;
   onRestore?: () => void;
+  templateId: string;
+  onTemplate: (id: string) => void;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
       <section className="space-y-4 rounded-2xl border bg-card p-4 sm:p-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-brand">Create from</p>
-          <h2 className="mt-1 text-2xl font-semibold">Start with a measured plan</h2>
+          <p className="text-xs font-semibold uppercase tracking-widest text-brand">New house</p>
+          <h2 className="mt-1 text-xl font-semibold sm:text-2xl">How do you want to start?</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Upload a drawing to trace and verify, or draw the building footprint with exact dimensions in your preferred units.
+            Every way in ends at the same editable plan — you check and correct it before anything is built from it.
           </p>
         </div>
 
@@ -437,38 +459,58 @@ function StartScreen({
           </button>
         ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <SourceCard
-            active={source === "upload"}
-            icon={<FileUp className="size-6" />}
-            title="Upload Floor Plan"
-            description="JPG, JPEG, PNG or PDF"
-            onClick={() => onSource("upload")}
-          />
-          <SourceCard
-            active={source === "manual"}
-            icon={<PencilRuler className="size-6" />}
-            title="Draw Floor Plan"
-            description="Drag walls and enter exact dimensions"
-            onClick={() => onSource("manual")}
-          />
+        <div role="radiogroup" aria-label="How to start" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {([
+            ["manual", <PencilRuler key="manual" className="size-5" />, "Draw manually", "Start from an outline and shape it"],
+            ["rooms", <LayoutGrid key="rooms" className="size-5" />, "Draw rooms", "Drag out each room; walls join up"],
+            ["upload", <FileUp key="upload" className="size-5" />, "Upload floor plan", "JPG, PNG or PDF — trace it or convert it"],
+            ["sketch", <PenLine key="sketch" className="size-5" />, "Upload hand sketch", "A photo of a drawing on paper"],
+            ["template", <House key="template" className="size-5" />, "Use a template", "A ready plan to adjust"],
+          ] as const).map(([value, icon, title, description]) => (
+            <SourceCard key={value} active={source === value} icon={icon} title={title} description={description} onClick={() => onSource(value)} />
+          ))}
         </div>
 
-        {source === "upload" ? (
+        {source === "upload" || source === "sketch" ? (
           <FloorPlanInput
             userId={userId}
             plans={floorPlans}
             onChange={onFloorPlans}
             maxPlans={1}
             multiple={false}
-            buttonLabel="Upload floor plan"
-            help="JPG, JPEG, PNG or PDF, up to 25MB"
+            buttonLabel={source === "sketch" ? "Upload sketch photo" : "Upload floor plan"}
+            help={source === "sketch" ? "A clear, straight-on photo; write the main lengths on it if you can" : "JPG, JPEG, PNG or PDF, up to 25MB"}
           />
+        ) : source === "template" ? (
+          <div role="radiogroup" aria-label="Template" className="grid gap-2 sm:grid-cols-3">
+            {PLAN_TEMPLATES.map((template) => (
+              <button key={template.id} type="button" role="radio" aria-checked={templateId === template.id} onClick={() => onTemplate(template.id)} className={cn("rounded-xl border p-3 text-left text-sm", templateId === template.id ? "border-brand bg-brand/5" : "hover:bg-muted/40")}>
+                <strong className="block">{template.name}</strong>
+                <span className="text-xs text-muted-foreground">{template.summary}</span>
+              </button>
+            ))}
+          </div>
         ) : (
-          <div className="rounded-xl border border-dashed bg-muted/20 p-5 text-sm text-muted-foreground">
-            Begin with a {displayLength(8000, displayUnits)} × {displayLength(6500, displayUnits)} {displayUnits} footprint, then drag corners, add wall points, doors and windows.
+          <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+            {source === "rooms"
+              ? "The plan opens with the Room tool ready: drag from corner to corner for each room, or type its size. Rooms that touch share their wall."
+              : `Begin with a ${displayLength(8000, displayUnits)} × ${displayLength(6500, displayUnits)} ${displayUnits} outline, then drag corners and walls, and add doors and windows.`}
           </div>
         )}
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {source === "upload" || source === "sketch" ? <>
+            <button type="button" onClick={() => onContinue(true)} disabled={analysingPlan || floorPlans.length === 0 || floorPlans[0]?.mediaType !== "image"} className="flex-1 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground disabled:opacity-40">
+              {analysingPlan ? <span className="flex items-center justify-center gap-2"><Loader2 className="size-4 animate-spin" /> Reading your {source === "sketch" ? "sketch" : "plan"}…</span> : source === "sketch" ? "Convert sketch with AI" : "Convert with AI"}
+            </button>
+            <button type="button" onClick={() => onContinue(false)} disabled={analysingPlan || floorPlans.length === 0} className="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold hover:bg-muted disabled:opacity-40">Trace it myself</button>
+          </> : (
+            <button type="button" onClick={() => onContinue(false)} className="flex-1 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground">
+              {source === "rooms" ? "Start drawing rooms" : source === "template" ? "Use this template" : "Draw floor plan"}
+            </button>
+          )}
+        </div>
+        {(source === "upload" || source === "sketch") && floorPlans[0]?.mediaType === "pdf" ? <p className="text-xs text-muted-foreground">AI conversion reads images; a PDF can be traced by hand.</p> : null}
       </section>
 
       <aside className="space-y-4 rounded-2xl border bg-card p-4">
@@ -510,20 +552,12 @@ function StartScreen({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={onContinue}
-          disabled={analysingPlan || (source === "upload" && floorPlans.length === 0)}
-          className="w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground disabled:opacity-40"
-        >
-          {analysingPlan ? <span className="flex items-center justify-center gap-2"><Loader2 className="size-4 animate-spin" /> Detecting plan…</span> : source === "upload" ? "Detect & verify floor plan" : "Draw floor plan"}
-        </button>
       </aside>
     </div>
   );
 }
 
-function VerifyScreen({ project, source, analysis, view, onView, onProjectChange, onDone, onBack, onSave, saveState, onDownload }: { project: HouseProject; source: Source; analysis: string | null; view: WorkspaceView; onView: (view: WorkspaceView) => void; onProjectChange: (project: HouseProject) => void; onDone: () => void; onBack: () => void; onSave: () => void; saveState: string; onDownload: () => void }) {
+function VerifyScreen({ project, source, analysis, view, onView, onProjectChange, onDone, onBack, onSave, saveState, onDownload, initialTool }: { project: HouseProject; source: Source; analysis: string | null; view: WorkspaceView; onView: (view: WorkspaceView) => void; onProjectChange: (project: HouseProject) => void; onDone: () => void; onBack: () => void; onSave: () => void; saveState: string; onDownload: () => void; initialTool?: HouseCommandId }) {
   return (
     <section className="space-y-3">
       <div className="hidden flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3 sm:flex">
@@ -532,7 +566,7 @@ function VerifyScreen({ project, source, analysis, view, onView, onProjectChange
           <p className="text-xs text-muted-foreground">Correct the outline, wall thickness, dimensions, doors and windows.</p>
         </div>
         <span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-medium text-brand">
-          {source === "upload" ? "Uploaded plan" : "Manual plan"}
+          {SOURCE_LABEL[source]}
         </span>
       </div>
       {project.levels[0]?.plan?.reference?.mediaType === "pdf" ? (
@@ -541,7 +575,7 @@ function VerifyScreen({ project, source, analysis, view, onView, onProjectChange
         </p>
       ) : null}
       {analysis ? <p className="rounded-xl border border-brand/25 bg-brand/5 p-3 text-xs text-foreground">{analysis}</p> : null}
-      <ModelScreen project={project} view={view} onView={onView} onProjectChange={onProjectChange} onSave={onSave} onSaveAs={onSave} saveState={saveState} onDownload={onDownload} verification onFinish={onDone} onBack={onBack} backLabel="Start" />
+      <ModelScreen project={project} view={view} onView={onView} onProjectChange={onProjectChange} onSave={onSave} onSaveAs={onSave} saveState={saveState} onDownload={onDownload} verification onFinish={onDone} onBack={onBack} backLabel="Start" initialTool={initialTool} />
     </section>
   );
 }
@@ -559,6 +593,7 @@ function ModelScreen({
   onFinish,
   onBack,
   backLabel,
+  initialTool = "select",
 }: {
   project: HouseProject;
   view: WorkspaceView;
@@ -572,6 +607,7 @@ function ModelScreen({
   onFinish?: () => void;
   onBack?: () => void;
   backLabel?: string;
+  initialTool?: HouseCommandId;
 }) {
   const [chosenLevelId, setActiveLevelId] = useState(project.levels[0]?.id ?? "ground-floor");
   // Undoing Add Floor deletes the floor being looked at; everything that
@@ -583,7 +619,7 @@ function ModelScreen({
   const [selections, setSelections] = useState<HouseSelection[]>([]);
   const [viewportOpen, setViewportOpen] = useState(true);
   const [activeCategory, setActiveCategory] = useState<HouseCommandCategory>("Architecture");
-  const [activeTool, setActiveTool] = useState<HouseCommandId | null>("select");
+  const [activeTool, setActiveTool] = useState<HouseCommandId | null>(initialTool);
   const [past, setPast] = useState<HouseProject[]>([]);
   const [future, setFuture] = useState<HouseProject[]>([]);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -1062,10 +1098,10 @@ function ModelScreen({
 
 function SourceCard({ active, icon, title, description, onClick }: { active: boolean; icon: React.ReactNode; title: string; description: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={cn("rounded-2xl border p-5 text-left transition-colors", active ? "border-brand bg-brand/5" : "hover:border-brand/40 hover:bg-muted/30")}>
-      <span className="mb-4 flex size-11 items-center justify-center rounded-xl bg-brand/10 text-brand">{icon}</span>
-      <strong className="block">{title}</strong>
-      <span className="mt-1 block text-xs text-muted-foreground">{description}</span>
+    <button type="button" role="radio" onClick={onClick} aria-checked={active} className={cn("flex items-center gap-3 rounded-2xl border p-3 text-left transition-colors sm:block sm:p-5", active ? "border-brand bg-brand/5" : "hover:border-brand/40 hover:bg-muted/30")}>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand sm:mb-4 sm:size-11">{icon}</span>
+      <span className="min-w-0"><strong className="block">{title}</strong>
+      <span className="mt-0.5 block text-xs text-muted-foreground sm:mt-1">{description}</span></span>
     </button>
   );
 }

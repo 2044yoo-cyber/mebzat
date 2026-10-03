@@ -304,6 +304,7 @@ try {
     await page.waitForFunction(() => document.querySelector("div.sticky button[aria-expanded]")?.textContent?.includes("1st Floor"));
     assert.equal(await walls(), 4, `${at}: the new floor has its walls`);
 
+    if (width === 360) await checkStart(page, at);
     if (width === 390) await checkThreeD(page, at, { screen, touch, tapAt });
     if (width === 390) await checkSuggestions(page, at, { touch });
 
@@ -408,6 +409,29 @@ async function checkThreeD(page, at, { touch, tapAt }) {
   assert.ok(stair && near(stair.max[0] - stair.min[0], 1), `${at}: a stair is a stair's width, whatever tool came before`);
 }
 
+/** "How do you want to start?" — every choice is real and fits a phone. */
+async function checkStart(page, at) {
+  await page.reload();
+  const choices = page.getByRole("radiogroup", { name: "How to start" }).getByRole("radio");
+  assert.deepEqual((await choices.allInnerTexts()).map((text) => text.split("\n")[0]), ["Draw manually", "Draw rooms", "Upload floor plan", "Upload hand sketch", "Use a template"], `${at}: five ways to start`);
+  assert.ok(await page.getByRole("button", { name: "Draw floor plan", exact: true }).isVisible() && await page.getByRole("button", { name: "Draw floor plan", exact: true }).evaluate((element) => element.getBoundingClientRect().bottom <= innerHeight), `${at}: the choices and the way on fit one screen`);
+  await page.getByRole("radio", { name: /Upload floor plan/ }).click();
+  assert.ok(await page.getByRole("button", { name: "Convert with AI" }).isDisabled(), `${at}: nothing to convert until a plan is uploaded`);
+  assert.ok(await page.getByRole("button", { name: "Trace it myself" }).isDisabled(), `${at}: or to trace`);
+  await page.getByRole("radio", { name: /Draw rooms/ }).click();
+  await page.getByRole("button", { name: "Start drawing rooms" }).click();
+  assert.ok(await page.getByRole("radiogroup", { name: "Room shape" }).isVisible(), `${at}: drawing rooms opens with the Room tool ready`);
+  await page.reload();
+  await page.getByRole("radio", { name: /Use a template/ }).click();
+  await page.getByRole("radio", { name: /Three-bedroom/ }).click();
+  await page.getByRole("button", { name: "Use this template" }).click();
+  await page.locator(PLAN).waitFor();
+  const options = await page.evaluate(() => [...document.querySelectorAll("#house-properties option")].map((option) => option.textContent));
+  assert.equal(options.filter((text) => /^Wall \d+$/.test(text)).length, 7, `${at}: a template arrives with its walls`);
+  assert.equal(options.filter((text) => /^Door/.test(text)).length, 4, `${at}: doors`);
+  assert.equal(options.filter((text) => /^Window/.test(text)).length, 4, `${at}: and windows`);
+}
+
 /**
  * Suggest Columns proposes; only Accept changes the model. Read back from
  * the 3D scene so "nothing changed" means nothing changed in the model.
@@ -470,4 +494,4 @@ async function checkSuggestions(page, at, { touch }) {
   assert.equal((await live()).columns, start.columns + 1, `${at}: without touching the model`);
 }
 
-console.log("House designer touch + 3D: layout, pinch, pan, tap, delete/undo, long-press, room drawing, typed lengths, doors, wall moves, locks, floors, 2D/3D sync and column suggestions passed at 360–430px");
+console.log("House designer touch + 3D: layout, pinch, pan, tap, delete/undo, long-press, room drawing, typed lengths, doors, wall moves, locks, floors, 2D/3D sync, column suggestions and the start choices passed at 360–430px");
