@@ -1,3 +1,5 @@
+import { propertyImage } from "@/lib/property/sample-images";
+import { PropertyImageNote } from "./property-image-note";
 import Image from "next/image";
 import Link from "next/link";
 import { Bath, Bed, Maximize, MapPin, Rotate3d } from "lucide-react";
@@ -57,6 +59,7 @@ export function PropertyCard({
   compact?: boolean;
   active?: boolean;
 }) {
+  property = { ...property, cover_image_url: propertyImage(property) };
   const land = isLandType(property.property_type);
 
   return (
@@ -81,6 +84,7 @@ export function PropertyCard({
           sizes={compact ? "112px" : "(max-width: 768px) 100vw, 33vw"}
           className="object-cover transition-transform duration-300 group-hover:scale-105"
         />
+        <PropertyImageNote src={property.cover_image_url} />
         {!compact && (
           <span className="absolute top-3 left-3 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium backdrop-blur">
             {LISTING_KIND[property.listing_kind]}

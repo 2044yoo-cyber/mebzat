@@ -1,5 +1,8 @@
 "use client";
 
+import { propertyImage } from "@/lib/property/sample-images";
+import { PropertyImageNote } from "./property-image-note";
+
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -142,9 +145,10 @@ function PanelBody({
   // gallery: a strip of identical placeholders is worse than a shorter strip.
   // The main image below falls back to one, since an empty frame there would
   // read as a broken card.
+  const coverImage = propertyImage(summary);
   const gallery = (
-    summary.cover_image_url
-      ? [{ id: "cover", url: summary.cover_image_url, caption: summary.title, kind: "photo" as const }, ...images]
+    coverImage
+      ? [{ id: "cover", url: coverImage, caption: summary.title, kind: "photo" as const }, ...images]
       : images
   ).filter((item) => isRenderableSrc(item.url));
 
@@ -198,6 +202,7 @@ function PanelBody({
             placeholder="empty"
           />
 
+          <PropertyImageNote src={gallery[activeImage]?.url} />
           <button
             type="button"
             onClick={onClose}

@@ -1,5 +1,8 @@
 "use client";
 
+import { propertyImage } from "@/lib/property/sample-images";
+import { PropertyImageNote } from "./property-image-note";
+
 import Image from "next/image";
 import Link from "next/link";
 import { Bath, BedDouble, MapPin, Maximize } from "lucide-react";
@@ -48,6 +51,7 @@ export function PropertyHoverCard({
   property: HoverProperty;
   className?: string;
 }) {
+  property = { ...property, cover_image_url: propertyImage(property) };
   const marker = markerFor(property.property_type);
 
   return (
@@ -78,6 +82,7 @@ export function PropertyHoverCard({
             {marker.emoji}
           </span>
         )}
+        <PropertyImageNote src={property.cover_image_url} />
         <span className="absolute top-2 left-2 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-medium backdrop-blur">
           {marker.emoji} {marker.label}
         </span>

@@ -1,3 +1,5 @@
+import { propertyImage } from "@/lib/property/sample-images";
+import { PropertyImageNote } from "@/components/property/property-image-note";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -53,7 +55,8 @@ export async function generateMetadata(props: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await props.params;
-  const property = await getProperty(id);
+  const originalProperty = await getProperty(id);
+  const property = originalProperty && { ...originalProperty, cover_image_url: propertyImage(originalProperty) };
   if (!property) return { title: "Property not found" };
 
   const price =
@@ -112,7 +115,8 @@ export default async function PropertyPage(props: {
 }) {
   const { id } = await props.params;
 
-  const property = await getProperty(id);
+  const originalProperty = await getProperty(id);
+  const property = originalProperty && { ...originalProperty, cover_image_url: propertyImage(originalProperty) };
   if (!property) notFound();
 
   const supabase = await createClient();
@@ -240,6 +244,7 @@ export default async function PropertyPage(props: {
               sizes="(max-width: 1024px) 100vw, 62vw"
               className="object-cover"
             />
+            <PropertyImageNote src={gallery[0]?.url} />
             <span className="absolute top-3 left-3 rounded-full bg-background/90 px-3 py-1 text-sm font-medium backdrop-blur">
               {LISTING_KIND[property.listing_kind]}
             </span>
