@@ -12,6 +12,7 @@ import {
   House,
   LayoutGrid,
   PenLine,
+  Sparkles,
   Loader2,
   Magnet,
   PencilRuler,
@@ -93,6 +94,7 @@ import {
 } from "../services/model-commands";
 import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong } from "../services/project-edit";
 import { PLAN_TEMPLATES } from "../services/plan-templates";
+import { planDescriptionError } from "../services/plan-analysis";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
 import {
   allHouseSelections,
@@ -117,8 +119,8 @@ import { HouseUnitsContext } from "./house-units";
 import { applyModelingOptions, modelingPreset, displayLength, modelLength, type DisplayUnits, type ModelingOptions } from "../services/workspace-options";
 
 type Stage = "start" | "verify" | "model";
-type Source = "manual" | "rooms" | "upload" | "sketch" | "template";
-const SOURCE_LABEL: Record<Source, string> = { manual: "Manual plan", rooms: "Drawn room by room", upload: "Uploaded plan", sketch: "Hand sketch", template: "Template" };
+type Source = "manual" | "rooms" | "upload" | "sketch" | "template" | "describe";
+const SOURCE_LABEL: Record<Source, string> = { manual: "Manual plan", rooms: "Drawn room by room", upload: "Uploaded plan", sketch: "Hand sketch", template: "Template", describe: "AI from a description" };
 type WorkspaceView = "2d" | "3d" | "split";
 
 const drawingCommands = new Set<HouseCommandId>([
@@ -133,6 +135,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
   const [stage, setStage] = useState<Stage>("start");
   const [source, setSource] = useState<Source>("manual");
   const [templateId, setTemplateId] = useState(PLAN_TEMPLATES[1]!.id);
+  const [description, setDescription] = useState("");
   const [startTool, setStartTool] = useState<HouseCommandId>("select");
   const [room, setRoom] = useState<Room>(() => rectangularRoom(8000, 6500));
   const [floorPlans, setFloorPlans] = useState<DraftPlan[]>([]);
@@ -201,6 +204,29 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       setPlanAnalysis(plan?.mediaType === "image"
         ? "Your drawing is under the plan. Drag the corners and walls onto its lines, then type the exact lengths."
         : "Enter the walls from your drawing with their exact lengths.");
+    }
+    if (nextSource === "describe") {
+      const invalid = planDescriptionError(description);
+      if (invalid) { toast.info(invalid); return; }
+      setAnalysingPlan(true);
+      try {
+        const response = await fetch("/api/house-design/generate-plan", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ description, ceilingHeight: floorHeight }),
+        });
+        const payload = (await response.json()) as { plan?: unknown; notes?: string[]; error?: string };
+        const parsed = roomSchema.safeParse(payload.plan);
+        if (!response.ok || !parsed.success) throw new Error(payload.error ?? "A plan could not be drawn from that description.");
+        verifiedRoom = parsed.data;
+        setPlanAnalysis(["AI drew this plan from your description. Check every wall, door and window before 3D.", ...(payload.notes ?? [])].join(" "));
+      } catch (error) {
+        // Nothing invented in its place: the description stays, ready to retry.
+        toast.error(error instanceof Error ? error.message : "A plan could not be drawn from that description.");
+        return;
+      } finally {
+        setAnalysingPlan(false);
+      }
     }
     if (uploaded && ai && plan?.mediaType === "image") {
       setAnalysingPlan(true);
@@ -350,6 +376,8 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           analysingPlan={analysingPlan}
           templateId={templateId}
           onTemplate={setTemplateId}
+          description={description}
+          onDescription={setDescription}
           onContinue={(ai) => void openVerification(source, ai)}
           onRestore={savedDraft ? restore : undefined}
         />
@@ -415,6 +443,8 @@ function StartScreen({
   onRestore,
   templateId,
   onTemplate,
+  description,
+  onDescription,
 }: {
   displayUnits: DisplayUnits; onDisplayUnits: (unit: DisplayUnits) => void;
   modelingOptions: ModelingOptions; onModelingOptions: (options: ModelingOptions) => void;
@@ -440,6 +470,8 @@ function StartScreen({
   onRestore?: () => void;
   templateId: string;
   onTemplate: (id: string) => void;
+  description: string;
+  onDescription: (value: string) => void;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -463,13 +495,14 @@ function StartScreen({
           </button>
         ) : null}
 
-        <div role="radiogroup" aria-label="How to start" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div role="radiogroup" aria-label="How to start" className="grid grid-cols-2 gap-2 xl:grid-cols-3">
           {([
             ["manual", <PencilRuler key="manual" className="size-5" />, "Draw manually", "An empty grid; draw the walls yourself"],
             ["rooms", <LayoutGrid key="rooms" className="size-5" />, "Draw rooms", "Drag out each room; walls join up"],
             ["upload", <FileUp key="upload" className="size-5" />, "Upload floor plan", "JPG, PNG or PDF — trace it or convert it"],
             ["sketch", <PenLine key="sketch" className="size-5" />, "Upload hand sketch", "A photo of a drawing on paper"],
             ["template", <House key="template" className="size-5" />, "Use a template", "A ready plan to adjust"],
+            ["describe", <Sparkles key="describe" className="size-5" />, "Describe it (AI)", "AI draws a plan; you check it"],
           ] as const).map(([value, icon, title, description]) => (
             <SourceCard key={value} active={source === value} icon={icon} title={title} description={description} onClick={() => onSource(value)} />
           ))}
@@ -485,6 +518,11 @@ function StartScreen({
             buttonLabel={source === "sketch" ? "Upload sketch photo" : "Upload floor plan"}
             help={source === "sketch" ? "A clear, straight-on photo; write the main lengths on it if you can" : "JPG, JPEG, PNG or PDF, up to 25MB"}
           />
+        ) : source === "describe" ? (
+          <label className="block space-y-1.5 text-xs text-muted-foreground">
+            <span>Describe the house</span>
+            <textarea aria-label="House description" value={description} onChange={(event) => onDescription(event.target.value)} maxLength={2000} rows={4} placeholder="e.g. A single-storey 3-bedroom house about 12 × 10 m, open living and kitchen at the front, two bathrooms" className="w-full rounded-xl border bg-background p-3 text-sm text-foreground" />
+          </label>
         ) : source === "template" ? (
           <div role="radiogroup" aria-label="Template" className="grid gap-2 sm:grid-cols-3">
             {PLAN_TEMPLATES.map((template) => (
@@ -508,7 +546,11 @@ function StartScreen({
               {analysingPlan ? <span className="flex items-center justify-center gap-2"><Loader2 className="size-4 animate-spin" /> Reading your {source === "sketch" ? "sketch" : "plan"}…</span> : source === "sketch" ? "Convert sketch with AI" : "Convert with AI"}
             </button>
             <button type="button" onClick={() => onContinue(false)} disabled={analysingPlan || floorPlans.length === 0} className="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold hover:bg-muted disabled:opacity-40">Trace it myself</button>
-          </> : (
+          </> : source === "describe" ? (
+            <button type="button" onClick={() => onContinue(true)} disabled={analysingPlan || description.trim().length < 10} className="flex-1 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground disabled:opacity-40">
+              {analysingPlan ? <span className="flex items-center justify-center gap-2"><Loader2 className="size-4 animate-spin" /> Drawing your plan…</span> : "Generate plan"}
+            </button>
+          ) : (
             <button type="button" onClick={() => onContinue(false)} className="flex-1 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground">
               {source === "rooms" ? "Start drawing rooms" : source === "template" ? "Use this template" : "Draw floor plan"}
             </button>
@@ -1156,10 +1198,10 @@ function ModelScreen({
 
 function SourceCard({ active, icon, title, description, onClick }: { active: boolean; icon: React.ReactNode; title: string; description: string; onClick: () => void }) {
   return (
-    <button type="button" role="radio" onClick={onClick} aria-checked={active} className={cn("flex items-center gap-3 rounded-2xl border p-3 text-left transition-colors sm:block sm:p-5", active ? "border-brand bg-brand/5" : "hover:border-brand/40 hover:bg-muted/30")}>
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand sm:mb-4 sm:size-11">{icon}</span>
-      <span className="min-w-0"><strong className="block">{title}</strong>
-      <span className="mt-0.5 block text-xs text-muted-foreground sm:mt-1">{description}</span></span>
+    <button type="button" role="radio" onClick={onClick} aria-checked={active} className={cn("block rounded-2xl border p-2.5 text-left transition-colors sm:p-5", active ? "border-brand bg-brand/5" : "hover:border-brand/40 hover:bg-muted/30")}>
+      <span className="mb-1.5 flex size-8 items-center justify-center rounded-lg bg-brand/10 text-brand sm:mb-4 sm:size-11 sm:rounded-xl">{icon}</span>
+      <strong className="block text-sm leading-tight sm:text-base">{title}</strong>
+      <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground sm:mt-1 sm:text-xs">{description}</span>
     </button>
   );
 }

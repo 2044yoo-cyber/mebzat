@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { roomSchema } from "../src/features/berchuma-studio/types/room";
 import { PLAN_TEMPLATES } from "../src/features/house-designer/services/plan-templates";
+import { planDescriptionError } from "../src/features/house-designer/services/plan-analysis";
 import { createHouseProject, houseProjectSchema } from "../src/features/house-designer/types/project";
 
 // ---------------------------------------------------------------------------
@@ -43,5 +44,24 @@ assert.match(open, /if \(uploaded && ai && plan\?\.mediaType === "image"\)/, "AI
 const route = code("src/app/api/house-design/analyze-plan/route.ts");
 assert.match(route, /text: body\.kind === "sketch" \? SKETCH_INSTRUCTION : /, "the route reads a sketch differently");
 assert.match(route, /const SKETCH_INSTRUCTION = \[[\s\S]*hand-drawn sketch/, "and says so to the model");
+
+// ---------------------------------------------------------------------------
+// Describe it (AI): validated, rate-limited, read like a detected plan.
+// ---------------------------------------------------------------------------
+assert.equal(planDescriptionError(undefined), "Describe the house you want.");
+assert.ok(planDescriptionError("tiny"), "too short to draw anything from");
+assert.ok(planDescriptionError("x".repeat(2001)), "too long");
+assert.equal(planDescriptionError("A three-bedroom house, 12 by 10 metres"), null);
+const generate = code("src/app/api/house-design/generate-plan/route.ts");
+assert.match(generate, /const invalid = planDescriptionError\(body\.description\);\s*if \(invalid\) return NextResponse\.json\(\{ error: invalid \}, \{ status: 400 \}\)/, "the route refuses a description it cannot use");
+assert.match(generate, /supabase\.rpc\("ai_feature_requests_in_window", \{ feature_name: "house_plan_generation"/, "it is rate limited");
+assert.match(generate, /if \(!user\) return NextResponse\.json/, "and needs a signed-in person");
+assert.match(generate, /for \(const \[index, provider\] of providerChain\(\)\.entries\(\)\)/, "it falls back through the text providers");
+assert.match(generate, /const result = detectedPlanToRoom\(extractJson\(output\), \{ ceilingHeight \}\);/, "and its answer goes through the same checks as a detected plan");
+assert.match(generate, /\$\{DETECTED_PLAN_SHAPE\}/, "asking for the same shape");
+assert.match(route, /\$\{DETECTED_PLAN_SHAPE\}/, "as plan detection does");
+const describe = open.slice(open.indexOf('if (nextSource === "describe")'));
+assert.match(describe, /fetch\("\/api\/house-design\/generate-plan"[\s\S]{0,200}JSON\.stringify\(\{ description, ceilingHeight: floorHeight \}\)/, "the client sends the description");
+assert.match(describe, /roomSchema\.safeParse\(payload\.plan\)/, "and checks what comes back before using it");
 
 console.log("House start: templates are valid, hosted plans; sketches reach the model as sketches");

@@ -285,9 +285,13 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
     }
     return corner;
   });
+  // Inside walls ending on this wall, and room corners on it, go with it.
+  const follow = attachedTo(plan.corners[startIndex]!, plan.corners[endIndex]!, corners[startIndex]!, corners[endIndex]!, plan.wallThickness / 2 + 5);
   const changedPlan: Room = {
     ...plan,
     corners,
+    interiorWalls: (plan.interiorWalls ?? []).map((item) => ({ ...item, start: follow(item.start), end: follow(item.end) })),
+    zones: plan.zones?.map((zone) => ({ ...zone, boundary: zone.boundary.map(follow) })),
     wallThickness: positiveOr(effectivePatch.thickness, plan.wallThickness),
     ceilingHeight: positiveOr(effectivePatch.height, plan.ceilingHeight),
   };
@@ -852,8 +856,9 @@ function subtractSegments(start: Point, end: Point, cuts: readonly [Point, Point
   return pieces;
 }
 
-/** Maps a point lying on the old segment to the same place along the new
- * one; any other point is returned unchanged. */
+/** Maps a point lying on the old segment to the same distance from the
+ * start along the new one — a move carries it, lengthening the wall leaves
+ * it where it was measured from; any other point is returned unchanged. */
 function attachedTo(oldStart: { x: number; y: number }, oldEnd: { x: number; y: number }, newStart: { x: number; y: number }, newEnd: { x: number; y: number }, tolerance: number) {
   const dx = oldEnd.x - oldStart.x;
   const dy = oldEnd.y - oldStart.y;
@@ -864,7 +869,11 @@ function attachedTo(oldStart: { x: number; y: number }, oldEnd: { x: number; y: 
     if (t < -0.001 || t > 1.001) return point;
     const off = Math.abs((point.x - oldStart.x) * dy - (point.y - oldStart.y) * dx) / Math.sqrt(lengthSquared);
     if (off > tolerance) return point;
-    return { x: micron(newStart.x + (newEnd.x - newStart.x) * t), y: micron(newStart.y + (newEnd.y - newStart.y) * t) };
+    const oldLength = Math.sqrt(lengthSquared);
+    const newLength = Math.hypot(newEnd.x - newStart.x, newEnd.y - newStart.y);
+    if (!newLength) return { x: micron(newStart.x), y: micron(newStart.y) };
+    const along = Math.min(Math.max(0, t) * oldLength, newLength);
+    return { x: micron(newStart.x + ((newEnd.x - newStart.x) / newLength) * along), y: micron(newStart.y + ((newEnd.y - newStart.y) / newLength) * along) };
   };
 }
 

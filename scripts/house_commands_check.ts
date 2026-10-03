@@ -204,7 +204,7 @@ assert.ok(deleteHouseSelections(editable.project, [triangleWall], { footprintEdi
   assert.ok(lockConflict(lockedLeft, left), "a locked wall reports itself");
   const refused = moveHouseSelections(lockedLeft, [top], 0, -500, { footprintEditable: true });
   assert.equal(refused.project, lockedLeft, "a move that would stretch a locked wall does nothing");
-  assert.match(refused.blocked.join(" "), /locked wall next to it/);
+  assert.match(refused.blocked.join(" "), /locked wall joined to it/);
   assert.equal(lockConflict(lockedLeft, right), null, "the lock reaches only the walls it touches");
   assert.deepEqual(moveHouseSelections(lockedLeft, [right], 300, 0, { footprintEditable: true }).blocked, []);
   const kept = deleteHouseSelections(pinHouseSelections(base, [top], true), [top], { footprintEditable: true });

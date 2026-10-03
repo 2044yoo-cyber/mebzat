@@ -117,12 +117,12 @@ export function lockConflict(project: HouseProject, selection: HouseSelection): 
   if (project.objectInstances[selection.id]?.pinned) return `This ${selection.kind} is locked — unlock it to change it`;
   if (selection.kind !== "wall") return null;
   const wall = project.walls.find((item) => item.id === selection.id);
-  const corners = project.levels.find((item) => item.id === wall?.levelId)?.plan?.corners ?? [];
-  const index = corners.findIndex((corner) => corner.id === wall?.sourceWallId);
-  if (!wall || index < 0) return null;
-  const neighbours = [corners[(index - 1 + corners.length) % corners.length]!.id, corners[(index + 1) % corners.length]!.id];
-  const locked = project.walls.some((item) => item.levelId === wall.levelId && item.id !== wall.id && neighbours.includes(item.sourceWallId ?? "") && project.objectInstances[item.id]?.pinned);
-  return locked ? "A locked wall next to it would have to change — unlock it first" : null;
+  if (!wall) return null;
+  // Any wall with an end on this one changes with it: the neighbours that
+  // share its corners, and walls meeting it in a T.
+  const attached = project.walls.filter((item) => item.levelId === wall.levelId && item.id !== wall.id
+    && [item.start, item.end].some((point) => pointSegmentDistance(point, wall.start, wall.end) <= wall.thickness / 2 + 5));
+  return attached.some((item) => project.objectInstances[item.id]?.pinned) ? "A locked wall joined to it would have to change — unlock it first" : null;
 }
 
 export function moveHouseSelections(project: HouseProject, selections: readonly HouseSelection[], dx: number, dy: number, options?: { footprintEditable?: boolean }): HouseCommandMutation {

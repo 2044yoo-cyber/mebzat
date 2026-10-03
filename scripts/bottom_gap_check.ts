@@ -314,24 +314,40 @@ check("and the utility for it exists", /\.scroll-pb-content-safe\s*\{[\s\S]{0,90
   );
 
   // The viewer only gets that space if the chain above it still resolves.
+  //
+  // Since "Fix Sketch 3D mobile viewport width" (528986f) the phone layout no
+  // longer stretches a flex column to the screen: the viewer is a sticky box
+  // with an explicit height, and only from @4xl does it fill a flex column.
+  // These assertions follow that design; they are anchored to the viewer's
+  // own class list so a sibling with similar classes cannot satisfy them.
   const studio = code("src/features/berchuma-studio/components/studio-workspace.tsx");
-  check("the studio fills its column", /className="flex h-full flex-col"/.test(studio));
-  check("the design column can shrink below its content", /flex min-h-0 flex-col/.test(studio));
-  check("and the editor takes what is left", /<div className="min-h-0 flex-1">/.test(studio));
+  check(
+    "the editor takes what is left of the design column",
+    /<div className="w-full min-w-0 max-w-full flex-1 overflow-x-hidden @4xl\/ws:min-h-0">/.test(studio),
+  );
 
   const editor = code("src/features/berchuma-studio/components/editor/design-editor.tsx");
-  // The controls are drawn over the drawing rather than stacked above it,
-  // which is what lets the viewer have the whole column.
-  check("the view controls overlay the viewer", /pointer-events-none absolute inset-x-0 top-0/.test(editor));
-  check("and so does the dimensions readout", /pointer-events-none absolute inset-x-0 bottom-0/.test(editor));
+  const viewer = editor.slice(editor.indexOf('"sticky top-0 z-10 w-full'), editor.indexOf('"sticky top-0 z-10 w-full') + 400);
+  check("the viewer has an explicit height on a phone", /"h-\[var\(--studio-viewport,60dvh\)\]"/.test(viewer));
+  check(
+    "and fills its column from @4xl",
+    /"@4xl\/ws:relative @4xl\/ws:z-auto @4xl\/ws:h-full @4xl\/ws:min-h-0 @4xl\/ws:w-auto @4xl\/ws:flex-1"/.test(viewer),
+  );
   // Two elements use `absolute inset-0` here — the drawing and the mobile
   // panel's backdrop — so a bare match went on passing after the drawing lost
-  // it. Anchored to the drawing's own wrapper, which is the child of the
-  // `relative min-h-0 flex-1` column.
+  // it. Anchored to the viewer's own first child.
   check(
     "the drawing itself fills its box",
-    /relative min-h-0 flex-1">\s*<div className="absolute inset-0">/.test(editor),
+    /@4xl\/ws:flex-1",\s*\)\}\s*>\s*<div className="absolute inset-0 w-full min-w-0 max-w-full overflow-hidden">/.test(editor),
   );
+  // The controls are drawn over the drawing rather than stacked above it,
+  // which is what lets the viewer have the whole column. On a phone the bar
+  // takes touches so it can scroll sideways; from @4xl it lets them through.
+  check(
+    "the view controls overlay the viewer, and let the drawing be touched where there is room",
+    /className="pointer-events-auto absolute inset-x-0 top-0 [^"]*@4xl\/ws:pointer-events-none/.test(editor),
+  );
+  check("and so does the dimensions readout", /pointer-events-none absolute inset-x-0 bottom-0/.test(editor));
 }
 
 // ---------------------------------------------------------------------------

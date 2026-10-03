@@ -295,7 +295,7 @@ try {
     assert.equal(await field("length").inputValue(), "6500", `${at}: or to take a typed length`);
     await tapAt(2000, 0);
     await drag([2000, 0], [2000, -500]);
-    assert.match(await toasts(), /locked wall next to it/, `${at}: and so does its neighbour`);
+    assert.match(await toasts(), /locked wall joined to it/, `${at}: and so does its neighbour`);
     await tapAt(0, 1500);
     assert.equal(await field("length").inputValue(), "6500", `${at}: nothing moved`);
 
@@ -419,20 +419,50 @@ async function checkRoomsAndRoofs(page, at, { touch }) {
     const top = Math.max(...points.map((point) => point.y));
     const ridge = points.filter((point) => Math.abs(point.y - top) < 1e-4);
     const span = (values) => Math.max(...values) - Math.min(...values);
-    return { width: span(points.map((point) => point.x)), depth: span(points.map((point) => point.z)), eaves: Math.min(...points.map((point) => point.y)), top, ridge: span(ridge.map((point) => point.x)), wallTop: walls.max.y };
+    const eaves = Math.min(...points.map((point) => point.y));
+    const underside = points.filter((point) => Math.abs(point.y - eaves) < 1e-4);
+    return { width: span(underside.map((point) => point.x)), depth: span(underside.map((point) => point.z)), eaves, top, ridge: span(ridge.map((point) => point.x)), wallTop: walls.max.y };
   });
   const near = (a, b) => Math.abs(a - b) < 0.005;
-  const rise = Math.tan(25 * Math.PI / 180) * 7.3 / 2;
+  const slope = 25 * Math.PI / 180;
+  const rise = Math.tan(slope) * 7.3 / 2 + Math.cos(slope) * 0.18;
   await roofType.selectOption("gable");
   const gable = await roof();
   assert.ok(near(gable.width, 8.8) && near(gable.depth, 7.3), `${at}: a gable roof covers the house and its overhang (${gable.width} x ${gable.depth})`);
   assert.ok(near(gable.eaves, gable.wallTop), `${at}: its eaves sit on the walls`);
-  assert.ok(near(gable.top - gable.eaves, rise), `${at}: and it rises at its 25° slope`);
+  assert.ok(near(gable.top - gable.eaves, rise), `${at}: and it rises at its 25° slope, 180 mm thick (${gable.top - gable.eaves})`);
   assert.ok(near(gable.ridge, 8.8), `${at}: with a ridge the full length — gable ends`);
   await roofType.selectOption("hip");
   const hip = await roof();
   assert.ok(near(hip.width, 8.8) && near(hip.depth, 7.3) && near(hip.eaves, hip.wallTop) && near(hip.top - hip.eaves, rise), `${at}: a hipped roof the same size and pitch`);
-  assert.ok(near(hip.ridge, 1.5), `${at}: but its ridge stops short, every side sloping (${hip.ridge})`);
+  assert.ok(near(hip.ridge, 1.5 + 2 * Math.sin(slope) * 0.18), `${at}: but its ridge stops short, every side sloping (${hip.ridge})`);
+
+  // An L-shaped house, outlined with the Room tool on blank space, is roofed
+  // as its two wings, not as one box over the gap.
+  await page.reload();
+  await page.getByRole("radio", { name: /Draw rooms/ }).click();
+  await page.getByRole("button", { name: "Start drawing rooms" }).click();
+  await page.locator(PLAN).waitFor();
+  await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
+  await page.getByRole("radio", { name: "L shape" }).click();
+  await drag([0, 0], [8000, 6000]);
+  await rail.getByRole("button", { name: "Select", exact: true }).click();
+  await page.getByRole("button", { name: "Both", exact: true }).click();
+  await page.waitForFunction(() => [...window.__scenes].some((scene) => scene.getObjectByName("main-roof")), null, { timeout: 15000 });
+  const lObject = page.locator("#house-properties select").first();
+  await lObject.selectOption(await lObject.locator("option", { hasText: /^Roof/ }).first().getAttribute("value"));
+  await page.locator("#house-properties select").filter({ has: page.locator('option[value="gable"]') }).selectOption("hip");
+  const wings = await page.evaluate(() => {
+    const scene = [...window.__scenes].filter((item) => item.getObjectByName("main-roof")).at(-1);
+    scene.updateMatrixWorld(true);
+    const roofs = [];
+    scene.getObjectByName("main-roof").traverse((mesh) => { if (mesh.isMesh) roofs.push(new window.__THREE.Box3().setFromObject(mesh)); });
+    const walls = new window.__THREE.Box3().setFromObject(scene.getObjectByName("walls:ground-floor"));
+    return { count: roofs.length, wallTop: walls.max.y, eaves: Math.min(...roofs.map((box) => box.min.y)), width: Math.max(...roofs.map((box) => box.max.x)) - Math.min(...roofs.map((box) => box.min.x)), depth: Math.max(...roofs.map((box) => box.max.z)) - Math.min(...roofs.map((box) => box.min.z)) };
+  });
+  assert.equal(wings.count, 2, `${at}: an L-shaped house gets a roof over each wing`);
+  assert.ok(near(wings.eaves, wings.wallTop), `${at}: on its walls`);
+  assert.ok(wings.width > 8.8 && wings.width < 9.2 && wings.depth > 6.8 && wings.depth < 7.2, `${at}: covering the L and its overhang (${wings.width.toFixed(2)} x ${wings.depth.toFixed(2)})`);
 }
 
 /**
@@ -556,7 +586,7 @@ async function checkThreeD(page, at, { touch, tapAt }) {
 async function checkStart(page, at) {
   await page.reload();
   const choices = page.getByRole("radiogroup", { name: "How to start" }).getByRole("radio");
-  assert.deepEqual((await choices.allInnerTexts()).map((text) => text.split("\n")[0]), ["Draw manually", "Draw rooms", "Upload floor plan", "Upload hand sketch", "Use a template"], `${at}: five ways to start`);
+  assert.deepEqual((await choices.allInnerTexts()).map((text) => text.split("\n")[0]), ["Draw manually", "Draw rooms", "Upload floor plan", "Upload hand sketch", "Use a template", "Describe it (AI)"], `${at}: six ways to start`);
   assert.ok(await page.getByRole("button", { name: "Draw floor plan", exact: true }).isVisible() && await page.getByRole("button", { name: "Draw floor plan", exact: true }).evaluate((element) => element.getBoundingClientRect().bottom <= innerHeight), `${at}: the choices and the way on fit one screen`);
   await page.getByRole("radio", { name: /Upload floor plan/ }).click();
   assert.ok(await page.getByRole("button", { name: "Convert with AI" }).isDisabled(), `${at}: nothing to convert until a plan is uploaded`);
@@ -573,6 +603,31 @@ async function checkStart(page, at) {
   assert.equal(options.filter((text) => /^Wall \d+$/.test(text)).length, 7, `${at}: a template arrives with its walls`);
   assert.equal(options.filter((text) => /^Door/.test(text)).length, 4, `${at}: doors`);
   assert.equal(options.filter((text) => /^Window/.test(text)).length, 4, `${at}: and windows`);
+
+  // Describe it (AI). No model is reachable here, so the endpoint answers as
+  // a model's checked plan would; what is tested is everything around it.
+  const plan = { version: 1, corners: [{ id: "c1", x: 0, y: 0 }, { id: "c2", x: 9000, y: 0 }, { id: "c3", x: 9000, y: 7000 }, { id: "c4", x: 0, y: 7000 }], wallThickness: 200, ceilingHeight: 2800, openings: [{ id: "o1", kind: "door", wallId: "c3", offset: 4000, width: 1000, height: 2100, sill: 0, swing: "in-right", label: "Entrance" }], runWalls: [], interiorWalls: [{ id: "iw1", start: { x: 4500, y: 0 }, end: { x: 4500, y: 7000 }, thickness: 120, height: 2800, label: "Interior wall" }], zones: [{ id: "r1", name: "Bedroom", boundary: [{ x: 0, y: 0 }, { x: 4500, y: 0 }, { x: 4500, y: 7000 }, { x: 0, y: 7000 }], floorMaterial: "Unspecified", wallMaterial: "Paint", ceilingMaterial: "Gypsum board" }, { id: "r2", name: "Living", boundary: [{ x: 4500, y: 0 }, { x: 9000, y: 0 }, { x: 9000, y: 7000 }, { x: 4500, y: 7000 }], floorMaterial: "Unspecified", wallMaterial: "Paint", ceilingMaterial: "Gypsum board" }], planColumns: [], planStairs: [], dimensions: [], planPlatforms: [] };
+  let sent = null;
+  let answer = { status: 502, body: { error: "A plan could not be drawn from that description. Try again, or draw it yourself." } };
+  await page.route("**/api/house-design/generate-plan", async (route) => { sent = route.request().postDataJSON(); await route.fulfill({ status: answer.status, contentType: "application/json", body: JSON.stringify(answer.body) }); });
+  await page.reload();
+  await page.getByRole("radio", { name: /Describe it/ }).click();
+  assert.ok(await page.getByRole("button", { name: "Generate plan" }).isDisabled(), `${at}: nothing to generate from yet`);
+  const wish = "A two-room house about 9 by 7 metres: a bedroom and a living room";
+  await page.getByLabel("House description").fill(wish);
+  await page.getByRole("button", { name: "Generate plan" }).click();
+  await page.locator("[data-sonner-toast]").first().waitFor();
+  assert.equal(sent?.description, wish, `${at}: the description is what is sent`);
+  assert.equal(await page.locator(PLAN).count(), 0, `${at}: a failed generation invents nothing — still choosing how to start`);
+  assert.equal(await page.getByLabel("House description").inputValue(), wish, `${at}: with the description kept to try again`);
+  answer = { status: 200, body: { plan, confidence: 0.8, notes: ["Assumed a single storey."] } };
+  await page.getByRole("button", { name: "Generate plan" }).click();
+  await page.locator(PLAN).waitFor();
+  const drawn = await page.evaluate(() => [...document.querySelectorAll("#house-properties option")].map((option) => option.textContent));
+  assert.equal(drawn.filter((text) => /^Wall \d+$/.test(text)).length, 5, `${at}: the generated plan opens to be checked, walls and all`);
+  assert.equal(await page.locator('svg[aria-label="Floor plan"] polygon').filter({ hasNot: page.locator("x") }).evaluateAll((polygons) => polygons.filter((polygon) => (polygon.getAttribute("class") ?? "").includes("fill-sky")).length), 2, `${at}: with its rooms`);
+  assert.match(await page.locator("#workspace").innerText(), /Assumed a single storey/, `${at}: and the AI's assumptions shown`);
+  await page.unroute("**/api/house-design/generate-plan");
 }
 
 /**

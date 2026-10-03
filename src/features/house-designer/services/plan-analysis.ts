@@ -71,6 +71,19 @@ export const detectedHousePlanSchema = z.object({
 
 export type DetectedHousePlan = z.infer<typeof detectedHousePlanSchema>;
 
+/** The JSON a model returns for a plan, read from a drawing or designed from
+ * a description — one shape, one converter, one set of checks. */
+export const DETECTED_PLAN_SHAPE = `{"outerBoundary":[{"id":"c1","x":0,"y":0},{"id":"c2","x":8000,"y":0},{"id":"c3","x":8000,"y":6500},{"id":"c4","x":0,"y":6500}],"wallThickness":150,"ceilingHeight":2700,"interiorWalls":[{"id":"iw1","start":{"x":4000,"y":0},"end":{"x":4000,"y":6500},"thickness":150,"height":2700,"label":"Interior wall"}],"rooms":[{"id":"r1","name":"Living room","boundary":[{"x":0,"y":0},{"x":4000,"y":0},{"x":4000,"y":6500},{"x":0,"y":6500}]}],"openings":[{"id":"o1","kind":"door","wallId":"c1","offset":1000,"width":900,"height":2100,"sill":0,"swing":"in-left","label":"Entry"}],"columns":[{"id":"col1","x":4000,"y":3250,"width":300,"depth":300}],"stairs":[{"id":"s1","x":6000,"y":3000,"width":1000,"length":3000,"rotation":0}],"dimensions":[{"id":"d1","start":{"x":0,"y":0},"end":{"x":8000,"y":0},"label":"8000"}],"platforms":[{"id":"p1","kind":"balcony","x":4000,"y":-600,"width":3000,"depth":1200,"rotation":0,"wallId":"c1","label":"Balcony"}],"confidence":0.8,"notes":[]}`;
+
+/** Why a plan description cannot be sent, or null when it can. */
+export function planDescriptionError(value: unknown): string | null {
+  if (typeof value !== "string") return "Describe the house you want.";
+  const text = value.trim();
+  if (text.length < 10) return "Say a little more — rooms, size, floors.";
+  if (text.length > 2000) return "Keep the description under 2000 characters.";
+  return null;
+}
+
 export function detectedPlanToRoom(input: unknown, options?: { ceilingHeight?: number; reference?: Room["reference"] }): { room: Room; confidence: number; notes: string[] } {
   const detected = detectedHousePlanSchema.parse(input);
   const aliases = new Map<string, string>();

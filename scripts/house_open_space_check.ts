@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room";
-import { createHouseObjectFromGesture, createRoomFromGesture, moveHouseSelections, roomOutline } from "../src/features/house-designer/services/model-commands";
+import { createHouseObjectFromGesture, createRoomFromGesture, lockConflict, moveHouseSelections, pinHouseSelections, roomOutline } from "../src/features/house-designer/services/model-commands";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
 import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong } from "../src/features/house-designer/services/project-edit";
 import { PLAN_TEMPLATES } from "../src/features/house-designer/services/plan-templates";
-import { pitchedRise } from "../src/features/house-designer/components/house-preview";
+import { pitchedRise, roofRectangles } from "../src/features/house-designer/components/house-preview";
 import { applyModelingOptions, modelingPreset } from "../src/features/house-designer/services/workspace-options";
 import { createHouseProject, houseProjectSchema } from "../src/features/house-designer/types/project";
 
@@ -104,6 +104,22 @@ assert.deepEqual(moved.blocked, [], "and its walls move");
   assert.deepEqual(boxes(moved), ["0..4000 x 0..6500", "4000..8000 x 0..3000", "4000..8000 x 3000..6500"], "and the rooms it bounds");
   assert.deepEqual(moved.levels[0]!.plan!.corners, tee.project.levels[0]!.plan!.corners, "the outside corners stay where they were");
 
+  // An outside wall carries what is joined to it too.
+  const topWall = tee.project.walls.find((item) => item.levelId === ground && item.start.y === 0 && item.end.y === 0 && item.sourceWallId === "c1")!;
+  const raised = moveHouseSelections(tee.project, [{ kind: "wall", id: topWall.id }], 0, -500, { footprintEditable: true }).project;
+  assert.deepEqual(find(raised, across.id).start, { x: 3000, y: -500 }, "moving an outside wall carries the inside wall joined to it");
+  assert.deepEqual(boxes(raised), ["0..3000 x -500..6500", "3000..8000 x -500..3000", "3000..8000 x 3000..6500"], "and the rooms along it");
+  const longer = patchHouseObject(tee.project, { kind: "wall", id: topWall.id }, { length: 9000 });
+  assert.deepEqual(find(longer, across.id).start, { x: 3000, y: 0 }, "lengthening a wall leaves a joined wall where it was measured from");
+
+  // A lock holds for walls joined in a T as well as at corners.
+  const lockedInside = pinHouseSelections(tee.project, [{ kind: "wall", id: across.id }], true);
+  assert.ok(lockConflict(lockedInside, { kind: "wall", id: topWall.id }), "an outside wall cannot drag a locked inside wall");
+  assert.equal(moveHouseSelections(lockedInside, [{ kind: "wall", id: topWall.id }], 0, -500, { footprintEditable: true }).blocked.length, 1);
+  const lockedTee = pinHouseSelections(tee.project, [{ kind: "wall", id: tee.id }], true);
+  assert.equal(moveHouseSelections(lockedTee, [{ kind: "wall", id: across.id }], 1000, 0).blocked.length, 1, "nor an inside wall a locked wall meeting it");
+  assert.equal(lockConflict(lockedTee, { kind: "wall", id: topWall.id }), null, "but a wall the locked one does not touch is free");
+
   const right = moved.rooms.filter((item) => item.levelId === ground && item.boundary.some((point) => point.x === 8000));
   const merged = mergeRooms(moved, right[0]!.id, right[1]!.id);
   assert.equal(merged.blocked, null);
@@ -143,6 +159,15 @@ assert.deepEqual(moved.blocked, [], "and its walls move");
   const roof = drawn.roofs[0]!;
   assert.ok(Math.abs(pitchedRise({ slope: 25, height: 300 }, 8800, 7300) - Math.tan((25 * Math.PI) / 180) * 3650) < 0.001, "rise = tan(slope) x half the shorter span");
   assert.equal(pitchedRise({ slope: 0, height: 420 }, 8800, 7300), 420, "a roof with no slope keeps its stated height");
+  // Roof shapes follow the outline: an L is two overlapping rectangles.
+  assert.deepEqual(roofRectangles(roomOutline("rectangle", { x: 0, y: 0 }, { x: 8000, y: 6500 })), [{ minX: 0, maxX: 8000, minY: 0, maxY: 6500 }], "a rectangle is one roof");
+  const ell = roofRectangles(roomOutline("l-shape", { x: 0, y: 0 }, { x: 8000, y: 6000 }))!;
+  assert.equal(ell.length, 2, "an L is roofed as two rectangles");
+  const covers = (x: number, y: number) => ell.some((part) => x >= part.minX && x <= part.maxX && y >= part.minY && y <= part.maxY);
+  assert.ok(covers(500, 500) && covers(7500, 1000) && covers(500, 5500), "that cover all of it");
+  assert.ok(!covers(7000, 5000), "and nothing outside it");
+  assert.equal(roofRectangles([{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 2000, y: 3000 }]), null, "an outline with an angled wall falls back to its bounding rectangle");
+
   const parapets = (value: typeof drawn) => value.facadeElements.filter((item) => item.type === "parapet").length;
   assert.ok(parapets(drawn) > 0, "a flat roof is edged by a parapet");
   const gable = patchHouseObject(drawn, { kind: "roof", id: roof.id }, { type: "gable", slope: 25 });

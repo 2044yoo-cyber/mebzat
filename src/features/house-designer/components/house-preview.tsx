@@ -446,19 +446,67 @@ function RoofMesh({ roof, bounds, color, selected, onSelect }: { roof: HouseRoof
     );
   }
 
-  const width = roofBounds.width + roof.overhang * 2;
-  const depth = roofBounds.depth + roof.overhang * 2;
-  const centreX = (roofBounds.minX + roofBounds.maxX) / 2;
-  const centreY = (roofBounds.minY + roofBounds.maxY) / 2;
+  // An L or T is roofed as the rectangles it is made of, each with its own
+  // ridge, the way a wing's roof meets the main one.
+  const parts = roofRectangles(roof.boundary) ?? [{ minX: roofBounds.minX, minY: roofBounds.minY, maxX: roofBounds.maxX, maxY: roofBounds.maxY }];
   return (
-    <mesh
-      position={[(centreX - bounds.centreX) * MM, roof.elevation * MM, -(centreY - bounds.centreY) * MM]}
-      onClick={(event) => { event.stopPropagation(); onSelect(); }}
-    >
-      <PitchedRoofGeometry width={width * MM} depth={depth * MM} rise={pitchedRise(roof, width, depth) * MM} hip={roof.type === "hip"} />
-      <meshStandardMaterial color={colour} roughness={0.82} side={THREE.DoubleSide} />
-    </mesh>
+    <group onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+      {parts.map((part, index) => {
+        const width = part.maxX - part.minX + roof.overhang * 2;
+        const depth = part.maxY - part.minY + roof.overhang * 2;
+        return (
+          <mesh key={index} position={[((part.minX + part.maxX) / 2 - bounds.centreX) * MM, roof.elevation * MM, -((part.minY + part.maxY) / 2 - bounds.centreY) * MM]}>
+            <PitchedRoofGeometry width={width * MM} depth={depth * MM} rise={pitchedRise(roof, width, depth) * MM} thickness={roof.thickness * MM} hip={roof.type === "hip"} />
+            <meshStandardMaterial color={colour} roughness={0.82} side={THREE.DoubleSide} />
+          </mesh>
+        );
+      })}
+    </group>
   );
+}
+
+type Rectangle = { minX: number; minY: number; maxX: number; maxY: number };
+
+/**
+ * An outline with square corners as overlapping rectangles that together
+ * cover it: the largest first, then the largest still reaching something
+ * uncovered. Null when a wall runs at an angle — that roof keeps its
+ * bounding rectangle.
+ */
+export function roofRectangles(boundary: readonly { x: number; y: number }[]): Rectangle[] | null {
+  const square = boundary.every((point, index) => { const next = boundary[(index + 1) % boundary.length]!; return Math.abs(point.x - next.x) < 1 || Math.abs(point.y - next.y) < 1; });
+  if (!square) return null;
+  const xs = [...new Set(boundary.map((point) => Math.round(point.x)))].sort((a, b) => a - b);
+  const ys = [...new Set(boundary.map((point) => Math.round(point.y)))].sort((a, b) => a - b);
+  const inside = (x: number, y: number) => {
+    let result = false;
+    for (let index = 0, previous = boundary.length - 1; index < boundary.length; previous = index, index += 1) {
+      const a = boundary[index]!;
+      const b = boundary[previous]!;
+      if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) result = !result;
+    }
+    return result;
+  };
+  const cells = xs.slice(0, -1).map((x, i) => ys.slice(0, -1).map((y, j) => inside((x + xs[i + 1]!) / 2, (y + ys[j + 1]!) / 2)));
+  const covered = cells.map((column) => column.map(() => false));
+  const rectangles: Rectangle[] = [];
+  for (let guard = 0; guard < 32 && cells.some((column, i) => column.some((cell, j) => cell && !covered[i]![j])); guard += 1) {
+    let best: { i0: number; i1: number; j0: number; j1: number; area: number } | null = null;
+    for (let i0 = 0; i0 < cells.length; i0 += 1) for (let i1 = i0; i1 < cells.length; i1 += 1) {
+      for (let j0 = 0; j0 < cells[0]!.length; j0 += 1) for (let j1 = j0; j1 < cells[0]!.length; j1 += 1) {
+        let full = true;
+        let fresh = false;
+        for (let i = i0; i <= i1 && full; i += 1) for (let j = j0; j <= j1; j += 1) { if (!cells[i]![j]) { full = false; break; } if (!covered[i]![j]) fresh = true; }
+        if (!full || !fresh) continue;
+        const area = (xs[i1 + 1]! - xs[i0]!) * (ys[j1 + 1]! - ys[j0]!);
+        if (!best || area > best.area) best = { i0, i1, j0, j1, area };
+      }
+    }
+    if (!best) break;
+    for (let i = best.i0; i <= best.i1; i += 1) for (let j = best.j0; j <= best.j1; j += 1) covered[i]![j] = true;
+    rectangles.push({ minX: xs[best.i0]!, maxX: xs[best.i1 + 1]!, minY: ys[best.j0]!, maxY: ys[best.j1 + 1]! });
+  }
+  return rectangles.length ? rectangles : null;
 }
 
 /** How high a pitched roof rises over its eaves: the slope across the
@@ -475,32 +523,60 @@ export function pitchedRise(roof: Pick<HouseRoof, "slope" | "height">, width: nu
  * vertical triangles. Hip: the ridge is shortened by half the span at each
  * end, so all four sides slope — on a square it becomes a pyramid.
  */
-function PitchedRoofGeometry({ width, depth, rise, hip }: { width: number; depth: number; rise: number; hip: boolean }) {
+function PitchedRoofGeometry({ width, depth, rise, thickness = 0, hip }: { width: number; depth: number; rise: number; thickness?: number; hip: boolean }) {
   const geometry = useMemo(() => {
     const alongX = width >= depth;
     const long = alongX ? width : depth;
     const short = alongX ? depth : width;
     const ridge = hip ? Math.max(0, (long - short) / 2) : long / 2;
-    const at = (along: number, across: number, y: number) => alongX ? [along, y, across] : [across, y, along];
+    const at = (along: number, across: number, y: number): Vec => alongX ? [along, y, across] : [across, y, along];
     const a = at(-long / 2, -short / 2, 0);
     const b = at(long / 2, -short / 2, 0);
     const c = at(long / 2, short / 2, 0);
     const d = at(-long / 2, short / 2, 0);
     const r1 = at(-ridge, 0, rise);
     const r2 = at(ridge, 0, rise);
-    const triangles = [
-      a, b, r2, a, r2, r1,
-      c, d, r1, c, r1, r2,
-      d, a, r1,
-      b, c, r2,
-    ].flat();
+    // Sloped faces are slabs of the roof's thickness, sitting on the walls;
+    // a gable's end stays a thin wall, not a slab.
+    const sloped: Vec[][] = [[a, b, r2, r1], [c, d, r1, r2]];
+    const ends: Vec[][] = [[d, a, r1], [b, c, r2]];
+    const triangles: number[] = [];
+    for (const face of hip ? [...sloped, ...ends] : sloped) triangles.push(...slab(face, thickness));
+    if (!hip) for (const face of ends) triangles.push(...fan(face));
     const result = new THREE.BufferGeometry();
     result.setAttribute("position", new THREE.Float32BufferAttribute(triangles, 3));
     result.computeVertexNormals();
     return result;
-  }, [width, depth, rise, hip]);
+  }, [width, depth, rise, thickness, hip]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   return <primitive object={geometry} attach="geometry" />;
+}
+
+type Vec = [number, number, number];
+
+function fan(face: readonly Vec[]): number[] {
+  const out: number[] = [];
+  for (let index = 1; index < face.length - 1; index += 1) out.push(...face[0]!, ...face[index]!, ...face[index + 1]!);
+  return out;
+}
+
+/** A planar face thickened along its upward normal: underside, top, edges. */
+function slab(face: readonly Vec[], thickness: number): number[] {
+  if (thickness <= 0) return fan(face);
+  const [p, q, r] = face;
+  const u = [q![0] - p![0], q![1] - p![1], q![2] - p![2]];
+  const v = [r![0] - p![0], r![1] - p![1], r![2] - p![2]];
+  let n = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+  const length = Math.hypot(n[0]!, n[1]!, n[2]!) || 1;
+  n = n.map((value) => value / length);
+  if (n[1]! < 0) n = n.map((value) => -value);
+  const top = face.map((point) => [point[0] + n[0]! * thickness, point[1] + n[1]! * thickness, point[2] + n[2]! * thickness] as Vec);
+  const out = [...fan(face), ...fan(top)];
+  for (let index = 0; index < face.length; index += 1) {
+    const next = (index + 1) % face.length;
+    out.push(...face[index]!, ...face[next]!, ...top[next]!, ...face[index]!, ...top[next]!, ...top[index]!);
+  }
+  return out;
 }
 
 function FacadeElementMesh({ element, project, bounds, selected, onSelect }: { element: HouseFacadeElement; project: HouseProject; bounds: Bounds; selected: boolean; onSelect: () => void }) {
