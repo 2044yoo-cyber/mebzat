@@ -70,6 +70,17 @@ export function BriefForm({
   const today = new Date().toISOString().slice(0, 10);
   const needsBudget = budgetKind !== "open";
 
+  // The Publish button disables silently on these two conditions — nothing
+  // else in the form blocks it. Named here, once, so the button and the
+  // sentence explaining why it is disabled can never disagree about what is
+  // actually missing.
+  const missingBeforePublish = [
+    title.trim().length < 6 ? "a project title (at least 6 characters)" : null,
+    description.trim().length < 20
+      ? "a description (at least 20 characters)"
+      : null,
+  ].filter((item): item is string => item !== null);
+
   function toggleSkill(slug: string) {
     setSkills((current) =>
       current.includes(slug)
@@ -127,7 +138,15 @@ export function BriefForm({
   return (
     <form onSubmit={submit} className="space-y-6">
       <Section title="What needs doing?">
-        <Field label="Project title" htmlFor="b-title">
+        <Field
+          label="Project title"
+          htmlFor="b-title"
+          hint={
+            title.trim().length < 6
+              ? `At least 6 characters (${title.trim().length}/6)`
+              : undefined
+          }
+        >
           <Input
             id="b-title"
             required
@@ -154,7 +173,15 @@ export function BriefForm({
           ))}
         </div>
 
-        <Field label="Describe the work" htmlFor="b-description">
+        <Field
+          label="Describe the work"
+          htmlFor="b-description"
+          hint={
+            description.trim().length < 20
+              ? `At least 20 characters (${description.trim().length}/20)`
+              : undefined
+          }
+        >
           <AiField
             id="b-description"
             required
@@ -393,13 +420,17 @@ export function BriefForm({
         </p>
       )}
 
+      {!pending && missingBeforePublish.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Add {joinWithAnd(missingBeforePublish)} to publish.
+        </p>
+      )}
+
       <div className="flex flex-wrap gap-3">
         <Button
           type="submit"
           size="lg"
-          disabled={
-            pending || title.trim().length < 6 || description.trim().length < 20
-          }
+          disabled={pending || missingBeforePublish.length > 0}
         >
           <Send className="size-4" />
           {pending ? "Publishing…" : "Publish and notify professionals"}
@@ -415,6 +446,11 @@ export function BriefForm({
       </div>
     </form>
   );
+}
+
+function joinWithAnd(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
 function Section({
@@ -435,16 +471,19 @@ function Section({
 function Field({
   label,
   htmlFor,
+  hint,
   children,
 }: {
   label: string;
   htmlFor: string;
+  hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
