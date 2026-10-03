@@ -38,6 +38,7 @@ import {
   HouseProjectBrowser,
   HouseRibbon,
   HouseMobileTools,
+  HouseMobileTopBar,
   HouseSchedulePanel,
   HouseSelectionActions,
   HouseShortcutHelp,
@@ -277,15 +278,15 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
   }
 
   return (
-    <main className="mx-auto w-full min-w-0 max-w-[1500px] overflow-x-hidden px-3 pb-44 pt-3 sm:px-5 md:pb-8">
-      <header className="mb-4 flex min-w-0 items-center justify-between gap-3 rounded-2xl border bg-card p-3 sm:p-4">
+    <main className="mx-auto w-full min-w-0 max-w-[1500px] overflow-x-hidden px-3 pb-6 pt-3 sm:px-5 md:pb-8">
+      <header className="mb-2 flex min-w-0 items-center justify-between gap-3 rounded-2xl border bg-card p-2 sm:mb-4 sm:p-4">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
-            <Building2 className="size-5" />
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand sm:size-10">
+            <Building2 className="size-4 sm:size-5" />
           </span>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold">House Design</h1>
-            <p className="truncate text-xs text-muted-foreground">
+            <h1 className="truncate text-sm font-semibold sm:text-lg">House Design</h1>
+            <p className="hidden truncate text-xs text-muted-foreground sm:block">
               Verified plan → structured data → editable 3D
             </p>
           </div>
@@ -584,6 +585,7 @@ function ModelScreen({
   const [draftStart, setDraftStart] = useState<HousePlanPoint | null>(null);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [viewRevision, setViewRevision] = useState(0);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [toolSettings, setToolSettings] = useState<HouseToolSettings>({
     wallType: "200 mm Exterior",
     locationLine: "Wall Centerline",
@@ -863,7 +865,21 @@ function ModelScreen({
 
   return (
     <HouseUnitsContext.Provider value={project.displayUnits ?? "mm"}><section className="min-w-0 space-y-3">
-      <div className="flex min-w-0 items-center justify-between gap-2 overflow-x-auto rounded-xl border bg-card p-2">
+      <HouseMobileTopBar
+        levels={project.levels}
+        activeLevelId={activeLevelId}
+        onLevel={chooseLevel}
+        view={view}
+        onView={onView}
+        canUndo={past.length > 0}
+        canRedo={future.length > 0}
+        onUndo={undo}
+        onRedo={redo}
+        moreOpen={mobileMoreOpen}
+        onToggleMore={() => setMobileMoreOpen((value) => !value)}
+      />
+
+      <div className={cn("flex min-w-0 items-center justify-between gap-2 overflow-x-auto rounded-xl border bg-card p-2", mobileMoreOpen ? "flex" : "hidden lg:flex")}>
         <div className="flex shrink-0 rounded-lg bg-muted p-1">
           {(["2d", "3d", "split"] as const).map((item) => (
             <button key={item} type="button" onClick={() => onView(item)} className={cn("rounded-md px-3 py-1.5 text-xs font-medium uppercase", view === item ? "bg-background text-brand shadow-sm" : "text-muted-foreground")}>{item === "split" ? "Split" : item}</button>
@@ -882,7 +898,7 @@ function ModelScreen({
         </div>
       </div>
 
-      <div className="flex min-w-0 gap-2 overflow-x-auto rounded-xl border bg-card p-2">
+      <div className={cn("flex min-w-0 gap-2 overflow-x-auto rounded-xl border bg-card p-2", mobileMoreOpen ? "flex" : "hidden lg:flex")}>
         {project.levels.map((level) => {
           const visible = visibleLevelIds.has(level.id);
           return (
@@ -920,15 +936,15 @@ function ModelScreen({
           onSearch={() => setPaletteOpen(true)}
           onHelp={() => setHelpOpen(true)}
         />
-        <HouseToolOptions activeTool={activeTool} project={project} levelId={activeLevelId} settings={toolSettings} onChange={(change) => setToolSettings((current) => ({ ...current, ...change }))} />
+        <div className={cn(mobileMoreOpen ? "block" : "hidden lg:block")}><HouseToolOptions activeTool={activeTool} project={project} levelId={activeLevelId} settings={toolSettings} onChange={(change) => setToolSettings((current) => ({ ...current, ...change }))} /></div>
       </div>
           <div className="hidden lg:block"><HouseSelectionActions selected={selected} onCommand={runCommand} /></div>
-          <div className="flex min-w-0 gap-1"><HouseMobileTools activeCategory={activeCategory} activeTool={activeTool} selectionCount={selections.length} canUndo={past.length > 0} canRedo={future.length > 0} onCommand={runCommand} />
+          <div className="flex min-w-0 gap-1"><HouseMobileTools activeTool={activeTool} selectionCount={selections.length} onCommand={runCommand} onMore={() => setPaletteOpen(true)} />
           <div className="min-w-0 flex-1">{viewportOpen ? <div className={cn("grid min-w-0 gap-3", view === "split" ? "lg:grid-cols-2" : "grid-cols-1")}>
             {view !== "3d" && activeRoom ? (
               <div className="relative h-[min(680px,68dvh)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 dark:bg-background">
                 <div className="pointer-events-none absolute inset-0"><PlanCanvas room={activeRoom} onChange={() => undefined} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} /></div>
-                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => commit(patchHouseObject(project, selection, patch), "Temporary dimension updated")} onGuidance={setGuidance} />
+                <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} chain={toolSettings.chain} viewRevision={viewRevision} onDraftStart={setDraftStart} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={setContextMenu} onDimensionChange={(selection, patch) => commit(patchHouseObject(project, selection, patch), "Temporary dimension updated")} onGuidance={setGuidance} />
                 <span className="absolute left-3 top-3 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>
               </div>
             ) : null}

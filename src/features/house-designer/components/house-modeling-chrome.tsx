@@ -3,23 +3,32 @@
 import { useMemo, useState } from "react";
 import {
   BoxSelect,
+  ChevronDown,
   Columns3,
   Copy,
   DoorOpen,
+  Footprints,
   Grid3X3,
   HelpCircle,
   Layers3,
+  LayoutGrid,
   Magnet,
+  MoreHorizontal,
+  Minus,
   PanelLeftClose,
   PanelLeftOpen,
   MousePointer2,
   Move,
   Redo2,
+  RectangleHorizontal,
   RotateCw,
+  Ruler,
   Search,
+  Sofa,
   Sparkles,
   Square,
   Trash2,
+  Triangle,
   Undo2,
 } from "lucide-react";
 
@@ -53,16 +62,33 @@ const icons: Partial<Record<HouseCommandId, React.ComponentType<{ className?: st
   undo: Undo2,
   redo: Redo2,
   delete: Trash2,
-  wall: Square,
+  wall: Minus,
+  room: LayoutGrid,
   door: DoorOpen,
-  window: Columns3,
+  window: RectangleHorizontal,
   column: Columns3,
+  stair: Footprints,
+  floor: Square,
+  roof: Triangle,
+  dimension: Ruler,
+  furniture: Sofa,
   grid: Grid3X3,
   move: Move,
   copy: Copy,
   rotate: RotateCw,
   "ai-remodel": Sparkles,
 };
+
+/**
+ * The tools a beginner actually needs on a phone — one flat row, not the six
+ * ribbon categories a desktop user gets. Everything else (Structure, Annotate
+ * beyond Dimension, Modify beyond what the context menu already offers, AI)
+ * lives behind More, which opens the same command search the desktop "⌘K"
+ * does rather than a second tool list to maintain.
+ */
+const MOBILE_PRIMARY_TOOLS: HouseCommandId[] = [
+  "select", "room", "wall", "door", "window", "column", "stair", "floor", "roof", "dimension", "furniture",
+];
 
 export function HouseRibbon({ activeCategory, activeTool, selectionCount, canUndo, canRedo, onCategory, onCommand, onSearch, onHelp }: {
   activeCategory: HouseCommandCategory;
@@ -107,15 +133,63 @@ export function HouseRibbon({ activeCategory, activeTool, selectionCount, canUnd
   );
 }
 
-export function HouseMobileTools({ activeCategory, activeTool, selectionCount, canUndo, canRedo, onCommand }: {
-  activeCategory: HouseCommandCategory; activeTool: HouseCommandId | null; selectionCount: number;
-  canUndo: boolean; canRedo: boolean; onCommand: (id: HouseCommandId) => void;
+export function HouseMobileTools({ activeTool, selectionCount, onCommand, onMore }: {
+  activeTool: HouseCommandId | null; selectionCount: number; onCommand: (id: HouseCommandId) => void; onMore: () => void;
 }) {
-  const commands = [...new Set<HouseCommandId>(["select", "undo", "redo", ...ribbonCommands[activeCategory]])];
-  return <nav aria-label="Modeling tools" className="sticky top-40 flex max-h-[62dvh] w-11 shrink-0 flex-col gap-1 self-start overflow-y-auto rounded-lg border bg-card p-0.5 lg:hidden">{commands.map((id) => {
+  return <nav aria-label="Modeling tools" className="sticky top-[calc(env(safe-area-inset-top)+7.5rem)] flex max-h-[70dvh] w-11 shrink-0 flex-col gap-1 self-start overflow-y-auto rounded-lg border bg-card p-0.5 lg:hidden">{MOBILE_PRIMARY_TOOLS.map((id) => {
     const command = houseCommand(id); const Icon = icons[id] ?? BoxSelect;
-    return <button key={id} type="button" aria-label={command.label} title={command.label} aria-pressed={activeTool === id} disabled={Boolean(command.selection && !selectionCount || id === "undo" && !canUndo || id === "redo" && !canRedo)} onClick={() => onCommand(id)} className={cn("flex min-h-11 shrink-0 flex-col items-center justify-center rounded-md text-muted-foreground active:bg-brand/20 disabled:opacity-30", activeTool === id && "bg-brand/15 text-brand")}><Icon className="size-4" /><span className="text-[8px] leading-3">{command.shortcut ?? command.label.slice(0, 5)}</span></button>;
-  })}</nav>;
+    return <button key={id} type="button" aria-label={command.label} title={command.label} aria-pressed={activeTool === id} disabled={Boolean(command.selection && !selectionCount)} onClick={() => onCommand(id)} className={cn("flex min-h-11 shrink-0 flex-col items-center justify-center rounded-md text-muted-foreground active:bg-brand/20 disabled:opacity-30", activeTool === id && "bg-brand/15 text-brand")}><Icon className="size-4" /><span className="text-[8px] leading-3">{command.shortcut ?? command.label.slice(0, 5)}</span></button>;
+  })}
+  <button type="button" aria-label="More tools" title="More tools" onClick={onMore} className="flex min-h-11 shrink-0 flex-col items-center justify-center rounded-md text-muted-foreground active:bg-brand/20"><MoreHorizontal className="size-4" /><span className="text-[8px] leading-3">More</span></button>
+  </nav>;
+}
+
+/**
+ * The ~48px mobile editing bar from the brief: floor switch, 2D/3D/Split,
+ * undo/redo, and a "more" toggle that reveals the secondary rows (units,
+ * snap, save, level visibility, tool options) the caller already renders —
+ * this component only orchestrates, it does not duplicate that chrome.
+ */
+export function HouseMobileTopBar({ levels, activeLevelId, onLevel, view, onView, canUndo, canRedo, onUndo, onRedo, moreOpen, onToggleMore }: {
+  levels: { id: string; name: string }[];
+  activeLevelId: string;
+  onLevel: (id: string) => void;
+  view: "2d" | "3d" | "split";
+  onView: (view: "2d" | "3d" | "split") => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  moreOpen: boolean;
+  onToggleMore: () => void;
+}) {
+  const [floorOpen, setFloorOpen] = useState(false);
+  const activeLevel = levels.find((level) => level.id === activeLevelId);
+  return (
+    <div className="sticky top-[calc(env(safe-area-inset-top)+0.25rem)] z-30 flex min-w-0 items-center gap-1 rounded-xl border bg-card p-1.5 lg:hidden">
+      <div className="relative shrink-0">
+        <button type="button" onClick={() => setFloorOpen((value) => !value)} aria-expanded={floorOpen} className="flex items-center gap-0.5 rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-muted">
+          <span className="max-w-20 truncate">{activeLevel?.name ?? "Floor"}</span>
+          <ChevronDown className="size-3.5" />
+        </button>
+        {floorOpen ? (
+          <div role="menu" className="absolute left-0 top-full z-40 mt-1 min-w-32 rounded-lg border bg-card p-1 shadow-lg">
+            {levels.map((level) => (
+              <button key={level.id} type="button" role="menuitem" onClick={() => { onLevel(level.id); setFloorOpen(false); }} className={cn("block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted", level.id === activeLevelId && "bg-brand/10 text-brand")}>{level.name}</button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 rounded-lg bg-muted p-0.5 text-[10px] font-medium uppercase">
+        {(["2d", "3d", "split"] as const).map((item) => (
+          <button key={item} type="button" onClick={() => onView(item)} className={cn("rounded px-2 py-1", view === item ? "bg-background text-brand shadow-sm" : "text-muted-foreground")}>{item === "split" ? "Both" : item}</button>
+        ))}
+      </div>
+      <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30"><Undo2 className="size-4" /></button>
+      <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30"><Redo2 className="size-4" /></button>
+      <button type="button" onClick={onToggleMore} aria-pressed={moreOpen} aria-label="More actions" className={cn("ml-auto shrink-0 rounded-lg p-1.5", moreOpen ? "bg-brand/15 text-brand" : "text-muted-foreground hover:bg-muted")}><MoreHorizontal className="size-4" /></button>
+    </div>
+  );
 }
 
 export type HouseToolSettings = {

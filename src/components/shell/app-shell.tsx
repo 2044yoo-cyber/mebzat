@@ -123,6 +123,11 @@ export function AppShell({
     return <div className="min-h-screen">{children}</div>;
   }
 
+  // The house designer is a full-screen drawing tool: the phone's bottom nav
+  // and the floating AI/quick-action buttons sit on top of the canvas and
+  // cover geometry a reader is trying to tap, so neither belongs here.
+  const isHouseDesigner = pathname.startsWith("/house-design");
+
   const signedIn = Boolean(profile);
   const navWidth = shell.navCollapsed ? 60 : shell.navWidth;
 
@@ -373,23 +378,26 @@ export function AppShell({
 
       {/* The floating controls belong to the workspace, so they clear the
           context panel instead of sitting on top of its footer. */}
-      <div
-        style={
-          {
-            // Below lg the panel floats over the workspace, so the buttons
-            // stay at the screen edge; from lg up they step aside for it.
-            "--fab-right": panelOpen ? `${shell.panelWidth}px` : "0px",
-          } as React.CSSProperties
-        }
-        className="pointer-events-none fixed right-4 bottom-[calc(var(--bottom-nav-h)+1rem)] z-40 flex flex-col items-end gap-3 lg:right-[var(--fab-right)] lg:bottom-0 lg:p-5 print:hidden"
-      >
-        <AiLauncher />
-        <QuickActions />
-      </div>
+      {!isHouseDesigner && (
+        <div
+          style={
+            {
+              // Below lg the panel floats over the workspace, so the buttons
+              // stay at the screen edge; from lg up they step aside for it.
+              "--fab-right": panelOpen ? `${shell.panelWidth}px` : "0px",
+            } as React.CSSProperties
+          }
+          className="pointer-events-none fixed right-4 bottom-[calc(var(--bottom-nav-h)+1rem)] z-40 flex flex-col items-end gap-3 lg:right-[var(--fab-right)] lg:bottom-0 lg:p-5 print:hidden"
+        >
+          <AiLauncher />
+          <QuickActions />
+        </div>
+      )}
 
       {/* The phone's navigation. Hidden from lg up, where the rail is a
-          permanent column and a second nav would be a duplicate. */}
-      <BottomNav signedIn={signedIn} />
+          permanent column and a second nav would be a duplicate — and hidden
+          here too, since the house designer needs the full screen. */}
+      {!isHouseDesigner && <BottomNav signedIn={signedIn} />}
 
       <CommandPalette />
     </div>

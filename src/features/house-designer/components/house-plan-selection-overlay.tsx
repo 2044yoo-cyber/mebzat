@@ -20,7 +20,7 @@ const pointTools = new Set<HouseCommandId>(["door", "window", "column", "room", 
 const MINOR_GRID = 1000;
 const MAJOR_GRID = MINOR_GRID * 5;
 
-export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
+export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
   project: HouseProject;
   levelId: string;
   activeTool: HouseCommandId | null;
@@ -28,6 +28,9 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   draftStart: HousePlanPoint | null;
   snapEnabled: boolean;
   chain: boolean;
+  /** Bumped by the "Zoom to Fit" command — re-fits the view on top of the
+   * usual reset when switching floors. */
+  viewRevision?: number;
   onDraftStart: (point: HousePlanPoint | null) => void;
   onDraft: (start: HousePlanPoint, end: HousePlanPoint) => void;
   onSelect: (items: HouseSelection[], mode: "replace" | "add" | "remove") => void;
@@ -42,8 +45,30 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   const bounds = useMemo(() => levelBounds(project, levelId), [levelId, project]);
   const objects = useMemo(() => selectableBounds(project, levelId), [levelId, project]);
   const candidates = useMemo(() => snapCandidates(project, levelId), [levelId, project]);
-  const margin = Math.max(500, Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.08);
-  const viewBox = `${bounds.minX} ${bounds.minY} ${bounds.maxX - bounds.minX} ${bounds.maxY - bounds.minY}`;
+
+  // The user's own pan/zoom, layered on top of the auto-fit `bounds`. `null`
+  // means "follow the auto-fit view" — the common case, and what a floor
+  // switch or Zoom to Fit returns to.
+  const [view, setView] = useState<Bounds | null>(null);
+  const [resetKey, setResetKey] = useState<[string, number]>([levelId, viewRevision ?? 0]);
+  if (resetKey[0] !== levelId || resetKey[1] !== (viewRevision ?? 0)) {
+    setResetKey([levelId, viewRevision ?? 0]);
+    setView(null);
+  }
+  const effective = view ?? bounds;
+
+  // Active touches, keyed by pointerId, so a second finger coming down is
+  // recognised as "start pinching" rather than "place a second wall point".
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ midX: number; midY: number; dist: number } | null>(null);
+
+  const margin = Math.max(500, Math.max(effective.maxX - effective.minX, effective.maxY - effective.minY) * 0.08);
+  const viewBox = `${effective.minX} ${effective.minY} ${effective.maxX - effective.minX} ${effective.maxY - effective.minY}`;
+  // The grid tiles forever, but the plain <rect> painting it has to end
+  // somewhere; a generous multiple of the model's own footprint covers any
+  // pan a person is likely to make without redrawing it every frame.
+  const gridSpan = Math.max(effective.maxX - effective.minX, effective.maxY - effective.minY, 8000) * 4;
+  const gridBounds = expand(bounds, gridSpan);
   const selectMode = !activeTool || activeTool === "select";
   const selectedIds = new Set(selections.map((item) => item.id));
 
@@ -52,6 +77,71 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     if (!matrix) return null;
     const result = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
     return { x: result.x, y: result.y };
+  }
+
+  function pinchState(): { midX: number; midY: number; dist: number } | null {
+    const touches = Array.from(pointers.current.values());
+    if (touches.length < 2) return null;
+    const [a, b] = touches;
+    return { midX: (a!.x + b!.x) / 2, midY: (a!.y + b!.y) / 2, dist: Math.max(1, Math.hypot(a!.x - b!.x, a!.y - b!.y)) };
+  }
+
+  /** Pinch to zoom, two fingers moving together to pan — the same gesture
+   * covers both, since a pan is just a pinch whose distance barely changes. */
+  function applyPinch() {
+    const next = pinchState();
+    const prev = pinch.current;
+    pinch.current = next;
+    if (!next || !prev || !svg.current) return;
+    const rect = svg.current.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    const base = view ?? bounds;
+    const width = base.maxX - base.minX;
+    const height = base.maxY - base.minY;
+    const span = Math.max(width, height, 1);
+    const maxSpan = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 8000) * 8;
+    const factor = clamp(prev.dist / next.dist, 300 / span, maxSpan / span);
+    const newWidth = width * factor;
+    const newHeight = height * factor;
+    const fracX = (prev.midX - rect.left) / rect.width;
+    const fracY = (prev.midY - rect.top) / rect.height;
+    const anchorX = base.minX + fracX * width;
+    const anchorY = base.minY + fracY * height;
+    const panX = (next.midX - prev.midX) * (newWidth / rect.width);
+    const panY = (next.midY - prev.midY) * (newHeight / rect.height);
+    const minX = anchorX - fracX * newWidth - panX;
+    const minY = anchorY - fracY * newHeight - panY;
+    setView({ minX, minY, maxX: minX + newWidth, maxY: minY + newHeight });
+  }
+
+  /** Mouse wheel zoom at the cursor; trackpad two-finger scroll pans (and a
+   * trackpad pinch arrives as wheel + ctrlKey, same as Google Maps reads it). */
+  function wheel(event: React.WheelEvent<SVGSVGElement>) {
+    event.preventDefault();
+    if (!svg.current) return;
+    const rect = svg.current.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    const base = view ?? bounds;
+    const width = base.maxX - base.minX;
+    const height = base.maxY - base.minY;
+    if (event.ctrlKey) {
+      const span = Math.max(width, height, 1);
+      const maxSpan = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 8000) * 8;
+      const factor = clamp(1 + event.deltaY * 0.01, 300 / span, maxSpan / span);
+      const fracX = (event.clientX - rect.left) / rect.width;
+      const fracY = (event.clientY - rect.top) / rect.height;
+      const anchorX = base.minX + fracX * width;
+      const anchorY = base.minY + fracY * height;
+      const newWidth = width * factor;
+      const newHeight = height * factor;
+      const minX = anchorX - fracX * newWidth;
+      const minY = anchorY - fracY * newHeight;
+      setView({ minX, minY, maxX: minX + newWidth, maxY: minY + newHeight });
+    } else {
+      const dx = event.deltaX * (width / rect.width);
+      const dy = event.deltaY * (height / rect.height);
+      setView({ minX: base.minX + dx, minY: base.minY + dy, maxX: base.maxX + dx, maxY: base.maxY + dy });
+    }
   }
 
   function snapped(raw: HousePlanPoint): SnapPoint {
@@ -82,6 +172,14 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   }
 
   function pointerDown(event: React.PointerEvent<SVGSVGElement>) {
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.current.size >= 2) {
+      // A second finger landing mid-drag means "I want to pan", not "place
+      // the next wall point" — the marquee it interrupted was never finished.
+      setDragStart(null);
+      pinch.current = pinchState();
+      return;
+    }
     if (event.button !== 0) return;
     const raw = modelPoint(event);
     if (!raw) return;
@@ -107,6 +205,8 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   }
 
   function pointerUp(event: React.PointerEvent<SVGSVGElement>) {
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size >= 1) return;
     if (!selectMode || !dragStart) return;
     const end = modelPoint(event) ?? dragStart;
     const distance = Math.hypot(end.x - dragStart.x, end.y - dragStart.y);
@@ -130,7 +230,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   const selectedColumn = selections.length === 1 && selections[0]?.kind === "column" ? project.structuralColumns.find((item) => item.id === selections[0]?.id) : null;
 
   return (
-    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onPointerCancel={() => setDragStart(null)}>
+    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); setDragStart(null); }} onWheel={wheel}>
       <defs>
         <pattern id={`${gridId}-minor`} width={MINOR_GRID} height={MINOR_GRID} patternUnits="userSpaceOnUse">
           <path d={`M ${MINOR_GRID} 0 L 0 0 0 ${MINOR_GRID}`} fill="none" strokeWidth={6} className="stroke-slate-300 dark:stroke-[#eef2f7]" />
@@ -140,7 +240,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
           <path d={`M ${MAJOR_GRID} 0 L 0 0 0 ${MAJOR_GRID}`} fill="none" strokeWidth={10} className="stroke-slate-400 dark:stroke-[#dbe3ec]" />
         </pattern>
       </defs>
-      <rect x={bounds.minX} y={bounds.minY} width={bounds.maxX - bounds.minX} height={bounds.maxY - bounds.minY} fill={`url(#${gridId}-major)`} pointerEvents="none" />
+      <rect x={gridBounds.minX} y={gridBounds.minY} width={gridBounds.maxX - gridBounds.minX} height={gridBounds.maxY - gridBounds.minY} fill={`url(#${gridId}-major)`} pointerEvents="none" />
       <ModelPlanGeometry project={project} levelId={levelId} />
       {objects.filter((object) => selectedIds.has(object.selection.id)).map((object) => {
         const line = lineGeometry(project, levelId, object.selection);
@@ -273,6 +373,7 @@ function toolName(tool: HouseCommandId) { return tool.split("-").map((word) => `
 function pointsBounds(points: HousePlanPoint[]): Bounds { const xs = points.map((item) => item.x); const ys = points.map((item) => item.y); return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) }; }
 function centred(x: number, y: number, width: number, depth: number): Bounds { return { minX: x - width / 2, minY: y - depth / 2, maxX: x + width / 2, maxY: y + depth / 2 }; }
 function expand(bounds: Bounds, amount: number): Bounds { return { minX: bounds.minX - amount, minY: bounds.minY - amount, maxX: bounds.maxX + amount, maxY: bounds.maxY + amount }; }
+function clamp(value: number, min: number, max: number): number { return Math.min(Math.max(value, Math.min(min, max)), Math.max(min, max)); }
 function normalized(a: HousePlanPoint, b: HousePlanPoint): Bounds { return { minX: Math.min(a.x, b.x), minY: Math.min(a.y, b.y), maxX: Math.max(a.x, b.x), maxY: Math.max(a.y, b.y) }; }
 function contains(a: Bounds, b: Bounds) { return b.minX >= a.minX && b.maxX <= a.maxX && b.minY >= a.minY && b.maxY <= a.maxY; }
 function intersects(a: Bounds, b: Bounds) { return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY; }

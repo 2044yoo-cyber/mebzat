@@ -366,6 +366,27 @@ check("and the utility for it exists", /\.scroll-pb-content-safe\s*\{[\s\S]{0,90
   check("its left border is desktop-only, since a sheet has no column beside it", /bg-background lg:border-l/.test(panel));
 }
 
+// ---------------------------------------------------------------------------
+// The house designer is a full-screen canvas
+//
+// The phone's bottom nav and the floating AI/quick-action buttons are fixed
+// chrome drawn on top of the workspace, so on this one route they cover
+// geometry a reader is trying to tap. Checked on call syntax, not merely the
+// `isHouseDesigner` identifier, since that constant could exist unused while
+// both pieces of chrome still render unconditionally underneath it.
+// ---------------------------------------------------------------------------
+
+{
+  check(
+    "the bottom nav is skipped on the house designer route",
+    /\{!isHouseDesigner && <BottomNav/.test(shell),
+  );
+  check(
+    "and so is the floating AI / quick-action stack",
+    /\{!isHouseDesigner && \(\s*<div[\s\S]{0,400}<AiLauncher \/>[\s\S]{0,80}<QuickActions \/>/.test(shell),
+  );
+}
+
 if (failures.length > 0) {
   console.log(`\n${RED}${failures.length} failed${RESET}`);
   for (const failure of failures) console.log(`  ${RED}✗${RESET} ${failure}`);
