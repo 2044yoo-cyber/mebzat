@@ -22,6 +22,7 @@ import { FeedMedia } from "@/components/feed/feed-media";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DemoBadge } from "@/components/ui/demo-badge";
 import { feedApi } from "@/lib/feed/client";
+import { samplePostMedia } from "@/lib/feed/sample-photos";
 import { FILE_LABEL, KIND_LABEL } from "@/lib/feed/constants";
 import type { FeedFile, FeedPost } from "@/lib/feed/types";
 import { cn, formatPrice, formatRelativeTime } from "@/lib/utils";
@@ -59,6 +60,8 @@ export function FeedCard({
   const [expanded, setExpanded] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
 
+  const media = samplePostMedia(post);
+  const hasGeneratedPhoto = media.some((item, index) => item.url !== post.media[index]?.url);
   const long = (post.body?.length ?? 0) > 220;
   const recordOpen = () => void feedApi.open(post.id, post.kind === "tour_360");
 
@@ -103,7 +106,11 @@ export function FeedCard({
       </div>
 
       {post.media.length > 0 && (
-        <FeedMedia media={post.media} priority={priority} />
+        <FeedMedia media={media} priority={priority} />
+      )}
+
+      {hasGeneratedPhoto && (
+        <p className="px-3 pt-1 text-[11px] text-muted-foreground">AI-generated illustration</p>
       )}
 
       <Detail post={post} onOpen={recordOpen} />
