@@ -1,0 +1,56 @@
+[
+  {
+    "name": "the logo goes back to being a link to the page you are on",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "        <button\n          type=\"button\"\n          onClick={onOpenMobileNav}\n          aria-label={t(\"common.openNavigation\")}\n          className=\"group relative mr-auto",
+    "to": "        <Link\n          href=\"/\"\n          aria-label={t(\"common.openNavigation\")}\n          className=\"group relative mr-auto"
+  },
+  {
+    "name": "the logo becomes a button that does nothing",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "          onClick={onOpenMobileNav}\n          aria-label={t(\"common.openNavigation\")}\n          className=\"group relative mr-auto",
+    "to": "          aria-label={t(\"common.openNavigation\")}\n          className=\"group relative mr-auto"
+  },
+  {
+    "name": "a screen reader is told nothing about what it does",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "          aria-label={t(\"common.openNavigation\")}\n          className=\"group relative mr-auto",
+    "to": "          aria-label=\"Medosha\"\n          className=\"group relative mr-auto"
+  },
+  {
+    "name": "one of the three lines is dropped",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "            {[0, 1, 2].map((index) => (\n              <span key={index} className={MENU_LINE} />\n            ))}",
+    "to": "            {[0, 1].map((index) => (\n              <span key={index} className={MENU_LINE} />\n            ))}"
+  },
+  {
+    "name": "the lines become opaque and cover the wordmark",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "bg-neutral-900/25 transition-colors",
+    "to": "bg-neutral-900 transition-colors"
+  },
+  {
+    "name": "the wash behind them turns solid",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "bg-gradient-to-l from-white/70 to-transparent",
+    "to": "bg-white"
+  },
+  {
+    "name": "the button loses `group`, so nothing under it reacts to a press",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "          className=\"group relative mr-auto h-12 w-32",
+    "to": "          className=\"relative mr-auto h-12 w-32"
+  },
+  {
+    "name": "the lines stop reacting to a press",
+    "file": "src/components/shell/topbar.tsx",
+    "from": " group-active:bg-neutral-900/60\";",
+    "to": "\";"
+  },
+  {
+    "name": "the ellipsis keeps a second copy of the menu button",
+    "file": "src/components/shell/topbar.tsx",
+    "from": "            <ThemeToggle />\n            <button type=\"button\"",
+    "to": "            <ThemeToggle />\n            <button type=\"button\" onClick={onOpenMobileNav} aria-label={t(\"common.openNavigation\")} className=\"flex size-10 items-center justify-center rounded-lg hover:bg-muted\"><Menu className=\"size-4\" /></button>\n            <button type=\"button\""
+  }
+]

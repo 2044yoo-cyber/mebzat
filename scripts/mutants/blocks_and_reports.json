@@ -1,0 +1,98 @@
+[
+  {
+    "name": "the block is not checked when a message is written",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "    and not public.is_blocked_by_anyone_in(conversation_id, auth.uid())",
+    "to": "    and true"
+  },
+  {
+    "name": "the block check looks at the wrong direction",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "      on b.blocker_id = cp.user_id\n     and b.blocked_id = sender",
+    "to": "      on b.blocked_id = cp.user_id\n     and b.blocker_id = sender"
+  },
+  {
+    "name": "a block by anybody anywhere silences the sender",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "    where cp.conversation_id = target_conversation\n      -- Belt and braces",
+    "to": "    where true\n      -- Belt and braces"
+  },
+  {
+    "name": "the helper stops being security definer, so the sender can defeat it",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "returns boolean\nlanguage sql\nstable\nsecurity definer",
+    "to": "returns boolean\nlanguage sql\nstable"
+  },
+  {
+    "name": "the participant check is dropped from the send policy",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "    and public.is_conversation_participant(conversation_id, auth.uid())",
+    "to": "    and true"
+  },
+  {
+    "name": "anybody can read anybody's block list",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "  using (blocker_id = auth.uid())\n  with check (blocker_id = auth.uid());",
+    "to": "  using (true)\n  with check (blocker_id = auth.uid());"
+  },
+  {
+    "name": "blocking yourself is allowed",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "  if target_user = auth.uid() then\n    raise exception 'You cannot block yourself.' using errcode = 'check_violation';\n  end if;",
+    "to": "  if false then\n    raise exception 'You cannot block yourself.' using errcode = 'check_violation';\n  end if;"
+  },
+  {
+    "name": "blocking leaves their entries in the bell",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "    and actor_id = target_user\n    and read_at is null;",
+    "to": "    and actor_id is null\n    and read_at is null;"
+  },
+  {
+    "name": "unblocking clears everybody's block",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "  where blocker_id = auth.uid() and blocked_id = target_user;",
+    "to": "  where blocked_id = target_user;"
+  },
+  {
+    "name": "unblocking does nothing",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "  delete from public.user_blocks\n  where blocker_id = auth.uid()",
+    "to": "  delete from public.user_blocks\n  where false and blocker_id = auth.uid()"
+  },
+  {
+    "name": "a reported person is filed as one of their pictures",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "    values ('profile', target_user, target_user, 'pending')",
+    "to": "    values ('profile_avatar', target_user, target_user, 'pending')"
+  },
+  {
+    "name": "every report opens a new moderation item",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "  select id into found_item\n  from public.moderation_items\n  where content_type = 'profile' and content_id = target_user",
+    "to": "  select id into found_item\n  from public.moderation_items\n  where false and content_type = 'profile' and content_id = target_user"
+  },
+  {
+    "name": "reporting yourself is allowed",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "  if target_user = auth.uid() then\n    raise exception 'You cannot report yourself.' using errcode = 'check_violation';\n  end if;",
+    "to": "  if false then\n    raise exception 'You cannot report yourself.' using errcode = 'check_violation';\n  end if;"
+  },
+  {
+    "name": "the block helpers are left open to a signed-out visitor",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "revoke all on function public.block_user(uuid, text) from public, anon;",
+    "to": "revoke all on function public.block_user(uuid, text) from public;"
+  },
+  {
+    "name": "the report helper is left open to a signed-out visitor",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "revoke all on function public.report_user(uuid, public.moderation_category, text)\n  from public, anon;",
+    "to": "revoke all on function public.report_user(uuid, public.moderation_category, text)\n  from public;"
+  },
+  {
+    "name": "the blocked-check helper is left open to a signed-out visitor",
+    "file": "supabase/migrations/0088_blocks_and_reports.sql",
+    "from": "revoke all on function public.is_blocked_by_anyone_in(uuid, uuid) from public, anon;",
+    "to": "revoke all on function public.is_blocked_by_anyone_in(uuid, uuid) from public;"
+  }
+]

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { ProjectForm } from "@/components/projects/project-form";
+import { companiesFor } from "@/lib/data/professionals";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Create Project" };
@@ -16,6 +17,8 @@ export default async function NewProjectPage() {
     redirect("/login");
   }
 
+  const companies = await companiesFor(user.id);
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
@@ -26,7 +29,7 @@ export default async function NewProjectPage() {
           Add photos and details to publish this project to your portfolio.
         </p>
       </div>
-      <ProjectForm userId={user.id} />
+      <ProjectForm userId={user.id} companies={companies} />
     </div>
   );
 }

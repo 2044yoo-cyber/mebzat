@@ -20,6 +20,7 @@ import { buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuLinkItem,
@@ -27,12 +28,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { FontChoice } from "@/lib/constants/fonts";
 import { createClient } from "@/lib/supabase/client";
 
 export type NavProfile = {
+  /** The signed-in account. The notification panel filters Realtime on it. */
+  id: string;
   fullName: string | null;
   email: string | null;
   avatarUrl: string | null;
+  /** Which reading face this account chose. The root layout renders it. */
+  font?: FontChoice;
 };
 
 /** Name shown in the nav. profiles has no display_name column, so the
@@ -89,6 +95,7 @@ export function UserNav({
       // Show something immediately from the session, then enrich with the
       // profile row (name + avatar) without blocking the first paint.
       setProfile((prev) => ({
+        id: session.user.id,
         fullName: prev?.fullName ?? null,
         email: session.user.email ?? prev?.email ?? null,
         avatarUrl: prev?.avatarUrl ?? null,
@@ -102,6 +109,7 @@ export function UserNav({
         .single();
       if (!active) return;
       setProfile({
+        id: session.user.id,
         fullName: data?.full_name ?? null,
         email: session.user.email ?? null,
         avatarUrl: data?.avatar_url ?? null,
@@ -161,16 +169,21 @@ export function UserNav({
         <ChevronDown className="hidden size-4 text-muted-foreground sm:inline" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="flex flex-col gap-0.5 py-2">
-          <span className="truncate text-sm font-medium text-foreground">
-            {name}
-          </span>
-          {profile.email && (
-            <span className="truncate text-xs font-normal text-muted-foreground">
-              {profile.email}
+        {/* GroupLabel reads MenuGroupContext, so Base UI throws
+            "MenuGroupContext is missing" when it is rendered as a direct child
+            of Content. The Group is the label's owner, not decoration. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col gap-0.5 py-2">
+            <span className="truncate text-sm font-medium text-foreground">
+              {name}
             </span>
-          )}
-        </DropdownMenuLabel>
+            {profile.email && (
+              <span className="truncate text-xs font-normal text-muted-foreground">
+                {profile.email}
+              </span>
+            )}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {MENU_LINKS.map(({ href, label, icon: Icon }) => (
           <DropdownMenuLinkItem key={href} render={<Link href={href} />}>

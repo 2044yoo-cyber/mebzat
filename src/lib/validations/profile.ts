@@ -34,7 +34,16 @@ export const profileDetailsSchema = z.object({
   locationCity: z.string().trim().optional().or(z.literal("")),
   locationCountry: z.string().trim().optional().or(z.literal("")),
   phone: z.string().trim().optional().or(z.literal("")),
-  yearsExperience: z.coerce.number().int().min(0).max(80).optional(),
+  // Checkboxes are absent from the form data when unticked, so these read as
+  // "on" only when the browser actually sent the value. Defaulting the other
+  // way would publish a number the moment somebody saved anything else.
+  showPhone: z.coerce.boolean().optional().default(false),
+  showEmail: z.coerce.boolean().optional().default(false),
+  // Deliberately a string here and a number in `parseYears`. A `z.coerce.number`
+  // rejects the whole form over a stray character in one optional field, and
+  // the failure it produces is "Expected number, received nan" — which is not
+  // a sentence anybody should be shown about how long they have been a welder.
+  yearsExperience: z.string().trim().optional().or(z.literal("")),
   bio: z.string().trim().max(600, "Keep it under 600 characters").optional().or(z.literal("")),
   website: z
     .string()
@@ -46,4 +55,16 @@ export const profileDetailsSchema = z.object({
       "Include http:// or https://",
     ),
   languages: z.string().trim().optional().or(z.literal("")),
+  portfolioLink: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .refine((v) => !v || /^https?:\/\/.+/.test(v), "Include http:// or https://"),
+  linkedinUrl: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .refine((v) => !v || /^https?:\/\/.+/.test(v), "Include http:// or https://"),
 });

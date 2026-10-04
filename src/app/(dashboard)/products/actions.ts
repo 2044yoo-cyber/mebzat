@@ -6,11 +6,19 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 import {
+  digitalFieldsFor,
   parseSpecs,
+  rentalFieldsFor,
   productSchema,
   type ProductFormValues,
+  usedFieldsFor,
 } from "@/lib/validations/product";
-import type { ProductStatus, StockStatus } from "@/types/database.types";
+import type {
+  ProductCondition,
+  ProductFulfilment,
+  ProductStatus,
+  StockStatus,
+} from "@/types/database.types";
 
 export type ProductFormState = {
   error?: string;
@@ -40,7 +48,23 @@ function buildValues(formData: FormData) {
     currency: formData.get("currency"),
     unit: formData.get("unit"),
     stockStatus: formData.get("stockStatus"),
+    fulfilment: formData.get("fulfilment"),
+    rentalPeriod: formData.get("rentalPeriod"),
+    rentalDeposit: formData.get("rentalDeposit") || undefined,
+    digitalFilePath: formData.get("digitalFilePath"),
+    digitalFileName: formData.get("digitalFileName"),
+    digitalKind: formData.get("digitalKind"),
+    fileFormat: formData.get("fileFormat"),
+    fileSizeMb: formData.get("fileSizeMb") || undefined,
+    license: formData.get("license"),
+    condition: formData.get("condition"),
+    usedGrade: formData.get("usedGrade"),
+    conditionNotes: formData.get("conditionNotes"),
+    knownDefects: formData.get("knownDefects"),
+    saleReason: formData.get("saleReason"),
+    ageMonths: formData.get("ageMonths") || undefined,
     locationCity: formData.get("locationCity"),
+    locationArea: formData.get("locationArea"),
     locationCountry: formData.get("locationCountry"),
     deliveryAvailable: formData.get("deliveryAvailable") === "on",
     specs: formData.get("specs"),
@@ -66,9 +90,26 @@ function toColumns(data: ProductFormValues) {
     currency: data.currency || "USD",
     unit: data.unit || null,
     stock_status: data.stockStatus as StockStatus,
+    // The two columns that decide the section. Nothing else on the row says
+    // "used" or "digital", so nothing else can disagree with them.
+    //
+    // A file is never second-hand and never shipped, and the database refuses
+    // a listing that claims otherwise. Forced rather than validated: a seller
+    // who set a condition and then chose Digital meant Digital.
+    fulfilment: data.fulfilment as ProductFulfilment,
+    condition: (data.fulfilment === "digital"
+      ? "new"
+      : data.condition) as ProductCondition,
+    ...usedFieldsFor(
+      data.fulfilment === "digital" ? { ...data, condition: "new" } : data,
+    ),
+    ...digitalFieldsFor(data),
+    ...rentalFieldsFor(data),
     location_city: data.locationCity || null,
+    location_area: data.locationArea || null,
     location_country: data.locationCountry || null,
-    delivery_available: Boolean(data.deliveryAvailable),
+    delivery_available:
+      data.fulfilment === "digital" ? false : Boolean(data.deliveryAvailable),
     specs: parseSpecs(data.specs),
     status: data.status as ProductStatus,
   };

@@ -36,3 +36,11 @@ export function intBetween(rng: Rng, min: number, max: number) {
 export function chance(rng: Rng, probability: number) {
   return rng() < probability;
 }
+
+/** Walks a fixed list in order, wrapping. Unlike pick(), this is not random:
+ * seeding n rows from a list of m gives every entry the same number of uses
+ * (±1), which is what the ecosystem seeds want — one of each kind before any
+ * repeat, rather than a random draw that leaves gaps and clusters. */
+export function cycle<T>(items: readonly T[], index: number): T {
+  return items[((index % items.length) + items.length) % items.length];
+}

@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import type { Database } from "@/types/database.types";
+import { supabaseAnonKey, supabaseUrl } from "@/lib/supabase/env";
 
 const AUTH_ROUTES = [
   "/login",
@@ -26,8 +27,8 @@ export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl(),
+    supabaseAnonKey(),
     {
       cookies: {
         getAll() {
@@ -61,7 +62,14 @@ export async function updateSession(request: NextRequest) {
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
+    // The whole address, not just the path. `/products/new?condition=used`
+    // used to come back as `/products/new`, so somebody who clicked "Sell
+    // something used", signed in, and was returned to the form found it set to
+    // New — and the parameters they had arrived with were left stranded on the
+    // login URL instead.
+    const target = pathname + request.nextUrl.search;
+    url.search = "";
+    url.searchParams.set("redirect", target);
     return NextResponse.redirect(url);
   }
 

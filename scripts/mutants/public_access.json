@@ -1,0 +1,38 @@
+[
+  {
+    "name": "the workspace layout stops requiring an account",
+    "file": "src/app/(dashboard)/agenda/projects/[projectId]/layout.tsx",
+    "from": "  await requireViewer(`/agenda/projects/${projectId}`);",
+    "to": "  void projectId;"
+  },
+  {
+    "name": "a scoped layout gate stops counting at all",
+    "file": "scripts/public_access_check.ts",
+    "from": "    gates(source) || scopedLayouts(file).some((l) => gates(layoutText(l))),",
+    "to": "    gates(source),"
+  },
+  {
+    "name": "the blanket gate at the dashboard root counts again",
+    "file": "scripts/public_access_check.ts",
+    "from": "  while (dir.includes(\"(dashboard)\") && !dir.endsWith(\"(dashboard)\")) {",
+    "to": "  while (dir.includes(\"(dashboard)\")) {"
+  },
+  {
+    "name": "an admin page gated with canAdmin reads as ungated",
+    "file": "scripts/public_access_check.ts",
+    "from": "    (/\\b(?:is|can)Admin\\(/.test(source) && /notFound\\(\\)/.test(source))",
+    "to": "    (/\\bisAdmin\\(/.test(source) && /notFound\\(\\)/.test(source))"
+  },
+  {
+    "name": "an Agenda page is left undeclared",
+    "file": "scripts/public_access_check.ts",
+    "from": "  \"/(dashboard)/agenda/projects/[projectId]/invoices\",\n",
+    "to": ""
+  },
+  {
+    "name": "the diagnostics page loses its gate",
+    "file": "src/app/(dashboard)/admin/diagnostics/page.tsx",
+    "from": "  if (!(await canAdmin(\"security\"))) notFound();",
+    "to": "  void canAdmin;"
+  }
+]

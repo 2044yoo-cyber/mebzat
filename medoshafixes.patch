@@ -1,0 +1,2542 @@
+From 6e3e8117c096297902df9cf1807d6a9ef60b5c28 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 26 Jul 2026 19:06:13 +0000
+Subject: [PATCH 1/4] Add error boundaries and branded 404 page
+
+The app had no error-handling UI: unhandled runtime errors and unknown
+routes fell back to Next.js's unstyled defaults. Add:
+
+- not-found.tsx: branded 404 with navigation back to home/marketplace
+- error.tsx: route-segment error boundary with retry + digest reference
+- global-error.tsx: self-contained root boundary for root-layout failures
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Vu9484XGCPFitpwyCgndnD
+---
+ src/app/error.tsx        | 52 ++++++++++++++++++++++++++++++++
+ src/app/global-error.tsx | 64 ++++++++++++++++++++++++++++++++++++++++
+ src/app/not-found.tsx    | 34 +++++++++++++++++++++
+ 3 files changed, 150 insertions(+)
+ create mode 100644 src/app/error.tsx
+ create mode 100644 src/app/global-error.tsx
+ create mode 100644 src/app/not-found.tsx
+
+diff --git a/src/app/error.tsx b/src/app/error.tsx
+new file mode 100644
+index 0000000..4ad02d1
+--- /dev/null
++++ b/src/app/error.tsx
+@@ -0,0 +1,52 @@
++"use client";
++
++import { useEffect } from "react";
++import Link from "next/link";
++import { RotateCcw, TriangleAlert } from "lucide-react";
++
++import { Button, buttonVariants } from "@/components/ui/button";
++
++export default function Error({
++  error,
++  reset,
++}: {
++  error: Error & { digest?: string };
++  reset: () => void;
++}) {
++  useEffect(() => {
++    // Surface the error to the browser console / monitoring in all environments.
++    console.error(error);
++  }, [error]);
++
++  return (
++    <main className="flex min-h-[70vh] flex-1 flex-col items-center justify-center px-6 py-24 text-center">
++      <div className="flex size-14 items-center justify-center rounded-2xl border bg-destructive/10 text-destructive">
++        <TriangleAlert className="size-7" aria-hidden />
++      </div>
++      <h1 className="mt-6 text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
++        Something went wrong
++      </h1>
++      <p className="mt-3 max-w-md text-balance text-muted-foreground">
++        An unexpected error occurred while loading this page. You can try again,
++        or head back to the home page.
++      </p>
++      {error.digest && (
++        <p className="mt-2 font-mono text-xs text-muted-foreground/70">
++          Reference: {error.digest}
++        </p>
++      )}
++      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
++        <Button size="lg" onClick={() => reset()}>
++          <RotateCcw aria-hidden />
++          Try again
++        </Button>
++        <Link
++          href="/"
++          className={buttonVariants({ variant: "outline", size: "lg" })}
++        >
++          Back to home
++        </Link>
++      </div>
++    </main>
++  );
++}
+diff --git a/src/app/global-error.tsx b/src/app/global-error.tsx
+new file mode 100644
+index 0000000..0f937e2
+--- /dev/null
++++ b/src/app/global-error.tsx
+@@ -0,0 +1,64 @@
++"use client";
++
++import { useEffect } from "react";
++
++// Catches errors thrown in the root layout itself. It replaces the entire
++// document, so it renders its own <html>/<body> and cannot depend on global
++// styles, fonts, or the theme provider — everything here is self-contained.
++export default function GlobalError({
++  error,
++  reset,
++}: {
++  error: Error & { digest?: string };
++  reset: () => void;
++}) {
++  useEffect(() => {
++    console.error(error);
++  }, [error]);
++
++  return (
++    <html lang="en">
++      <body
++        style={{
++          margin: 0,
++          minHeight: "100vh",
++          display: "flex",
++          flexDirection: "column",
++          alignItems: "center",
++          justifyContent: "center",
++          gap: "1rem",
++          padding: "2rem",
++          textAlign: "center",
++          fontFamily:
++            "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
++          background: "#0a0a0a",
++          color: "#fafafa",
++        }}
++      >
++        <h1 style={{ fontSize: "1.5rem", fontWeight: 600, margin: 0 }}>
++          Something went wrong
++        </h1>
++        <p style={{ maxWidth: "28rem", color: "#a1a1aa", margin: 0 }}>
++          A critical error occurred. Please try again — if the problem persists,
++          come back in a little while.
++        </p>
++        <button
++          onClick={() => reset()}
++          style={{
++            marginTop: "0.5rem",
++            padding: "0.55rem 1.1rem",
++            borderRadius: "0.5rem",
++            border: "none",
++            background: "#fafafa",
++            color: "#0a0a0a",
++            fontSize: "0.875rem",
++            fontWeight: 500,
++            cursor: "pointer",
++          }}
++        >
++          Try again
++        </button>
++      </body>
++    </html>
++  );
++}
+diff --git a/src/app/not-found.tsx b/src/app/not-found.tsx
+new file mode 100644
+index 0000000..2c7e295
+--- /dev/null
++++ b/src/app/not-found.tsx
+@@ -0,0 +1,34 @@
++import Link from "next/link";
++import { Compass, Home } from "lucide-react";
++
++import { buttonVariants } from "@/components/ui/button";
++
++export default function NotFound() {
++  return (
++    <main className="flex min-h-[70vh] flex-1 flex-col items-center justify-center px-6 py-24 text-center">
++      <div className="flex size-14 items-center justify-center rounded-2xl border bg-muted/40 text-muted-foreground">
++        <Compass className="size-7" aria-hidden />
++      </div>
++      <p className="mt-6 text-sm font-medium text-muted-foreground">404</p>
++      <h1 className="mt-2 text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
++        This page could not be found
++      </h1>
++      <p className="mt-3 max-w-md text-balance text-muted-foreground">
++        The page you&apos;re looking for doesn&apos;t exist or may have moved.
++        Let&apos;s get you back on track.
++      </p>
++      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
++        <Link href="/" className={buttonVariants({ size: "lg" })}>
++          <Home aria-hidden />
++          Back to home
++        </Link>
++        <Link
++          href="/marketplace"
++          className={buttonVariants({ variant: "outline", size: "lg" })}
++        >
++          Browse marketplace
++        </Link>
++      </div>
++    </main>
++  );
++}
+-- 
+2.43.0
+
+
+From 61a0c1c5be8de127a250694c33b6b6c4ab4057e8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 26 Jul 2026 19:53:46 +0000
+Subject: [PATCH 2/4] Allow picsum.photos images so existing seeded rows render
+
+Product/project cards crashed with a next/image runtime error:
+  Invalid src prop (https://picsum.photos/...), hostname "picsum.photos"
+  is not configured under images in your next.config.js
+
+Rows seeded by an earlier image scheme still carry picsum URLs, so add
+the host to remotePatterns rather than reseeding. Unconfigured hosts are
+still rejected (verified: example.com -> 400 "url parameter is not allowed").
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Vu9484XGCPFitpwyCgndnD
+---
+ next.config.ts | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/next.config.ts b/next.config.ts
+index 73b1933..b289c89 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -26,6 +26,9 @@ const nextConfig: NextConfig = {
+       // dicebear serves generated avatars. See scripts/lib/images.ts.
+       { protocol: "https" as const, hostname: "image.pollinations.ai" },
+       { protocol: "https" as const, hostname: "api.dicebear.com" },
++      // Earlier seed runs stored picsum URLs; kept so existing seeded rows
++      // still render without reseeding.
++      { protocol: "https" as const, hostname: "picsum.photos" },
+     ],
+   },
+ };
+-- 
+2.43.0
+
+
+From 55d1d4969c12bcd20654a8048d758edba1bb3870 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 26 Jul 2026 19:59:26 +0000
+Subject: [PATCH 3/4] Configure all remote image hosts used by seeded data
+
+Adds pollinations.ai (apex + subdomain wildcard, covering the
+image.pollinations.ai generator) alongside the existing dicebear and
+picsum hosts, and widens the Supabase Storage pattern from
+/storage/v1/object/public/** to /storage/v1/** so image-transformation
+(render) URLs are allowed too.
+
+The Supabase host stays derived from NEXT_PUBLIC_SUPABASE_URL rather than
+hardcoded, so each deployment allows its own project host.
+
+Verified against the image optimizer: all configured hosts return
+'url parameter is valid'; unconfigured hosts still return 400.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Vu9484XGCPFitpwyCgndnD
+---
+ next.config.ts | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
+
+diff --git a/next.config.ts b/next.config.ts
+index b289c89..55e1451 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -12,22 +12,28 @@ const nextConfig: NextConfig = {
+     contentDispositionType: "attachment",
+     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+     remotePatterns: [
++      // Supabase Storage for this project, derived from the environment so
++      // each deployment allows its own project host rather than a hardcoded
++      // ref. Scoped to /storage/v1/** to cover both the public object route
++      // and the image-transformation (render) route.
+       ...(supabaseHost
+         ? [
+             {
+               protocol: "https" as const,
+               hostname: supabaseHost,
+-              pathname: "/storage/v1/object/public/**",
++              pathname: "/storage/v1/**",
+             },
+           ]
+         : []),
+-      // Placeholder image hosts used by the development seed dataset only:
+-      // pollinations serves context-matched images from a keyword prompt,
+-      // dicebear serves generated avatars. See scripts/lib/images.ts.
+-      { protocol: "https" as const, hostname: "image.pollinations.ai" },
++      // Placeholder image hosts used by the development seed dataset only.
++      // pollinations serves context-matched images from a keyword prompt
++      // (see scripts/lib/images.ts) — the apex and any subdomain, since the
++      // generator uses image.pollinations.ai.
++      { protocol: "https" as const, hostname: "pollinations.ai" },
++      { protocol: "https" as const, hostname: "**.pollinations.ai" },
++      // dicebear serves generated avatars.
+       { protocol: "https" as const, hostname: "api.dicebear.com" },
+-      // Earlier seed runs stored picsum URLs; kept so existing seeded rows
+-      // still render without reseeding.
++      // Rows seeded by an earlier image scheme still carry picsum URLs.
+       { protocol: "https" as const, hostname: "picsum.photos" },
+     ],
+   },
+-- 
+2.43.0
+
+
+From d9604dda0603c37b92951292e123bb0ce9feadf1 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 26 Jul 2026 20:26:39 +0000
+Subject: [PATCH 4/4] Serve all demo imagery from local branded assets
+
+The seed dataset pulled images from external providers (pollinations for
+product/project/company imagery, dicebear for avatars) and legacy rows
+still referenced picsum. That made demo content depend on third-party
+uptime and leaked outbound requests on every page render.
+
+Replace the whole pipeline with branded Medosha SVGs committed under
+public/images (products, projects, companies, avatars, placeholders):
+
+- scripts/lib/images.ts resolves each item to a local asset by category,
+  keeping the existing keyword matching; unmatched items fall back to the
+  branded placeholder for their kind.
+- fictional.ts avatars now use the local avatar set instead of dicebear.
+- next.config.ts drops every external host; Supabase Storage (derived from
+  the environment) is the only permitted remote image source.
+- Product/project/company cards render the branded placeholder when a
+  record has no image, replacing the bare ImageOff icon.
+- scripts/migrate-images.ts (npm run migrate:images) rewrites external
+  URLs already stored in the database; dry run by default, --apply writes.
+
+Verified: no external image URL remains in the repo, all mapped paths
+resolve to files on disk, six pages load with zero requests to any
+non-local host, and the production build passes.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Vu9484XGCPFitpwyCgndnD
+---
+ SETUP.md                                      |  24 +-
+ eslint.config.mjs                             |  14 +
+ next.config.ts                                |  49 ++--
+ package.json                                  |   3 +-
+ public/images/avatars/avatar-01.svg           |  18 ++
+ public/images/avatars/avatar-02.svg           |  18 ++
+ public/images/avatars/avatar-03.svg           |  18 ++
+ public/images/avatars/avatar-04.svg           |  18 ++
+ public/images/avatars/avatar-05.svg           |  18 ++
+ public/images/avatars/avatar-06.svg           |  18 ++
+ public/images/avatars/avatar-07.svg           |  18 ++
+ public/images/avatars/avatar-08.svg           |  18 ++
+ public/images/avatars/avatar-09.svg           |  18 ++
+ public/images/avatars/avatar-10.svg           |  18 ++
+ public/images/avatars/avatar-11.svg           |  18 ++
+ public/images/avatars/avatar-12.svg           |  18 ++
+ public/images/companies/architecture.svg      |  18 ++
+ public/images/companies/contractor.svg        |  19 ++
+ public/images/companies/developer.svg         |  19 ++
+ public/images/companies/engineering.svg       |  19 ++
+ public/images/companies/general.svg           |  19 ++
+ public/images/companies/interior.svg          |  19 ++
+ public/images/companies/materials.svg         |  19 ++
+ public/images/companies/steel.svg             |  18 ++
+ public/images/placeholders/avatar.svg         |  18 ++
+ public/images/placeholders/company.svg        |  19 ++
+ public/images/placeholders/cover.svg          |  19 ++
+ public/images/placeholders/product.svg        |  18 ++
+ public/images/placeholders/project.svg        |  19 ++
+ public/images/products/bathroom.svg           |  19 ++
+ .../products/construction-materials.svg       |  20 ++
+ public/images/products/doors.svg              |  18 ++
+ public/images/products/electrical.svg         |  18 ++
+ public/images/products/flooring.svg           |  21 ++
+ public/images/products/furniture.svg          |  20 ++
+ public/images/products/hardware.svg           |  19 ++
+ public/images/products/kitchen.svg            |  19 ++
+ public/images/products/lighting.svg           |  19 ++
+ public/images/products/paint.svg              |  19 ++
+ public/images/products/plumbing.svg           |  19 ++
+ public/images/products/roofing.svg            |  18 ++
+ public/images/products/solar.svg              |  18 ++
+ public/images/products/windows.svg            |  19 ++
+ public/images/projects/commercial.svg         |  19 ++
+ public/images/projects/hospitality.svg        |  19 ++
+ public/images/projects/industrial.svg         |  18 ++
+ public/images/projects/institutional.svg      |  19 ++
+ public/images/projects/interior.svg           |  19 ++
+ public/images/projects/landscape.svg          |  19 ++
+ public/images/projects/mixed-use.svg          |  19 ++
+ public/images/projects/other.svg              |  19 ++
+ public/images/projects/renovation.svg         |  18 ++
+ public/images/projects/residential.svg        |  19 ++
+ scripts/lib/fictional.ts                      |  17 +-
+ scripts/lib/images.ts                         | 268 ++++++++----------
+ scripts/migrate-images.ts                     | 213 ++++++++++++++
+ src/components/companies/company-card.tsx     |  17 +-
+ src/components/products/product-card.tsx      |  22 +-
+ src/components/projects/project-card.tsx      |  23 +-
+ src/lib/constants/placeholders.ts             |   9 +
+ 60 files changed, 1340 insertions(+), 232 deletions(-)
+ create mode 100644 public/images/avatars/avatar-01.svg
+ create mode 100644 public/images/avatars/avatar-02.svg
+ create mode 100644 public/images/avatars/avatar-03.svg
+ create mode 100644 public/images/avatars/avatar-04.svg
+ create mode 100644 public/images/avatars/avatar-05.svg
+ create mode 100644 public/images/avatars/avatar-06.svg
+ create mode 100644 public/images/avatars/avatar-07.svg
+ create mode 100644 public/images/avatars/avatar-08.svg
+ create mode 100644 public/images/avatars/avatar-09.svg
+ create mode 100644 public/images/avatars/avatar-10.svg
+ create mode 100644 public/images/avatars/avatar-11.svg
+ create mode 100644 public/images/avatars/avatar-12.svg
+ create mode 100644 public/images/companies/architecture.svg
+ create mode 100644 public/images/companies/contractor.svg
+ create mode 100644 public/images/companies/developer.svg
+ create mode 100644 public/images/companies/engineering.svg
+ create mode 100644 public/images/companies/general.svg
+ create mode 100644 public/images/companies/interior.svg
+ create mode 100644 public/images/companies/materials.svg
+ create mode 100644 public/images/companies/steel.svg
+ create mode 100644 public/images/placeholders/avatar.svg
+ create mode 100644 public/images/placeholders/company.svg
+ create mode 100644 public/images/placeholders/cover.svg
+ create mode 100644 public/images/placeholders/product.svg
+ create mode 100644 public/images/placeholders/project.svg
+ create mode 100644 public/images/products/bathroom.svg
+ create mode 100644 public/images/products/construction-materials.svg
+ create mode 100644 public/images/products/doors.svg
+ create mode 100644 public/images/products/electrical.svg
+ create mode 100644 public/images/products/flooring.svg
+ create mode 100644 public/images/products/furniture.svg
+ create mode 100644 public/images/products/hardware.svg
+ create mode 100644 public/images/products/kitchen.svg
+ create mode 100644 public/images/products/lighting.svg
+ create mode 100644 public/images/products/paint.svg
+ create mode 100644 public/images/products/plumbing.svg
+ create mode 100644 public/images/products/roofing.svg
+ create mode 100644 public/images/products/solar.svg
+ create mode 100644 public/images/products/windows.svg
+ create mode 100644 public/images/projects/commercial.svg
+ create mode 100644 public/images/projects/hospitality.svg
+ create mode 100644 public/images/projects/industrial.svg
+ create mode 100644 public/images/projects/institutional.svg
+ create mode 100644 public/images/projects/interior.svg
+ create mode 100644 public/images/projects/landscape.svg
+ create mode 100644 public/images/projects/mixed-use.svg
+ create mode 100644 public/images/projects/other.svg
+ create mode 100644 public/images/projects/renovation.svg
+ create mode 100644 public/images/projects/residential.svg
+ create mode 100644 scripts/migrate-images.ts
+ create mode 100644 src/lib/constants/placeholders.ts
+
+diff --git a/SETUP.md b/SETUP.md
+index 57a8093..e95bd40 100644
+--- a/SETUP.md
++++ b/SETUP.md
+@@ -77,12 +77,24 @@ and upserts everything else on a stable key. Demo logins are
+ `demo01@medosha.test` … `demo50@medosha.test` (password
+ `medosha-demo-1234`).
+ 
+-Product, project, and company images are **context-matched** — each item's
+-title/category maps to a descriptive keyword phrase
+-(`scripts/lib/images.ts`) that drives a keyword image provider, so a kitchen
+-sink shows a kitchen sink (never a random photo). URLs are deterministic, so
+-they stay stable across reseeds; unmatched items fall back to a branded
+-Medosha placeholder.
++Product, project, and company images are **context-matched branded Medosha
++assets stored locally** in `public/images/` — each item's title/category
++maps to a local SVG (`scripts/lib/images.ts`), so a kitchen product shows a
++kitchen image and unmatched items fall back to a branded placeholder. No
++image is ever requested from an external provider, so the demo dataset
++renders fully offline (Supabase is the only network dependency).
++
++### Migrate legacy external image URLs
++
++Databases seeded by earlier versions may still hold external image URLs
++(picsum, pollinations, dicebear). Rewrite them to local branded assets:
++
++```bash
++npm run migrate:images            # dry run — reports, changes nothing
++npm run migrate:images -- --apply # write the replacements
++```
++
++Supabase Storage URLs are left untouched — they are first-party uploads.
+ 
+ To import "unclaimed" business listings (the Business Import system) —
+ businesses that exist without a user account and show a "Claim this
+diff --git a/eslint.config.mjs b/eslint.config.mjs
+index 05e726d..c35246f 100644
+--- a/eslint.config.mjs
++++ b/eslint.config.mjs
+@@ -13,6 +13,20 @@ const eslintConfig = defineConfig([
+     "build/**",
+     "next-env.d.ts",
+   ]),
++  {
++    rules: {
++      // Allow intentionally-unused args/vars when prefixed with "_" — used for
++      // parameters kept for call-site compatibility.
++      "@typescript-eslint/no-unused-vars": [
++        "warn",
++        {
++          argsIgnorePattern: "^_",
++          varsIgnorePattern: "^_",
++          caughtErrorsIgnorePattern: "^_",
++        },
++      ],
++    },
++  },
+ ]);
+ 
+ export default eslintConfig;
+diff --git a/next.config.ts b/next.config.ts
+index 55e1451..f683174 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -5,37 +5,30 @@ const supabaseHost = supabaseUrl ? new URL(supabaseUrl).hostname : undefined;
+ 
+ const nextConfig: NextConfig = {
+   images: {
+-    // Allow SVGs (the branded fallback placeholder, and any SVG a user
+-    // uploads as a company logo) but neutralize them: served as attachments
+-    // under a sandbox CSP that blocks scripts, per Next.js guidance.
++    // Allow SVGs (the branded Medosha placeholders under public/images, and
++    // any SVG a user uploads as a company logo) but neutralize them: served
++    // as attachments under a sandbox CSP that blocks scripts, per Next.js
++    // guidance.
+     dangerouslyAllowSVG: true,
+     contentDispositionType: "attachment",
+     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+-    remotePatterns: [
+-      // Supabase Storage for this project, derived from the environment so
+-      // each deployment allows its own project host rather than a hardcoded
+-      // ref. Scoped to /storage/v1/** to cover both the public object route
+-      // and the image-transformation (render) route.
+-      ...(supabaseHost
+-        ? [
+-            {
+-              protocol: "https" as const,
+-              hostname: supabaseHost,
+-              pathname: "/storage/v1/**",
+-            },
+-          ]
+-        : []),
+-      // Placeholder image hosts used by the development seed dataset only.
+-      // pollinations serves context-matched images from a keyword prompt
+-      // (see scripts/lib/images.ts) — the apex and any subdomain, since the
+-      // generator uses image.pollinations.ai.
+-      { protocol: "https" as const, hostname: "pollinations.ai" },
+-      { protocol: "https" as const, hostname: "**.pollinations.ai" },
+-      // dicebear serves generated avatars.
+-      { protocol: "https" as const, hostname: "api.dicebear.com" },
+-      // Rows seeded by an earlier image scheme still carry picsum URLs.
+-      { protocol: "https" as const, hostname: "picsum.photos" },
+-    ],
++    // Supabase Storage for this project is the ONLY permitted remote image
++    // source, and its host is derived from the environment so each
++    // deployment allows its own project. Scoped to /storage/v1/** to cover
++    // both the public object route and the image-transformation route.
++    //
++    // No external image providers are allowed. All demo/placeholder imagery
++    // is stored locally under public/images (see scripts/lib/images.ts), so
++    // the app renders its content fully offline.
++    remotePatterns: supabaseHost
++      ? [
++          {
++            protocol: "https" as const,
++            hostname: supabaseHost,
++            pathname: "/storage/v1/**",
++          },
++        ]
++      : [],
+   },
+ };
+ 
+diff --git a/package.json b/package.json
+index 2701fa0..cda9bbe 100644
+--- a/package.json
++++ b/package.json
+@@ -8,7 +8,8 @@
+     "start": "next start",
+     "lint": "eslint",
+     "seed": "tsx --env-file=.env.local scripts/seed.ts",
+-    "import:businesses": "tsx --env-file=.env.local scripts/import-businesses.ts"
++    "import:businesses": "tsx --env-file=.env.local scripts/import-businesses.ts",
++    "migrate:images": "tsx --env-file=.env.local scripts/migrate-images.ts"
+   },
+   "dependencies": {
+     "@base-ui/react": "^1.6.0",
+diff --git a/public/images/avatars/avatar-01.svg b/public/images/avatars/avatar-01.svg
+new file mode 100644
+index 0000000..6260e76
+--- /dev/null
++++ b/public/images/avatars/avatar-01.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-02.svg b/public/images/avatars/avatar-02.svg
+new file mode 100644
+index 0000000..497448f
+--- /dev/null
++++ b/public/images/avatars/avatar-02.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a45b8"/>
++      <stop offset="1" stop-color="#332f8f"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-03.svg b/public/images/avatars/avatar-03.svg
+new file mode 100644
+index 0000000..2068a4a
+--- /dev/null
++++ b/public/images/avatars/avatar-03.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3d4a6b"/>
++      <stop offset="1" stop-color="#2a3448"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-04.svg b/public/images/avatars/avatar-04.svg
+new file mode 100644
+index 0000000..8b6f743
+--- /dev/null
++++ b/public/images/avatars/avatar-04.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2f6f8f"/>
++      <stop offset="1" stop-color="#22526b"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-05.svg b/public/images/avatars/avatar-05.svg
+new file mode 100644
+index 0000000..456818c
+--- /dev/null
++++ b/public/images/avatars/avatar-05.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a5a78"/>
++      <stop offset="1" stop-color="#333f57"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-06.svg b/public/images/avatars/avatar-06.svg
+new file mode 100644
+index 0000000..ddac111
+--- /dev/null
++++ b/public/images/avatars/avatar-06.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#5a45b0"/>
++      <stop offset="1" stop-color="#3f2f85"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-07.svg b/public/images/avatars/avatar-07.svg
+new file mode 100644
+index 0000000..71ff8df
+--- /dev/null
++++ b/public/images/avatars/avatar-07.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2b5ea8"/>
++      <stop offset="1" stop-color="#1f4480"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-08.svg b/public/images/avatars/avatar-08.svg
+new file mode 100644
+index 0000000..c22af23
+--- /dev/null
++++ b/public/images/avatars/avatar-08.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a4f63"/>
++      <stop offset="1" stop-color="#333745"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-09.svg b/public/images/avatars/avatar-09.svg
+new file mode 100644
+index 0000000..6260e76
+--- /dev/null
++++ b/public/images/avatars/avatar-09.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-10.svg b/public/images/avatars/avatar-10.svg
+new file mode 100644
+index 0000000..8b6f743
+--- /dev/null
++++ b/public/images/avatars/avatar-10.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2f6f8f"/>
++      <stop offset="1" stop-color="#22526b"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-11.svg b/public/images/avatars/avatar-11.svg
+new file mode 100644
+index 0000000..497448f
+--- /dev/null
++++ b/public/images/avatars/avatar-11.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a45b8"/>
++      <stop offset="1" stop-color="#332f8f"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/avatars/avatar-12.svg b/public/images/avatars/avatar-12.svg
+new file mode 100644
+index 0000000..71ff8df
+--- /dev/null
++++ b/public/images/avatars/avatar-12.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — ">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2b5ea8"/>
++      <stop offset="1" stop-color="#1f4480"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1"></text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3"></text>
++</svg>
+diff --git a/public/images/companies/architecture.svg b/public/images/companies/architecture.svg
+new file mode 100644
+index 0000000..afbf47d
+--- /dev/null
++++ b/public/images/companies/architecture.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Architecture">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="400" fill="url(#bg)"/>
++  <rect width="1200" height="400" fill="url(#grid)"/>
++  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="0" r="130"/><path d="M55 -55 L20 20 L-55 55 L-20 -20 z"/>
++  </g>
++  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Architecture</text>
++  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/companies/contractor.svg b/public/images/companies/contractor.svg
+new file mode 100644
+index 0000000..3f8c3da
+--- /dev/null
++++ b/public/images/companies/contractor.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Contracting">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2b5ea8"/>
++      <stop offset="1" stop-color="#1f4480"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="400" fill="url(#bg)"/>
++  <rect width="1200" height="400" fill="url(#grid)"/>
++  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-140 130 H140"/><path d="M-40 130 V-120 H120"/><path d="M-40 -120 H-140 l100 100"/>
++    <path d="M60 -120 V-40"/>
++  </g>
++  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Contracting</text>
++  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/companies/developer.svg b/public/images/companies/developer.svg
+new file mode 100644
+index 0000000..e0611ee
+--- /dev/null
++++ b/public/images/companies/developer.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Development">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a45b8"/>
++      <stop offset="1" stop-color="#332f8f"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="400" fill="url(#bg)"/>
++  <rect width="1200" height="400" fill="url(#grid)"/>
++  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-110" y="-140" width="220" height="280" rx="10"/>
++    <path d="M-60 -90 h40 M20 -90 h40 M-60 -20 h40 M20 -20 h40 M-60 50 h40 M20 50 h40"/>
++  </g>
++  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Development</text>
++  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/companies/engineering.svg b/public/images/companies/engineering.svg
+new file mode 100644
+index 0000000..a6d75f5
+--- /dev/null
++++ b/public/images/companies/engineering.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Engineering">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2f6f8f"/>
++      <stop offset="1" stop-color="#22526b"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="400" fill="url(#bg)"/>
++  <rect width="1200" height="400" fill="url(#grid)"/>
++  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-140" y="-110" width="280" height="220" rx="12"/>
++    <path d="M-90 -60 h100 v80 h-100 z"/><path d="M40 -60 h50 M40 20 h50"/>
++  </g>
++  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Engineering</text>
++  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/companies/general.svg b/public/images/companies/general.svg
+new file mode 100644
+index 0000000..8933e71
+--- /dev/null
++++ b/public/images/companies/general.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Construction">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="400" fill="url(#bg)"/>
++  <rect width="1200" height="400" fill="url(#grid)"/>
++  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-140 -20 l60 -50 l70 40 l70 -40 l60 50"/>
++    <path d="M-80 30 l60 50 l40 -30 l40 30 l60 -50"/>
++  </g>
++  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Construction</text>
++  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/companies/interior.svg b/public/images/companies/interior.svg
+new file mode 100644
+index 0000000..8221a15
+--- /dev/null
++++ b/public/images/companies/interior.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Interior & Furniture">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a4f63"/>
++      <stop offset="1" stop-color="#333745"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="400" fill="url(#bg)"/>
++  <rect width="1200" height="400" fill="url(#grid)"/>
++  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-150 90 H150"/><rect x="-130" y="-10" width="120" height="100" rx="14"/>
++    <rect x="30" y="-120" width="110" height="80" rx="10"/><path d="M60 90 V-10"/>
++  </g>
++  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Interior & Furniture</text>
++  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/companies/materials.svg b/public/images/companies/materials.svg
+new file mode 100644
+index 0000000..1e96b38
+--- /dev/null
++++ b/public/images/companies/materials.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Building Materials">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3d4a6b"/>
++      <stop offset="1" stop-color="#2a3448"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="400" fill="url(#bg)"/>
++  <rect width="1200" height="400" fill="url(#grid)"/>
++  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-140 -60 l30 -70 h220 l30 70"/><path d="M-140 -60 h280 v190 h-280 z"/>
++    <path d="M-50 130 V30 h100 v100"/>
++  </g>
++  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Building Materials</text>
++  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/companies/steel.svg b/public/images/companies/steel.svg
+new file mode 100644
+index 0000000..ecfe8b7
+--- /dev/null
++++ b/public/images/companies/steel.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Steel & Metal">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a5a78"/>
++      <stop offset="1" stop-color="#333f57"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="400" fill="url(#bg)"/>
++  <rect width="1200" height="400" fill="url(#grid)"/>
++  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-150 130 V-10 L-30 60 V-10 L90 60 V-70 h60 V130 z"/>
++  </g>
++  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Steel & Metal</text>
++  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/placeholders/avatar.svg b/public/images/placeholders/avatar.svg
+new file mode 100644
+index 0000000..6cf810d
+--- /dev/null
++++ b/public/images/placeholders/avatar.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Medosha — Medosha">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="512" height="512" fill="url(#bg)"/>
++  <rect width="512" height="512" fill="url(#grid)"/>
++  <g transform="translate(256 215.04) scale(0.576)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="-45" r="72"/><path d="M-125 135 a125 125 0 0 1 250 0"/>
++  </g>
++  <text x="256" y="378.88" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff" letter-spacing="1">Medosha</text>
++  <text x="256" y="417.98" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/placeholders/company.svg b/public/images/placeholders/company.svg
+new file mode 100644
+index 0000000..00b754f
+--- /dev/null
++++ b/public/images/placeholders/company.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Company">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="400" fill="url(#bg)"/>
++  <rect width="1200" height="400" fill="url(#grid)"/>
++  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-140 -60 l30 -70 h220 l30 70"/><path d="M-140 -60 h280 v190 h-280 z"/>
++    <path d="M-50 130 V30 h100 v100"/>
++  </g>
++  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Company</text>
++  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/placeholders/cover.svg b/public/images/placeholders/cover.svg
+new file mode 100644
+index 0000000..90bf189
+--- /dev/null
++++ b/public/images/placeholders/cover.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Medosha">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3d4a6b"/>
++      <stop offset="1" stop-color="#2a3448"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="400" fill="url(#bg)"/>
++  <rect width="1200" height="400" fill="url(#grid)"/>
++  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-140 130 H140"/><path d="M-40 130 V-120 H120"/><path d="M-40 -120 H-140 l100 100"/>
++    <path d="M60 -120 V-40"/>
++  </g>
++  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Medosha</text>
++  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/placeholders/product.svg b/public/images/placeholders/product.svg
+new file mode 100644
+index 0000000..e8c3416
+--- /dev/null
++++ b/public/images/placeholders/product.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Product">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M0 -130 L140 -60 V70 L0 140 L-140 70 V-60 z"/><path d="M-140 -60 L0 10 L140 -60"/><path d="M0 10 V140"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Product</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/placeholders/project.svg b/public/images/placeholders/project.svg
+new file mode 100644
+index 0000000..7d23413
+--- /dev/null
++++ b/public/images/placeholders/project.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Project">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-130" y="-130" width="260" height="260" rx="14"/>
++    <path d="M-70 -70 h50 M20 -70 h50 M-70 0 h50 M20 0 h50 M-70 70 h50 M20 70 h50"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Project</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/bathroom.svg b/public/images/products/bathroom.svg
+new file mode 100644
+index 0000000..a6b89cc
+--- /dev/null
++++ b/public/images/products/bathroom.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Bathroom">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2b5ea8"/>
++      <stop offset="1" stop-color="#1f4480"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-140 0 h280 v40 a70 70 0 0 1 -70 70 h-140 a70 70 0 0 1 -70 -70 z"/>
++    <path d="M-90 0 v-70 a34 34 0 0 1 68 0"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Bathroom</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/construction-materials.svg b/public/images/products/construction-materials.svg
+new file mode 100644
+index 0000000..aee6150
+--- /dev/null
++++ b/public/images/products/construction-materials.svg
+@@ -0,0 +1,20 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Materials">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a5a78"/>
++      <stop offset="1" stop-color="#333f57"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-140" y="20" width="120" height="70" rx="8"/>
++    <rect x="20" y="20" width="120" height="70" rx="8"/>
++    <rect x="-60" y="-70" width="120" height="70" rx="8"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Materials</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/doors.svg b/public/images/products/doors.svg
+new file mode 100644
+index 0000000..73937a3
+--- /dev/null
++++ b/public/images/products/doors.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Doors">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a4f63"/>
++      <stop offset="1" stop-color="#333745"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-90" y="-140" width="180" height="280" rx="12"/><circle cx="46" cy="10" r="14"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Doors</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/electrical.svg b/public/images/products/electrical.svg
+new file mode 100644
+index 0000000..17f7823
+--- /dev/null
++++ b/public/images/products/electrical.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Electrical">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a45b8"/>
++      <stop offset="1" stop-color="#332f8f"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M20 -140 L-70 20 H10 L-20 140 L80 -20 H0 z"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Electrical</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/flooring.svg b/public/images/products/flooring.svg
+new file mode 100644
+index 0000000..ded1e52
+--- /dev/null
++++ b/public/images/products/flooring.svg
+@@ -0,0 +1,21 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Flooring">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-130" y="-130" width="115" height="115" rx="10"/>
++    <rect x="15" y="-130" width="115" height="115" rx="10"/>
++    <rect x="-130" y="15" width="115" height="115" rx="10"/>
++    <rect x="15" y="15" width="115" height="115" rx="10"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Flooring</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/furniture.svg b/public/images/products/furniture.svg
+new file mode 100644
+index 0000000..944405e
+--- /dev/null
++++ b/public/images/products/furniture.svg
+@@ -0,0 +1,20 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Furniture">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-140 40 v70"/><path d="M140 40 v70"/>
++    <rect x="-150" y="-30" width="300" height="80" rx="26"/>
++    <path d="M-120 -30 v-60 a24 24 0 0 1 24 -24 h192 a24 24 0 0 1 24 24 v60"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Furniture</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/hardware.svg b/public/images/products/hardware.svg
+new file mode 100644
+index 0000000..c3ca486
+--- /dev/null
++++ b/public/images/products/hardware.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Hardware">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a4f63"/>
++      <stop offset="1" stop-color="#333745"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <circle cx="0" cy="0" r="60"/><path d="M0 -130 V-70"/><path d="M0 70 V130"/>
++    <path d="M-130 0 H-70"/><path d="M70 0 H130"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Hardware</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/kitchen.svg b/public/images/products/kitchen.svg
+new file mode 100644
+index 0000000..93645f5
+--- /dev/null
++++ b/public/images/products/kitchen.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Kitchen">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2f6f8f"/>
++      <stop offset="1" stop-color="#22526b"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-140 60 h280"/><rect x="-140" y="-60" width="280" height="120" rx="14"/>
++    <path d="M0 -60 V60"/><circle cx="-70" cy="0" r="16"/><circle cx="70" cy="0" r="16"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Kitchen</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/lighting.svg b/public/images/products/lighting.svg
+new file mode 100644
+index 0000000..cac98b3
+--- /dev/null
++++ b/public/images/products/lighting.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Lighting">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a45b8"/>
++      <stop offset="1" stop-color="#332f8f"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M0 -130 V-80"/><path d="M-90 -10 L0 -80 L90 -10 z"/>
++    <path d="M-40 -10 a40 40 0 0 0 80 0"/><path d="M0 50 V110"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Lighting</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/paint.svg b/public/images/products/paint.svg
+new file mode 100644
+index 0000000..46864f4
+--- /dev/null
++++ b/public/images/products/paint.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Paint & Finishes">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#5a45b0"/>
++      <stop offset="1" stop-color="#3f2f85"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-100" y="-40" width="200" height="160" rx="16"/>
++    <path d="M-100 -40 a100 40 0 0 1 200 0"/><path d="M60 -60 V-140 h60"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Paint & Finishes</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/plumbing.svg b/public/images/products/plumbing.svg
+new file mode 100644
+index 0000000..e5757ce
+--- /dev/null
++++ b/public/images/products/plumbing.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Plumbing">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2f6f8f"/>
++      <stop offset="1" stop-color="#22526b"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-140 -60 h130 a50 50 0 0 1 50 50 v70 a50 50 0 0 0 50 50 h50"/>
++    <rect x="-150" y="-95" width="40" height="70" rx="8"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Plumbing</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/roofing.svg b/public/images/products/roofing.svg
+new file mode 100644
+index 0000000..52e4d03
+--- /dev/null
++++ b/public/images/products/roofing.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Roofing">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3d4a6b"/>
++      <stop offset="1" stop-color="#2a3448"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-150 30 L0 -110 L150 30"/><path d="M-110 30 L-110 120 H110 V30"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Roofing</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/solar.svg b/public/images/products/solar.svg
+new file mode 100644
+index 0000000..5358860
+--- /dev/null
++++ b/public/images/products/solar.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Solar">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2b5ea8"/>
++      <stop offset="1" stop-color="#1f4480"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-150 60 L-110 -70 H110 L150 60 z"/><path d="M-130 5 H130"/><path d="M0 -70 V60"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Solar</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/products/windows.svg b/public/images/products/windows.svg
+new file mode 100644
+index 0000000..ffa847a
+--- /dev/null
++++ b/public/images/products/windows.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Medosha — Windows">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2b5ea8"/>
++      <stop offset="1" stop-color="#1f4480"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="800" height="800" fill="url(#bg)"/>
++  <rect width="800" height="800" fill="url(#grid)"/>
++  <g transform="translate(400 336) scale(0.900)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-130" y="-120" width="260" height="240" rx="12"/>
++    <path d="M0 -120 V120"/><path d="M-130 0 H130"/>
++  </g>
++  <text x="400" y="592" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="1">Windows</text>
++  <text x="400" y="649.8" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="34" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/projects/commercial.svg b/public/images/projects/commercial.svg
+new file mode 100644
+index 0000000..43525e4
+--- /dev/null
++++ b/public/images/projects/commercial.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Commercial">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2b5ea8"/>
++      <stop offset="1" stop-color="#1f4480"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-110" y="-140" width="220" height="280" rx="10"/>
++    <path d="M-60 -90 h40 M20 -90 h40 M-60 -20 h40 M20 -20 h40 M-60 50 h40 M20 50 h40"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Commercial</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/projects/hospitality.svg b/public/images/projects/hospitality.svg
+new file mode 100644
+index 0000000..81d596e
+--- /dev/null
++++ b/public/images/projects/hospitality.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Hospitality">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#5a45b0"/>
++      <stop offset="1" stop-color="#3f2f85"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-140" y="-120" width="280" height="240" rx="12"/>
++    <path d="M-80 -60 h40 M40 -60 h40 M-80 10 h40 M40 10 h40"/><path d="M-25 120 v-60 h50 v60"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Hospitality</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/projects/industrial.svg b/public/images/projects/industrial.svg
+new file mode 100644
+index 0000000..887079b
+--- /dev/null
++++ b/public/images/projects/industrial.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Industrial">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a5a78"/>
++      <stop offset="1" stop-color="#333f57"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-150 130 V-10 L-30 60 V-10 L90 60 V-70 h60 V130 z"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Industrial</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/projects/institutional.svg b/public/images/projects/institutional.svg
+new file mode 100644
+index 0000000..655c1ac
+--- /dev/null
++++ b/public/images/projects/institutional.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Institutional">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3d4a6b"/>
++      <stop offset="1" stop-color="#2a3448"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-150 -30 L0 -120 L150 -30"/><path d="M-150 130 H150"/>
++    <path d="M-100 -30 V90 M-35 -30 V90 M35 -30 V90 M100 -30 V90"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Institutional</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/projects/interior.svg b/public/images/projects/interior.svg
+new file mode 100644
+index 0000000..fd981d4
+--- /dev/null
++++ b/public/images/projects/interior.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Interior">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a4f63"/>
++      <stop offset="1" stop-color="#333745"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-150 90 H150"/><rect x="-130" y="-10" width="120" height="100" rx="14"/>
++    <rect x="30" y="-120" width="110" height="80" rx="10"/><path d="M60 90 V-10"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Interior</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/projects/landscape.svg b/public/images/projects/landscape.svg
+new file mode 100644
+index 0000000..0bb9d1b
+--- /dev/null
++++ b/public/images/projects/landscape.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Landscape">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#2f6f8f"/>
++      <stop offset="1" stop-color="#22526b"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M0 130 V20"/><path d="M0 40 a80 80 0 0 0 -80 -80 a80 80 0 0 0 80 80"/>
++    <path d="M0 40 a80 80 0 0 1 80 -80 a80 80 0 0 1 -80 80"/><path d="M-120 130 H120"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Landscape</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/projects/mixed-use.svg b/public/images/projects/mixed-use.svg
+new file mode 100644
+index 0000000..42156fd
+--- /dev/null
++++ b/public/images/projects/mixed-use.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Mixed Use">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a45b8"/>
++      <stop offset="1" stop-color="#332f8f"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-150" y="-40" width="130" height="180" rx="10"/>
++    <rect x="10" y="-130" width="140" height="270" rx="10"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Mixed Use</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/projects/other.svg b/public/images/projects/other.svg
+new file mode 100644
+index 0000000..d7915ba
+--- /dev/null
++++ b/public/images/projects/other.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Architecture">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <rect x="-130" y="-130" width="260" height="260" rx="14"/>
++    <path d="M-70 -70 h50 M20 -70 h50 M-70 0 h50 M20 0 h50 M-70 70 h50 M20 70 h50"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Architecture</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/projects/renovation.svg b/public/images/projects/renovation.svg
+new file mode 100644
+index 0000000..333685a
+--- /dev/null
++++ b/public/images/projects/renovation.svg
+@@ -0,0 +1,18 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Renovation">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#4a5a78"/>
++      <stop offset="1" stop-color="#333f57"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-140 60 L-20 -60 l80 80 L-60 140 z"/><path d="M40 -40 l60 -60 a40 40 0 0 1 60 60 l-60 60"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Renovation</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/public/images/projects/residential.svg b/public/images/projects/residential.svg
+new file mode 100644
+index 0000000..4988804
+--- /dev/null
++++ b/public/images/projects/residential.svg
+@@ -0,0 +1,19 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="Medosha — Residential">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#3652c4"/>
++      <stop offset="1" stop-color="#2a3f9c"/>
++    </linearGradient>
++    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
++      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
++    </pattern>
++  </defs>
++  <rect width="1200" height="900" fill="url(#bg)"/>
++  <rect width="1200" height="900" fill="url(#grid)"/>
++  <g transform="translate(600 378) scale(1.012)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
++    <path d="M-150 0 L0 -130 L150 0"/><path d="M-110 0 V130 H110 V0"/>
++    <rect x="-35" y="40" width="70" height="90" rx="6"/>
++  </g>
++  <text x="600" y="666" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff" letter-spacing="1">Residential</text>
++  <text x="600" y="730.6" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="38" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
++</svg>
+diff --git a/scripts/lib/fictional.ts b/scripts/lib/fictional.ts
+index f71f08c..c08ca3a 100644
+--- a/scripts/lib/fictional.ts
++++ b/scripts/lib/fictional.ts
+@@ -3,11 +3,13 @@
+ // - Names combine common Ethiopian given names + patronymics into fictional
+ //   persons (not any specific real individual).
+ // - Emails use the reserved @medosha.test domain.
+-// - Avatars are generated (DiceBear); product/project/company images are
+-//   context-matched placeholders keyed off the item (see ./images.ts).
++// - Avatars and all product/project/company images are branded Medosha
++//   assets stored locally under public/images (see ./images.ts). No image
++//   is ever requested from an external service.
+ 
+ import {
+   architectureCover,
++  avatarImage,
+   companyCover,
+   productImages,
+   projectImages,
+@@ -149,8 +151,9 @@ export function slugify(input: string) {
+     .replace(/^-|-$/g, "");
+ }
+ 
++/** Branded local avatar for a demo user. */
+ export function avatarUrl(seed: string) {
+-  return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed)}&radius=50&backgroundType=gradientLinear`;
++  return avatarImage(seed);
+ }
+ 
+ // --- Records ---------------------------------------------------------------
+@@ -312,7 +315,6 @@ export function makeProjects(count: number): DemoProject[] {
+     const slug = slugify(`${title}-${num}`);
+     const year = intBetween(rng, 2016, 2025);
+     const buildingType = pick(rng, BUILDING_TYPES);
+-    const imageCount = intBetween(rng, 3, 4);
+     projects.push({
+       key: `project-${num}`,
+       title,
+@@ -327,7 +329,7 @@ export function makeProjects(count: number): DemoProject[] {
+       materials: pickSome(rng, MATERIALS, intBetween(rng, 3, 6)),
+       completionDate: `${year}-${String(intBetween(rng, 1, 12)).padStart(2, "0")}-15`,
+       views: intBetween(rng, 0, 4000),
+-      images: projectImages(title, buildingType, style, `project-${num}`, imageCount),
++      images: projectImages(title, buildingType, style, `project-${num}`),
+     });
+   }
+   return projects;
+@@ -368,7 +370,6 @@ export function makeProducts(count: number): DemoProduct[] {
+     while (slugs.has(slug)) slug = `${slug}-x`;
+     slugs.add(slug);
+ 
+-    const imageCount = intBetween(rng, 3, 5);
+     products.push({
+       key: `product-${num}`,
+       title,
+@@ -389,8 +390,8 @@ export function makeProducts(count: number): DemoProduct[] {
+         Warranty: pick(rng, ["6 months", "1 year", "2 years", "None"]),
+         Material: pick(rng, MATERIALS),
+       },
+-      // Context-aware images matched to the product title/category.
+-      images: productImages(title, categorySlug, `product-${num}`, imageCount),
++      // Branded local images matched to the product title/category.
++      images: productImages(title, categorySlug, `product-${num}`),
+     });
+   }
+   return products;
+diff --git a/scripts/lib/images.ts b/scripts/lib/images.ts
+index 1bfa99b..61bac58 100644
+--- a/scripts/lib/images.ts
++++ b/scripts/lib/images.ts
+@@ -1,18 +1,21 @@
+-// Context-aware placeholder images for the seed dataset. Instead of random
+-// photos, each product/project/company maps to a descriptive keyword phrase,
+-// and the phrase becomes the prompt for a keyword image provider — so the
+-// image always matches the item and is never a random landscape/nature photo.
++// Context-aware placeholder images for the seed dataset.
+ //
+-// Provider: pollinations.ai (keyword/prompt -> image). Deterministic: the URL
+-// carries a stable seed derived from the item + image index, so the same seed
+-// run always yields the same URLs (they stay cached/stable across reseeds).
+-// If nothing matches, we fall back to a branded local Medosha placeholder.
+-
+-const PROVIDER = "https://image.pollinations.ai/prompt";
+-
+-/** Branded local fallback (public/images/placeholder.svg) — used only when no
+- * keyword mapping is found, never a random photo. */
+-export const BRAND_PLACEHOLDER = "/images/placeholder.svg";
++// Every image is a branded Medosha SVG stored locally under public/images/.
++// Nothing here contacts an external image service: the app must render its
++// demo content fully offline (Supabase is the only network dependency).
++//
++// Each product/project/company maps to a descriptive category, and that
++// category resolves to a local asset — so the image always suits the item
++// instead of being a random photo. Unmatched items fall back to the generic
++// branded placeholder for their kind.
++
++/** Generic branded fallback, used when nothing more specific matches. */
++export const BRAND_PLACEHOLDER = "/images/placeholders/product.svg";
++export const PRODUCT_PLACEHOLDER = "/images/placeholders/product.svg";
++export const PROJECT_PLACEHOLDER = "/images/placeholders/project.svg";
++export const COMPANY_PLACEHOLDER = "/images/placeholders/company.svg";
++export const AVATAR_PLACEHOLDER = "/images/placeholders/avatar.svg";
++export const COVER_PLACEHOLDER = "/images/placeholders/cover.svg";
+ 
+ function hash(str: string): number {
+   let h = 5381;
+@@ -20,192 +23,153 @@ function hash(str: string): number {
+   return h >>> 0;
+ }
+ 
+-function buildUrl(prompt: string, seed: number, w: number, h: number) {
+-  return `${PROVIDER}/${encodeURIComponent(prompt)}?width=${w}&height=${h}&seed=${seed}&nologo=true`;
+-}
+-
+-// --- Product keyword mapping ----------------------------------------------
++// --- Product mapping -------------------------------------------------------
+ // Title-specific rules are checked first (top to bottom), then category
+-// defaults. Material-aware door/window rules come before the generic ones.
++// defaults. Each rule resolves to a local asset slug in public/images/products.
+ 
+ const PRODUCT_TITLE_RULES: [RegExp, string][] = [
+-  [/granite|countertop/i, "granite kitchen countertop"],
+-  [/marble/i, "polished marble floor"],
+-  [/porcelain|ceramic (floor )?tile|floor tile/i, "ceramic floor tiles"],
+-  [/vinyl|spc/i, "vinyl plank flooring"],
+-  [/hardwood|laminate floor/i, "hardwood wood flooring"],
+-  [/epoxy/i, "epoxy resin floor coating"],
+-  [/sink/i, "stainless steel kitchen sink"],
+-  [/wash basin|basin/i, "modern ceramic bathroom wash basin"],
+-  [/toilet|water closet/i, "modern white toilet"],
+-  [/shower/i, "modern shower set fixture"],
+-  [/faucet|mixer|\btap\b/i, "chrome kitchen faucet"],
+-  [/vanity/i, "bathroom vanity cabinet"],
+-  [/kitchen cabinet|modular kitchen|kitchen island|pantry/i, "modern kitchen cabinets"],
+-  [/wardrobe|closet/i, "wooden wardrobe closet"],
+-  [/dining table|table/i, "wooden dining table"],
+-  [/desk/i, "office desk furniture"],
+-  [/chair/i, "modern office chair"],
+-  [/sofa|lounge|couch/i, "luxury living room sofa"],
+-  [/bed( frame)?/i, "modern bed frame furniture"],
+-  [/bookshelf|shelf/i, "wooden bookshelf furniture"],
+-  [/aluminum (sliding )?door/i, "aluminum sliding door"],
+-  [/steel (security )?door/i, "steel security door"],
+-  [/glass door/i, "glass door"],
+-  [/upvc door/i, "upvc door"],
+-  [/\bdoor/i, "solid wooden door"], // \b so "outdoor" doesn't match
+-  [/aluminum (sliding )?window/i, "aluminum sliding window"],
+-  [/tempered glass|glass panel/i, "tempered glass window panel"],
+-  [/window/i, "modern building window"],
+-  [/corrugated|metal sheet|roof sheet/i, "corrugated metal roofing sheets"],
+-  [/waterproof|membrane/i, "roof waterproofing membrane"], // before roof
+-  [/truss/i, "steel roof truss"],
+-  [/roof tile|clay roof|\broof/i, "clay roof tiles"], // \b so "waterproof" doesn't match
+-  [/insulation/i, "thermal insulation roll"],
+-  [/primer|putty|coating|paint/i, "paint buckets and cans"],
+-  [/cement|portland/i, "stacked cement bags"],
+-  [/rebar|reinforc/i, "steel reinforcement bars rebar"],
+-  [/block|hcb|hollow/i, "concrete blocks"],
+-  [/sand|aggregate|gravel/i, "construction sand and gravel"],
+-  [/cable|wire/i, "electrical cables"],
+-  [/switch/i, "wall light switch"],
+-  [/socket|outlet/i, "electrical wall socket outlet"],
+-  [/distribution board|breaker|panel board/i, "electrical distribution board"],
+-  [/water tank|tank/i, "plastic water storage tank"],
+-  [/solar/i, "solar panels"],
+-  [/pipe|ppr|pvc/i, "pvc plumbing pipes"],
+-  [/led|light|lamp|chandelier|pendant/i, "modern ceiling light fixture"],
++  [/granite|countertop|marble/i, "construction-materials"],
++  [/porcelain|ceramic (floor )?tile|floor tile|vinyl|spc|hardwood|laminate floor|epoxy/i, "flooring"],
++  [/sink|kitchen cabinet|modular kitchen|kitchen island|pantry/i, "kitchen"],
++  [/wash basin|basin|toilet|water closet|shower|vanity/i, "bathroom"],
++  [/faucet|mixer|\btap\b|pipe|ppr|pvc/i, "plumbing"],
++  [/wardrobe|closet|dining table|table|desk|chair|sofa|lounge|couch|bed( frame)?|bookshelf|shelf/i, "furniture"],
++  [/\bdoor/i, "doors"], // \b so "outdoor" doesn't match
++  [/window|tempered glass|glass panel/i, "windows"],
++  [/corrugated|metal sheet|roof sheet|truss|waterproof|membrane|roof tile|clay roof|\broof|insulation/i, "roofing"],
++  [/primer|putty|coating|paint/i, "paint"],
++  [/cement|portland|rebar|reinforc|block|hcb|hollow|sand|aggregate|gravel/i, "construction-materials"],
++  [/cable|wire|switch|socket|outlet|distribution board|breaker|panel board/i, "electrical"],
++  [/water tank|tank/i, "plumbing"],
++  [/solar/i, "solar"],
++  [/led|light|lamp|chandelier|pendant/i, "lighting"],
++  [/hinge|lock|handle|screw|bolt|nail|tool/i, "hardware"],
+ ];
+ 
+-const PRODUCT_CATEGORY_DEFAULTS: Record<string, string> = {
+-  furniture: "modern furniture",
+-  kitchen: "modern kitchen sink",
+-  bathroom: "modern ceramic bathroom fixture",
+-  lighting: "modern ceiling light fixture",
+-  doors: "solid wooden door",
+-  windows: "modern building window",
+-  roofing: "roof tiles",
+-  paint: "paint buckets and cans",
+-  flooring: "ceramic floor tiles",
+-  electrical: "electrical supplies cables",
+-  "construction-materials": "stacked cement bags on pallet",
++// Product category slug -> local asset slug.
++const PRODUCT_CATEGORY_ASSETS: Record<string, string> = {
++  furniture: "furniture",
++  kitchen: "kitchen",
++  bathroom: "bathroom",
++  lighting: "lighting",
++  doors: "doors",
++  windows: "windows",
++  roofing: "roofing",
++  paint: "paint",
++  flooring: "flooring",
++  electrical: "electrical",
++  "construction-materials": "construction-materials",
++  plumbing: "plumbing",
++  solar: "solar",
++  hardware: "hardware",
+ };
+ 
+-const PRODUCT_STYLE = "product photography, studio lighting, plain background";
+-
+-/** Descriptive phrase for a product, or null when nothing maps. */
++/** Local asset slug for a product, or null when nothing maps. */
+ export function productPhrase(
+   title: string,
+   categorySlug: string,
+ ): string | null {
+-  for (const [rule, phrase] of PRODUCT_TITLE_RULES) {
+-    if (rule.test(title)) return phrase;
++  for (const [rule, slug] of PRODUCT_TITLE_RULES) {
++    if (rule.test(title)) return slug;
+   }
+-  return PRODUCT_CATEGORY_DEFAULTS[categorySlug] ?? null;
++  return PRODUCT_CATEGORY_ASSETS[categorySlug] ?? null;
+ }
+ 
+-/** 3–5 matched images for a product. Falls back to the branded placeholder
+- * (never a random photo) if no keyword maps. */
++/** Local image for a product. Returns a single-element array: local assets
++ * are one branded image per category, so a gallery of duplicates would be
++ * meaningless. `_count` is accepted for call-site compatibility. */
+ export function productImages(
+   title: string,
+   categorySlug: string,
+-  key: string,
+-  count: number,
++  _key: string,
++  _count?: number,
+ ): string[] {
+-  const phrase = productPhrase(title, categorySlug);
+-  if (!phrase) return Array.from({ length: count }, () => BRAND_PLACEHOLDER);
+-  const prompt = `${phrase}, ${PRODUCT_STYLE}`;
+-  return Array.from({ length: count }, (_, i) =>
+-    buildUrl(prompt, hash(`${key}|${phrase}|${i}`), 800, 800),
+-  );
++  const slug = productPhrase(title, categorySlug);
++  return [slug ? `/images/products/${slug}.svg` : PRODUCT_PLACEHOLDER];
+ }
+ 
+-// --- Project keyword mapping ----------------------------------------------
++// --- Project mapping -------------------------------------------------------
+ 
+-// Base phrases carry no style adjective — projectPhrase() prefixes the
+-// project's own style (Modern, Luxury, Minimalist…) so it isn't doubled.
+ const PROJECT_NOUN_RULES: [RegExp, string][] = [
+-  [/villa/i, "villa house exterior"],
+-  [/apartment|tower/i, "apartment building"],
+-  [/plaza|mall|showroom|commercial|office/i, "commercial building architecture"],
+-  [/lodge|hotel|hospitality/i, "hotel building"],
+-  [/estate|complex|residence|house/i, "residential house exterior"],
+-  [/pavilion/i, "architectural pavilion"],
++  [/villa|estate|complex|residence|house/i, "residential"],
++  [/apartment|tower/i, "commercial"],
++  [/plaza|mall|showroom|commercial|office/i, "commercial"],
++  [/lodge|hotel|hospitality/i, "hospitality"],
++  [/pavilion/i, "other"],
+ ];
+ 
+-const PROJECT_TYPE_DEFAULTS: Record<string, string> = {
+-  residential: "residential house exterior",
+-  commercial: "commercial building architecture",
+-  industrial: "industrial building",
+-  hospitality: "hotel building",
+-  institutional: "institutional building",
+-  mixed_use: "mixed use building",
+-  landscape: "landscape architecture garden design",
+-  interior: "interior design",
+-  renovation: "renovated building",
+-  other: "architecture building",
++const PROJECT_TYPE_ASSETS: Record<string, string> = {
++  residential: "residential",
++  commercial: "commercial",
++  industrial: "industrial",
++  hospitality: "hospitality",
++  institutional: "institutional",
++  mixed_use: "mixed-use",
++  landscape: "landscape",
++  interior: "interior",
++  renovation: "renovation",
++  other: "other",
+ };
+ 
+-const PROJECT_STYLE = "architectural photography, high quality, daytime";
+-
++/** Local asset slug for a project. `_style` is kept for call-site
++ * compatibility — local assets are chosen by building type, not by style. */
+ export function projectPhrase(
+   title: string,
+   buildingType: string,
+-  style: string,
++  _style?: string,
+ ): string {
+-  let base: string | null = null;
+-  for (const [rule, phrase] of PROJECT_NOUN_RULES) {
+-    if (rule.test(title)) {
+-      base = phrase;
+-      break;
+-    }
++  for (const [rule, slug] of PROJECT_NOUN_RULES) {
++    if (rule.test(title)) return slug;
+   }
+-  base ??= PROJECT_TYPE_DEFAULTS[buildingType] ?? "modern architecture building";
+-  // Prefix the design style (Modern, Luxury, Minimalist…) for variety.
+-  return `${style.toLowerCase()} ${base}`;
++  return PROJECT_TYPE_ASSETS[buildingType] ?? "other";
+ }
+ 
+ export function projectImages(
+   title: string,
+   buildingType: string,
+   style: string,
+-  key: string,
+-  count: number,
++  _key: string,
++  _count?: number,
+ ): string[] {
+-  const prompt = `${projectPhrase(title, buildingType, style)}, ${PROJECT_STYLE}`;
+-  return Array.from({ length: count }, (_, i) =>
+-    buildUrl(prompt, hash(`${key}|proj|${i}`), 1200, 900),
+-  );
++  return [`/images/projects/${projectPhrase(title, buildingType, style)}.svg`];
+ }
+ 
+-// --- Company keyword mapping ----------------------------------------------
++// --- Company mapping -------------------------------------------------------
+ 
+ const COMPANY_RULES: [RegExp, string][] = [
+-  [/architect|design/i, "modern architecture office interior"],
+-  [/interior|furniture/i, "furniture showroom interior"],
+-  [/steel/i, "steel warehouse industrial"],
+-  [/cement|material|supplier|trading/i, "building materials warehouse"],
+-  [/contractor|construction|builder/i, "construction site with cranes"],
+-  [/developer|real estate/i, "modern office building exterior"],
+-  [/engineering/i, "engineering office construction plans"],
++  [/architect|design/i, "architecture"],
++  [/interior|furniture/i, "interior"],
++  [/steel/i, "steel"],
++  [/cement|material|supplier|trading/i, "materials"],
++  [/contractor|construction|builder/i, "contractor"],
++  [/developer|real estate/i, "developer"],
++  [/engineering/i, "engineering"],
+ ];
+ 
+-const COMPANY_STYLE = "professional photography, high quality";
+-
++/** Local asset slug for a company category. */
+ export function companyPhrase(category: string): string {
+-  for (const [rule, phrase] of COMPANY_RULES) {
+-    if (rule.test(category)) return phrase;
++  for (const [rule, slug] of COMPANY_RULES) {
++    if (rule.test(category)) return slug;
+   }
+-  return "construction company office";
++  return "general";
++}
++
++export function companyCover(category: string, _key?: string): string {
++  return `/images/companies/${companyPhrase(category)}.svg`;
+ }
+ 
+-export function companyCover(category: string, key: string): string {
+-  const prompt = `${companyPhrase(category)}, ${COMPANY_STYLE}`;
+-  return buildUrl(prompt, hash(`${key}|cover`), 1200, 400);
++/** Decorative profile cover — branded, on-theme, always local. */
++export function architectureCover(_key?: string): string {
++  return COVER_PLACEHOLDER;
+ }
+ 
+-/** Decorative profile cover — kept on-theme (architecture), never nature. */
+-export function architectureCover(key: string): string {
+-  const prompt = `modern construction architecture cityscape, ${COMPANY_STYLE}`;
+-  return buildUrl(prompt, hash(`${key}|usercover`), 1200, 400);
++// --- Avatars ---------------------------------------------------------------
++
++/** Number of branded avatar variants in public/images/avatars. */
++const AVATAR_COUNT = 12;
++
++/** Deterministic branded avatar for a seed string (name, username, id). */
++export function avatarImage(seed: string): string {
++  const n = (hash(seed) % AVATAR_COUNT) + 1;
++  return `/images/avatars/avatar-${String(n).padStart(2, "0")}.svg`;
+ }
+diff --git a/scripts/migrate-images.ts b/scripts/migrate-images.ts
+new file mode 100644
+index 0000000..34029d8
+--- /dev/null
++++ b/scripts/migrate-images.ts
+@@ -0,0 +1,213 @@
++// Replaces external image URLs already stored in the database with branded
++// local Medosha assets. Safe to re-run.
++//
++//   npm run migrate:images            # dry run — reports, changes nothing
++//   npm run migrate:images -- --apply # writes the replacements
++//
++// Rows seeded by earlier versions may still point at external providers
++// (picsum, pollinations, dicebear, unsplash…). Nothing in the app should ever
++// request an external image, so this rewrites those columns to the local
++// asset that matches each record (see ./lib/images.ts). Supabase Storage URLs
++// are left alone — they are first-party uploads, not external providers.
++
++import { adminClient, requireTables, type Admin } from "./lib/admin";
++import {
++  architectureCover,
++  avatarImage,
++  companyCover,
++  productImages,
++  projectImages,
++  COMPANY_PLACEHOLDER,
++  PRODUCT_PLACEHOLDER,
++  PROJECT_PLACEHOLDER,
++} from "./lib/images";
++
++const APPLY = process.argv.includes("--apply");
++const PAGE = 1000;
++
++/** A URL that leaves our own origin/storage — anything we must replace. */
++function isExternal(url: string | null | undefined): boolean {
++  if (!url) return false;
++  if (!/^https?:\/\//i.test(url)) return false; // local path like /images/...
++  const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL;
++  if (supabase && url.startsWith(supabase)) return false; // first-party storage
++  return true;
++}
++
++type Change = { table: string; id: string; column: string; from: string; to: string };
++const changes: Change[] = [];
++
++function note(table: string, id: string, column: string, from: string, to: string) {
++  changes.push({ table, id, column, from, to });
++}
++
++async function selectAll<T>(
++  admin: Admin,
++  table: string,
++  columns: string,
++): Promise<T[]> {
++  const rows: T[] = [];
++  for (let from = 0; ; from += PAGE) {
++    const { data, error } = await admin
++      // eslint-disable-next-line @typescript-eslint/no-explicit-any
++      .from(table as any)
++      .select(columns)
++      .range(from, from + PAGE - 1);
++    if (error) throw new Error(`${table}: ${error.message}`);
++    const batch = (data ?? []) as T[];
++    rows.push(...batch);
++    if (batch.length < PAGE) return rows;
++  }
++}
++
++async function update(admin: Admin, table: string, id: string, patch: object) {
++  if (!APPLY) return;
++  const { error } = await admin
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
++    .from(table as any)
++    .update(patch)
++    .eq("id", id);
++  if (error) throw new Error(`${table} ${id}: ${error.message}`);
++}
++
++async function migrateProfiles(admin: Admin) {
++  type Row = { id: string; full_name: string | null; username: string | null; avatar_url: string | null; cover_url: string | null };
++  const rows = await selectAll<Row>(admin, "profiles", "id, full_name, username, avatar_url, cover_url");
++  for (const row of rows) {
++    const patch: Record<string, string> = {};
++    if (isExternal(row.avatar_url)) {
++      patch.avatar_url = avatarImage(row.full_name || row.username || row.id);
++      note("profiles", row.id, "avatar_url", row.avatar_url!, patch.avatar_url);
++    }
++    if (isExternal(row.cover_url)) {
++      patch.cover_url = architectureCover(row.username ?? row.id);
++      note("profiles", row.id, "cover_url", row.cover_url!, patch.cover_url);
++    }
++    if (Object.keys(patch).length) await update(admin, "profiles", row.id, patch);
++  }
++  return rows.length;
++}
++
++async function migrateCompanies(admin: Admin) {
++  type Row = { id: string; slug: string | null; category: string | null; logo_url: string | null; cover_url: string | null };
++  const rows = await selectAll<Row>(admin, "companies", "id, slug, category, logo_url, cover_url");
++  for (const row of rows) {
++    const patch: Record<string, string> = {};
++    const local = companyCover(row.category ?? "", row.slug ?? row.id);
++    if (isExternal(row.cover_url)) {
++      patch.cover_url = local;
++      note("companies", row.id, "cover_url", row.cover_url!, local);
++    }
++    if (isExternal(row.logo_url)) {
++      patch.logo_url = COMPANY_PLACEHOLDER;
++      note("companies", row.id, "logo_url", row.logo_url!, COMPANY_PLACEHOLDER);
++    }
++    if (Object.keys(patch).length) await update(admin, "companies", row.id, patch);
++  }
++  return rows.length;
++}
++
++async function migrateProjects(admin: Admin) {
++  type Row = { id: string; title: string | null; building_type: string | null; style: string | null; cover_image_url: string | null };
++  const rows = await selectAll<Row>(admin, "projects", "id, title, building_type, style, cover_image_url");
++  const localFor = (r: Row) =>
++    projectImages(r.title ?? "", r.building_type ?? "other", r.style ?? "", r.id)[0] ?? PROJECT_PLACEHOLDER;
++
++  for (const row of rows) {
++    if (isExternal(row.cover_image_url)) {
++      const to = localFor(row);
++      note("projects", row.id, "cover_image_url", row.cover_image_url!, to);
++      await update(admin, "projects", row.id, { cover_image_url: to });
++    }
++  }
++
++  // project_images rows inherit the parent project's local asset.
++  type Img = { id: string; project_id: string; url: string | null };
++  const byId = new Map(rows.map((r) => [r.id, r]));
++  const imgs = await selectAll<Img>(admin, "project_images", "id, project_id, url");
++  for (const img of imgs) {
++    if (!isExternal(img.url)) continue;
++    const parent = byId.get(img.project_id);
++    const to = parent ? localFor(parent) : PROJECT_PLACEHOLDER;
++    note("project_images", img.id, "url", img.url!, to);
++    await update(admin, "project_images", img.id, { url: to });
++  }
++  return rows.length + imgs.length;
++}
++
++async function migrateProducts(admin: Admin) {
++  type Row = { id: string; title: string | null; category_id: string | null; cover_image_url: string | null };
++  type Cat = { id: string; slug: string };
++  const cats = await selectAll<Cat>(admin, "product_categories", "id, slug");
++  const catSlug = new Map(cats.map((c) => [c.id, c.slug]));
++
++  const rows = await selectAll<Row>(admin, "products", "id, title, category_id, cover_image_url");
++  const localFor = (r: Row) =>
++    productImages(r.title ?? "", catSlug.get(r.category_id ?? "") ?? "", r.id)[0] ?? PRODUCT_PLACEHOLDER;
++
++  for (const row of rows) {
++    if (isExternal(row.cover_image_url)) {
++      const to = localFor(row);
++      note("products", row.id, "cover_image_url", row.cover_image_url!, to);
++      await update(admin, "products", row.id, { cover_image_url: to });
++    }
++  }
++
++  type Img = { id: string; product_id: string; url: string | null };
++  const byId = new Map(rows.map((r) => [r.id, r]));
++  const imgs = await selectAll<Img>(admin, "product_images", "id, product_id, url");
++  for (const img of imgs) {
++    if (!isExternal(img.url)) continue;
++    const parent = byId.get(img.product_id);
++    const to = parent ? localFor(parent) : PRODUCT_PLACEHOLDER;
++    note("product_images", img.id, "url", img.url!, to);
++    await update(admin, "product_images", img.id, { url: to });
++  }
++  return rows.length + imgs.length;
++}
++
++async function main() {
++  const admin = adminClient();
++  await requireTables(admin, [
++    "profiles",
++    "companies",
++    "projects",
++    "project_images",
++    "products",
++    "product_images",
++    "product_categories",
++  ]);
++
++  console.log(APPLY ? "Applying image migration…\n" : "Dry run — no changes will be written.\n");
++
++  const scanned =
++    (await migrateProfiles(admin)) +
++    (await migrateCompanies(admin)) +
++    (await migrateProjects(admin)) +
++    (await migrateProducts(admin));
++
++  const byTable = new Map<string, number>();
++  for (const c of changes) byTable.set(c.table, (byTable.get(c.table) ?? 0) + 1);
++
++  console.log(`Scanned ${scanned} rows.`);
++  if (changes.length === 0) {
++    console.log("✓ No external image URLs found — database is clean.");
++    return;
++  }
++  for (const [table, count] of byTable) console.log(`  ${table}: ${count}`);
++  for (const c of changes.slice(0, 10)) {
++    console.log(`    ${c.table}.${c.column}  ${c.from.slice(0, 52)}…  ->  ${c.to}`);
++  }
++  if (changes.length > 10) console.log(`    …and ${changes.length - 10} more`);
++
++  console.log(
++    APPLY
++      ? `\n✓ Replaced ${changes.length} external image URL(s) with local assets.`
++      : `\n${changes.length} URL(s) would be replaced. Re-run with --apply to write them.`,
++  );
++}
++
++main().catch((err) => {
++  console.error(err instanceof Error ? err.message : err);
++  process.exit(1);
++});
+diff --git a/src/components/companies/company-card.tsx b/src/components/companies/company-card.tsx
+index cc4ae61..e05030a 100644
+--- a/src/components/companies/company-card.tsx
++++ b/src/components/companies/company-card.tsx
+@@ -3,6 +3,7 @@ import Link from "next/link";
+ import { BadgeCheck, Building2, MapPin, Star } from "lucide-react";
+ 
+ import { Badge } from "@/components/ui/badge";
++import { COMPANY_PLACEHOLDER } from "@/lib/constants/placeholders";
+ import type { Company } from "@/types/database.types";
+ 
+ export type CompanyCardData = Pick<
+@@ -30,15 +31,13 @@ export function CompanyCard({ company }: { company: CompanyCardData }) {
+       className="group flex flex-col overflow-hidden rounded-2xl border bg-card transition-shadow hover:shadow-md"
+     >
+       <div className="relative h-24 bg-muted">
+-        {company.cover_url && (
+-          <Image
+-            src={company.cover_url}
+-            alt=""
+-            fill
+-            sizes="(max-width: 640px) 100vw, 33vw"
+-            className="object-cover"
+-          />
+-        )}
++        <Image
++          src={company.cover_url || COMPANY_PLACEHOLDER}
++          alt=""
++          fill
++          sizes="(max-width: 640px) 100vw, 33vw"
++          className="object-cover"
++        />
+         {!company.is_claimed && (
+           <span className="absolute right-2 top-2 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium backdrop-blur">
+             Unclaimed
+diff --git a/src/components/products/product-card.tsx b/src/components/products/product-card.tsx
+index 64f2d7b..0858c79 100644
+--- a/src/components/products/product-card.tsx
++++ b/src/components/products/product-card.tsx
+@@ -1,8 +1,8 @@
+ import Image from "next/image";
+ import Link from "next/link";
+-import { ImageOff } from "lucide-react";
+ 
+ import { SaveButton } from "@/components/products/save-button";
++import { PRODUCT_PLACEHOLDER } from "@/lib/constants/placeholders";
+ import { STOCK_STATUS } from "@/lib/constants/product-categories";
+ import { cn, formatPrice } from "@/lib/utils";
+ import type { Product } from "@/types/database.types";
+@@ -37,19 +37,13 @@ export function ProductCard({ product }: { product: ProductCardData }) {
+       className="group block overflow-hidden rounded-2xl border bg-card transition-shadow hover:shadow-md"
+     >
+       <div className="relative aspect-square bg-muted">
+-        {product.cover_image_url ? (
+-          <Image
+-            src={product.cover_image_url}
+-            alt={product.title}
+-            fill
+-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+-          />
+-        ) : (
+-          <div className="flex h-full items-center justify-center text-muted-foreground">
+-            <ImageOff className="size-8" />
+-          </div>
+-        )}
++        <Image
++          src={product.cover_image_url || PRODUCT_PLACEHOLDER}
++          alt={product.title}
++          fill
++          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
++          className="object-cover transition-transform duration-300 group-hover:scale-105"
++        />
+         {product.status === "draft" && (
+           <span className="absolute left-3 top-3 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium">
+             Draft
+diff --git a/src/components/projects/project-card.tsx b/src/components/projects/project-card.tsx
+index cb1c543..d9cfb42 100644
+--- a/src/components/projects/project-card.tsx
++++ b/src/components/projects/project-card.tsx
+@@ -1,9 +1,10 @@
+ import Image from "next/image";
+ import Link from "next/link";
+-import { ImageOff, MapPin } from "lucide-react";
++import { MapPin } from "lucide-react";
+ 
+ import { Badge } from "@/components/ui/badge";
+ import { BUILDING_TYPE_MAP } from "@/lib/constants/building-types";
++import { PROJECT_PLACEHOLDER } from "@/lib/constants/placeholders";
+ import type { Project } from "@/types/database.types";
+ 
+ export type ProjectCardData = Pick<
+@@ -31,19 +32,13 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
+       className="group block overflow-hidden rounded-2xl border bg-card transition-shadow hover:shadow-md"
+     >
+       <div className="relative aspect-4/3 bg-muted">
+-        {project.cover_image_url ? (
+-          <Image
+-            src={project.cover_image_url}
+-            alt={project.title}
+-            fill
+-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+-          />
+-        ) : (
+-          <div className="flex h-full items-center justify-center text-muted-foreground">
+-            <ImageOff className="size-8" />
+-          </div>
+-        )}
++        <Image
++          src={project.cover_image_url || PROJECT_PLACEHOLDER}
++          alt={project.title}
++          fill
++          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
++          className="object-cover transition-transform duration-300 group-hover:scale-105"
++        />
+         {project.status === "draft" && (
+           <span className="absolute left-3 top-3 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium">
+             Draft
+diff --git a/src/lib/constants/placeholders.ts b/src/lib/constants/placeholders.ts
+new file mode 100644
+index 0000000..48e1553
+--- /dev/null
++++ b/src/lib/constants/placeholders.ts
+@@ -0,0 +1,9 @@
++// Branded Medosha placeholder images, stored locally in public/images.
++// Used whenever a record has no image of its own — the app never requests a
++// placeholder from an external service.
++
++export const PRODUCT_PLACEHOLDER = "/images/placeholders/product.svg";
++export const PROJECT_PLACEHOLDER = "/images/placeholders/project.svg";
++export const COMPANY_PLACEHOLDER = "/images/placeholders/company.svg";
++export const AVATAR_PLACEHOLDER = "/images/placeholders/avatar.svg";
++export const COVER_PLACEHOLDER = "/images/placeholders/cover.svg";
+-- 
+2.43.0
+

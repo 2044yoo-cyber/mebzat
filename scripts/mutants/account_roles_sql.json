@@ -1,0 +1,62 @@
+[
+  {
+    "name": "the search stops reading the role, so a homeowner is offered as a welder",
+    "file": "supabase/migrations/0099_professional_search_roles.sql",
+    "from": "      and (\n        cardinality(p.roles) = 0\n        or p.roles && array['professional', 'company']::public.medosha_role[]\n      )",
+    "to": ""
+  },
+  {
+    "name": "a client is let back into the search",
+    "file": "supabase/migrations/0099_professional_search_roles.sql",
+    "from": "array['professional', 'company']::public.medosha_role[]",
+    "to": "array['professional', 'company', 'client']::public.medosha_role[]"
+  },
+  {
+    "name": "an account that has not answered the question is thrown out of the search",
+    "file": "supabase/migrations/0099_professional_search_roles.sql",
+    "from": "        cardinality(p.roles) = 0\n        or p.roles &&",
+    "to": "        p.roles &&"
+  },
+  {
+    "name": "a firm is dropped from the search along with the homeowners",
+    "file": "supabase/migrations/0099_professional_search_roles.sql",
+    "from": "array['professional', 'company']::public.medosha_role[]",
+    "to": "array['professional']::public.medosha_role[]"
+  },
+  {
+    "name": "anybody can create an agent record in somebody else's name",
+    "file": "supabase/migrations/0097_account_roles.sql",
+    "from": "        for insert to authenticated with check (profile_id = auth.uid());",
+    "to": "        for insert to authenticated with check (true);"
+  },
+  {
+    "name": "anybody can rewrite an agent's agency",
+    "file": "supabase/migrations/0097_account_roles.sql",
+    "from": "        for update to authenticated\n        using (profile_id = auth.uid())",
+    "to": "        for update to authenticated\n        using (true)"
+  },
+  {
+    "name": "anybody can clear the areas an agent covers",
+    "file": "supabase/migrations/0097_account_roles.sql",
+    "from": "        for delete to authenticated using (profile_id = auth.uid());",
+    "to": "        for delete to authenticated using (true);"
+  },
+  {
+    "name": "a shop is visible only to itself",
+    "file": "supabase/migrations/0097_account_roles.sql",
+    "from": "        for select to anon, authenticated using (true);",
+    "to": "        for select to anon, authenticated using (profile_id = auth.uid());"
+  },
+  {
+    "name": "the owner cannot change what they wrote",
+    "file": "supabase/migrations/0097_account_roles.sql",
+    "from": "        using (profile_id = auth.uid())\n        with check (profile_id = auth.uid());",
+    "to": "        using (false)\n        with check (profile_id = auth.uid());"
+  },
+  {
+    "name": "row-level security is never switched on",
+    "file": "supabase/migrations/0097_account_roles.sql",
+    "from": "    execute format('alter table public.%I enable row level security', t);",
+    "to": ""
+  }
+]

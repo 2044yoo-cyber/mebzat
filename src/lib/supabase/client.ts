@@ -21,11 +21,16 @@ import type { Database } from "@/types/database.types";
  */
 export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Both spellings, for the same reason as in env.ts: Supabase renamed the
+  // anon key to the publishable key, and which one a project has depends on
+  // when it was created rather than on anything about this application.
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   const missing = [
     !url && "NEXT_PUBLIC_SUPABASE_URL",
-    !anonKey && "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    !anonKey && "NEXT_PUBLIC_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)",
   ].filter(Boolean);
 
   if (missing.length > 0) {

@@ -9,10 +9,13 @@ import {
   Phone,
 } from "lucide-react";
 
+import { ProfessionDetails } from "@/components/profile/profession-details";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { ACCOUNT_TYPE_MAP } from "@/lib/constants/account-types";
+import { visibleContact } from "@/lib/data/professional-profile";
+import { formatYears } from "@/lib/profile/experience";
 import type { Profile } from "@/types/database.types";
 
 export function ProfileDisplay({
@@ -25,6 +28,12 @@ export function ProfileDisplay({
   const accountType = profile.account_type
     ? ACCOUNT_TYPE_MAP[profile.account_type]
     : null;
+  // Today this renders only on the owner's own dashboard, so the rule changes
+  // nothing here. It is applied anyway: the component is a `Profile` away from
+  // being dropped onto a public page, and the version that read
+  // `profile.phone` directly is how the number came to be published in the
+  // first place.
+  const contact = visibleContact(profile, isOwner);
   const displayName = profile.company_name || profile.full_name || "Unnamed";
   const initials = displayName
     .split(" ")
@@ -91,6 +100,11 @@ export function ProfileDisplay({
           <p className="text-sm leading-relaxed whitespace-pre-line">
             {profile.bio || "No bio yet."}
           </p>
+
+          {/* The owner's own view of what their trade said. Same component as
+              the public page, so there is no version of this that shows one
+              thing to them and another to a client. */}
+          <ProfessionDetails profile={profile} />
         </div>
 
         <div className="space-y-3 rounded-2xl border p-5 text-sm">
@@ -115,16 +129,16 @@ export function ProfileDisplay({
               </a>
             </div>
           )}
-          {profile.phone && (
+          {contact.phone && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Phone className="size-4 shrink-0" />
-              {profile.phone}
+              {contact.phone}
             </div>
           )}
-          {typeof profile.years_experience === "number" && (
+          {formatYears(profile.years_experience) && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Briefcase className="size-4 shrink-0" />
-              {profile.years_experience} years of experience
+              {formatYears(profile.years_experience)} experience
             </div>
           )}
           {profile.languages.length > 0 && (

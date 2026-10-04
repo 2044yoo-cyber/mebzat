@@ -1,0 +1,56 @@
+[
+  {
+    "name": "company_size is not added, which is the reported error",
+    "file": "supabase/migrations/0100_profile_form_columns.sql",
+    "from": "  add column if not exists company_size text,",
+    "to": ""
+  },
+  {
+    "name": "industry is not added, so the next save fails on it instead",
+    "file": "supabase/migrations/0100_profile_form_columns.sql",
+    "from": "  add column if not exists industry text,",
+    "to": ""
+  },
+  {
+    "name": "the trade's answers have nowhere to go",
+    "file": "supabase/migrations/0100_profile_form_columns.sql",
+    "from": "  add column if not exists profession_details jsonb not null default '{}'::jsonb;",
+    "to": "  add column if not exists profession_details_unused jsonb;"
+  },
+  {
+    "name": "specialties are added as one string rather than a list",
+    "file": "supabase/migrations/0100_profile_form_columns.sql",
+    "from": "  add column if not exists specialties text[] not null default '{}'::text[],",
+    "to": "  add column if not exists specialties_unused text,"
+  },
+  {
+    "name": "the areas block is left out",
+    "file": "supabase/migrations/0100_profile_form_columns.sql",
+    "from": "  add column if not exists base_area text,\n  add column if not exists travel_radius_km integer,\n  add column if not exists serves_entire_city boolean not null default false;",
+    "to": "  add column if not exists base_area text;"
+  },
+  {
+    "name": "the contact toggles are left out",
+    "file": "supabase/migrations/0100_profile_form_columns.sql",
+    "from": "  add column if not exists show_phone boolean not null default false,\n  add column if not exists show_email boolean not null default false,",
+    "to": ""
+  },
+  {
+    "name": "the enum type is assumed rather than created",
+    "file": "supabase/migrations/0100_profile_form_columns.sql",
+    "from": "  if not exists (select 1 from pg_type where typname = 'work_status') then\n    create type public.work_status as enum (\n      'available', 'limited', 'busy', 'fully_booked'\n    );\n  end if;",
+    "to": "  create type public.work_status as enum ('available');"
+  },
+  {
+    "name": "the migration stops being idempotent",
+    "file": "supabase/migrations/0100_profile_form_columns.sql",
+    "from": "  add column if not exists company_size text,\n  add column if not exists industry text,",
+    "to": "  add column company_size text,\n  add column industry text,"
+  },
+  {
+    "name": "PostgREST is never told to reload, so the columns stay invisible",
+    "file": "supabase/migrations/0100_profile_form_columns.sql",
+    "from": "notify pgrst, 'reload schema';",
+    "to": ""
+  }
+]

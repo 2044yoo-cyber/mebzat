@@ -1,0 +1,237 @@
+[
+  {
+    "name": "an architect is asked for a crew size again",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "const ARCHITECT: readonly ProfessionField[] = [\n  {\n    id: \"sectors\",",
+    "to": "const ARCHITECT: readonly ProfessionField[] = [\n  { id: \"crew_size\", label: \"Crew size\", type: \"number\", required: true },\n  {\n    id: \"sectors\","
+  },
+  {
+    "name": "an electrician is asked a contractor's business questions",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "const ELECTRICIAN: readonly ProfessionField[] = [\n  {\n    id: \"work_types\",",
+    "to": "const ELECTRICIAN: readonly ProfessionField[] = [\n  { id: \"max_project_value\", label: \"Largest project you take\", type: \"select\", required: true, options: PROJECT_VALUES },\n  {\n    id: \"work_types\","
+  },
+  {
+    "name": "a contractor loses one of its fifteen",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "    id: \"years_in_business\",\n    label: \"Years in business\",\n    type: \"number\",\n    required: true,\n  },",
+    "to": "    id: \"years_in_business\",\n    label: \"Years in business\",\n    type: \"number\",\n  },"
+  },
+  {
+    "name": "a day labourer is given the contractor's form",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "  \"Aluminium Worker\": ALUMINIUM_WORKER,\n};",
+    "to": "  \"Aluminium Worker\": ALUMINIUM_WORKER,\n  \"Construction Labourer\": CONTRACTOR,\n};"
+  },
+  {
+    "name": "a configuration is keyed on a trade nothing can be saved as",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "  Contractor: CONTRACTOR,",
+    "to": "  Contractor: CONTRACTOR,\n  \"Site Boss\": CONTRACTOR,"
+  },
+  {
+    "name": "two trades asking the same question ask it twice",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "      if (seen.has(field.id)) continue;\n      seen.add(field.id);",
+    "to": ""
+  },
+  {
+    "name": "an unknown trade falls through to the first configuration",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "    for (const field of PROFESSION_FIELDS[profession ?? \"\"] ?? []) {",
+    "to": "    for (const field of PROFESSION_FIELDS[profession ?? \"\"] ?? CONTRACTOR) {"
+  },
+  {
+    "name": "an unticked box counts as a finished answer",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "  if (field.type === \"boolean\") return typeof value === \"boolean\";",
+    "to": "  if (field.type === \"boolean\") return true;"
+  },
+  {
+    "name": "\"no\" stops being an answer",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "  if (field.type === \"boolean\") return typeof value === \"boolean\";",
+    "to": "  if (field.type === \"boolean\") return value === true;"
+  },
+  {
+    "name": "an empty list of choices counts as answered",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "  if (field.type === \"multi\") return Array.isArray(value) && value.length > 0;",
+    "to": "  if (field.type === \"multi\") return Array.isArray(value);"
+  },
+  {
+    "name": "a bio of three spaces counts as an answer",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "  return typeof value === \"string\" ? value.trim().length > 0 : false;",
+    "to": "  return typeof value === \"string\" ? value.length > 0 : false;"
+  },
+  {
+    "name": "changing trade wipes the answers of the trade you came from",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "  const next: ProfessionDetails = { ...stored };",
+    "to": "  const next: ProfessionDetails = {};"
+  },
+  {
+    "name": "a field the form did not ask is cleared instead of left alone",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "    if (value === undefined) continue;",
+    "to": "",
+    "note": "an unasked field then writes undefined over a stored answer"
+  },
+  {
+    "name": "a crafted post can put any string in a multi-choice field",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "      .filter((value) => allowed.has(value));",
+    "to": "      .filter((value) => value.length > 0);"
+  },
+  {
+    "name": "a crafted post can put any string in a single-choice field",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "    return (field.options ?? []).includes(raw) ? raw : null;",
+    "to": "    return raw;"
+  },
+  {
+    "name": "a crew of minus four is accepted",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "    return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;",
+    "to": "    return Number.isFinite(parsed) ? Math.round(parsed) : null;"
+  },
+  {
+    "name": "a word typed into a number field becomes a number",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "    const parsed = Number(raw);",
+    "to": "    const parsed = Number(raw) || 0;"
+  },
+  {
+    "name": "an unanswered tick box reads as no rather than as unanswered",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "    return raw === \"yes\" ? true : raw === \"no\" ? false : null;",
+    "to": "    return raw === \"yes\";"
+  },
+  {
+    "name": "working anywhere in the city stops answering where you work",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "      p.serves_entire_city === true ||\n      text(p.base_area) ||\n      text(p.location_city),",
+    "to": "      text(p.base_area) || text(p.location_city),"
+  },
+  {
+    "name": "the portfolio link becomes required, so nobody without one finishes",
+    "file": "src/lib/profile/profession-fields.ts",
+    "from": "    id: \"portfolio\",\n    label: \"Portfolio or past projects\",\n    required: false,",
+    "to": "    id: \"portfolio\",\n    label: \"Portfolio or past projects\",\n    required: true,"
+  },
+  {
+    "name": "optional fields go back into the denominator",
+    "file": "src/lib/profile/completion.ts",
+    "from": "    for (const field of COMMON_FIELDS) {\n      if (!field.required) continue;",
+    "to": "    for (const field of COMMON_FIELDS) {"
+  },
+  {
+    "name": "a trade's optional fields go into the denominator too",
+    "file": "src/lib/profile/completion.ts",
+    "from": "    for (const field of fieldsFor([profile.profession])) {\n      if (!field.required) continue;",
+    "to": "    for (const field of fieldsFor([profile.profession])) {"
+  },
+  {
+    "name": "the trade stops choosing the bar, so one denominator serves everybody",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  const scoresByTrade =\n    !isOrganizationAccount(profile.account_type) &&\n    hasProfessionFields(profile.profession);",
+    "to": "  const scoresByTrade = false;"
+  },
+  {
+    "name": "a firm is scored against a trade it is never asked for",
+    "file": "src/lib/profile/completion.ts",
+    "from": "    !isOrganizationAccount(profile.account_type) &&\n    hasProfessionFields(profile.profession);",
+    "to": "    hasProfessionFields(profile.profession);"
+  },
+  {
+    "name": "the trade's answers stop counting towards its own bar",
+    "file": "src/lib/profile/completion.ts",
+    "from": "      if (isAnswered(field, stored[field.id]))\n        earned += PROFESSION_FIELD_WEIGHT;\n      else missing.push(field.label);",
+    "to": "      earned += PROFESSION_FIELD_WEIGHT;"
+  },
+  {
+    "name": "a heavy set rounds up to finished",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  return Math.min(Math.max(Math.round((100 * earned) / total), 1), 99);",
+    "to": "  return Math.round((100 * earned) / total);"
+  },
+  {
+    "name": "somebody who has started is told they have not",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  return Math.min(Math.max(Math.round((100 * earned) / total), 1), 99);",
+    "to": "  return Math.min(Math.round((100 * earned) / total), 99);"
+  },
+  {
+    "name": "a hundred is computed rather than stated, so a mistyped weight shows 99",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  if (missing === 0) return 100;",
+    "to": ""
+  },
+  {
+    "name": "the caller can no longer tell which trade's bar was used",
+    "file": "src/lib/profile/completion.ts",
+    "from": "      profession: profile.profession,",
+    "to": "      profession: null,"
+  },
+  {
+    "name": "the form is bound to the saved trade, not the one being typed",
+    "file": "src/components/profile/trade-and-areas.tsx",
+    "from": "<ProfessionFieldsForm profession={trade} details={professionDetails} />",
+    "to": "<ProfessionFieldsForm profession={profession ?? \"\"} details={professionDetails} />"
+  },
+  {
+    "name": "a changed trade reuses the old trade's boxes",
+    "file": "src/components/profile/profession-fields-form.tsx",
+    "from": "            key={`${profession}:${field.id}`}",
+    "to": "            key={field.id}"
+  },
+  {
+    "name": "the renderer stops reading the configuration",
+    "file": "src/components/profile/profession-fields-form.tsx",
+    "from": "  const fields = fieldsFor([profession]);",
+    "to": "  const fields: ProfessionField[] = [];"
+  },
+  {
+    "name": "a tick box loses its third state",
+    "file": "src/components/profile/profession-fields-form.tsx",
+    "from": "          <option value=\"\">Not said</option>\n          <option value=\"yes\">Yes</option>",
+    "to": "          <option value=\"yes\">Yes</option>"
+  },
+  {
+    "name": "the save reads the trade on the row rather than the one being saved",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "  const shownFields = fieldsFor([profession]);",
+    "to": "  const shownFields = fieldsFor([String(formData.get(\"workStatus\") ?? \"\")]);"
+  },
+  {
+    "name": "the save replaces the stored answers instead of merging",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "      detailsOf({ profession_details: stored?.profession_details ?? null }),",
+    "to": "      {},"
+  },
+  {
+    "name": "saving as a labourer writes an empty object over everything",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "  if (shownFields.length > 0) {",
+    "to": "  if (true) {"
+  },
+  {
+    "name": "the public profile shows a dash for every unanswered field",
+    "file": "src/components/profile/profession-details.tsx",
+    "from": "  const answered = fieldsFor([profile.profession]).filter((field) =>\n    isAnswered(field, stored[field.id]),\n  );",
+    "to": "  const answered = fieldsFor([profile.profession]);"
+  },
+  {
+    "name": "the public profile publishes the answers of a trade they no longer do",
+    "file": "src/components/profile/profession-details.tsx",
+    "from": "  const answered = fieldsFor([profile.profession]).filter((field) =>",
+    "to": "  const answered = Object.values(PROFESSION_FIELDS).flat().filter((field) =>"
+  },
+  {
+    "name": "an empty details section renders its heading anyway",
+    "file": "src/components/profile/profession-details.tsx",
+    "from": "  if (answered.length === 0) return null;",
+    "to": ""
+  }
+]

@@ -1,14 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   createProduct,
   updateProduct,
   type ProductFormState,
 } from "@/app/(dashboard)/products/actions";
+import { DigitalFileInput } from "@/components/products/digital-file-input";
 import { ProductImagesInput } from "@/components/products/product-images-input";
 import { SpecsInput } from "@/components/products/specs-input";
+import { OwnershipConfirmation } from "@/components/shared/ownership-confirmation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -21,8 +23,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { STOCK_STATUS } from "@/lib/constants/product-categories";
-import type { Product, ProductCategory } from "@/types/database.types";
+import { cn } from "@/lib/utils";
+import {
+  CONDITIONS,
+  DIGITAL_KINDS,
+  DIGITAL_LICENSES,
+  RENTAL_PERIODS,
+  SELLABLE_CONDITIONS,
+  STOCK_STATUS,
+  USED_GRADES,
+} from "@/lib/constants/product-categories";
+import type {
+  Product,
+  ProductCategory,
+  ProductCondition,
+  ProductFulfilment,
+} from "@/types/database.types";
 
 const initialState: ProductFormState = {};
 
@@ -32,17 +48,44 @@ export function ProductForm({
   product,
   initialImageUrls = [],
   initialSpecs = {},
+  /** Preset by the page somebody arrived from — Used Items opens on Used. */
+  initialCondition,
 }: {
   userId: string;
   categories: Pick<ProductCategory, "id" | "name">[];
   product?: Product;
   initialImageUrls?: string[];
   initialSpecs?: Record<string, string>;
+  initialCondition?: ProductCondition;
 }) {
   const action = product
     ? updateProduct.bind(null, product.id)
     : createProduct;
   const [state, formAction, pending] = useActionState(action, initialState);
+
+  // Which section the listing lands in, and the only thing that decides
+  // whether the second-hand fields are worth asking for. Held in state rather
+  // than read back from the form, because the fields have to appear as soon as
+  // the seller picks Used, not after a round trip.
+  const [condition, setCondition] = useState<ProductCondition>(
+    // The listing being edited wins over the link that was followed: opening
+    // a new listing's form from Used Items should default to Used, but
+    // editing an existing new listing must not silently switch it.
+    (product?.condition as ProductCondition | undefined) ??
+      initialCondition ??
+      "new",
+  );
+  const secondHand = condition !== "new";
+
+  // The other column that decides the section. A file is never second-hand and
+  // never shipped, so choosing Digital puts the condition and delivery
+  // questions away rather than leaving a seller to answer two that no longer
+  // apply and then meet a constraint error.
+  const [fulfilment, setFulfilment] = useState<ProductFulfilment>(
+    (product?.fulfilment as ProductFulfilment | undefined) ?? "physical",
+  );
+  const digital = fulfilment === "digital";
+  const rental = fulfilment === "rental";
 
   return (
     <form action={formAction} className="space-y-6">
@@ -65,8 +108,31 @@ export function ProductForm({
         <ProductImagesInput userId={userId} initialUrls={initialImageUrls} />
         <p className="text-xs text-muted-foreground">
           The first image is the cover. Hover an image to set a different cover
-          or remove it.
+          or remove it. Published photos carry your watermark.
         </p>
+        {/* Only on a second-hand listing. A supplier photographing new stock
+            does not need to be told to show the damage, and a shot list on
+            every listing is a shot list nobody reads. */}
+        {secondHand && (
+          <div className="rounded-xl border border-dashed p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">
+              What buyers ask for, in this order
+            </p>
+            <ul className="mt-1 grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
+              <li>Front, straight on</li>
+              <li>Back</li>
+              <li>Side</li>
+              <li>Close-up of the surface or finish</li>
+              <li>Every scratch, dent or missing part</li>
+              <li>Serial or model plate, if it has one</li>
+            </ul>
+            <p className="mt-1.5">
+              The damage photo is the one that sells it. A buyer who finds the
+              scratch on collection walks away; one who saw it first turns up
+              expecting it.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -131,6 +197,266 @@ export function ProductForm({
         </div>
       </div>
 
+      <div className="space-y-4 rounded-xl border p-4">
+        <div className="space-y-2">
+          <Label htmlFor="fulfilment">What is being sold</Label>
+          <Select
+            name="fulfilment"
+            value={fulfilment}
+            onValueChange={(value) => setFulfilment(value as ProductFulfilment)}
+          >
+            <SelectTrigger id="fulfilment" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="physical">A thing, for sale</SelectItem>
+              <SelectItem value="rental">A thing, for rent</SelectItem>
+              <SelectItem value="digital">A file</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {digital
+              ? "This listing will appear under Marketplace → Digital."
+              : rental
+                ? "This listing will appear under Marketplace → Rental. The price is the rate."
+                : "This listing will appear under Marketplace → New or Used, by its condition."}
+          </p>
+        </div>
+
+        {rental && (
+          <div className="grid gap-4 border-t pt-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="rentalPeriod">Rate is per</Label>
+              <Select
+                name="rentalPeriod"
+                defaultValue={product?.rental_period ?? "daily"}
+              >
+                <SelectTrigger id="rentalPeriod" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(RENTAL_PERIODS).map(([value, entry]) => (
+                    <SelectItem key={value} value={value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rentalDeposit">Deposit (optional)</Label>
+              <Input
+                id="rentalDeposit"
+                name="rentalDeposit"
+                type="number"
+                min={0}
+                placeholder="2000"
+                defaultValue={product?.rental_deposit ?? ""}
+              />
+            </div>
+          </div>
+        )}
+
+        {digital && (
+          <div className="space-y-4 border-t pt-4">
+            <div className="space-y-2">
+              <Label>The file</Label>
+              <DigitalFileInput
+                userId={userId}
+                initialPath={product?.digital_file_path ?? ""}
+                initialName={product?.digital_file_name ?? ""}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="digitalKind">Kind of file</Label>
+                <Select
+                  name="digitalKind"
+                  defaultValue={product?.digital_kind ?? "course"}
+                >
+                  <SelectTrigger id="digitalKind" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(DIGITAL_KINDS).map(([value, kind]) => (
+                      <SelectItem key={value} value={value}>
+                        {kind.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="license">Licence</Label>
+                <Select
+                  name="license"
+                  defaultValue={product?.license ?? "personal"}
+                >
+                  <SelectTrigger id="license" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(DIGITAL_LICENSES).map(([value, entry]) => (
+                      <SelectItem key={value} value={value}>
+                        {entry.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="fileFormat">Formats</Label>
+                <Input
+                  id="fileFormat"
+                  name="fileFormat"
+                  placeholder="DWG + PDF"
+                  defaultValue={product?.file_format ?? ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fileSizeMb">Size in MB (optional)</Label>
+                <Input
+                  id="fileSizeMb"
+                  name="fileSizeMb"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="46"
+                  defaultValue={product?.file_size_mb ?? ""}
+                />
+                {state.fieldErrors?.fileSizeMb && (
+                  <p className="text-sm text-destructive">
+                    {state.fieldErrors.fileSizeMb}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* A file has no condition and no second-hand grade, so the whole block
+          goes away rather than being shown and ignored. A rental keeps it —
+          whether the scaffold is new or worn is exactly what somebody hiring
+          it wants to know — it just does not decide the section. */}
+      <div className={cn("space-y-4 rounded-xl border p-4", digital && "hidden")}>
+        <div className="space-y-2">
+          <Label htmlFor="condition">Condition</Label>
+          <Select
+            name="condition"
+            value={condition}
+            onValueChange={(value) => setCondition(value as ProductCondition)}
+          >
+            <SelectTrigger id="condition" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SELLABLE_CONDITIONS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {CONDITIONS[value].label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {secondHand
+              ? "This listing will appear under Marketplace → Used Items. You do not need to post it twice."
+              : "This listing will appear under Marketplace → New Items."}
+          </p>
+          {state.fieldErrors?.condition && (
+            <p className="text-sm text-destructive">
+              {state.fieldErrors.condition}
+            </p>
+          )}
+        </div>
+
+        {/* Only asked for when they mean something. A form that shows every
+            field to everybody is a form people abandon halfway. */}
+        {secondHand && (
+          <div className="space-y-4 border-t pt-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="usedGrade">Used condition</Label>
+                <Select
+                  name="usedGrade"
+                  defaultValue={product?.used_grade ?? "good"}
+                >
+                  <SelectTrigger id="usedGrade" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(USED_GRADES).map(([value, grade]) => (
+                      <SelectItem key={value} value={value}>
+                        {grade.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ageMonths">Age in months (optional)</Label>
+                <Input
+                  id="ageMonths"
+                  name="ageMonths"
+                  type="number"
+                  min={0}
+                  max={1200}
+                  placeholder="30"
+                  defaultValue={product?.age_months ?? ""}
+                />
+                {state.fieldErrors?.ageMonths && (
+                  <p className="text-sm text-destructive">
+                    {state.fieldErrors.ageMonths}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="conditionNotes">
+                Condition details (optional)
+              </Label>
+              <Textarea
+                id="conditionNotes"
+                name="conditionNotes"
+                rows={2}
+                placeholder="One owner, kept indoors, all parts present."
+                defaultValue={product?.condition_notes ?? ""}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="knownDefects">Known defects (optional)</Label>
+              <Textarea
+                id="knownDefects"
+                name="knownDefects"
+                rows={2}
+                placeholder="Scratch on the left edge. Handle is loose."
+                defaultValue={product?.known_defects ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">
+                Say what is wrong. A buyer who finds out on collection leaves a
+                review about it.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="saleReason">Reason for selling (optional)</Label>
+              <Input
+                id="saleReason"
+                name="saleReason"
+                placeholder="Moving office"
+                defaultValue={product?.sale_reason ?? ""}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="stockStatus">Availability</Label>
         <Select
@@ -150,7 +476,8 @@ export function ProductForm({
         </Select>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* A file has no city and does not come in a van. */}
+      <div className={cn("grid gap-4 sm:grid-cols-3", digital && "hidden")}>
         <div className="space-y-2">
           <Label htmlFor="locationCity">City</Label>
           <Input
@@ -158,6 +485,18 @@ export function ProductForm({
             name="locationCity"
             defaultValue={product?.location_city ?? ""}
           />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="locationArea">Area (optional)</Label>
+          <Input
+            id="locationArea"
+            name="locationArea"
+            placeholder="Bole"
+            defaultValue={product?.location_area ?? ""}
+          />
+          <p className="text-xs text-muted-foreground">
+            A neighbourhood, not your address.
+          </p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="locationCountry">Country</Label>
@@ -169,7 +508,7 @@ export function ProductForm({
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className={cn("flex items-center gap-2 text-sm", digital && "hidden")}>
         <Checkbox
           name="deliveryAvailable"
           value="on"
@@ -213,6 +552,8 @@ export function ProductForm({
           </SelectContent>
         </Select>
       </div>
+
+      <OwnershipConfirmation defaultChecked={Boolean(product)} />
 
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 

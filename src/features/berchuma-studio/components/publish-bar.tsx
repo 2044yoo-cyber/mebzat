@@ -1,0 +1,245 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Check, Globe, Loader2, LogOut, Save } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+
+import type { DesignSpec } from "../types/spec";
+
+/**
+ * Save, then publish.
+ *
+ * Two steps on purpose. Saving is private and reversible; publishing puts the
+ * design on the feed, in the gallery and behind a permanent URL that other
+ * people will remix. Collapsing those into one button would mean somebody
+ * pressing "save" and finding they had broadcast a half-finished wardrobe to
+ * the whole platform.
+ *
+ * The spec goes up; the price does not. Whatever this browser has computed is
+ * recomputed on the server before anything is stored, because a price a client
+ * chose is not a price a public page can quote.
+ */
+
+type Saved = { id: string; slug: string };
+
+export function PublishBar({
+  spec,
+  lastBrief,
+  initialSaved = null,
+}: {
+  spec: DesignSpec;
+  /** The message that produced the current design, kept as the version note. */
+  lastBrief: string | null;
+  /**
+   * The design this already is, when the studio was opened on a saved one.
+   *
+   * Without it the bar starts as though nothing had ever been saved, and Save
+   * posts with no `designId` — which creates a second design rather than a new
+   * version of the one on screen. Somebody editing their wardrobe would end up
+   * with two wardrobes and no idea which one the link they shared points at.
+   */
+  initialSaved?: Saved | null;
+}) {
+  const router = useRouter();
+  const [saved, setSaved] = useState<Saved | null>(initialSaved);
+  const [published, setPublished] = useState(false);
+  const [busy, setBusy] = useState<"save" | "publish" | "exit" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Cleared whenever the design changes, so the bar never claims a stale save
+  // covers the edits made since. Compared by content rather than by reference
+  // because every rail edit produces a new object.
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
+  const signature = JSON.stringify(spec);
+  const dirty = saved !== null && savedSignature !== signature;
+
+  const post = async (body: Record<string, unknown>) => {
+    const response = await fetch("/api/studio/designs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload = (await response.json()) as Record<string, unknown>;
+    if (!response.ok || typeof payload.error === "string") {
+      throw new Error(
+        typeof payload.error === "string" ? payload.error : "That did not work.",
+      );
+    }
+    return payload;
+  };
+
+  const save = async () => {
+    setBusy("save");
+    setError(null);
+    try {
+      const payload = await post({
+        action: "save",
+        designId: saved?.id,
+        spec,
+        note: lastBrief,
+      });
+      setSaved({ id: String(payload.id), slug: String(payload.slug) });
+      setSavedSignature(signature);
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : "That did not work.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * Leave the studio for the design's own page.
+   *
+   * It saves on the way out when there is anything unsaved, which is not the
+   * same button as "save and exit" — it is this button refusing to send you to
+   * a page showing an older wardrobe than the one you were just looking at.
+   * Without it, Exit after an edit lands on stale content and reads as having
+   * lost the work.
+   *
+   * Nothing is lost when the save fails: the error shows, the navigation does
+   * not happen, and the draft in this browser still holds the design.
+   */
+  const exit = async () => {
+    setBusy("exit");
+    setError(null);
+    try {
+      let target = saved;
+      if (!target || dirty) {
+        const payload = await post({
+          action: "save",
+          designId: saved?.id,
+          spec,
+          note: lastBrief,
+        });
+        target = { id: String(payload.id), slug: String(payload.slug) };
+        setSaved(target);
+        setSavedSignature(signature);
+      }
+      router.push(`/designs/${target.slug}`);
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : "That did not work.");
+      setBusy(null);
+    }
+  };
+
+  const publish = async () => {
+    if (!saved) return;
+    setBusy("publish");
+    setError(null);
+    try {
+      // Publishing an edited design would otherwise put the last saved version
+      // on a public page while the screen shows a different one.
+      if (dirty) {
+        const payload = await post({
+          action: "save",
+          designId: saved.id,
+          spec,
+          note: lastBrief,
+        });
+        setSaved({ id: String(payload.id), slug: String(payload.slug) });
+        setSavedSignature(signature);
+      }
+
+      const payload = await post({
+        action: "publish",
+        designId: saved.id,
+        visibility: "public",
+      });
+      setSaved((previous) =>
+        previous ? { ...previous, slug: String(payload.slug) } : previous,
+      );
+      setPublished(true);
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : "That did not work.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    // On a phone this is a row of buttons and nothing else.
+    //
+    // The card — a border, 12px of padding all round and a line of prose
+    // under the buttons — is worth its space beside a design on a desktop.
+    // On a phone the header wraps, so it became a full-width block costing
+    // about 110px above the viewer, on a screen where the viewer is the
+    // point. The explanation goes with it: "Saving keeps a private copy" is
+    // useful the first time and furniture every time after.
+    <div className="space-y-2 sm:rounded-xl sm:border sm:bg-card sm:p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant={saved && !dirty ? "outline" : "default"}
+          className="gap-1.5"
+          onClick={save}
+          disabled={busy !== null || (saved !== null && !dirty)}
+        >
+          {busy === "save" ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          ) : saved && !dirty ? (
+            <Check className="size-3.5" aria-hidden />
+          ) : (
+            <Save className="size-3.5" aria-hidden />
+          )}
+          {saved ? (dirty ? "Save changes" : "Saved") : "Save"}
+        </Button>
+
+        {saved ? (
+          <Button
+            size="sm"
+            variant={published && !dirty ? "outline" : "default"}
+            className="gap-1.5"
+            onClick={publish}
+            disabled={busy !== null || (published && !dirty)}
+          >
+            {busy === "publish" ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Globe className="size-3.5" aria-hidden />
+            )}
+            {published ? (dirty ? "Publish update" : "Published") : "Publish"}
+          </Button>
+        ) : null}
+
+        {/*
+          Exit, where "Open the page" used to be — the same destination, as a
+          control rather than a footnote. It is not conditional on having saved:
+          leaving a design you have never saved is exactly when a link that
+          only appears afterwards is no use, so this one saves first and then
+          goes.
+        */}
+        <Button
+          size="sm"
+          variant="outline"
+          className="ml-auto gap-1.5"
+          onClick={exit}
+          disabled={busy !== null}
+          title="Save anything outstanding and open this design's page"
+        >
+          {busy === "exit" ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <LogOut className="size-3.5" aria-hidden />
+          )}
+          Exit
+        </Button>
+      </div>
+
+      <p className="hidden text-[11px] text-muted-foreground sm:block">
+        {published && !dirty
+          ? "Live on the feed and in the gallery. Anyone can open it and remix it."
+          : saved
+            ? "Saved privately. Publishing gives it a permanent link and puts it on the feed."
+            : "Saving keeps a private copy and starts its version history."}
+      </p>
+
+      {error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}

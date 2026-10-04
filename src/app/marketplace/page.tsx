@@ -3,6 +3,8 @@ import { PackageOpen, Store } from "lucide-react";
 
 import { ProductCard } from "@/components/products/product-card";
 import { MarketplaceFilters } from "@/components/products/marketplace-filters";
+import { MarketplaceSections } from "@/components/products/marketplace-sections";
+import { PostItemButton } from "@/components/products/post-item-button";
 import { Pagination } from "@/components/ui/pagination";
 import { isProductSort, type ProductSort } from "@/lib/constants/product-categories";
 import {
@@ -13,9 +15,9 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Marketplace — Construction materials, furniture & more",
+  title: "Marketplace — New construction materials, furniture & more",
   description:
-    "Browse construction materials, furniture, fixtures, and equipment from verified suppliers on Medosha.",
+    "Browse new construction materials, furniture, fixtures, and equipment from suppliers on Medosha. Second-hand goods have their own section.",
 };
 
 const PAGE_SIZE = 24;
@@ -49,6 +51,9 @@ export default async function MarketplacePage(props: {
       maxPrice: toNumber(maxPrice),
       page,
       pageSize: PAGE_SIZE,
+      // New Items. Everything already listed defaults to `new`, so nothing
+      // that was here yesterday has moved.
+      section: "new",
     }),
     (await createClient()).auth.getUser(),
   ]);
@@ -69,18 +74,18 @@ export default async function MarketplacePage(props: {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-10">
-      <div className="mb-8">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Store className="size-4" /> Marketplace
-        </div>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-          Everything for your build
+      {/* A heading and the one action, and nothing between them. The eyebrow
+          repeated what the tabs underneath already say, and the paragraph
+          described a marketplace to people who are standing in it — five lines
+          on a phone before a single product. */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Marketplace
         </h1>
-        <p className="mt-1 text-muted-foreground">
-          Materials, furniture, fixtures, and equipment from suppliers across
-          the network.
-        </p>
+        <PostItemButton condition="new" />
       </div>
+
+      <MarketplaceSections active="new" className="mb-4" />
 
       <MarketplaceFilters
         categories={categories}
@@ -101,8 +106,9 @@ export default async function MarketplacePage(props: {
             description={
               q || category || minPrice || maxPrice
                 ? "Try adjusting your filters or search."
-                : "Be the first supplier to list a product."
+                : "Be the first supplier to list a product. Selling something second-hand? It goes under Used Items."
             }
+            action={<PostItemButton condition="new" />}
           />
         ) : (
           <>
@@ -133,16 +139,19 @@ function EmptyState({
   icon,
   title,
   description,
+  action,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed p-16 text-center">
       <div className="text-muted-foreground">{icon}</div>
       <p className="font-medium">{title}</p>
       <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
+      {action}
     </div>
   );
 }

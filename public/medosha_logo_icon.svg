@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Medosha</title>
+  <path fill="#102030" d="M7 14 28 3l17 11v40L28 64 7 51z"/>
+  <path fill="#0875f5" d="m28 12 24-12v50L39 57V25z"/>
+  <path fill="none" stroke="#fff" stroke-width="3" d="M39 25v32M51 15 39 25M40 34h11M40 44h11M46 20v34"/>
+  <path fill="#fff" d="M13 26c7-7 15-9 24-5v7h-7v25h-8V29h-9z"/>
+  <path fill="#102030" d="M28 18h7v8h-7z"/>
+</svg>

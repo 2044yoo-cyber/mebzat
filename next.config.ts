@@ -4,6 +4,20 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseHost = supabaseUrl ? new URL(supabaseUrl).hostname : undefined;
 
 const nextConfig: NextConfig = {
+  async headers() {
+    // Safe, non-breaking defaults only — no CSP here, since a wrong one
+    // would silently break existing pages rather than fail loudly.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+    ];
+  },
   images: {
     // Allow SVGs (the branded fallback placeholder, and any SVG a user
     // uploads as a company logo) but neutralize them: served as attachments
@@ -18,6 +32,17 @@ const nextConfig: NextConfig = {
               protocol: "https" as const,
               hostname: supabaseHost,
               pathname: "/storage/v1/object/public/**",
+            },
+            // Signed objects from the private buckets. Agenda's site photos
+            // live in one — a photograph of a client's building and its
+            // progress is not something an unlisted URL is a permission for —
+            // so they are served as `/object/sign/...` with an expiry, and the
+            // optimiser has to be told that path exists as well as the public
+            // one. Same host either way: this widens the path, not the origin.
+            {
+              protocol: "https" as const,
+              hostname: supabaseHost,
+              pathname: "/storage/v1/object/sign/**",
             },
           ]
         : []),

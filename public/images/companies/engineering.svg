@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Medosha — Engineering">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f6f8f"/>
+      <stop offset="1" stop-color="#22526b"/>
+    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="400" fill="url(#bg)"/>
+  <rect width="1200" height="400" fill="url(#grid)"/>
+  <g transform="translate(600 152) scale(0.450)" fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="-140" y="-110" width="280" height="220" rx="12"/>
+    <path d="M-90 -60 h100 v80 h-100 z"/><path d="M40 -60 h50 M40 20 h50"/>
+  </g>
+  <text x="600" y="296" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff" letter-spacing="1">Engineering</text>
+  <text x="600" y="328.3" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#ffffff" fill-opacity="0.72" letter-spacing="3">MEDOSHA</text>
+</svg>

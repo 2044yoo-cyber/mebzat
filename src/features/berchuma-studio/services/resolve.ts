@@ -1,0 +1,395 @@
+import { placeOnRun, solveLayout, type SolvedLayout } from "./layout";
+import {
+  rotatedRectBounds,
+  transformPlanPoint,
+  unionPlanBounds,
+} from "./part-transform";
+import type { Cabinet, DesignSpec } from "../types/spec";
+import type { RunPlacement } from "../types/layout";
+
+/**
+ * Turning a spec into placed geometry.
+ *
+ * The one function between "what the customer said" and "where the boxes are".
+ * Everything downstream — the viewer, the cut list, the worktop, the costing —
+ * reads its output rather than the spec's stored positions, which is what
+ * makes Part 59 true: change a wall length and every consequence follows from
+ * this one recomputation.
+ *
+ * ## Stored positions are a fallback, not the truth
+ *
+ * A cabinet with a `runId` is placed by its run. A cabinet without one keeps
+ * the position it was given — that is the island, the free-standing dresser,
+ * and every design authored before runs existed and not yet migrated.
+ *
+ * Both are legitimate, and the distinction is visible in the result so the
+ * editor can say "this module is on Wall B at 900 mm" for one and "this island
+ * is at x 2100" for the other. Presenting a run-placed cabinet's coordinates
+ * as though somebody had chosen them is how a person ends up dragging a box
+ * that will snap back on the next edit.
+ *
+ * Pure. Runs under plain Node in the check script.
+ */
+
+export type PlacedCabinet = {
+  cabinet: Cabinet;
+  /** Plan position of the cabinet's left-front corner, in the design frame. */
+  x: number;
+  z: number;
+  /** Floor to the cabinet's underside. Straight from the spec. */
+  y: number;
+  /** Degrees anticlockwise about y. Zero for anything not on a turned run. */
+  rotation: number;
+  /** The run it belongs to, or null when it is placed by hand. */
+  runId: string | null;
+  /** How far along its run it sits. Null for a hand-placed cabinet. */
+  offset: number | null;
+};
+
+export type ResolvedDesign = {
+  layout: SolvedLayout;
+  cabinets: PlacedCabinet[];
+  /**
+   * Problems that are about the arrangement rather than about one cabinet.
+   *
+   * Kept separate from the spec's own validation issues because they are
+   * recomputed on every edit and are often transient — a run is briefly
+   * over-filled while somebody is typing a new wall length.
+   */
+  issues: string[];
+};
+
+/** Bounds of the resolved geometry frame, including run rotation and corners. */
+export type DesignWorldBounds = {
+  min: { x: number; y: number; z: number };
+  max: { x: number; y: number; z: number };
+  width: number;
+  height: number;
+  depth: number;
+};
+
+export function resolveDesign(spec: DesignSpec): ResolvedDesign {
+  const layout = solveLayout(spec.layout, spec.runs, {
+    cornerKind: spec.cornerKind,
+    cornerKinds: spec.cornerKinds,
+    cornerSettings: spec.cornerSettings,
+    wardrobeOwnership: spec.furnitureType === "wardrobe",
+    kitchenFacing:
+      !!spec.kitchenSetup ||
+      (spec.furnitureType === "wardrobe" &&
+        (spec.layout === "l_shaped" || spec.layout === "u_shaped")),
+  });
+
+  const byRun = new Map<string, RunPlacement>(
+    layout.placements.map((placement) => [placement.runId, placement]),
+  );
+
+  const cabinets: PlacedCabinet[] = [];
+  const issues: string[] = [...layout.notes];
+
+  // How much of each run is spoken for, so an over-filled run is reported
+  // once with a number rather than once per cabinet.
+  const filled = new Map<string, number>();
+  const runCounts = new Map<string, number>();
+  for (const cabinet of spec.cabinets) if (cabinet.runId) runCounts.set(cabinet.runId, (runCounts.get(cabinet.runId) ?? 0) + 1);
+
+  for (const cabinet of spec.cabinets) {
+    const placement = cabinet.runId ? byRun.get(cabinet.runId) : undefined;
+
+    if (!placement) {
+      if (cabinet.runId) {
+        // A dangling run reference. The cabinet still has to appear somewhere
+        // — dropping it would delete a customer's module because a run was
+        // renamed — so it falls back to its stored position and says so.
+        issues.push(
+          `${cabinet.label} refers to a run that no longer exists, so it is shown where it was last placed.`,
+        );
+      }
+
+      cabinets.push({
+        cabinet,
+        x: cabinet.position.x,
+        z: cabinet.position.z,
+        y: cabinet.position.y,
+        rotation: 0,
+        runId: null,
+        offset: null,
+      });
+      continue;
+    }
+
+    const offset = cabinet.offset ?? 0;
+    // A generated turned wardrobe has one fitted carcass per run. Corner
+    // dimension edits change the run's usable span, so derive that carcass and
+    // its bay openings from the same span instead of leaving it inside the
+    // newly enlarged corner volume.
+    let effectiveCabinet = cabinet;
+    if (spec.furnitureType === "wardrobe" && spec.layout !== "straight" && runCounts.get(placement.runId) === 1 && Math.abs(cabinet.size.width - placement.usableLength) > 0.01) {
+      const t = spec.carcass.board.thickness;
+      const available = Math.max(0, placement.usableLength - (cabinet.bays.length + 1) * t);
+      const oldOpenings = cabinet.bays.reduce((sum, bay) => sum + bay.width, 0);
+      effectiveCabinet = {
+        ...cabinet,
+        size: { ...cabinet.size, width: placement.usableLength },
+        bays: cabinet.bays.map((bay) => ({ ...bay, width: oldOpenings > 0 ? available * bay.width / oldOpenings : 0 })),
+      };
+    }
+    if (spec.furnitureType === "wardrobe") {
+      effectiveCabinet = applyOwnedCornerBays(effectiveCabinet, placement, layout.corners, spec.carcass.board.thickness, spec.cornerSettings);
+    }
+    const placed = placeOnRun(placement, offset, spec.kitchenSetup ? effectiveCabinet.size.depth : undefined);
+
+    cabinets.push({
+      cabinet: effectiveCabinet,
+      x: placed.x,
+      z: placed.z,
+      y: cabinet.position.y,
+      rotation: placed.rotation,
+      runId: placement.runId,
+      offset,
+    });
+
+    // Wall units sit above base units on the same run and share its length —
+    // counting both would report every kitchen as twice over-filled. Fill is
+    // measured per kind, and only the fullest kind is reported.
+    const key = `${placement.runId}:${effectiveCabinet.kind}:${effectiveCabinet.position.y}`;
+    filled.set(key, (filled.get(key) ?? 0) + effectiveCabinet.size.width);
+  }
+
+  for (const placement of layout.placements) {
+    let worst = 0;
+    for (const [key, used] of filled) {
+      if (key.startsWith(`${placement.runId}:`)) worst = Math.max(worst, used);
+    }
+
+    if (worst > placement.usableLength + 1) {
+      issues.push(
+        `${placement.label} holds ${Math.round(worst)} mm of cabinets but only ` +
+          `${Math.round(placement.usableLength)} mm is free after the corner. ` +
+          `Lengthen the wall or narrow a module.`,
+      );
+    }
+  }
+
+  return { layout, cabinets, issues };
+}
+
+function applyOwnedCornerBays(
+  cabinet: Cabinet,
+  placement: RunPlacement,
+  corners: SolvedLayout["corners"],
+  thickness: number,
+  settings: DesignSpec["cornerSettings"],
+): Cabinet {
+  const owned = corners.filter((corner) => corner.ownerRunId === placement.runId);
+  if (owned.length === 0 || cabinet.bays.length < 2) return cabinet;
+
+  const start = placeOnRun(placement, 0);
+  const end = placeOnRun(placement, placement.usableLength);
+  const assigned = owned.map((corner) => {
+    const centre = {
+      x: corner.x + (corner.width ?? corner.size) / 2,
+      z: corner.z + (corner.depth ?? corner.size) / 2,
+    };
+    const distance = (point: { x: number; z: number }) => (point.x - centre.x) ** 2 + (point.z - centre.z) ** 2;
+    return { corner, atStart: distance(start) <= distance(end) };
+  });
+
+  const bays = cabinet.bays.map((bay) => ({ ...bay }));
+  const available = cabinet.size.width - (bays.length + 1) * thickness;
+  const reserved = new Map<number, { width: number; corner: (typeof owned)[number] }>();
+  for (const entry of assigned) {
+    const index = entry.atStart ? 0 : bays.length - 1;
+    const radians = placement.rotation * Math.PI / 180;
+    const cornerSpan = Math.abs(Math.sin(radians)) > 0.5
+      ? entry.corner.depth ?? entry.corner.size
+      : entry.corner.width ?? entry.corner.size;
+    reserved.set(index, {
+      width: Math.max(0, cornerSpan - 2 * thickness),
+      corner: entry.corner,
+    });
+  }
+  const reservedWidth = [...reserved.values()].reduce((sum, entry) => sum + entry.width, 0);
+  const ordinary = bays.map((_, index) => index).filter((index) => !reserved.has(index));
+  const oldOrdinary = ordinary.reduce((sum, index) => sum + bays[index]!.width, 0);
+  const remaining = Math.max(0, available - reservedWidth);
+
+  for (const [index, entry] of reserved) {
+    const count = settings?.[entry.corner.id]?.shelves ?? 3;
+    bays[index] = {
+      ...bays[index]!,
+      width: entry.width,
+      door: "none",
+      doorLeaves: 1,
+      fitting: entry.corner.kind === "hanging"
+        ? { kind: "open" }
+        : { kind: "shelves", count, adjustable: true },
+    };
+  }
+  for (const index of ordinary) {
+    bays[index] = {
+      ...bays[index]!,
+      width: oldOrdinary > 0 ? remaining * bays[index]!.width / oldOrdinary : remaining / ordinary.length,
+    };
+  }
+  return { ...cabinet, bays };
+}
+
+/**
+ * The one display/selection envelope for a placed design.
+ *
+ * Stored cabinet coordinates are deliberately not trusted here: run-bound
+ * cabinets move with their walls and can be rotated, while L/U corners are
+ * real physical blocks with no Cabinet record of their own. Four transformed
+ * corners make custom 45° runs correct as well as the normal 0/90/180/270°.
+ */
+export function designWorldBounds(spec: DesignSpec): DesignWorldBounds {
+  const resolved = resolveDesign(spec);
+  const frontProjection =
+    spec.carcass.frontBoard?.thickness ?? spec.carcass.board.thickness;
+  const plan = resolved.cabinets.map((placed) =>
+    // Doors and drawer fronts stand proud of the local front plane. Including
+    // that small projection prevents an otherwise-correct camera frame from
+    // clipping the actual rendered front on rotated runs.
+    rotatedRectBounds(
+      transformPlanPoint(
+        { x: placed.x, z: placed.z },
+        placed.rotation,
+        { x: 0, z: -frontProjection },
+      ),
+      {
+        width: placed.cabinet.size.width,
+        depth: placed.cabinet.size.depth + frontProjection,
+      },
+      placed.rotation,
+    ),
+  );
+  for (const corner of resolved.layout.corners) {
+    plan.push(
+      rotatedRectBounds(
+        { x: corner.x, z: corner.z },
+        { width: corner.width ?? corner.size, depth: corner.depth ?? corner.size },
+      ),
+    );
+  }
+
+  const footprint = unionPlanBounds(plan);
+  const heights = [
+    ...resolved.cabinets.map(
+      (placed) => placed.y + placed.cabinet.size.height,
+    ),
+    ...resolved.layout.corners.map((corner) => corner.height),
+    0,
+  ];
+  const minimumY = Math.min(...resolved.cabinets.map((placed) => placed.y), 0);
+  const maximumY = Math.max(...heights);
+
+  return {
+    min: { x: footprint.minX, y: minimumY, z: footprint.minZ },
+    max: { x: footprint.maxX, y: maximumY, z: footprint.maxZ },
+    width: Math.max(1, Math.ceil(footprint.maxX - footprint.minX)),
+    height: Math.max(1, Math.ceil(maximumY - minimumY)),
+    depth: Math.max(1, Math.ceil(footprint.maxZ - footprint.minZ)),
+  };
+}
+
+/**
+ * The next free offset on a run, for "+ Module".
+ *
+ * Measured per cabinet kind for the same reason the fill check is: adding a
+ * wall unit to a kitchen should place it above the base units, at its own
+ * offset, not after them.
+ */
+export function nextOffset(
+  spec: DesignSpec,
+  runId: string,
+  kind: Cabinet["kind"],
+): number {
+  let end = 0;
+
+  for (const cabinet of spec.cabinets) {
+    if (cabinet.runId !== runId || cabinet.kind !== kind) continue;
+    end = Math.max(end, (cabinet.offset ?? 0) + cabinet.size.width);
+  }
+
+  return end;
+}
+
+/**
+ * How much room is left on a run for another cabinet of this kind.
+ *
+ * Negative when the run is already over-filled, which the caller shows rather
+ * than clamping — a person who has typed a wall length that no longer fits
+ * their kitchen needs to see by how much.
+ */
+export function remainingOn(
+  spec: DesignSpec,
+  runId: string,
+  kind: Cabinet["kind"],
+): number {
+  const layout = solveLayout(spec.layout, spec.runs, {
+    cornerKind: spec.cornerKind,
+    cornerKinds: spec.cornerKinds,
+    cornerSettings: spec.cornerSettings,
+    kitchenFacing: !!spec.kitchenSetup,
+  });
+
+  const placement = layout.placements.find((entry) => entry.runId === runId);
+  if (!placement) return 0;
+
+  return placement.usableLength - nextOffset(spec, runId, kind);
+}
+
+/**
+ * The worktop's path, as a polyline along the fronts of the base runs.
+ *
+ * Follows the layout rather than being drawn per run, so an L gets one
+ * continuous worktop with a mitre at the corner instead of two slabs that
+ * happen to meet. The corner squares are included: a worktop with a hole where
+ * the corner cabinet is would be a worktop nobody could put a kettle on.
+ *
+ * Returns plan rectangles rather than a single polygon. A rectangle per run
+ * plus one per corner tiles the same area, is trivially correct, and is what
+ * both the viewer and the sheet-goods calculation want — the alternative is a
+ * polygon that has to be triangulated before either can use it.
+ */
+export function worktopSections(
+  resolved: ResolvedDesign,
+  options: { overhang?: number } = {},
+): { x: number; z: number; width: number; depth: number }[] {
+  const overhang = options.overhang ?? 0;
+  const sections: { x: number; z: number; width: number; depth: number }[] = [];
+
+  for (const placement of resolved.layout.placements) {
+    const alongX = placement.rotation % 180 === 0;
+
+    sections.push({
+      x: placement.origin.x,
+      z: placement.origin.z,
+      width: alongX ? placement.usableLength : placement.depth + overhang,
+      depth: alongX ? placement.depth + overhang : placement.usableLength,
+    });
+  }
+
+  for (const corner of resolved.layout.corners) {
+    sections.push({
+      x: corner.x,
+      z: corner.z,
+      width: corner.width ?? corner.size,
+      depth: corner.depth ?? corner.size,
+    });
+  }
+
+  return sections;
+}
+
+/** Total worktop area in square metres, for the BOQ. */
+export function worktopArea(
+  sections: { width: number; depth: number }[],
+): number {
+  const mm2 = sections.reduce(
+    (total, section) => total + section.width * section.depth,
+    0,
+  );
+  return Math.round((mm2 / 1_000_000) * 1000) / 1000;
+}

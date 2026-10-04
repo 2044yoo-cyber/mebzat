@@ -32,6 +32,14 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  // The one question a new account is asked, asked here rather than from a
+  // layout. 0097 marked every profile that already existed as onboarded, so
+  // this catches new sign-ups only and an account from last year lands on the
+  // dashboard as it always has.
+  if (!profile.onboarding_completed) {
+    redirect("/welcome");
+  }
+
   const { count: projectCount } = await supabase
     .from("projects")
     .select("id", { count: "exact", head: true })
@@ -41,7 +49,7 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="grid gap-4 lg:grid-cols-2">
         <WelcomeCard profile={profile} />
-        <ProfileCompletionCard profile={profile} />
+        <ProfileCompletionCard profile={profile} compact />
       </div>
 
       <QuickActions />

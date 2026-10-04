@@ -260,5 +260,5 @@ export function isModerationConfigured(): boolean {
 /** Names the variables an operator has to set. Never their values. */
 export function moderationSetupHelp(): string {
   const names = PROVIDERS.flatMap((entry) => entry.keyVars).join(" or ");
-  return `No moderation provider is configured. Set ${names} in .env.local. Until then every upload goes to review rather than being published.`;
+  return `No moderation provider is configured. Set ${names} in .env.local. Until then uploads publish unchecked — nothing is classified, so nothing is flagged and nothing is blocked. Reports from members still reach the queue.`;
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { EditProfileForm } from "@/components/profile/edit-profile-form";
+import { listAreas, serviceAreasFor } from "@/lib/data/professionals";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function EditProfilePage() {
@@ -23,6 +24,11 @@ export default async function EditProfilePage() {
     redirect("/dashboard");
   }
 
+  const [areas, mine] = await Promise.all([
+    listAreas(),
+    serviceAreasFor(user.id),
+  ]);
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
@@ -33,7 +39,11 @@ export default async function EditProfilePage() {
           Keep your public profile up to date.
         </p>
       </div>
-      <EditProfileForm profile={profile} />
+      <EditProfileForm
+        profile={profile}
+        areas={areas}
+        serviceAreaSlugs={mine.map((a) => a.slug)}
+      />
     </div>
   );
 }

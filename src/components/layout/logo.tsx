@@ -1,5 +1,14 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
+
+export function BrandIcon({ className }: { className?: string }) {
+  return (
+    <span className={cn("relative block size-8 shrink-0 overflow-hidden rounded-lg", className)}>
+      <Image src="/medosha_logo_icon.svg" alt="" fill sizes="32px" />
+    </span>
+  );
+}
 
 export function Logo({ className }: { className?: string }) {
   return (
@@ -10,9 +19,7 @@ export function Logo({ className }: { className?: string }) {
         className,
       )}
     >
-      <span className="flex size-7 items-center justify-center rounded-lg bg-brand text-brand-foreground text-sm font-bold">
-        M
-      </span>
+      <BrandIcon className="size-7" />
       Medosha
     </Link>
   );

@@ -96,10 +96,20 @@ function DropdownMenuItem({
   )
 }
 
+/**
+ * Base UI's LinkItem defaults `closeOnClick` to false, on the reasoning that a
+ * link navigates the page away and the menu goes with it. That reasoning does
+ * not hold in a client-routed app: `next/link` swaps the route without
+ * unmounting the menu, so the account popup stayed open over Profile,
+ * Dashboard and Settings until something else was clicked. The default is
+ * flipped here rather than at each call site so a menu added later cannot
+ * reintroduce it.
+ */
 function DropdownMenuLinkItem({
   className,
   inset,
   variant = "default",
+  closeOnClick = true,
   ...props
 }: MenuPrimitive.LinkItem.Props & {
   inset?: boolean
@@ -108,6 +118,7 @@ function DropdownMenuLinkItem({
   return (
     <MenuPrimitive.LinkItem
       data-slot="dropdown-menu-link-item"
+      closeOnClick={closeOnClick}
       data-inset={inset}
       data-variant={variant}
       className={cn(

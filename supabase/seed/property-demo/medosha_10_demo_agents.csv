@@ -1,0 +1,11 @@
+﻿agent_id,agency_name,agent_name,base_area,email
+agent_demo_01,Abel Homes Ethiopia,Abel Kebede,Bole,abel.demo@example.com
+agent_demo_02,Addis Prime Realty,Marta Tesfaye,Kazanchis,marta.demo@example.com
+agent_demo_03,Nile Property Group,Samuel Bekele,CMC,samuel.demo@example.com
+agent_demo_04,Bole Atlas Properties,Hana Girma,Bole,hana.demo@example.com
+agent_demo_05,Capital Homes Ethiopia,Dawit Alemu,Sarbet,dawit.demo@example.com
+agent_demo_06,Addis Urban Estate,Selam Worku,Megenagna,selam.demo@example.com
+agent_demo_07,Summit Realty Demo,Yonas Tadesse,Summit,yonas.demo@example.com
+agent_demo_08,Horizon Land & Homes,Mimi Haile,Ayat,mimi.demo@example.com
+agent_demo_09,Ethio Living Demo,Robel Mengistu,Lebu,robel.demo@example.com
+agent_demo_10,Nexus Demo Properties,Betelhem Fikre,Wollo Sefer,betelhem.demo@example.com

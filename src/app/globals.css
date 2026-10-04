@@ -2,6 +2,81 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* The reading face.
+ *
+ * `--font-sans` used to be declared only inside `@theme inline`, as
+ * `--font-sans: var(--font-sans)` — a property defined in terms of itself,
+ * which is invalid at computed-value time. So `font-family: var(--font-sans)`
+ * resolved to nothing and the whole site rendered in the browser's fallback
+ * while Geist was downloaded on every page load and never drawn. This is the
+ * definition that was missing.
+ *
+ * Order inside a stack matters and is not the obvious one. A browser chooses a
+ * face per character, so the Latin face goes first and the Ethiopic faces
+ * follow: English keeps Geist, and Fidel falls through to a font that has the
+ * syllables. Leading with the Ethiopic font — the obvious way to "support
+ * Amharic" — renders every Latin letter in its Latin glyphs instead.
+ *
+ * The local names after the loaded one are for a failed webfont: Nyala ships
+ * on Windows, Kefa on macOS and iOS, Noto on Android.
+ *
+ * The three stacks are named separately from the selector that picks one so
+ * that `[data-font]` can be an *attribute* selector rather than `html[...]`.
+ * The settings screen renders each option in its own face by putting the
+ * attribute on the button, which only works if the rule is not anchored to the
+ * root element. */
+:root {
+  --font-ethiopic-stack: var(--font-noto-ethiopic), "Noto Sans Ethiopic",
+    "Abyssinica SIL", "Kefa", "Nyala";
+  --font-stack-default: var(--font-geist-sans), var(--font-ethiopic-stack),
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* The device's own UI font, with the Ethiopic stack still behind it — the
+   * point of this choice is speed and familiarity, not going without Fidel. */
+  --font-stack-system: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, var(--font-ethiopic-stack), sans-serif;
+  --font-stack-serif: ui-serif, Georgia, "Times New Roman",
+    var(--font-ethiopic-stack), serif;
+
+  --font-sans: var(--font-stack-default);
+}
+
+/* `default` is spelled out rather than left to `:root`, so a sample rendered
+ * inside a page already set to another face shows the default rather than
+ * inheriting the one it is meant to be an alternative to. */
+[data-font="default"] {
+  --font-sans: var(--font-stack-default);
+}
+[data-font="system"] {
+  --font-sans: var(--font-stack-system);
+}
+[data-font="serif"] {
+  --font-sans: var(--font-stack-serif);
+}
+
+/* Reading a whole page in Fidel is a different job from reading a word of it.
+ * Here the Ethiopic face leads, because almost every glyph on the page will be
+ * one it has.
+ *
+ * `var(--font-sans)` behind it rather than Geist by name: the reader's font
+ * choice still has to decide what the Latin words are drawn in, and naming the
+ * default face here would quietly make the setting do nothing for anybody
+ * reading in Amharic or Afaan Oromo. */
+html[lang="am"] body,
+html[lang="om"] body {
+  font-family: var(--font-ethiopic-stack), var(--font-sans);
+}
+
+[data-i18n-managed] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+html[lang="am"] :where(button, a, label, [role="button"]),
+html[lang="om"] :where(button, a, label, [role="button"]) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -51,74 +126,131 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* How much of the screen the phone's bottom navigation actually takes.
+   *
+   * The bar is h-14 — 56px — *plus* the safe-area inset a phone with a home
+   * indicator reserves below it. Anything clearing it has to clear both, and
+   * two places were clearing only the 56px: the workspace's scroll padding and
+   * the floating action buttons. On a device with no inset that is invisibly
+   * correct, which is why it survived; on every iPhone since the X and most
+   * recent Androids it hid the last ~34px of the page behind the bar.
+   *
+   * Defined once here rather than written out twice, so a change to the bar's
+   * height cannot leave one consumer behind. */
+  --bottom-nav-h: calc(3.5rem + env(safe-area-inset-bottom));
+
+  /* How much room the floating actions take above the bar.
+   *
+   * Measured rather than guessed, because the first version of this was and
+   * was 28px short. The stack is `p-5` around two controls with `gap-3`:
+   *
+   *   20px padding
+   *   48px  Ask Medosha AI   (py-2.5 around a size-7 circle)
+   *   12px  gap
+   *   48px  quick actions    (size-12)
+   *   20px padding
+   *   ────
+   *   148px = 9.25rem
+   *
+   * A scrolling column whose last control is a full-width button ends
+   * underneath these even when it has cleared the navigation bar — which is
+   * what the bar was getting blamed for. */
+  --floating-actions-h: 9.25rem;
+
+  /* Let the final control scroll fully above the bottom bar and both floating
+   * actions, with a small comfortable over-scroll margin. */
+  --content-bottom-gap: calc(var(--bottom-nav-h) + var(--floating-actions-h) + 1.5rem);
+
+  /* A strip down each side of a full-screen map that the page keeps.
+   *
+   * A map fills its box edge to edge and swallows every touch inside it —
+   * that is what a map is for. In full screen the box is the whole screen, so
+   * there is nowhere left to put a finger that scrolls the page instead of
+   * panning the city, and the header above it becomes unreachable.
+   *
+   * CSS `mm` is not millimetres on a phone: it is defined against 96dpi, so
+   * `4mm` resolves to about 15 CSS px and lands nearer 2.4mm of actual glass.
+   * Measured instead — a 393px-wide phone is about 7cm across, so a
+   * millimetre is close to 5.6 CSS px and 24px is a shade over 4mm.
+   *
+   * Wide enough for a thumb to start a swipe in, narrow enough that the city
+   * keeps almost all of the screen. */
+  --map-scroll-gutter: 1.5rem;
+
+  /* How much of the *width* the floating stack takes.
+   *
+   * 20px of padding either side of a 48px button. This is the number that
+   * lets pinned or internally scrolling controls step around the stack too. */
+  --floating-actions-w: 5.5rem;
+
+  --background: oklch(0.99 0.006 255);
+  --foreground: oklch(0.2 0.035 255);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.2 0.035 255);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.2 0.035 255);
+  --primary: oklch(0.55 0.2 257);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.965 0.02 255);
+  --secondary-foreground: oklch(0.28 0.08 257);
+  --muted: oklch(0.965 0.018 255);
+  --muted-foreground: oklch(0.5 0.035 255);
+  --accent: oklch(0.95 0.035 255);
+  --accent-foreground: oklch(0.28 0.09 257);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.9 0.025 255);
+  --input: oklch(0.9 0.025 255);
+  --ring: oklch(0.62 0.16 257);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar: oklch(0.98 0.012 255);
+  --sidebar-foreground: oklch(0.2 0.035 255);
+  --sidebar-primary: oklch(0.55 0.2 257);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --brand: oklch(0.47 0.16 259);
+  --sidebar-accent: oklch(0.95 0.035 255);
+  --sidebar-accent-foreground: oklch(0.28 0.09 257);
+  --sidebar-border: oklch(0.9 0.025 255);
+  --sidebar-ring: oklch(0.62 0.16 257);
+  --brand: oklch(0.55 0.2 257);
   --brand-foreground: oklch(0.985 0 0);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.16 0.025 255);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.2 0.03 255);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.2 0.03 255);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --primary: oklch(0.68 0.17 257);
+  --primary-foreground: oklch(0.15 0.025 255);
+  --secondary: oklch(0.25 0.035 255);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --muted: oklch(0.25 0.035 255);
+  --muted-foreground: oklch(0.72 0.025 255);
+  --accent: oklch(0.28 0.055 255);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(0.65 0.08 255 / 22%);
+  --input: oklch(0.65 0.08 255 / 28%);
+  --ring: oklch(0.68 0.17 257);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: oklch(0.18 0.032 255);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(0.68 0.17 257);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent: oklch(0.27 0.05 255);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-border: oklch(0.65 0.08 255 / 22%);
+  --sidebar-ring: oklch(0.68 0.17 257);
   --brand: oklch(0.72 0.14 259);
   --brand-foreground: oklch(0.145 0 0);
 }
@@ -135,8 +267,349 @@
   }
 }
 
+/* From lg up there is no bottom bar — the rail is a permanent column and
+ * BottomNav is `lg:hidden`. The floating buttons stay, so the reservation
+ * shrinks to them rather than disappearing: a desktop page ending in a wide
+ * button has the same overlap, just less of it.
+ *
+ * This keeps the "no unnecessary desktop spacing" rule honestly: the bar's
+ * height is dropped because the bar is not there, and the buttons' height is
+ * kept because they are. */
+@media (min-width: 1024px) {
+  :root {
+    /* No bar from lg up — BottomNav is `lg:hidden` and the rail is a permanent
+     * column — so there is nothing full-width to clear and the reservation
+     * goes to nothing. This is the "desktop stays normal" rule. */
+    --content-bottom-gap: 0px;
+    /* The rail takes the buttons out of the content's way from lg up. */
+    --floating-actions-w: 0px;
+  }
+}
+
 @layer utilities {
   .glass {
     @apply bg-background/70 backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-background/60;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Printing
+ *
+ * The calculators offer Print for a bill of quantities and a cut list, and both
+ * are documents somebody carries to a site or a saw. Without this they print
+ * the way the screen looks: the sidebar down the left, the bottom navigation
+ * across the page, a dark background eating a cartridge, and a table sliced
+ * through the middle of a row at the page break.
+ *
+ * Everything here is `@media print`, so nothing below changes the screen.
+ * ------------------------------------------------------------------------- */
+
+@media print {
+  /* Navigation is not part of the document. The topbar already opts out with
+     `print:hidden`; the rail and the bottom bar have no such class, and hiding
+     them by element keeps this working if either is ever restructured. */
+  nav,
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  /* Paper is white and ink is expensive. The app's surfaces are painted from
+     tokens, so this resets the ground rather than fighting each component. */
+  :root,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  * {
+    background-image: none !important;
+    box-shadow: none !important;
+    /* Chrome drops backgrounds when printing unless asked; the amber warning
+       panel and the result card are meaningful, so keep what colour remains. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Fixed and sticky elements repeat on every page or cover the content. */
+  .fixed,
+  .sticky {
+    position: static !important;
+  }
+
+  /* A scroll container prints only what was visible in it — which for a cut
+     list is the first eight rows and nothing else. On paper it has to flow. */
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-auto {
+    overflow: visible !important;
+  }
+
+  /* Tables are the reason any of this exists. A row split across a page break
+     puts a part's length on one sheet and its quantity on the next. */
+  table {
+    width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: collapse;
+    page-break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group; /* Repeat the header on every page. */
+  }
+
+  tr,
+  img {
+    page-break-inside: avoid;
+  }
+
+  th,
+  td {
+    border-bottom: 1px solid #ccc;
+    padding: 4px 6px !important;
+  }
+
+  /* Keep a result block and its heading together. */
+  h1,
+  h2,
+  h3 {
+    page-break-after: avoid;
+  }
+
+  /* Links print as text; a URL in brackets after every word is noise on a
+     document somebody is holding a tape measure against. */
+  a {
+    text-decoration: none !important;
+    color: #000 !important;
+  }
+
+  /* The working is the part a quantity surveyor checks, so it must be open on
+     paper whether or not the reader expanded it on screen. */
+  [data-print="working"] {
+    display: block !important;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * The one utility that clears the bottom furniture
+ *
+ * Applied to the workspace's scroll container, which is what actually scrolls
+ * for nearly every page. A page with its own nested `overflow-y-auto` scrolls
+ * independently and does not inherit it, so those few carry the class
+ * themselves — that is the "small explicit handling for unusual containers"
+ * rather than a fix repeated per page.
+ *
+ * Deliberately a class and not a raw `pb-[...]` written at each site: the two
+ * places that had written the calculation out by hand had both got it wrong,
+ * and neither could be corrected without finding every copy.
+ * ------------------------------------------------------------------------- */
+
+@layer utilities {
+  .pb-content-safe {
+    padding-bottom: var(--content-bottom-gap);
+  }
+
+  .scroll-pb-content-safe {
+    scroll-padding-bottom: var(--content-bottom-gap);
+  }
+
+  /* For a control at the foot of a column that would otherwise run underneath
+     the floating buttons. It stops short of them instead of the whole column
+     being pushed above them. */
+  .pr-actions-safe {
+    padding-right: var(--floating-actions-w);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * A note on the workspaces that size themselves off the viewport
+ *
+ * Medosha AI, Render AI and the image studio are `100dvh` less the topbar,
+ * which made them exactly as tall as the visible column — so their composer,
+ * pinned at the bottom, landed precisely at the fold with the navigation bar
+ * over it. Reachable by scrolling, invisible until you did.
+ *
+ * They now subtract `--content-bottom-gap` as well, which makes the column's
+ * content and its visible height agree: the composer sits above the furniture
+ * with nothing to scroll. Subtracting it here rather than adding padding
+ * inside them is what avoids counting the same gap twice — the shell's scroll
+ * container already reserves it.
+ * ------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+ * The press
+ *
+ * Touching anything on Medosha changed nothing you could see. The shared
+ * `Button` had gained an `active:` colour per variant, but a colour change is
+ * where the work stopped — and most of what a thumb lands on is not a `Button`.
+ * Tabs, navigation rows, icon buttons over the 3D model, the plus and minus on
+ * a measurement, the language picker, a card that is really a link: all of them
+ * answered a tap with nothing at all until the next paint arrived. People
+ * pressed twice, which on anything that submits is two submissions.
+ *
+ * This is the whole system, in one place. Nothing was added to a call site: the
+ * rules below match what is already there — the elements and the ARIA roles
+ * that mean "this does something" — so a button written next week is covered by
+ * having been written as a button.
+ *
+ * ## Why it sits in the utilities layer, at zero specificity
+ *
+ * Both halves are deliberate and together they are what makes the effect
+ * subordinate rather than uniform.
+ *
+ * Layer order beats specificity across layers, so a rule in `components` could
+ * never show on an element carrying `bg-*`. In `utilities`, ordinary
+ * specificity decides — and every selector below is wrapped in `:where()`,
+ * including the ones inside `:not()`, so the whole thing weighs exactly as much
+ * as the `:active` on the end of it: one pseudo-class. The `:where()` around
+ * the exclusions is not tidiness. `:not()` takes the weight of its argument, so
+ * three bare exclusions would have made this rule heavier than
+ * `active:bg-primary/70` and painted the blue Save button white.
+ *
+ * As written, a call site that has an opinion keeps it: two classes beat one,
+ * so a primary button presses to its own darker blue.
+ *
+ * ## Why the tint is a background *image*
+ *
+ * `background-image` layers over `background-color` instead of replacing it, so
+ * a tinted element keeps its own colour underneath and takes a few per cent of
+ * ink on top — including the blue button, which ends up slightly brightened as
+ * well as darkened, which is what was wanted. Using `background-color` would
+ * swap the colour out, and a glass button would appear to lose its glass.
+ * Nothing interactive in this codebase carries a gradient, so there is nothing
+ * for it to overwrite; that was checked rather than assumed.
+ *
+ * The ink is white in the dark theme and black in the light one. A white wash
+ * over a white button is not feedback, and this application has both themes.
+ *
+ * ## What is deliberately not touched
+ *
+ * `:hover` is left alone. Tailwind v4 already emits every `hover:` utility
+ * inside `@media (hover: hover)`, so a phone never applies one and a hover
+ * style cannot stick to the last thing tapped — the usual mobile complaint is
+ * already handled here, and a second guard would only be a second thing to keep
+ * in step. `:focus-visible` is untouched for the same reason: the ring is how a
+ * keyboard says where it is, and nothing below competes with it.
+ * ------------------------------------------------------------------------- */
+
+@layer utilities {
+  :root {
+    /* Black on a light background, white on a dark one — see above. */
+    --press-ink: 0 0 0;
+    --press-tint: 0.07;
+    --press-scale: 0.97;
+    --press-ms: 120ms;
+  }
+
+  .dark {
+    --press-ink: 255 255 255;
+    --press-tint: 0.1;
+  }
+
+  /*
+   * Everything a finger can press.
+   *
+   * `a[href]` rather than `a`: an anchor with no target is a name, not a
+   * control. An inline link inside a paragraph is in this list and is not a
+   * problem — a scale has no effect on a non-replaced inline box by definition,
+   * so a link in prose takes the tint and stays exactly where it is, while a
+   * card that happens to be an anchor scales like the button it is.
+   *
+   * The two `label:has(…)` lines are the checkbox and radio toggles — "Show
+   * inside" over the 3D model, and every filter in the application — which are
+   * built as a `label` with the input inside it and are otherwise matched by
+   * nothing here. Deliberately not `label` on its own: a label wrapping a text
+   * field would scale the field when you pressed its name.
+   *
+   * The press state is nested rather than written as a second rule, and that is
+   * not house style. The list was three copies — one for the transition, one
+   * for `:active`, one for reduced motion — and deleting a line from one of
+   * them left the other two agreeing, so tabs and menu items could stop
+   * responding while every check still passed. Mutating the code is what
+   * found it. One list is one thing to get wrong.
+   */
+  :where(
+    button,
+    summary,
+    a[href],
+    [role="button"],
+    [role="tab"],
+    [role="link"],
+    [role="menuitem"],
+    [role="menuitemradio"],
+    [role="menuitemcheckbox"],
+    [role="option"],
+    [role="switch"],
+    label:has(> input[type="checkbox"]),
+    label:has(> input[type="radio"]),
+    .press
+  ):not(:where(:disabled, [aria-disabled="true"], [data-no-press])) {
+    -webkit-tap-highlight-color: transparent;
+
+    /* Kills the 300 ms the browser waits to see whether a tap was the first
+       half of a double-tap-to-zoom. Without it the feedback is correct and
+       late, which reads as the same fault it was written to fix. */
+    touch-action: manipulation;
+
+    /* `scale` and `translate` by name, not `transform`: Tailwind v4 writes
+       those as separate properties, and a transition on `transform` alone
+       would leave both of them snapping. */
+    transition-property: scale, translate, background-color, background-image,
+      opacity, color, border-color;
+    transition-duration: var(--press-ms);
+    transition-timing-function: ease;
+
+    /* `&` carries the weight of the list above it, which is nothing, so this
+       comes out at exactly one pseudo-class — light enough for a call site's
+       own `active:bg-*` to win. */
+    &:active {
+      background-image: linear-gradient(
+        rgb(var(--press-ink) / var(--press-tint)),
+        rgb(var(--press-ink) / var(--press-tint))
+      );
+      scale: var(--press-scale);
+    }
+
+    /*
+     * Reduced motion keeps the feedback and drops the movement.
+     *
+     * Somebody who has asked for less animation still needs to know their tap
+     * landed, so the tint stays and only the scale goes. The usual mistake is
+     * to turn the whole thing off, which leaves them with the problem this
+     * exists to fix.
+     */
+    @media (prefers-reduced-motion: reduce) {
+      &:active {
+        scale: none;
+      }
+    }
+  }
+
+  /*
+   * An opt-out, for the few places a press effect is a bug.
+   *
+   * A full-screen scrim is a button so it can be dismissed from the keyboard,
+   * and scaling the whole screen by three per cent when a finger lands on it is
+   * not feedback, it is a fault. A drag handle is worse: the scale fights the
+   * thing being dragged for as long as the drag lasts.
+   */
+  [data-no-press]:active {
+    scale: none;
+    background-image: none;
+  }
+
+  /*
+   * The same press, for something that is none of the above.
+   *
+   * A clickable card is usually a `div` with an `onClick`, which is neither a
+   * button nor a link and cannot be matched by anything structural. `.press`
+   * opts it in. An informational card is left alone, which is why this is not
+   * simply applied to every card.
+   */
+  .press {
+    cursor: pointer;
   }
 }

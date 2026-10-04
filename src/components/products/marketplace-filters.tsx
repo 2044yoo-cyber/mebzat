@@ -14,7 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PRODUCT_SORTS, type ProductSort } from "@/lib/constants/product-categories";
+import {
+  PRODUCT_SORTS,
+  USED_GRADES,
+  type ProductSort,
+} from "@/lib/constants/product-categories";
 import { cn } from "@/lib/utils";
 
 type Category = { id: string; slug: string; name: string };
@@ -22,6 +26,14 @@ type Category = { id: string; slug: string; name: string };
 export function MarketplaceFilters({
   categories,
   current,
+  searchPlaceholder = "Search products, brands, materials…",
+  /**
+   * Grade and place, which only mean anything about something second-hand.
+   * Shown on Used Items and nowhere else rather than being greyed out on the
+   * new marketplace, where they would be two controls that never do anything.
+   */
+  showUsedFilters = false,
+  cities = [],
 }: {
   categories: Category[];
   current: {
@@ -30,7 +42,13 @@ export function MarketplaceFilters({
     sort: ProductSort;
     minPrice: string;
     maxPrice: string;
+    usedGrade?: string;
+    city?: string;
+    area?: string;
   };
+  searchPlaceholder?: string;
+  showUsedFilters?: boolean;
+  cities?: string[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -39,9 +57,21 @@ export function MarketplaceFilters({
   const [q, setQ] = useState(current.q);
   const [minPrice, setMinPrice] = useState(current.minPrice);
   const [maxPrice, setMaxPrice] = useState(current.maxPrice);
-  const [showPrice, setShowPrice] = useState(
-    Boolean(current.minPrice || current.maxPrice),
+  // One disclosure for every refinement, opened by the filter button. It used
+  // to hold the price only, while the used-item filters sat permanently open
+  // above the category rail — about 250px of controls on a phone before a
+  // single product. Open on arrival when something is already set, so a
+  // shared link does not look unfiltered.
+  const [showMore, setShowMore] = useState(
+    Boolean(
+      current.minPrice ||
+        current.maxPrice ||
+        current.usedGrade ||
+        current.city ||
+        current.area,
+    ),
   );
+  const [area, setArea] = useState(current.area ?? "");
 
   function pushWith(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -55,7 +85,13 @@ export function MarketplaceFilters({
   }
 
   const hasFilters =
-    current.q || current.category || current.minPrice || current.maxPrice;
+    current.q ||
+    current.category ||
+    current.minPrice ||
+    current.maxPrice ||
+    current.usedGrade ||
+    current.city ||
+    current.area;
 
   return (
     <div className="space-y-4">
@@ -71,7 +107,7 @@ export function MarketplaceFilters({
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search products, brands, materials…"
+            placeholder={searchPlaceholder}
             className="pl-9"
             aria-label="Search products"
           />
@@ -95,18 +131,18 @@ export function MarketplaceFilters({
           </Select>
           <Button
             type="button"
-            variant={showPrice ? "secondary" : "outline"}
+            variant={showMore ? "secondary" : "outline"}
             size="icon"
-            aria-label="Price filter"
-            aria-pressed={showPrice}
-            onClick={() => setShowPrice((v) => !v)}
+            aria-label="More filters"
+            aria-pressed={showMore}
+            onClick={() => setShowMore((v) => !v)}
           >
             <SlidersHorizontal className="size-4" />
           </Button>
         </div>
       </div>
 
-      {showPrice && (
+      {showMore && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -143,12 +179,104 @@ export function MarketplaceFilters({
         </form>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      {showMore && showUsedFilters && (
+        <div className="flex flex-wrap items-end gap-2 rounded-xl border p-3">
+          <div className="space-y-1">
+            <span className="text-xs text-muted-foreground">Condition</span>
+            <Select
+              value={current.usedGrade || "any"}
+              onValueChange={(value) =>
+                pushWith({ grade: value === "any" ? null : value })
+              }
+            >
+              <SelectTrigger className="w-40" aria-label="Filter by condition">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any condition</SelectItem>
+                {Object.entries(USED_GRADES).map(([value, grade]) => (
+                  <SelectItem key={value} value={value}>
+                    {grade.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-xs text-muted-foreground">City</span>
+            <Select
+              value={current.city || "any"}
+              onValueChange={(value) =>
+                pushWith({ city: value === "any" ? null : value })
+              }
+            >
+              <SelectTrigger className="w-44" aria-label="Filter by city">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Anywhere</SelectItem>
+                {cities.map((city) => (
+                  <SelectItem key={city} value={city}>
+                    {city}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              pushWith({ area: area.trim() || null });
+            }}
+            className="space-y-1"
+          >
+            <span className="block text-xs text-muted-foreground">Area</span>
+            <Input
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              placeholder="Bole"
+              className="h-9 w-32"
+              aria-label="Filter by area"
+            />
+          </form>
+        </div>
+      )}
+
+      {/*
+        Two rows on a phone, and never more.
+
+        Twelve chips wrapped to five rows at 360px, which pushed the products
+        themselves off the screen — the category rail was taller than the thing
+        it filters. Shrinking the type does not fix it: measured at text-xs with
+        tight padding the chips still come to about 1140px against roughly 650px
+        of space in two rows, so "Construction Materials" alone would have to
+        lose half its width.
+
+        So the rows are capped and the overflow scrolls sideways, which is what
+        a chip rail does everywhere else on a phone. Nothing is hidden and
+        nothing is truncated; the type stays legible. From `sm` up there is room
+        to wrap and it wraps, exactly as before.
+
+        `grid-flow-col` fills top-then-bottom per column rather than left-to-
+        right across two rows. That is the right order here: a column is one
+        scroll position, so a category and the one under it arrive together.
+      */}
+      <div
+        className={cn(
+          "grid grid-flow-col grid-rows-2 justify-start gap-2 overflow-x-auto pb-1",
+          // The scrollbar is noise on a rail this short, and on a phone there
+          // is no scrollbar to hide anyway.
+          "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          "sm:flex sm:grid-flow-row sm:flex-wrap sm:overflow-visible sm:pb-0",
+        )}
+      >
         <button
           type="button"
           onClick={() => pushWith({ category: null })}
           className={cn(
-            "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+            "rounded-full border px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:px-3 sm:text-sm",
             !current.category
               ? "border-brand bg-brand text-brand-foreground"
               : "hover:border-brand hover:bg-brand/5",
@@ -166,13 +294,13 @@ export function MarketplaceFilters({
                 pushWith({ category: active ? null : category.slug })
               }
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:px-3 sm:text-sm",
                 active
                   ? "border-brand bg-brand text-brand-foreground"
                   : "hover:border-brand hover:bg-brand/5",
               )}
             >
-              <CategoryIcon slug={category.slug} className="size-3.5" />
+              <CategoryIcon slug={category.slug} className="size-3 sm:size-3.5" />
               {category.name}
             </button>
           );
@@ -184,9 +312,11 @@ export function MarketplaceFilters({
               setQ("");
               setMinPrice("");
               setMaxPrice("");
+              setArea("");
+              setShowMore(false);
               router.push(pathname);
             }}
-            className="inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1.5 text-xs whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground sm:px-3 sm:text-sm"
           >
             <X className="size-3.5" /> Clear
           </button>

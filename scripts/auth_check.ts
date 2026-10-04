@@ -25,10 +25,28 @@ function check(name: string, ok: boolean, detail = "") {
 const button = readFileSync("src/components/auth/google-button.tsx", "utf8");
 const client = readFileSync("src/lib/supabase/client.ts", "utf8");
 const callback = readFileSync("src/app/auth/callback/route.ts", "utf8");
+// The rule moved out of the callback and into a module the password sign-in
+// and the login form share, because the password path had been redirecting to
+// whatever arrived in its hidden input. The checks below follow it there
+// rather than being relaxed — the property is stronger now, not weaker.
+const safeRedirect = readFileSync("src/lib/auth/safe-redirect.ts", "utf8");
 
 /** Comments stripped, so no check matches the prose explaining itself. */
+/**
+ * NOTE ON STRIPPING BLOCK COMMENTS
+ *
+ * `/\*` is only treated as a comment opener when something that cannot be part
+ * of a token precedes it. Without that guard the `/\*` inside a string literal
+ * — `accept="image/\*"` is the common one — opens a comment that runs to the
+ * next real `*\/`, silently deleting everything between. In this repository
+ * that was 109 files and, in one case, 3,497 characters of real markup.
+ *
+ * Checks read the stripped text, so anything swallowed is code no assertion can
+ * see: the check passes because the thing it was looking for is not there to
+ * disagree with, which is worse than the check not existing.
+ */
 const code = (source: string) =>
-  source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  source.replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1").replace(/^\s*\/\/.*$/gm, "");
 
 /* -------------------------------------------------------------------------- */
 /* The button always recovers                                                 */
@@ -108,12 +126,22 @@ check(
 
 check(
   "the next parameter is validated",
-  /function safeNext/.test(code(callback)),
+  /safeRedirect\(searchParams\.get\("next"\)\)/.test(code(callback)),
   "`next` arrives from whoever wrote the link",
 );
 check(
+  "and the callback keeps no copy of the rule of its own",
+  !/function safeNext/.test(code(callback)),
+  "two implementations of one rule is how the second comes to be missing",
+);
+check(
+  "a leading slash is required",
+  /!raw\.startsWith\("\/"\)/.test(code(safeRedirect)),
+  "`javascript:alert(1)` has a colon and no `://`, so nothing else catches it",
+);
+check(
   "protocol-relative paths are rejected",
-  /startsWith\("\/\/"\)/.test(code(callback)),
+  /startsWith\("\/\/"\)/.test(code(safeRedirect)),
   "`//evil.example` after an origin is read as a host, not a path",
 );
 // A plain string search rather than a regex. The pattern being looked for is
@@ -122,17 +150,24 @@ check(
 // testing something other than what its name says.
 check(
   "backslash paths are rejected",
-  code(callback).includes(String.raw`startsWith("/\\")`),
+  code(safeRedirect).includes(String.raw`startsWith("/\\")`),
   "some browsers normalise a backslash into a forward slash",
 );
 check(
   "absolute URLs are rejected",
-  /includes\("::\/\/"\)|includes\("\:\/\/"\)/.test(code(callback)),
+  /includes\("::\/\/"\)|includes\("\:\/\/"\)/.test(code(safeRedirect)),
 );
 check(
   "anything unrecognised falls back to a known page",
-  (code(callback).match(/return "\/dashboard";/g) ?? []).length >= 4,
+  (code(safeRedirect).match(/return fallback;/g) ?? []).length >= 4,
   "a validator that returns the input on an unmatched case validates nothing",
+);
+check(
+  "the password sign-in uses it too",
+  /redirect\(safeRedirect\(/.test(
+    code(readFileSync("src/app/(auth)/login/actions.ts", "utf8")),
+  ),
+  "it redirected to its hidden input, and the hidden input came from the URL",
 );
 
 /* -------------------------------------------------------------------------- */

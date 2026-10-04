@@ -23,6 +23,9 @@ export const MODERATION_CATEGORIES = [
   "scam",
   "spam",
   "illegal",
+  // Only ever set by a person. No classifier returns it: whether a photograph
+  // is somebody's own work is not visible in the pixels.
+  "infringement",
   "other",
 ] as const;
 export type ModerationCategory = (typeof MODERATION_CATEGORIES)[number];
@@ -39,6 +42,8 @@ export const CONTENT_KINDS = [
   "comment",
   "listing",
   "video",
+  "panorama",
+  "floor_plan",
 ] as const;
 export type ContentKind = (typeof CONTENT_KINDS)[number];
 
@@ -58,6 +63,9 @@ export const REPORT_CATEGORIES = [
   { id: "violence", label: "Violence or threats" },
   { id: "spam", label: "Spam" },
   { id: "illegal", label: "Illegal content" },
+  // The reason the watermark exists. Filed under "Something else" a copyright
+  // claim reaches a moderator with nothing to act on.
+  { id: "infringement", label: "Uses my photos or work without permission" },
   { id: "other", label: "Something else" },
 ] as const satisfies readonly { id: ModerationCategory; label: string }[];
 
@@ -76,15 +84,30 @@ export function uploadMessage(status: ModerationStatus): string {
     case "safe":
       return "Published";
     case "review":
-      return "Under review";
+      // Published, and still being looked at. It used to mean "held back",
+      // which is what the seller read it as — and they were right, because it
+      // was. Now the listing is live and this is a note, not a refusal.
+      return "Published. We are still checking one image.";
     case "blocked":
       return "This content cannot be published because it violates Medosha's content guidelines.";
   }
 }
 
-/** Whether something in this state may be rendered publicly. Ever. */
+/**
+ * Whether something in this state may be rendered publicly.
+ *
+ * `review` is published now and looked at afterwards. Holding back everything
+ * a classifier was unsure about meant holding back mostly innocent work, and
+ * meant nobody could sell anything on a day no classifier was configured —
+ * which is every day one is not.
+ *
+ * `blocked` and `pending` are not publishable and that is the whole of the
+ * guarantee: nothing reaches a public bucket that a check refused, or that no
+ * check has seen. The database says the same thing in a constraint, so a bug
+ * here cannot publish a blocked file.
+ */
 export function isPublishable(status: ModerationStatus): boolean {
-  return status === "safe";
+  return status === "safe" || status === "review";
 }
 
 export type ModerationOutcome = {

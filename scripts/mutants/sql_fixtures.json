@@ -1,0 +1,56 @@
+[
+  {
+    "name": "the viewport stops excluding what is north of the box",
+    "file": "supabase/migrations/0066_buildings_in_viewport.sql",
+    "from": "    and b.latitude between south and north",
+    "to": "    and b.latitude between -90 and 90"
+  },
+  {
+    "name": "the viewport stops excluding what is east of it",
+    "file": "supabase/migrations/0066_buildings_in_viewport.sql",
+    "from": "    and b.longitude between west and east",
+    "to": "    and b.longitude between -180 and 180"
+  },
+  {
+    "name": "an admin-verified price stops outranking a submitted one",
+    "file": "supabase/migrations/0067_saved_calculations.sql",
+    "from": "    mp.data_status desc,\n    mp.price_date desc",
+    "to": "    mp.price_date desc"
+  },
+  {
+    "name": "the seed prerequisite is no longer declared",
+    "file": "supabase/tests/jobs-seed-check.sql",
+    "from": "-- requires: supabase/seed/jobs-50.sql",
+    "to": "-- needs: supabase/seed/jobs-50.sql"
+  },
+  {
+    "name": "the runner ignores declared prerequisites",
+    "file": "supabase/tests/run.sh",
+    "from": "  for prereq in $(grep -oE '^-- requires: .+$' \"$test\" | sed 's/^-- requires: //'); do",
+    "to": "  for prereq in $(true); do"
+  },
+  {
+    "name": "the reader's own city stops winning over another",
+    "file": "supabase/migrations/0067_saved_calculations.sql",
+    "from": "    (lower(mp.city_region) = lower(coalesce(p_city, ''))) desc,\n",
+    "to": ""
+  },
+  {
+    "name": "the feed shuffle stops varying with the seed",
+    "file": "supabase/migrations/0065_feed_discovery.sql",
+    "from": "md5(p.id::text || ':' || p_seed::text)",
+    "to": "md5(p.id::text || ':0')"
+  },
+  {
+    "name": "a superseded price is served again",
+    "file": "supabase/migrations/0067_saved_calculations.sql",
+    "from": "  where mp.superseded_by is null",
+    "to": "  where true"
+  },
+  {
+    "name": "a should_be_false column is judged as if it were should_be_true",
+    "file": "supabase/tests/verdicts.awk",
+    "from": "    bad = /should_be_false/ ? \"t\" : \"f\"",
+    "to": "    bad = \"f\""
+  }
+]

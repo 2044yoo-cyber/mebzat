@@ -68,6 +68,24 @@ export function PhoneAuthForm({ next = "/dashboard" }: { next?: string }) {
       return;
     }
 
+    // The code is confirmed, so the badge can be brought into line with it.
+    //
+    // This is the *only* route to `phone_verified`: the column itself is
+    // refused to API sessions by a trigger, and the function behind this reads
+    // `auth.users.phone_confirmed_at` — which nothing in the browser can
+    // write. Calling it here rather than trusting the client to set a flag is
+    // the difference between a badge and a claim.
+    //
+    // Awaited but not fatal. A member who has genuinely confirmed their phone
+    // is signed in either way, and the next call to this function — on their
+    // next sign-in — settles it. Blocking the redirect on it would strand
+    // somebody on a form for a database round trip they did not ask for.
+    try {
+      await supabase.rpc("sync_phone_verification");
+    } catch {
+      // Left for the next sign-in.
+    }
+
     router.push(next);
     router.refresh();
   }

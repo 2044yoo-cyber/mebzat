@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  BadgeCheck,
   Eye,
   MapPin,
   Store,
@@ -17,11 +16,19 @@ import { SaveButton } from "@/components/products/save-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { STOCK_STATUS } from "@/lib/constants/product-categories";
+import { STOCK_STATUS, isSecondHand } from "@/lib/constants/product-categories";
 import { withFavorites } from "@/lib/data/products";
 import { createClient } from "@/lib/supabase/server";
-import { cn, formatPrice } from "@/lib/utils";
+import { cn, formatPrice, safeJsonLd } from "@/lib/utils";
 import type { ProductCardData } from "@/components/products/product-card";
+import type { ProductCondition, UsedGrade } from "@/types/database.types";
+import { MessageButton } from "@/components/messages/message-button";
+import {
+  ConditionBadge,
+  conditionSentence,
+} from "@/components/products/condition-badge";
+import { ReportDialog } from "@/components/moderation/report-dialog";
+import { VerifiedBadge } from "@/components/profile/verified-badge";
 
 type Supplier = {
   id: string;
@@ -120,6 +127,9 @@ export default async function ProductDetailPage(props: {
   const specs = (product.specs ?? {}) as Record<string, string>;
   const specEntries = Object.entries(specs);
   const stock = STOCK_STATUS[product.stock_status as keyof typeof STOCK_STATUS];
+  const condition = (product.condition ?? "new") as ProductCondition;
+  const usedGrade = (product.used_grade ?? null) as UsedGrade | null;
+  const secondHand = isSecondHand(condition);
   const supplierName = supplier?.company_name || supplier?.full_name || "Supplier";
   const price = product.price as number | null;
   const currency = product.currency as string;
@@ -130,10 +140,13 @@ export default async function ProductDetailPage(props: {
     const { data } = await supabase
       .from("products")
       .select(
-        "id, title, cover_image_url, price, currency, unit, brand, stock_status, status, supplier:profiles!owner_id(full_name, company_name)",
+        "id, title, cover_image_url, price, currency, unit, brand, stock_status, status, condition, used_grade, location_city, location_area, supplier:profiles!owner_id(full_name, company_name)",
       )
       .eq("status", "published")
       .eq("category_id", product.category_id as string)
+      // Like for like. A second-hand listing next to four new ones reads as a
+      // cheaper version of the same thing, which it is not.
+      .eq("condition", product.condition as ProductCondition)
       .neq("id", id)
       .order("created_at", { ascending: false })
       .limit(4);
@@ -169,7 +182,7 @@ export default async function ProductDetailPage(props: {
     <div className="mx-auto w-full max-w-6xl px-6 py-10">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
 
       <nav className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -188,6 +201,16 @@ export default async function ProductDetailPage(props: {
           </>
         )}
       </nav>
+
+      {/* Reporting sits beside the breadcrumb rather than at the foot of the
+          page: somebody who has decided to report a listing should not have to
+          scroll past the thing they are reporting to find the button. Hidden
+          from the owner, who has their own controls. */}
+      {!isOwner && (
+        <div className="mb-4 flex justify-end">
+          <ReportDialog contentType="product" contentId={id} ownerId={ownerId} variant="row" />
+        </div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-2">
         <ProductGallery images={galleryImages} alt={String(product.title)} />
@@ -224,6 +247,27 @@ export default async function ProductDetailPage(props: {
             ) : null}
           </div>
 
+          {/* Drawn from the column, which is also what decides the section
+              this listing appears in. There is no separate label a seller
+              could set to say something else. */}
+          {condition !== "new" && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3">
+              <ConditionBadge condition={condition} grade={usedGrade} />
+              <span className="text-sm font-medium">
+                {conditionSentence(condition, usedGrade)}
+              </span>
+              {typeof product.age_months === "number" && (
+                <span className="text-sm text-muted-foreground">
+                  · about {Math.round((product.age_months as number) / 12) || 1}{" "}
+                  {Math.round((product.age_months as number) / 12) > 1
+                    ? "years"
+                    : "year"}{" "}
+                  old
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <span
               className={cn(
@@ -241,10 +285,19 @@ export default async function ProductDetailPage(props: {
                 <Truck className="size-4" /> Delivery available
               </span>
             ) : null}
-            {product.location_city || product.location_country ? (
+            {product.location_area ||
+            product.location_city ||
+            product.location_country ? (
               <span className="flex items-center gap-1 text-muted-foreground">
                 <MapPin className="size-4" />
-                {[product.location_city, product.location_country]
+                {/* Area, then city. Never a street address — `products` has
+                    never held one and the seller gives the rest in a message,
+                    once they have decided to. */}
+                {[
+                  product.location_area,
+                  product.location_city,
+                  product.location_country,
+                ]
                   .filter(Boolean)
                   .join(", ")}
               </span>
@@ -265,12 +318,27 @@ export default async function ProductDetailPage(props: {
                   variant="labeled"
                   className="h-9"
                 />
+                {/* A message, not a link to a page with a phone number on
+                    it. "Contact supplier" went to the profile and left the
+                    buyer to work out how — and on a second-hand listing the
+                    seller is a person whose number is private by default, so
+                    there was often nothing there to find. The thread opens
+                    against this product, so the seller sees which one. */}
+                <MessageButton
+                  userId={String(product.owner_id)}
+                  contextType="product"
+                  contextId={id}
+                  subject={String(product.title)}
+                  label={secondHand ? "Message seller" : "Message supplier"}
+                  variant="default"
+                  className="w-auto [&_button]:w-auto"
+                />
                 {supplier?.username && (
                   <Link
                     href={`/u/${supplier.username}`}
-                    className={buttonVariants()}
+                    className={buttonVariants({ variant: "outline" })}
                   >
-                    <Store className="size-4" /> Contact supplier
+                    <Store className="size-4" /> View profile
                   </Link>
                 )}
               </>
@@ -296,7 +364,7 @@ export default async function ProductDetailPage(props: {
                 <p className="flex items-center gap-1 font-medium">
                   {supplierName}
                   {supplier.verification_status === "verified" && (
-                    <BadgeCheck className="size-4 text-brand" />
+                    <VerifiedBadge level="phone" showLabel={false} />
                   )}
                 </p>
                 {(supplier.location_city || supplier.location_country) && (

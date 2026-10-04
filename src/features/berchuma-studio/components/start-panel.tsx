@@ -1,0 +1,381 @@
+"use client";
+
+import { useState } from "react";
+import { KitchenSetup } from "./kitchen-setup";
+import {
+  Armchair,
+  Boxes,
+  ChefHat,
+  Droplets,
+  ImageUp,
+  Library,
+  MessageSquare,
+  Monitor,
+  PanelsTopLeft,
+  Ruler,
+  Shapes,
+  Sparkles,
+} from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+import { LengthField } from "./ui/length-field";
+
+import { ImageToDesign } from "./image-to-design";
+import { OpeningPanel } from "./openings/opening-panel";
+import { PlanEditor } from "./plan/plan-editor";
+import { runsFromRoom } from "../services/room-geometry";
+import { startingDesign } from "../services/starting-designs";
+import { WardrobeShapeSetup } from "./wardrobe-shape-setup";
+import { validateSpec, type DesignKind, type DesignSpec } from "../types/spec";
+
+/**
+ * Where a design starts.
+ *
+ * The studio used to open empty and wait to be told what to build, which is
+ * backwards for the person it is for. Somebody who wants a kitchen does not
+ * want to specify one — they want to look at one and say "not that cupboard, a
+ * drawer". So the first screen offers a category and hands back a finished
+ * design to argue with.
+ *
+ * The design appears instantly and identically every time, because it is
+ * ordinary arithmetic rather than a model call. That also means this works
+ * with no AI provider configured at all, which is the difference between a
+ * studio and a demonstration of one.
+ */
+
+const CATEGORIES: {
+  kind: DesignKind;
+  label: string;
+  icon: typeof ChefHat;
+  hint: string;
+}[] = [
+  { kind: "kitchen", label: "Kitchen", icon: ChefHat, hint: "Base run, wall units, worktop" },
+  { kind: "wardrobe", label: "Wardrobe", icon: Armchair, hint: "Hanging, drawers, shelves" },
+  { kind: "tv_unit", label: "TV Unit", icon: Monitor, hint: "Low unit and a wall shelf" },
+  { kind: "vanity", label: "Vanity", icon: Droplets, hint: "Wall hung, with a mirror cabinet" },
+  { kind: "bookshelf", label: "Bookshelf", icon: Library, hint: "Open shelving, floor to eye" },
+  { kind: "office_storage", label: "Office Storage", icon: Boxes, hint: "Cupboards under open filing" },
+  { kind: "custom", label: "Sketch 3D", icon: Shapes, hint: "Draw custom furniture and simple forms" },
+];
+
+/** Run lengths people actually ask for, so nobody types a number to begin. */
+const SIZES = [1800, 2400, 3000, 3600, 4200, 5000];
+
+export function StartPanel({
+  onStart,
+  onOpenChat,
+  initialKind,
+  initialWidth,
+}: {
+  onStart: (spec: DesignSpec) => void;
+  onOpenChat: () => void;
+  initialKind?: DesignKind;
+  initialWidth?: number;
+}) {
+  const [kind, setKind] = useState<DesignKind | null>(initialKind ?? null);
+  const [width, setWidth] = useState(initialWidth ?? 3600);
+  const [route, setRoute] = useState<"design" | "photo" | "opening" | "plan">("design");
+
+  const chosen = CATEGORIES.find((entry) => entry.kind === kind);
+
+  return (
+    /**
+     * Two elements, and the outer one is the only thing that scrolls.
+     *
+     * This used to be one `h-full ... justify-center` column with no overflow
+     * rule at all. On a desktop the seven categories and the size inputs fit,
+     * so it looked right. On a 390px phone they do not, and a flex column that
+     * centres what it cannot contain spills it off *both* ends — the last size
+     * control and the start button below the fold, the heading above it, and
+     * no scrollbar either way because nothing had been told it could scroll.
+     * The bottom navigation was sitting on top of the symptom rather than
+     * causing it; adding padding would have moved unreachable content a little
+     * further up and left it unreachable.
+     *
+     * `min-h-full` on the inner column is what keeps the centring honest: at
+     * least as tall as the viewport, so a short panel still centres, and taller
+     * than it when the content demands, so it grows downward and scrolls from
+     * the top instead of hiding its own beginning.
+     */
+    <div
+      className={cn(
+        "mx-auto w-full max-w-2xl",
+        // Its own scrolling column beside the design, an ordinary block under
+        // it — the same rule as the control panel, and missed here.
+        //
+        // When the studio's design tab became a scrolling page, this panel was
+        // left as `h-full overflow-y-auto`. In a column that is no longer a
+        // fixed height that is a second scroll container inside the first: the
+        // panel clips its own content at whatever height it resolved to, the
+        // page has nothing left to scroll, and the last card sits below the
+        // fold with no gesture that reaches it. Which is the fault the panel's
+        // own scroller was added to fix, arriving from the other direction.
+        "@4xl/ws:h-full @4xl/ws:overflow-y-auto @4xl/ws:overscroll-contain",
+      )}
+    >
+      <div
+        className={cn(
+          "flex min-h-full w-full flex-col gap-5 p-4",
+          // Room at the end of the scroll for the two things that float over
+          // it. The panel's box already stops above the navigation bar, but
+          // the AI launcher and the + button sit *inside* that box in the
+          // bottom-right corner, and this column ends in a full-width "Start
+          // with a…" button — so the last control was reachable by scrolling
+          // and not by tapping, which is a worse failure than not reaching it
+          // at all.
+          //
+          // That used to be solved by reserving the buttons' *height* here,
+          // which cost about 4cm of a phone screen to avoid 88px of corner and
+          // left a visible band of nothing under the panel. The button steps
+          // around them instead — see `pr-actions-safe` on it below.
+          "pb-8",
+          // A cut list is taller than the panel and scrolls inside itself, so
+          // centring it vertically pushes its heading off the top. Only the
+          // centring is conditional now: `min-h-0` used to be the other half
+          // of this and would sit in the class list beside `min-h-full`, where
+          // which one wins is decided by stylesheet order rather than by the
+          // order they are written here.
+          route === "opening" || route === "plan" ? null : "justify-center",
+        )}
+      >
+      {route === "opening" || route === "plan" ? null : (
+        <div className="text-center">
+          <h1 className="text-xl font-semibold">What are you making?</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Pick one and a complete design appears. Change anything in it
+            afterwards — nothing here is fixed.
+          </p>
+        </div>
+      )}
+
+      {/* Four ways in. The first two produce a design — starting from a
+          photograph is not a separate feature with its own dead end. The third
+          produces an opening instead: a window is not a cabinet, it is cut from
+          bars rather than sheets, and pretending otherwise is how the frame
+          engine ended up with no way in at all. The fourth starts from the room
+          rather than the furniture, which is the order somebody with a floor
+          plan in their hand already has it in. */}
+      <div
+        role="tablist"
+        aria-label="How to start"
+        className="mx-auto grid w-full max-w-2xl grid-cols-2 gap-1 rounded-lg bg-muted p-1 sm:grid-cols-4"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={route === "design"}
+          onClick={() => setRoute("design")}
+          className={cn(
+            "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium",
+            route === "design" ? "bg-background shadow-sm" : "text-muted-foreground",
+          )}
+        >
+          <Sparkles className="size-3.5" aria-hidden />
+          Start with a design
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={route === "photo"}
+          onClick={() => setRoute("photo")}
+          className={cn(
+            "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium",
+            route === "photo" ? "bg-background shadow-sm" : "text-muted-foreground",
+          )}
+        >
+          <ImageUp className="size-3.5" aria-hidden />
+          Upload a photo
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={route === "opening"}
+          onClick={() => setRoute("opening")}
+          className={cn(
+            "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium",
+            route === "opening" ? "bg-background shadow-sm" : "text-muted-foreground",
+          )}
+        >
+          <PanelsTopLeft className="size-3.5" aria-hidden />
+          Window or door
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={route === "plan"}
+          onClick={() => setRoute("plan")}
+          className={cn(
+            "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium",
+            route === "plan" ? "bg-background shadow-sm" : "text-muted-foreground",
+          )}
+        >
+          <Ruler className="size-3.5" aria-hidden />
+          From a floor plan
+        </button>
+      </div>
+
+      {route === "plan" ? (
+        <div className="min-h-0 flex-1">
+          <PlanEditor
+            onDone={(room) => {
+              // The room's chosen walls become the runs, and from there the
+              // design is an ordinary Berchuma design: the layout solver
+              // places the cabinets, buildParts costs them, and the cut list
+              // and price follow. Nothing downstream knows a plan was drawn.
+              const runs = runsFromRoom(room, { depth: 600, height: 2400 });
+              const base = startingDesign("kitchen", {
+                width: runs[0]?.length ?? 3600,
+              });
+
+              // Re-validated, because the runs came from a drawing rather than
+              // from the generator: validateSpec is what repairs a cabinet the
+              // new wall lengths no longer fit, and it is the same check every
+              // other route here goes through.
+              onStart(
+                validateSpec({
+                  ...base,
+                  room,
+                  runs: runs.length > 0 ? runs : base.runs,
+                  layout: runs.length >= 3 ? "u_shaped" : runs.length === 2 ? "l_shaped" : "straight",
+                }).spec,
+              );
+            }}
+          />
+        </div>
+      ) : route === "opening" ? (
+        <OpeningPanel />
+      ) : route === "photo" ? (
+        <ImageToDesign compact onDesign={(spec) => onStart(spec)} />
+      ) : (
+      <>
+      <div className="grid grid-cols-2 gap-2 @lg/ws:grid-cols-3">
+        {CATEGORIES.map((entry) => (
+          <button
+            key={entry.kind}
+            type="button"
+            aria-pressed={kind === entry.kind}
+            onClick={() => {
+              setKind(entry.kind);
+              // A wardrobe is not 3600 wide and a vanity is not 3600 wide. The
+              // slider starts wherever that category usually starts.
+              setWidth(defaultWidth(entry.kind));
+            }}
+            className={cn(
+              "rounded-xl border p-3 text-left transition-colors",
+              kind === entry.kind
+                ? "border-brand bg-brand/5"
+                : "hover:border-brand/50 hover:bg-muted/40",
+            )}
+          >
+            <entry.icon className="size-5 text-brand" aria-hidden />
+            <span className="mt-1.5 block text-sm font-medium">{entry.label}</span>
+            <span className="block text-[11px] leading-snug text-muted-foreground">
+              {entry.hint}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {chosen?.kind === "kitchen" ? <KitchenSetup initial={initialWidth ? { roomWidth: initialWidth } : undefined} onStart={onStart} />
+      : chosen?.kind === "wardrobe" ? (
+        // A wardrobe can turn a corner, so it asks about walls rather than
+        // about one width. Straight is still one wall and still produces the
+        // wardrobe the card behind it always did.
+        <WardrobeShapeSetup initialWidth={initialWidth} onStart={onStart} />
+      ) : chosen ? (
+        <div className="space-y-3 rounded-xl border p-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-sm font-medium">
+              How wide is the space?
+            </span>
+            <span className="text-sm tabular-nums text-muted-foreground">
+              {width} mm
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {SIZES.map((size) => (
+              <button
+                key={size}
+                type="button"
+                aria-pressed={width === size}
+                onClick={() => setWidth(size)}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-xs tabular-nums transition-colors",
+                  width === size
+                    ? "border-brand bg-brand text-brand-foreground"
+                    : "hover:border-brand hover:bg-brand/5",
+                )}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+
+          {/*
+            The presets above are the common sizes; this is for the wall that
+            is not a common size. It was a slider alone, which meant a room
+            measured at 2437 had to be approximated to the nearest hundred
+            before the design even started.
+          */}
+          <LengthField
+            label="Width"
+            value={width}
+            min={600}
+            max={6000}
+            step={100}
+            onChange={setWidth}
+          />
+
+          <button
+            type="button"
+            onClick={() => {
+              const spec = startingDesign(chosen.kind, { width });
+              onStart(chosen.kind === "custom" ? { ...spec, sketchMode: true } : spec);
+            }}
+            // `pr-actions-safe` keeps the label clear of the floating stack
+            // in the corner without the whole panel being pushed above it. The
+            // button still spans the width; its text simply stops before the
+            // buttons do. Zero from lg up, where the rail moves them aside.
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 pr-actions-safe text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+          >
+            <Sparkles className="size-4" aria-hidden />
+            Start with a {chosen.label.toLowerCase()}
+          </button>
+        </div>
+      ) : null}
+      </>
+      )}
+
+      <button
+        type="button"
+        onClick={onOpenChat}
+        className="flex items-center justify-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <MessageSquare className="size-4" aria-hidden />
+        Or describe it in your own words
+      </button>
+      </div>
+    </div>
+  );
+}
+
+function defaultWidth(kind: DesignKind): number {
+  switch (kind) {
+    case "kitchen":
+      return 3600;
+    case "wardrobe":
+      return 2400;
+    case "tv_unit":
+    case "bookshelf":
+    case "shelving":
+      return 1800;
+    case "vanity":
+      return 1200;
+    case "office_storage":
+      return 2000;
+    default:
+      return 1200;
+  }
+}

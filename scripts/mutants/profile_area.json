@@ -1,0 +1,566 @@
+[
+  {
+    "name": "the menu link item stops closing the menu",
+    "file": "src/components/ui/dropdown-menu.tsx",
+    "from": "  closeOnClick = true,\n  ...props\n}: MenuPrimitive.LinkItem.Props",
+    "to": "  closeOnClick = false,\n  ...props\n}: MenuPrimitive.LinkItem.Props"
+  },
+  {
+    "name": "the link item loses the default while a sibling keeps a closeOnClick",
+    "file": "src/components/ui/dropdown-menu.tsx",
+    "from": "  variant = \"default\",\n  closeOnClick = true,\n  ...props\n}: MenuPrimitive.LinkItem.Props",
+    "to": "  variant = \"default\",\n  ...props\n}: MenuPrimitive.LinkItem.Props & { closeOnClick?: boolean }"
+  },
+  {
+    "name": "the default is destructured and never passed on",
+    "file": "src/components/ui/dropdown-menu.tsx",
+    "from": "      data-slot=\"dropdown-menu-link-item\"\n      closeOnClick={closeOnClick}",
+    "to": "      data-slot=\"dropdown-menu-link-item\""
+  },
+  {
+    "name": "an empty years field becomes zero again",
+    "file": "src/lib/profile/experience.ts",
+    "from": "  if (!text) return null;\n\n  const digits",
+    "to": "  if (!text) return 0;\n\n  const digits"
+  },
+  {
+    "name": "years are no longer clamped",
+    "file": "src/lib/profile/experience.ts",
+    "from": "  return Math.min(Math.max(years, 0), MAX_YEARS);",
+    "to": "  return years;"
+  },
+  {
+    "name": "a word with no digits becomes a number",
+    "file": "src/lib/profile/experience.ts",
+    "from": "  if (!digits) return null;",
+    "to": "  if (!digits) return 0;"
+  },
+  {
+    "name": "one year reads as one yrs.",
+    "file": "src/lib/profile/experience.ts",
+    "from": "  return `${whole} ${whole === 1 ? \"yr.\" : \"yrs.\"}`;",
+    "to": "  return `${whole} yrs.`;"
+  },
+  {
+    "name": "the field stops filtering to digits",
+    "file": "src/lib/profile/experience.ts",
+    "from": "  return value.replace(/\\D/g, \"\").replace(/^0+(?=\\d)/, \"\").slice(0, 2);",
+    "to": "  return value.slice(0, 2);"
+  },
+  {
+    "name": "the field accepts a third digit",
+    "file": "src/lib/profile/experience.ts",
+    "from": ".slice(0, 2);",
+    "to": ".slice(0, 3);"
+  },
+  {
+    "name": "the years input goes back to type=number",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "              inputMode=\"numeric\"",
+    "to": "              type=\"number\""
+  },
+  {
+    "name": "the keystroke filter is dropped but the import stays",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "onChange={(event) => setYears(digitsOnly(event.target.value))}",
+    "to": "onChange={(event) => setYears(event.target.value)}"
+  },
+  {
+    "name": "the action stores the raw value again",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "      years_experience: parseYears(yearsExperience),",
+    "to": "      years_experience: yearsExperience ?? null,"
+  },
+  {
+    "name": "one screen writes the words itself",
+    "file": "src/components/profile/profile-display.tsx",
+    "from": "              {formatYears(profile.years_experience)} experience",
+    "to": "              {profile.years_experience} years of experience"
+  },
+  {
+    "name": "the save is no longer stamped",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "  return { success: true, savedAt: stamp() };",
+    "to": "  return { success: true };"
+  },
+  {
+    "name": "the confirmation watches the boolean again",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    if (state.savedAt) toast.success(\"Profile saved\");\n  }, [state.savedAt]);",
+    "to": "    if (state.success) toast.success(\"Profile saved\");\n  }, [state.success]);"
+  },
+  {
+    "name": "a failure goes back to silent red text",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    if (state.error) toast.error(state.error);",
+    "to": "    if (false) toast.error(state.error);"
+  },
+  {
+    "name": "a database failure is not stamped",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "    return { error: error.message, erroredAt: stamp() };",
+    "to": "    return { error: error.message };"
+  },
+  {
+    "name": "Ethiopian languages stop coming first",
+    "file": "src/lib/constants/languages.ts",
+    "from": "  ...ETHIOPIAN.map((language) => ({ ...language, ethiopian: true })),\n  ...OTHER,",
+    "to": "  ...OTHER,\n  ...ETHIOPIAN.map((language) => ({ ...language, ethiopian: true })),"
+  },
+  {
+    "name": "a language cannot be found by its own script",
+    "file": "src/lib/constants/languages.ts",
+    "from": "    for (const spelling of [language.name, language.native ?? \"\"]) {",
+    "to": "    for (const spelling of [language.name]) {"
+  },
+  {
+    "name": "a trailing comma stores an empty language",
+    "file": "src/lib/constants/languages.ts",
+    "from": "    if (!clean) continue;",
+    "to": "    if (false) continue;"
+  },
+  {
+    "name": "the same language can be stored twice",
+    "file": "src/lib/constants/languages.ts",
+    "from": "    if (seen.has(key)) continue;",
+    "to": "    if (false) continue;"
+  },
+  {
+    "name": "the language list has no ceiling",
+    "file": "src/lib/constants/languages.ts",
+    "from": "    if (out.length >= max) break;",
+    "to": "    if (false) break;"
+  },
+  {
+    "name": "a chip can carry the separator it is joined with",
+    "file": "src/components/ui/token-picker.tsx",
+    "from": "    const clean = entry.replace(/,/g, \" \").replace(/\\s+/g, \" \").trim();",
+    "to": "    const clean = entry.trim();"
+  },
+  {
+    "name": "a chip can be added twice",
+    "file": "src/components/ui/token-picker.tsx",
+    "from": "    if (value.some((item) => item.toLowerCase() === clean.toLowerCase())) return;",
+    "to": "    if (false) return;"
+  },
+  {
+    "name": "the city field goes back to a plain input",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "            <PlacePicker\n              id=\"locationCity\"\n              name=\"locationCity\"",
+    "to": "            <Input\n              id=\"locationCity\"\n              name=\"locationCity\""
+  },
+  {
+    "name": "the base location goes back to a select",
+    "file": "src/components/profile/trade-and-areas.tsx",
+    "from": "          <PlacePicker\n            id=\"baseArea\"\n            name=\"baseArea\"",
+    "to": "          <select\n            id=\"baseArea\"\n            name=\"baseArea\""
+  },
+  {
+    "name": "the service-area search box stops filtering",
+    "file": "src/components/profile/trade-and-areas.tsx",
+    "from": "                onChange={(event) => setAreaQuery(event.target.value)}",
+    "to": "                onChange={() => setAreaQuery(\"\")}"
+  },
+  {
+    "name": "the service-area search stops using the shared ranking",
+    "file": "src/components/profile/trade-and-areas.tsx",
+    "from": "    const ranked = searchPlaces(areaQuery, { limit: 200, kinds: [\"area\", \"city\"] });",
+    "to": "    const ranked = areas.filter((a) => a.name.toLowerCase().includes(areaQuery.toLowerCase())).map((a) => ({ slug: a.slug }));"
+  },
+  {
+    "name": "the grouped list is replaced rather than kept",
+    "file": "src/components/profile/trade-and-areas.tsx",
+    "from": "    if (!areaQuery.trim()) return null;",
+    "to": "    if (false) return null;"
+  },
+  {
+    "name": "the picker submits only what was clicked",
+    "file": "src/components/location/place-picker.tsx",
+    "from": "      <input type=\"hidden\" name={name} value={usable ? trimmed : \"\"} />",
+    "to": "      <input type=\"hidden\" name={name} value={known ? trimmed : \"\"} />"
+  },
+  {
+    "name": "the picker submits anything at all",
+    "file": "src/components/location/place-picker.tsx",
+    "from": "  const usable = trimmed.length === 0 || isPlausiblePlace(trimmed);",
+    "to": "  const usable = true;"
+  },
+  {
+    "name": "the server takes the browser's word for the base area",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "  const baseArea = isPlausiblePlace(baseAreaRaw) ? baseAreaRaw : \"\";",
+    "to": "  const baseArea = baseAreaRaw;"
+  },
+  {
+    "name": "the server takes the browser's word for the city",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "      location_city:\n        locationCity && isPlausiblePlace(locationCity) ? locationCity : null,",
+    "to": "      location_city: locationCity || null,"
+  },
+  {
+    "name": "a pointer selection is lost to blur again",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "              onPointerDown={(event) => {\n                event.preventDefault();\n                choose(index);\n              }}",
+    "to": "              onClick={() => {\n                choose(index);\n              }}"
+  },
+  {
+    "name": "the highlight is no longer clamped",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "  const active = highlight >= rows ? 0 : highlight;",
+    "to": "  const active = highlight;"
+  },
+  {
+    "name": "Enter stops taking the highlighted row",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "    if (event.key === \"Enter\" && open && rows > 0) {",
+    "to": "    if (false) {"
+  },
+  {
+    "name": "the list stops announcing itself",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "          aria-activedescendant={",
+    "to": "          data-activedescendant={"
+  },
+  {
+    "name": "the rows shrink below a thumb",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "                \"flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm\",\n                index === active",
+    "to": "                \"flex cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm\",\n                index === active"
+  },
+  {
+    "name": "a pointer selection is lost to blur on the add row",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "              onPointerDown={(event) => {\n                event.preventDefault();\n                choose(options.length);\n              }}",
+    "to": "              onClick={() => {\n                choose(options.length);\n              }}"
+  },
+  {
+    "name": "the add row shrinks below a thumb",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "                \"flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm\",\n                active === options.length",
+    "to": "                \"flex cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm\",\n                active === options.length"
+  },
+  {
+    "name": "the field itself shrinks below a thumb",
+    "file": "src/components/ui/combobox.tsx",
+    "from": "          className=\"min-h-11 w-full rounded-lg border border-input",
+    "to": "          className=\"w-full rounded-lg border border-input"
+  },
+  {
+    "name": "the lapsed-session failure is not stamped",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "    return { error: \"Your session expired. Log in again.\", erroredAt: stamp() };",
+    "to": "    return { error: \"Your session expired. Log in again.\" };"
+  },
+  {
+    "name": "the validation failure is not stamped",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "      error: \"Nothing was saved \u2014 check the fields marked below.\",\n      erroredAt: stamp(),",
+    "to": "      error: \"Nothing was saved \u2014 check the fields marked below.\","
+  },
+  {
+    "name": "the duplicate-username failure is not stamped",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "        error: \"That username is taken.\",\n        erroredAt: stamp(),",
+    "to": "        error: \"That username is taken.\","
+  },
+  {
+    "name": "a company is asked for years of experience again",
+    "file": "src/lib/profile/completion.ts",
+    "from": "const ORGANIZATION: CompletionField[] = [",
+    "to": "const ORGANIZATION: CompletionField[] = [\n  { key: \"years_experience\", label: \"Years of experience\", weight: 0, filled: (p) => p.years_experience !== null },"
+  },
+  {
+    "name": "a person is asked for a website again",
+    "file": "src/lib/profile/completion.ts",
+    "from": "const PERSON: CompletionField[] = [",
+    "to": "const PERSON: CompletionField[] = [\n  { key: \"website\", label: \"Website\", weight: 0, filled: (p) => filledText(p.website) },"
+  },
+  {
+    "name": "whitespace counts as an answer",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  typeof value === \"string\" && value.trim().length > 0;",
+    "to": "  typeof value === \"string\" && value.length > 0;"
+  },
+  {
+    "name": "everybody gets the same required set",
+    "file": "src/lib/profile/completion.ts",
+    "from": "  return isOrganizationAccount(accountType) ? ORGANIZATION : PERSON;",
+    "to": "  return PERSON;"
+  },
+  {
+    "name": "the card vanishes at a hundred per cent again",
+    "file": "src/components/profile/profile-completion-card.tsx",
+    "from": "  if (complete) {\n    return (",
+    "to": "  if (complete) {\n    return null;\n  }\n  if (false) {\n    return ("
+  },
+  {
+    "name": "the applicant snapshot goes back to its own rule",
+    "file": "src/lib/data/jobs.ts",
+    "from": "    complete: getProfileCompletion(data).complete,",
+    "to": "    complete: Boolean(data.full_name && data.bio && data.location_city),"
+  },
+  {
+    "name": "the snapshot narrows its select again",
+    "file": "src/lib/data/jobs.ts",
+    "from": "    .select(\"*\")\n    .eq(\"id\", userId)\n    .maybeSingle();",
+    "to": "    .select(\"full_name, company_name, bio, website, location_city, years_experience, avatar_url, username, account_type, base_area, phone, profession, languages, industry\")\n    .eq(\"id\", userId)\n    .maybeSingle();"
+  },
+  {
+    "name": "the completion card is dropped from the profile page",
+    "file": "src/app/(dashboard)/profile/page.tsx",
+    "from": "      <ProfileCompletionCard profile={profile} />\n",
+    "to": ""
+  },
+  {
+    "name": "an employer is asked for a CV after all",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "        {!isOrganization && (\n          <fieldset className=\"space-y-3 rounded-xl border p-4\">",
+    "to": "        {true && (\n          <fieldset className=\"space-y-3 rounded-xl border p-4\">"
+  },
+  {
+    "name": "a person is asked for an industry",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "          {isOrganization ? (\n            <div className=\"space-y-2\">\n              <Label htmlFor=\"industry\">Industry</Label>",
+    "to": "          {true ? (\n            <div className=\"space-y-2\">\n              <Label htmlFor=\"industry\">Industry</Label>"
+  },
+  {
+    "name": "a company size is asked of everybody",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "        {isOrganization && (\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"companySize\">Company size</Label>",
+    "to": "        {true && (\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"companySize\">Company size</Label>"
+  },
+  {
+    "name": "a firm is asked for a trade and a travel radius",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "        {!isOrganization && (\n        <TradeAndAreas",
+    "to": "        {true && (\n        <TradeAndAreas"
+  },
+  {
+    "name": "a field nobody was shown is written null",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "      ...(asked(\"industry\") ? { industry } : {}),",
+    "to": "      industry,"
+  },
+  {
+    "name": "a missing optional field fails the whole save",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "    portfolioLink: formData.get(\"portfolioLink\") ?? undefined,",
+    "to": "    portfolioLink: formData.get(\"portfolioLink\"),"
+  },
+  {
+    "name": "the industry is taken on trust",
+    "file": "src/app/(dashboard)/profile/edit/actions.ts",
+    "from": "  const industry = isIndustry(industryRaw) ? industryRaw : null;",
+    "to": "  const industry = industryRaw ? String(industryRaw) : null;"
+  },
+  {
+    "name": "a document is stored outside the profile's folder",
+    "file": "src/components/profile/document-upload.tsx",
+    "from": "    const path = `${userId}/${kind}-${crypto.randomUUID()}-${safe}`;",
+    "to": "    const path = `${kind}-${crypto.randomUUID()}-${safe}`;"
+  },
+  {
+    "name": "a document waits for Save",
+    "file": "src/components/profile/document-upload.tsx",
+    "from": "    const result = await saveProfileDocument(kind, path, file.name);",
+    "to": "    const result = { error: undefined };"
+  },
+  {
+    "name": "the server accepts a path into somebody else's folder",
+    "file": "src/app/(dashboard)/profile/edit/document-actions.ts",
+    "from": "  if (!path.startsWith(`${user.id}/`) || path.includes(\"..\")) {",
+    "to": "  if (false) {"
+  },
+  {
+    "name": "removing a document leaves the file in storage",
+    "file": "src/app/(dashboard)/profile/edit/document-actions.ts",
+    "from": "    await supabase.storage.from(PROFILE_DOCUMENTS_BUCKET).remove([existing]);",
+    "to": "    void existing;"
+  },
+  {
+    "name": "a document link lasts a year",
+    "file": "src/app/(dashboard)/profile/edit/document-actions.ts",
+    "from": "    .createSignedUrl(path, 60 * 60);",
+    "to": "    .createSignedUrl(path, 60 * 60 * 24 * 365);"
+  },
+  {
+    "name": "the saved CV is not offered on an application",
+    "file": "src/components/jobs/apply-form.tsx",
+    "from": "                Use my saved CV",
+    "to": "                Attach a CV"
+  },
+  {
+    "name": "an edited application forgets the answer it was given",
+    "file": "src/components/jobs/apply-form.tsx",
+    "from": "    existing ? existing.use_saved_cv : Boolean(profile?.savedCv),",
+    "to": "    Boolean(profile?.savedCv),"
+  },
+  {
+    "name": "a document nobody uploaded is offered anyway",
+    "file": "src/components/jobs/apply-form.tsx",
+    "from": "        useSavedCv: Boolean(profile?.savedCv) && useSavedCv,",
+    "to": "        useSavedCv,"
+  },
+  {
+    "name": "the flags never reach the database",
+    "file": "src/app/jobs/actions.ts",
+    "from": "        p_cv: Boolean(input.useSavedCv),",
+    "to": "        p_cv: false,"
+  },
+  {
+    "name": "a failure to record the flags is swallowed",
+    "file": "src/app/jobs/actions.ts",
+    "from": "    if (flagsError) return { error: rpcMessage(flagsError) };",
+    "to": "    void flagsError;"
+  },
+  {
+    "name": "the employer's page signs every applicant's documents",
+    "file": "src/app/jobs/[id]/applications/page.tsx",
+    "from": "        application.use_saved_cv ? application.applicant?.cv_path : null,",
+    "to": "        application.applicant?.cv_path,"
+  },
+  {
+    "name": "the employer sees a CV that was not offered",
+    "file": "src/components/jobs/applicant-card.tsx",
+    "from": "        {application.use_saved_cv &&\n          applicant?.cv_path &&",
+    "to": "        {applicant?.cv_path &&"
+  },
+  {
+    "name": "the Ethiopic face is declared and never loaded",
+    "file": "src/app/layout.tsx",
+    "from": "  subsets: [\"ethiopic\"],",
+    "to": "  subsets: [\"latin\"],"
+  },
+  {
+    "name": "the Ethiopic variable never reaches the document",
+    "file": "src/app/layout.tsx",
+    "from": " ${notoEthiopic.variable}",
+    "to": ""
+  },
+  {
+    "name": "the font choice is not rendered on the server",
+    "file": "src/app/layout.tsx",
+    "from": "      data-font={profile?.font ?? undefined}",
+    "to": ""
+  },
+  {
+    "name": "the pre-paint script runs after the app",
+    "file": "src/app/layout.tsx",
+    "from": "        <FontPreference serverChoice={profile?.font ?? null} />\n        <LanguageProvider",
+    "to": "        <LanguageProvider"
+  },
+  {
+    "name": "one browser's stale choice overrides the account",
+    "file": "src/components/layout/font-preference.tsx",
+    "from": "    if (server) {\n      root.setAttribute(\"data-font\", server);",
+    "to": "    if (false) {\n      root.setAttribute(\"data-font\", server);"
+  },
+  {
+    "name": "a private window takes the page down",
+    "file": "src/components/layout/font-preference.tsx",
+    "from": "  } catch (error) {}",
+    "to": "  } finally {}"
+  },
+  {
+    "name": "choosing a font waits for the round trip",
+    "file": "src/components/settings/font-settings-form.tsx",
+    "from": "      document.documentElement.setAttribute(\"data-font\", next);",
+    "to": "      void next;"
+  },
+  {
+    "name": "choosing the default leaves the override in place",
+    "file": "src/components/settings/font-settings-form.tsx",
+    "from": "      document.documentElement.removeAttribute(\"data-font\");",
+    "to": "      void next;"
+  },
+  {
+    "name": "the samples stop being drawn in their own faces",
+    "file": "src/components/settings/font-settings-form.tsx",
+    "from": "              data-font={option.value}",
+    "to": ""
+  },
+  {
+    "name": "the font setting is dropped from Settings",
+    "file": "src/app/(dashboard)/settings/page.tsx",
+    "from": "      <FontSettingsForm initial={toFontChoice(profile?.font_preference)} />\n",
+    "to": ""
+  },
+  {
+    "name": "the profile draft is reimplemented instead of reusing the project one",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "} from \"@/lib/projects/draft\";",
+    "to": "} from \"@/lib/projects/draft-copy\";"
+  },
+  {
+    "name": "the profile draft shares the project's storage key",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "  return `medosha:profile-draft:${profileId}`;",
+    "to": "  return `medosha:project-draft:${profileId}:new`;"
+  },
+  {
+    "name": "a field only saves on blur, not while typing",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "        onInput={queueSave}\n        onChange={queueSave}",
+    "to": "        onBlur={queueSave}"
+  },
+  {
+    "name": "a saved draft is written with the avatar carried along",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "      images: [],\n      primary: null,",
+    "to": "      images: [profile.avatar_url ?? \"\"],\n      primary: profile.avatar_url ?? null,"
+  },
+  {
+    "name": "continuing a draft no longer restores the plain fields",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    applyDraftToForm(form, offer.values);",
+    "to": ""
+  },
+  {
+    "name": "account type stops being restored through state",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    if (ACCOUNT_TYPES.some((t) => t.value === draftAccountType)) {\n      setAccountType(draftAccountType as AccountType);\n    }",
+    "to": ""
+  },
+  {
+    "name": "languages stop being restored through state",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    setLanguages(parseLanguages(offer.values.languages));",
+    "to": ""
+  },
+  {
+    "name": "an invented account type is accepted from a corrupted draft",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    if (ACCOUNT_TYPES.some((t) => t.value === draftAccountType)) {\n      setAccountType(draftAccountType as AccountType);\n    }",
+    "to": "    setAccountType(draftAccountType as AccountType);"
+  },
+  {
+    "name": "the trade is not remounted, so a restored profession never takes",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    setRestoreNonce((n) => n + 1);",
+    "to": ""
+  },
+  {
+    "name": "discarding a draft does not clear it",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "  function discardDraft() {\n    clearDraft(window.localStorage, draftKey);",
+    "to": "  function discardDraft() {"
+  },
+  {
+    "name": "a successful save leaves the draft in place",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "    if (state.savedAt) {\n      clearDraft(window.localStorage, draftKey);\n      snapshot.current = null;\n    }",
+    "to": ""
+  },
+  {
+    "name": "TradeAndAreas is not keyed, so it never actually remounts",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "          key={restoreNonce}\n          areas={areas}",
+    "to": "          areas={areas}"
+  },
+  {
+    "name": "the offer keeps showing after it has been answered",
+    "file": "src/components/profile/edit-profile-form.tsx",
+    "from": "  const hasOffer = !answered && isDraftWorthKeeping(found);",
+    "to": "  const hasOffer = isDraftWorthKeeping(found);"
+  }
+]

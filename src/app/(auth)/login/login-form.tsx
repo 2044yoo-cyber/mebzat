@@ -1,5 +1,6 @@
 "use client";
 
+import { safeRedirect } from "@/lib/auth/safe-redirect";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useActionState } from "react";
@@ -25,7 +26,9 @@ const initialState: LoginState = {};
 
 export function LoginForm() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
+  // Guarded here too, so the form never renders a link or a hidden input
+  // carrying an off-site destination in the first place.
+  const redirectTo = safeRedirect(searchParams.get("redirect"));
   const [state, formAction, pending] = useActionState(
     loginWithEmail,
     initialState,

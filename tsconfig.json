@@ -6,6 +6,10 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    // scripts/ run under tsx, which resolves "./x.ts" specifiers. tsconfig
+    // includes **/*.ts, so next build type-checks them too and rejected the
+    // extension. Safe with noEmit: nothing is written from these paths.
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",

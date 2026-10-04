@@ -1,0 +1,32 @@
+{
+  "generatedWith": "Built-in image generation",
+  "purpose": "Illustrations for seeded sample properties only; not photographs of actual listings.",
+  "generatedPrompts": {
+    "condominium": "A modest Ethiopian IHDP condominium block in Addis Ababa, cream and pale ochre plaster, five floors, exterior stair access, small rectangular windows, paved shared courtyard, realistic lived-in housing, no luxury resort",
+    "villa": "A contemporary two-storey family villa in Addis Ababa, cream plaster and local grey stone, modest walled garden, dark metal gate, generous windows, practical Ethiopian residential architecture",
+    "house": "A modest single-storey detached family house in Addis Ababa, cream walls, pitched corrugated metal roof, small paved compound with a few plants, realistic local housing",
+    "duplex": "A detached two-storey duplex home in Addis Ababa, warm white walls, stone base, balcony, flat roof, walled compact residential compound",
+    "townhouse": "A row of three attached two-storey townhouses in an Addis Ababa residential compound, beige plaster, small front gardens, metal gates and balconies",
+    "land": "An undeveloped residential land parcel on the outskirts of Addis Ababa, flat brown earth and short grass, simple boundary posts, access lane, scattered modest homes and eucalyptus on distant hills, no buildings on the parcel",
+    "commercial": "A contemporary mixed-use commercial building in Addis Ababa, five floors, ground-floor glass storefronts without lettering, upper offices, local stone and warm grey plaster, sidewalk and realistic city street",
+    "unfurnished": "An unfurnished apartment living room in Addis Ababa, clean cream plaster walls, light ceramic tile floor, aluminium-framed windows, small balcony visible through glazed door, simple realistic midrange finishes, no furniture"
+  },
+  "stockLicense": "https://www.pexels.com/license/",
+  "stock": [
+    {
+      "file": "stock_apartment_1.webp",
+      "author": "Max Vakhtbovych",
+      "source": "https://www.pexels.com/photo/apartment-with-living-room-and-bedroom-7019026/"
+    },
+    {
+      "file": "stock_apartment_2.webp",
+      "author": "Erdem ÖZDEMİR",
+      "source": "https://www.pexels.com/photo/apartment-living-room-16056400/"
+    },
+    {
+      "file": "stock_apartment_3.webp",
+      "author": "Thới Nam Cao",
+      "source": "https://www.pexels.com/photo/modern-apartment-living-room-with-city-view-29953440/"
+    }
+  ]
+}

@@ -1,0 +1,1444 @@
+/**
+ * The geometry behind Medosha 360°.
+ *
+ *   npx tsx scripts/tour_check.ts
+ *
+ * A tour fails quietly. A hotspot placed a hundred pixels from the doorway it
+ * labels still looks like a working tour to whoever built it, and only the
+ * buyer clicking the wrong wall finds out. So the projection is asserted here
+ * against positions worked out by hand, not judged by eye in a browser.
+ *
+ * Two of these assertions exist because the failure is invisible rather than
+ * loud: a marker for what is *behind* you gets drawn mirrored on the wall in
+ * front of you, and a pitch of exactly straight up flips the whole horizon.
+ */
+
+import { readFileSync } from "node:fs";
+
+import { isMissingRelation } from "../src/lib/supabase/missing-relation.ts";
+
+import * as THREE from "three";
+
+import {
+  clampFov,
+  clampPitch,
+  dragSpeed,
+  lookTarget,
+  MAX_FOV,
+  MIN_FOV,
+  normaliseDegrees,
+  PITCH_LIMIT,
+  sphereExtents,
+  projectHotspot,
+} from "../src/lib/tour/panorama-math.ts";
+import {
+  EQUIRECTANGULAR_RATIO,
+  MAX_PANORAMA_WIDTH,
+  MIN_PANORAMA_RATIO,
+  MIN_PANORAMA_WIDTH,
+  PANORAMA_TYPES,
+  RATIO_TOLERANCE,
+  readPanorama,
+  sceneName,
+} from "../src/lib/tour/panorama-image.ts";
+import type { ValidatableHotspot, ValidatableScene } from "../src/lib/tour/validate.ts";
+import {
+  resolveSceneTargets,
+  toSceneInputs,
+  type DraftTourScene,
+} from "../src/lib/tour/draft.ts";
+import {
+  belongsInTheFeed,
+  fromOurPlans,
+  fromOurStorage,
+  ownsQuarantinePath,
+  MAX_HOTSPOTS_PER_SCENE,
+  MAX_SCENES,
+  validateTour,
+} from "../src/lib/tour/validate.ts";
+
+const GREEN = "\x1b[32m";
+const RED = "\x1b[31m";
+const DIM = "\x1b[2m";
+const RESET = "\x1b[0m";
+
+let passed = 0;
+const failures: string[] = [];
+
+function check(name: string, condition: boolean, detail = "") {
+  if (condition) {
+    passed += 1;
+    return;
+  }
+  failures.push(`${name}${detail ? ` — ${detail}` : ""}`);
+}
+
+const W = 800;
+const H = 600;
+
+/** A camera turned to a given yaw and pitch in degrees, as the viewer aims it. */
+function cameraLooking(yawDegrees: number, pitchDegrees: number, fov = 75) {
+  const camera = new THREE.PerspectiveCamera(fov, W / H, 0.1, 1000);
+  camera.lookAt(lookTarget((yawDegrees * Math.PI) / 180, (pitchDegrees * Math.PI) / 180));
+  camera.updateMatrixWorld(true);
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
+// ---------------------------------------------------------------------------
+// 1. A hotspot dead ahead is in the middle of the screen
+//
+// If this is wrong, every marker in every tour is wrong together, which is the
+// one failure obvious enough to catch by eye — so it is the cheapest to pin
+// down and the one everything below depends on.
+// ---------------------------------------------------------------------------
+
+for (const yaw of [0, 45, 90, 180, 270, 359]) {
+  const at = projectHotspot(cameraLooking(yaw, 0), yaw, 0, W, H);
+  check(
+    `a hotspot at yaw ${yaw}° is centred when the camera faces it`,
+    at.visible && Math.abs(at.x - W / 2) < 0.5 && Math.abs(at.y - H / 2) < 0.5,
+    `${at.x.toFixed(1)}, ${at.y.toFixed(1)}`,
+  );
+}
+
+for (const pitch of [-60, -30, 0, 30, 60]) {
+  const at = projectHotspot(cameraLooking(0, pitch), 0, pitch, W, H);
+  check(
+    `a hotspot at pitch ${pitch}° is centred when the camera faces it`,
+    at.visible && Math.abs(at.x - W / 2) < 0.5 && Math.abs(at.y - H / 2) < 0.5,
+    `${at.x.toFixed(1)}, ${at.y.toFixed(1)}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 2. Which way is which
+//
+// A sign flip here is the mistake that survives review: the markers move, they
+// move smoothly, and they move the wrong way. Yaw increases anticlockwise in
+// the spherical convention, so a hotspot at a *higher* yaw than the camera sits
+// to the left; a positive pitch is up, which is a *smaller* y in screen space.
+// ---------------------------------------------------------------------------
+
+const rightOfCentre = projectHotspot(cameraLooking(0, 0), -20, 0, W, H);
+check(
+  "a hotspot 20° clockwise of the view is on the right",
+  rightOfCentre.visible && rightOfCentre.x > W / 2,
+  `x = ${rightOfCentre.x.toFixed(1)}`,
+);
+
+const leftOfCentre = projectHotspot(cameraLooking(0, 0), 20, 0, W, H);
+check(
+  "a hotspot 20° anticlockwise of the view is on the left",
+  leftOfCentre.visible && leftOfCentre.x < W / 2,
+  `x = ${leftOfCentre.x.toFixed(1)}`,
+);
+
+const above = projectHotspot(cameraLooking(0, 0), 0, 20, W, H);
+check(
+  "a hotspot 20° above the horizon is above the middle",
+  above.visible && above.y < H / 2,
+  `y = ${above.y.toFixed(1)}`,
+);
+
+const below = projectHotspot(cameraLooking(0, 0), 0, -20, W, H);
+check(
+  "a hotspot 20° below the horizon is below the middle",
+  below.visible && below.y > H / 2,
+  `y = ${below.y.toFixed(1)}`,
+);
+
+// ---------------------------------------------------------------------------
+// 3. What is behind you stays behind you
+//
+// Past the camera the perspective divide flips sign, so a marker for the door
+// behind the viewer would be drawn on the wall in front of them — in the wrong
+// place, mirrored, and looking entirely legitimate.
+// ---------------------------------------------------------------------------
+
+for (const yaw of [120, 150, 180, 210, 240]) {
+  const at = projectHotspot(cameraLooking(0, 0), yaw, 0, W, H);
+  check(`a hotspot ${yaw}° round is hidden`, !at.visible);
+}
+
+for (const yaw of [-40, -20, 0, 20, 40]) {
+  const at = projectHotspot(cameraLooking(0, 0), yaw, 0, W, H);
+  check(`a hotspot ${yaw}° from the view is shown`, at.visible);
+}
+
+// A narrow fov sees less of the room, but "visible" is about the hemisphere in
+// front of the camera, not the frame — a marker just outside the edge should
+// still be positioned, so that panning towards it does not make it pop in.
+const narrow = projectHotspot(cameraLooking(0, 0, MIN_FOV), 40, 0, W, H);
+check("zoomed in, a hotspot outside the frame is still placed", narrow.visible);
+check(
+  "zoomed in, that hotspot is off the left of the frame",
+  narrow.x < 0,
+  `x = ${narrow.x.toFixed(1)}`,
+);
+
+// ---------------------------------------------------------------------------
+// 4. The poles
+//
+// `lookAt` has no roll to fall back on when the target is parallel to the up
+// vector, so a pitch of exactly ±90° rolls the whole panorama on its side.
+// The clamp is what stops a drag reaching it.
+// ---------------------------------------------------------------------------
+
+check("the pitch limit stops short of straight up", PITCH_LIMIT < Math.PI / 2);
+check("a drag far past the top is clamped", clampPitch(10) === PITCH_LIMIT);
+check("a drag far past the bottom is clamped", clampPitch(-10) === -PITCH_LIMIT);
+check("a pitch inside the limit is left alone", clampPitch(0.5) === 0.5);
+
+// Straight up is the failure the clamp exists to prevent. `lookAt` cannot
+// build a basis when the target is parallel to the up vector, and the
+// degenerate matrix that comes out throws every hotspot behind the camera —
+// so the whole tour loses its markers, silently, at one particular angle.
+const rolled = cameraLooking(0, 90);
+const rolledA = projectHotspot(rolled, 45, 0, W, H);
+const rolledB = projectHotspot(rolled, -45, 0, W, H);
+check(
+  "straight up loses the hotspots (this is why pitch is clamped)",
+  !rolledA.visible && !rolledB.visible,
+  `${rolledA.y.toFixed(1)} vs ${rolledB.y.toFixed(1)}`,
+);
+
+// Clamped, the horizon stays level: two hotspots the same distance either side
+// of the view sit at the same height, and mirrored about the middle.
+const atLimit = cameraLooking(0, (PITCH_LIMIT * 180) / Math.PI);
+const limitA = projectHotspot(atLimit, 30, 0, W, H);
+const limitB = projectHotspot(atLimit, -30, 0, W, H);
+check(
+  "at the clamped limit the hotspots are still there",
+  limitA.visible && limitB.visible,
+);
+check(
+  "at the clamped limit the horizon is still level",
+  Math.abs(limitA.y - limitB.y) < 0.5,
+  `${limitA.y.toFixed(1)} vs ${limitB.y.toFixed(1)}`,
+);
+check(
+  "at the clamped limit the two are mirrored about the middle",
+  Math.abs(limitA.x - W / 2 + (limitB.x - W / 2)) < 0.5,
+  `${limitA.x.toFixed(1)} vs ${limitB.x.toFixed(1)}`,
+);
+
+// ---------------------------------------------------------------------------
+// 5. Zoom
+// ---------------------------------------------------------------------------
+
+check("zooming in stops at the minimum", clampFov(1) === MIN_FOV);
+check("zooming out stops at the maximum", clampFov(1000) === MAX_FOV);
+check("a fov inside the range is left alone", clampFov(60) === 60);
+check("the range is the right way round", MIN_FOV < MAX_FOV);
+
+// Zoomed in, the same hotspot must sit further from the centre — that is what
+// zoom *is*. A clamp applied to the wrong variable would leave it still.
+const wide = projectHotspot(cameraLooking(0, 0, MAX_FOV), 20, 0, W, H);
+const tight = projectHotspot(cameraLooking(0, 0, MIN_FOV), 20, 0, W, H);
+check(
+  "zooming in pushes a hotspot further from the centre",
+  Math.abs(tight.x - W / 2) > Math.abs(wide.x - W / 2),
+  `${Math.abs(tight.x - W / 2).toFixed(1)} vs ${Math.abs(wide.x - W / 2).toFixed(1)}`,
+);
+
+// Drag speed tracks fov, so a drag covers the same amount of image at any
+// zoom. Equal at the reference fov, smaller when zoomed in.
+check("drag speed is the reference at fov 75", dragSpeed(75) === 0.0025);
+check("zoomed in, a drag turns the view less", dragSpeed(MIN_FOV) < dragSpeed(75));
+check("zoomed out, a drag turns the view more", dragSpeed(MAX_FOV) > dragSpeed(75));
+
+// ---------------------------------------------------------------------------
+// 6. The camera target is a direction, not a position
+//
+// `lookAt` takes a point in world space and the camera sits at the origin, so
+// the target has to be a unit vector in the direction being faced. A target
+// that drifts off the unit sphere still works until something else reads it.
+// ---------------------------------------------------------------------------
+
+for (const [yaw, pitch] of [
+  [0, 0],
+  [Math.PI / 2, 0],
+  [Math.PI, PITCH_LIMIT],
+  [-Math.PI / 3, -PITCH_LIMIT],
+] as const) {
+  const target = lookTarget(yaw, pitch);
+  check(
+    `the target for yaw ${yaw.toFixed(2)}, pitch ${pitch.toFixed(2)} is a unit vector`,
+    Math.abs(target.length() - 1) < 1e-9,
+    `length ${target.length()}`,
+  );
+}
+
+check("looking at the horizon does not tilt the target", Math.abs(lookTarget(0, 0).y) < 1e-9);
+check("looking up puts the target above the horizon", lookTarget(0, 1).y > 0);
+check("looking down puts the target below the horizon", lookTarget(0, -1).y < 0);
+
+// ---------------------------------------------------------------------------
+// 6b. The same direction, expressed once
+//
+// JavaScript's % keeps the sign of its left operand, so -370 % 360 is -10.
+// A hotspot stored at -10° and one stored at 350° are on the same wall, and a
+// tour built by dragging anticlockwise must not hold different numbers from
+// one built by dragging the other way.
+// ---------------------------------------------------------------------------
+
+for (const [given, expected] of [
+  [0, 0],
+  [90, 90],
+  [359, 359],
+  [360, 0],
+  [370, 10],
+  [720, 0],
+  [-10, 350],
+  [-370, 350],
+  [-360, 0],
+  [-720, 0],
+  [1085, 5],
+  [-1085, 355],
+] as const) {
+  check(
+    `${given}° normalises to ${expected}°`,
+    normaliseDegrees(given) === expected,
+    String(normaliseDegrees(given)),
+  );
+}
+
+// Whatever comes in, what comes out is a bearing.
+for (const value of [0, 1, -1, 180, -180, 359.9, -359.9, 12345, -12345]) {
+  const out = normaliseDegrees(value);
+  check(`${value}° lands inside one turn`, out >= 0 && out < 360, String(out));
+}
+
+// Turning right round is a no-op, at any starting angle.
+for (const value of [0, 37, 180, 359, -45]) {
+  check(
+    `${value}° and ${value + 360}° are the same direction`,
+    normaliseDegrees(value) === normaliseDegrees(value + 360),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 7. What kind of panorama this is
+//
+// This used to refuse anything that was not 2:1 within a hair, and threw out
+// real panoramas — 4368×2448 among them — telling the person their camera was
+// wrong. Two questions had been run together: "is this a full equirectangular
+// sphere" and "can this be used at all". Only the first depends on 2:1.
+// ---------------------------------------------------------------------------
+
+// True equirectangular, from the cameras that write it.
+for (const [w, h, label] of [
+  [5376, 2688, "Ricoh Theta"],
+  [4096, 2048, "a stitched panorama"],
+  [2048, 1024, "a small panorama"],
+  [1024, 512, "the smallest accepted"],
+  [11968, 5984, "Insta360 X3"],
+] as const) {
+  const reading = readPanorama(w, h);
+  check(`${label} (${w}×${h}) is accepted`, reading.refusal === null);
+  check(`${label} is called equirectangular`, reading.kind === "equirectangular", reading.kind);
+  check(`${label} needs no confirming`, !reading.needsConfirmation);
+}
+
+// The image this was all about.
+const theirs = readPanorama(4368, 2448);
+check("4368×2448 is accepted", theirs.refusal === null, theirs.refusal ?? "");
+check("4368×2448 is called a wide panorama", theirs.kind === "wide", theirs.kind);
+check("its ratio is reported as 1.78:1", theirs.label === "1.78:1", theirs.label);
+check("it is not held up for confirmation", !theirs.needsConfirmation);
+check(
+  "and the note says what that means rather than refusing",
+  theirs.note !== null && theirs.note.includes("1.78:1") && !/must|cannot|has to be/.test(theirs.note),
+  theirs.note ?? "",
+);
+
+// Other wide-but-not-2:1 shapes, all usable.
+for (const [w, h] of [
+  [3000, 1800],
+  [4000, 2000 + 300],
+  [6000, 2000],
+  [8000, 2000],
+] as const) {
+  const reading = readPanorama(w, h);
+  check(`${w}×${h} is accepted`, reading.refusal === null, reading.refusal ?? "");
+  check(`${w}×${h} is not held up`, !reading.needsConfirmation);
+}
+
+// A 16:9 screenshot is 1.778 and their panorama is 1.784 — the same shape.
+// Ratio alone cannot separate them, which is the whole reason this warns
+// instead of refusing. Both are accepted as wide panoramas.
+const screenshot = readPanorama(1920, 1080);
+check("a 16:9 image is accepted", screenshot.refusal === null);
+check("a 16:9 image is a wide panorama", screenshot.kind === "wide", screenshot.kind);
+check(
+  "because it is the same shape as a real 1.78:1 panorama",
+  Math.abs(1920 / 1080 - 4368 / 2448) < 0.01,
+);
+
+// Close to an ordinary photograph: asked about, still never refused.
+for (const [w, h, label] of [
+  [4032, 3024, "a 4:3 phone photo"],
+  [2000, 1400, "a wide-ish photo"],
+  [1080, 1920, "a portrait photo"],
+  [1600, 1600, "a square crop"],
+] as const) {
+  const reading = readPanorama(w, h);
+  check(`${label} (${w}×${h}) is not refused`, reading.refusal === null);
+  check(`${label} is asked about`, reading.needsConfirmation);
+  check(`${label} is marked as needing verification`, reading.kind === "uncertain");
+  check(
+    `${label} is told it may not be a full panorama`,
+    reading.note !== null && reading.note.includes("may not"),
+    reading.note ?? "",
+  );
+  check(
+    `${label} is offered anyway`,
+    reading.note !== null && reading.note.includes("use it anyway"),
+    reading.note ?? "",
+  );
+}
+
+// The threshold between "wide panorama" and "ask first".
+check("the panorama ratio floor is 1.5", MIN_PANORAMA_RATIO === 1.5);
+check("just above the floor is a wide panorama", readPanorama(3040, 2000).kind === "wide");
+check("just below the floor is asked about", readPanorama(2960, 2000).needsConfirmation);
+check("the ratio two to one is still the standard", EQUIRECTANGULAR_RATIO === 2);
+check("the equirectangular tolerance stays tight", RATIO_TOLERANCE < 0.1);
+
+// The two hard refusals, which are about the file and not its shape.
+check("a zero-sized image is refused", readPanorama(0, 0).refusal !== null);
+check("a negative size is refused", readPanorama(-4096, -2048).refusal !== null);
+check("a non-finite size is refused", readPanorama(Number.NaN, 2048).refusal !== null);
+
+const tiny = readPanorama(MIN_PANORAMA_WIDTH - 2, (MIN_PANORAMA_WIDTH - 2) / 2);
+check("a panorama under the minimum width is refused", tiny.refusal !== null);
+check(
+  "and it is refused for its size, not its shape",
+  tiny.refusal !== null && tiny.refusal.includes("too small"),
+  tiny.refusal ?? "",
+);
+
+// Shrinking keeps the picture's own proportions. Forcing 2:1 here is what
+// would stretch the room.
+const huge = readPanorama(11968, 5984);
+check("an oversized panorama is resized", huge.resizeTo?.width === MAX_PANORAMA_WIDTH);
+check("and stays 2:1 when it started 2:1", huge.resizeTo?.height === MAX_PANORAMA_WIDTH / 2);
+
+const hugeWide = readPanorama(8736, 4896);
+check("an oversized 1.78:1 keeps its ratio", hugeWide.resizeTo?.width === MAX_PANORAMA_WIDTH);
+check(
+  "and is not squared up to 2:1",
+  hugeWide.resizeTo !== null &&
+    Math.abs(hugeWide.resizeTo.width / hugeWide.resizeTo.height - 8736 / 4896) < 0.01,
+  JSON.stringify(hugeWide.resizeTo),
+);
+check("a panorama at the limit is not resized", readPanorama(4096, 2048).resizeTo === null);
+
+check("jpeg is accepted", (PANORAMA_TYPES as readonly string[]).includes("image/jpeg"));
+check("webp is accepted", (PANORAMA_TYPES as readonly string[]).includes("image/webp"));
+check("png is not", !(PANORAMA_TYPES as readonly string[]).includes("image/png"));
+
+// ---------------------------------------------------------------------------
+// 7b. How much of the sphere the picture covers
+//
+// Wrap a 1.78:1 image over a full 360×180 sphere and every vertical line in
+// the room is stretched. Nothing errors; the flat just looks subtly wrong.
+// ---------------------------------------------------------------------------
+
+const DEG = 180 / Math.PI;
+
+const square = sphereExtents(4096, 2048);
+check("a 2:1 panorama covers the whole turn", Math.abs(square.haov * DEG - 360) < 0.01);
+check("and the whole height", Math.abs(square.vaov * DEG - 180) < 0.01);
+
+const theirExtents = sphereExtents(4368, 2448);
+check(
+  "a 1.78:1 panorama covers 321 degrees, not 360",
+  Math.abs(theirExtents.haov * DEG - 321.2) < 0.5,
+  (theirExtents.haov * DEG).toFixed(1),
+);
+check("and still the full height", Math.abs(theirExtents.vaov * DEG - 180) < 0.01);
+
+const veryWide = sphereExtents(6000, 2000);
+check("a 3:1 panorama covers the whole turn", Math.abs(veryWide.haov * DEG - 360) < 0.01);
+check(
+  "and 120 degrees of height",
+  Math.abs(veryWide.vaov * DEG - 120) < 0.01,
+  (veryWide.vaov * DEG).toFixed(1),
+);
+
+// The one property that matters: degrees per pixel is the same on both axes,
+// which is what "not stretched" means.
+for (const [w, h] of [
+  [4096, 2048],
+  [4368, 2448],
+  [6000, 2000],
+  [8000, 2000],
+  [3000, 1800],
+] as const) {
+  const { haov, vaov } = sphereExtents(w, h);
+  check(
+    `${w}×${h} is mapped without stretching`,
+    Math.abs(haov / w - vaov / h) < 1e-9,
+    `${(haov / w).toExponential(3)} vs ${(vaov / h).toExponential(3)}`,
+  );
+}
+
+// Never more sphere than exists.
+for (const [w, h] of [
+  [4096, 2048],
+  [4368, 2448],
+  [2000, 1900],
+  [10000, 1000],
+] as const) {
+  const { haov, vaov } = sphereExtents(w, h);
+  check(`${w}×${h} does not exceed a full turn`, haov <= Math.PI * 2 + 1e-9);
+  check(`${w}×${h} does not exceed the poles`, vaov <= Math.PI + 1e-9);
+}
+
+// A scene saved before dimensions were recorded is shown as it always was.
+// A negative dimension passes every falsy check and would otherwise produce a
+// sphere with a negative angular extent — geometry that renders as nothing.
+for (const [w, h] of [
+  [null, null],
+  [undefined, undefined],
+  [0, 0],
+  [4096, 0],
+  [-4096, 2048],
+  [4096, -2048],
+  [Number.NaN, 2048],
+] as const) {
+  const extents = sphereExtents(w, h);
+  check(
+    `unknown dimensions (${w}×${h}) fall back to the full sphere`,
+    Math.abs(extents.haov - Math.PI * 2) < 1e-9 && Math.abs(extents.vaov - Math.PI) < 1e-9,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 8. What a scene is called before anybody renames it
+//
+// A serial number as a scene title is worse than a placeholder, because it
+// looks deliberate. Nobody edits "R0010234", and it ships to the buyer.
+// ---------------------------------------------------------------------------
+
+for (const [file, expected] of [
+  ["living room.jpg", "Living room"],
+  ["master_bedroom.jpg", "Master bedroom"],
+  ["kitchen-and-dining.webp", "Kitchen and dining"],
+  ["Balcony.JPG", "Balcony"],
+  ["  rooftop  .jpg", "Rooftop"],
+  ["second floor landing.jpeg", "Second floor landing"],
+] as const) {
+  check(`"${file}" becomes "${expected}"`, sceneName(file, 0) === expected, sceneName(file, 0));
+}
+
+// Camera output, in the shapes the common 360° cameras write.
+for (const file of [
+  "R0010234.JPG",
+  "IMG_2201.jpg",
+  "DSC00042.jpg",
+  "GS__0198.jpg",
+  "20260904.jpg",
+  "0001.webp",
+  ".jpg",
+  "___.jpg",
+]) {
+  check(`"${file}" falls back to a numbered scene`, sceneName(file, 2) === "Scene 3", sceneName(file, 2));
+}
+
+check("the fallback is one-based", sceneName("IMG_0001.jpg", 0) === "Scene 1");
+
+// A real room name that happens to contain digits is not a serial number.
+check('"bedroom 2.jpg" keeps its name', sceneName("bedroom 2.jpg", 0) === "Bedroom 2");
+check('"unit 401.jpg" keeps its name', sceneName("unit 401.jpg", 0) === "Unit 401");
+// Short block-and-unit labels — "B2", "A 12" — are how buildings here are
+// signed. A serial number is a long run of digits; two is a door.
+check('"B2.jpg" keeps its name', sceneName("B2.jpg", 0) === "B2", sceneName("B2.jpg", 0));
+check('"A 12.jpg" keeps its name', sceneName("A 12.jpg", 0) === "A 12", sceneName("A 12.jpg", 0));
+
+// ---------------------------------------------------------------------------
+// 9. A tour that is safe to write
+//
+// A validation gap does not throw. It writes a tour that looks fine until a
+// visitor clicks a door that opens nothing.
+// ---------------------------------------------------------------------------
+
+/** Hotspots are optional on a scene, but every tour built here has some, and
+ * the assertions below reach into them. */
+type CheckScene = ValidatableScene & { hotspots: ValidatableHotspot[] };
+
+/** The shape of a tour that should save without complaint. */
+function goodTour(): { title: string; scenes: CheckScene[] } {
+  return {
+    title: "Two bedroom in Bole",
+    scenes: [
+      {
+        key: "a",
+        title: "Living room",
+        panoramaUrl: "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/1.jpg",
+        hotspots: [
+          { kind: "scene", yaw: 90, pitch: 0, title: "To the kitchen", targetSceneKey: "b" },
+          { kind: "info", yaw: -30, pitch: 10, title: "South facing" },
+        ],
+      },
+      {
+        key: "b",
+        title: "Kitchen",
+        panoramaUrl: "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/2.jpg",
+        hotspots: [{ kind: "scene", yaw: -90, pitch: 0, title: "Back", targetSceneKey: "a" }],
+      },
+    ],
+  };
+}
+
+check("a complete tour is accepted", validateTour(goodTour()) === null, validateTour(goodTour()) ?? "");
+
+// The name.
+check("a tour with no name is refused", validateTour({ ...goodTour(), title: "" }) !== null);
+check("a tour named with spaces is refused", validateTour({ ...goodTour(), title: "   " }) !== null);
+check("a two-letter name is refused", validateTour({ ...goodTour(), title: "2b" }) !== null);
+check("a three-letter name is accepted", validateTour({ ...goodTour(), title: "G+4" }) === null);
+check(
+  "an absurdly long name is refused",
+  validateTour({ ...goodTour(), title: "x".repeat(201) }) !== null,
+);
+
+// The scenes.
+check("a tour with no scenes is refused", validateTour({ ...goodTour(), scenes: [] }) !== null);
+check(
+  "a tour past the scene limit is refused",
+  validateTour({
+    ...goodTour(),
+    scenes: Array.from({ length: MAX_SCENES + 1 }, (_, i) => ({
+      key: `k${i}`,
+      title: `Scene ${i}`,
+      panoramaUrl: "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/1.jpg",
+    })),
+  }) !== null,
+);
+check(
+  "a tour at the scene limit is accepted",
+  validateTour({
+    ...goodTour(),
+    scenes: Array.from({ length: MAX_SCENES }, (_, i) => ({
+      key: `k${i}`,
+      title: `Scene ${i}`,
+      panoramaUrl: "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/1.jpg",
+    })),
+  }) === null,
+);
+
+// Duplicate keys would make one scene's hotspots land on another, because the
+// key is what pairs a scene with the uuid it was given.
+// No scene hotspots here: with a door in play the duplicate would be refused
+// for pointing at a key that no longer resolves, and the duplicate check
+// itself would never be reached.
+const duplicated = goodTour();
+duplicated.scenes[1].key = "a";
+duplicated.scenes[0].hotspots = [{ kind: "info", yaw: 0, pitch: 0, title: "Note" }];
+duplicated.scenes[1].hotspots = [];
+check("two scenes sharing a key are refused", validateTour(duplicated) !== null);
+check(
+  "and it is refused for the duplicate, not for a broken door",
+  validateTour(duplicated)?.includes("same id") === true,
+  validateTour(duplicated) ?? "",
+);
+
+const unnamed = goodTour();
+unnamed.scenes[1].title = "  ";
+check("a scene with no name is refused", validateTour(unnamed) !== null);
+
+const photoless = goodTour();
+photoless.scenes[1].panoramaUrl = "";
+check("a scene with no photo is refused", validateTour(photoless) !== null);
+
+// The dead end: the failure this whole function exists to prevent.
+const dangling = goodTour();
+dangling.scenes[0].hotspots[0].targetSceneKey = "does-not-exist";
+check("a door pointing at a scene not in the tour is refused", validateTour(dangling) !== null);
+
+check(
+  "and it is refused for pointing at a missing scene",
+  validateTour(dangling)?.includes("not in this tour") === true,
+  validateTour(dangling) ?? "",
+);
+
+const targetless = goodTour();
+dangling.scenes[0].hotspots[0].targetSceneKey = "b";
+targetless.scenes[0].hotspots[0].targetSceneKey = null;
+check("a door pointing nowhere is refused", validateTour(targetless) !== null);
+// A different sentence from the one above, because they are different
+// mistakes: one door was never given a destination, the other lost it.
+check(
+  "and it says the door has no scene to open",
+  validateTour(targetless)?.includes("no scene to open") === true,
+  validateTour(targetless) ?? "",
+);
+
+// An info hotspot has nothing to point at, and must not be held to the rule.
+const info = goodTour();
+info.scenes[0].hotspots = [{ kind: "info", yaw: 0, pitch: 0, title: "Balcony" }];
+check("an info hotspot needs no target", validateTour(info) === null);
+
+const unlabelled = goodTour();
+unlabelled.scenes[0].hotspots[1].title = "";
+check("a hotspot with no label is refused", validateTour(unlabelled) !== null);
+
+const nowhere = goodTour();
+nowhere.scenes[0].hotspots[1].yaw = Number.NaN;
+check("a hotspot with no position is refused", validateTour(nowhere) !== null);
+
+const crowded = goodTour();
+crowded.scenes[0].hotspots = Array.from({ length: MAX_HOTSPOTS_PER_SCENE + 1 }, () => ({
+  kind: "info",
+  yaw: 0,
+  pitch: 0,
+  title: "Note",
+}));
+check("a scene past the hotspot limit is refused", validateTour(crowded) !== null);
+
+// ---------------------------------------------------------------------------
+// 10. Where a panorama is allowed to come from
+//
+// The browser sends a URL, not a file — a server action cannot receive a Blob.
+// So an unchecked URL would let a tour embed an image from anywhere, bypassing
+// the moderation the upload path exists to enforce, and point Medosha's viewer
+// at a stranger's server.
+// ---------------------------------------------------------------------------
+
+const OURS = "https://abc123.supabase.co";
+const ok = (url: string) => fromOurStorage(url, OURS);
+
+check(
+  "a published panorama is accepted",
+  ok("https://abc123.supabase.co/storage/v1/object/public/panoramas/user/a.jpg"),
+);
+
+// Another host entirely.
+check("a foreign host is refused", !ok("https://evil.example/panoramas/a.jpg"));
+check(
+  "a foreign host imitating the path is refused",
+  !ok("https://evil.example/storage/v1/object/public/panoramas/a.jpg"),
+);
+check(
+  "a subdomain of ours is refused",
+  !ok("https://abc123.supabase.co.evil.example/storage/v1/object/public/panoramas/a.jpg"),
+);
+check(
+  "the same host over http is refused",
+  !ok("http://abc123.supabase.co/storage/v1/object/public/panoramas/a.jpg"),
+);
+
+// Our host, wrong bucket. Quarantine is the one that matters: those files are
+// the ones that have *not* been checked yet.
+check(
+  "a file still in quarantine is refused",
+  !ok("https://abc123.supabase.co/storage/v1/object/public/moderation-quarantine/u/a.jpg"),
+);
+check(
+  "another public bucket is refused",
+  !ok("https://abc123.supabase.co/storage/v1/object/public/avatars/u/a.jpg"),
+);
+check(
+  "a bucket whose name merely starts the same is refused",
+  !ok("https://abc123.supabase.co/storage/v1/object/public/panoramas-staging/u/a.jpg"),
+);
+// An uploader picks the object name inside their own quarantine folder, so
+// they can name a file after the panoramas path. Matching the path anywhere
+// in the URL rather than at its start would publish an unchecked image.
+check(
+  "a quarantine file named after the panoramas path is refused",
+  !ok(
+    "https://abc123.supabase.co/storage/v1/object/public/moderation-quarantine/" +
+      "user/storage/v1/object/public/panoramas/x.jpg",
+  ),
+);
+
+check(
+  "the private object route is refused",
+  !ok("https://abc123.supabase.co/storage/v1/object/panoramas/u/a.jpg"),
+);
+
+// Nonsense.
+check("an empty url is refused", !ok(""));
+check("a relative path is refused", !ok("/storage/v1/object/public/panoramas/a.jpg"));
+check("a javascript url is refused", !ok("javascript:alert(1)"));
+check(
+  "a data url is refused",
+  !ok("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA=="),
+);
+check(
+  "no configured supabase url refuses everything",
+  !fromOurStorage(
+    "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/a.jpg",
+    undefined,
+  ),
+);
+
+// ---------------------------------------------------------------------------
+// 11. A scene that is still being reviewed
+//
+// It stays in the tour — the person carries on building — but its image is in
+// quarantine, which is private, and the path comes from the browser. Adopting
+// a path outside the caller's own folder would let somebody attach a
+// stranger's unreviewed file to their tour and have it published when it
+// cleared.
+// ---------------------------------------------------------------------------
+
+const ME = "11111111-2222-3333-4444-555555555555";
+const THEM = "99999999-8888-7777-6666-555555555555";
+
+check("my own folder is mine", ownsQuarantinePath(`${ME}/a.jpg`, ME));
+check("a nested path in my folder is mine", ownsQuarantinePath(`${ME}/deep/a.jpg`, ME));
+check("somebody else's folder is not", !ownsQuarantinePath(`${THEM}/a.jpg`, ME));
+check("a bare filename is not", !ownsQuarantinePath("a.jpg", ME));
+check("an empty path is not", !ownsQuarantinePath("", ME));
+check("a leading slash is not", !ownsQuarantinePath(`/${ME}/a.jpg`, ME));
+check("a path climbing out is not", !ownsQuarantinePath(`${ME}/../${THEM}/a.jpg`, ME));
+check("my id appearing later does not count", !ownsQuarantinePath(`${THEM}/${ME}/a.jpg`, ME));
+check("no user id matches nothing", !ownsQuarantinePath(`${ME}/a.jpg`, ""));
+// Both empty is the one pair that compares equal without the guard, and it is
+// reachable: a signed-out caller and a scene whose path never got written.
+check("an empty path and no user id is not a match", !ownsQuarantinePath("", ""));
+
+// A pending scene is validated on its path, a cleared one on its URL.
+const pendingTour = goodTour();
+pendingTour.scenes[1] = {
+  key: "b",
+  title: "Kitchen",
+  panoramaUrl: "https://abc123.supabase.co/storage/v1/object/sign/moderation-quarantine/x",
+  pending: true,
+  quarantinePath: `${ME}/k.jpg`,
+  hotspots: [],
+};
+check("a tour with a scene in review is accepted", validateTour(pendingTour) === null,
+  validateTour(pendingTour) ?? "");
+
+const pendingNoPath = goodTour();
+pendingNoPath.scenes[1] = {
+  key: "b",
+  title: "Kitchen",
+  panoramaUrl: "https://abc123.supabase.co/storage/v1/object/sign/moderation-quarantine/x",
+  pending: true,
+  hotspots: [],
+};
+check("a scene in review with no path is refused", validateTour(pendingNoPath) !== null);
+
+// A signed quarantine link must never pass as a published panorama.
+check(
+  "a signed quarantine link is not a published panorama",
+  !ok("https://abc123.supabase.co/storage/v1/object/sign/moderation-quarantine/u/a.jpg"),
+);
+
+// ---------------------------------------------------------------------------
+// 11b. Everything the builder holds reaches the server
+//
+// This conversion is a hand-written field list that has to stay in step with
+// two other types, and it has already fallen behind once: `pending`,
+// `quarantinePath` and `moderationItemId` were added to the types and not to
+// the copy, so a room waiting on review arrived looking like an attempt to
+// smuggle in a foreign image and the save was refused. The check counts the
+// fields rather than naming a few, so the next one that is added and forgotten
+// fails here.
+// ---------------------------------------------------------------------------
+
+const draftScene: DraftTourScene = {
+  key: "a",
+  title: "Living room",
+  panoramaUrl: "https://abc123.supabase.co/storage/v1/object/sign/x",
+  width: 4096,
+  height: 2048,
+  pending: true,
+  quarantinePath: `${ME}/a.jpg`,
+  moderationItemId: "cafe0000-0000-0000-0000-000000000001",
+  initialYaw: 90,
+  initialPitch: -10,
+  initialZoom: 60,
+  hotspots: [
+    {
+      key: "local-only",
+      kind: "scene",
+      yaw: 45,
+      pitch: 5,
+      title: "To the kitchen",
+      description: null,
+      targetSceneKey: "b",
+    },
+  ],
+};
+
+const [converted] = toSceneInputs([draftScene]);
+
+// Every field the builder holds, except the ones deliberately left behind.
+const carried = Object.keys(draftScene).filter((field) => field !== "hotspots");
+for (const field of carried) {
+  check(
+    `the builder's "${field}" reaches the server`,
+    converted[field as keyof typeof converted] ===
+      draftScene[field as keyof DraftTourScene],
+    `${String(converted[field as keyof typeof converted])} vs ${String(
+      draftScene[field as keyof DraftTourScene],
+    )}`,
+  );
+}
+
+check("the scene's hotspots come across", converted.hotspots?.length === 1);
+check(
+  "a hotspot's local key does not",
+  converted.hotspots !== undefined && !("key" in converted.hotspots[0]),
+  JSON.stringify(converted.hotspots?.[0]),
+);
+check(
+  "a hotspot's target survives",
+  converted.hotspots?.[0].targetSceneKey === "b",
+);
+check(
+  "a hotspot's angles survive",
+  converted.hotspots?.[0].yaw === 45 && converted.hotspots?.[0].pitch === 5,
+);
+
+// A cleared scene carries no pending state at all.
+const clearedDraft: DraftTourScene = {
+  key: "c",
+  title: "Kitchen",
+  panoramaUrl: "https://abc123.supabase.co/storage/v1/object/public/panoramas/u/1.jpg",
+  width: 4096,
+  height: 2048,
+  initialYaw: 0,
+  initialPitch: 0,
+  initialZoom: 75,
+  hotspots: [],
+};
+const [clearedOut] = toSceneInputs([clearedDraft]);
+check("a cleared scene is not marked pending", !clearedOut.pending);
+check("and carries no quarantine path", !clearedOut.quarantinePath);
+
+check("the whole list is converted", toSceneInputs([draftScene, clearedDraft]).length === 2);
+
+// ---------------------------------------------------------------------------
+// 11e. A door that resolves to nothing never reaches the database
+//
+// hotspot_scene_has_target refuses a scene hotspot with no target, and what
+// comes back is a 23514 quoting a row of uuids: "new row for relation
+// tour_hotspots violates check constraint". Nobody can act on that. Worse, by
+// the time it arrives the scenes have already been written.
+// ---------------------------------------------------------------------------
+
+/** A hotspot as the builder holds one. */
+function door(title: string, targetSceneKey: string | null) {
+  return {
+    key: `h-${title}`,
+    kind: "scene" as const,
+    yaw: 90,
+    pitch: 0,
+    title,
+    description: null,
+    targetSceneKey,
+  };
+}
+
+function note(title: string) {
+  return {
+    key: `h-${title}`,
+    kind: "info" as const,
+    yaw: 0,
+    pitch: 0,
+    title,
+    description: null,
+    targetSceneKey: null,
+  };
+}
+
+const two = [
+  { key: "a", title: "Living room", hotspots: [door("To the kitchen", "b"), note("South facing")] },
+  { key: "b", title: "Kitchen", hotspots: [door("Back", "a")] },
+];
+const ids = new Map([
+  ["a", "11111111-0000-0000-0000-000000000001"],
+  ["b", "11111111-0000-0000-0000-000000000002"],
+]);
+const at = (i: number) => ["11111111-0000-0000-0000-000000000001", "11111111-0000-0000-0000-000000000002"][i];
+
+const good = resolveSceneTargets(two, ids, at);
+check("two rooms with doors between them resolve", good.ok, good.ok ? "" : good.reason);
+check("every hotspot is carried", good.ok && good.hotspots.length === 3);
+check(
+  "a door points at the uuid its room was given",
+  good.ok && good.hotspots[0].target_scene_id === "11111111-0000-0000-0000-000000000002",
+);
+check(
+  "and sits in the uuid of the room it is in",
+  good.ok && good.hotspots[0].scene_id === "11111111-0000-0000-0000-000000000001",
+);
+check("a note needs no target", good.ok && good.hotspots[1].target_scene_id === null);
+
+// The failure that produced the 23514.
+const brokenDoor = [
+  { key: "a", title: "Living room", hotspots: [door("To Shot panoramic bedroom", "gone")] },
+];
+const orphan = resolveSceneTargets(brokenDoor, ids, at);
+check("a door pointing at a missing room is refused", !orphan.ok);
+check(
+  "and the message names the door and the room it is in",
+  !orphan.ok &&
+    orphan.reason.includes("To Shot panoramic bedroom") &&
+    orphan.reason.includes("Living room"),
+  orphan.ok ? "" : orphan.reason,
+);
+check(
+  "and says what to do about it",
+  !orphan.ok && /remove it|Choose another room/.test(orphan.reason),
+  orphan.ok ? "" : orphan.reason,
+);
+// Two different mistakes, two different sentences: this door was given a room
+// that has since gone, the one below was never given one. Telling somebody
+// their door "has no room to open" when they can see a room selected in the
+// dropdown sends them looking in the wrong place.
+check(
+  "and says the room has gone, not that none was chosen",
+  !orphan.ok && orphan.reason.includes("no longer in this tour"),
+  orphan.ok ? "" : orphan.reason,
+);
+
+const noDestination = [{ key: "a", title: "Living room", hotspots: [door("Nowhere", null)] }];
+const empty = resolveSceneTargets(noDestination, ids, at);
+check("a door with no target at all is refused", !empty.ok);
+check(
+  "and says the door has no room to open",
+  !empty.ok && empty.reason.includes("no room to open"),
+  empty.ok ? "" : empty.reason,
+);
+
+// A scene whose insert returned no id must not silently write hotspots that
+// point at nothing.
+const noId = resolveSceneTargets(two, ids, () => undefined);
+check("a scene with no id back is refused", !noId.ok);
+check(
+  "and it is reported as a scene failure, not a door one",
+  !noId.ok && noId.reason.includes("scenes"),
+  noId.ok ? "" : noId.reason,
+);
+
+// A hotspot belongs to the room at its index, not to whatever the key map
+// says. The two agree in every normal save, which is exactly why a mix-up
+// here would go unnoticed: every marker would land in the wrong room and the
+// tour would still open.
+const disagreeing = new Map([
+  ["a", "22222222-0000-0000-0000-00000000000a"],
+  ["b", "11111111-0000-0000-0000-000000000002"],
+]);
+const byIndex = resolveSceneTargets(two, disagreeing, at);
+check(
+  "a hotspot sits in the room at its index, not the one its key maps to",
+  byIndex.ok && byIndex.hotspots[0].scene_id === at(0),
+  byIndex.ok ? byIndex.hotspots[0].scene_id : "",
+);
+
+check("a tour with no hotspots resolves to none",
+  (() => {
+    const r = resolveSceneTargets([{ key: "a", title: "Only room", hotspots: [] }], ids, at);
+    return r.ok && r.hotspots.length === 0;
+  })(),
+);
+
+// ---------------------------------------------------------------------------
+// 11c. An embed between two tables joined twice must name its foreign key
+//
+// tour_hotspots points at tour_scenes twice: scene_id, for the room the marker
+// is in, and target_scene_id, for the room a door opens. Asked to embed one in
+// the other, PostgREST will not guess which — it refuses the entire query. The
+// select then returns an error, the error was discarded, and every page built
+// on it answered 404 with nothing to say why.
+//
+// This reads the migration for the pairs of tables joined more than once, then
+// reads every select in the codebase that embeds one in the other, so a new
+// ambiguous embed fails here rather than as a bare 404.
+// ---------------------------------------------------------------------------
+
+const tourSql = readFileSync("supabase/migrations/0057_tours.sql", "utf8")
+  .replace(/--.*$/gm, "");
+
+// The two references that make the embed ambiguous. If either ever goes, the
+// disambiguation below is no longer needed and this says so.
+check(
+  "a hotspot references the scene it sits in",
+  /scene_id\s+uuid\s+not null\s+references public\.tour_scenes/.test(tourSql),
+);
+check(
+  "a hotspot also references the scene a door opens",
+  /target_scene_id\s+uuid\s+references public\.tour_scenes/.test(tourSql),
+);
+
+const queries = readFileSync("src/lib/tour/queries.ts", "utf8")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+// Every embed of tour_hotspots has to name which reference it means.
+const embeds = queries.match(/tour_hotspots\s*!?[A-Za-z_]*\s*\(/g) ?? [];
+check("the tour query embeds hotspots", embeds.length > 0);
+for (const embed of embeds) {
+  check(
+    `the embed "${embed.trim()}" names its foreign key`,
+    embed.includes("!"),
+    embed,
+  );
+}
+check(
+  "and it names the scene the hotspot sits in, not the one it opens",
+  queries.includes("tour_hotspots!tour_hotspots_scene_id_fkey"),
+);
+
+// The errors these reads produce must not be discarded — that is what turned a
+// clear PostgREST message into a bare 404 for several rounds.
+const reads = queries.match(/const \{ data[^}]*\} = await/g) ?? [];
+check("the tour reads destructure a result", reads.length >= 3);
+for (const read of reads) {
+  check(`"${read.trim()}" keeps its error`, read.includes("error"), read);
+}
+check(
+  "and the error is reported",
+  (queries.match(/reportFailure\(/g) ?? []).length >= 3,
+);
+
+// ---------------------------------------------------------------------------
+// 11d. The viewer has to be given a height
+//
+// PanoramaViewer sets position:relative as an inline style, and an inline
+// style beats a class. So `absolute inset-0` on it does nothing: the element
+// stays relative, takes no height from its absolutely-positioned contents, and
+// renders as a black rectangle. The texture loads, the loop runs, no error is
+// raised anywhere — there is simply nowhere to draw.
+// ---------------------------------------------------------------------------
+
+const player = readFileSync("src/components/tour/tour-player.tsx", "utf8")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+// Scoped to the PanoramaViewer element, not the whole file: the player is full
+// of absolutely-positioned overlays, and every one of them is fine.
+const viewerTag = player.match(/<PanoramaViewer[\s\S]*?\/>/)?.[0] ?? "";
+check("the player renders the viewer", viewerTag.length > 0);
+check(
+  "and gives it a sizing class",
+  /className="[^"]*(size-full|h-full|h-\[)/.test(viewerTag),
+  viewerTag.match(/className="[^"]*"/)?.[0] ?? "no className",
+);
+check(
+  "and does not position it absolutely",
+  !/className="[^"]*absolute/.test(viewerTag),
+  viewerTag.match(/className="[^"]*"/)?.[0] ?? "",
+);
+
+const viewer = readFileSync("src/components/tour/panorama-viewer.tsx", "utf8");
+check(
+  "a viewer with no size says so rather than going black",
+  /clientWidth === 0 \|\| clientHeight === 0/.test(viewer) &&
+    /console\.error\(\s*\n?\s*"\[panorama\] the viewer has no size/.test(viewer),
+);
+
+// ---------------------------------------------------------------------------
+// 11f. Where a floor plan is allowed to come from
+//
+// The same boundary as a panorama's, against a different bucket — and it
+// matters more, because a plan is routinely a PDF and a PDF from an arbitrary
+// origin embedded in an <object> is a document the browser runs a viewer for.
+// ---------------------------------------------------------------------------
+
+const plan = (url: string) => fromOurPlans(url, OURS);
+
+check(
+  "a published plan is accepted",
+  plan("https://abc123.supabase.co/storage/v1/object/public/floor-plans/u/402.pdf"),
+);
+check("a foreign host is refused", !plan("https://evil.example/floor-plans/402.pdf"));
+check(
+  "a foreign host imitating the path is refused",
+  !plan("https://evil.example/storage/v1/object/public/floor-plans/402.pdf"),
+);
+check(
+  "a subdomain of ours is refused",
+  !plan("https://abc123.supabase.co.evil.example/storage/v1/object/public/floor-plans/a.pdf"),
+);
+check(
+  "a file still in quarantine is refused",
+  !plan("https://abc123.supabase.co/storage/v1/object/public/moderation-quarantine/u/a.pdf"),
+);
+check(
+  "the panoramas bucket is not the plans bucket",
+  !plan("https://abc123.supabase.co/storage/v1/object/public/panoramas/u/a.jpg"),
+);
+check(
+  "a bucket whose name merely starts the same is refused",
+  !plan("https://abc123.supabase.co/storage/v1/object/public/floor-plans-old/u/a.pdf"),
+);
+check(
+  "a quarantine file named after the plans path is refused",
+  !plan(
+    "https://abc123.supabase.co/storage/v1/object/public/moderation-quarantine/" +
+      "user/storage/v1/object/public/floor-plans/a.pdf",
+  ),
+);
+check("a javascript url is refused", !plan("javascript:alert(1)"));
+check("an empty url is refused", !plan(""));
+check(
+  "no configured supabase url refuses everything",
+  !fromOurPlans(
+    "https://abc123.supabase.co/storage/v1/object/public/floor-plans/u/a.pdf",
+    undefined,
+  ),
+);
+
+// A plan and a panorama must not be interchangeable: each names its own bucket.
+check(
+  "a panorama url is not a plan url",
+  !plan("https://abc123.supabase.co/storage/v1/object/public/panoramas/u/a.jpg") &&
+    ok("https://abc123.supabase.co/storage/v1/object/public/panoramas/u/a.jpg"),
+);
+check(
+  "a plan url is not a panorama url",
+  !ok("https://abc123.supabase.co/storage/v1/object/public/floor-plans/u/a.pdf") &&
+    plan("https://abc123.supabase.co/storage/v1/object/public/floor-plans/u/a.pdf"),
+);
+
+// ---------------------------------------------------------------------------
+// 11g. A PDF is not an image
+//
+// Floor plans arrive as PDFs more often than as pictures, so quarantine has to
+// accept one and the sniffer has to recognise one. What must never happen is a
+// PDF being handed to an image classifier as though it were a picture: the
+// provider answers about nothing, and "nothing found" would read as safe.
+// ---------------------------------------------------------------------------
+
+const uploads = readFileSync("src/app/moderation/upload-actions.ts", "utf8")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+check(
+  "the sniffer knows the PDF signature",
+  /mime: "application\/pdf", bytes: \[0x25, 0x50, 0x44, 0x46, 0x2d\]/.test(uploads),
+);
+check(
+  "only an image is sent to the classifier",
+  /const checkable = actual\.startsWith\("image\/"\)/.test(uploads) &&
+    /image: dataUrl/.test(uploads) &&
+    /checkable\s*\?/.test(uploads),
+);
+check(
+  "and the file type is still sniffed rather than believed",
+  /const actual = sniff\(\s*bytes\s*\)/.test(uploads) && /if\s*\(\s*!actual\s*\)/.test(uploads),
+);
+
+const planMigration = readFileSync("supabase/migrations/0061_floor_plans.sql", "utf8")
+  .replace(/--.*$/gm, "");
+
+check(
+  "quarantine is widened to accept a PDF",
+  /application\/pdf/.test(planMigration) && /moderation-quarantine/.test(planMigration),
+);
+check(
+  "the plans bucket exists and takes a PDF",
+  /'floor-plans'/.test(planMigration) && /array\['image\/jpeg', 'image\/png', 'image\/webp', 'application\/pdf'\]/.test(planMigration),
+);
+check(
+  "the plans table is granted to the roles that must read it",
+  /grant select on public\.floor_plans to anon, authenticated;/.test(planMigration),
+);
+check(
+  "and written only by the signed-in",
+  /grant insert, update, delete on public\.floor_plans to authenticated;/.test(planMigration),
+);
+check(
+  "a plan in review is not readable by a visitor",
+  /using \(file_url is not null or owner_id = auth\.uid\(\)\)/.test(planMigration),
+);
+
+// ---------------------------------------------------------------------------
+// 11h. An unapplied migration is not a bug worth shouting about
+//
+// A feature behind a new table has to render as absent on a deployment that
+// has not run its migration. The existing convention does that by discarding
+// every error, which is the habit that cost several rounds of debugging a 404
+// whose cause was sitting in the error object. Both, then: silent for a table
+// that is not there yet, loud for everything else.
+// ---------------------------------------------------------------------------
+
+const err = (fields: Partial<{ message: string; code: string; details: string; hint: string }>) =>
+  ({
+    message: fields.message ?? "",
+    code: fields.code ?? "",
+    details: fields.details ?? "",
+    hint: fields.hint ?? "",
+    name: "PostgrestError",
+  }) as unknown as Parameters<typeof isMissingRelation>[0];
+
+check("no error is not a missing table", !isMissingRelation(null));
+check("42P01 is a missing table", isMissingRelation(err({ code: "42P01" })));
+check("PGRST205 is a missing table", isMissingRelation(err({ code: "PGRST205" })));
+check(
+  "so is the message PostgREST sends",
+  isMissingRelation(
+    err({ message: "Could not find the table 'public.floor_plans' in the schema cache" }),
+  ),
+);
+check(
+  "and the one Postgres sends",
+  isMissingRelation(err({ message: 'relation "public.floor_plans" does not exist' })),
+);
+
+// Everything that is a real fault must still be reported. These are the ones
+// this feature actually hit.
+check(
+  "an ambiguous embed is not a missing table",
+  !isMissingRelation(
+    err({
+      code: "PGRST201",
+      message:
+        "Could not embed because more than one relationship was found for " +
+        "'tour_scenes' and 'tour_hotspots'",
+    }),
+  ),
+);
+check(
+  "a check constraint is not a missing table",
+  !isMissingRelation(
+    err({
+      code: "23514",
+      message: 'new row for relation "tour_hotspots" violates check constraint',
+    }),
+  ),
+);
+check(
+  "a permission denial is not a missing table",
+  !isMissingRelation(
+    err({ code: "42501", message: "permission denied for table floor_plans" }),
+  ),
+);
+check(
+  "a missing column is not a missing table",
+  !isMissingRelation(err({ code: "42703", message: 'column "quarantine_path" of relation' })),
+);
+check("an empty error is not assumed to be a missing table", !isMissingRelation(err({})));
+
+// The reads have to use it rather than going back to discarding everything.
+for (const [file, label] of [
+  ["src/lib/tour/floor-plans.ts", "listFloorPlans"],
+  ["src/lib/tour/queries.ts", "getTour"],
+  ["src/lib/tour/queries.ts", "listMyTours"],
+  ["src/lib/tour/queries.ts", "listToursFor"],
+] as const) {
+  const source = readFileSync(file, "utf8")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
+    .replace(/^\s*\/\/.*$/gm, "");
+  check(
+    `${label} reports a real failure and not an absent table`,
+    source.includes(`if (error && !isMissingRelation(error)) reportFailure("${label}"`),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 11i. Whether a tour belongs in other people's feeds
+//
+// Two questions that are easy to run together, and the first overrides the
+// second entirely. Getting this wrong puts a tour somebody meant to send to
+// one buyer in front of everybody, which is not a bug you get to fix after the
+// fact.
+// ---------------------------------------------------------------------------
+
+check("a public tour the author shared is posted", belongsInTheFeed("published", true));
+check("a public tour they did not share is not", !belongsInTheFeed("published", false));
+
+// The one that matters.
+check("a link-only tour is never posted, even if shared is set", !belongsInTheFeed("unlisted", true));
+check("nor when it is not", !belongsInTheFeed("unlisted", false));
+
+for (const visibility of ["draft", "private", "archived"]) {
+  check(`a ${visibility} tour is never posted`, !belongsInTheFeed(visibility, true));
+}
+
+// An unset flag is not a yes. A tour saved before this existed has null here.
+check("a null share flag is not a yes", !belongsInTheFeed("published", null));
+check("an undefined share flag is not a yes", !belongsInTheFeed("published", undefined));
+
+// And the action has to ask this rather than reimplementing it.
+const feedActions = readFileSync("src/app/tours/feed-actions.ts", "utf8")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
+  .replace(/^\s*\/\/.*$/gm, "");
+check(
+  "the sync asks the shared rule",
+  /belongsInTheFeed\(tour\.visibility, tour\.share_to_feed\)/.test(feedActions),
+);
+check(
+  "and finds the post by the tour it points at",
+  /\.eq\("entity_type", "tour"\)/.test(feedActions) &&
+    /\.eq\("entity_id", tour\.id\)/.test(feedActions),
+);
+check(
+  "unsharing hides the post rather than deleting it",
+  /status: "hidden"/.test(feedActions) && !/\.from\("feed_posts"\)\s*\.delete\(\)/.test(feedActions),
+);
+check(
+  "and no second table is invented for likes or comments",
+  !/tour_likes|tour_comments/.test(feedActions),
+);
+
+// ---------------------------------------------------------------------------
+// 12. next/image must not be pointed at quarantine
+//
+// The obvious fix for "Invalid src prop" on a signed preview is to add the
+// /object/sign/ path to remotePatterns. It is the wrong fix: Next's optimiser
+// caches by URL and serves the result from /_next/image with no auth, so the
+// optimised copy of an unreviewed panorama would outlive the signature that
+// was protecting it and be fetchable by anyone. A pending room uses a plain
+// <img> instead. This is here so that reasoning survives the next person who
+// meets that error message.
+// ---------------------------------------------------------------------------
+
+const nextConfig = readFileSync("next.config.ts", "utf8");
+
+check(
+  "next/image allows the public storage path",
+  nextConfig.includes("/storage/v1/object/public/**"),
+);
+check(
+  "next/image is not allowed to fetch signed storage URLs",
+  !nextConfig.includes("/object/sign"),
+);
+check(
+  "next/image is not allowed to fetch quarantine",
+  !nextConfig.includes("moderation-quarantine"),
+);
+
+// Comments are stripped first: the explanation above mentions <img>, and a
+// check that matched its own prose would pass whatever the code did.
+const thumbnail = readFileSync("src/components/tour/scene-thumbnail.tsx", "utf8")
+  .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+check(
+  "a pending room is rendered with a plain img",
+  /<img\s/.test(thumbnail),
+);
+check(
+  "a cleared room still goes through next/image",
+  /<Image\s/.test(thumbnail),
+);
+check(
+  "and the two are chosen by the pending flag",
+  /if\s*\(\s*pending\s*\)/.test(thumbnail),
+);
+
+// ---------------------------------------------------------------------------
+
+if (failures.length > 0) {
+  console.log(`\n${RED}${failures.length} failed${RESET}`);
+  for (const failure of failures) console.log(`  ${RED}✗${RESET} ${failure}`);
+}
+
+console.log(
+  `\n${failures.length === 0 ? GREEN : RED}${passed} passed, ${failures.length} failed${RESET}` +
+    `\n${DIM}360°: the marker is on the door, or it is not shown at all${RESET}\n`,
+);
+
+process.exit(failures.length === 0 ? 0 : 1);
