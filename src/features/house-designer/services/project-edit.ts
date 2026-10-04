@@ -1,6 +1,5 @@
 import { roomSchema, type Room } from "@/features/berchuma-studio/types/room";
 
-import { generateStructureFromGrid, hasGeneratedStructure } from "./structure";
 import { applyModelingOptions } from "./workspace-options";
 
 import {
@@ -509,15 +508,9 @@ function ordinalFloor(index: number) {
   return `${index}${suffix}`;
 }
 
+// Structure — columns, beams, grid, footings — is never generated here: a
+// plan edit rebuilds the plan and leaves whatever structure exists alone.
 function rebuildLevel(project: HouseProject, levelId: string, plan: Room): HouseProject {
-  // Structure comes last, from the finished plan: nothing is generated while
-  // the plan is drawn. Once it has been generated, a plan edit regenerates it
-  // from the new grid so columns, beams and footings never go stale.
-  const next = rebuildPlan(project, levelId, plan);
-  return hasGeneratedStructure(project) ? generateStructureFromGrid(next) : next;
-}
-
-function rebuildPlan(project: HouseProject, levelId: string, plan: Room): HouseProject {
   const roomId = project.rooms.find((room) => room.levelId === levelId)?.id ?? `${levelId}:room-1`;
   const oldWalls = new Map(
     project.walls

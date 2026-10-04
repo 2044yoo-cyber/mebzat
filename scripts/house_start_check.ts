@@ -68,9 +68,18 @@ assert.match(describe, /roomSchema\.safeParse\(payload\.plan\)/, "and checks wha
 assert.match(workspace, /const \[strict, setStrict\] = useState\(false\);/, "Original Floor Plan Strict starts off");
 assert.doesNotMatch(workspace, /Design setup/, "and the setup panel is gone");
 
-// Structure comes last: none while designing, generated on Finish design.
+// Structure is never generated automatically — not on open, Finish, restore
+// or from a command.
 assert.match(open, /const built = ensureHouseBimState\(\{ \.\.\.withoutStructure\(applyModelingOptions\(createHouseProject\(/, "a template, upload or description starts without structure");
 const verify = workspace.slice(workspace.indexOf("<VerifyScreen"), workspace.indexOf("/>", workspace.indexOf("<VerifyScreen")));
-assert.match(verify, /onDone=\{\(\) => \{ updateProject\(ensureHouseBimState\(generateStructureFromGrid\(project\)\)\); setStage\("model"\);/, "finishing the design generates the structure");
+assert.match(verify, /onDone=\{\(\) => \{ setStage\("model"\); setView\("3d"\); \}\}/, "finishing the design only changes the view");
+const restoreFn = workspace.slice(workspace.indexOf("function restore()"), workspace.indexOf("\n  }\n", workspace.indexOf("function restore()")));
+assert.match(restoreFn, /const restored = ensureHouseBimState\(withoutStructure\(/, "a restored draft comes back without generated structure");
+assert.doesNotMatch(restoreFn, /ensurePhaseFourProject\(/, "and none is generated for it");
+for (const path of ["src/features/house-designer/components/house-designer-workspace.tsx", "src/features/house-designer/components/house-structure-panel.tsx", "src/features/house-designer/services/project-edit.ts", "src/features/house-designer/services/model-state.ts", "src/features/house-designer/services/command-registry.ts", "src/features/house-designer/components/house-modeling-chrome.tsx"]) {
+  assert.doesNotMatch(code(path), /\b(generateStructureFromGrid|generatePreliminaryStructure|ensurePhaseFourProject|buildStructuralColumns|buildStructuralBeams)\(/, `${path} generates no structure`);
+  assert.doesNotMatch(code(path), /"generate-structure"/, `${path} offers no generate-structure command`);
+}
+assert.doesNotMatch(code("src/features/house-designer/services/model-state.ts"), /id: `foundation:\$\{column\.id\}`/, "no footings are made up for columns");
 
 console.log("House start: templates are valid, hosted plans; sketches reach the model as sketches");

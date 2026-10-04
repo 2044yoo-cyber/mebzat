@@ -479,7 +479,7 @@ function structureIn3D(page) {
   const names = new Set();
   scene?.traverse((object) => { if (object.name) names.add(object.name); });
   const count = (pattern) => [...names].filter((name) => pattern.test(name)).length;
-  return { columns: count(/^[^:]+:column:/), beams: count(/^[^:]+:beam:/), footings: count(/^foundation:/) };
+  return { walls: names.has("walls:ground-floor"), columns: count(/^[^:]+:column:/), beams: count(/^[^:]+:beam:/), footings: count(/^foundation:/) };
   });
 }
 
@@ -623,11 +623,11 @@ async function checkStart(page, at) {
   // Strict is off unless someone turns it on: past verification — where
   // Strict applies — an outside wall still moves like any other.
   await page.getByRole("button", { name: "Finish design → 3D" }).click();
-  // Finishing the design generates the structure, from the grid.
+  // Finishing the design generates no structure: there is none in 3D.
   await page.waitForFunction(() => [...window.__scenes].some((scene) => scene.getObjectByName("level:ground-floor")), null, { timeout: 15000 });
   await page.waitForTimeout(300);
   const finished = await structureIn3D(page);
-  assert.ok(finished.columns >= 4 && finished.beams >= 4 && finished.footings === finished.columns, `${at}: finishing the design puts columns, beams and a footing under each column in 3D (${JSON.stringify(finished)})`);
+  assert.deepEqual(finished, { walls: true, columns: 0, beams: 0, footings: 0 }, `${at}: finishing the design adds no columns, beams or footings`);
   await page.getByRole("button", { name: "2d", exact: true }).click();
   await page.locator(PLAN).waitFor();
   await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));

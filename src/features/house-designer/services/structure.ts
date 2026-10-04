@@ -79,16 +79,3 @@ export function generateStructureFromGrid(project: HouseProject): HouseProject {
   };
   return next;
 }
-
-/** Regenerate, from the structure panel. */
-export function generatePreliminaryStructure(project: HouseProject): HouseProject {
-  const now = new Date().toISOString();
-  const next = generateStructureFromGrid(project);
-  return { ...next, metadata: { ...next.metadata, updatedAt: now }, revisions: [...next.revisions, { id: crypto.randomUUID(), createdAt: now, note: "Regenerated preliminary structure from the grid" }] };
-}
-
-export function ensurePhaseFourProject(project: HouseProject): HouseProject {
-  if (project.modelingOptions) return project;
-  if (project.structuralColumns.length > 0 && project.structuralBeams.length > 0 && project.structuralGrid.length > 0) return project;
-  return generatePreliminaryStructure(project);
-}

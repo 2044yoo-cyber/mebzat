@@ -56,7 +56,7 @@ const ribbonCommands: Record<HouseCommandCategory, HouseCommandId[]> = {
   Modify: ["move", "copy", "rotate", "align", "offset", "trim", "split", "mirror-pick", "array", "join", "unjoin", "scale", "pin", "unpin", "create-similar", "match-type", "delete"],
   Annotate: ["dimension", "text", "room-tag", "tag", "section", "elevation"],
   View: ["floor-plan", "default-3d", "split-view", "view-top", "view-front", "view-back", "view-left", "view-right", "view-isometric", "view-perspective", "visibility", "zoom-fit", "hide", "isolate", "reset-hide"],
-  AI: ["ask-ai", "ai-remodel", "generate-facade", "alternatives", "generate-structure", "analyze-plan"],
+  AI: ["ask-ai", "ai-remodel", "generate-facade", "alternatives", "analyze-plan"],
 };
 
 const ribbonCategories: HouseCommandCategory[] = ["Architecture", "Modify", "Structure", "Annotate", "View", "AI"];

@@ -7,9 +7,7 @@ import type {
 } from "../types/project";
 
 export function ensureHouseBimState(project: HouseProject): HouseProject {
-  const groundId = project.levels[0]?.id;
-  const foundations = project.modelingOptions || project.foundations.length || !groundId ? project.foundations : project.structuralColumns.filter((item) => item.levelId === groundId).map((column) => ({ id: `foundation:${column.id}`, levelId: column.levelId, x: column.x, y: column.y, elevation: -450, width: Math.max(900, column.width * 3), depth: Math.max(900, column.depth * 3), thickness: 450, material: "Reinforced concrete" }));
-  const base = { ...project, foundations };
+  const base = project;
   const objectTypes = base.objectTypes.length ? base.objectTypes : fallbackTypes(base);
   const objectInstances = { ...project.objectInstances };
   for (const selection of allHouseSelections(base)) {

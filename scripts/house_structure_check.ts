@@ -5,7 +5,7 @@ import { acceptColumnProposals, suggestColumns } from "../src/features/house-des
 import { createHouseObjectFromGesture, createRoomFromGesture, moveHouseSelections } from "../src/features/house-designer/services/model-commands";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
 import { patchHouseObject } from "../src/features/house-designer/services/project-edit";
-import { generatePreliminaryStructure } from "../src/features/house-designer/services/structure";
+import { withoutStructure } from "../src/features/house-designer/services/structure";
 import { applyModelingOptions, modelingPreset } from "../src/features/house-designer/services/workspace-options";
 import { createHouseProject, houseProjectSchema } from "../src/features/house-designer/types/project";
 
@@ -18,13 +18,17 @@ const slideDoor = (project: typeof house) => {
 };
 
 // ---------------------------------------------------------------------------
-// A plan edit rebuilds the automatic structure — and only that.
+// A plan edit never generates structure, and keeps what is there.
 // ---------------------------------------------------------------------------
 {
   const placed = createHouseObjectFromGesture(house, "column", level, { x: 4000, y: 3250 });
   const id = placed.selections[0]!.id;
   assert.ok(slideDoor(placed.project).structuralColumns.some((column) => column.id === id), "a column placed by hand survives the next plan edit");
-  assert.ok(generatePreliminaryStructure(placed.project).structuralColumns.some((column) => column.id === id), "and Regenerate");
+  assert.deepEqual(slideDoor(placed.project).structuralColumns, placed.project.structuralColumns, "no column is added, moved or removed by a plan edit");
+  const plain = slideDoor(withoutStructure(house));
+  assert.equal(plain.structuralColumns.length + plain.structuralBeams.length + plain.structuralGrid.length + plain.foundations.length, 0, "a house without structure gets none from an edit");
+  const grown = moveHouseSelections(withoutStructure(house), [{ kind: "wall", id: house.walls.find((wall) => wall.levelId === level && wall.start.y === 0 && wall.end.y === 0)!.id }], 0, -500, { footprintEditable: true }).project;
+  assert.equal(grown.structuralColumns.length + grown.structuralBeams.length + grown.structuralGrid.length + grown.foundations.length, 0, "nor from moving an outside wall");
 
   const edited = slideDoor(apartment);
   assert.equal(edited.structuralColumns.length, 0, "an apartment never grows columns from an edit");

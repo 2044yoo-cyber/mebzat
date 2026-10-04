@@ -61,7 +61,7 @@ import {
 } from "../services/draft";
 import { ensurePhaseThreeProject } from "../services/facade";
 import { ensureHouseEnvelopeProject } from "../services/envelope";
-import { ensurePhaseFourProject, generateStructureFromGrid, withoutStructure } from "../services/structure";
+import { withoutStructure } from "../services/structure";
 import {
   commandFromChord,
   commandFromKeyboard,
@@ -110,7 +110,6 @@ import {
   type HouseViewState,
 } from "../types/project";
 import { generateFacadeAlternatives } from "../services/facade";
-import { generatePreliminaryStructure } from "../services/structure";
 
 import { HouseUnitsContext } from "./house-units";
 import { applyModelingOptions, modelingPreset, type DisplayUnits, type ModelingOptions } from "../services/workspace-options";
@@ -251,7 +250,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       }
     }
     setRoom(verifiedRoom);
-    // The plan comes first; its structure is generated when it is finished.
+    // Structure is not generated automatically: the plan arrives without it.
     const built = ensureHouseBimState({ ...withoutStructure(applyModelingOptions(createHouseProject({
       id: project?.id,
       title,
@@ -271,7 +270,9 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
 
   function restore() {
     if (!savedDraft) return;
-    const restored = ensureHouseBimState(ensureHouseEnvelopeProject(ensurePhaseFourProject(ensurePhaseThreeProject(ensurePhaseTwoProject(savedDraft.project)))));
+    // Structure is not generated automatically; a draft saved with the
+    // generated kind comes back without it. Columns placed by hand stay.
+    const restored = ensureHouseBimState(withoutStructure(ensureHouseEnvelopeProject(ensurePhaseThreeProject(ensurePhaseTwoProject(savedDraft.project)))));
     const restoredRoom = restored.levels.find((level) => level.plan)?.plan;
     setProject(restored);
     setDisplayUnits(restored.displayUnits ?? "mm");
@@ -373,7 +374,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           view={view}
           onView={setView}
           onProjectChange={updateProject}
-          onDone={() => { updateProject(ensureHouseBimState(generateStructureFromGrid(project))); setStage("model"); setView("3d"); }}
+          onDone={() => { setStage("model"); setView("3d"); }}
           onBack={() => setStage("start")}
           initialTool={startTool}
           userId={userId}
@@ -925,7 +926,6 @@ function ModelScreen({
       case "move": setActiveTool(id); setDraftStart(null); if (view === "3d") onView("2d"); setGuidance("Move Tool · Pick a new location or use arrow keys"); return;
       case "ask-ai": case "ai-remodel": document.getElementById("house-ai-remodel")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
       case "generate-facade": case "alternatives": commit(generateFacadeAlternatives(project, 3), "Generated façade alternatives"); document.getElementById("house-facade")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
-      case "generate-structure": commit(generatePreliminaryStructure(project), "Preliminary structure generated"); return;
       case "suggest-columns": suggest(proposals?.maxSpan ?? 4500); return;
       case "merge-rooms": {
         const rooms = selections.filter((item) => item.kind === "room");
@@ -1096,7 +1096,7 @@ function ModelScreen({
 
       <div id="house-facade"><HouseFacadePanel project={project} userId={userId} onChange={(next) => commit(next, "Façade updated")} /></div>
       <div id="house-ai-remodel"><HouseAiRemodelPanel project={project} selected={selected} selections={selections} onChange={(next) => commit(next, "AI model change applied")} /></div>
-      <HouseStructurePanel project={project} onChange={(next) => commit(next, "Structure updated")} onSuggest={() => runCommand("suggest-columns")} />
+      <HouseStructurePanel project={project} onSuggest={() => runCommand("suggest-columns")} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Summary label="Level area" value={activeRoom ? `${floorArea(activeRoom).toFixed(2)} m²` : "—"} />

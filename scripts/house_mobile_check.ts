@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room";
 import { createHouseProject, houseProjectSchema, ensurePhaseTwoProject } from "../src/features/house-designer/types/project";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
-import { ensurePhaseFourProject } from "../src/features/house-designer/services/structure";
+import { withoutStructure } from "../src/features/house-designer/services/structure";
 import { ensurePhaseThreeProject } from "../src/features/house-designer/services/facade";
 import { ensureHouseEnvelopeProject } from "../src/features/house-designer/services/envelope";
 import { applyModelingOptions, modelingPreset, displayLength, modelLength } from "../src/features/house-designer/services/workspace-options";
@@ -10,7 +10,8 @@ import { applyModelingOptions, modelingPreset, displayLength, modelLength } from
 const base = createHouseProject({ title: "Mobile", room: rectangularRoom(8000, 6500), style: "modern", strict: false, floorCount: 1, floorToFloorHeight: 3000 });
 const reload = (value: typeof base) => {
   const saved = houseProjectSchema.parse(JSON.parse(JSON.stringify(value)));
-  return [ensurePhaseTwoProject, ensurePhaseThreeProject, ensurePhaseFourProject, ensureHouseEnvelopeProject, ensureHouseBimState].reduce((project, ensure) => ensure(project), saved);
+  // The same steps, in the same order, as restoring a draft.
+  return [ensurePhaseTwoProject, ensurePhaseThreeProject, ensureHouseEnvelopeProject, withoutStructure, ensureHouseBimState].reduce((project, ensure) => ensure(project), saved);
 };
 for (const mode of ["apartment", "room"] as const) {
   const project = reload({ ...applyModelingOptions(base, modelingPreset(mode)), displayUnits: "m" });
@@ -24,10 +25,17 @@ for (const mode of ["apartment", "room"] as const) {
   assert.equal(project.displayUnits, "m");
   assert.deepEqual(project.walls, base.walls, "Setup preserves actual dimensions");
 }
-const custom = reload(applyModelingOptions(base, { ...modelingPreset("house"), foundations: false }));
-assert.ok(custom.structuralColumns.length);
-assert.equal(custom.foundations.length, 0, "Structure without footing must persist");
-assert.ok(reload(base).foundations.length, "Legacy full-house behavior remains");
+// Structure is not generated automatically: a draft saved with generated
+// columns, beams, grid and footings comes back without them, hand-placed
+// columns kept.
+assert.ok(base.structuralColumns.length && base.structuralBeams.length, "fixture: a legacy house with generated structure");
+for (const saved of [base, applyModelingOptions(base, modelingPreset("house")), applyModelingOptions(base, { ...modelingPreset("house"), foundations: false })]) {
+  const restored = reload(saved);
+  assert.equal(restored.structuralColumns.length + restored.structuralBeams.length + restored.structuralGrid.length + restored.foundations.length, 0, "No generated structure after reload");
+}
+const handPlaced = { ...base, structuralColumns: [...base.structuralColumns, { ...base.structuralColumns[0]!, id: "column:by-hand" }] };
+assert.deepEqual(reload(handPlaced).structuralColumns.map((column) => column.id), ["column:by-hand"], "a column placed by hand survives reload");
+assert.equal(reload(handPlaced).foundations.length, 0, "and no footing is made up for it");
 assert.equal(displayLength(8000, "m"), 8);
 assert.equal(displayLength(8000, "cm"), 800);
 assert.equal(modelLength(4.2, "m"), 4200);
