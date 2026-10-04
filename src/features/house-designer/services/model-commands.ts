@@ -1,4 +1,4 @@
-import { patchHouseObject, removeFootprintCorner } from "./project-edit";
+import { deleteRoom, moveRoom, patchHouseObject, removeFootprintCorner } from "./project-edit";
 import { allHouseSelections, sameSelection } from "./model-state";
 import { houseCommand, type HouseCommandId } from "./command-registry";
 import { wallObjectId, openingObjectId, type HouseObjectKind, type HouseProject, type HouseSelection } from "../types/project";
@@ -31,7 +31,9 @@ export function deleteHouseSelections(project: HouseProject, selections: readonl
       continue;
     }
     if (selection.kind === "room") {
-      blocked.push("Delete or edit the room boundary in the plan editor");
+      const result = deleteRoom(next, selection.id);
+      if (result.blocked) blocked.push(result.blocked);
+      else next = result.project;
       continue;
     }
     if (selection.kind === "wall") {
@@ -147,6 +149,12 @@ export function moveHouseSelections(project: HouseProject, selections: readonly 
     if (selection.kind === "door" || selection.kind === "window") {
       const item = (selection.kind === "door" ? next.doors : next.windows).find((entry) => entry.id === selection.id);
       if (item) next = patchHouseObject(next, selection, { offset: Math.max(0, item.offset + dx) });
+      continue;
+    }
+    if (selection.kind === "room") {
+      const result = moveRoom(next, selection.id, dx, dy);
+      if (result.blocked) blocked.push(result.blocked);
+      else next = result.project;
       continue;
     }
     next = moveSimpleObject(next, selection, dx, dy);

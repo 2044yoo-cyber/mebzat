@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room";
-import { roomOutline } from "../src/features/house-designer/services/model-commands";
+import { createHouseObjectFromGesture, createRoomFromGesture, deleteHouseSelections, moveHouseSelections, roomOutline } from "../src/features/house-designer/services/model-commands";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
 import { establishLevelOutline, openSpace } from "../src/features/house-designer/services/project-edit";
 import { duplicateWallParallel, extendWall, levelChains, moveWallEnd, roomRectangle, rotateWall90, setWallDistance, setWallLength, splitRoom, wallChain } from "../src/features/house-designer/services/quick-edit";
@@ -97,4 +97,73 @@ assert.deepEqual([rotated.start.x, rotated.end.x], [2250, 2250], "turned upright
 assert.deepEqual([rotated.start.y, rotated.end.y].sort((a, b) => a - b), [3250, 7750], "the same length");
 assert.equal(rotateWall90(project, top.id).blocked.length, 1, "the outline is not turned");
 
-console.log("House quick edit: split rooms, duplicate a partition, set a distance, extend and shorten from either end, drag an end, rotate 90°, dimension chains");
+// ---------------------------------------------------------------------------
+// Rooms are deleted and moved like anything else.
+// ---------------------------------------------------------------------------
+const house = establishLevelOutline(base, ground, roomOutline("rectangle", { x: 0, y: 0 }, { x: 6000, y: 5000 }))!;
+const roomAt = (value: HouseProject, x: number, y: number) => value.rooms.find((room) => room.levelId === ground && Math.min(...room.boundary.map((point) => point.x)) === x && Math.min(...room.boundary.map((point) => point.y)) === y)!;
+// A room drawn apart from the house, with a door in it and a bed.
+let apart = createRoomFromGesture(house, ground, { x: 8000, y: 0 }, { x: 11000, y: 3000 }, "rectangle", { wallThickness: 120 }).project;
+const apartBottom = wallAt(apart, (wall) => wall.start.y === 3000 && wall.end.y === 3000 && Math.min(wall.start.x, wall.end.x) === 8000);
+apart = createHouseObjectFromGesture(apart, "door", ground, { x: 9500, y: 3000 }).project;
+const apartDoor = apart.doors.find((door) => door.wallId === apartBottom.id)!;
+assert.ok(apartDoor, "fixture: a door in the room apart");
+apart = { ...apart, components: [...apart.components, { ...(base.components[0] ?? {}), id: "bed", levelId: ground, x: 9000, y: 1500, width: 1600, depth: 2000, height: 500, rotation: 0, elevation: 0, category: "bed", name: "Bed", material: "Timber" } as HouseProject["components"][number]] };
+assert.deepEqual(rooms(apart), ["0..6000 x 0..5000", "8000..11000 x 0..3000"]);
+
+// Moved: its walls, its door and its furniture go with it; the house stays.
+const away = moveHouseSelections(apart, [{ kind: "room", id: roomAt(apart, 8000, 0).id }], 1000, 500, { footprintEditable: true });
+assert.deepEqual(away.blocked, []);
+assert.deepEqual(rooms(away.project), ["0..6000 x 0..5000", "9000..12000 x 500..3500"], "the room apart moves");
+assert.equal(on(away.project).filter((wall) => [wall.start, wall.end].every((point) => point.x >= 9000 && point.x <= 12000 && point.y >= 500 && point.y <= 3500)).length, 4, "with its four walls");
+assert.ok(wallAt(away.project, vertical(0)) && wallAt(away.project, vertical(6000)), "the house does not");
+assert.equal(away.project.doors.filter((door) => door.levelId === ground).length, 1, "its door comes along");
+assert.deepEqual([away.project.components.find((item) => item.id === "bed")!.x, away.project.components.find((item) => item.id === "bed")!.y], [10000, 2000], "and the bed in it");
+// The house's only room moves the whole outline.
+const shifted = moveHouseSelections(apart, [{ kind: "room", id: roomAt(apart, 0, 0).id }], -1000, 0, { footprintEditable: true }).project;
+assert.deepEqual(rooms(shifted), ["-1000..5000 x 0..5000", "8000..11000 x 0..3000"], "the house moves, the room apart stays");
+// A room sharing a wall is changed by its walls instead.
+const halves = splitRoom(apart, roomAt(apart, 0, 0).id, "vertical").project;
+assert.equal(moveHouseSelections(halves, [{ kind: "room", id: roomAt(halves, 0, 0).id }], 500, 0).blocked.length, 1, "a room sharing a wall is not dragged off it");
+const pair = createRoomFromGesture(apart, ground, { x: 11000, y: 0 }, { x: 13000, y: 3000 }, "rectangle", { wallThickness: 120 }).project;
+assert.match(moveHouseSelections(pair, [{ kind: "room", id: roomAt(pair, 8000, 0).id }], 0, 500).blocked[0] ?? "", /shares a wall/, "nor is a room apart joined to another");
+
+// Deleted: the room apart goes with its walls and door.
+let gone = deleteHouseSelections(apart, [{ kind: "room", id: roomAt(apart, 8000, 0).id }], { footprintEditable: true });
+assert.deepEqual(gone.blocked, [], "a room can be deleted");
+assert.deepEqual(rooms(gone.project), ["0..6000 x 0..5000"]);
+assert.equal(on(gone.project).length, 4, "and its walls with it");
+assert.equal(gone.project.doors.filter((door) => door.levelId === ground).length, 0, "and its door");
+// One of two halves: the wall it shares stays, the other half is untouched.
+gone = deleteHouseSelections(halves, [{ kind: "room", id: roomAt(halves, 0, 0).id }], { footprintEditable: true });
+assert.deepEqual(rooms(gone.project), ["3000..6000 x 0..5000", "8000..11000 x 0..3000"], "one half deleted");
+assert.ok(wallAt(gone.project, vertical(3000)), "the wall it shared stays");
+assert.ok(wallAt(gone.project, vertical(0)), "and so does the house's outline around it");
+// The house itself, with a room apart: that room becomes the house, door kept where it was.
+gone = deleteHouseSelections(apart, [{ kind: "room", id: roomAt(apart, 0, 0).id }], { footprintEditable: true });
+assert.deepEqual(gone.blocked, []);
+assert.deepEqual(rooms(gone.project), ["8000..11000 x 0..3000"], "the house deleted, the room apart remains");
+assert.deepEqual(gone.project.levels[0]!.plan!.corners.map((corner) => [corner.x, corner.y]).sort(), [[11000, 0], [11000, 3000], [8000, 0], [8000, 3000]], "its walls are the outline now");
+assert.equal(on(gone.project).length, 4, "four walls, not eight");
+const keptDoor = gone.project.doors.filter((door) => door.levelId === ground);
+assert.equal(keptDoor.length, 1, "its door kept");
+const host = on(gone.project).find((wall) => wall.id === keptDoor[0]!.wallId)!;
+const along = (wall: typeof host, offset: number) => wall.start.x + (wall.end.x - wall.start.x) * offset / Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+const centre = (wall: typeof host, door: typeof apartDoor) => along(wall, door.offset + door.width / 2);
+assert.equal(host.start.y, 3000);
+assert.equal(Math.round(centre(host, keptDoor[0]!)), Math.round(centre(apartBottom, apartDoor)), "in the same place on the same side");
+// An L-shaped room apart, as drawn with the Room tool: moved, then deleted.
+const ell = createRoomFromGesture(house, ground, { x: 8000, y: 1000 }, { x: 11000, y: 5000 }, "l-shape", { wallThickness: 120 }).project;
+const ellId = ell.rooms.find((room) => room.levelId === ground && room.boundary.length === 6)!.id;
+const ellWalls = on(ell).length;
+const ellMoved = moveHouseSelections(ell, [{ kind: "room", id: ellId }], 0, -1000).project;
+assert.equal(on(ellMoved).filter((wall) => Math.min(wall.start.y, wall.end.y) >= 0 && Math.max(wall.start.y, wall.end.y) <= 4000 && Math.min(wall.start.x, wall.end.x) >= 8000).length, ellWalls - 4, "an L-shaped room moves with all six walls");
+assert.equal(on(deleteHouseSelections(ellMoved, [{ kind: "room", id: ellId }], { footprintEditable: true }).project).length, 4, "and is deleted with them");
+
+// The only room on the floor: the floor is empty again.
+const empty = deleteHouseSelections(house, [{ kind: "room", id: house.rooms[0]!.id }], { footprintEditable: true }).project;
+assert.equal(on(empty).length, 0, "the last room deleted leaves open space");
+assert.equal(empty.levels[0]!.plan, null);
+assert.ok(establishLevelOutline(empty, ground, roomOutline("rectangle", { x: 0, y: 0 }, { x: 4000, y: 4000 })), "ready to draw again");
+
+console.log("House quick edit: rooms deleted and moved, split rooms, duplicate a partition, set a distance, extend and shorten from either end, drag an end, rotate 90°, dimension chains");

@@ -223,6 +223,35 @@ try {
   await undo(page);
   assert.ok((await rooms(page)).includes("6750..9000 x 0..11000"), "one undo");
 
+  // A room apart from the house: dragged to a new place, then deleted.
+  const wallCount = () => page.evaluate(() => [...document.querySelectorAll("#house-properties option")].filter((option) => /^Wall \d+$/.test(option.textContent)).length);
+  const before = await wallCount();
+  await rail(page).getByRole("button", { name: "Room", exact: true }).click();
+  await drag([10000, 7000], [12000, 9000]);
+  await rail(page).getByRole("button", { name: "Select", exact: true }).click();
+  assert.ok((await rooms(page)).includes("10000..12000 x 7000..9000"), `a room drawn apart (${await rooms(page)})`);
+  assert.equal(await wallCount(), before + 4);
+  await nothing();
+  await tapAt(11000, 8000);
+  assert.equal(await bar(page).getAttribute("aria-label"), "Room actions");
+  await drag([11000, 8000], [11000, 9000]);
+  assert.ok((await rooms(page)).includes("10000..12000 x 8000..10000"), `a selected room is dragged to a new place (${await rooms(page)})`);
+  assert.equal(await wallCount(), before + 4, "its walls with it");
+  await undo(page);
+  assert.ok((await rooms(page)).includes("10000..12000 x 7000..9000"), "one undo");
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await nothing();
+  await tapAt(11000, 9000);
+  await bar(page).getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  assert.ok(!(await rooms(page)).some((room) => room.startsWith("10000..")), "a room is deleted");
+  assert.equal(await wallCount(), before, "with its walls");
+  await undo(page);
+  assert.equal(await wallCount(), before + 4, "and undo brings it back");
+  await undo(page);
+  await undo(page);
+  assert.equal(await wallCount(), before);
+
   // Drawn freehand, a wall's length is a fraction; its field reads whole millimetres.
   await page.getByRole("button", { name: "Snap", exact: true }).click();
   await rail(page).getByRole("button", { name: "Wall", exact: true }).click();
