@@ -644,6 +644,7 @@ async function checkRooms(page, at) {
   await tap(3000, 3000);
   await tap(8000, 3000);
   await rail(page).getByRole("button", { name: "Select", exact: true }).click();
+  assert.equal(await lengthField(page).inputValue(), "5000", `${at}: a wall ended on another reads to the millimetre, not 4999.999603`);
   assert.deepEqual(await rooms(), ["0..3000 x 0..6500", "3000..8000 x 0..3000", "3000..8000 x 3000..6500"], `${at}: and a wall from wall to wall splits again`);
   const before = await walls(page);
 

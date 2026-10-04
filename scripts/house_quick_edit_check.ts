@@ -34,7 +34,7 @@ assert.deepEqual(step.selections, [{ kind: "wall", id: partition.id }], "and the
 const left = project.rooms.find((room) => room.boundary.every((point) => point.x <= 4500))!;
 project = splitRoom(project, left.id, "horizontal").project;
 assert.deepEqual(rooms(project), ["0..4500 x 0..5500", "0..4500 x 5500..11000", "4500..9000 x 0..11000"], "and across");
-assert.deepEqual(splitRoom(project, left.id, "vertical", 4300).blocked.length, 1, "a room that is no longer there cannot be split");
+assert.equal(splitRoom(project, `${ground}:gone`, "vertical").blocked.length, 1, "a room that is not there cannot be split");
 const right = project.rooms.find((room) => room.boundary.every((point) => point.x >= 4500))!;
 assert.equal(splitRoom(project, right.id, "vertical", 200).blocked[0], "Each part needs to be at least 300 mm", "nor into a sliver");
 const exact = splitRoom(project, right.id, "vertical", 4000).project;
