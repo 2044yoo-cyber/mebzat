@@ -138,6 +138,9 @@ assert.ok(after.plan.openings.filter((item) => item.kind === "window").every((it
 const gridBefore = templateGrid(family);
 assert.equal(gridBefore.columns.reduce((a, b) => a + b, 0), 8000);
 assert.equal(adjustTemplate(family, { width: 6000, length: 20000 }), null, "not into a plot that would make rooms too small");
+const roomier = adjustTemplate(family, { width: 12000, length: 20000 })!;
+assert.ok(roomier.width > before.width && roomier.length > before.length, "on a roomier plot the rooms grow a little");
+assert.equal(widthOf(roomier, "Corridor").depth, 1200, "but the corridor stays a corridor");
 assert.equal(fitTemplate(byId("large-family"), plotOf(8000, 12000)).status, "none");
 
 // ---------------------------------------------------------------------------

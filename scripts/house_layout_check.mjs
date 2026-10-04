@@ -284,6 +284,22 @@ try {
   await rail(page).getByRole("button", { name: "Select", exact: true }).click();
   const outline = await page.evaluate(() => { const polygon = document.querySelector('svg[aria-label="Floor plan"] polygon'); const points = polygon.getAttribute("points").trim().split(/\s+/).map((pair) => pair.split(",").map(Number)); return [Math.max(...points.map((p) => p[0])) - Math.min(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1])) - Math.min(...points.map((p) => p[1]))]; });
   assert.ok(outline.includes(7800), `the adjusted house is 7.8 m between wall centres across (${outline})`);
+  // The road is to the north: the front door is in the top wall of the plan.
+  await page.waitForTimeout(1200);
+  const facing = await page.evaluate(() => {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const text = localStorage.getItem(localStorage.key(index)) ?? "";
+      if (!text.includes('"sourceOpeningId":"entrance"')) continue;
+      const found = JSON.parse(text);
+      const project = found.project ?? found;
+      const door = project.doors.find((item) => item.sourceOpeningId === "entrance");
+      const wall = project.walls.find((item) => item.id === door.wallId);
+      const top = Math.min(...project.walls.flatMap((item) => [item.start.y, item.end.y]));
+      return { level: wall.start.y === wall.end.y && wall.start.y === top };
+    }
+    return null;
+  });
+  assert.deepEqual(facing, { level: true }, "road to the north: the front door is in the north wall");
 
   assert.deepEqual(errors, [], "page errors");
 } finally {

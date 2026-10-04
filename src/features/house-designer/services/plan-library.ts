@@ -384,7 +384,7 @@ export function buildTemplate(template: LibraryTemplate, sizes = templateGrid(te
     // a bathroom to get somewhere else.
     const rank = (name: string) => PRIVATE.includes(grid.types.get(name)!) ? 1 : 0;
     const candidates = stranded.sort((a, b) => rank(a) - rank(b));
-    const bridged = candidates.some((name) => neighbours(name).filter((other) => reached.has(other) && !PRIVATE.includes(grid.types.get(other)!)).some((other) => join(name, other, open(name, other) ? "passage" : "door")));
+    const bridged = candidates.some((name) => neighbours(name).filter((other) => reached.has(other)).some((other) => join(name, other, open(name, other) ? "passage" : "door")));
     if (!bridged) break;
   }
 
