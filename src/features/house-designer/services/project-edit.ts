@@ -844,6 +844,16 @@ function attachedTo(oldStart: { x: number; y: number }, oldEnd: { x: number; y: 
     const oldLength = Math.sqrt(lengthSquared);
     const newLength = Math.hypot(newEnd.x - newStart.x, newEnd.y - newStart.y);
     if (!newLength) return { x: micron(newStart.x), y: micron(newStart.y) };
+    // Lengthened or shortened along its own line: whatever meets it stays
+    // where it is, only clamped to the new ends. Measuring from the start
+    // moved every junction when the start was the end that changed.
+    const ux = (newEnd.x - newStart.x) / newLength;
+    const uy = (newEnd.y - newStart.y) / newLength;
+    const sameLine = Math.abs(ux * dy - uy * dx) / oldLength < 1e-6 && Math.abs((newStart.x - oldStart.x) * dy - (newStart.y - oldStart.y) * dx) / oldLength < 0.5;
+    if (sameLine) {
+      const along = Math.min(Math.max(0, (point.x - newStart.x) * ux + (point.y - newStart.y) * uy), newLength);
+      return { x: micron(newStart.x + ux * along), y: micron(newStart.y + uy * along) };
+    }
     const along = Math.min(Math.max(0, t) * oldLength, newLength);
     return { x: micron(newStart.x + ((newEnd.x - newStart.x) / newLength) * along), y: micron(newStart.y + ((newEnd.y - newStart.y) / newLength) * along) };
   };

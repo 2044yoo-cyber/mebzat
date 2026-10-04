@@ -31,6 +31,13 @@ const screen = (page, x, y) => page.evaluate(([selector, x, y]) => {
 const optionCount = (page, pattern) => page.evaluate((source) => [...document.querySelectorAll("#house-properties option")].filter((option) => new RegExp(source).test(option.textContent)).length, pattern);
 const walls = (page) => optionCount(page, "^Wall \\d+$");
 const sheet = (page) => page.locator('section[aria-label$=" properties"]');
+const bar = (page) => page.getByRole("toolbar", { name: / actions$|^Split room$/ });
+const barButtons = (page) => bar(page).getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label") ?? button.textContent));
+async function more(page, item) {
+  await bar(page).getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: item, exact: true }).click();
+}
+const lengthField = (page) => page.locator('input[aria-label="Selected object temporary length"]');
 const rail = (page) => page.locator('nav[aria-label="Modeling tools"]');
 const toasts = (page) => page.evaluate(() => [...document.querySelectorAll("[data-sonner-toast]")].map((toast) => toast.textContent).join(" | "));
 
@@ -122,7 +129,7 @@ try {
 
     // The screen: nine tools, the secondary row, and Save / View 3D — and
     // nothing else permanent. Move, Delete and the rest belong to a selection.
-    assert.deepEqual(await rail(page).getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))), ["Select", "Wall", "Room", "Door", "Window", "Column", "Stair", "Furniture", "Measure"], `${at}: the plan toolbar is the nine frequent tools`);
+    assert.deepEqual(await rail(page).getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))), ["Select", "Wall", "Room", "Door", "Window", "Column", "Stair", "Furniture", "Measure", "Split"], `${at}: the plan toolbar is the frequent tools`);
     for (const name of ["Undo", "Redo", "Snap", "Grid", "More"]) assert.ok(await page.getByRole("button", { name, exact: true }).isVisible(), `${at}: ${name} is on the secondary row`);
     for (const name of ["Move", "Rotate", "Scale", "Duplicate", "Delete", "Pan", "Roof", "Beam", "Façade"]) assert.equal(await page.getByRole("button", { name, exact: true }).count(), 0, `${at}: no permanent ${name} button`);
     assert.deepEqual(await page.getByRole("tab").allInnerTexts(), ["PLAN", "SKETCH", "3D", "FILES", "AGENDA"], `${at}: the project's sections`);
@@ -178,20 +185,22 @@ try {
     // Tap selects the wall — not the grid line on it — and its sheet opens
     // with its measurements and what can be done to it.
     await tapAt(4000, 0);
-    await sheet(page).waitFor();
-    assert.match(await sheet(page).getAttribute("aria-label"), /^Wall /, `${at}: a tap on a wall opens the wall's sheet`);
-    assert.equal(await sheet(page).getByLabel("Length").inputValue(), "8000", `${at}: with its length`);
-    assert.deepEqual(await sheet(page).getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.textContent).filter((text) => text)), ["Move", "Lock", "Delete", "Add to Agenda", "More properties"], `${at}: and what can be done to a wall`);
-    assert.ok(await sheet(page).evaluate((element) => { const box = element.getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth; }), `${at}: the sheet fits the screen`);
-    await sheet(page).getByLabel("Length").fill("7000");
-    await sheet(page).getByLabel("Length").press("Enter");
+    await bar(page).waitFor();
+    assert.equal(await bar(page).getAttribute("aria-label"), "Wall actions", `${at}: a tap on a wall offers the wall's actions, beside it`);
+    assert.deepEqual(await barButtons(page), ["Duplicate", "↻ 90°", "Split", "More actions"], `${at}: Duplicate, Rotate 90°, Split, and the rest under ⋮`);
+    assert.equal(await sheet(page).count(), 0, `${at}: no sheet across the screen`);
+    const barBox = await bar(page).evaluate((element) => { const box = element.getBoundingClientRect(); return { left: box.left, right: box.right, height: box.height }; });
+    assert.ok(barBox.left >= 0 && barBox.right <= width && barBox.height <= 52, `${at}: the bar is small and on screen (${JSON.stringify(barBox)})`);
+    assert.equal(await lengthField(page).inputValue(), "8000", `${at}: the wall's length is on it`);
+    await lengthField(page).fill("7000");
+    await lengthField(page).press("Enter");
     await page.waitForTimeout(150);
-    assert.equal(await sheet(page).getByLabel("Length").inputValue(), "7000", `${at}: a length typed in the sheet is the wall's length`);
+    assert.equal(await lengthField(page).inputValue(), "7000", `${at}: a typed length is the wall's length`);
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     await tapAt(4000, 0);
-    assert.equal(await sheet(page).getByLabel("Length").inputValue(), "8000", `${at}: undo puts it back`);
+    assert.equal(await lengthField(page).inputValue(), "8000", `${at}: undo puts it back`);
     assert.equal(await walls(page), 4);
-    await sheet(page).getByRole("button", { name: "Delete" }).click();
+    await more(page, "Delete");
     await page.waitForFunction(() => [...document.querySelectorAll("#house-properties option")].filter((option) => /^Wall \d+$/.test(option.textContent)).length === 3);
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     assert.equal(await walls(page), 4, `${at}: undo restores the wall`);
@@ -203,7 +212,7 @@ try {
     await page.waitForTimeout(650);
     await touch("touchEnd", []);
     await page.waitForTimeout(150);
-    assert.ok(await sheet(page).isVisible(), `${at}: a long press selects`);
+    assert.ok(await bar(page).isVisible(), `${at}: a long press selects`);
     assert.equal(await walls(page), 4, `${at}: lifting the finger pressed nothing`);
     assert.equal(await scrollTop(), 0, `${at}: and scrolled nothing`);
 
@@ -248,7 +257,7 @@ try {
     assert.ok(Math.abs(run[3] - run[1] - 2500) < 0.01, `${at}: exactly the length typed (${run.map(Math.round)})`);
     assert.equal(await page.locator('input[aria-label^="Selected object temporary"]').count(), 0, `${at}: no editing fields while drawing`);
     assert.ok(await page.getByLabel("Typed length").isVisible(), `${at}: the chain carries on from the new end`);
-    assert.equal(await sheet(page).count(), 0, `${at}: no selection sheet while drawing`);
+    assert.equal(await bar(page).count(), 0, `${at}: no selection actions while drawing`);
 
     // Doors slide and take exact distances, walls move and drag their
     // neighbours, locks hold, floors are added.
@@ -261,10 +270,12 @@ try {
     await rail(page).getByRole("button", { name: "Select", exact: true }).click();
     assert.equal(await field("distance from start").inputValue(), "3550", `${at}: a door shows its distance from each end`);
     assert.equal(await field("distance to end").inputValue(), "3550");
+    assert.deepEqual(await barButtons(page), ["Flip", "Duplicate", "Move", "More actions"], `${at}: a door is flipped, duplicated, moved`);
+    await more(page, "Properties");
     assert.match(await sheet(page).getAttribute("aria-label"), /^Door D1/, `${at}: the new door is selected, as Door D1`);
-    assert.deepEqual(await sheet(page).getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.textContent).filter((text) => text)), ["Flip", "Move", "Delete", "Add to Agenda"], `${at}: a door can be flipped, moved, deleted`);
     assert.equal(await sheet(page).getByLabel("Width").inputValue(), "900", `${at}: 900 wide`);
     assert.equal(await sheet(page).getByLabel("Height").inputValue(), "2100", `${at}: 2100 high`);
+    await sheet(page).getByRole("button", { name: "Close" }).click();
     await drag([4000, 0], [5000, 0]);
     assert.equal(await field("distance from start").inputValue(), "4550", `${at}: dragging slides the door along its wall`);
     assert.equal(await field("distance to end").inputValue(), "2550");
@@ -274,35 +285,39 @@ try {
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     assert.equal(await field("distance from start").inputValue(), "4550", `${at}: undo steps back one edit`);
     await tapAt(2000, 0);
-    assert.match(await sheet(page).getAttribute("aria-label"), /^Wall /);
+    assert.equal(await bar(page).getAttribute("aria-label"), "Wall actions");
     await tapAt(4550 + 450, 0);
-    assert.match(await sheet(page).getAttribute("aria-label"), /^Door /, `${at}: a door in the selected wall can still be tapped`);
+    assert.equal(await bar(page).getAttribute("aria-label"), "Door actions", `${at}: a door in the selected wall can still be tapped`);
 
     await rail(page).getByRole("button", { name: "Window", exact: true }).click();
     await tapAt(0, 3000);
     await rail(page).getByRole("button", { name: "Select", exact: true }).click();
+    assert.deepEqual(await barButtons(page), ["Duplicate", "Move", "More actions"], `${at}: a window is duplicated or moved`);
+    await more(page, "Properties");
     assert.match(await sheet(page).getAttribute("aria-label"), /^Window W1/, `${at}: a window is Window W1`);
     assert.equal(await sheet(page).getByLabel("Sill height").inputValue(), "900", `${at}: with its sill height`);
     await sheet(page).getByLabel("Sill height").fill("1100");
     await sheet(page).getByLabel("Sill height").press("Enter");
     await page.waitForTimeout(100);
     assert.equal(await sheet(page).getByLabel("Sill height").inputValue(), "1100", `${at}: which can be changed`);
+    await sheet(page).getByRole("button", { name: "Close" }).click();
 
     await tapAt(2000, 0);
-    await drag([2000, 0], [2000, -500]);
+    await drag([3000, 0], [3000, -500]);
     await tapAt(0, 1500);
     assert.equal(await field("length").inputValue(), "7000", `${at}: moving a wall stretches the one beside it`);
     await page.getByRole("button", { name: "Undo", exact: true }).click();
-    await tapAt(0, 1500);
-    assert.equal(await field("length").inputValue(), "6500");
+    assert.equal(await field("length").inputValue(), "6500", `${at}: the wall stays selected through undo`);
 
-    await sheet(page).getByRole("button", { name: "Lock" }).click();
+    await more(page, "Lock");
     assert.equal(await page.locator(`${PLAN} text`, { hasText: "Locked" }).count(), 1, `${at}: a locked wall says so`);
-    assert.equal(await sheet(page).getByRole("button", { name: "Unlock" }).count(), 1, `${at}: and offers Unlock`);
+    await bar(page).getByRole("button", { name: "More actions" }).click();
+    assert.equal(await page.getByRole("menuitem", { name: "Unlock" }).count(), 1, `${at}: and offers Unlock`);
+    await bar(page).getByRole("button", { name: "More actions" }).click();
     await drag([0, 1500], [600, 1500]);
     assert.match(await toasts(page), /This wall is locked/, `${at}: a locked wall refuses to move`);
     await tapAt(2000, 0);
-    await drag([2000, 0], [2000, -500]);
+    await drag([3000, 0], [3000, -500]);
     assert.match(await toasts(page), /locked wall joined to it/, `${at}: and so does its neighbour`);
     await tapAt(0, 1500);
     assert.equal(await field("length").inputValue(), "6500", `${at}: nothing moved`);
@@ -338,20 +353,23 @@ async function checkFurnitureAndMeasure(page, at) {
   await tapAt(4000, 3000);
   const sofa = page.locator(`${PLAN} g[aria-label="Sofa"]`);
   assert.equal(await sofa.count(), 1, `${at}: the sofa is on the plan, named`);
-  assert.equal(await sheet(page).getAttribute("aria-label"), "Sofa properties", `${at}: and selected`);
-  assert.deepEqual(await sheet(page).getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.textContent).filter((text) => text)), ["Rotate", "Move", "Duplicate", "Delete", "Add to Agenda"], `${at}: furniture rotates, moves, duplicates, deletes`);
+  assert.equal(await bar(page).getAttribute("aria-label"), "Furniture actions", `${at}: and selected`);
+  assert.deepEqual(await barButtons(page), ["Move", "↻ 90°", "Duplicate", "More actions"], `${at}: furniture moves, rotates, duplicates`);
+  await more(page, "Properties");
+  assert.equal(await sheet(page).getAttribute("aria-label"), "Sofa properties");
   assert.equal(await sheet(page).getByLabel("Width").inputValue(), "2000");
   assert.equal(await sheet(page).getByLabel("Depth").inputValue(), "900");
-  await sheet(page).getByRole("button", { name: "Rotate" }).click();
+  await sheet(page).getByRole("button", { name: "Close" }).click();
+  await bar(page).getByRole("button", { name: "↻ 90°" }).click();
   assert.match(await sofa.getAttribute("transform"), /^rotate\(90 4000 3000\)$/, `${at}: Rotate turns it a quarter`);
   await drag([4000, 3000], [5000, 3500]);
   assert.match(await sofa.getAttribute("transform"), /^rotate\(90 5000 3500\)$/, `${at}: dragging the selected sofa moves it`);
-  await sheet(page).getByRole("button", { name: "Duplicate" }).click();
+  await bar(page).getByRole("button", { name: "Duplicate" }).click();
   assert.equal(await page.locator(`${PLAN} g[aria-label="Sofa"]`).count(), 2, `${at}: Duplicate makes a second`);
-  await sheet(page).getByRole("button", { name: "Delete" }).click();
+  await more(page, "Delete");
   assert.equal(await page.locator(`${PLAN} g[aria-label="Sofa"]`).count(), 1, `${at}: Delete removes the copy`);
   await tapAt(5000, 3500);
-  await sheet(page).getByRole("button", { name: "Move" }).click();
+  await bar(page).getByRole("button", { name: "Move" }).click();
   await tapAt(2000, 2000);
   assert.match(await page.locator(`${PLAN} g[aria-label="Sofa"]`).getAttribute("transform"), /^rotate\(90 2000 2000\)$/, `${at}: Move then a tap puts it there`);
 
@@ -406,12 +424,12 @@ async function checkThreeD(page, at) {
   for (const view of ["Orbit", "Top", "Walk", "Reset"]) assert.ok(await page.getByRole("button", { name: view, exact: true }).isVisible(), `${at}: 3D offers ${view}`);
   const [cx, cy] = await page.locator("canvas").evaluate((canvas) => { const box = canvas.getBoundingClientRect(); return [box.left + box.width / 2, box.top + box.height / 2]; });
   await page.touchscreen.tap(cx, cy);
-  assert.equal(await sheet(page).count(), 0, `${at}: tapping the 3D view selects nothing — editing is on the plan`);
+  assert.equal(await bar(page).count(), 0, `${at}: tapping the 3D view selects nothing — editing is on the plan`);
   await page.getByRole("button", { name: "Back to plan" }).click();
   await page.locator(PLAN).waitFor();
 
   await tapAt(2000, 0);
-  await drag([2000, 0], [2000, -500]);
+  await drag([3000, 0], [3000, -500]);
   await open3D(page);
   assert.ok(near(depth((await liveScene(page)).boxes["walls:ground-floor"]) - depth(start.boxes["walls:ground-floor"]), 0.5), `${at}: a wall moved on the plan moves in 3D`);
   await plan();
@@ -633,21 +651,28 @@ async function checkRooms(page, at) {
   // rooms either side follow; the outside walls do not move.
   await tap(3000, 1500);
   await drag([3000, 1500], [4000, 1500]);
-  await tap(4000, 1500);
+  await tap(4000, 2500);
   assert.deepEqual(await selectedLine(), [4000, 0, 4000, 6500], `${at}: the inside wall moved`);
   await tap(6000, 3000);
   assert.deepEqual(await selectedLine(), [4000, 3000, 8000, 3000], `${at}: the wall joined to it followed`);
   assert.deepEqual(await rooms(), ["0..4000 x 0..6500", "4000..8000 x 0..3000", "4000..8000 x 3000..6500"], `${at}: and so did the rooms`);
 
-  // Rename a room in its sheet; merge two rooms.
+  // Rename a room in its sheet; merge two rooms. The selected wall's
+  // distances sit in the rooms beside it, so let go of it first.
+  await tap(-700, 7200);
+  assert.equal(await bar(page).count(), 0, `${at}: a tap on nothing lets go`);
   await tap(6000, 1500);
+  assert.deepEqual(await barButtons(page), ["Split", "Duplicate", "Rename", "More actions"], `${at}: a room is split, duplicated, renamed`);
+  await bar(page).getByRole("button", { name: "Rename" }).click();
   assert.match(await sheet(page).getAttribute("aria-label"), /^Room \d+ properties$/);
   assert.match(await sheet(page).innerText(), /4000 × 3000 mm[\s\S]*12\.00 m²[\s\S]*14000 mm/, `${at}: a room's sheet gives its size, area and perimeter`);
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Name", `${at}: Rename starts on the name`);
   await sheet(page).getByLabel("Name").fill("Kitchen");
   await sheet(page).getByLabel("Name").press("Enter");
   await page.waitForTimeout(100);
   assert.equal(await sheet(page).getAttribute("aria-label"), "Kitchen properties", `${at}: a room is renamed in place`);
-  await sheet(page).getByRole("button", { name: "Merge rooms" }).click();
+  await sheet(page).getByRole("button", { name: "Close" }).click();
+  await more(page, "Merge with…");
   await tap(6000, 5000);
   assert.deepEqual(await rooms(), ["0..4000 x 0..6500", "4000..8000 x 0..6500"], `${at}: two rooms merge into one`);
   assert.equal(await walls(page), before - 1, `${at}: losing the wall between them`);
@@ -696,7 +721,6 @@ async function checkKeyboard(page, at) {
   await page.locator(PLAN).focus();
   await page.keyboard.press("v");
   assert.equal(await rail(page).getByRole("button", { name: "Select" }).getAttribute("aria-pressed"), "true", `${at}: V picks Select`);
-  await sheet(page).count();
   await page.getByRole("button", { name: "More", exact: true }).click();
   await page.getByRole("menuitem", { name: "Text label" }).click();
   await page.keyboard.press("v");

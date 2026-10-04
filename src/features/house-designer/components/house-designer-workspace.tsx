@@ -34,9 +34,11 @@ import {
   FurniturePicker,
   PlanSecondaryBar,
   PlanToolbar,
+  QuickActionBar,
   SelectionSheet,
   WorkspaceTabs,
   type MoreItem,
+  type QuickAction,
   type SaveStatus,
   type SheetAction,
   type WorkspaceTab,
@@ -75,6 +77,7 @@ import {
   moveHouseSelectionsTo,
   pinHouseSelections,
   rotateHouseSelections,
+  splitHouseSelection,
   type HouseClipboard,
 } from "../services/model-commands";
 import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong } from "../services/project-edit";
@@ -82,7 +85,8 @@ import { PLAN_TEMPLATES } from "../services/plan-templates";
 import { planDescriptionError } from "../services/plan-analysis";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
 import { furnitureItem, type FurnitureItem } from "../services/furniture-catalog";
-import { levelMeasurements } from "../services/measurements";
+import { levelMeasurements, pointInPolygon } from "../services/measurements";
+import { duplicateWallParallel, extendWall, moveWallEnd, roomRectangle, rotateWall90, setWallDistance, setWallLength, splitRoom } from "../services/quick-edit";
 import { attachToTask, createPin, createTask, listPins, pinHref, taskStatuses, updatePin, type Pin, type SketchSource } from "../services/sketch-store";
 import {
   createProject,
@@ -108,7 +112,7 @@ import {
 } from "../types/project";
 
 import { HouseUnitsContext } from "./house-units";
-import { applyModelingOptions, modelingPreset, type DisplayUnits, type ModelingOptions } from "../services/workspace-options";
+import { applyModelingOptions, displayLength, modelLength, modelingPreset, type DisplayUnits, type ModelingOptions } from "../services/workspace-options";
 
 // three.js is only loaded when somebody opens 3D: the plan is the screen most
 // people stay on, and on a phone the 3D engine is most of the page's weight.
@@ -126,7 +130,7 @@ type Source = "manual" | "rooms" | "upload" | "sketch" | "template" | "describe"
 const HIDDEN_IN_3D = new Set<HouseObjectKind>(["roof", "ceiling", "facade", "site", "balcony", "veranda", "railing", "grid", "beam", "foundation"]);
 
 const drawingCommands = new Set<HouseCommandId>([
-  "wall", "door", "window", "room", "room-separator", "stair", "furniture", "column", "dimension", "text",
+  "wall", "door", "window", "room", "room-separator", "stair", "furniture", "column", "dimension", "text", "split",
 ]);
 
 const noSubscription = () => () => undefined;
@@ -708,6 +712,12 @@ function PlanEditor({
   const [sketchRequest, setSketchRequest] = useState<SketchRequest | null>(null);
   const [planFocus, setPlanFocus] = useState<{ x: number; y: number; key: string } | null>(null);
   const focusHandled = useRef(false);
+  // The fast layout tools: properties on demand, a room's split, the Split
+  // tool's line before it is made, and a room copy being placed.
+  const [propertiesFor, setPropertiesFor] = useState<string | null>(null);
+  const [roomSplit, setRoomSplit] = useState<string | null>(null);
+  const [splitDraft, setSplitDraft] = useState<{ roomId: string; axis: "vertical" | "horizontal"; first: number } | null>(null);
+  const [placement, setPlacement] = useState<{ x: number; y: number; width: number; depth: number; name: string } | null>(null);
   const clipboard = useRef<HouseClipboard | null>(null);
   const keyboardRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
   const escapeRef = useRef(0);
@@ -902,6 +912,8 @@ function PlanEditor({
 
   function chooseTool(id: HouseCommandId) {
     setFurnitureOpen(id === "furniture");
+    setSplitDraft(null);
+    setPlacement(null);
     if (id === "select") { setActiveTool("select"); setDraftStart(null); setOutlineSketch([]); return; }
     activateDrawingTool(id);
   }
@@ -911,6 +923,20 @@ function PlanEditor({
     if (activeTool === "move") {
       applyMutation(moveHouseSelectionsTo(project, selections, end));
       setActiveTool("select");
+      return;
+    }
+    if (activeTool === "split") {
+      // The side tapped nearest says which way: tap the top or bottom for a
+      // vertical partition, a side for a horizontal one.
+      const room = project.rooms.find((item) => item.levelId === activeLevelId && pointInPolygon(end, item.boundary));
+      if (!room) { toast.info("Tap inside a room, near the side to split from"); return; }
+      const xs = room.boundary.map((point) => point.x);
+      const ys = room.boundary.map((point) => point.y);
+      const fromTopOrBottom = Math.min(end.y - Math.min(...ys), Math.max(...ys) - end.y);
+      const fromSides = Math.min(end.x - Math.min(...xs), Math.max(...xs) - end.x);
+      const axis = fromTopOrBottom <= fromSides ? "vertical" : "horizontal";
+      const span = axis === "vertical" ? Math.max(...xs) - Math.min(...xs) : Math.max(...ys) - Math.min(...ys);
+      setSplitDraft({ roomId: room.id, axis, first: Math.round(span / 2) });
       return;
     }
     if (!activeLevel?.plan && activeTool === "room") {
@@ -986,6 +1012,89 @@ function PlanEditor({
         return;
       }
       case "properties": setInspectorOpen(true); window.setTimeout(() => document.getElementById("house-properties")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); return;
+    }
+  }
+
+  /** One undoable step, refused if it would move a locked wall. */
+  function wallEdit(selection: HouseSelection, edit: () => ReturnType<typeof extendWall>) {
+    const conflict = lockConflict(project, selection);
+    if (conflict) { toast.info(conflict); return; }
+    applyMutation(edit());
+  }
+
+  function startPlacement(roomId: string) {
+    const rectangle = roomRectangle(project, roomId);
+    const room = project.rooms.find((item) => item.id === roomId);
+    if (!rectangle || !room) { toast.info("A copy can be made of a rectangular room"); return; }
+    const numbered = /^(.*?)(\d+)$/.exec(room.name);
+    setPlacement({ ...rectangle, x: rectangle.x + rectangle.width, name: numbered ? `${numbered[1]}${Number(numbered[2]) + 1}` : `${room.name} 2` });
+    setSelections([]);
+  }
+
+  function placeCopy() {
+    if (!placement) return;
+    const result = createRoomFromGesture(project, activeLevelId, { x: placement.x, y: placement.y }, { x: placement.x + placement.width, y: placement.y + placement.depth }, "rectangle", { wallThickness: 120 });
+    if (result.blocked.length) { toast.info(result.blocked.join(". ")); return; }
+    const created = result.project.rooms.find((room) => room.levelId === activeLevelId && !project.rooms.some((item) => item.id === room.id) && Math.abs(Math.min(...room.boundary.map((point) => point.x)) - placement.x) < 1 && Math.abs(Math.min(...room.boundary.map((point) => point.y)) - placement.y) < 1);
+    const named = created ? patchHouseObject(result.project, { kind: "room", id: created.id }, { name: placement.name }) : result.project;
+    commit(named);
+    setSelections(created ? [{ kind: "room", id: created.id }] : result.selections);
+    setPlacement(null);
+  }
+
+  function quickActions(selection: HouseSelection): { label: string; actions: QuickAction[]; more: QuickAction[] } {
+    const run = (id: SheetAction) => () => sheetAction(id);
+    const shared: QuickAction[] = [
+      { id: "delete", label: "Delete", onSelect: run("delete") },
+      { id: "agenda", label: "Add to Agenda", onSelect: run("agenda") },
+      { id: "properties", label: "Properties", onSelect: () => setPropertiesFor(selection.id) },
+    ];
+    const duplicate: QuickAction = { id: "duplicate", label: "Duplicate", onSelect: run("duplicate") };
+    const move: QuickAction = { id: "move", label: "Move", onSelect: run("move") };
+    switch (selection.kind) {
+      case "wall": {
+        const locked = Boolean(project.objectInstances[selection.id]?.pinned);
+        return {
+          label: "Wall actions",
+          actions: [
+            { id: "duplicate", label: "Duplicate", onSelect: () => wallEdit(selection, () => duplicateWallParallel(project, selection.id)) },
+            { id: "rotate", label: "↻ 90°", onSelect: () => wallEdit(selection, () => rotateWall90(project, selection.id)) },
+            { id: "split", label: "Split", onSelect: () => wallEdit(selection, () => splitHouseSelection(project, selection)) },
+          ],
+          more: [move, { id: "lock", label: locked ? "Unlock" : "Lock", onSelect: run("lock") }, ...shared],
+        };
+      }
+      case "room":
+        if (roomSplit === selection.id) return {
+          label: "Split room",
+          actions: [
+            { id: "vertical", label: "│ Vertical", onSelect: () => { setRoomSplit(null); applyMutation(splitRoom(project, selection.id, "vertical")); } },
+            { id: "horizontal", label: "─ Horizontal", onSelect: () => { setRoomSplit(null); applyMutation(splitRoom(project, selection.id, "horizontal")); } },
+            { id: "cancel", label: "Cancel", onSelect: () => setRoomSplit(null) },
+          ],
+          more: [],
+        };
+        return {
+          label: "Room actions",
+          actions: [
+            { id: "split", label: "Split", onSelect: () => setRoomSplit(selection.id) },
+            { id: "duplicate", label: "Duplicate", onSelect: () => startPlacement(selection.id) },
+            { id: "rename", label: "Rename", onSelect: () => setPropertiesFor(selection.id) },
+          ],
+          more: [{ id: "merge", label: "Merge with…", onSelect: run("merge") }, ...shared],
+        };
+      case "door":
+        return { label: "Door actions", actions: [{ id: "flip", label: "Flip", onSelect: run("flip") }, duplicate, move], more: shared };
+      case "window":
+        return { label: "Window actions", actions: [duplicate, move], more: shared };
+      case "component":
+        return { label: "Furniture actions", actions: [move, { id: "rotate", label: "↻ 90°", onSelect: run("rotate") }, duplicate], more: shared };
+      case "stair":
+        return { label: "Stair actions", actions: [move, { id: "rotate", label: "↻ 90°", onSelect: run("rotate") }, duplicate], more: shared };
+      case "column":
+        return { label: "Column actions", actions: [move, duplicate], more: shared };
+      default:
+        return { label: "Actions", actions: [{ id: "delete", label: "Delete", onSelect: run("delete") }], more: shared.slice(1) };
     }
   }
 
@@ -1066,7 +1175,18 @@ function PlanEditor({
     { id: "fit", label: "Zoom to fit", onSelect: () => setViewRevision((value) => value + 1) },
   ];
 
-  const sheetFor = tab === "plan" && selectMode && selected && selected.kind !== "level" && !proposals && !mergeFrom && !activePinId && selections.length === 1 ? selected : null;
+  const sheetFor = tab === "plan" && selectMode && selected && selected.kind !== "level" && !proposals && !mergeFrom && !activePinId && !placement && selections.length === 1 ? selected : null;
+  const quick = sheetFor ? quickActions(sheetFor) : null;
+  const splitRoomTarget = splitDraft ? project.rooms.find((room) => room.id === splitDraft.roomId) : null;
+  const splitGuide = (() => {
+    if (!splitDraft || !splitRoomTarget) return null;
+    const xs = splitRoomTarget.boundary.map((point) => point.x);
+    const ys = splitRoomTarget.boundary.map((point) => point.y);
+    const box = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+    const span = splitDraft.axis === "vertical" ? box.maxX - box.minX : box.maxY - box.minY;
+    const at = (splitDraft.axis === "vertical" ? box.minX : box.minY) + splitDraft.first;
+    return { span, line: splitDraft.axis === "vertical" ? { start: { x: at, y: box.minY }, end: { x: at, y: box.maxY } } : { start: { x: box.minX, y: at }, end: { x: box.maxX, y: at } } };
+  })();
   const activePin = pins.find((pin) => pin.id === activePinId) ?? null;
   const bottomActions = (
     <div className="grid grid-cols-2 gap-2">
@@ -1089,7 +1209,16 @@ function PlanEditor({
               {analysis && showAnalysis ? <p className="flex items-start gap-2 rounded-xl border border-brand/25 bg-brand/5 p-2.5 text-xs">{analysis}<button type="button" onClick={() => setShowAnalysis(false)} aria-label="Dismiss" className="ml-auto shrink-0 text-muted-foreground">✕</button></p> : null}
               <PlanToolbar activeTool={activeTool} onTool={chooseTool} />
               <div className="relative h-[calc(100dvh-26rem)] min-h-[300px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 lg:h-[min(640px,60dvh)] dark:bg-background">
-                {activeLevel ? <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} showGrid={gridVisible} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} sketch={outlineSketch} onCancelDraft={() => { setDraftStart(null); setOutlineSketch([]); }} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => applyMutation(moveHouseSelections(project, [selection], dx, dy, { footprintEditable: true }))} onDraftStart={(point) => { if (chainEnded.current) { chainEnded.current = false; setDraftStart(null); return; } setDraftStart(point); }} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={() => undefined} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch)); }} onGuidance={() => undefined} pins={pins.filter((pin) => pin.source.kind === "plan" && pin.source.level === activeLevelId)} onPinTap={(id) => setActivePinId(id)} focus={planFocus} /> : null}
+                {activeLevel ? <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} showGrid={gridVisible} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} sketch={outlineSketch} onCancelDraft={() => { setDraftStart(null); setOutlineSketch([]); }} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => applyMutation(moveHouseSelections(project, [selection], dx, dy, { footprintEditable: true }))} onDraftStart={(point) => { if (chainEnded.current) { chainEnded.current = false; setDraftStart(null); return; } setDraftStart(point); }} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={() => undefined} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch)); }} onGuidance={() => undefined} pins={pins.filter((pin) => pin.source.kind === "plan" && pin.source.level === activeLevelId)} onPinTap={(id) => setActivePinId(id)} focus={planFocus}
+                  onWallExtend={(selection, end, delta) => wallEdit(selection, () => extendWall(project, selection.id, end, delta))}
+                  onWallEnd={(selection, end, to) => wallEdit(selection, () => moveWallEnd(project, selection.id, end, to))}
+                  onWallLength={(selection, end, length) => wallEdit(selection, () => setWallLength(project, selection.id, end, length))}
+                  onWallDistance={(selection, neighbourId, distance) => wallEdit(selection, () => setWallDistance(project, selection.id, neighbourId, distance))}
+                  actionBar={quick && propertiesFor !== sheetFor?.id ? <QuickActionBar key={`${sheetFor!.id}:${roomSplit ?? ""}`} label={quick.label} actions={quick.actions} more={quick.more} /> : null}
+                  guide={splitGuide ? { ...splitGuide.line, label: `${shortMm(splitDraft!.first, project.displayUnits ?? "mm")} | ${shortMm(splitGuide.span - splitDraft!.first, project.displayUnits ?? "mm")}` } : null}
+                  placement={placement}
+                  onPlacementMove={(x, y) => setPlacement((current) => current && { ...current, x, y })}
+                /> : null}
                 <span className="pointer-events-none absolute left-2 top-2 rounded-full border bg-background/90 px-2.5 py-1 text-[11px] font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>
                 {activeTool === "room" && !draftStart ? <div role="radiogroup" aria-label="Room shape" className="absolute left-1/2 top-10 z-10 flex -translate-x-1/2 gap-1 rounded-xl border bg-card/95 p-1 text-xs shadow-sm backdrop-blur">
                   {([["rectangle", "Rectangle"], ["l-shape", "L shape"]] as const).map(([shape, label]) => <button key={shape} type="button" role="radio" aria-checked={roomShape === shape} onClick={() => setRoomShape(shape)} className={cn("min-h-9 rounded-lg px-3", roomShape === shape ? "bg-brand/15 text-brand" : "text-muted-foreground hover:bg-muted")}>{label}</button>)}
@@ -1099,7 +1228,24 @@ function PlanEditor({
                 {activeTool === "move" ? <p className="pointer-events-none absolute inset-x-2 top-10 z-10 rounded-lg bg-brand px-3 py-2 text-center text-xs font-medium text-brand-foreground">Tap the new position</p> : null}
                 {mergeFrom ? <p className="pointer-events-none absolute inset-x-2 top-10 z-10 rounded-lg bg-brand px-3 py-2 text-center text-xs font-medium text-brand-foreground">Tap the room to merge with</p> : null}
                 {proposals && proposals.levelId === activeLevelId ? <HouseColumnSuggestions items={proposals.items} chosen={proposals.chosen} maxSpan={proposals.maxSpan} onSpan={suggest} onRegenerate={() => suggest(proposals.maxSpan)} onAccept={acceptProposals} onRemove={(item) => setProposals({ ...proposals, items: proposals.items.filter((entry) => entry !== item), chosen: null })} onClear={() => setProposals(null)} /> : null}
-                {sheetFor ? <SelectionSheet key={sheetFor.id} project={project} selection={sheetFor} onPatch={(patch) => { const conflict = lockConflict(project, sheetFor); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, sheetFor, patch)); }} onAction={sheetAction} onClose={() => setSelections([])} /> : null}
+                {sheetFor && propertiesFor === sheetFor.id ? <SelectionSheet key={sheetFor.id} project={project} selection={sheetFor} showActions={false} autoFocus={sheetFor.kind === "room" ? "Name" : undefined} onPatch={(patch) => { const conflict = lockConflict(project, sheetFor); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, sheetFor, patch)); }} onAction={sheetAction} onClose={() => setPropertiesFor(null)} /> : null}
+                {splitDraft && splitGuide ? (
+                  <form aria-label="Split" onSubmit={(event) => { event.preventDefault(); applyMutation(splitRoom(project, splitDraft.roomId, splitDraft.axis, splitDraft.first)); setSplitDraft(null); setActiveTool("select"); }} className="absolute inset-x-1.5 top-10 z-20 flex flex-wrap items-center gap-1 rounded-xl border bg-card/95 p-1.5 text-xs shadow-lg backdrop-blur">
+                    <button type="button" onClick={() => setSplitDraft({ ...splitDraft, first: Math.round(splitGuide.span / 2) })} aria-pressed={Math.abs(splitDraft.first - splitGuide.span / 2) < 1} className="min-h-10 rounded-lg border px-2.5 font-medium aria-pressed:bg-brand/15 aria-pressed:text-brand">50 / 50</button>
+                    <label className="flex items-center gap-1"><span className="sr-only">First part</span><input aria-label="First part" key={splitDraft.first} type="number" inputMode="decimal" defaultValue={displayLength(splitDraft.first, project.displayUnits ?? "mm")} onBlur={(event) => { const value = modelLength(Number(event.target.value), project.displayUnits ?? "mm"); if (value > 0 && value < splitGuide.span) setSplitDraft({ ...splitDraft, first: value }); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} className="min-h-10 w-20 rounded-lg border bg-background px-2 text-right text-sm" /><span className="text-muted-foreground">| {shortMm(splitGuide.span - splitDraft.first, project.displayUnits ?? "mm")}</span></label>
+                    <button type="button" onClick={() => { const axis = splitDraft.axis === "vertical" ? "horizontal" : "vertical"; const xs = splitRoomTarget!.boundary.map((point) => point.x); const ys = splitRoomTarget!.boundary.map((point) => point.y); setSplitDraft({ ...splitDraft, axis, first: Math.round((axis === "vertical" ? Math.max(...xs) - Math.min(...xs) : Math.max(...ys) - Math.min(...ys)) / 2) }); }} aria-label="Other way" className="min-h-10 rounded-lg border px-2.5">{splitDraft.axis === "vertical" ? "│" : "─"} ⇄</button>
+                    <button type="submit" className="ml-auto min-h-10 rounded-lg bg-brand px-3 font-semibold text-brand-foreground">Split</button>
+                    <button type="button" onClick={() => setSplitDraft(null)} aria-label="Cancel split" className="min-h-10 rounded-lg px-2 text-muted-foreground">✕</button>
+                  </form>
+                ) : null}
+                {placement ? (
+                  <div role="region" aria-label="Place room copy" className="absolute inset-x-1.5 top-10 z-20 flex items-center gap-1 rounded-xl border bg-card/95 p-1.5 text-xs shadow-lg backdrop-blur">
+                    <span className="min-w-0 flex-1 truncate px-1">Drag the copy into place</span>
+                    <button type="button" onClick={() => setPlacement({ ...placement, width: placement.depth, depth: placement.width })} className="min-h-10 rounded-lg border px-2.5">↻ 90°</button>
+                    <button type="button" onClick={placeCopy} className="min-h-10 rounded-lg bg-brand px-3 font-semibold text-brand-foreground">Place</button>
+                    <button type="button" onClick={() => setPlacement(null)} aria-label="Cancel copy" className="min-h-10 rounded-lg px-2 text-muted-foreground">✕</button>
+                  </div>
+                ) : null}
               </div>
               <PlanSecondaryBar canUndo={past.length > 0} canRedo={future.length > 0} onUndo={undo} onRedo={redo} snap={snapEnabled} onSnap={() => setSnapEnabled((value) => !value)} grid={gridVisible} onGrid={() => setGridVisible((value) => !value)} more={moreTools} />
               <HouseMeasurementsDrawer project={project} levelId={activeLevelId} onSelect={(selection) => { setActiveTool("select"); setSelections([selection]); }} onSendToAgenda={link ? (text) => void sendMeasurements(text) : undefined} />
@@ -1181,3 +1327,8 @@ function slug(value: string) { return value.toLowerCase().trim().replace(/[^a-z0
 
 function nextUnit(unit: DisplayUnits): DisplayUnits { return unit === "mm" ? "cm" : unit === "cm" ? "m" : "mm"; }
 
+
+/** A length as the plan's labels show it: 3.20 (m), 320 (cm), 3200 (mm). */
+function shortMm(mm: number, unit: DisplayUnits) {
+  return unit === "m" ? (mm / 1000).toFixed(2) : unit === "cm" ? String(Math.round(mm / 10)) : String(Math.round(mm));
+}
