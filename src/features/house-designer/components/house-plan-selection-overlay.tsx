@@ -708,9 +708,9 @@ function lineGeometry(project: HouseProject, levelId: string, selection: HouseSe
 // structural grid line — 40 mm wide, drawn exactly on the wall — beat the
 // wall a person was actually pointing at.
 const PICK_TIER: Partial<Record<HouseSelection["kind"], number>> = {
-  door: 0, window: 0, column: 0, component: 0, stair: 0, annotation: 0, foundation: 0,
+  door: 0, window: 0, column: 0, component: 0, stair: 0, annotation: 0,
   wall: 1, railing: 1,
-  beam: 2,
+  beam: 2, foundation: 2,
   grid: 3, "reference-plane": 3,
   room: 4, slab: 4, ceiling: 4, roof: 4,
 };

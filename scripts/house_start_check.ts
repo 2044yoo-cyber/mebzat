@@ -68,4 +68,9 @@ assert.match(describe, /roomSchema\.safeParse\(payload\.plan\)/, "and checks wha
 assert.match(workspace, /const \[strict, setStrict\] = useState\(false\);/, "Original Floor Plan Strict starts off");
 assert.doesNotMatch(workspace, /Design setup/, "and the setup panel is gone");
 
+// Structure comes last: none while designing, generated on Finish design.
+assert.match(open, /const built = ensureHouseBimState\(\{ \.\.\.withoutStructure\(applyModelingOptions\(createHouseProject\(/, "a template, upload or description starts without structure");
+const verify = workspace.slice(workspace.indexOf("<VerifyScreen"), workspace.indexOf("/>", workspace.indexOf("<VerifyScreen")));
+assert.match(verify, /onDone=\{\(\) => \{ updateProject\(ensureHouseBimState\(generateStructureFromGrid\(project\)\)\); setStage\("model"\);/, "finishing the design generates the structure");
+
 console.log("House start: templates are valid, hosted plans; sketches reach the model as sketches");

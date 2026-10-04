@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room";
 import { pickHouseObject, selectableBounds } from "../src/features/house-designer/components/house-plan-selection-overlay";
+import { generateStructureFromGrid } from "../src/features/house-designer/services/structure";
 import { createHouseProject } from "../src/features/house-designer/types/project";
 
 // The default house carries a structural grid and beams drawn exactly on its
@@ -24,5 +25,15 @@ assert.equal(pickHouseObject(objects, { x: column.x, y: column.y })?.kind, "colu
 const centre = { x: 4000, y: 3250 };
 assert.equal(pickHouseObject(objects, centre)?.kind, "room", "a tap inside the house picks the room");
 assert.equal(pickHouseObject(objects, { x: -5000, y: -5000 }), null, "a tap on empty canvas picks nothing");
+
+// Footings are below ground and wider than their columns: they sit over the
+// walls in plan, and a tap on the wall still picks the wall.
+const finished = generateStructureFromGrid(project);
+const finishedObjects = selectableBounds(finished, levelId);
+const footing = finished.foundations.find((item) => item.y === 0 && item.x > 0 && item.x < 8000)!;
+assert.ok(footing, "fixture has a footing under a mid-span column");
+assert.equal(pickHouseObject(finishedObjects, { x: footing.x + 400, y: 0 })?.kind, "wall", "a tap on the wall over a footing picks the wall");
+assert.equal(pickHouseObject(finishedObjects, { x: footing.x, y: 0 })?.kind, "column", "the column on it still wins");
+assert.equal(pickHouseObject(finishedObjects, { x: footing.x, y: -400 })?.kind, "foundation", "and the footing is picked where nothing stands on it");
 
 console.log("House plan tap picking passed");

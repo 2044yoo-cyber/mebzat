@@ -97,8 +97,9 @@ assert.deepEqual(project.walls.map(({ start, end }) => ({ start, end })), footpr
 
 project = patchHouseObject(project, { kind: "column", id: "ground-floor:column:c1" }, { width: 350, depth: 400 });
 assert.equal(project.structuralColumns.find((column) => column.id === "ground-floor:column:c1")?.width, 350);
-project = patchHouseObject(project, { kind: "beam", id: "ground-floor:beam:c1" }, { width: 250, depth: 450 });
-assert.equal(project.structuralBeams.find((beam) => beam.id === "ground-floor:beam:c1")?.depth, 450);
+const beamId = project.structuralBeams.find((beam) => beam.levelId === "ground-floor")!.id;
+project = patchHouseObject(project, { kind: "beam", id: beamId }, { width: 250, depth: 450 });
+assert.equal(project.structuralBeams.find((beam) => beam.id === beamId)?.depth, 450);
 
 const balconyId = project.balconies[0]!.id;
 project = patchHouseObject(project, { kind: "balcony", id: balconyId }, { width: 2600, railingHeight: 1100 });

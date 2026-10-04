@@ -4,6 +4,7 @@ import { rectangularRoom } from "../src/features/berchuma-studio/types/room";
 import { createHouseObjectFromGesture, createRoomFromGesture, lockConflict, moveHouseSelections, pinHouseSelections, roomOutline } from "../src/features/house-designer/services/model-commands";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
 import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong } from "../src/features/house-designer/services/project-edit";
+import { generateStructureFromGrid, hasGeneratedStructure, withoutStructure } from "../src/features/house-designer/services/structure";
 import { PLAN_TEMPLATES } from "../src/features/house-designer/services/plan-templates";
 import { pitchedRise, roofRectangles } from "../src/features/house-designer/components/house-preview";
 import { applyModelingOptions, modelingPreset } from "../src/features/house-designer/services/workspace-options";
@@ -41,8 +42,11 @@ assert.ok(houseProjectSchema.safeParse(drawn).success, "and a valid project");
 const on = <T extends { levelId: string }>(items: readonly T[]) => items.filter((item) => item.levelId === ground);
 const shape = (walls: typeof reference.walls) => walls.map((wall) => [wall.start.x, wall.start.y, wall.end.x, wall.end.y, wall.thickness, wall.height]).sort();
 assert.deepEqual(shape(on(drawn.walls)), shape(on(reference.walls)), "its walls are the builder's walls");
-for (const key of ["rooms", "slabs", "roofs", "structuralColumns", "structuralBeams", "foundations"] as const) {
+for (const key of ["rooms", "slabs", "roofs"] as const) {
   assert.equal(drawn[key].length, reference[key].length, `and as many ${key}`);
+}
+for (const key of ["structuralColumns", "structuralBeams", "structuralGrid", "foundations"] as const) {
+  assert.equal(drawn[key].length, 0, `but no ${key} while the plan is being drawn`);
 }
 assert.ok(drawn.facadeElements.length > 0, "dressed in the project's style");
 assert.equal(establishLevelOutline(drawn, ground, roomOutline("rectangle", { x: 0, y: 0 }, { x: 3000, y: 3000 })), null, "a floor is outlined once; after that a room is a room");
@@ -69,7 +73,9 @@ assert.equal(lowerDrawn.roofs.length, 0, "the ground floor of two is not roofed"
 const bothDrawn = establishLevelOutline(lowerDrawn, upper!.id, roomOutline("rectangle", { x: 0, y: 0 }, { x: 8000, y: 6500 }))!;
 assert.equal(bothDrawn.roofs.length, 1);
 assert.equal(bothDrawn.roofs[0]!.levelId, upper!.id, "the floor on top is");
-assert.equal(bothDrawn.foundations.every((item) => item.levelId === lower!.id), true, "footings only under the ground floor");
+const bothFinished = generateStructureFromGrid(bothDrawn);
+assert.ok(bothFinished.structuralColumns.some((item) => item.levelId === upper!.id), "both floors get columns when the plan is finished");
+assert.ok(bothFinished.foundations.length > 0 && bothFinished.foundations.every((item) => item.levelId === lower!.id), "footings only under the ground floor");
 
 // ---------------------------------------------------------------------------
 // From there it is an ordinary house.
@@ -175,6 +181,83 @@ assert.deepEqual(moved.blocked, [], "and its walls move");
   const top = gable.walls.find((item) => item.levelId === ground && item.start.y === 0 && item.end.y === 0)!;
   assert.equal(parapets(moveHouseSelections(gable, [{ kind: "wall", id: top.id }], 0, -500, { footprintEditable: true }).project), 0, "nor after the plan is edited");
   assert.ok(parapets(patchHouseObject(gable, { kind: "roof", id: roof.id }, { type: "flat", slope: 0 })) > 0, "and flat again brings it back");
+}
+
+// ---------------------------------------------------------------------------
+// Structure comes last: nothing while the plan is drawn, then columns, the
+// grid through them, beams along the grid and footings, all from the plan.
+// ---------------------------------------------------------------------------
+{
+  let plan = createRoomFromGesture(drawn, ground, { x: 0, y: 0 }, { x: 3000, y: 3000 }, "rectangle", { wallThickness: 120 }).project;
+  plan = createHouseObjectFromGesture(plan, "door", ground, { x: 6000, y: 0 }).project;
+  assert.equal(plan.structuralColumns.length + plan.structuralBeams.length + plan.structuralGrid.length + plan.foundations.length, 0, "rooms and doors add no structure");
+  assert.equal(hasGeneratedStructure(plan), false);
+
+  const done = generateStructureFromGrid(plan);
+  assert.ok(houseProjectSchema.safeParse(done).success, "the finished house is a valid project");
+  const columns = on(done.structuralColumns);
+  for (const corner of plan.levels[0]!.plan!.corners) {
+    assert.ok(columns.some((column) => column.id === `${ground}:column:${corner.id}` && column.x === corner.x && column.y === corner.y), `a column at corner ${corner.id}`);
+  }
+  assert.ok(columns.length > 4, "and along the long spans");
+  const doorway = done.doors[0]!;
+  const doorWall = done.walls.find((wall) => wall.id === doorway.wallId)!;
+  assert.ok(!columns.some((column) => column.y === doorWall.start.y && column.x > doorway.offset - 150 && column.x < doorway.offset + doorway.width + 150), "none in the doorway");
+  const grid = on(done.structuralGrid);
+  for (const column of columns) {
+    assert.ok(grid.some((line) => line.axis === "x" && line.position === column.x) && grid.some((line) => line.axis === "y" && line.position === column.y), `${column.id} stands on two grid lines`);
+  }
+  for (const line of grid) {
+    assert.ok(columns.some((column) => (line.axis === "x" ? column.x : column.y) === line.position), `${line.id} runs through a column`);
+  }
+  const beams = on(done.structuralBeams);
+  assert.ok(beams.length > 0, "beams are generated");
+  const at = (point: { x: number; y: number }) => columns.find((column) => column.x === point.x && column.y === point.y);
+  for (const beam of beams) {
+    const [a, b] = [at(beam.start), at(beam.end)];
+    assert.ok(a && b, `${beam.id} runs column to column`);
+    assert.ok(a.x === b.x || a.y === b.y, `${beam.id} lies on a grid line`);
+    assert.ok(grid.some((line) => line.axis === "x" ? line.position === a.x && a.x === b.x : line.position === a.y && a.y === b.y), `${beam.id} follows its grid line`);
+    const between = columns.filter((column) => column !== a && column !== b && (a.x === b.x
+      ? column.x === a.x && column.y > Math.min(a.y, b.y) && column.y < Math.max(a.y, b.y)
+      : column.y === a.y && column.x > Math.min(a.x, b.x) && column.x < Math.max(a.x, b.x)));
+    assert.equal(between.length, 0, `${beam.id} spans to the next column, not past it`);
+  }
+  for (const line of grid) {
+    const count = columns.filter((column) => (line.axis === "x" ? column.x : column.y) === line.position).length;
+    assert.equal(beams.filter((beam) => line.axis === "x" ? beam.start.x === line.position && beam.end.x === line.position : beam.start.y === line.position && beam.end.y === line.position).length, count - 1, `${line.id}: one beam between each pair of columns on it`);
+  }
+  assert.equal(done.foundations.length, columns.length, "a footing under every ground-floor column");
+  for (const column of columns) {
+    assert.ok(done.foundations.some((footing) => footing.id === `foundation:${column.id}` && footing.x === column.x && footing.y === column.y), `${column.id} has its footing`);
+  }
+  assert.deepEqual(generateStructureFromGrid(done), done, "generating again changes nothing");
+
+  // Once generated, the structure follows the plan.
+  const right = done.walls.find((wall) => wall.levelId === ground && wall.start.x === 8000 && wall.end.x === 8000)!;
+  const moved = moveHouseSelections(done, [{ kind: "wall", id: right.id }], 1000, 0, { footprintEditable: true }).project;
+  assert.ok(on(moved.structuralColumns).some((column) => column.x === 9000), "a moved wall takes its columns with it");
+  assert.ok(!on(moved.structuralColumns).some((column) => column.x === 8000), "and leaves none behind");
+  assert.ok(on(moved.structuralGrid).some((line) => line.axis === "x" && line.position === 9000), "the grid line moves too");
+  assert.ok(moved.foundations.some((footing) => footing.x === 9000) && !moved.foundations.some((footing) => footing.x === 8000), "and the footings");
+
+  // A column placed by hand is kept, joins the grid, and gets a footing.
+  const placed = createHouseObjectFromGesture(plan, "column", ground, { x: 5200, y: 4100 }).project;
+  const mine = placed.structuralColumns.find((column) => !column.id.startsWith(`${ground}:column:`))!;
+  assert.ok(mine, "a column can be placed by hand");
+  const withMine = generateStructureFromGrid(placed);
+  assert.ok(withMine.structuralColumns.some((column) => column.id === mine.id), "generation keeps it");
+  assert.equal(withMine.structuralColumns.filter((column) => Math.hypot(column.x - mine.x, column.y - mine.y) < 250).length, 1, "and puts none on top of it");
+  assert.ok(withMine.foundations.some((footing) => footing.id === `foundation:${mine.id}`), "it gets a footing");
+  assert.ok(withMine.structuralGrid.some((line) => line.axis === "x" && line.position === mine.x) && withMine.structuralGrid.some((line) => line.axis === "y" && line.position === mine.y), "and the grid runs through it");
+  const stripped = withoutStructure(withMine);
+  assert.deepEqual(stripped.structuralColumns.map((column) => column.id), [mine.id], "taking the structure off keeps the hand-placed column");
+  assert.equal(stripped.structuralBeams.length + stripped.structuralGrid.length + stripped.foundations.length, 0, "and nothing generated");
+
+  // The project's setup still decides.
+  assert.equal(hasGeneratedStructure(generateStructureFromGrid(apartment)), false, "an apartment gets no structure, even finished");
+  const noFootings = generateStructureFromGrid({ ...plan, modelingOptions: { ...plan.modelingOptions!, foundations: false } });
+  assert.ok(noFootings.structuralColumns.length > 0 && noFootings.foundations.length === 0, "footings switched off: columns and beams, no footings");
 }
 
 console.log("House open space: starts empty; the first closed shape becomes the house the builder would make");

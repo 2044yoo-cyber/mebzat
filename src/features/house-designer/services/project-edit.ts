@@ -1,5 +1,6 @@
 import { roomSchema, type Room } from "@/features/berchuma-studio/types/room";
 
+import { generateStructureFromGrid, hasGeneratedStructure } from "./structure";
 import { applyModelingOptions } from "./workspace-options";
 
 import {
@@ -8,9 +9,6 @@ import {
   buildHouseCeilings,
   buildHouseSite,
   buildHouseVerandas,
-  buildStructuralBeams,
-  buildStructuralColumns,
-  buildStructuralGrid,
   housePlanWalls,
   openingObjectId,
   wallObjectId,
@@ -439,7 +437,6 @@ export function establishLevelOutline(
   });
   const boundary = corners.map(({ x, y }) => ({ x, y }));
   const top = [...project.levels].sort((a, b) => b.elevation - a.elevation)[0]!;
-  const lowest = [...project.levels].sort((a, b) => a.elevation - b.elevation)[0]!;
   const roofId = project.roofs.some((roof) => roof.id === "main-roof") ? `${levelId}:roof` : "main-roof";
   const withPlan: HouseProject = {
     ...project,
@@ -450,16 +447,7 @@ export function establishLevelOutline(
   };
   // The rebuild reads the old outline to decide which slabs follow it; there
   // was none, so the plan goes in with the rebuild rather than before it.
-  let next = rebuildLevel(withPlan, levelId, plan);
-  if (lowest.id === levelId) {
-    next = {
-      ...next,
-      foundations: [...next.foundations, ...next.structuralColumns.filter((column) => column.levelId === levelId && column.id.startsWith(`${levelId}:column:`)).map((column) => ({
-        id: `foundation:${column.id}`, levelId, x: column.x, y: column.y, elevation: level.elevation - 450,
-        width: Math.max(900, column.width * 3), depth: Math.max(900, column.depth * 3), thickness: 450, material: "Reinforced concrete",
-      }))],
-    };
-  }
+  const next = rebuildLevel(withPlan, levelId, plan);
   return project.modelingOptions ? applyModelingOptions(next, project.modelingOptions) : next;
 }
 
@@ -522,6 +510,14 @@ function ordinalFloor(index: number) {
 }
 
 function rebuildLevel(project: HouseProject, levelId: string, plan: Room): HouseProject {
+  // Structure comes last, from the finished plan: nothing is generated while
+  // the plan is drawn. Once it has been generated, a plan edit regenerates it
+  // from the new grid so columns, beams and footings never go stale.
+  const next = rebuildPlan(project, levelId, plan);
+  return hasGeneratedStructure(project) ? generateStructureFromGrid(next) : next;
+}
+
+function rebuildPlan(project: HouseProject, levelId: string, plan: Room): HouseProject {
   const roomId = project.rooms.find((room) => room.levelId === levelId)?.id ?? `${levelId}:room-1`;
   const oldWalls = new Map(
     project.walls
@@ -576,20 +572,6 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
     ...project.windows.filter((opening) => opening.levelId !== levelId),
     ...openings.filter((opening) => opening.type === "window"),
   ];
-  // Only this floor's automatic structure follows the plan. Columns, beams
-  // and grid lines somebody placed by hand — and every other floor's — are
-  // kept: rebuilding them all from corners used to delete a hand-placed
-  // column the moment a door was slid. With structure switched off (an
-  // apartment or a single room) nothing is generated at all.
-  const generate = project.modelingOptions?.structure ?? true;
-  const thisLevel = levels.filter((level) => level.id === levelId);
-  const automatic = (id: string, kind: "column" | "beam" | "grid") => id.startsWith(`${levelId}:${kind}:`);
-  const keptColumns = project.structuralColumns.filter((item) => !automatic(item.id, "column"));
-  const structuralColumns = generate ? [...keptColumns, ...buildStructuralColumns(thisLevel, project.structuralColumns)] : keptColumns;
-  const keptBeams = project.structuralBeams.filter((item) => !automatic(item.id, "beam"));
-  const structuralBeams = generate ? [...keptBeams, ...buildStructuralBeams(walls, thisLevel, project.structuralBeams)] : keptBeams;
-  const keptGrid = project.structuralGrid.filter((item) => !automatic(item.id, "grid"));
-  const structuralGrid = generate ? [...keptGrid, ...buildStructuralGrid(thisLevel, structuralColumns, project.structuralGrid)] : keptGrid;
   // A slab or roof that followed the outline follows it still; one laid over
   // a single room (an extension's own floor) keeps its own shape.
   const oldOutline = project.levels.find((level) => level.id === levelId)?.plan?.corners ?? [];
@@ -613,9 +595,6 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
         : roof,
     ),
     facadeElements: parapetsOnlyOnFlatRoofs(buildFacadeElements(rebuiltWalls, levels, project.facade), project.roofs),
-    structuralColumns,
-    structuralBeams,
-    structuralGrid,
     ceilings: buildHouseCeilings(rebuiltRooms, levels, project.ceilings),
     site: buildHouseSite(rebuiltRooms, project.site),
     verandas: buildHouseVerandas(levels, rebuiltWalls, rebuiltDoors, project.verandas),

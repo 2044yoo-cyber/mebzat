@@ -470,6 +470,19 @@ async function checkRoomsAndRoofs(page, at, { touch }) {
  * empty space — nothing but the grid and coordinates — and the outline is
  * drawn wall by wall with typed lengths, closing on its first point.
  */
+function structureOptions(page) {
+  return page.evaluate(() => [...document.querySelectorAll("#house-properties option")].map((option) => option.value).filter((value) => /^(column|beam|grid|foundation)\|/.test(value)));
+}
+function structureIn3D(page) {
+  return page.evaluate(() => {
+  const scene = [...window.__scenes].filter((item) => item.getObjectByName("level:ground-floor")).at(-1);
+  const names = new Set();
+  scene?.traverse((object) => { if (object.name) names.add(object.name); });
+  const count = (pattern) => [...names].filter((name) => pattern.test(name)).length;
+  return { columns: count(/^[^:]+:column:/), beams: count(/^[^:]+:beam:/), footings: count(/^foundation:/) };
+  });
+}
+
 async function newHouse(page) {
   await page.getByRole("button", { name: "Draw floor plan", exact: true }).click();
   await page.locator(PLAN).waitFor();
@@ -486,6 +499,7 @@ async function newHouse(page) {
     await page.getByLabel("Typed length").press("Enter");
   }
   await page.locator('svg[aria-label="Floor plan"]').waitFor();
+  assert.deepEqual(await structureOptions(page), [], "a drawn plan has no columns, beams, grid or footings yet");
   await page.locator('nav[aria-label="Modeling tools"]').getByRole("button", { name: "Select", exact: true }).click();
 }
 
@@ -605,9 +619,15 @@ async function checkStart(page, at) {
   assert.equal(options.filter((text) => /^Door/.test(text)).length, 4, `${at}: doors`);
   assert.equal(options.filter((text) => /^Window/.test(text)).length, 4, `${at}: and windows`);
   assert.ok(await page.getByRole("button", { name: /Upload façade photo/ }).count(), `${at}: a façade reference photo is added in the Façade designer`);
+  assert.deepEqual(await structureOptions(page), [], `${at}: nor any structure while it is being designed`);
   // Strict is off unless someone turns it on: past verification — where
   // Strict applies — an outside wall still moves like any other.
   await page.getByRole("button", { name: "Finish design → 3D" }).click();
+  // Finishing the design generates the structure, from the grid.
+  await page.waitForFunction(() => [...window.__scenes].some((scene) => scene.getObjectByName("level:ground-floor")), null, { timeout: 15000 });
+  await page.waitForTimeout(300);
+  const finished = await structureIn3D(page);
+  assert.ok(finished.columns >= 4 && finished.beams >= 4 && finished.footings === finished.columns, `${at}: finishing the design puts columns, beams and a footing under each column in 3D (${JSON.stringify(finished)})`);
   await page.getByRole("button", { name: "2d", exact: true }).click();
   await page.locator(PLAN).waitFor();
   await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
@@ -678,7 +698,7 @@ async function checkSuggestions(page, at, { touch }) {
 
   const start = await live();
   await open();
-  assert.deepEqual(await marks(), ["0:3250", "4000:0", "4000:6500", "8000:3250"], `${at}: a column is suggested mid-span on each long wall`);
+  assert.deepEqual(await marks(), ["0:0", "0:3250", "0:6500", "4000:0", "4000:6500", "8000:0", "8000:3250", "8000:6500"], `${at}: with no structure yet, a column is suggested at each corner and mid-span on each long wall`);
   assert.deepEqual(await live(), start, `${at}: suggesting changes nothing in the model`);
 
   const [gx, gy] = await screenOf(4000, 0);
@@ -693,10 +713,10 @@ async function checkSuggestions(page, at, { touch }) {
   for (let step = 1; step <= 6; step += 1) await touch("touchMove", [[ax, ay + (by - ay) * step / 6]]);
   await touch("touchEnd", []);
   await page.waitForTimeout(150);
-  assert.deepEqual(await marks(), ["0:2250", "4000:6500", "8000:3250"], `${at}: a suggestion drags to where you want it`);
+  assert.deepEqual(await marks(), ["0:0", "0:2250", "0:6500", "4000:6500", "8000:0", "8000:3250", "8000:6500"], `${at}: a suggestion drags to where you want it`);
   await page.getByRole("button", { name: "Accept all" }).click();
   const accepted = await live();
-  assert.equal(accepted.columns, start.columns + 4, `${at}: accept all adds the rest`);
+  assert.equal(accepted.columns, start.columns + 8, `${at}: accept all adds the rest`);
   assert.equal(accepted.walls, start.walls, `${at}: and no wall moves`);
   assert.equal(await panel.count(), 0, `${at}: nothing is left to suggest`);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
@@ -704,7 +724,7 @@ async function checkSuggestions(page, at, { touch }) {
 
   await open();
   await page.getByLabel("Maximum span").selectOption("3000");
-  assert.ok((await marks()).length > 3, `${at}: a shorter span asks for more columns`);
+  assert.ok((await marks()).length > 7, `${at}: a shorter span asks for more columns`);
   await panel.getByRole("button", { name: "Clear" }).click();
   assert.equal((await marks()).length, 0, `${at}: and Clear takes the suggestions away`);
   assert.equal((await live()).columns, start.columns + 1, `${at}: without touching the model`);

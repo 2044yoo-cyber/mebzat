@@ -61,7 +61,7 @@ import {
 } from "../services/draft";
 import { ensurePhaseThreeProject } from "../services/facade";
 import { ensureHouseEnvelopeProject } from "../services/envelope";
-import { ensurePhaseFourProject } from "../services/structure";
+import { ensurePhaseFourProject, generateStructureFromGrid, withoutStructure } from "../services/structure";
 import {
   commandFromChord,
   commandFromKeyboard,
@@ -251,7 +251,8 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       }
     }
     setRoom(verifiedRoom);
-    const built = ensureHouseBimState({ ...applyModelingOptions(createHouseProject({
+    // The plan comes first; its structure is generated when it is finished.
+    const built = ensureHouseBimState({ ...withoutStructure(applyModelingOptions(createHouseProject({
       id: project?.id,
       title,
       room: verifiedRoom,
@@ -260,7 +261,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
       floorCount,
       floorToFloorHeight: floorHeight,
       referenceImages: references(floorPlans, facades),
-    }), modelingOptions), displayUnits });
+    }), modelingOptions)), displayUnits });
     // Drawing from scratch starts on genuinely open space: the project's
     // floors and settings, and nothing on them until it is drawn.
     setProject(nextSource === "manual" || nextSource === "rooms" ? openSpace(built) : built);
@@ -372,7 +373,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           view={view}
           onView={setView}
           onProjectChange={updateProject}
-          onDone={() => { setStage("model"); setView("3d"); }}
+          onDone={() => { updateProject(ensureHouseBimState(generateStructureFromGrid(project))); setStage("model"); setView("3d"); }}
           onBack={() => setStage("start")}
           initialTool={startTool}
           userId={userId}
