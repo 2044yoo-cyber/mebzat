@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { roomSchema } from "../src/features/berchuma-studio/types/room";
-import { PLAN_TEMPLATES } from "../src/features/house-designer/services/plan-templates";
+import { PLAN_TEMPLATES, ROOM_SAMPLES } from "../src/features/house-designer/services/plan-templates";
+import { addHouseFloor, patchHouseObject } from "../src/features/house-designer/services/project-edit";
+import { applyModelingOptions, modelingPreset } from "../src/features/house-designer/services/workspace-options";
 import { planDescriptionError } from "../src/features/house-designer/services/plan-analysis";
 import { createHouseProject, houseProjectSchema } from "../src/features/house-designer/types/project";
 
@@ -10,7 +12,8 @@ import { createHouseProject, houseProjectSchema } from "../src/features/house-de
 // Templates are real plans: valid, hosted, inside their outline.
 // ---------------------------------------------------------------------------
 assert.ok(PLAN_TEMPLATES.length >= 3);
-for (const template of PLAN_TEMPLATES) {
+assert.ok(ROOM_SAMPLES.length >= 10, "Draw rooms offers at least 10 sample rooms");
+for (const template of [...PLAN_TEMPLATES, ...ROOM_SAMPLES]) {
   const plan = template.build();
   assert.ok(roomSchema.safeParse(plan).success, `${template.id} is a valid plan`);
   const project = createHouseProject({ title: template.name, room: plan, style: "modern", strict: false, floorCount: 1, floorToFloorHeight: 3000 });
@@ -30,6 +33,26 @@ for (const template of PLAN_TEMPLATES) {
   assert.ok(project.doors.some((door) => plan.corners.some((corner) => door.wallId.endsWith(`:${corner.id}`))), `${template.id}: there is a way in`);
 }
 assert.equal(new Set(PLAN_TEMPLATES.map((template) => template.id)).size, PLAN_TEMPLATES.length, "template ids are unique");
+assert.equal(new Set(ROOM_SAMPLES.map((sample) => sample.id)).size, ROOM_SAMPLES.length, "sample ids are unique");
+
+// Each sample room has a door and a window, none overlapping on its wall, and
+// all of it editable; as a new plan sets it up, no slab comes with the walls.
+for (const sample of ROOM_SAMPLES) {
+  const project = applyModelingOptions(createHouseProject({ title: sample.name, room: sample.build(), style: "modern", strict: false, floorCount: 1, floorToFloorHeight: 3000 }), modelingPreset("house"));
+  assert.ok(project.doors.length >= 1 && project.windows.length >= 1, `${sample.id}: a door and a window`);
+  const openings = [...project.doors, ...project.windows];
+  for (const a of openings) for (const b of openings) {
+    if (a !== b && a.wallId === b.wallId) assert.ok(a.offset + a.width <= b.offset || b.offset + b.width <= a.offset, `${sample.id}: ${a.id} and ${b.id} do not overlap`);
+  }
+  assert.equal(project.slabs.length, 0, `${sample.id}: no slab attached to the walls`);
+  assert.equal(addHouseFloor(project).project.slabs.length, 0, `${sample.id}: nor to a floor added above it`);
+  const door = project.doors[0]!;
+  const moved = patchHouseObject(project, { kind: "door", id: door.id }, { width: door.width - 100 });
+  assert.equal(moved.doors.find((item) => item.id === door.id)?.width, door.width - 100, `${sample.id}: its door can be changed`);
+  const window = project.windows[0]!;
+  const wider = patchHouseObject(project, { kind: "window", id: window.id }, { width: window.width + 100 });
+  assert.equal(wider.windows.find((item) => item.id === window.id)?.width, window.width + 100, `${sample.id}: and its window`);
+}
 
 // ---------------------------------------------------------------------------
 // A hand sketch reaches the model as a sketch. Checked on the calls, with

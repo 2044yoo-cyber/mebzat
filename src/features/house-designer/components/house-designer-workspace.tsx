@@ -81,7 +81,7 @@ import {
   type HouseClipboard,
 } from "../services/model-commands";
 import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong } from "../services/project-edit";
-import { PLAN_TEMPLATES } from "../services/plan-templates";
+import { PLAN_TEMPLATES, ROOM_SAMPLES } from "../services/plan-templates";
 import { planDescriptionError } from "../services/plan-analysis";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
 import { furnitureItem, type FurnitureItem } from "../services/furniture-catalog";
@@ -139,6 +139,8 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
   const [stage, setStage] = useState<Stage>(planId ? "loading" : "start");
   const [source, setSource] = useState<Source>("manual");
   const [templateId, setTemplateId] = useState(PLAN_TEMPLATES[1]!.id);
+  // "" is the empty grid with the Room tool; otherwise a sample room to start from.
+  const [roomSampleId, setRoomSampleId] = useState("");
   const [description, setDescription] = useState("");
   const [startTool, setStartTool] = useState<HouseCommandId>("select");
   const [room, setRoom] = useState<Room>(() => rectangularRoom(8000, 6500));
@@ -274,13 +276,14 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
 
   async function openEditor(nextSource: Source, ai = false) {
     setSource(nextSource);
-    const template = nextSource === "template" ? PLAN_TEMPLATES.find((item) => item.id === templateId) : null;
+    const template = nextSource === "template" ? PLAN_TEMPLATES.find((item) => item.id === templateId)
+      : nextSource === "rooms" && roomSampleId ? ROOM_SAMPLES.find((item) => item.id === roomSampleId) : null;
     let verifiedRoom: Room = {
       ...(template ? template.build() : room),
       ceilingHeight: clamp(floorHeight, 1800, 6000),
     };
     setPlanAnalysis(null);
-    setStartTool(nextSource === "rooms" ? "room" : nextSource === "manual" ? "wall" : "select");
+    setStartTool(nextSource === "rooms" && !template ? "room" : nextSource === "manual" ? "wall" : "select");
     const plan = floorPlans[0];
     const uploaded = nextSource === "upload" || nextSource === "sketch";
     if (uploaded && !ai) {
@@ -350,7 +353,7 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
     }), modelingOptions)), displayUnits });
     // Drawing from scratch starts on genuinely open space: the project's
     // floors and settings, and nothing on them until it is drawn.
-    setProject(nextSource === "manual" || nextSource === "rooms" ? openSpace(built) : built);
+    setProject(nextSource === "manual" || (nextSource === "rooms" && !template) ? openSpace(built) : built);
     setLink(null);
     lastSaved.current = null;
     setStatus("device");
@@ -466,6 +469,8 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
             analysingPlan={analysingPlan}
             templateId={templateId}
             onTemplate={setTemplateId}
+            roomSampleId={roomSampleId}
+            onRoomSample={setRoomSampleId}
             description={description}
             onDescription={setDescription}
             onContinue={(ai) => void openEditor(source, ai)}
@@ -513,6 +518,8 @@ function StartScreen({
   onRestore,
   templateId,
   onTemplate,
+  roomSampleId,
+  onRoomSample,
   description,
   onDescription,
   recentPlans,
@@ -528,6 +535,8 @@ function StartScreen({
   onRestore?: () => void;
   templateId: string;
   onTemplate: (id: string) => void;
+  roomSampleId: string;
+  onRoomSample: (id: string) => void;
   description: string;
   onDescription: (value: string) => void;
   recentPlans: PlanSummary[] | null;
@@ -606,11 +615,23 @@ function StartScreen({
               </button>
             ))}
           </div>
+        ) : source === "rooms" ? (
+          <div role="radiogroup" aria-label="Room sample" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {[{ id: "", name: "Empty grid", summary: "Drag out each room yourself" }, ...ROOM_SAMPLES].map((sample) => (
+              <button key={sample.id || "empty"} type="button" role="radio" aria-checked={roomSampleId === sample.id} onClick={() => onRoomSample(sample.id)} className={cn("min-h-11 rounded-xl border p-3 text-left text-sm", roomSampleId === sample.id ? "border-brand bg-brand/5" : "hover:bg-muted/40")}>
+                <strong className="block">{sample.name}</strong>
+                <span className="text-xs text-muted-foreground">{sample.summary}</span>
+              </button>
+            ))}
+            <p className="col-span-full text-xs text-muted-foreground">
+              {roomSampleId
+                ? "The room opens with its door and windows in place — every size, door and window can be changed, and more rooms dragged out beside it."
+                : "The plan opens with the Room tool ready: drag from corner to corner for each room, or type its size. Rooms that touch share their wall."}
+            </p>
+          </div>
         ) : (
           <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-            {source === "rooms"
-              ? "The plan opens with the Room tool ready: drag from corner to corner for each room, or type its size. Rooms that touch share their wall."
-              : "An empty grid. Draw walls and close them on the first point, or drag out a Room."}
+            An empty grid. Draw walls and close them on the first point, or drag out a Room.
           </div>
         )}
 
@@ -626,7 +647,7 @@ function StartScreen({
             </button>
           ) : (
             <button type="button" onClick={() => onContinue(false)} className="flex-1 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground">
-              {source === "rooms" ? "Start drawing rooms" : source === "template" ? "Use this template" : "Draw floor plan"}
+              {source === "rooms" ? (roomSampleId ? "Start with this room" : "Start drawing rooms") : source === "template" ? "Use this template" : "Draw floor plan"}
             </button>
           )}
         </div>

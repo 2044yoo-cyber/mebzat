@@ -470,7 +470,7 @@ async function checkThreeD(page, at) {
   await open3D(page);
   const raised = await liveScene(page);
   assert.ok(raised.boxes["walls:floor-2"] && near(raised.boxes["walls:floor-2"].min[1], 3), `${at}: a new floor stands on the one below`);
-  assert.ok(raised.boxes["floor-2:slab"], `${at}: on its own slab`);
+  assert.equal(raised.boxes["floor-2:slab"], undefined, `${at}: with no slab attached to its walls`);
   await plan();
   await undo();
   assert.match(await page.getByRole("button", { name: /^Floor: / }).getAttribute("aria-label"), /Ground Floor/, `${at}: undo goes back to a floor that exists`);
@@ -521,6 +521,24 @@ async function checkStart(page, at) {
   await page.getByRole("radio", { name: /Draw rooms/ }).click();
   await page.getByRole("button", { name: "Start drawing rooms" }).click();
   assert.ok(await page.getByRole("radiogroup", { name: "Room shape" }).isVisible(), `${at}: drawing rooms opens with the Room tool ready`);
+
+  // Or from a sample room, with its door and windows, all of it editable.
+  await fresh(page);
+  await page.getByRole("radio", { name: /Draw rooms/ }).click();
+  const samples = page.getByRole("radiogroup", { name: "Room sample" }).getByRole("radio");
+  assert.ok(await samples.count() >= 11, `${at}: at least 10 sample rooms besides the empty grid`);
+  assert.equal(await page.getByRole("radio", { name: /Empty grid/ }).getAttribute("aria-checked"), "true", `${at}: the empty grid unless a sample is chosen`);
+  await page.getByRole("radio", { name: /Master bedroom/ }).click();
+  await page.getByRole("button", { name: "Start with this room" }).click();
+  await page.locator(PLAN).waitFor();
+  const sampleObjects = await page.evaluate(() => [...document.querySelectorAll("#house-properties option")].map((option) => option.textContent));
+  assert.equal(sampleObjects.filter((text) => /^Door/.test(text)).length, 2, `${at}: the sample's doors`);
+  assert.equal(sampleObjects.filter((text) => /^Window/.test(text)).length, 3, `${at}: and windows`);
+  assert.equal(sampleObjects.filter((text) => /^Slab/.test(text)).length, 0, `${at}: and no slab attached to its walls`);
+  assert.equal(await page.getByRole("radiogroup", { name: "Room shape" }).count(), 0, `${at}: it opens ready to edit, not to draw`);
+  const { tapAt: tapSample } = await gestures(page);
+  await tapSample(650, 5000);
+  assert.equal(await page.getByRole("toolbar", { name: "Door actions" }).count(), 1, `${at}: its door is tapped and edited like any other`);
   await fresh(page);
   await page.getByRole("radio", { name: /Use a template/ }).click();
   await page.getByRole("radio", { name: /Three-bedroom/ }).click();

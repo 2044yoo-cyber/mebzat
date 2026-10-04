@@ -31,6 +31,12 @@ const db = (page) => page.evaluate(() => window.__fakeDb.read());
 const status = (page) => page.getByRole("button", { name: /^Save status:/ }).getAttribute("aria-label");
 const walls = (page) => page.evaluate(() => [...document.querySelectorAll("#house-properties option")].filter((option) => /^Wall \d+$/.test(option.textContent)).length);
 const bar = (page) => page.getByRole("toolbar", { name: / actions$/ });
+/** Taps to select; straight after a reload the canvas may still be fitting itself to the screen, so a tap that selected nothing is made again. */
+async function select(page, x, y) {
+  await tapAt(page, x, y);
+  if (await bar(page).count() === 0) { await page.waitForTimeout(500); await tapAt(page, x, y); }
+  await bar(page).waitFor({ timeout: 5000 });
+}
 async function more(page, item) {
   await bar(page).getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: item, exact: true }).click();
@@ -88,7 +94,7 @@ try {
   // ---------------------------------------------------------------------
   // Autosave: a change shows as unsaved, then saves itself.
   // ---------------------------------------------------------------------
-  await tapAt(page, 4000, 0);
+  await select(page, 4000, 0);
   await more(page, "Delete");
   assert.equal(await status(page), "Save status: Unsaved changes", "a change shows as unsaved");
   await page.waitForFunction(() => document.querySelector('[aria-label^="Save status:"]')?.getAttribute("aria-label") === "Save status: Saved ✓", null, { timeout: 8000 });
@@ -123,7 +129,7 @@ try {
   // Somebody else saved first: this save is refused, not lost silently.
   // ---------------------------------------------------------------------
   await page.evaluate(() => { const value = window.__fakeDb.read(); value.agenda_plans[0].revision += 1; window.__fakeDb.write(value); });
-  await tapAt(page, 4000, 0);
+  await select(page, 4000, 0);
   await page.locator('input[aria-label="Selected object temporary length"]').fill("7500");
   await page.locator('input[aria-label="Selected object temporary length"]').press("Enter");
   await page.waitForFunction(() => document.querySelector('[aria-label^="Save status:"]')?.getAttribute("aria-label") === "Save status: Changed elsewhere", null, { timeout: 8000 });
@@ -136,7 +142,7 @@ try {
   await page.goto(page.url());
   await page.locator(UNDER).waitFor();
   await page.evaluate(() => { window.__fakeDb.fail = (table, op) => table === "agenda_plans" && op === "update"; });
-  await tapAt(page, 0, 3000);
+  await select(page, 0, 3000);
   await more(page, "Delete");
   await page.waitForFunction(() => document.querySelector('[aria-label^="Save status:"]')?.getAttribute("aria-label") === "Save status: Not saved — retry", null, { timeout: 8000 });
   await page.evaluate(() => { window.__fakeDb.fail = null; });

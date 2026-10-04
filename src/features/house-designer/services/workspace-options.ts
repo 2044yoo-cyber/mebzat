@@ -8,7 +8,9 @@ export const modelLength = (value: number, unit: DisplayUnits) => value * unitSc
 
 export function modelingPreset(mode: ModelingOptions["mode"]): ModelingOptions {
   const house = mode === "house";
-  return { mode, structure: house, foundations: house, roof: house, stairs: house, site: house, floors: true, ceilings: true };
+  // No floor slab with the walls: a room's floor is the room itself, and a
+  // slab tied to the outline came along with every wall that was drawn.
+  return { mode, structure: house, foundations: house, roof: house, stairs: house, site: house, floors: false, ceilings: true };
 }
 
 export function applyModelingOptions(project: HouseProject, options: ModelingOptions): HouseProject {
