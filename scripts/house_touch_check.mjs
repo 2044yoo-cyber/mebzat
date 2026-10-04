@@ -56,7 +56,10 @@ async function gestures(page) {
     await touch("touchEnd", []);
     await page.waitForTimeout(wait);
   };
-  const tapAt = async (x, y) => { const [sx, sy] = await screen(page, x, y); await page.touchscreen.tap(sx, sy); await page.waitForTimeout(150); };
+  // A tap waits for the drawing to stop moving: on a loaded machine a zoom
+  // can still be settling, and the tap lands on whatever is there by then.
+  const settle = () => page.waitForFunction((selector) => { const m = document.querySelector(selector)?.getScreenCTM(); if (!m) return false; const now = `${m.a},${m.e},${m.f}`; const before = window.__lastCtm; window.__lastCtm = now; return before === now; }, PLAN, { polling: 100, timeout: 5000 }).catch(() => {});
+  const tapAt = async (x, y) => { await settle(); const [sx, sy] = await screen(page, x, y); await page.touchscreen.tap(sx, sy); await page.waitForTimeout(150); };
   return { touch, drag, tapAt };
 }
 
@@ -540,14 +543,41 @@ async function checkStart(page, at) {
   await tapSample(650, 5000);
   assert.equal(await page.getByRole("toolbar", { name: "Door actions" }).count(), 1, `${at}: its door is tapped and edited like any other`);
   await fresh(page);
+  // Use a template: the plot first, then the plans that fit it.
   await page.getByRole("radio", { name: /Use a template/ }).click();
-  await page.getByRole("radio", { name: /Three-bedroom/ }).click();
-  await page.getByRole("button", { name: "Use this template" }).click();
+  const plotForm = page.getByRole("form", { name: "Plot" });
+  assert.match(await plotForm.innerText(), /What is your plot size\?/, `${at}: a template starts from the plot`);
+  assert.ok(await plotForm.getByRole("button", { name: "Find plans" }).isDisabled(), `${at}: width and length come first`);
+  await page.getByLabel("Plot width").fill("10");
+  await page.getByLabel("Plot length").fill("20");
+  await page.getByRole("radiogroup", { name: "Bedrooms" }).getByRole("radio", { name: "3" }).click();
+  await plotForm.getByRole("button", { name: "Find plans" }).click();
+  const best = page.getByRole("region", { name: "Best fit" });
+  const firstCard = best.getByRole("button").first();
+  assert.equal(await firstCard.getAttribute("aria-label"), "3-bedroom standard family house", `${at}: on a 10 m plot, an 8.2 m-wide plan comes first`);
+  assert.match(await firstCard.innerText(), /3 bed · 2 bath[\s\S]*House: 8\.2 × 12\.4 m[\s\S]*Floor area: 101\.7 m²[\s\S]*Recommended plot: 10 × 17 m\+[\s\S]*BEST FIT/, `${at}: the card says what the plan is and that it fits`);
+  assert.equal(await firstCard.locator("svg line").count() > 10, true, `${at}: with a thumbnail drawn from its walls`);
+  assert.equal(await best.getByRole("button", { name: "Wide-plot house" }).count(), 0, `${at}: a 15 m-wide house is not offered as a fit`);
+  assert.equal(await page.getByRole("region", { name: "Does not fit" }).count(), 0, `${at}: plans that do not fit are hidden`);
+  await page.getByRole("button", { name: "Show all plans" }).click();
+  assert.ok(await page.getByRole("region", { name: "Does not fit" }).getByRole("button").count() > 0, `${at}: until asked for`);
+  await firstCard.click();
+  const preview = page.getByRole("region", { name: "3-bedroom standard family house preview" });
+  const drawing = preview.getByRole("img", { name: "Plan on the plot" });
+  for (const part of ["Plot boundary", "Setbacks", "Overall X 8.2 m", "Overall Y 12.4 m", "Room Bedroom 1", "Room Kitchen"]) assert.equal(await drawing.locator(`[aria-label="${part}"]`).count(), 1, `${at}: the preview shows ${part}`);
+  assert.ok(await drawing.locator('[aria-label="Door"]').count() >= 8 && await drawing.locator('[aria-label="Window"]').count() >= 6, `${at}: with its doors and windows`);
+  assert.match(await drawing.textContent(), /ROAD · FRONT \(SOUTH\)/, `${at}: and which way the road is`);
+  assert.equal(await preview.getByLabel("Fit status").innerText(), "BEST FIT");
+  await preview.getByRole("button", { name: "Rotate plan 90°" }).click();
+  assert.equal(await preview.getByLabel("Fit status").innerText(), "DOES NOT FIT AS IS", `${at}: turned 90°, 12.4 m does not go across a 10 m plot`);
+  await preview.getByRole("button", { name: "Rotate plan 90°" }).click();
+  await preview.getByRole("button", { name: "Use this plan" }).click();
   await page.locator(PLAN).waitFor();
   const options = await page.evaluate(() => [...document.querySelectorAll("#house-properties option")].map((option) => option.textContent));
-  assert.equal(options.filter((text) => /^Wall \d+$/.test(text)).length, 7, `${at}: a template arrives with its walls`);
-  assert.equal(options.filter((text) => /^Door/.test(text)).length, 4, `${at}: doors`);
-  assert.equal(options.filter((text) => /^Window/.test(text)).length, 4, `${at}: and windows`);
+  assert.equal(options.filter((text) => /^Wall \d+$/.test(text)).length, 12, `${at}: the plan arrives with its walls`);
+  assert.ok(options.filter((text) => /^Door/.test(text)).length >= 7, `${at}: doors`);
+  assert.equal(options.filter((text) => /^Window/.test(text)).length, 8, `${at}: and windows`);
+  assert.equal(options.filter((text) => /^Room/.test(text) || /Bedroom|Kitchen|Living/.test(text)).length >= 8, true, `${at}: and its named rooms`);
   assert.equal(await page.getByRole("button", { name: /Finish design/ }).count(), 0, `${at}: there is no "finish": a plan is saved and keeps changing`);
   const structure = await page.evaluate(() => [...document.querySelectorAll("#house-properties option")].map((option) => option.value).filter((value) => /^(column|beam|grid|foundation)\|/.test(value)));
   assert.deepEqual(structure, [], `${at}: nor any structure`);
