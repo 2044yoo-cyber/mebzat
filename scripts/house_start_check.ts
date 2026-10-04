@@ -37,7 +37,8 @@ assert.equal(new Set(PLAN_TEMPLATES.map((template) => template.id)).size, PLAN_T
 // ---------------------------------------------------------------------------
 const code = (path: string) => readFileSync(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const workspace = code("src/features/house-designer/components/house-designer-workspace.tsx");
-const open = workspace.slice(workspace.indexOf("async function openVerification("), workspace.indexOf("function restore()"));
+const open = workspace.slice(workspace.indexOf("async function openEditor("), workspace.indexOf("function updateProject("));
+assert.ok(open.length > 1000, "the function that opens a new plan was found");
 assert.match(open, /fetch\("\/api\/house-design\/analyze-plan"/, "the client calls plan analysis");
 assert.match(open, /JSON\.stringify\(\{[^}]*kind: nextSource === "sketch" \? "sketch" : "plan"/, "and says whether it is a sketch");
 assert.match(open, /if \(uploaded && ai && plan\?\.mediaType === "image"\)/, "AI runs only when asked for");
@@ -71,15 +72,31 @@ assert.doesNotMatch(workspace, /Design setup/, "and the setup panel is gone");
 // Structure is never generated automatically — not on open, Finish, restore
 // or from a command.
 assert.match(open, /const built = ensureHouseBimState\(\{ \.\.\.withoutStructure\(applyModelingOptions\(createHouseProject\(/, "a template, upload or description starts without structure");
-const verify = workspace.slice(workspace.indexOf("<VerifyScreen"), workspace.indexOf("/>", workspace.indexOf("<VerifyScreen")));
-assert.match(verify, /onDone=\{\(\) => \{ setStage\("model"\); setView\("3d"\); \}\}/, "finishing the design only changes the view");
-const restoreFn = workspace.slice(workspace.indexOf("function restore()"), workspace.indexOf("\n  }\n", workspace.indexOf("function restore()")));
-assert.match(restoreFn, /const restored = ensureHouseBimState\(withoutStructure\(/, "a restored draft comes back without generated structure");
-assert.doesNotMatch(restoreFn, /ensurePhaseFourProject\(/, "and none is generated for it");
+assert.doesNotMatch(workspace, /Finish design/, "there is no Finish design: a plan is saved and keeps changing");
+const normalise = workspace.slice(workspace.indexOf("function normalise("), workspace.indexOf("\n  }\n", workspace.indexOf("function normalise(")));
+assert.match(normalise, /return ensureHouseBimState\(withoutStructure\(/, "a saved or restored plan comes back without generated structure");
+assert.doesNotMatch(normalise, /ensurePhaseFourProject\(/, "and none is generated for it");
 for (const path of ["src/features/house-designer/components/house-designer-workspace.tsx", "src/features/house-designer/components/house-structure-panel.tsx", "src/features/house-designer/services/project-edit.ts", "src/features/house-designer/services/model-state.ts", "src/features/house-designer/services/command-registry.ts", "src/features/house-designer/components/house-modeling-chrome.tsx"]) {
   assert.doesNotMatch(code(path), /\b(generateStructureFromGrid|generatePreliminaryStructure|ensurePhaseFourProject|buildStructuralColumns|buildStructuralBeams)\(/, `${path} generates no structure`);
   assert.doesNotMatch(code(path), /"generate-structure"/, `${path} offers no generate-structure command`);
 }
 assert.doesNotMatch(code("src/features/house-designer/services/model-state.ts"), /id: `foundation:\$\{column\.id\}`/, "no footings are made up for columns");
+
+// The Agenda side: the project's Floor Plans section, and tasks made from a
+// pin linking back to the drawing. Server pages, so checked on the code.
+const plans = code("src/app/(dashboard)/agenda/projects/[projectId]/plan/page.tsx");
+assert.match(plans, /const project = await getAgendaProject\(projectId\);\s*if \(!project\) notFound\(\);/, "the Floor Plans page checks access itself");
+for (const table of ["agenda_plans", "agenda_sketches", "agenda_pins"]) {
+  assert.match(plans, new RegExp(`from\\("${table}"\\)\\.select\\([^)]*\\)\\.eq\\("project_id", projectId\\)`), `it reads this project's ${table}`);
+}
+assert.match(plans, /`\/house-design\?plan=\$\{pin\.plan_id\}\$\{pin\.sketch_id \? `&sketch=\$\{pin\.sketch_id\}` : ""\}&pin=\$\{pin\.id\}`/, "a pin opens the drawing at the pin");
+const tasksPage = code("src/app/(dashboard)/agenda/projects/[projectId]/tasks/page.tsx");
+assert.match(tasksPage, /\.from\("agenda_pins"\)[\s\S]{0,120}\.eq\("project_id", projectId\)[\s\S]{0,40}\.in\("task_id", taskIds\)/, "the tasks page finds the pins its tasks were made from");
+assert.match(tasksPage, /drawings=\{drawings\}/, "and hands them to the task list");
+const taskPanel = code("src/components/agenda/task-panel.tsx");
+assert.match(taskPanel, /drawing=\{drawings\[task\.id\]\}[\s\S]*drawing=\{drawings\[task\.id\]\}/, "open and finished tasks both get their link");
+assert.match(taskPanel, /\{drawing && \(\s*<Link\s+href=\{drawing\.href\}/, "which is rendered as a link");
+const nav = code("src/lib/agenda/workspace-nav.ts");
+assert.match(nav, /\{ id: "plan", segment: "plan", label: "Floor Plans", icon: LayoutGrid, phase: 1 \}/, "Floor Plans is a section of the project");
 
 console.log("House start: templates are valid, hosted plans; sketches reach the model as sketches");

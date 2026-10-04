@@ -37,7 +37,7 @@ function fieldClearance(normal: { x: number; y: number }, px: number) {
 const chainTools = new Set<HouseCommandId>(["wall", "structural-wall", "room-separator"]);
 const DIRECTIONS = [{ label: "→", x: 1, y: 0 }, { label: "↓", x: 0, y: 1 }, { label: "←", x: -1, y: 0 }, { label: "↑", x: 0, y: -1 }] as const;
 
-export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, roomShape = "rectangle", sketch = [], onCancelDraft, proposals = null, chosenProposal = null, onProposalChoose, onProposalMove, onMoveSelection, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu }: {
+export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, roomShape = "rectangle", sketch = [], onCancelDraft, proposals = null, chosenProposal = null, onProposalChoose, onProposalMove, onMoveSelection, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu, showGrid = true, pins = [], onPinTap, focus = null }: {
   project: HouseProject;
   levelId: string;
   activeTool: HouseCommandId | null;
@@ -65,6 +65,13 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   onDimensionChange: (selection: HouseSelection, patch: Record<string, number>) => void;
   onGuidance: (message: string) => void;
   onSelectionMenu: (point: { x: number; y: number } | null) => void;
+  /** The background grid; snapping to it is separate and follows `snapEnabled`. */
+  showGrid?: boolean;
+  /** Numbered pins on this floor: tapping one opens it. */
+  pins?: readonly { id: string; number: string; x: number; y: number; status: "open" | "resolved" }[];
+  onPinTap?: (id: string) => void;
+  /** A point to bring to the middle — a pin opened from the Agenda. `key` says when it is a new request. */
+  focus?: { x: number; y: number; key: string } | null;
 }) {
   const svg = useRef<SVGSVGElement | null>(null);
   const gridId = useId();
@@ -80,6 +87,8 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   const [proposalDrag, setProposalDrag] = useState<{ pointerId: number; id: string; grab: HousePlanPoint; x: number; y: number; moved: boolean } | null>(null);
   const [wallDrag, setWallDrag] = useState<{ pointerId: number; selection: HouseSelection; origin: HousePlanPoint; normal: HousePlanPoint; distance: number } | null>(null);
   const [openingDrag, setOpeningDrag] = useState<{ pointerId: number; selection: HouseSelection; grab: number; offset: number; from: number } | null>(null);
+  // Furniture, a column or a stair dragged freely to a new place.
+  const [itemDrag, setItemDrag] = useState<{ pointerId: number; selection: HouseSelection; origin: HousePlanPoint; dx: number; dy: number } | null>(null);
   const bounds = useMemo(() => levelBounds(project, levelId), [levelId, project]);
   const objects = useMemo(() => selectableBounds(project, levelId), [levelId, project]);
   const candidates = useMemo(() => snapCandidates(project, levelId), [levelId, project]);
@@ -92,6 +101,12 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   if (resetKey[0] !== levelId || resetKey[1] !== (viewRevision ?? 0)) {
     setResetKey([levelId, viewRevision ?? 0]);
     setView(null);
+  }
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  if (focus && focus.key !== focusKey) {
+    setFocusKey(focus.key);
+    const span = Math.max(4000, Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2);
+    setView({ minX: focus.x - span / 2, minY: focus.y - span / 2, maxX: focus.x + span / 2, maxY: focus.y + span / 2 });
   }
   const effective = view ?? bounds;
   const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null);
@@ -293,6 +308,11 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       }, 500);
       longPress.current = entry;
     }
+    if (selectMode && pins.length && onPinTap) {
+      const reach = 22 * mmPerPx;
+      const hit = pins.find((pin) => Math.hypot(raw.x - pin.x, raw.y - (pin.y - 14 * mmPerPx)) <= reach);
+      if (hit) { cancelLongPress(); onPinTap(hit.id); return; }
+    }
     const point = snapped(raw);
     setCurrent(point);
     if (selectMode && proposals?.length) {
@@ -312,6 +332,15 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
         cancelLongPress();
         svg.current?.setPointerCapture(event.pointerId);
         setOpeningDrag({ pointerId: event.pointerId, selection: selections[0], grab: alongWall(selectedOpeningWall, raw) - selectedOpening.offset, offset: selectedOpening.offset, from: selectedOpening.offset });
+        return;
+      }
+    }
+    if (selectMode && selectedItemBounds && selections[0] && onMoveSelection) {
+      const reach = Math.max(16 * mmPerPx, 60);
+      if (raw.x >= selectedItemBounds.minX - reach && raw.x <= selectedItemBounds.maxX + reach && raw.y >= selectedItemBounds.minY - reach && raw.y <= selectedItemBounds.maxY + reach) {
+        cancelLongPress();
+        svg.current?.setPointerCapture(event.pointerId);
+        setItemDrag({ pointerId: event.pointerId, selection: selections[0], origin: raw, dx: 0, dy: 0 });
         return;
       }
     }
@@ -371,6 +400,17 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     return true;
   }
 
+  function moveItem(event: React.PointerEvent<SVGSVGElement>) {
+    if (!itemDrag || itemDrag.pointerId !== event.pointerId) return false;
+    const raw = modelPoint(event);
+    if (!raw) return true;
+    const step = snapEnabled ? 50 : 10;
+    const dx = Math.round((raw.x - itemDrag.origin.x) / step) * step;
+    const dy = Math.round((raw.y - itemDrag.origin.y) / step) * step;
+    if (dx !== itemDrag.dx || dy !== itemDrag.dy) setItemDrag({ ...itemDrag, dx, dy });
+    return true;
+  }
+
   function moveOpening(event: React.PointerEvent<SVGSVGElement>) {
     if (!openingDrag || openingDrag.pointerId !== event.pointerId || !selectedOpening || !selectedOpeningWall) return false;
     const raw = modelPoint(event);
@@ -393,6 +433,12 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       return;
     }
     const tapped = () => { const end = modelPoint(event); if (end) onSelect(pickHouseObject(objects, end) ? [pickHouseObject(objects, end)!] : [], "replace"); };
+    if (itemDrag && itemDrag.pointerId === event.pointerId) {
+      if (itemDrag.dx !== 0 || itemDrag.dy !== 0) onMoveSelection?.(itemDrag.selection, itemDrag.dx, itemDrag.dy);
+      else tapped();
+      setItemDrag(null);
+      return;
+    }
     if (wallDrag && wallDrag.pointerId === event.pointerId) {
       if (wallDrag.distance !== 0) onMoveSelection?.(wallDrag.selection, wallDrag.normal.x * wallDrag.distance, wallDrag.normal.y * wallDrag.distance);
       else tapped();
@@ -442,6 +488,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   const selectedOpening = selections.length === 1 && (selections[0]?.kind === "door" || selections[0]?.kind === "window") ? [...project.doors, ...project.windows].find((item) => item.id === selections[0]?.id) : null;
   const selectedOpeningWall = selectedOpening ? project.walls.find((item) => item.id === selectedOpening.wallId) ?? null : null;
   const selectedColumn = selections.length === 1 && selections[0]?.kind === "column" ? project.structuralColumns.find((item) => item.id === selections[0]?.id) : null;
+  const selectedItemBounds = selections.length === 1 && ["component", "column", "stair"].includes(selections[0]!.kind) ? objects.find((object) => object.selection.id === selections[0]!.id)?.bounds ?? null : null;
 
   const plan = project.levels.find((level) => level.id === levelId)?.plan;
   return (
@@ -449,7 +496,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     {/* The verified plan underneath, in the same frame, so it pans and zooms
         with the model rather than staying put behind it. */}
     {plan ? <div className="pointer-events-none absolute inset-0"><PlanCanvas room={plan} onChange={noop} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} viewBox={{ x: effective.minX, y: effective.minY, width: effective.maxX - effective.minX, height: effective.maxY - effective.minY }} /></div> : null}
-    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (moveProposal(event) || moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => { if (swallowRelease.current) { swallowRelease.current = false; event.preventDefault(); } }} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); cancelLongPress(); setDragStart(null); setOpeningDrag(null); setWallDrag(null); setProposalDrag(null); }} onWheel={wheel}>
+    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (moveProposal(event) || moveItem(event) || moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => { if (swallowRelease.current) { swallowRelease.current = false; event.preventDefault(); } }} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); cancelLongPress(); setDragStart(null); setOpeningDrag(null); setWallDrag(null); setItemDrag(null); setProposalDrag(null); }} onWheel={wheel}>
       <defs>
         <pattern id={`${gridId}-minor`} width={MINOR_GRID} height={MINOR_GRID} patternUnits="userSpaceOnUse">
           <path d={`M ${MINOR_GRID} 0 L 0 0 0 ${MINOR_GRID}`} fill="none" strokeWidth={6} className="stroke-slate-300 dark:stroke-[#eef2f7]" />
@@ -459,7 +506,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
           <path d={`M ${MAJOR_GRID} 0 L 0 0 0 ${MAJOR_GRID}`} fill="none" strokeWidth={10} className="stroke-slate-400 dark:stroke-[#dbe3ec]" />
         </pattern>
       </defs>
-      <rect x={gridBounds.minX} y={gridBounds.minY} width={gridBounds.maxX - gridBounds.minX} height={gridBounds.maxY - gridBounds.minY} fill={`url(#${gridId}-major)`} pointerEvents="none" />
+      {showGrid ? <rect aria-label="Grid" x={gridBounds.minX} y={gridBounds.minY} width={gridBounds.maxX - gridBounds.minX} height={gridBounds.maxY - gridBounds.minY} fill={`url(#${gridId}-major)`} pointerEvents="none" /> : null}
       <MmPerPx.Provider value={mmPerPx}><Coordinates view={effective} unit={unit} /></MmPerPx.Provider>
       {sketch.length ? <g pointerEvents="none">
         <polyline points={sketch.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke="#1473e6" strokeWidth={3} vectorEffect="non-scaling-stroke" />
@@ -488,6 +535,16 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       <MmPerPx.Provider value={mmPerPx}>
       {proposals?.map((item, index) => <ProposalMark key={item.id} proposal={proposalDrag?.id === item.id ? { ...item, x: proposalDrag.x, y: proposalDrag.y } : item} number={index + 1} chosen={chosenProposal === item.id} />)}
       {project.walls.filter((wall) => wall.levelId === levelId && project.objectInstances[wall.id]?.pinned).map((wall) => <LockBadge key={wall.id} wall={wall} />)}
+      {pins.map((pin) => {
+        const size = 26 * mmPerPx;
+        return (
+          <g key={pin.id} aria-label={`Pin ${pin.number}`} pointerEvents="none">
+            <path d={`M ${pin.x} ${pin.y} l ${-size * 0.45} ${-size * 0.9} a ${size * 0.5} ${size * 0.5} 0 1 1 ${size * 0.9} 0 z`} fill={pin.status === "resolved" ? "#16a34a" : "#e11d48"} stroke="white" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            <text x={pin.x} y={pin.y - size * 0.95} fontSize={size * 0.5} textAnchor="middle" fill="white" fontWeight={700}>{pin.number.replace(/^PIN-0*/, "")}</text>
+          </g>
+        );
+      })}
+      {itemDrag && selectedItemBounds && (itemDrag.dx !== 0 || itemDrag.dy !== 0) ? <rect aria-label="Move preview" x={selectedItemBounds.minX + itemDrag.dx} y={selectedItemBounds.minY + itemDrag.dy} width={selectedItemBounds.maxX - selectedItemBounds.minX} height={selectedItemBounds.maxY - selectedItemBounds.minY} fill="rgba(20,115,230,.12)" stroke="#1473e6" strokeWidth={2} strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" /> : null}
       {wallDrag && selectedWall && wallDrag.distance !== 0 ? <WallMovePreview wall={selectedWall} normal={wallDrag.normal} distance={wallDrag.distance} unit={unit} /> : null}
       {/* Editing fields belong to Select. While drawing, they sat where the
           next room or wall was being started and took the touch. */}
@@ -673,7 +730,7 @@ function ModelPlanGeometry({ project, levelId }: { project: HouseProject; levelI
     {project.foundations.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} fill="rgba(100,116,139,.12)" stroke="#64748b" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
     {project.structuralColumns.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} fill="#64748b" />)}
     {project.stairs.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.length / 2} width={item.width} height={item.length} fill="rgba(71,85,105,.16)" stroke="#475569" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
-    {project.components.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} fill="rgba(20,115,230,.10)" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
+    {project.components.filter((item) => item.levelId === levelId).map((item) => <g key={item.id} aria-label={item.name} transform={`rotate(${item.rotation} ${item.x} ${item.y})`}><rect x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} rx={Math.min(item.width, item.depth) * 0.06} fill="rgba(20,115,230,.10)" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={item.x} y={item.y} textAnchor="middle" dominantBaseline="middle" fontSize={Math.max(90, Math.min(item.width, item.depth) * 0.22)} fill="#1e40af">{item.name}</text></g>)}
   </g>;
 }
 
@@ -734,7 +791,11 @@ export function selectableBounds(project: HouseProject, levelId: string): { sele
   for (const column of project.structuralColumns.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "column", id: column.id }, bounds: centred(column.x, column.y, column.width, column.depth) });
   for (const foundation of project.foundations.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "foundation", id: foundation.id }, bounds: centred(foundation.x, foundation.y, foundation.width, foundation.depth) });
   for (const stair of project.stairs.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "stair", id: stair.id }, bounds: centred(stair.x, stair.y, stair.width, stair.length) });
-  for (const component of project.components.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "component", id: component.id }, bounds: centred(component.x, component.y, component.width, component.depth) });
+  for (const component of project.components.filter((item) => item.levelId === levelId)) {
+    // Turned a quarter, a piece of furniture is as deep as it was wide.
+    const turned = Math.abs(Math.round(component.rotation / 90)) % 2 === 1;
+    result.push({ selection: { kind: "component", id: component.id }, bounds: centred(component.x, component.y, turned ? component.depth : component.width, turned ? component.width : component.depth) });
+  }
   for (const beam of project.structuralBeams.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "beam", id: beam.id }, bounds: expand(pointsBounds([beam.start, beam.end]), beam.width / 2) });
   for (const grid of project.structuralGrid.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "grid", id: grid.id }, bounds: expand(pointsBounds([grid.start, grid.end]), 20) });
   for (const railing of project.railings.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "railing", id: railing.id }, bounds: expand(pointsBounds([railing.start, railing.end]), 40) });

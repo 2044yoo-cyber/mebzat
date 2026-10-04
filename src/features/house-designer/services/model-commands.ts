@@ -13,6 +13,8 @@ export type HousePlacementOptions = {
   sillHeight?: number;
   wallThickness?: number;
   material?: string;
+  /** A furniture item's name — "Bed", "Sofa" — from the catalogue. */
+  name?: string;
 };
 
 export function deleteHouseSelections(project: HouseProject, selections: readonly HouseSelection[], options?: { footprintEditable?: boolean }): HouseCommandMutation {
@@ -396,7 +398,7 @@ export function createHouseObjectFromGesture(
     next = { ...next, foundations: [...next.foundations, { id, levelId: level.id, x: strip ? midpoint.x : start.x, y: strip ? midpoint.y : start.y, elevation: level.elevation - foundationThickness, width: strip ? Math.max(width, Math.abs(end.x - start.x)) : width, depth: strip ? Math.max(width, Math.abs(end.y - start.y)) : depth, thickness: foundationThickness, material: "Reinforced concrete" }] };
     selection = { kind: "foundation", id };
   } else if (["component", "furniture", "kitchen", "wardrobe", "plumbing-fixture"].includes(tool)) {
-    const name = ({ component: "Generic Component", furniture: "Furniture", kitchen: "Kitchen Unit", wardrobe: "Wardrobe", "plumbing-fixture": "Plumbing Fixture" } as Record<string, string>)[tool]!;
+    const name = options.name?.trim() || ({ component: "Generic Component", furniture: "Furniture", kitchen: "Kitchen Unit", wardrobe: "Wardrobe", "plumbing-fixture": "Plumbing Fixture" } as Record<string, string>)[tool]!;
     next = { ...next, components: [...next.components, { id, levelId: level.id, family: name, name, x: start.x, y: start.y, elevation: level.elevation, width, depth, height, rotation: 0, material: options.material ?? (tool === "wardrobe" || tool === "kitchen" ? "MDF" : "Generic"), source: tool === "wardrobe" || tool === "kitchen" ? "berchuma" : "library" }] };
     selection = { kind: "component", id };
   } else if (tool === "stair") {

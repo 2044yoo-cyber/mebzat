@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { CalendarClock, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { CalendarClock, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
 import { saveTask } from "@/app/(dashboard)/projects/[id]/agenda/actions";
@@ -31,11 +32,14 @@ export function TaskPanel({
   tasks,
   members,
   myUserId,
+  drawings = {},
 }: {
   projectId: string;
   tasks: AgendaTask[];
   members: AgendaMember[];
   myUserId: string;
+  /** Tasks made from a pin on a plan, photo or PDF: where to reopen it. */
+  drawings?: Record<string, { href: string; label: string }>;
 }) {
   const router = useRouter();
   const panel = usePanel();
@@ -180,6 +184,7 @@ export function TaskPanel({
                 now={now}
                 pending={pendingId === task.id}
                 onStatus={setStatus}
+                drawing={drawings[task.id]}
               />
             ))}
           </ul>
@@ -197,6 +202,7 @@ export function TaskPanel({
                     now={now}
                     pending={pendingId === task.id}
                     onStatus={setStatus}
+                    drawing={drawings[task.id]}
                   />
                 ))}
               </ul>
@@ -213,11 +219,13 @@ function Row({
   now,
   pending,
   onStatus,
+  drawing,
 }: {
   task: AgendaTask;
   now: number;
   pending: boolean;
   onStatus: (task: AgendaTask, status: TaskStatus) => void;
+  drawing?: { href: string; label: string };
 }) {
   const priority = TASK_PRIORITIES.find((entry) => entry.value === task.priority);
   const late =
@@ -246,6 +254,15 @@ function Row({
           <p className="mt-0.5 text-sm text-muted-foreground">
             {task.description}
           </p>
+        )}
+        {drawing && (
+          <Link
+            href={drawing.href}
+            className="mt-1 inline-flex min-h-9 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium hover:bg-muted"
+          >
+            <MapPin className="size-3.5" />
+            {drawing.label}
+          </Link>
         )}
         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
           <span className={priority?.tone}>{priority?.label}</span>

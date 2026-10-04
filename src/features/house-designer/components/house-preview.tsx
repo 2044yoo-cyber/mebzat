@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useStore, useThree } from "@react-three/fiber";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as THREE from "three";
+import { pitchedRise } from "../services/roof-geometry";
 
 import { RoomShell } from "@/features/berchuma-studio/components/viewer/room-shell";
 import { roomWalls } from "@/features/berchuma-studio/services/room-geometry";
@@ -31,7 +32,10 @@ import {
 } from "../types/project";
 
 const MM = 0.001;
-type View = "3d" | "top" | "front" | "back" | "left" | "right";
+type View = "3d" | "top" | "front" | "back" | "left" | "right" | "walk";
+
+/** A person's eye height, in metres: what Walk looks from. */
+const EYE_HEIGHT = 1.6;
 
 export function HousePreview({
   project,
@@ -56,6 +60,9 @@ export function HousePreview({
 }) {
   const bounds = useMemo(() => projectBounds(project), [project]);
   const [view, setView] = useState<View>(() => initialView ?? "3d");
+  // Reset puts the camera back even when the view has not changed.
+  const [reset, setReset] = useState(0);
+  const walk = useRef<((metres: number) => void) | null>(null);
   const selectionMode = useRef<"replace" | "add" | "remove">("replace");
   const highlighted = selectedIds ?? new Set(selected ? [selected.id] : []);
   const visible = (kind: HouseSelection["kind"], id: string, levelId: string) => visibleLevelIds.has(levelId) && !hiddenKinds.has(kind) && !hiddenIds.has(id);
@@ -157,13 +164,14 @@ export function HousePreview({
         ))}
 
         {!hiddenKinds.has("foundation") && project.foundations.filter((item) => visible("foundation", item.id, item.levelId)).map((item) => <group key={item.id} name={item.id}><BoxObjectMesh x={item.x} y={item.y} elevation={item.elevation} width={item.width} height={item.thickness} depth={item.depth} bounds={bounds} selected={highlighted.has(item.id)} color="#8f969e" onSelect={() => choose({ kind: "foundation", id: item.id })} /></group>)}
-        {!hiddenKinds.has("component") && project.components.filter((item) => visible("component", item.id, item.levelId)).map((item) => <BoxObjectMesh key={item.id} x={item.x} y={item.y} elevation={item.elevation} width={item.width} height={item.height} depth={item.depth} rotation={item.rotation} bounds={bounds} selected={highlighted.has(item.id)} color={item.material.toLowerCase().includes("wood") ? "#9d7350" : "#d5d0c8"} onSelect={() => choose({ kind: "component", id: item.id })} />)}
+        {!hiddenKinds.has("component") && project.components.filter((item) => visible("component", item.id, item.levelId)).map((item) => <group key={item.id} name={item.id}><BoxObjectMesh x={item.x} y={item.y} elevation={item.elevation} width={item.width} height={item.height} depth={item.depth} rotation={item.rotation} bounds={bounds} selected={highlighted.has(item.id)} color={item.material.toLowerCase().includes("wood") ? "#9d7350" : "#d5d0c8"} onSelect={() => choose({ kind: "component", id: item.id })} /></group>)}
         {!hiddenKinds.has("railing") && project.railings.filter((item) => visible("railing", item.id, item.levelId)).map((item) => <LineObjectMesh key={item.id} start={item.start} end={item.end} elevation={item.elevation} height={item.height} bounds={bounds} selected={highlighted.has(item.id)} color="#56616c" onSelect={() => choose({ kind: "railing", id: item.id })} />)}
         {!hiddenKinds.has("reference-plane") && project.referencePlanes.filter((item) => visible("reference-plane", item.id, item.levelId)).map((item) => <LineObjectMesh key={item.id} start={item.start} end={item.end} elevation={project.levels.find((level) => level.id === item.levelId)?.elevation ?? 0} height={25} bounds={bounds} selected={highlighted.has(item.id)} color="#de3c8d" onSelect={() => choose({ kind: "reference-plane", id: item.id })} />)}
 
-        <CameraRig bounds={bounds} view={view} />
+        <CameraRig bounds={bounds} view={view} reset={reset} walkRef={walk} />
       </Canvas>
-      <ViewButtons view={view} onChange={setView} />
+      <ViewButtons view={view} onChange={setView} onReset={() => { setView("3d"); setReset((value) => value + 1); }} />
+      {view === "walk" ? <WalkPad onStep={(metres) => walk.current?.(metres)} /> : null}
     </div>
   );
 }
@@ -512,10 +520,9 @@ export function roofRectangles(boundary: readonly { x: number; y: number }[]): R
 /** How high a pitched roof rises over its eaves: the slope across the
  * shorter span decides it, so the planes meet at the ridge whatever the
  * span; a roof with no slope falls back to its stated height. */
-export function pitchedRise(roof: Pick<HouseRoof, "slope" | "height">, width: number, depth: number) {
-  const half = Math.min(width, depth) / 2;
-  return roof.slope > 0 ? Math.tan((Math.min(roof.slope, 60) * Math.PI) / 180) * half : roof.height;
-}
+// Pure arithmetic, kept outside this module so the inspector can use it
+// without loading three.js; re-exported for the callers that import it here.
+export { pitchedRise };
 
 /**
  * A gable or hip roof over a rectangle, eaves at y = 0, ridge along the
@@ -624,7 +631,7 @@ function LineObjectMesh({ start, end, elevation, height, bounds, selected, color
   );
 }
 
-function CameraRig({ bounds, view }: { bounds: Bounds; view: View }) {
+function CameraRig({ bounds, view, reset, walkRef }: { bounds: Bounds; view: View; reset: number; walkRef: React.MutableRefObject<((metres: number) => void) | null> }) {
   const store = useStore();
   const element = useThree((state) => state.gl.domElement);
   const invalidate = useThree((state) => state.invalidate);
@@ -637,6 +644,18 @@ function CameraRig({ bounds, view }: { bounds: Bounds; view: View }) {
     const distance = Math.max(4, span * 1.55);
     const target = new THREE.Vector3(0, bounds.height * MM * 0.45, 0);
     camera.aspect = size.width / size.height;
+    // The browser checks read the camera back; nothing else looks for it.
+    if ("__scenes" in window) Object.assign(window, { __houseCamera: camera });
+    if (view === "walk") {
+      // Standing in the middle of the house, looking along it.
+      camera.position.set(0, EYE_HEIGHT, 0);
+      camera.near = 0.05;
+      camera.far = Math.max(60, distance * 15);
+      camera.lookAt(0, EYE_HEIGHT, -1);
+      camera.updateProjectionMatrix();
+      invalidate();
+      return;
+    }
     if (view === "top") camera.position.set(0, distance * 1.25, 0.001);
     else if (view === "front") camera.position.set(0, target.y, distance);
     else if (view === "back") camera.position.set(0, target.y, -distance);
@@ -648,16 +667,50 @@ function CameraRig({ bounds, view }: { bounds: Bounds; view: View }) {
     camera.lookAt(target);
     camera.updateProjectionMatrix();
     invalidate();
-  }, [bounds, invalidate, size.height, size.width, store, view]);
+  }, [bounds, invalidate, reset, size.height, size.width, store, view]);
 
   useEffect(() => {
     const { camera } = store.getState();
-    const target = new THREE.Vector3(0, bounds.height * MM * 0.45, 0);
+    if (view === "walk") {
+      // Standing still and turning the head: a drag changes where you look,
+      // never where you are. Moving is the pad's job, always at eye height.
+      let yaw = 0;
+      let pitch = 0;
+      let last: { x: number; y: number } | null = null;
+      const look = () => { camera.rotation.set(pitch, yaw, 0, "YXZ"); invalidate(); };
+      const down = (event: PointerEvent) => { last = { x: event.clientX, y: event.clientY }; element.setPointerCapture(event.pointerId); };
+      const move = (event: PointerEvent) => {
+        if (!last) return;
+        yaw += (event.clientX - last.x) * 0.005;
+        pitch = Math.max(-1.2, Math.min(1.2, pitch + (event.clientY - last.y) * 0.005));
+        last = { x: event.clientX, y: event.clientY };
+        look();
+      };
+      const up = () => { last = null; };
+      element.addEventListener("pointerdown", down);
+      element.addEventListener("pointermove", move);
+      element.addEventListener("pointerup", up);
+      element.addEventListener("pointercancel", up);
+      look();
+      walkRef.current = (metres) => {
+        camera.position.x -= Math.sin(yaw) * metres;
+        camera.position.z -= Math.cos(yaw) * metres;
+        camera.position.y = EYE_HEIGHT;
+        invalidate();
+      };
+      return () => {
+        element.removeEventListener("pointerdown", down);
+        element.removeEventListener("pointermove", move);
+        element.removeEventListener("pointerup", up);
+        element.removeEventListener("pointercancel", up);
+        walkRef.current = null;
+      };
+    }
     const orbit = new OrbitControls(camera, element);
     orbit.enableDamping = true;
     orbit.dampingFactor = 0.08;
     orbit.maxPolarAngle = Math.PI * 0.495;
-    orbit.target.copy(target);
+    orbit.target.set(0, bounds.height * MM * 0.45, 0);
     const changed = () => invalidate();
     orbit.addEventListener("change", changed);
     orbit.update();
@@ -665,28 +718,43 @@ function CameraRig({ bounds, view }: { bounds: Bounds; view: View }) {
       orbit.removeEventListener("change", changed);
       orbit.dispose();
     };
-  }, [bounds.height, element, invalidate, store, view]);
+  }, [bounds.height, element, invalidate, reset, store, view, walkRef]);
 
   return null;
 }
 
-function ViewButtons({ view: currentView, onChange }: { view: View; onChange: (view: View) => void }) {
+/**
+ * The 3D view is for looking, not for modelling: orbit round the house, look
+ * down on it, walk through it at eye height, or put the camera back. Every
+ * change to the building is made on the plan.
+ */
+function ViewButtons({ view: currentView, onChange, onReset }: { view: View; onChange: (view: View) => void; onReset: () => void }) {
   const views: { id: View; label: string }[] = [
-    { id: "3d", label: "3D" },
+    { id: "3d", label: "Orbit" },
     { id: "top", label: "Top" },
-    { id: "front", label: "Front" },
-    { id: "back", label: "Back" },
-    { id: "left", label: "Left" },
-    { id: "right", label: "Right" },
+    { id: "walk", label: "Walk" },
   ];
   return (
     <div className="pointer-events-none absolute left-3 right-3 top-3 overflow-x-auto">
       <div className="pointer-events-auto flex w-max rounded-full border bg-background/90 p-1 shadow-sm backdrop-blur">
         {views.map((item) => (
-          <button key={item.id} type="button" onClick={() => onChange(item.id)} aria-pressed={item.id === currentView} className={cn("rounded-full px-3 py-1 text-xs", item.id === currentView ? "bg-brand text-brand-foreground" : "text-muted-foreground")}>
+          <button key={item.id} type="button" onClick={() => onChange(item.id)} aria-pressed={item.id === currentView} className={cn("min-h-9 rounded-full px-3.5 text-xs", item.id === currentView ? "bg-brand text-brand-foreground" : "text-muted-foreground")}>
             {item.label}
           </button>
         ))}
+        <button type="button" onClick={onReset} className="min-h-9 rounded-full px-3.5 text-xs text-muted-foreground">Reset</button>
+      </div>
+    </div>
+  );
+}
+
+function WalkPad({ onStep }: { onStep: (metres: number) => void }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
+      <p className="rounded-full bg-background/85 px-3 py-1 text-[11px] text-muted-foreground backdrop-blur">Drag to look around</p>
+      <div className="pointer-events-auto flex flex-col gap-1">
+        <button type="button" aria-label="Walk forward" onClick={() => onStep(0.75)} className="flex size-12 items-center justify-center rounded-full border bg-background/90 text-lg shadow-sm">▲</button>
+        <button type="button" aria-label="Walk back" onClick={() => onStep(-0.75)} className="flex size-12 items-center justify-center rounded-full border bg-background/90 text-lg shadow-sm">▼</button>
       </div>
     </div>
   );
