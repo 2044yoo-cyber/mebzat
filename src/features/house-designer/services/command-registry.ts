@@ -157,6 +157,9 @@ export function commandFromKeyboard(event: Pick<KeyboardEvent, "key" | "ctrlKey"
     return null;
   }
   if (event.key === "Delete") return "delete";
+  // Single keys, only where nothing else used them: V for Select, M for Measure.
+  if (key === "v" && !event.shiftKey) return "select";
+  if (key === "m" && !event.shiftKey) return "dimension";
   if (event.key === "Escape") return "cancel";
   if (event.key === "Enter") return "finish";
   if (event.key === " ") return "flip";

@@ -1,6 +1,6 @@
 "use client";
 
-import { pitchedRise } from "./house-preview";
+import { pitchedRise } from "../services/roof-geometry";
 import { useHouseUnits } from "./house-units";
 import { displayLength, modelLength, unitScale } from "../services/workspace-options";
 

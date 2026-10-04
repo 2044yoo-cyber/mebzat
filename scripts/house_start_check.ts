@@ -37,7 +37,8 @@ assert.equal(new Set(PLAN_TEMPLATES.map((template) => template.id)).size, PLAN_T
 // ---------------------------------------------------------------------------
 const code = (path: string) => readFileSync(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const workspace = code("src/features/house-designer/components/house-designer-workspace.tsx");
-const open = workspace.slice(workspace.indexOf("async function openVerification("), workspace.indexOf("function restore()"));
+const open = workspace.slice(workspace.indexOf("async function openEditor("), workspace.indexOf("function updateProject("));
+assert.ok(open.length > 1000, "the function that opens a new plan was found");
 assert.match(open, /fetch\("\/api\/house-design\/analyze-plan"/, "the client calls plan analysis");
 assert.match(open, /JSON\.stringify\(\{[^}]*kind: nextSource === "sketch" \? "sketch" : "plan"/, "and says whether it is a sketch");
 assert.match(open, /if \(uploaded && ai && plan\?\.mediaType === "image"\)/, "AI runs only when asked for");
@@ -71,11 +72,10 @@ assert.doesNotMatch(workspace, /Design setup/, "and the setup panel is gone");
 // Structure is never generated automatically — not on open, Finish, restore
 // or from a command.
 assert.match(open, /const built = ensureHouseBimState\(\{ \.\.\.withoutStructure\(applyModelingOptions\(createHouseProject\(/, "a template, upload or description starts without structure");
-const verify = workspace.slice(workspace.indexOf("<VerifyScreen"), workspace.indexOf("/>", workspace.indexOf("<VerifyScreen")));
-assert.match(verify, /onDone=\{\(\) => \{ setStage\("model"\); setView\("3d"\); \}\}/, "finishing the design only changes the view");
-const restoreFn = workspace.slice(workspace.indexOf("function restore()"), workspace.indexOf("\n  }\n", workspace.indexOf("function restore()")));
-assert.match(restoreFn, /const restored = ensureHouseBimState\(withoutStructure\(/, "a restored draft comes back without generated structure");
-assert.doesNotMatch(restoreFn, /ensurePhaseFourProject\(/, "and none is generated for it");
+assert.doesNotMatch(workspace, /Finish design/, "there is no Finish design: a plan is saved and keeps changing");
+const normalise = workspace.slice(workspace.indexOf("function normalise("), workspace.indexOf("\n  }\n", workspace.indexOf("function normalise(")));
+assert.match(normalise, /return ensureHouseBimState\(withoutStructure\(/, "a saved or restored plan comes back without generated structure");
+assert.doesNotMatch(normalise, /ensurePhaseFourProject\(/, "and none is generated for it");
 for (const path of ["src/features/house-designer/components/house-designer-workspace.tsx", "src/features/house-designer/components/house-structure-panel.tsx", "src/features/house-designer/services/project-edit.ts", "src/features/house-designer/services/model-state.ts", "src/features/house-designer/services/command-registry.ts", "src/features/house-designer/components/house-modeling-chrome.tsx"]) {
   assert.doesNotMatch(code(path), /\b(generateStructureFromGrid|generatePreliminaryStructure|ensurePhaseFourProject|buildStructuralColumns|buildStructuralBeams)\(/, `${path} generates no structure`);
   assert.doesNotMatch(code(path), /"generate-structure"/, `${path} offers no generate-structure command`);
