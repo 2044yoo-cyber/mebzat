@@ -262,6 +262,45 @@ try {
   assert.match(freehand, /^\d+$/, `a freehand length to the millimetre (${freehand})`);
   await page.getByRole("button", { name: "Snap", exact: true }).click();
 
+  // A template adjusted to a tight plot, faced to a road on the north.
+  await page.goto(url);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(url);
+  await page.getByRole("radio", { name: /Use a template/ }).click();
+  await page.getByLabel("Plot width").fill("9.6");
+  await page.getByLabel("Plot length").fill("20");
+  await page.getByRole("radiogroup", { name: "Which side is the road/front?" }).getByRole("radio", { name: "↑ North" }).click();
+  await page.getByRole("button", { name: "Find plans" }).click();
+  const adjustable = page.getByRole("region", { name: "Can be adjusted" }).getByRole("button", { name: "3-bedroom standard family house" });
+  assert.equal(await adjustable.count(), 1, "8.2 m into 8.0 m: offered as one to adjust");
+  await adjustable.click();
+  const previewed = page.getByRole("region", { name: "3-bedroom standard family house preview" });
+  assert.equal(await previewed.getByLabel("Fit status").innerText(), "DOES NOT FIT AS IS");
+  await previewed.getByRole("button", { name: "Adjust to my plot" }).click();
+  assert.equal(await previewed.getByLabel("Fit status").innerText(), "ADJUSTED · FITS", "adjusted, it fits");
+  assert.match(await previewed.getByRole("status").innerText(), /House 8\.2 × 12\.4 m → 8 × [\d.]+ m[\s\S]*Doors and windows keep their sizes/, "and says what changed");
+  await previewed.getByRole("button", { name: "Use this plan" }).click();
+  await page.locator(PLAN).waitFor();
+  await rail(page).getByRole("button", { name: "Select", exact: true }).click();
+  const outline = await page.evaluate(() => { const polygon = document.querySelector('svg[aria-label="Floor plan"] polygon'); const points = polygon.getAttribute("points").trim().split(/\s+/).map((pair) => pair.split(",").map(Number)); return [Math.max(...points.map((p) => p[0])) - Math.min(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1])) - Math.min(...points.map((p) => p[1]))]; });
+  assert.ok(outline.includes(7800), `the adjusted house is 7.8 m between wall centres across (${outline})`);
+  // The road is to the north: the front door is in the top wall of the plan.
+  await page.waitForTimeout(1200);
+  const facing = await page.evaluate(() => {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const text = localStorage.getItem(localStorage.key(index)) ?? "";
+      if (!text.includes('"sourceOpeningId":"entrance"')) continue;
+      const found = JSON.parse(text);
+      const project = found.project ?? found;
+      const door = project.doors.find((item) => item.sourceOpeningId === "entrance");
+      const wall = project.walls.find((item) => item.id === door.wallId);
+      const top = Math.min(...project.walls.flatMap((item) => [item.start.y, item.end.y]));
+      return { level: wall.start.y === wall.end.y && wall.start.y === top };
+    }
+    return null;
+  });
+  assert.deepEqual(facing, { level: true }, "road to the north: the front door is in the north wall");
+
   assert.deepEqual(errors, [], "page errors");
 } finally {
   await page.close();
