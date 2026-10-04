@@ -223,6 +223,16 @@ try {
   await undo(page);
   assert.ok((await rooms(page)).includes("6750..9000 x 0..11000"), "one undo");
 
+  // Drawn freehand, a wall's length is a fraction; its field reads whole millimetres.
+  await page.getByRole("button", { name: "Snap", exact: true }).click();
+  await rail(page).getByRole("button", { name: "Wall", exact: true }).click();
+  await tapAt(1234, 2345);
+  await tapAt(3456, 4321);
+  await rail(page).getByRole("button", { name: "Select", exact: true }).click();
+  const freehand = await lengthField(page).inputValue();
+  assert.match(freehand, /^\d+$/, `a freehand length to the millimetre (${freehand})`);
+  await page.getByRole("button", { name: "Snap", exact: true }).click();
+
   assert.deepEqual(errors, [], "page errors");
 } finally {
   await page.close();

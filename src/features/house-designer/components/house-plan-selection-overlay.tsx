@@ -255,7 +255,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     return { minX: base.minX + dx, minY: base.minY + dy, maxX: base.maxX + dx, maxY: base.maxY + dy };
   }
 
-  function snapped(raw: HousePlanPoint, from: HousePlanPoint | null = draftStart): SnapPoint {
+  function snapped(raw: HousePlanPoint, from: HousePlanPoint | null = draftStart, moving?: string): SnapPoint {
     const draftStart = from;
     if (!snapEnabled) return { ...raw, label: "Nearest" };
     let best: SnapPoint = { x: Math.round(raw.x / MINOR_GRID) * MINOR_GRID, y: Math.round(raw.y / MINOR_GRID) * MINOR_GRID, label: "Grid" };
@@ -267,7 +267,9 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       const next = Math.hypot(candidate.x - raw.x, candidate.y - raw.y);
       if (next < distance && next <= 140) { best = candidate; distance = next; }
     }
-    for (const wall of project.walls.filter((item) => item.levelId === levelId)) {
+    // Not onto the wall whose end is being dragged: its own face is always
+    // within reach, and held the end there whatever else was aimed at.
+    for (const wall of project.walls.filter((item) => item.levelId === levelId && item.id !== moving)) {
       const centre = closestPointOnSegment(raw, wall.start, wall.end);
       const dx = wall.end.x - wall.start.x;
       const dy = wall.end.y - wall.start.y;
@@ -490,7 +492,17 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   function moveEnd(event: React.PointerEvent<SVGSVGElement>) {
     if (!endDrag || endDrag.pointerId !== event.pointerId || !selectedWall) return false;
     const raw = modelPoint(event);
-    if (raw) setEndDrag({ ...endDrag, point: snapped(raw, endDrag.end === "end" ? selectedWall.start : selectedWall.end) });
+    if (!raw) return true;
+    const anchor = endDrag.end === "end" ? selectedWall.start : selectedWall.end;
+    let point = snapped(raw, anchor, selectedWall.id);
+    // Straight on from the other end, the length is what was aimed at, in
+    // the same steps as + and −.
+    const run = Math.hypot(point.x - anchor.x, point.y - anchor.y);
+    if ((point.label === "Perpendicular" || point.label === "Parallel") && run > 0) {
+      const length = Math.max(holdStep, Math.round(run / holdStep) * holdStep);
+      point = { x: anchor.x + (point.x - anchor.x) * length / run, y: anchor.y + (point.y - anchor.y) * length / run, label: point.label };
+    }
+    setEndDrag({ ...endDrag, point });
     return true;
   }
 
@@ -627,7 +639,17 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     {/* The verified plan underneath, in the same frame, so it pans and zooms
         with the model rather than staying put behind it. */}
     {plan ? <div className="pointer-events-none absolute inset-0"><PlanCanvas room={plan} onChange={noop} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} viewBox={{ x: effective.minX, y: effective.minY, width: effective.maxX - effective.minX, height: effective.maxY - effective.minY }} /></div> : null}
-    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (placementDrag && placementDrag.pointerId === event.pointerId) { const raw = modelPoint(event); if (raw && onPlacementMove) onPlacementMove(...placementSnap(raw, placementDrag.grab)); return; } if (hold && hold.pointerId === event.pointerId) { holdSlide(event); return; } if (moveEnd(event) || moveProposal(event) || moveItem(event) || moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => { if (swallowRelease.current) { swallowRelease.current = false; event.preventDefault(); } }} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); cancelLongPress(); setDragStart(null); setOpeningDrag(null); setWallDrag(null); setItemDrag(null); setProposalDrag(null); setEndDrag(null); setPlacementDrag(null); stopHold(); setHold(null); }} onWheel={wheel}>
+    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (placementDrag && placementDrag.pointerId === event.pointerId) { const raw = modelPoint(event); if (raw && onPlacementMove) onPlacementMove(...placementSnap(raw, placementDrag.grab)); return; } if (hold && hold.pointerId === event.pointerId) { holdSlide(event); return; } if (moveEnd(event) || moveProposal(event) || moveItem(event) || moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => {
+        if (swallowRelease.current) { swallowRelease.current = false; event.preventDefault(); return; }
+        // The canvas has had the tap. The click a browser makes of it after
+        // the finger lifts would land on whatever the tap just opened there —
+        // the action bar — so it is not made. A field on the canvas still
+        // takes its tap; one being typed in elsewhere is let go.
+        if ((event.target as Element).closest("foreignObject")) return;
+        event.preventDefault();
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active !== document.body) active.blur();
+      }} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); cancelLongPress(); setDragStart(null); setOpeningDrag(null); setWallDrag(null); setItemDrag(null); setProposalDrag(null); setEndDrag(null); setPlacementDrag(null); stopHold(); setHold(null); }} onWheel={wheel}>
       <defs>
         <pattern id={`${gridId}-minor`} width={MINOR_GRID} height={MINOR_GRID} patternUnits="userSpaceOnUse">
           <path d={`M ${MINOR_GRID} 0 L 0 0 0 ${MINOR_GRID}`} fill="none" strokeWidth={6} className="stroke-slate-300 dark:stroke-[#eef2f7]" />
@@ -1046,8 +1068,11 @@ function WallChainView({ project, wall, shift, editable, unit, onDistance }: { p
         const gap = item.at - previous.at;
         // Beside the line, not across it: centred on it, a field covered the
         // wall next to the one selected, and a tap meant for that wall typed.
-        const middle = point((item.at + previous.at) / 2, chain.axis === "x" ? -18 * px : 28 * px);
         const beside = editable && (offset === index - 1 || offset === index);
+        // Two fields either side of a wall in a narrow gap would sit on each
+        // other: the second steps out.
+        const crowded = offset === index && index > 0 && Math.min(gap, chain.positions[index]!.at - chain.positions[index - 1]!.at) < 56 * px;
+        const middle = point((item.at + previous.at) / 2, (chain.axis === "x" ? -18 : 28) * px + (crowded ? (chain.axis === "x" ? -32 : 52) * px : 0));
         const neighbour = offset === index - 1 ? previous.wallId : item.wallId;
         return beside
           ? <DistanceField key={`${previous.wallId}-${item.wallId}`} at={middle} value={gap} label={offset === index - 1 ? "Distance before" : "Distance after"} onChange={(value) => onDistance(neighbour, value)} />
