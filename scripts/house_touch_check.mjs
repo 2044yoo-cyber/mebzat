@@ -586,6 +586,7 @@ async function checkThreeD(page, at, { touch, tapAt }) {
 async function checkStart(page, at) {
   await page.reload();
   const choices = page.getByRole("radiogroup", { name: "How to start" }).getByRole("radio");
+  assert.equal(await page.getByText("Design setup").count() + await page.getByText("What are you modeling?").count() + await page.getByText("Original Floor Plan Strict").count(), 0, `${at}: no setup panel before there is a house`);
   assert.deepEqual((await choices.allInnerTexts()).map((text) => text.split("\n")[0]), ["Draw manually", "Draw rooms", "Upload floor plan", "Upload hand sketch", "Use a template", "Describe it (AI)"], `${at}: six ways to start`);
   assert.ok(await page.getByRole("button", { name: "Draw floor plan", exact: true }).isVisible() && await page.getByRole("button", { name: "Draw floor plan", exact: true }).evaluate((element) => element.getBoundingClientRect().bottom <= innerHeight), `${at}: the choices and the way on fit one screen`);
   await page.getByRole("radio", { name: /Upload floor plan/ }).click();
@@ -603,6 +604,23 @@ async function checkStart(page, at) {
   assert.equal(options.filter((text) => /^Wall \d+$/.test(text)).length, 7, `${at}: a template arrives with its walls`);
   assert.equal(options.filter((text) => /^Door/.test(text)).length, 4, `${at}: doors`);
   assert.equal(options.filter((text) => /^Window/.test(text)).length, 4, `${at}: and windows`);
+  assert.ok(await page.getByRole("button", { name: /Upload façade photo/ }).count(), `${at}: a façade reference photo is added in the Façade designer`);
+  // Strict is off unless someone turns it on: past verification — where
+  // Strict applies — an outside wall still moves like any other.
+  await page.getByRole("button", { name: "Finish design → 3D" }).click();
+  await page.getByRole("button", { name: "2d", exact: true }).click();
+  await page.locator(PLAN).waitFor();
+  await page.evaluate(() => document.getElementById("workspace").scrollTo(0, 0));
+  const [tx, ty] = await page.evaluate((selector) => { const point = new DOMPoint(4500, 0).matrixTransform(document.querySelector(selector).getScreenCTM()); return [point.x, point.y]; }, PLAN);
+  await page.touchscreen.tap(tx, ty);
+  await page.getByText("Wall Properties").waitFor();
+  const [, ay] = await page.evaluate((selector) => { const point = new DOMPoint(4500, -500).matrixTransform(document.querySelector(selector).getScreenCTM()); return [point.x, point.y]; }, PLAN);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: tx, y: ty, id: 0 }] });
+  for (let step = 1; step <= 8; step += 1) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: tx, y: ty + (ay - ty) * step / 8, id: 0 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await page.waitForTimeout(250);
+  assert.doesNotMatch(await page.evaluate(() => [...document.querySelectorAll("[data-sonner-toast]")].map((toast) => toast.textContent).join(" ")), /Strict/, `${at}: no hidden setting refuses the move`);
 
   // Describe it (AI). No model is reachable here, so the endpoint answers as
   // a model's checked plan would; what is tested is everything around it.

@@ -64,4 +64,8 @@ const describe = open.slice(open.indexOf('if (nextSource === "describe")'));
 assert.match(describe, /fetch\("\/api\/house-design\/generate-plan"[\s\S]{0,200}JSON\.stringify\(\{ description, ceilingHeight: floorHeight \}\)/, "the client sends the description");
 assert.match(describe, /roomSchema\.safeParse\(payload\.plan\)/, "and checks what comes back before using it");
 
+// Strict has no switch on screen any more, so it starts off.
+assert.match(workspace, /const \[strict, setStrict\] = useState\(false\);/, "Original Floor Plan Strict starts off");
+assert.doesNotMatch(workspace, /Design setup/, "and the setup panel is gone");
+
 console.log("House start: templates are valid, hosted plans; sketches reach the model as sketches");

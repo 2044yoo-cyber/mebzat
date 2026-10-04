@@ -17,7 +17,6 @@ import {
   Magnet,
   PencilRuler,
   Save,
-  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -104,8 +103,6 @@ import {
 import {
   createHouseProject,
   ensurePhaseTwoProject,
-  HOUSE_STYLE_LABELS,
-  houseStyles,
   type HouseProject,
   type HouseObjectKind,
   type HouseSelection,
@@ -116,7 +113,7 @@ import { generateFacadeAlternatives } from "../services/facade";
 import { generatePreliminaryStructure } from "../services/structure";
 
 import { HouseUnitsContext } from "./house-units";
-import { applyModelingOptions, modelingPreset, displayLength, modelLength, type DisplayUnits, type ModelingOptions } from "../services/workspace-options";
+import { applyModelingOptions, modelingPreset, type DisplayUnits, type ModelingOptions } from "../services/workspace-options";
 
 type Stage = "start" | "verify" | "model";
 type Source = "manual" | "rooms" | "upload" | "sketch" | "template" | "describe";
@@ -146,7 +143,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
   const [modelingOptions, setModelingOptions] = useState<ModelingOptions>(() => modelingPreset("house"));
   const [floorHeight, setFloorHeight] = useState(3000);
   const [style, setStyle] = useState<HouseStyle>("modern");
-  const [strict, setStrict] = useState(true);
+  const [strict, setStrict] = useState(false);
   const [project, setProject] = useState<HouseProject | null>(null);
   const [view, setView] = useState<WorkspaceView>("split");
   const [analysingPlan, setAnalysingPlan] = useState(false);
@@ -359,20 +356,6 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           onSource={setSource}
           floorPlans={floorPlans}
           onFloorPlans={choosePlans}
-          facades={facades}
-          onFacades={(plans) => setFacades(plans.slice(-1))}
-          title={title}
-          onTitle={setTitle}
-          displayUnits={displayUnits} onDisplayUnits={setDisplayUnits}
-          modelingOptions={modelingOptions} onModelingOptions={setModelingOptions}
-          floorCount={floorCount}
-          onFloorCount={setFloorCount}
-          floorHeight={floorHeight}
-          onFloorHeight={setFloorHeight}
-          style={style}
-          onStyle={setStyle}
-          strict={strict}
-          onStrict={setStrict}
           analysingPlan={analysingPlan}
           templateId={templateId}
           onTemplate={setTemplateId}
@@ -392,6 +375,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           onDone={() => { setStage("model"); setView("3d"); }}
           onBack={() => setStage("start")}
           initialTool={startTool}
+          userId={userId}
           onSave={save}
           saveState={saveState}
           onDownload={download}
@@ -413,6 +397,7 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
           onDownload={download}
           onBack={() => setStage("verify")}
           backLabel="Edit plan"
+          userId={userId}
         />
       ) : null}
     </main>
@@ -420,25 +405,12 @@ export function HouseDesignerWorkspace({ userId }: { userId: string }) {
 }
 
 function StartScreen({
-  displayUnits, onDisplayUnits, modelingOptions, onModelingOptions,
   userId,
   source,
   onSource,
   floorPlans,
   onFloorPlans,
-  facades,
-  onFacades,
-  title,
-  onTitle,
-  floorCount,
-  onFloorCount,
-  floorHeight,
-  onFloorHeight,
-  style,
-  onStyle,
-  strict,
   analysingPlan,
-  onStrict,
   onContinue,
   onRestore,
   templateId,
@@ -446,26 +418,12 @@ function StartScreen({
   description,
   onDescription,
 }: {
-  displayUnits: DisplayUnits; onDisplayUnits: (unit: DisplayUnits) => void;
-  modelingOptions: ModelingOptions; onModelingOptions: (options: ModelingOptions) => void;
   userId: string;
   source: Source;
   onSource: (source: Source) => void;
   floorPlans: DraftPlan[];
   onFloorPlans: (plans: DraftPlan[]) => void;
-  facades: DraftPlan[];
-  onFacades: (plans: DraftPlan[]) => void;
-  title: string;
-  onTitle: (value: string) => void;
-  floorCount: number;
-  onFloorCount: (value: number) => void;
-  floorHeight: number;
-  onFloorHeight: (value: number) => void;
-  style: HouseStyle;
-  onStyle: (value: HouseStyle) => void;
-  strict: boolean;
   analysingPlan: boolean;
-  onStrict: (value: boolean) => void;
   onContinue: (ai: boolean) => void;
   onRestore?: () => void;
   templateId: string;
@@ -474,7 +432,7 @@ function StartScreen({
   onDescription: (value: string) => void;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div>
       <section className="space-y-4 rounded-2xl border bg-card p-4 sm:p-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-brand">New house</p>
@@ -559,51 +517,11 @@ function StartScreen({
         {(source === "upload" || source === "sketch") && floorPlans[0]?.mediaType === "pdf" ? <p className="text-xs text-muted-foreground">AI conversion reads images; a PDF can be traced by hand.</p> : null}
       </section>
 
-      <aside className="space-y-4 rounded-2xl border bg-card p-4">
-        <h2 className="font-semibold">Design setup</h2>
-        <label className="block text-xs">What are you modeling?<select aria-label="Design scope" value={modelingOptions.mode} onChange={(event) => { const mode = event.target.value as ModelingOptions["mode"]; onModelingOptions(modelingPreset(mode)); if (mode !== "house") onFloorCount(1); }} className="mt-1 w-full rounded-lg border bg-background p-2"><option value="house">Full house</option><option value="apartment">Apartment interior</option><option value="room">Single room</option></select></label>
-        <label className="block text-xs">Units<select aria-label="Setup units" value={displayUnits} onChange={(event) => onDisplayUnits(event.target.value as DisplayUnits)} className="mt-1 w-full rounded-lg border bg-background p-2"><option value="mm">Millimetres (mm)</option><option value="cm">Centimetres (cm)</option><option value="m">Metres (m)</option></select></label>
-        <fieldset className="grid grid-cols-2 gap-2 rounded-lg border p-3 text-xs"><legend className="px-1">Include in model</legend>{([["structure", "Columns / beams"], ["foundations", "Footings"], ["roof", "Roof"], ["stairs", "Stairs"], ["site", "Site / exterior"], ["floors", "Floors"], ["ceilings", "Ceilings"]] as const).map(([key, label]) => <label key={key} className="flex items-center gap-2"><input type="checkbox" checked={modelingOptions[key]} onChange={(event) => onModelingOptions({ ...modelingOptions, [key]: event.target.checked })} />{label}</label>)}</fieldset>
-        <label className="block space-y-1.5 text-xs text-muted-foreground">
-          <span>Project name</span>
-          <input value={title} onChange={(event) => onTitle(event.target.value)} maxLength={100} className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground" />
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          <NumberField label="Floors" value={floorCount} min={1} max={6} step={1} onChange={onFloorCount} />
-          <NumberField label="Floor-to-floor" value={displayLength(floorHeight, displayUnits)} min={displayLength(2200, displayUnits)} max={displayLength(6000, displayUnits)} step={0.001} suffix={displayUnits} onChange={(value) => onFloorHeight(modelLength(value, displayUnits))} />
-        </div>
-        <label className="block space-y-1.5 text-xs text-muted-foreground">
-          <span>Architectural style</span>
-          <select value={style} onChange={(event) => onStyle(event.target.value as HouseStyle)} className="w-full rounded-lg border bg-background px-3 py-2 text-sm capitalize text-foreground">
-            {houseStyles.map((item) => <option key={item} value={item}>{labelStyle(item)}</option>)}
-          </select>
-        </label>
-        <label className="flex items-start gap-2 rounded-xl border p-3 text-sm">
-          <input type="checkbox" checked={strict} onChange={(event) => onStrict(event.target.checked)} className="mt-0.5 size-4 accent-[var(--brand)]" />
-          <span><strong className="flex items-center gap-1.5"><ShieldCheck className="size-4 text-brand" /> Original Floor Plan Strict</strong><span className="mt-1 block text-xs text-muted-foreground">Locks verified footprint and plan geometry for later style changes.</span></span>
-        </label>
-
-        <div className="space-y-2 border-t pt-3">
-          <p className="text-xs font-medium">Optional front façade / reference</p>
-          <FloorPlanInput
-            userId={userId}
-            plans={facades}
-            onChange={onFacades}
-            maxPlans={1}
-            multiple={false}
-            buttonLabel="Upload façade reference"
-            help="JPG, JPEG or PNG recommended"
-            contentType="project_image"
-            publicBucket="project-images"
-          />
-        </div>
-
-      </aside>
     </div>
   );
 }
 
-function VerifyScreen({ project, source, analysis, view, onView, onProjectChange, onDone, onBack, onSave, saveState, onDownload, initialTool }: { project: HouseProject; source: Source; analysis: string | null; view: WorkspaceView; onView: (view: WorkspaceView) => void; onProjectChange: (project: HouseProject) => void; onDone: () => void; onBack: () => void; onSave: () => void; saveState: string; onDownload: () => void; initialTool?: HouseCommandId }) {
+function VerifyScreen({ project, source, analysis, view, onView, onProjectChange, onDone, onBack, onSave, saveState, onDownload, initialTool, userId }: { project: HouseProject; source: Source; analysis: string | null; view: WorkspaceView; onView: (view: WorkspaceView) => void; onProjectChange: (project: HouseProject) => void; onDone: () => void; onBack: () => void; onSave: () => void; saveState: string; onDownload: () => void; initialTool?: HouseCommandId; userId: string }) {
   return (
     <section className="space-y-3">
       <div className="hidden flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3 sm:flex">
@@ -621,7 +539,7 @@ function VerifyScreen({ project, source, analysis, view, onView, onProjectChange
         </p>
       ) : null}
       {analysis ? <p className="rounded-xl border border-brand/25 bg-brand/5 p-3 text-xs text-foreground">{analysis}</p> : null}
-      <ModelScreen project={project} view={view} onView={onView} onProjectChange={onProjectChange} onSave={onSave} onSaveAs={onSave} saveState={saveState} onDownload={onDownload} verification onFinish={onDone} onBack={onBack} backLabel="Start" initialTool={initialTool} />
+      <ModelScreen project={project} view={view} onView={onView} onProjectChange={onProjectChange} onSave={onSave} onSaveAs={onSave} saveState={saveState} onDownload={onDownload} verification onFinish={onDone} onBack={onBack} backLabel="Start" initialTool={initialTool} userId={userId} />
     </section>
   );
 }
@@ -640,6 +558,7 @@ function ModelScreen({
   onBack,
   backLabel,
   initialTool = "select",
+  userId,
 }: {
   project: HouseProject;
   view: WorkspaceView;
@@ -654,6 +573,7 @@ function ModelScreen({
   onBack?: () => void;
   backLabel?: string;
   initialTool?: HouseCommandId;
+  userId?: string;
 }) {
   const [chosenLevelId, setActiveLevelId] = useState(project.levels[0]?.id ?? "ground-floor");
   // Undoing Add Floor deletes the floor being looked at; everything that
@@ -1173,7 +1093,7 @@ function ModelScreen({
         <HouseObjectInspector project={project} activeLevelId={activeLevelId} selected={selected} selections={selections} onSelect={(selection) => choose(selection)} onChange={(next) => commit(next, "Properties updated")} />
       </div>
 
-      <div id="house-facade"><HouseFacadePanel project={project} onChange={(next) => commit(next, "Façade updated")} /></div>
+      <div id="house-facade"><HouseFacadePanel project={project} userId={userId} onChange={(next) => commit(next, "Façade updated")} /></div>
       <div id="house-ai-remodel"><HouseAiRemodelPanel project={project} selected={selected} selections={selections} onChange={(next) => commit(next, "AI model change applied")} /></div>
       <HouseStructurePanel project={project} onChange={(next) => commit(next, "Structure updated")} onSuggest={() => runCommand("suggest-columns")} />
 
@@ -1206,18 +1126,6 @@ function SourceCard({ active, icon, title, description, onClick }: { active: boo
   );
 }
 
-function NumberField({ label, value, min, max, step, suffix, onChange }: { label: string; value: number; min: number; max: number; step: number; suffix?: string; onChange: (value: number) => void }) {
-  return (
-    <label className="space-y-1.5 text-xs text-muted-foreground">
-      <span>{label}</span>
-      <span className="flex rounded-lg border bg-background px-2">
-        <input type="number" value={value} min={min} max={max} step={step} onChange={(event) => { const next = Number(event.target.value); if (Number.isFinite(next)) onChange(clamp(next, min, max)); }} className="min-w-0 flex-1 bg-transparent py-2 text-right text-sm text-foreground outline-none" />
-        {suffix ? <span className="ml-1 self-center text-[11px]">{suffix}</span> : null}
-      </span>
-    </label>
-  );
-}
-
 function Summary({ label, value }: { label: string; value: string }) {
   return <div className="rounded-xl border bg-card p-3"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{value}</p></div>;
 }
@@ -1241,7 +1149,6 @@ function clamp(value: number, min: number, max: number) { return Math.min(max, M
 
 function slug(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 
-function labelStyle(value: HouseStyle) { return HOUSE_STYLE_LABELS[value]; }
 
 function previewView(viewId: string | null): "3d" | "top" | "front" | "back" | "left" | "right" {
   if (viewId?.endsWith(":top")) return "top";

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ImageIcon, Loader2, Palette, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
+import { FloorPlanInput } from "@/components/tour/floor-plan-input";
 import type { SpaceAnalysis } from "@/lib/ai/vision.types";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,7 @@ import {
 } from "../services/facade";
 import { HOUSE_STYLE_LABELS, houseStyles, type HouseProject, type HouseStyle } from "../types/project";
 
-export function HouseFacadePanel({ project, onChange }: { project: HouseProject; onChange: (project: HouseProject) => void }) {
+export function HouseFacadePanel({ project, userId, onChange }: { project: HouseProject; userId?: string; onChange: (project: HouseProject) => void }) {
   const [count, setCount] = useState<2 | 3 | 4>(3);
   const [analysing, setAnalysing] = useState(false);
   const facadeReference = project.referenceImages.find((image) => image.kind === "facade" && image.mediaType === "image");
@@ -79,6 +80,28 @@ export function HouseFacadePanel({ project, onChange }: { project: HouseProject;
           <Sparkles className="size-3.5" /> Generate alternatives
         </button>
       </div>
+
+      {/* The reference photo is uploaded here, where it is used, rather than
+          before there is a house to dress. */}
+      {userId ? (
+        <FloorPlanInput
+          userId={userId}
+          plans={project.referenceImages.filter((image) => image.kind === "facade").map((image) => ({ key: image.id, title: image.name, url: image.url, mediaType: image.mediaType }))}
+          onChange={(plans) => onChange({
+            ...project,
+            referenceImages: [
+              ...project.referenceImages.filter((image) => image.kind !== "facade"),
+              ...plans.slice(-1).map((plan) => ({ id: plan.key, kind: "facade" as const, name: plan.title, url: plan.url, mediaType: plan.mediaType })),
+            ],
+          })}
+          maxPlans={1}
+          multiple={false}
+          buttonLabel="Upload façade photo"
+          help="A photo of a house front you like (JPG or PNG)"
+          contentType="project_image"
+          publicBucket="project-images"
+        />
+      ) : null}
 
       {project.facadeReferenceAnalysis ? (
         <p className="rounded-lg bg-muted/60 p-2 text-xs leading-5 text-muted-foreground"><strong className="text-foreground">Reference:</strong> {project.facadeReferenceAnalysis.summary}</p>
