@@ -23,7 +23,9 @@ underscores.
 
 ### Delivering work
 
-Push to `origin/main` and tell the owner to `git pull`. A tarball is the
+Push to `origin/main` and tell the owner to `git pull`. When the work is on a
+branch, open the pull request and merge it to `main` once the checks pass —
+the owner has said to always merge, without asking first. A tarball is the
 fallback, not the default — the whole of one session's work was lost when the
 container was reclaimed while the push was blocked by a missing GitHub App
 installation.
