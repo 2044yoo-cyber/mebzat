@@ -243,7 +243,7 @@ export function splitHouseSelection(project: HouseProject, selection: HouseSelec
     const wall = project.walls.find((item) => item.id === selection.id);
     const level = wall ? project.levels.find((item) => item.id === wall.levelId) : null;
     if (!wall) return { project, selections: [selection], blocked: ["Wall not found"] };
-    if (wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId)) return { project, selections: [selection], blocked: ["Exterior footprint walls must be split in plan verification"] };
+    if (wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId)) return { project, selections: [selection], blocked: ["An outside wall is the house's outline — to divide a room, select the room and Split it"] };
     const middle = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
     const oldEnd = { ...wall.end };
     let next = patchHouseObject(project, selection, { endX: middle.x, endY: middle.y });

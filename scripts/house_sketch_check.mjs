@@ -220,7 +220,8 @@ try {
   // The sketch's pin is on the plan's own coordinates, so it shows on the plan too.
   assert.equal(await page.locator(`${PLAN} g[aria-label="Pin PIN-001"]`).count(), 1, "a pin on a sketch of the plan shows on the plan");
   await tap(page, PLAN, 1500, 0);
-  await page.locator('section[aria-label$=" properties"]').getByRole("button", { name: "Add to Agenda" }).click();
+  await page.getByRole("toolbar", { name: "Wall actions" }).getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Add to Agenda" }).click();
   const dialog = page.getByRole("dialog", { name: "New pin" });
   assert.equal(await dialog.getByLabel("Title").inputValue(), "Wall A (Room 1)", "a pin from a wall is titled with the wall");
   assert.equal(await dialog.getByLabel("Measurement").inputValue(), "8000 mm", "and carries its length");

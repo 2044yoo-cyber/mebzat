@@ -21,7 +21,8 @@ for (const mode of ["apartment", "room"] as const) {
   assert.equal(project.roofs.length, 0);
   assert.equal(project.site, null);
   assert.equal(project.facadeElements.length, 0);
-  assert.ok(project.walls.length && project.slabs.length && project.ceilings.length);
+  assert.ok(project.walls.length && project.ceilings.length);
+  assert.equal(project.slabs.length, 0, "no floor slab comes with the walls");
   assert.equal(project.displayUnits, "m");
   assert.deepEqual(project.walls, base.walls, "Setup preserves actual dimensions");
 }

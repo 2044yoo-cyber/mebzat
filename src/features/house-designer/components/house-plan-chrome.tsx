@@ -20,6 +20,7 @@ import {
   Redo2,
   Ruler,
   Sofa,
+  SplitSquareHorizontal,
   Undo2,
   X,
 } from "lucide-react";
@@ -50,6 +51,7 @@ export const PLAN_TOOLS: { id: HouseCommandId; label: string; icon: React.Compon
   { id: "stair", label: "Stair", icon: Footprints },
   { id: "furniture", label: "Furniture", icon: Sofa },
   { id: "dimension", label: "Measure", icon: Ruler },
+  { id: "split", label: "Split", icon: SplitSquareHorizontal },
 ];
 
 export function PlanToolbar({ activeTool, onTool }: { activeTool: HouseCommandId | null; onTool: (id: HouseCommandId) => void }) {
@@ -192,9 +194,13 @@ export function WorkspaceTabs({ tab, onTab }: { tab: WorkspaceTab; onTab: (tab: 
 
 export type SheetAction = "move" | "delete" | "flip" | "rotate" | "duplicate" | "merge" | "lock" | "agenda" | "properties";
 
-export function SelectionSheet({ project, selection, onPatch, onAction, onClose }: {
+export function SelectionSheet({ project, selection, onPatch, onAction, onClose, showActions = true, autoFocus }: {
   project: HouseProject;
   selection: HouseSelection;
+  /** Off when the actions are already beside the selection. */
+  showActions?: boolean;
+  /** The field to start typing in — Rename opens the sheet on the name. */
+  autoFocus?: string;
   onPatch: (patch: HousePatch) => void;
   onAction: (action: SheetAction) => void;
   onClose: () => void;
@@ -214,16 +220,16 @@ export function SelectionSheet({ project, selection, onPatch, onAction, onClose 
           {content.fields.map((field) => (
             <label key={field.label} className={cn("min-w-0 rounded-lg bg-muted/50 px-2 py-1", field.edit?.text && "col-span-3")}>
               <span className="block truncate text-[10px] text-muted-foreground">{field.label}{field.edit && !field.edit.text ? ` (${unit})` : ""}</span>
-              {field.edit ? <SheetNumber key={`${selection.id}:${field.edit.key}:${field.edit.value}`} label={field.label} value={field.edit.value} unit={field.edit.text ? null : unit} text={field.edit.text} onCommit={(value) => onPatch({ [field.edit!.key]: value })} /> : <span className="block truncate text-xs font-medium tabular-nums">{field.value}</span>}
+              {field.edit ? <SheetNumber key={`${selection.id}:${field.edit.key}:${field.edit.value}`} label={field.label} value={field.edit.value} unit={field.edit.text ? null : unit} text={field.edit.text} autoFocus={autoFocus === field.label} onCommit={(value) => onPatch({ [field.edit!.key]: value })} /> : <span className="block truncate text-xs font-medium tabular-nums">{field.value}</span>}
             </label>
           ))}
         </div>
       ) : null}
-      <div className="mt-1.5 flex gap-1.5 overflow-x-auto">
+      {showActions ? <div className="mt-1.5 flex gap-1.5 overflow-x-auto">
         {content.actions.map((action) => (
           <button key={action} type="button" onClick={() => onAction(action)} aria-pressed={action === "lock" ? locked : undefined} className={cn("min-h-10 shrink-0 rounded-lg border px-3 text-xs font-medium hover:bg-muted", action === "delete" && "border-destructive/30 text-destructive", action === "lock" && locked && "border-brand/40 text-brand")}>{action === "lock" && locked ? "Unlock" : ACTION_LABEL[action]}</button>
         ))}
-      </div>
+      </div> : null}
     </section>
   );
 }
@@ -345,7 +351,7 @@ function sheetContent(project: HouseProject, selection: HouseSelection, unit: Di
 }
 
 /** A number edited in the sheet: typed in the project's units, saved in millimetres on Enter or leaving the field. */
-function SheetNumber({ label, value, unit, text, onCommit }: { label: string; value: number | string; unit: DisplayUnits | null; text?: boolean; onCommit: (value: number | string) => void }) {
+function SheetNumber({ label, value, unit, text, autoFocus, onCommit }: { label: string; value: number | string; unit: DisplayUnits | null; text?: boolean; autoFocus?: boolean; onCommit: (value: number | string) => void }) {
   const shown = typeof value === "number" && unit ? String(displayLength(Math.round(value * 1000) / 1000, unit)) : String(value);
   const [draft, setDraft] = useState(shown);
   const commit = () => {
@@ -357,8 +363,31 @@ function SheetNumber({ label, value, unit, text, onCommit }: { label: string; va
   };
   return (
     <span className="relative block">
-      <input aria-label={label} value={draft} inputMode={text ? "text" : "decimal"} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") { event.currentTarget.blur(); } if (event.key === "Escape") setDraft(shown); }} className="min-h-8 w-full rounded-md border bg-background px-1.5 text-sm tabular-nums" />
+      <input aria-label={label} autoFocus={autoFocus} value={draft} inputMode={text ? "text" : "decimal"} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") { event.currentTarget.blur(); } if (event.key === "Escape") setDraft(shown); }} className="min-h-8 w-full rounded-md border bg-background px-1.5 text-sm tabular-nums" />
       {draft !== shown ? <Check className="pointer-events-none absolute right-1.5 top-1/2 size-3.5 -translate-y-1/2 text-brand" /> : null}
     </span>
+  );
+}
+
+export type QuickAction = { id: string; label: string; onSelect: () => void; pressed?: boolean };
+
+/**
+ * The selection's own actions, small and beside it — not a bar across the
+ * screen. The common few are buttons; the rest are under ⋮.
+ */
+export function QuickActionBar({ label, actions, more }: { label: string; actions: QuickAction[]; more: QuickAction[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div role="toolbar" aria-label={label} className="relative flex items-center gap-0.5 rounded-full border bg-card/95 p-0.5 shadow-lg backdrop-blur">
+      {actions.map((action) => (
+        <button key={action.id} type="button" onClick={() => { setOpen(false); action.onSelect(); }} aria-pressed={action.pressed} className={cn("min-h-11 min-w-11 shrink-0 rounded-full px-3 text-xs font-medium hover:bg-muted", action.pressed && "bg-brand/15 text-brand")}>{action.label}</button>
+      ))}
+      {more.length ? <button type="button" aria-label="More actions" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="flex min-h-11 min-w-11 items-center justify-center rounded-full hover:bg-muted"><MoreVertical className="size-4" /></button> : null}
+      {open ? (
+        <div role="menu" aria-label={`${label}: more`} className="absolute right-0 top-full z-30 mt-1 w-48 rounded-xl border bg-card p-1 shadow-xl">
+          {more.map((action) => <button key={action.id} type="button" role="menuitem" onClick={() => { setOpen(false); action.onSelect(); }} className={cn("block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-muted", action.id === "delete" && "text-destructive")}>{action.label}</button>)}
+        </div>
+      ) : null}
+    </div>
   );
 }

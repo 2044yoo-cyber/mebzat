@@ -495,7 +495,7 @@ export function addHouseFloor(project: HouseProject): { project: HouseProject; l
     ...project,
     levels: [...project.levels, { id: levelId, name, elevation, floorToFloorHeight: top.floorToFloorHeight, plan }],
     views: [...project.views, { id: `view:plan:${levelId}`, name, kind: "floor-plan", levelId, hiddenCategories: [], temporaryHiddenIds: [], isolatedIds: [], cutPlane: 1200, topOffset: 2300, bottomOffset: 0 }],
-    slabs: [...project.slabs, { id: `${levelId}:slab`, levelId, boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })), thickness: 150, elevation, material: "Reinforced concrete" }],
+    slabs: project.modelingOptions?.floors === false ? project.slabs : [...project.slabs, { id: `${levelId}:slab`, levelId, boundary: plan.corners.map((point) => ({ x: point.x, y: point.y })), thickness: 150, elevation, material: "Reinforced concrete" }],
     roofs: project.roofs.map((roof) => roof.levelId === top.id ? { ...roof, levelId, elevation: roof.elevation + top.floorToFloorHeight } : roof),
     stairs: hasStair ? project.stairs : [...project.stairs, stair],
     plannedFloorCount: Math.max(project.plannedFloorCount, project.levels.length + 1),
@@ -844,6 +844,16 @@ function attachedTo(oldStart: { x: number; y: number }, oldEnd: { x: number; y: 
     const oldLength = Math.sqrt(lengthSquared);
     const newLength = Math.hypot(newEnd.x - newStart.x, newEnd.y - newStart.y);
     if (!newLength) return { x: micron(newStart.x), y: micron(newStart.y) };
+    // Lengthened or shortened along its own line: whatever meets it stays
+    // where it is, only clamped to the new ends. Measuring from the start
+    // moved every junction when the start was the end that changed.
+    const ux = (newEnd.x - newStart.x) / newLength;
+    const uy = (newEnd.y - newStart.y) / newLength;
+    const sameLine = Math.abs(ux * dy - uy * dx) / oldLength < 1e-6 && Math.abs((newStart.x - oldStart.x) * dy - (newStart.y - oldStart.y) * dx) / oldLength < 0.5;
+    if (sameLine) {
+      const along = Math.min(Math.max(0, (point.x - newStart.x) * ux + (point.y - newStart.y) * uy), newLength);
+      return { x: micron(newStart.x + ux * along), y: micron(newStart.y + uy * along) };
+    }
     const along = Math.min(Math.max(0, t) * oldLength, newLength);
     return { x: micron(newStart.x + ((newEnd.x - newStart.x) / newLength) * along), y: micron(newStart.y + ((newEnd.y - newStart.y) / newLength) * along) };
   };

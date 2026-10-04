@@ -68,6 +68,50 @@ export const PLAN_TEMPLATES: PlanTemplate[] = [
   },
 ];
 
+/**
+ * Single rooms for "Draw rooms": each a measured room with its door and its
+ * windows, editable like anything drawn, to grow a plan from — more rooms are
+ * dragged out beside it.
+ */
+export const ROOM_SAMPLES: PlanTemplate[] = [
+  sample("bedroom", "Bedroom", 3500, 4000, [door("door", "c3", 2400, 900, "Door"), window("window", "c1", 1000, 1500)]),
+  {
+    id: "master-bedroom",
+    name: "Master bedroom with en-suite",
+    summary: "4.5 × 5 m · 2 doors, 3 windows",
+    build: () => plan(4500, 5000, [
+      wall("en-suite-side", [3000, 0], [3000, 2500]),
+      wall("en-suite-front", [3000, 2500], [4500, 2500]),
+    ], [
+      { ...zone("bedroom", "Master bedroom", [0, 0], [4500, 5000]), boundary: [{ x: 0, y: 0 }, { x: 3000, y: 0 }, { x: 3000, y: 2500 }, { x: 4500, y: 2500 }, { x: 4500, y: 5000 }, { x: 0, y: 5000 }] },
+      zone("en-suite", "En-suite", [3000, 0], [4500, 2500]),
+    ], [
+      door("door", "c3", 3400, 900, "Door"),
+      door("en-suite-door", "en-suite-front", 300, 800, "En-suite"),
+      window("window", "c1", 800, 1500),
+      window("en-suite-window", "c1", 3450, 600, 600, 1500),
+      window("side-window", "c2", 3000, 1200),
+    ]),
+  },
+  sample("children", "Children's room", 3000, 3500, [door("door", "c3", 2000, 900, "Door"), window("window", "c1", 750, 1500)]),
+  sample("bathroom", "Bathroom", 2000, 2500, [door("door", "c3", 1100, 800, "Door"), window("window", "c1", 700, 600, 600, 1500)]),
+  sample("toilet", "Guest toilet", 1500, 2000, [door("door", "c3", 650, 700, "Door"), window("window", "c1", 450, 600, 600, 1500)]),
+  sample("kitchen", "Kitchen", 3000, 4000, [door("door", "c4", 600, 900, "Door"), window("window", "c1", 900, 1200, 1050, 1050)]),
+  sample("living", "Living room", 5000, 6000, [door("door", "c3", 2000, 1000, "Entrance"), window("front-window", "c3", 3500, 1300), window("side-window", "c2", 2000, 1800)]),
+  sample("dining", "Dining room", 4000, 4000, [door("door", "c4", 1500, 900, "Door"), window("window", "c2", 1300, 1500)]),
+  sample("office", "Office or study", 3000, 3000, [door("door", "c3", 1900, 900, "Door"), window("window", "c1", 900, 1200)]),
+  sample("shop", "Shop", 4000, 6000, [door("door", "c3", 400, 2000, "Shop front"), window("front-window", "c3", 2700, 1100), door("back-door", "c1", 2800, 900, "Back door")]),
+  sample("store", "Store", 2000, 2000, [door("door", "c3", 1000, 800, "Door"), window("vent", "c1", 700, 600, 400, 1800)]),
+  sample("garage", "Garage", 3500, 6000, [door("door", "c3", 500, 2500, "Garage door", 2400), door("side-door", "c2", 1000, 900, "Side door"), window("window", "c4", 3000, 1200)]),
+];
+
+function sample(id: string, name: string, width: number, depth: number, openings: Room["openings"]): PlanTemplate {
+  const doors = openings.filter((item) => item.kind === "door").length;
+  const windows = openings.length - doors;
+  const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+  return { id, name, summary: `${width / 1000} × ${depth / 1000} m · ${count(doors, "door")}, ${count(windows, "window")}`, build: () => plan(width, depth, [], [zone(id, name, [0, 0], [width, depth])], openings) };
+}
+
 function plan(width: number, depth: number, interiorWalls: Room["interiorWalls"], zones: Room["zones"], openings: Room["openings"]): Room {
   return roomSchema.parse({
     version: 1,
@@ -93,10 +137,10 @@ function zone(id: string, name: string, from: [number, number], to: [number, num
   return { id, name, boundary: [{ x: from[0], y: from[1] }, { x: to[0], y: from[1] }, { x: to[0], y: to[1] }, { x: from[0], y: to[1] }], floorMaterial: "Unspecified", wallMaterial: "Paint", ceilingMaterial: "Gypsum board" };
 }
 
-function door(id: string, wallId: string, offset: number, width: number, label: string) {
-  return { id, kind: "door" as const, wallId, offset, width, height: 2100, sill: 0, swing: "in-right" as const, label };
+function door(id: string, wallId: string, offset: number, width: number, label: string, height = 2100) {
+  return { id, kind: "door" as const, wallId, offset, width, height, sill: 0, swing: "in-right" as const, label };
 }
 
-function window(id: string, wallId: string, offset: number, width: number) {
-  return { id, kind: "window" as const, wallId, offset, width, height: 1200, sill: 900, swing: "none" as const, label: "Window" };
+function window(id: string, wallId: string, offset: number, width: number, height = 1200, sill = 900) {
+  return { id, kind: "window" as const, wallId, offset, width, height, sill, swing: "none" as const, label: "Window" };
 }
