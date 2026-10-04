@@ -82,4 +82,21 @@ for (const path of ["src/features/house-designer/components/house-designer-works
 }
 assert.doesNotMatch(code("src/features/house-designer/services/model-state.ts"), /id: `foundation:\$\{column\.id\}`/, "no footings are made up for columns");
 
+// The Agenda side: the project's Floor Plans section, and tasks made from a
+// pin linking back to the drawing. Server pages, so checked on the code.
+const plans = code("src/app/(dashboard)/agenda/projects/[projectId]/plan/page.tsx");
+assert.match(plans, /const project = await getAgendaProject\(projectId\);\s*if \(!project\) notFound\(\);/, "the Floor Plans page checks access itself");
+for (const table of ["agenda_plans", "agenda_sketches", "agenda_pins"]) {
+  assert.match(plans, new RegExp(`from\\("${table}"\\)\\.select\\([^)]*\\)\\.eq\\("project_id", projectId\\)`), `it reads this project's ${table}`);
+}
+assert.match(plans, /`\/house-design\?plan=\$\{pin\.plan_id\}\$\{pin\.sketch_id \? `&sketch=\$\{pin\.sketch_id\}` : ""\}&pin=\$\{pin\.id\}`/, "a pin opens the drawing at the pin");
+const tasksPage = code("src/app/(dashboard)/agenda/projects/[projectId]/tasks/page.tsx");
+assert.match(tasksPage, /\.from\("agenda_pins"\)[\s\S]{0,120}\.eq\("project_id", projectId\)[\s\S]{0,40}\.in\("task_id", taskIds\)/, "the tasks page finds the pins its tasks were made from");
+assert.match(tasksPage, /drawings=\{drawings\}/, "and hands them to the task list");
+const taskPanel = code("src/components/agenda/task-panel.tsx");
+assert.match(taskPanel, /drawing=\{drawings\[task\.id\]\}[\s\S]*drawing=\{drawings\[task\.id\]\}/, "open and finished tasks both get their link");
+assert.match(taskPanel, /\{drawing && \(\s*<Link\s+href=\{drawing\.href\}/, "which is rendered as a link");
+const nav = code("src/lib/agenda/workspace-nav.ts");
+assert.match(nav, /\{ id: "plan", segment: "plan", label: "Floor Plans", icon: LayoutGrid, phase: 1 \}/, "Floor Plans is a section of the project");
+
 console.log("House start: templates are valid, hosted plans; sketches reach the model as sketches");

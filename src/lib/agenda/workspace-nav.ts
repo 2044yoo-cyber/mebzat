@@ -1,4 +1,5 @@
 import {
+  LayoutGrid,
   Activity, Banknote, Boxes, Building2, CalendarRange, ClipboardCheck,
   ClipboardList, Coins, Contact, FileSignature, FileSpreadsheet, FileStack,
   FileText, Gavel, HardHat, Image as ImageIcon, LayoutDashboard, ListChecks,
@@ -53,6 +54,7 @@ export const WORKSPACE_GROUPS: WorkspaceGroup[] = [
     id: "records",
     label: "Drawings and documents",
     sections: [
+      { id: "plan", segment: "plan", label: "Floor Plans", icon: LayoutGrid, phase: 1 },
       { id: "drawings", segment: "drawings", label: "Drawings", icon: PencilRuler, phase: 1 },
       { id: "documents", segment: "documents", label: "Documents", icon: FileStack, phase: 1 },
       { id: "photos", segment: "photos", label: "Photos", icon: ImageIcon, phase: 2 },

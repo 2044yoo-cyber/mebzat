@@ -38,12 +38,34 @@ export default async function Page({
     agendaMembers(projectId),
   ]);
 
+  // A task made from a pin opens the drawing, photo or PDF at the pin.
+  const taskIds = tasks.map((task) => task.id);
+  const { data: pins } = taskIds.length
+    ? await supabase
+        .from("agenda_pins")
+        .select("id, number, plan_id, sketch_id, task_id")
+        .eq("project_id", projectId)
+        .in("task_id", taskIds)
+    : { data: [] };
+  const drawings = Object.fromEntries(
+    (pins ?? [])
+      .filter((pin) => pin.task_id && pin.plan_id)
+      .map((pin) => [
+        pin.task_id!,
+        {
+          href: `/house-design?plan=${pin.plan_id}${pin.sketch_id ? `&sketch=${pin.sketch_id}` : ""}&pin=${pin.id}`,
+          label: `Open ${pin.number} on the drawing`,
+        },
+      ]),
+  );
+
   return (
     <TaskPanel
       projectId={projectId}
       tasks={tasks}
       members={members}
       myUserId={user.id}
+      drawings={drawings}
     />
   );
 }

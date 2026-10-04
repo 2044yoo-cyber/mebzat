@@ -41,9 +41,13 @@ import {
   type SheetAction,
   type WorkspaceTab,
 } from "./house-plan-chrome";
+import { HouseAgendaPanel } from "./house-agenda-panel";
+import { HouseFilesPanel } from "./house-files-panel";
 import { HouseMeasurementsDrawer } from "./house-measurements-drawer";
+import { HousePinDialog, HousePinSheet } from "./house-pin-sheet";
+import { HouseSketchPanel, type SketchRequest } from "./house-sketch-panel";
 import { HouseObjectInspector } from "./house-object-inspector";
-import { HousePlanSelectionOverlay, type HousePlanPoint } from "./house-plan-selection-overlay";
+import { HousePlanSelectionOverlay, selectableBounds, type HousePlanPoint } from "./house-plan-selection-overlay";
 import { HouseSaveDialog, type SaveChoice } from "./house-save-dialog";
 import {
   houseDraftKey,
@@ -78,6 +82,8 @@ import { PLAN_TEMPLATES } from "../services/plan-templates";
 import { planDescriptionError } from "../services/plan-analysis";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
 import { furnitureItem, type FurnitureItem } from "../services/furniture-catalog";
+import { levelMeasurements } from "../services/measurements";
+import { attachToTask, createPin, createTask, listPins, pinHref, taskStatuses, updatePin, type Pin, type SketchSource } from "../services/sketch-store";
 import {
   createProject,
   insertPlan,
@@ -125,7 +131,7 @@ const drawingCommands = new Set<HouseCommandId>([
 
 const noSubscription = () => () => undefined;
 
-export function HouseDesignerWorkspace({ userId, planId = null, projectId = null, pinId = null }: { userId: string; planId?: string | null; projectId?: string | null; pinId?: string | null }) {
+export function HouseDesignerWorkspace({ userId, planId = null, projectId = null, pinId = null, sketchId = null }: { userId: string; planId?: string | null; projectId?: string | null; pinId?: string | null; sketchId?: string | null }) {
   const [stage, setStage] = useState<Stage>(planId ? "loading" : "start");
   const [source, setSource] = useState<Source>("manual");
   const [templateId, setTemplateId] = useState(PLAN_TEMPLATES[1]!.id);
@@ -481,6 +487,9 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
           analysis={planAnalysis}
           initialTool={startTool}
           link={link}
+          userId={userId}
+          // A link to a pin or a sketch opens there — once, for the plan it was for.
+          focusRequest={link && link.planId === planId && (pinId || sketchId) ? { pinId, sketchId } : null}
           onBusy={(busy) => { busyRef.current = busy; }}
         />
       )}
@@ -637,6 +646,8 @@ function PlanEditor({
   analysis,
   initialTool = "select",
   link,
+  userId,
+  focusRequest,
   onBusy,
 }: {
   project: HouseProject;
@@ -651,6 +662,8 @@ function PlanEditor({
   analysis: string | null;
   initialTool?: HouseCommandId;
   link: PlanLink | null;
+  userId: string;
+  focusRequest: { pinId: string | null; sketchId: string | null } | null;
   onBusy: (busy: boolean) => void;
 }) {
   const [chosenLevelId, setActiveLevelId] = useState(project.levels[0]?.id ?? "ground-floor");
@@ -687,6 +700,14 @@ function PlanEditor({
     sillHeight: 900,
     chain: true,
   });
+  // Pins on this plan and its sketches, and the Agenda tasks made from them.
+  const [pins, setPins] = useState<Pin[]>([]);
+  const [statuses, setStatuses] = useState<Record<string, string>>({});
+  const [activePinId, setActivePinId] = useState<string | null>(null);
+  const [pinDialog, setPinDialog] = useState<{ at: HousePlanPoint; initial: { title: string; measurement: string } } | null>(null);
+  const [sketchRequest, setSketchRequest] = useState<SketchRequest | null>(null);
+  const [planFocus, setPlanFocus] = useState<{ x: number; y: number; key: string } | null>(null);
+  const focusHandled = useRef(false);
   const clipboard = useRef<HouseClipboard | null>(null);
   const keyboardRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
   const escapeRef = useRef(0);
@@ -695,6 +716,88 @@ function PlanEditor({
   const selectMode = !activeTool || activeTool === "select";
 
   useEffect(() => { onBusy(Boolean(draftStart || outlineSketch.length)); }, [draftStart, outlineSketch, onBusy]);
+
+  const planId = link?.planId ?? null;
+  async function reloadPins() {
+    if (!planId) return;
+    const client = createClient();
+    const items = await listPins(client, planId);
+    setPins(items);
+    setStatuses(await taskStatuses(client, items.flatMap((pin) => (pin.taskId ? [pin.taskId] : []))));
+  }
+  useEffect(() => {
+    if (!planId) return;
+    let live = true;
+    const client = createClient();
+    void listPins(client, planId).then(async (items) => {
+      if (!live) return;
+      setPins(items);
+      const found = await taskStatuses(client, items.flatMap((pin) => (pin.taskId ? [pin.taskId] : [])));
+      if (live) setStatuses(found);
+      // Opened from the Agenda: straight to the pin, or the sketch.
+      if (focusRequest && !focusHandled.current) {
+        focusHandled.current = true;
+        const pin = items.find((item) => item.id === focusRequest.pinId);
+        if (pin) openPin(pin);
+        else if (focusRequest.sketchId) { onTab("sketch"); setSketchRequest({ sketchId: focusRequest.sketchId, nonce: Date.now() }); }
+      }
+    });
+    return () => { live = false; };
+    // `openPin` and the request are read once, when the pins arrive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planId]);
+
+  function whereOf(pin: Pin) {
+    if (pin.source.kind === "plan") return project.levels.find((item) => item.id === pin.source.level)?.name ?? "Plan";
+    return `${pin.source.name ?? pin.source.kind}${pin.source.kind === "pdf" && pin.source.page ? ` · page ${pin.source.page}` : ""}`;
+  }
+
+  /** Shows a pin where it was dropped: on its floor of the plan, or on its sketch. */
+  function openPin(pin: Pin) {
+    setActivePinId(pin.id);
+    if (pin.sketchId) {
+      onTab("sketch");
+      setSketchRequest({ sketchId: pin.sketchId, pinId: pin.id, nonce: Date.now() });
+      return;
+    }
+    onTab("plan");
+    if (pin.source.level && project.levels.some((item) => item.id === pin.source.level)) setActiveLevelId(pin.source.level);
+    setSelections([]);
+    setPlanFocus({ x: pin.x, y: pin.y, key: `${pin.id}:${Date.now()}` });
+  }
+
+  /** The pin on the project's Agenda: a task saying what and where, linked both ways. */
+  async function addPinToAgenda(pin: Pin, previewPath: string | null = null) {
+    if (!link) return;
+    const client = createClient();
+    const address = `${window.location.origin}${pinHref(link.planId, pin)}`;
+    const description = [pin.note, pin.measurement ? `Measurement: ${pin.measurement}` : null, `Drawing: ${project.metadata.title} · ${whereOf(pin)} · ${pin.number}`, `Open: ${address}`].filter(Boolean).join("\n");
+    const task = await createTask(client, userId, link.projectId, { title: pin.title, description });
+    if ("error" in task) { toast.error(task.error); return; }
+    const linked = await updatePin(client, pin.id, { taskId: task.id });
+    if (linked.error) { toast.error(linked.error); return; }
+    if (previewPath) await attachToTask(client, userId, link.projectId, task.id, { path: previewPath, name: `${pin.number}.png`, caption: `Marked up: ${whereOf(pin)}` });
+    await reloadPins();
+    toast.success(`${pin.number} is on the Agenda`);
+  }
+
+  async function placePlanPin(at: HousePlanPoint, details: { title: string; note: string; measurement: string; agenda: boolean }) {
+    setPinDialog(null);
+    if (!link) return;
+    const source: SketchSource = { kind: "plan", path: null, name: activeLevel?.name ?? null, level: activeLevelId, page: null };
+    const pin = await createPin(createClient(), userId, { projectId: link.projectId, planId: link.planId }, { sketchId: null, source, x: at.x, y: at.y, title: details.title, note: details.note, measurement: details.measurement });
+    if ("error" in pin) { toast.error(pin.error); return; }
+    await reloadPins();
+    setActivePinId(pin.id);
+    if (details.agenda) await addPinToAgenda(pin);
+  }
+
+  async function sendMeasurements(text: string) {
+    if (!link) return;
+    const task = await createTask(createClient(), userId, link.projectId, { title: `Measurements — ${project.metadata.title} · ${activeLevel?.name ?? ""}`.trim(), description: `${text}\n\nOpen: ${window.location.origin}/house-design?plan=${link.planId}` });
+    if ("error" in task) { toast.error(task.error); return; }
+    toast.success("Measurements sent to the Agenda");
+  }
 
   function chooseLevel(levelId: string) {
     setOutlineSketch([]);
@@ -873,11 +976,15 @@ function PlanEditor({
         toast.info("Tap the room to merge with");
         return;
       }
-      case "agenda":
+      case "agenda": {
         if (!link) { toast.info("Save the project first — then it can go on its Agenda."); return; }
-        toast.info("Open the Agenda tab to add this to the project's Agenda.");
-        onTab("agenda");
+        const target = selections[0];
+        const bounds = target ? selectableBounds(project, activeLevelId).find((item) => item.selection.id === target.id)?.bounds : null;
+        if (!target || !bounds) return;
+        const measured = levelMeasurements(project, activeLevelId).find((item) => item.id === target.id);
+        setPinDialog({ at: { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }, initial: { title: measured?.label ?? "Pin", measurement: measured?.value.split(" · ")[0] ?? "" } });
         return;
+      }
       case "properties": setInspectorOpen(true); window.setTimeout(() => document.getElementById("house-properties")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); return;
     }
   }
@@ -959,7 +1066,8 @@ function PlanEditor({
     { id: "fit", label: "Zoom to fit", onSelect: () => setViewRevision((value) => value + 1) },
   ];
 
-  const sheetFor = tab === "plan" && selectMode && selected && selected.kind !== "level" && !proposals && !mergeFrom && selections.length === 1 ? selected : null;
+  const sheetFor = tab === "plan" && selectMode && selected && selected.kind !== "level" && !proposals && !mergeFrom && !activePinId && selections.length === 1 ? selected : null;
+  const activePin = pins.find((pin) => pin.id === activePinId) ?? null;
   const bottomActions = (
     <div className="grid grid-cols-2 gap-2">
       <button type="button" onClick={onSave} className="min-h-12 rounded-xl bg-brand px-4 text-sm font-semibold text-brand-foreground">Save project</button>
@@ -981,7 +1089,7 @@ function PlanEditor({
               {analysis && showAnalysis ? <p className="flex items-start gap-2 rounded-xl border border-brand/25 bg-brand/5 p-2.5 text-xs">{analysis}<button type="button" onClick={() => setShowAnalysis(false)} aria-label="Dismiss" className="ml-auto shrink-0 text-muted-foreground">✕</button></p> : null}
               <PlanToolbar activeTool={activeTool} onTool={chooseTool} />
               <div className="relative h-[calc(100dvh-26rem)] min-h-[300px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 lg:h-[min(640px,60dvh)] dark:bg-background">
-                {activeLevel ? <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} showGrid={gridVisible} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} sketch={outlineSketch} onCancelDraft={() => { setDraftStart(null); setOutlineSketch([]); }} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => applyMutation(moveHouseSelections(project, [selection], dx, dy, { footprintEditable: true }))} onDraftStart={(point) => { if (chainEnded.current) { chainEnded.current = false; setDraftStart(null); return; } setDraftStart(point); }} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={() => undefined} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch)); }} onGuidance={() => undefined} /> : null}
+                {activeLevel ? <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} showGrid={gridVisible} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} sketch={outlineSketch} onCancelDraft={() => { setDraftStart(null); setOutlineSketch([]); }} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => applyMutation(moveHouseSelections(project, [selection], dx, dy, { footprintEditable: true }))} onDraftStart={(point) => { if (chainEnded.current) { chainEnded.current = false; setDraftStart(null); return; } setDraftStart(point); }} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={() => undefined} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch)); }} onGuidance={() => undefined} pins={pins.filter((pin) => pin.source.kind === "plan" && pin.source.level === activeLevelId)} onPinTap={(id) => setActivePinId(id)} focus={planFocus} /> : null}
                 <span className="pointer-events-none absolute left-2 top-2 rounded-full border bg-background/90 px-2.5 py-1 text-[11px] font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>
                 {activeTool === "room" && !draftStart ? <div role="radiogroup" aria-label="Room shape" className="absolute left-1/2 top-10 z-10 flex -translate-x-1/2 gap-1 rounded-xl border bg-card/95 p-1 text-xs shadow-sm backdrop-blur">
                   {([["rectangle", "Rectangle"], ["l-shape", "L shape"]] as const).map(([shape, label]) => <button key={shape} type="button" role="radio" aria-checked={roomShape === shape} onClick={() => setRoomShape(shape)} className={cn("min-h-9 rounded-lg px-3", roomShape === shape ? "bg-brand/15 text-brand" : "text-muted-foreground hover:bg-muted")}>{label}</button>)}
@@ -994,7 +1102,7 @@ function PlanEditor({
                 {sheetFor ? <SelectionSheet key={sheetFor.id} project={project} selection={sheetFor} onPatch={(patch) => { const conflict = lockConflict(project, sheetFor); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, sheetFor, patch)); }} onAction={sheetAction} onClose={() => setSelections([])} /> : null}
               </div>
               <PlanSecondaryBar canUndo={past.length > 0} canRedo={future.length > 0} onUndo={undo} onRedo={redo} snap={snapEnabled} onSnap={() => setSnapEnabled((value) => !value)} grid={gridVisible} onGrid={() => setGridVisible((value) => !value)} more={moreTools} />
-              <HouseMeasurementsDrawer project={project} levelId={activeLevelId} onSelect={(selection) => { setActiveTool("select"); setSelections([selection]); }} />
+              <HouseMeasurementsDrawer project={project} levelId={activeLevelId} onSelect={(selection) => { setActiveTool("select"); setSelections([selection]); }} onSendToAgenda={link ? (text) => void sendMeasurements(text) : undefined} />
               {bottomActions}
             </div>
             <div id="house-properties-panel" className={cn("min-w-0", inspectorOpen ? "block" : "hidden lg:block")}>
@@ -1013,9 +1121,21 @@ function PlanEditor({
             />
             {bottomActions}
           </div>
+        ) : !link ? (
+          <ProjectSectionPlaceholder tab={tab} linked={false} onSave={onSave} />
+        ) : tab === "sketch" ? (
+          <HouseSketchPanel project={project} levelId={activeLevelId} link={link} userId={userId} pins={pins} onPinsChanged={reloadPins} request={sketchRequest} onOpenFiles={() => onTab("files")} onPin={(pin) => setActivePinId(pin.id)} onAddToAgenda={addPinToAgenda} />
+        ) : tab === "files" ? (
+          <HouseFilesPanel projectId={link.projectId} userId={userId} onSketch={(source) => { onTab("sketch"); setSketchRequest({ source, nonce: Date.now() }); }} />
         ) : (
-          <ProjectSectionPlaceholder tab={tab} linked={Boolean(link)} onSave={onSave} />
+          <HouseAgendaPanel link={link} pins={pins} statuses={statuses} onOpen={openPin} where={whereOf} />
         )}
+        {activePin && link ? (
+          <div className="fixed inset-x-2 bottom-2 z-[60] max-h-[70dvh] overflow-y-auto sm:left-auto sm:w-[420px]">
+            <HousePinSheet key={activePin.id} pin={activePin} userId={userId} projectId={link.projectId} taskStatus={activePin.taskId ? statuses[activePin.taskId] : undefined} where={whereOf(activePin)} onClose={() => setActivePinId(null)} onChange={async (patch) => { const result = await updatePin(createClient(), activePin.id, patch); if (result.error) toast.error(result.error); await reloadPins(); }} onAddToAgenda={() => addPinToAgenda(activePin)} onShow={tab === "agenda" || tab === "files" ? () => openPin(activePin) : undefined} />
+          </div>
+        ) : null}
+        {pinDialog ? <HousePinDialog initial={pinDialog.initial} onCancel={() => setPinDialog(null)} onSave={(details) => void placePlanPin(pinDialog.at, details)} /> : null}
       </section>
     </HouseUnitsContext.Provider>
   );

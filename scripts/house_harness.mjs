@@ -46,7 +46,7 @@ const scenes = new Set<THREE.Scene>();
 Object.assign(window, { __scenes: scenes, __THREE: THREE });
 THREE.Scene.prototype.onBeforeRender = function () { scenes.add(this); };
 const query = new URLSearchParams(location.search);
-createRoot(document.getElementById("root")!).render(<><HouseDesignerWorkspace userId={FAKE_USER} planId={query.get("plan")} projectId={query.get("project")} pinId={query.get("pin")} /><Toaster /></>);
+createRoot(document.getElementById("root")!).render(<><HouseDesignerWorkspace userId={FAKE_USER} planId={query.get("plan")} projectId={query.get("project")} pinId={query.get("pin")} sketchId={query.get("sketch")} /><Toaster /></>);
 `);
   // The start screen's upload field talks to moderation; nothing here uploads through it.
   writeFileSync(join(out, "stub.ts"), `
@@ -82,7 +82,8 @@ export const signQuarantinePreview = async () => ({});
     const page = /^\/(house-design)?(\?|$)/.test(request.url);
     const path = page ? "index.html" : decodeURIComponent(request.url.slice(1).split("?")[0]);
     try {
-      const body = readFileSync(join(out, path));
+      // pdf.js finds its worker beside the bundle, as Next serves it beside the page.
+      const body = path.startsWith("pdfjs-dist/") ? readFileSync(join(root, "node_modules", path)) : readFileSync(join(out, path));
       const extension = Object.keys(types).find((item) => path.endsWith(item));
       response.writeHead(200, { "content-type": types[extension] ?? "application/octet-stream" });
       response.end(body);

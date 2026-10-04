@@ -26,5 +26,5 @@ export default async function HouseDesignPage({
     redirect(`/login?redirect=${encodeURIComponent(`/house-design${query ? `?${query}` : ""}`)}`);
   }
 
-  return <HouseDesignerWorkspace userId={profile.id} planId={id(params.plan)} projectId={id(params.project)} pinId={id(params.pin)} />;
+  return <HouseDesignerWorkspace userId={profile.id} planId={id(params.plan)} projectId={id(params.project)} pinId={id(params.pin)} sketchId={id(params.sketch)} />;
 }
