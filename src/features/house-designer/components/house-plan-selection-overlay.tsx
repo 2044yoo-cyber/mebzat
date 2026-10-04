@@ -631,7 +631,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     }
     return controls;
   }
-  const selectedItemBounds = selections.length === 1 && ["component", "column", "stair"].includes(selections[0]!.kind) ? objects.find((object) => object.selection.id === selections[0]!.id)?.bounds ?? null : null;
+  const selectedItemBounds = selections.length === 1 && ["component", "column", "stair", "room"].includes(selections[0]!.kind) ? objects.find((object) => object.selection.id === selections[0]!.id)?.bounds ?? null : null;
 
   const plan = project.levels.find((level) => level.id === levelId)?.plan;
   return (

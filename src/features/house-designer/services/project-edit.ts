@@ -661,17 +661,24 @@ export function mergeRooms(project: HouseProject, firstRoomId: string, secondRoo
   if (!a || !b) return { project, blocked: "Those rooms cannot be merged" };
   const union = unionAlongSharedEdges(a.boundary, b.boundary);
   if (!union) return { project, blocked: `${first.name} and ${second.name} do not share a wall` };
-  const shared = sharedSegments(a.boundary, b.boundary);
+  const { interiorWalls, openings } = cutInteriorWalls(plan, sharedSegments(a.boundary, b.boundary));
+  const nextZones = zones.filter((zone) => zone.id !== b.id).map((zone) => zone.id === a.id ? { ...zone, boundary: union } : zone);
+  return { project: rebuildLevel(project, level!.id, { ...plan, zones: nextZones, interiorWalls, openings }), blocked: null };
+}
+
+/**
+ * The stretches of inside wall lying along `cuts` are taken out. A door or
+ * window in a wall that was shortened moves onto whichever piece still holds
+ * it, measured from that piece's start; one in a stretch taken out goes with it.
+ */
+function cutInteriorWalls(plan: Room, cuts: readonly [Point, Point][]) {
   const removed = new Set<string>();
   const interiorWalls = (plan.interiorWalls ?? []).flatMap((wall) => {
-    const pieces = subtractSegments(wall.start, wall.end, shared, wall.thickness / 2 + 5);
+    const pieces = subtractSegments(wall.start, wall.end, cuts, wall.thickness / 2 + 5);
     if (pieces.length === 1 && samePoint(pieces[0]![0], wall.start) && samePoint(pieces[0]![1], wall.end)) return [wall];
     removed.add(wall.id);
     return pieces.map(([start, end], index) => ({ ...wall, id: index === 0 && samePoint(start, wall.start) ? wall.id : `${wall.id}-${index + 1}`, start, end }));
   });
-  // A door or window in a wall that was shortened moves onto whichever piece
-  // still holds it, measured from that piece's start; one in the stretch
-  // taken out goes with it.
   const original = new Map((plan.interiorWalls ?? []).map((wall) => [wall.id, wall]));
   const openings = plan.openings.flatMap((opening) => {
     if (!removed.has(opening.wallId)) return [opening];
@@ -681,8 +688,112 @@ export function mergeRooms(project: HouseProject, firstRoomId: string, secondRoo
     const host = interiorWalls.find((piece) => (piece.id === wall.id || piece.id.startsWith(`${wall.id}-`)) && along(piece.start) <= opening.offset + 0.5 && opening.offset + opening.width <= along(piece.end) + 0.5);
     return host ? [{ ...opening, wallId: host.id, offset: micron(opening.offset - along(host.start)) }] : [];
   });
-  const nextZones = zones.filter((zone) => zone.id !== b.id).map((zone) => zone.id === a.id ? { ...zone, boundary: union } : zone);
-  return { project: rebuildLevel(project, level!.id, { ...plan, zones: nextZones, interiorWalls, openings }), blocked: null };
+  return { interiorWalls, openings };
+}
+
+const edgesOf = (polygon: readonly Point[]): [Point, Point][] => polygon.map((point, index) => [point, polygon[(index + 1) % polygon.length]!]);
+
+/** The stretches of a room's edge no other room shares: what is its alone. */
+function ownEdges(target: readonly Point[], others: readonly (readonly Point[])[]): [Point, Point][] {
+  const shared = others.flatMap((other) => sharedSegments(target, other));
+  return edgesOf(target).flatMap(([start, end]) => subtractSegments(start, end, shared, 5));
+}
+
+const overlapsAny = (segments: readonly [Point, Point][], lines: readonly [Point, Point][]) =>
+  segments.some(([start, end]) => { const left = subtractSegments(start, end, lines, 5); return !(left.length === 1 && samePoint(left[0]![0], start) && samePoint(left[0]![1], end)); });
+
+function onOrInside(point: Point, polygon: readonly Point[]) {
+  return pointInPolygon(point, polygon) || edgesOf(polygon).some(([a, b]) => { const dx = b.x - a.x; const dy = b.y - a.y; const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / Math.max(1, dx * dx + dy * dy))); return Math.hypot(point.x - a.x - dx * t, point.y - a.y - dy * t) <= 5; });
+}
+
+/**
+ * Deletes a room and the walls that were its alone; a wall it shares with
+ * another room stays. The house's only room takes the outline with it: the
+ * floor is empty again, or — when a room was drawn apart from the house —
+ * that room becomes the house, its walls the outline, its doors and windows
+ * kept.
+ */
+export function deleteRoom(project: HouseProject, roomId: string): { project: HouseProject; blocked: string | null } {
+  const room = project.rooms.find((item) => item.id === roomId);
+  const level = room ? project.levels.find((item) => item.id === room.levelId) : null;
+  const plan = level?.plan;
+  if (!room || !plan) return { project, blocked: "That room is not on the plan" };
+  const zones = zonesOf(plan);
+  const target = zones.find((zone) => `${level!.id}:${zone.id}` === roomId) ?? (zones.length === 1 ? zones[0] : undefined);
+  if (!target) return { project, blocked: "That room is not on the plan" };
+  const others = zones.filter((zone) => zone !== target);
+  const own = ownEdges(target.boundary, others.map((zone) => zone.boundary));
+  const outline = plan.corners.map(({ x, y }) => ({ x, y }));
+  const inHouse = (zone: (typeof zones)[number]) => zone.boundary.every((point) => onOrInside(point, outline));
+  const takesOutline = overlapsAny(own, edgesOf(outline)) && !others.some(inHouse);
+  const { interiorWalls, openings } = cutInteriorWalls(plan, own);
+  if (!takesOutline) return { project: rebuildLevel(project, level!.id, { ...plan, zones: others, interiorWalls, openings }), blocked: null };
+
+  const cornerIds = new Set(plan.corners.map((corner) => corner.id));
+  const kept = openings.filter((opening) => !cornerIds.has(opening.wallId));
+  const promoted = [...others].sort((a, b) => Math.abs(signedArea(b.boundary)) - Math.abs(signedArea(a.boundary)))[0];
+  if (!promoted) {
+    // Nothing left on the floor: it is open space again.
+    const levelId = level!.id;
+    const gone = <T extends { levelId: string }>(items: T[]) => items.filter((item) => item.levelId !== levelId);
+    return { project: { ...project, levels: project.levels.map((item) => item.id === levelId ? { ...item, plan: null } : item), walls: gone(project.walls), doors: gone(project.doors), windows: gone(project.windows), rooms: gone(project.rooms), slabs: gone(project.slabs), ceilings: gone(project.ceilings), facadeElements: gone(project.facadeElements), verandas: gone(project.verandas), balconies: gone(project.balconies) }, blocked: null };
+  }
+  // The room drawn apart becomes the house: its walls are the outline now.
+  const corners = promoted.boundary.map((point, index) => ({ id: `c${index + 1}`, x: point.x, y: point.y }));
+  const edges = edgesOf(promoted.boundary);
+  const rest = cutInteriorWalls({ ...plan, interiorWalls, openings: kept }, edges);
+  const before = new Map(interiorWalls.map((wall) => [wall.id, wall]));
+  const moved = kept.flatMap((opening) => {
+    if (rest.openings.includes(opening)) return [opening];
+    const wall = before.get(opening.wallId);
+    if (!wall) return [];
+    const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y) || 1;
+    const at = (offset: number) => ({ x: wall.start.x + (wall.end.x - wall.start.x) * offset / length, y: wall.start.y + (wall.end.y - wall.start.y) * offset / length });
+    const [from, to] = [at(opening.offset), at(opening.offset + opening.width)];
+    const index = edges.findIndex(([a, b]) => { const left = subtractSegments(a, b, [[from, to]], 5); return !(left.length === 1 && samePoint(left[0]![0], a) && samePoint(left[0]![1], b)); });
+    if (index < 0) return [];
+    const [a, b] = edges[index]!;
+    const run = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const along = (point: Point) => ((point.x - a.x) * (b.x - a.x) + (point.y - a.y) * (b.y - a.y)) / run;
+    return [{ ...opening, wallId: corners[index]!.id, offset: micron(Math.max(0, Math.min(along(from), along(to)))) }];
+  });
+  const openingsAfter = [...rest.openings.filter((opening) => !moved.includes(opening)), ...moved.filter((opening) => !rest.openings.includes(opening))];
+  return { project: rebuildLevel(project, level!.id, { ...plan, corners, zones: others, interiorWalls: rest.interiorWalls, openings: openingsAfter }), blocked: null };
+}
+
+/**
+ * Moves a room with its walls. A room apart from the others moves with the
+ * walls that are its alone; the house's only room moves the whole outline.
+ * A room sharing a wall with another is moved by dragging that wall.
+ */
+export function moveRoom(project: HouseProject, roomId: string, dx: number, dy: number): { project: HouseProject; blocked: string | null } {
+  const room = project.rooms.find((item) => item.id === roomId);
+  const level = room ? project.levels.find((item) => item.id === room.levelId) : null;
+  const plan = level?.plan;
+  if (!room || !plan) return { project, blocked: "That room is not on the plan" };
+  const zones = zonesOf(plan);
+  const target = zones.find((zone) => `${level!.id}:${zone.id}` === roomId) ?? (zones.length === 1 ? zones[0] : undefined);
+  if (!target) return { project, blocked: "That room is not on the plan" };
+  const others = zones.filter((zone) => zone !== target);
+  if (others.some((zone) => sharedSegments(target.boundary, zone.boundary).length)) return { project, blocked: `${target.name} shares a wall with another room — drag that wall to change it` };
+  const shift = <T extends Point>(point: T): T => ({ ...point, x: micron(point.x + dx), y: micron(point.y + dy) });
+  const outline = plan.corners.map(({ x, y }) => ({ x, y }));
+  const edges = edgesOf(target.boundary);
+  const isHouse = overlapsAny(edges, edgesOf(outline));
+  const lies = (wall: NonNullable<Room["interiorWalls"]>[number]) => isHouse
+    ? onOrInside(wall.start, outline) && onOrInside(wall.end, outline)
+    : subtractSegments(wall.start, wall.end, edges, wall.thickness / 2 + 5).length === 0;
+  if (isHouse && others.some((zone) => zone.boundary.every((point) => onOrInside(point, outline)))) return { project, blocked: `${target.name} shares the house with another room — drag a wall to change it` };
+  const interiorWalls = (plan.interiorWalls ?? []).map((wall) => lies(wall) ? { ...wall, start: shift(wall.start), end: shift(wall.end) } : wall);
+  // The furniture in it goes with it.
+  const inside = (item: { levelId: string; x: number; y: number }) => item.levelId === level!.id && pointInPolygon(item, target.boundary);
+  const withContents = { ...project, components: project.components.map((item) => inside(item) ? shift(item) : item) };
+  return { project: rebuildLevel(withContents, level!.id, {
+    ...plan,
+    corners: isHouse ? plan.corners.map(shift) : plan.corners,
+    interiorWalls,
+    zones: zones.map((zone) => zone === target ? { ...zone, boundary: zone.boundary.map(shift) } : zone),
+  }), blocked: null };
 }
 
 function samePoint(a: Point, b: Point, tolerance = 1) { return Math.hypot(a.x - b.x, a.y - b.y) <= tolerance; }
