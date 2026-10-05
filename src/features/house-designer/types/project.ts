@@ -29,7 +29,7 @@ export const HOUSE_STYLE_LABELS: Record<HouseStyle, string> = {
 };
 
 export const roofTypes = ["flat", "gable", "hip"] as const;
-export const stairTypes = ["straight", "l-shaped", "u-shaped"] as const;
+export const stairTypes = ["straight", "l-shaped", "u-shaped", "dog-legged", "switchback", "winder", "l-winder", "u-winder", "spiral", "curved"] as const;
 export const houseObjectKinds = ["level", "room", "wall", "door", "window", "stair", "slab", "roof", "column", "beam", "grid", "facade", "balcony", "veranda", "ceiling", "site", "foundation", "railing", "reference-plane", "annotation", "component"] as const;
 export const facadeElementTypes = ["band", "cornice", "pilaster", "accent", "parapet"] as const;
 
@@ -189,9 +189,17 @@ const stairSchema = z.object({
   length: z.number().positive(),
   height: z.number().positive(),
   rotation: z.number(),
+  /** Risers. */
   steps: z.number().int().min(3).max(40),
   type: z.enum(stairTypes),
   material: z.string(),
+  // The stair's own parameters; its width and length are the footprint they
+  // make (services/stair-geometry). Absent on stairs saved before them.
+  stairWidth: z.number().positive().optional(),
+  treadDepth: z.number().positive().optional(),
+  landing: z.number().positive().optional(),
+  gap: z.number().nonnegative().optional(),
+  reversed: z.boolean().optional(),
 });
 
 const slabSchema = z.object({
@@ -213,8 +221,10 @@ const structuralColumnSchema = z.object({
   width: z.number().positive(),
   depth: z.number().positive(),
   height: z.number().positive(),
+  /** "rectangular", "square" or "circular" (width is the diameter). */
   type: z.string(),
   material: z.string(),
+  rotation: z.number().optional(),
 });
 
 const structuralBeamSchema = z.object({

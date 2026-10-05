@@ -1,6 +1,7 @@
 import { roomSchema, type Room } from "@/features/berchuma-studio/types/room";
 
 import { applyModelingOptions } from "./workspace-options";
+import { applyStairEdit, stairFields, stairParams } from "./stair-geometry";
 
 import {
   buildFacadeElements,
@@ -54,7 +55,7 @@ export function patchHouseObject(
     case "window":
       return patchOpening(project, selection.kind, selection.id, patch);
     case "stair":
-      return { ...project, stairs: patchList(project.stairs, selection.id, patch) };
+      return patchStair(project, selection.id, patch);
     case "slab":
       return { ...project, slabs: patchList(project.slabs, selection.id, patch) };
     case "roof": {
@@ -65,8 +66,13 @@ export function patchHouseObject(
       // the roof it is meant to edge. Going back to flat puts it back.
       return { ...project, roofs, facadeElements: parapetsOnlyOnFlatRoofs(buildFacadeElements(project.walls, project.levels, project.facade), roofs) };
     }
-    case "column":
-      return { ...project, structuralColumns: patchList(project.structuralColumns, selection.id, patch) };
+    case "column": {
+      // A square or round column is as deep as it is wide.
+      const column = project.structuralColumns.find((item) => item.id === selection.id);
+      const shape = typeof patch.type === "string" ? patch.type : column?.type;
+      const width = numberOr(patch.width, column?.width ?? 0);
+      return { ...project, structuralColumns: patchList(project.structuralColumns, selection.id, shape === "circular" || shape === "square" ? { ...patch, depth: width } : patch) };
+    }
     case "beam":
       return patchBeam(project, selection.id, patch);
     case "grid":
@@ -94,6 +100,18 @@ export function patchHouseObject(
     case "level":
       return patchLevel(project, selection.id, patch);
   }
+}
+
+/** A stair edit, and everything that follows from it: risers, treads, its footprint. */
+function patchStair(project: HouseProject, id: string, patch: HousePatch): HouseProject {
+  return {
+    ...project,
+    stairs: project.stairs.map((item) => {
+      if (item.id !== id) return item;
+      const fields = stairFields(applyStairEdit(stairParams(item), patch));
+      return { ...item, ...fields, x: numberOr(patch.x, item.x), y: numberOr(patch.y, item.y), rotation: numberOr(patch.rotation, item.rotation), material: typeof patch.material === "string" ? patch.material : item.material };
+    }),
+  };
 }
 
 function patchRailing(project: HouseProject, id: string, patch: HousePatch): HouseProject {
@@ -331,12 +349,16 @@ function patchOpening(
             height: positiveOr(patch.height, item.height),
             sill: nonNegativeOr(patch.sillHeight, item.sill),
             offset: nonNegativeOr(patch.offset, item.offset),
+            // The rebuild reads the swing from the plan: it is kept there too.
+            swing: SWINGS.includes(patch.swing as never) ? patch.swing as Room["openings"][number]["swing"] : item.swing,
           }
         : item,
     ),
   };
   return rebuildLevel(next, level.id, changedPlan);
 }
+
+const SWINGS = ["in-left", "in-right", "out-left", "out-right", "none"];
 
 function patchLevel(project: HouseProject, id: string, patch: HousePatch): HouseProject {
   const level = project.levels.find((item) => item.id === id);

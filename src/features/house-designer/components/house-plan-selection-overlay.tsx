@@ -11,6 +11,9 @@ import type { HouseCommandId } from "../services/command-registry";
 import { roomOutline, type HouseRoomShape } from "../services/model-commands";
 import type { ColumnProposal } from "../services/column-suggestions";
 import type { HouseProject, HouseSelection } from "../types/project";
+import { definitionOf } from "../services/object-library";
+import { stairGeometry, stairParams } from "../services/stair-geometry";
+import { DoorSymbol, ObjectSymbol, StairSymbol, WindowSymbol } from "./plan-symbols";
 
 export type HousePlanPoint = { x: number; y: number };
 type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
@@ -38,7 +41,7 @@ function fieldClearance(normal: { x: number; y: number }, px: number) {
 const chainTools = new Set<HouseCommandId>(["wall", "structural-wall", "room-separator"]);
 const DIRECTIONS = [{ label: "→", x: 1, y: 0 }, { label: "↓", x: 0, y: 1 }, { label: "←", x: -1, y: 0 }, { label: "↑", x: 0, y: -1 }] as const;
 
-export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, roomShape = "rectangle", sketch = [], onCancelDraft, proposals = null, chosenProposal = null, onProposalChoose, onProposalMove, onMoveSelection, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu, showGrid = true, pins = [], onPinTap, focus = null, onWallExtend, onWallEnd, onWallLength, onWallDistance, actionBar = null, guide = null, placement = null, onPlacementMove }: {
+export function HousePlanSelectionOverlay({ project, levelId, activeTool, selections, draftStart, snapEnabled, chain, viewRevision, roomShape = "rectangle", sketch = [], onCancelDraft, proposals = null, chosenProposal = null, onProposalChoose, onProposalMove, onMoveSelection, onDraftStart, onDraft, onSelect, onDimensionChange, onGuidance, onSelectionMenu, showGrid = true, pins = [], onPinTap, focus = null, onWallExtend, onWallEnd, onWallLength, onWallDistance, actionBar = null, guide = null, placement = null, onPlacementMove, ghost = null }: {
   project: HouseProject;
   levelId: string;
   activeTool: HouseCommandId | null;
@@ -88,6 +91,8 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   /** A room being placed: its outline follows the finger. */
   placement?: { x: number; y: number; width: number; depth: number } | null;
   onPlacementMove?: (x: number, y: number) => void;
+  /** What is being placed, drawn where the finger is until it is put down. */
+  ghost?: ((point: HousePlanPoint) => React.ReactNode) | null;
 }) {
   const svg = useRef<SVGSVGElement | null>(null);
   const gridId = useId();
@@ -638,7 +643,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     <>
     {/* The verified plan underneath, in the same frame, so it pans and zooms
         with the model rather than staying put behind it. */}
-    {plan ? <div className="pointer-events-none absolute inset-0"><PlanCanvas room={plan} onChange={noop} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} viewBox={{ x: effective.minX, y: effective.minY, width: effective.maxX - effective.minX, height: effective.maxY - effective.minY }} /></div> : null}
+    {plan ? <div className="pointer-events-none absolute inset-0"><PlanCanvas room={plan} onChange={noop} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} openingSymbols={false} viewBox={{ x: effective.minX, y: effective.minY, width: effective.maxX - effective.minX, height: effective.maxY - effective.minY }} /></div> : null}
     <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (placementDrag && placementDrag.pointerId === event.pointerId) { const raw = modelPoint(event); if (raw && onPlacementMove) onPlacementMove(...placementSnap(raw, placementDrag.grab)); return; } if (hold && hold.pointerId === event.pointerId) { holdSlide(event); return; } if (moveEnd(event) || moveProposal(event) || moveItem(event) || moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => {
         if (swallowRelease.current) { swallowRelease.current = false; event.preventDefault(); return; }
         // The canvas has had the tap. The click a browser makes of it after
@@ -666,6 +671,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
         {sketch.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r={Math.max(40, (index === 0 ? 7 : 4) * mmPerPx)} fill={index === 0 ? "#1473e6" : "white"} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" aria-label={index === 0 ? "Outline start" : undefined} />)}
       </g> : null}
       <ModelPlanGeometry project={project} levelId={levelId} />
+      {ghost && current && !selectMode ? <g aria-label="Placing" pointerEvents="none" opacity={0.65} className="text-brand">{ghost(current)}</g> : null}
       {objects.filter((object) => selectedIds.has(object.selection.id)).map((object) => {
         const line = lineGeometry(project, levelId, object.selection);
         if (line) {
@@ -893,10 +899,60 @@ function ModelPlanGeometry({ project, levelId }: { project: HouseProject; levelI
     {project.structuralBeams.filter((item) => item.levelId === levelId).map((item) => <line key={item.id} x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke="#b7791f" strokeWidth={Math.max(30, item.width)} opacity={0.72} />)}
     {project.railings.filter((item) => item.levelId === levelId).map((item) => <line key={item.id} x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke="#475569" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
     {project.foundations.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} fill="rgba(100,116,139,.12)" stroke="#64748b" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
-    {project.structuralColumns.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} fill="#64748b" />)}
-    {project.stairs.filter((item) => item.levelId === levelId).map((item) => <rect key={item.id} x={item.x - item.width / 2} y={item.y - item.length / 2} width={item.width} height={item.length} fill="rgba(71,85,105,.16)" stroke="#475569" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
-    {project.components.filter((item) => item.levelId === levelId).map((item) => <g key={item.id} aria-label={item.name} transform={`rotate(${item.rotation} ${item.x} ${item.y})`}><rect x={item.x - item.width / 2} y={item.y - item.depth / 2} width={item.width} height={item.depth} rx={Math.min(item.width, item.depth) * 0.06} fill="rgba(20,115,230,.10)" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={item.x} y={item.y} textAnchor="middle" dominantBaseline="middle" fontSize={Math.max(90, Math.min(item.width, item.depth) * 0.22)} fill="#1e40af">{item.name}</text></g>)}
+    {project.structuralColumns.filter((item) => item.levelId === levelId).map((item) => <g key={item.id} aria-label="Column" className="text-slate-600 dark:text-slate-300"><ColumnSymbol column={item} /></g>)}
+    {project.stairs.filter((item) => item.levelId === levelId).map((item) => <g key={item.id} aria-label={`Stair ${item.type}`} transform={`translate(${item.x} ${item.y}) rotate(${item.rotation})`} className="text-slate-700 dark:text-slate-200"><StairSymbol geometry={stairGeometry(stairParams(item))} /></g>)}
+    {project.components.filter((item) => item.levelId === levelId).map((item) => { const flipped = project.objectInstances[item.id]?.flipped; return <g key={item.id} aria-label={item.name} transform={`translate(${item.x} ${item.y}) rotate(${item.rotation})${flipped ? " scale(-1 1)" : ""}`} className="text-slate-700 dark:text-slate-200"><ObjectSymbol definition={definitionOf(item)} width={item.width} depth={item.depth} /></g>; })}
+    <OpeningSymbols project={project} levelId={levelId} />
   </g>;
+}
+
+/** A column: square or rectangular, turned if it is, or round; filled as cut. */
+export function ColumnSymbol({ column }: { column: Pick<HouseProject["structuralColumns"][number], "x" | "y" | "width" | "depth" | "type" | "rotation"> }) {
+  if (column.type === "circular") return <circle cx={column.x} cy={column.y} r={column.width / 2} fill="currentColor" fillOpacity={0.55} stroke="currentColor" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />;
+  return <g transform={`rotate(${column.rotation ?? 0} ${column.x} ${column.y})`}><rect x={column.x - column.width / 2} y={column.y - column.depth / 2} width={column.width} height={column.depth} fill="currentColor" fillOpacity={0.55} stroke="currentColor" strokeWidth={1.2} vectorEffect="non-scaling-stroke" /><line x1={column.x - column.width / 2} y1={column.y - column.depth / 2} x2={column.x + column.width / 2} y2={column.y + column.depth / 2} stroke="currentColor" strokeWidth={0.8} vectorEffect="non-scaling-stroke" /></g>;
+}
+
+/**
+ * Doors and windows drawn by type over the holes the plan leaves for them:
+ * a door's leaf and swing on the side it opens to, hung on the jamb its
+ * swing names; a window's frame and glazing.
+ */
+function OpeningSymbols({ project, levelId }: { project: HouseProject; levelId: string }) {
+  const outline = project.levels.find((level) => level.id === levelId)?.plan?.corners ?? [];
+  const cornerIds = new Set(outline.map((corner) => corner.id));
+  return <g pointerEvents="none" className="text-slate-800 dark:text-slate-100">
+    {[...project.doors, ...project.windows].filter((item) => item.levelId === levelId).map((opening) => {
+      const wall = project.walls.find((item) => item.id === opening.wallId);
+      if (!wall) return null;
+      const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y) || 1;
+      const u = { x: (wall.end.x - wall.start.x) / length, y: (wall.end.y - wall.start.y) / length };
+      const from = { x: wall.start.x + u.x * opening.offset, y: wall.start.y + u.y * opening.offset };
+      const to = { x: from.x + u.x * opening.width, y: from.y + u.y * opening.width };
+      // "In" is into the house for an outside wall; one side, consistently, for an inside one.
+      let inward = { x: -u.y, y: u.x };
+      if (wall.sourceWallId && cornerIds.has(wall.sourceWallId)) {
+        const mid = { x: (from.x + to.x) / 2 + inward.x * (wall.thickness + 10), y: (from.y + to.y) / 2 + inward.y * (wall.thickness + 10) };
+        if (!containsInPolygon(mid, outline)) inward = { x: -inward.x, y: -inward.y };
+      }
+      if (opening.type === "window") return <WindowSymbol key={opening.id} from={from} to={to} side={inward} style={opening.style} thickness={wall.thickness} />;
+      if (opening.type === "passage") return null;
+      const out = opening.swing.startsWith("out");
+      const side = out ? { x: -inward.x, y: -inward.y } : inward;
+      const flipped = Boolean(project.objectInstances[opening.id]?.flipped);
+      const hingeAtFrom = opening.swing.endsWith("left") === flipped;
+      return <DoorSymbol key={opening.id} from={from} to={to} side={side} hingeAtFrom={hingeAtFrom} style={opening.style} thickness={wall.thickness} />;
+    })}
+  </g>;
+}
+
+function containsInPolygon(point: HousePlanPoint, polygon: readonly HousePlanPoint[]) {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const a = polygon[index]!;
+    const b = polygon[previous]!;
+    if ((a.y > point.y) !== (b.y > point.y) && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
 }
 
 function WallTemporaryDimension({ wall, margin, selection, onChange }: { wall: HouseProject["walls"][number]; margin: number; selection: HouseSelection; onChange: (selection: HouseSelection, length: number) => void }) {
@@ -955,7 +1011,10 @@ export function selectableBounds(project: HouseProject, levelId: string): { sele
   for (const opening of [...project.doors, ...project.windows].filter((item) => item.levelId === levelId)) { const wall = project.walls.find((item) => item.id === opening.wallId); if (!wall) continue; const point = pointAlongWall(wall, opening.offset + opening.width / 2); result.push({ selection: { kind: opening.type === "window" ? "window" : "door", id: opening.id }, bounds: centred(point.x, point.y, Math.max(opening.width, 180), Math.max(opening.width, 180)) }); }
   for (const column of project.structuralColumns.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "column", id: column.id }, bounds: centred(column.x, column.y, column.width, column.depth) });
   for (const foundation of project.foundations.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "foundation", id: foundation.id }, bounds: centred(foundation.x, foundation.y, foundation.width, foundation.depth) });
-  for (const stair of project.stairs.filter((item) => item.levelId === levelId)) result.push({ selection: { kind: "stair", id: stair.id }, bounds: centred(stair.x, stair.y, stair.width, stair.length) });
+  for (const stair of project.stairs.filter((item) => item.levelId === levelId)) {
+    const turned = Math.abs(Math.round(stair.rotation / 90)) % 2 === 1;
+    result.push({ selection: { kind: "stair", id: stair.id }, bounds: centred(stair.x, stair.y, turned ? stair.length : stair.width, turned ? stair.width : stair.length) });
+  }
   for (const component of project.components.filter((item) => item.levelId === levelId)) {
     // Turned a quarter, a piece of furniture is as deep as it was wide.
     const turned = Math.abs(Math.round(component.rotation / 90)) % 2 === 1;

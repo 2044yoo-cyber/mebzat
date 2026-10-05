@@ -31,7 +31,6 @@ import { cn } from "@/lib/utils";
 import { HouseColumnSuggestions } from "./house-modeling-chrome";
 import {
   EditorHeader,
-  FurniturePicker,
   PlanSecondaryBar,
   PlanToolbar,
   QuickActionBar,
@@ -83,6 +82,11 @@ import {
 import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong } from "../services/project-edit";
 import { PLAN_TEMPLATES, ROOM_SAMPLES } from "../services/plan-templates";
 import { HouseTemplateLibrary } from "./house-template-library";
+import { ObjectLibrarySheet, type LibraryChoice, type LibraryKind } from "./house-object-library";
+import { ObjectSymbol, StairSymbol } from "./plan-symbols";
+import { ColumnSymbol } from "./house-plan-selection-overlay";
+import { placeAgainstWall } from "../services/object-library";
+import { stairGeometry } from "../services/stair-geometry";
 import { planDescriptionError } from "../services/plan-analysis";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
 import { furnitureItem, type FurnitureItem } from "../services/furniture-catalog";
@@ -707,8 +711,11 @@ function PlanEditor({
   const [mergeFrom, setMergeFrom] = useState<string | null>(null);
   // Suggested columns live here, outside the model, until one is accepted.
   const [proposals, setProposals] = useState<{ levelId: string; maxSpan: number; items: ColumnProposal[]; chosen: string | null } | null>(null);
-  const [furniture, setFurniture] = useState<FurnitureItem>(() => furnitureItem("bed"));
-  const [furnitureOpen, setFurnitureOpen] = useState(false);
+  const [furniture] = useState<FurnitureItem>(() => furnitureItem("bed"));
+  // The object library open over the plan, and what was chosen from it to put down.
+  const [libraryFor, setLibraryFor] = useState<LibraryKind | null>(null);
+  const [placing, setPlacing] = useState<LibraryChoice | null>(null);
+  const [stairSpace, setStairSpace] = useState<{ width: number; length: number } | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [toolSettings, setToolSettings] = useState({
     height: project.levels[0]?.floorToFloorHeight ?? 3000,
@@ -924,15 +931,60 @@ function PlanEditor({
   }
 
   function chooseTool(id: HouseCommandId) {
-    setFurnitureOpen(id === "furniture");
+    const library = (["furniture", "stair", "door", "window", "column"] as const).find((item) => item === id) ?? null;
+    // A room selected when Stair is tapped is the space Auto fit starts from.
+    if (id === "stair") { const room = selections[0]?.kind === "room" ? roomRectangle(project, selections[0].id) : null; setStairSpace(room ? { width: room.width, length: room.depth } : null); }
+    setLibraryFor(library);
+    setPlacing(null);
     setSplitDraft(null);
     setPlacement(null);
     if (id === "select") { setActiveTool("select"); setDraftStart(null); setOutlineSketch([]); return; }
     activateDrawingTool(id);
   }
 
+  function chooseFromLibrary(choice: LibraryChoice) {
+    setLibraryFor(null);
+    setPlacing(choice);
+    if (choice.kind === "object") setToolSettings((current) => ({ ...current, width: choice.definition.width, depth: choice.definition.depth, height: choice.definition.height }));
+    else if (choice.kind === "door") setToolSettings((current) => ({ ...current, width: choice.width, height: 2100, sillHeight: 0 }));
+    else if (choice.kind === "window") setToolSettings((current) => ({ ...current, width: choice.width, height: choice.height, sillHeight: choice.sill }));
+    else if (choice.kind === "column") setToolSettings((current) => ({ ...current, width: choice.width, depth: choice.depth }));
+    toast.info(choice.kind === "door" || choice.kind === "window" ? "Tap a wall to place it" : "Tap the plan to place it");
+  }
+
+  /** Where the chosen object lands for a tap at `point`: furniture backs onto a wall within reach. */
+  function placementAt(point: HousePlanPoint) {
+    if (placing?.kind !== "object") return { x: point.x, y: point.y, rotation: placing?.kind === "stair" ? placing.rotation : 0 };
+    return placeAgainstWall(project, activeLevelId, point, { width: placing.definition.width, depth: placing.definition.depth });
+  }
+
+  function placingGhost(point: HousePlanPoint) {
+    if (!placing) return null;
+    const at = placementAt(point);
+    if (placing.kind === "object") return <g transform={`translate(${at.x} ${at.y}) rotate(${at.rotation})`}><ObjectSymbol definition={placing.definition} width={placing.definition.width} depth={placing.definition.depth} /></g>;
+    if (placing.kind === "stair") return <g transform={`translate(${at.x} ${at.y}) rotate(${at.rotation})`}><StairSymbol geometry={stairGeometry(placing.params)} /></g>;
+    if (placing.kind === "column") return <ColumnSymbol column={{ x: point.x, y: point.y, width: placing.width, depth: placing.depth, type: placing.shape, rotation: 0 }} />;
+    return null;
+  }
+
   function draftObject(start: HousePlanPoint, end: HousePlanPoint) {
     if (!activeTool) return;
+    if (placing && (activeTool === "furniture" || activeTool === "stair" || activeTool === "column")) {
+      const at = placementAt(end);
+      const result = placing.kind === "object"
+        ? createHouseObjectFromGesture(project, "furniture", activeLevelId, { x: at.x, y: at.y }, undefined, { width: placing.definition.width, depth: placing.definition.depth, height: placing.definition.height, family: placing.definition.id, rotation: at.rotation })
+        : placing.kind === "stair"
+          ? createHouseObjectFromGesture(project, "stair", activeLevelId, { x: at.x, y: at.y }, undefined, { stair: placing.params, rotation: at.rotation })
+          : placing.kind === "column"
+            ? createHouseObjectFromGesture(project, "column", activeLevelId, end, undefined, { width: placing.width, depth: placing.depth, height: activeLevel?.floorToFloorHeight, columnType: placing.shape })
+            : null;
+      if (!result) return;
+      applyMutation(result);
+      // Put down, it is selected — ready to move, turn or size.
+      setPlacing(null);
+      setActiveTool("select");
+      return;
+    }
     if (activeTool === "move") {
       applyMutation(moveHouseSelectionsTo(project, selections, end));
       setActiveTool("select");
@@ -985,12 +1037,15 @@ function PlanEditor({
       sillHeight: toolSettings.sillHeight,
       wallThickness: activeTool === "wall" ? (activeLevel?.plan ? 120 : 200) : wallThickness,
       name: activeTool === "furniture" ? furniture.name : undefined,
+      style: placing && (placing.kind === "door" || placing.kind === "window") ? placing.style : undefined,
     });
     // A wall drawn right across a room divides it, in the same undo step.
     if (activeTool === "wall" && !created.blocked.length) created.project = splitRoomAlong(created.project, activeLevelId, start, end);
     applyMutation(created);
-    // Furniture and a measurement are placed one at a time and then shown.
+    // Furniture and a measurement are placed one at a time and then shown;
+    // so is a door or window chosen from the library, ready to edit.
     if (activeTool === "furniture" || activeTool === "dimension" || activeTool === "text") setActiveTool("select");
+    if (placing && !created.blocked.length && (activeTool === "door" || activeTool === "window")) { setPlacing(null); setActiveTool("select"); }
   }
 
   function deleteSelection() {
@@ -1101,11 +1156,11 @@ function PlanEditor({
       case "window":
         return { label: "Window actions", actions: [duplicate, move], more: shared };
       case "component":
-        return { label: "Furniture actions", actions: [move, { id: "rotate", label: "↻ 90°", onSelect: run("rotate") }, duplicate], more: shared };
+        return { label: "Furniture actions", actions: [move, { id: "rotate", label: "↻ 90°", onSelect: run("rotate") }, { id: "mirror", label: "Mirror", onSelect: run("flip") }, duplicate], more: shared };
       case "stair":
-        return { label: "Stair actions", actions: [move, { id: "rotate", label: "↻ 90°", onSelect: run("rotate") }, duplicate], more: shared };
+        return { label: "Stair actions", actions: [{ id: "reverse", label: "Reverse", onSelect: () => commit(patchHouseObject(project, selection, { reversed: "toggle" })) }, { id: "rotate", label: "↻ 90°", onSelect: run("rotate") }, duplicate], more: [move, ...shared] };
       case "column":
-        return { label: "Column actions", actions: [move, duplicate], more: shared };
+        return { label: "Column actions", actions: [move, { id: "rotate", label: "↻ 90°", onSelect: () => commit(patchHouseObject(project, selection, { rotation: ((project.structuralColumns.find((item) => item.id === selection.id)?.rotation ?? 0) + 90) % 360 })) }, duplicate], more: shared };
       default:
         return { label: "Actions", actions: [{ id: "delete", label: "Delete", onSelect: run("delete") }], more: shared.slice(1) };
     }
@@ -1127,7 +1182,8 @@ function PlanEditor({
         }
         if (activeTool && activeTool !== "select") setActiveTool("select");
         else setSelections([]);
-        setFurnitureOpen(false);
+        setLibraryFor(null);
+        setPlacing(null);
         escapeRef.current = now;
         return;
       }
@@ -1230,6 +1286,7 @@ function PlanEditor({
                   actionBar={quick && propertiesFor !== sheetFor?.id ? <QuickActionBar key={`${sheetFor!.id}:${roomSplit ?? ""}`} label={quick.label} actions={quick.actions} more={quick.more} /> : null}
                   guide={splitGuide ? { ...splitGuide.line, label: `${shortMm(splitDraft!.first, project.displayUnits ?? "mm")} | ${shortMm(splitGuide.span - splitDraft!.first, project.displayUnits ?? "mm")}` } : null}
                   placement={placement}
+                  ghost={placing && (activeTool === "furniture" || activeTool === "stair" || activeTool === "column") ? placingGhost : null}
                   onPlacementMove={(x, y) => setPlacement((current) => current && { ...current, x, y })}
                 /> : null}
                 <span className="pointer-events-none absolute left-2 top-2 rounded-full border bg-background/90 px-2.5 py-1 text-[11px] font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>
@@ -1237,7 +1294,7 @@ function PlanEditor({
                   {([["rectangle", "Rectangle"], ["l-shape", "L shape"]] as const).map(([shape, label]) => <button key={shape} type="button" role="radio" aria-checked={roomShape === shape} onClick={() => setRoomShape(shape)} className={cn("min-h-9 rounded-lg px-3", roomShape === shape ? "bg-brand/15 text-brand" : "text-muted-foreground hover:bg-muted")}>{label}</button>)}
                   <button type="button" onClick={() => chooseTool("wall")} className="min-h-9 rounded-lg px-3 text-muted-foreground hover:bg-muted">Free draw</button>
                 </div> : null}
-                {activeTool === "furniture" && furnitureOpen ? <FurniturePicker chosen={furniture.id} onChoose={(item) => { setFurniture(item); activateDrawingTool("furniture", item); setFurnitureOpen(false); toast.info(`Tap where the ${item.name.toLowerCase()} goes`); }} onClose={() => setFurnitureOpen(false)} /> : null}
+                {libraryFor ? <ObjectLibrarySheet kind={libraryFor} floorHeight={activeLevel?.floorToFloorHeight ?? 3000} space={stairSpace} onChoose={chooseFromLibrary} onClose={() => setLibraryFor(null)} /> : null}
                 {activeTool === "move" ? <p className="pointer-events-none absolute inset-x-2 top-10 z-10 rounded-lg bg-brand px-3 py-2 text-center text-xs font-medium text-brand-foreground">Tap the new position</p> : null}
                 {mergeFrom ? <p className="pointer-events-none absolute inset-x-2 top-10 z-10 rounded-lg bg-brand px-3 py-2 text-center text-xs font-medium text-brand-foreground">Tap the room to merge with</p> : null}
                 {proposals && proposals.levelId === activeLevelId ? <HouseColumnSuggestions items={proposals.items} chosen={proposals.chosen} maxSpan={proposals.maxSpan} onSpan={suggest} onRegenerate={() => suggest(proposals.maxSpan)} onAccept={acceptProposals} onRemove={(item) => setProposals({ ...proposals, items: proposals.items.filter((entry) => entry !== item), chosen: null })} onClear={() => setProposals(null)} /> : null}
