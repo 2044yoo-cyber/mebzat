@@ -151,7 +151,7 @@ assert.deepEqual([window.offset, window.sillHeight, window.style], [500, 1000, "
 
 // A corner window: one window each side of the corner, grouped.
 const before = project.windows.length;
-step = createHouseObjectFromGesture(project, "window", ground, { x: 7600, y: 6000 }, undefined, { width: 1000, height: 1200, sillHeight: 900, style: "corner" });
+step = createHouseObjectFromGesture(project, "window", ground, { x: 6800, y: 6000 }, undefined, { width: 1000, height: 1200, sillHeight: 900, style: "corner" });
 assert.equal(step.project.windows.length, before + 2, "a corner window is two windows");
 const [first, second] = step.selections.map((selection) => step.project.windows.find((item) => item.id === selection.id)!);
 const wallOf = (opening: typeof first) => step.project.walls.find((wall) => wall.id === opening!.wallId)!;
