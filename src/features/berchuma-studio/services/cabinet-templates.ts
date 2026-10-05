@@ -3,7 +3,7 @@ import { moduleInterior, modulesOf, type CabinetModule } from "./transport-modul
 import { startingDesign, wardrobeShapeDesign } from "./starting-designs";
 import { edgeBandForBoard } from "./wardrobe-materials";
 import { BOARDS, findBoard } from "../types/catalogue";
-import { LIMITS, validateSpec, type Bay, type Cabinet, type DesignKind, type DesignSpec } from "../types/spec";
+import { LIMITS, maximumWardrobeHeight, validateSpec, type Bay, type Cabinet, type DesignKind, type DesignSpec } from "../types/spec";
 import type { KitchenSetup } from "../types/kitchen";
 
 /**
@@ -113,8 +113,8 @@ function wardrobeBaysFor(cabinet: Cabinet, wanted: number, style: Bay["door"], i
   );
   // Share the wanted doors by width; each module has at least its least.
   const total = modules.reduce((sum, carcassModule) => sum + carcassModule.width, 0);
-  const shared = modules.map((carcassModule, index) => Math.max(least[index]!, Math.round((wanted * carcassModule.width) / total)));
-  const perModule = sliding ? shared.map((count) => count + (count % 2)) : shared;
+  // For sliding doors the least is already a pair per bay, so this is even.
+  const perModule = modules.map((carcassModule, index) => Math.max(least[index]!, Math.round((wanted * carcassModule.width) / total)));
   const bays: Bay[] = [];
   const leavesOf: number[][] = modules.map((carcassModule, index) => {
     const doors = perModule[index]!;
@@ -144,11 +144,15 @@ function wardrobeBaysFor(cabinet: Cabinet, wanted: number, style: Bay["door"], i
 /** A straight wardrobe of a template's composition, laid out in the space. */
 function straightWardrobe(space: Space, doors: number, style: Bay["door"], options: { internalDrawers?: boolean; height?: number } = {}): DesignSpec {
   const base = startingDesign("wardrobe", { width: space.width });
-  const height = Math.min(options.height ?? space.height, 2700);
+  // No taller than a gable cut from a stocked sheet: past that the space is
+  // for a top cabinet, which is its own template.
+  const tallest = maximumWardrobeHeight(base.carcass.board, base.carcass.frontBoard ?? base.carcass.board, main(base).plinthHeight);
+  const height = Math.min(options.height ?? space.height, tallest);
   const sized = { ...main(base), size: { ...main(base).size, height, depth: Math.min(space.depth, 900) } };
   const laid = wardrobeBaysFor(sized, doors, style, options.internalDrawers);
   const cabinet = { ...sized, bays: laid.bays };
   let spec = validateSpec({ ...base, cabinets: base.cabinets.map((entry) => (entry.id === cabinet.id ? cabinet : entry)) }).spec;
+  if (options.height === undefined && space.height > tallest) spec = note(spec, `The space is ${space.height} mm high; a wardrobe carcass stops at ${tallest} mm, the longest gable a stocked sheet gives. "Wardrobe with top cabinet" fills the rest.`);
   if (laid.doors !== doors) {
     const modules = modulesOf(main(spec)).length;
     spec = note(spec, `Laid out with ${laid.doors} doors to suit ${space.width} mm: doors are kept to a width that ${style === "sliding" ? "runs" : "hangs"} well${modules > 1 ? `, across ${modules} transport modules` : ""}.`);
@@ -159,7 +163,9 @@ function straightWardrobe(space: Space, doors: number, style: Bay["door"], optio
 function shapedWardrobe(space: Space, options: TemplateOptions): DesignSpec {
   const shape = options.layout ?? "straight";
   const walls = options.walls ?? (shape === "l_shaped" ? [space.width, 1800] : shape === "u_shaped" ? [1800, space.width, 1800] : [space.width]);
-  const spec = wardrobeShapeDesign({ shape, walls, depth: Math.min(space.depth, 900), height: Math.min(space.height, 2700) });
+  const probe = startingDesign("wardrobe");
+  const tallest = maximumWardrobeHeight(probe.carcass.board, probe.carcass.frontBoard ?? probe.carcass.board, main(probe).plinthHeight);
+  const spec = wardrobeShapeDesign({ shape, walls, depth: Math.min(space.depth, 900), height: Math.min(space.height, tallest) });
   return validateSpec(spec).spec;
 }
 

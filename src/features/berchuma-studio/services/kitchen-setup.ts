@@ -100,17 +100,9 @@ export function clearWindows(spec: DesignSpec, windows: KitchenWindow[] | undefi
     if (windows.some((window) => window.wall === wall && window.offset < to - 1 && window.offset + window.width > from + 1)) blocked.add(cabinet.id);
   }
   if (!blocked.size) return spec;
-  // Whatever stands on a removed cabinet goes with it.
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const cabinet of spec.cabinets) {
-      if (cabinet.stackedOn && blocked.has(cabinet.stackedOn) && !blocked.has(cabinet.id)) {
-        blocked.add(cabinet.id);
-        grew = true;
-      }
-    }
-  }
+  // Whatever stands on a removed cabinet goes with it, even where it is
+  // narrower than the cabinet and clear of the window itself.
+  for (const cabinet of spec.cabinets) if (cabinet.stackedOn && blocked.has(cabinet.stackedOn)) blocked.add(cabinet.id);
   const named = windows.map((window) => `${window.wall} wall at ${Math.round(window.offset)} mm, ${Math.round(window.width)} mm wide`).join("; ");
   return validateSpec({
     ...spec,

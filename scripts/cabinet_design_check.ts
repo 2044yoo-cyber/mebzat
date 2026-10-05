@@ -82,6 +82,7 @@ for (const id of ["wardrobe-2-door", "wardrobe-3-door", "wardrobe-4-door", "ward
     const spec = buildTemplate(id, { width, height: 2400, depth: 600 }, {})!;
     const wardrobe = main(spec);
     equal(wardrobe.size.width, width, `${id} at ${width}: as wide as the space`);
+    equal(wardrobe.size.height, 2400, `${id} at ${width}: as high as the space`);
     equal(spec.meta.corrections, [], `${id} at ${width}: nothing for the validator to correct`);
     equal(jointsOf(wardrobe), defaultJoints(width), `${id} at ${width}: transport modules on the 1600 mm rule`);
     ok(wardrobe.bays.every((bay) => bay.width <= LIMITS.wardrobeBayWidth), `${id} at ${width}: every bay within ${LIMITS.wardrobeBayWidth} mm`);
@@ -190,6 +191,23 @@ equal(withMaterial(startingDesign("wardrobe"), "not-a-board"), startingDesign("w
   }
   const spec = createKitchenDesign({ ...DEFAULT_KITCHEN_SETUP, shape: "straight" });
   equal(clearWindows(spec, undefined), spec, "clearWindows without windows returns the design itself");
+  const lofty = buildTemplate("wardrobe-4-door", { width: 2400, height: 3000, depth: 600 }, {})!;
+  equal([main(lofty).size.height, lofty.meta.corrections], [2540, []], "in a 3000 mm room a wardrobe stops at 2540 mm, the longest gable a sheet gives — with nothing to correct");
+  ok(lofty.meta.assumptions.some((line) => /Wardrobe with top cabinet/.test(line)), "and points at the top cabinet template for the rest");
+  equal(buildTemplate("wardrobe-l", { width: 2400, height: 3000, depth: 600 }, { layout: "l_shaped" })!.meta.corrections, [], "an L wardrobe in a tall room is not over height either");
+  // A top cabinet narrower than the cabinet it stands on, clear of the
+  // window, still goes when the cabinet under it does.
+  const top = spec.cabinets.find((cabinet) => cabinet.stackedOn)!;
+  const under = spec.cabinets.find((cabinet) => cabinet.id === top.stackedOn)!;
+  const [from, to] = span({ ...spec, cabinets: [under] }, "back")[0]!;
+  const narrow = { ...spec, cabinets: spec.cabinets.map((cabinet) => (cabinet.id === top.id ? { ...cabinet, size: { ...cabinet.size, width: 300 }, bays: [{ ...cabinet.bays[0]!, width: 264, doorLeaves: 1 as const }] } : cabinet)) };
+  // Narrowed, the top keeps one end of the cabinet under it (the back run is
+  // laid from the right); the window goes at whichever end the top has left.
+  const [topFrom] = span({ ...narrow, cabinets: [narrow.cabinets.find((cabinet) => cabinet.id === top.id)!] }, "back")[0]!;
+  const window: KitchenWindow = { wall: "back", offset: Math.round(topFrom! > from! + 200 ? from! + 50 : to! - 150), width: 100 };
+  ok(span({ ...narrow, cabinets: [narrow.cabinets.find((cabinet) => cabinet.id === top.id)!] }, "back").every(([a, b]) => b! <= window.offset || a! >= window.offset + window.width), "(the narrowed top cabinet is clear of the window itself)");
+  ok(from! < window.offset && window.offset + window.width < to!, "(and the cabinet under it is not)");
+  ok(!clearWindows(narrow, [window]).cabinets.some((cabinet) => cabinet.id === top.id), "a top cabinet goes with the cabinet it stands on");
 }
 
 // ---------------------------------------------------------------------------

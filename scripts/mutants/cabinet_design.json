@@ -18,12 +18,6 @@
   "to": "const pairs = true;"
  },
  {
-  "name": "sliding doors single",
-  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
-  "from": "const perModule = sliding ? shared.map((count) => count + (count % 2)) : shared;",
-  "to": "const perModule = shared;"
- },
- {
   "name": "bays ignore transport modules",
   "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
   "from": "    const interior = moduleInterior(carcassModule, leaves.length, T);",
@@ -38,8 +32,8 @@
  {
   "name": "height not capped by the space",
   "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
-  "from": "const height = Math.min(options.height ?? space.height, 2700);",
-  "to": "const height = 2100;"
+  "from": "  const height = Math.min(options.height ?? space.height, tallest);",
+  "to": "  const height = Math.min(options.height ?? space.height, 2700);"
  },
  {
   "name": "internal drawers not internal",
@@ -122,8 +116,8 @@
  {
   "name": "stacked tops left floating",
   "file": "src/features/berchuma-studio/services/kitchen-setup.ts",
-  "from": "      if (cabinet.stackedOn && blocked.has(cabinet.stackedOn) && !blocked.has(cabinet.id)) {",
-  "to": "      if (false) {"
+  "from": "  for (const cabinet of spec.cabinets) if (cabinet.stackedOn && blocked.has(cabinet.stackedOn)) blocked.add(cabinet.id);",
+  "to": ""
  },
  {
   "name": "base cabinets cleared too",
@@ -268,5 +262,17 @@
   "file": "src/features/berchuma-studio/components/start-panel.tsx",
   "from": " initialTemplate={initialTemplate} />",
   "to": " />"
+ },
+ {
+  "name": "shaped wardrobe over height",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "height: Math.min(space.height, tallest) });",
+  "to": "height: Math.min(space.height, 2700) });"
+ },
+ {
+  "name": "no note for a tall room",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "  if (options.height === undefined && space.height > tallest) spec = note(",
+  "to": "  if (false) spec = note("
  }
 ]
