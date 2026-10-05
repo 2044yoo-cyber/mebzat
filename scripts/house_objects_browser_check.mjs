@@ -136,6 +136,8 @@ try {
   await bar().getByRole("button", { name: "Reverse" }).click();
   const after = await walk();
   assert.equal(after, before.trim().split(/\s+/).reverse().join(" "), "9. reversed: the arrow runs the other way");
+  await bar().getByRole("button", { name: "↻ 90°" }).click();
+  assert.match(await page.locator(`${PLAN} g[aria-label="Stair u-shaped"]`).getAttribute("transform"), /rotate\(90\)$/, "and a stair turns like anything else");
   sheet = await properties();
   assert.equal(await sheet.getByLabel("Number of risers").inputValue(), "18", "18 risers for 3000 mm");
   assert.equal(await sheet.getByLabel("Riser height").inputValue(), "166.7");
@@ -205,8 +207,9 @@ try {
     const dx = (where[index].x - origin.x) * 1000;
     const dy = -(where[index].z - origin.z) * 1000;
     assert.ok(Math.abs(dx - (item.x - plan[0].x)) < 2 && Math.abs(dy - (item.y - plan[0].y)) < 2, `15. ${item.name ?? item.type} sits in 3D where it is on the plan`);
-    if (item.rotation !== undefined) assert.ok(Math.abs(Math.cos(where[index].turn) - Math.cos(item.rotation * Math.PI / 180)) < 1e-6, `and turned the same way`);
+    if (item.rotation !== undefined) assert.ok(Math.abs(Math.cos(where[index].turn) - Math.cos(item.rotation * Math.PI / 180)) < 1e-6 && Math.abs(Math.sin(where[index].turn) - Math.sin(item.rotation * Math.PI / 180)) < 1e-6, `and turned the same way (${item.rotation}°)`);
   });
+  assert.ok(plan.some((item) => item.type === "u-shaped" && item.rotation === 90), "a turned stair is among them");
 
   assert.deepEqual(errors, [], "page errors");
 } finally {

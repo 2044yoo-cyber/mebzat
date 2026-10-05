@@ -37,6 +37,7 @@ assert.equal(objectDefinition("wall-cabinet")!.elevation, 1450, "a wall cabinet 
 assert.deepEqual(searchObjects("sofa").map((item) => item.id), ["sofa-2", "sofa-3", "sofa-l", "sofa-u"], "search by name");
 assert.ok(searchObjects("bathroom").some((item) => item.id === "toilet"), "or by category");
 assert.equal(definitionOf({ family: "Bed", name: "Bed" }).id, "queen-bed", "a bed placed before the library still draws as a bed");
+assert.equal(definitionOf({ family: "Bed", name: "Master bed" }).id, "queen-bed", "even renamed");
 assert.equal(definitionOf({ family: "Generic Model", name: "Generic Component" }).symbol, "generic");
 assert.equal(DOOR_TYPES.length, 7);
 assert.equal(WINDOW_TYPES.length, 7);
@@ -154,6 +155,9 @@ project = step.project;
 assert.deepEqual([project.structuralColumns.at(-1)!.type, project.structuralColumns.at(-1)!.depth], ["circular", 400], "a round column is as deep as it is wide");
 project = patchHouseObject(project, step.selections[0]!, { type: "rectangular", width: 300, depth: 400, rotation: 30 });
 assert.deepEqual([project.structuralColumns.at(-1)!.type, project.structuralColumns.at(-1)!.width, project.structuralColumns.at(-1)!.depth, project.structuralColumns.at(-1)!.rotation], ["rectangular", 300, 400, 30]);
+const rounded = patchHouseObject(project, step.selections[0]!, { type: "circular" });
+assert.equal(rounded.structuralColumns.at(-1)!.depth, 300, "made round, it is as deep as it is wide");
+assert.equal(patchHouseObject(rounded, step.selections[0]!, { width: 450 }).structuralColumns.at(-1)!.depth, 450, "and a new diameter both ways");
 
 // Saved and opened again: every object as it was.
 const reopened = houseProjectSchema.parse(JSON.parse(JSON.stringify(project)));
