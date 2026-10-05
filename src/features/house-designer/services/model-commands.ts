@@ -1,4 +1,6 @@
 import { deleteRoom, moveRoom, patchHouseObject, removeFootprintCorner } from "./project-edit";
+import { objectDefinition } from "./object-library";
+import { stairFields, stairPreset, type StairParams } from "./stair-geometry";
 import { allHouseSelections, sameSelection } from "./model-state";
 import { houseCommand, type HouseCommandId } from "./command-registry";
 import { wallObjectId, openingObjectId, type HouseObjectKind, type HouseProject, type HouseSelection } from "../types/project";
@@ -15,6 +17,15 @@ export type HousePlacementOptions = {
   material?: string;
   /** A furniture item's name — "Bed", "Sofa" — from the catalogue. */
   name?: string;
+  /** The object library definition a component is made from (services/object-library). */
+  family?: string;
+  rotation?: number;
+  /** A door's or window's type: "single", "sliding", "casement"… */
+  style?: string;
+  /** A column's shape: "rectangular", "square", "circular". */
+  columnType?: string;
+  /** A stair's parameters; its footprint follows from them. */
+  stair?: StairParams;
 };
 
 export function deleteHouseSelections(project: HouseProject, selections: readonly HouseSelection[], options?: { footprintEditable?: boolean }): HouseCommandMutation {
@@ -365,7 +376,7 @@ export function createHouseObjectFromGesture(
     const openingHeight = options.height ?? (kind === "door" ? 2100 : 1500);
     const sillHeight = kind === "door" ? 0 : Math.max(0, options.sillHeight ?? 900);
     const offset = wallOffsetAtPoint(wall, start, openingWidth);
-    const opening: HouseProject["doors"][number] = { id: objectId, sourceOpeningId, levelId: level.id, wallId: wall.id, width: openingWidth, height: openingHeight, sillHeight, offset, type: planKind, style: tool === "opening" ? "open" : "standard", material: kind === "door" ? "Timber" : "Aluminium", swing: tool === "door" ? "in-right" : "none" };
+    const opening: HouseProject["doors"][number] = { id: objectId, sourceOpeningId, levelId: level.id, wallId: wall.id, width: openingWidth, height: openingHeight, sillHeight, offset, type: planKind, style: tool === "opening" ? "open" : options.style ?? (kind === "door" ? "single" : "fixed"), material: kind === "door" ? "Timber" : "Aluminium", swing: tool === "door" ? "in-right" : "none" };
     next = {
       ...next,
       doors: kind === "door" ? [...next.doors, opening] : next.doors,
@@ -374,7 +385,8 @@ export function createHouseObjectFromGesture(
     };
     selection = { kind, id: objectId };
   } else if (tool === "column") {
-    next = { ...next, structuralColumns: [...next.structuralColumns, { id, levelId: level.id, x: start.x, y: start.y, elevation: level.elevation, width, depth, height, type: "rectangular", material: "Reinforced concrete" }] };
+    const shape = options.columnType === "circular" || options.columnType === "square" ? options.columnType : "rectangular";
+    next = { ...next, structuralColumns: [...next.structuralColumns, { id, levelId: level.id, x: start.x, y: start.y, elevation: level.elevation, width, depth: shape === "rectangular" ? depth : width, height, type: shape, material: "Reinforced concrete", rotation: options.rotation ?? 0 }] };
     selection = { kind: "column", id };
   } else if (tool === "beam") {
     if (lineLength < 50) return { project, selections: [], blocked: ["Beam length must be at least 50 mm"] };
@@ -406,11 +418,15 @@ export function createHouseObjectFromGesture(
     next = { ...next, foundations: [...next.foundations, { id, levelId: level.id, x: strip ? midpoint.x : start.x, y: strip ? midpoint.y : start.y, elevation: level.elevation - foundationThickness, width: strip ? Math.max(width, Math.abs(end.x - start.x)) : width, depth: strip ? Math.max(width, Math.abs(end.y - start.y)) : depth, thickness: foundationThickness, material: "Reinforced concrete" }] };
     selection = { kind: "foundation", id };
   } else if (["component", "furniture", "kitchen", "wardrobe", "plumbing-fixture"].includes(tool)) {
-    const name = options.name?.trim() || ({ component: "Generic Component", furniture: "Furniture", kitchen: "Kitchen Unit", wardrobe: "Wardrobe", "plumbing-fixture": "Plumbing Fixture" } as Record<string, string>)[tool]!;
-    next = { ...next, components: [...next.components, { id, levelId: level.id, family: name, name, x: start.x, y: start.y, elevation: level.elevation, width, depth, height, rotation: 0, material: options.material ?? (tool === "wardrobe" || tool === "kitchen" ? "MDF" : "Generic"), source: tool === "wardrobe" || tool === "kitchen" ? "berchuma" : "library" }] };
+    const definition = options.family ? objectDefinition(options.family) : null;
+    const name = options.name?.trim() || definition?.name || ({ component: "Generic Component", furniture: "Furniture", kitchen: "Kitchen Unit", wardrobe: "Wardrobe", "plumbing-fixture": "Plumbing Fixture" } as Record<string, string>)[tool]!;
+    next = { ...next, components: [...next.components, { id, levelId: level.id, family: definition?.id ?? name, name, x: start.x, y: start.y, elevation: level.elevation + (definition?.elevation ?? 0), width, depth, height, rotation: options.rotation ?? 0, material: options.material ?? definition?.material ?? (tool === "wardrobe" || tool === "kitchen" ? "MDF" : "Generic"), source: tool === "wardrobe" || tool === "kitchen" ? "berchuma" : "library" }] };
     selection = { kind: "component", id };
   } else if (tool === "stair") {
-    next = { ...next, stairs: [...next.stairs, { id, levelId: level.id, x: start.x, y: start.y, elevation: level.elevation, width, length: Math.max(depth, 1000), height, rotation: 0, steps: Math.max(3, Math.min(40, Math.round(height / 175))), type: "straight", material: "Reinforced concrete" }] };
+    // Built from its parameters: risers for the floor height, treads, flight
+    // width — the footprint is what those make.
+    const params = options.stair ?? stairPreset("straight", level.floorToFloorHeight);
+    next = { ...next, stairs: [...next.stairs, { id, levelId: level.id, x: start.x, y: start.y, elevation: level.elevation, rotation: options.rotation ?? 0, material: "Reinforced concrete", ...stairFields(params) }] };
     selection = { kind: "stair", id };
   } else if (tool === "room") {
     const zoneId = `zone-${crypto.randomUUID()}`;

@@ -29,6 +29,8 @@ import { cn } from "@/lib/utils";
 
 import { displayLength, modelLength, type DisplayUnits } from "../services/workspace-options";
 import { FURNITURE_CATALOG, type FurnitureItem } from "../services/furniture-catalog";
+import { COLUMN_SHAPES, COLUMN_SIZES, DOOR_TYPES, WINDOW_TYPES, columnShape, doorType, windowType } from "../services/object-library";
+import { STAIR_TYPES, stairGeometry, stairParams, stairWarnings } from "../services/stair-geometry";
 import { formatArea, formatLength, formatSize, polygonArea, polygonPerimeter, wallLabels, wallRooms } from "../services/measurements";
 import type { HouseCommandId } from "../services/command-registry";
 import type { HousePatch } from "../services/project-edit";
@@ -217,10 +219,21 @@ export function SelectionSheet({ project, selection, onPatch, onAction, onClose,
       </div>
       {content.fields.length ? (
         <div className="mt-1 grid grid-cols-3 gap-1.5">
-          {content.fields.map((field) => (
-            <label key={field.label} className={cn("min-w-0 rounded-lg bg-muted/50 px-2 py-1", field.edit?.text && "col-span-3")}>
-              <span className="block truncate text-[10px] text-muted-foreground">{field.label}{field.edit && !field.edit.text ? ` (${unit})` : ""}</span>
-              {field.edit ? <SheetNumber key={`${selection.id}:${field.edit.key}:${field.edit.value}`} label={field.label} value={field.edit.value} unit={field.edit.text ? null : unit} text={field.edit.text} autoFocus={autoFocus === field.label} onCommit={(value) => onPatch({ [field.edit!.key]: value })} /> : <span className="block truncate text-xs font-medium tabular-nums">{field.value}</span>}
+          {content.fields.map((field) => field.choice ? (
+            <div key={field.label} role="radiogroup" aria-label={field.label} className="col-span-3 min-w-0">
+              <span className="block text-[10px] text-muted-foreground">{field.label}</span>
+              <div className="flex gap-1 overflow-x-auto pb-0.5">
+                {field.choice.options.map(([value, text]) => <button key={value} type="button" role="radio" aria-checked={String(field.choice!.value) === value} onClick={() => onPatch({ [field.choice!.key]: field.choice!.numeric ? Number(value) : value })} className={cn("min-h-9 shrink-0 rounded-lg border px-2.5 text-xs", String(field.choice!.value) === value ? "border-brand bg-brand/10 text-brand" : "hover:bg-muted")}>{text}</button>)}
+              </div>
+            </div>
+          ) : field.buttons ? (
+            <div key={field.label} className="col-span-3 flex flex-wrap gap-1">
+              {field.buttons.map((button) => <button key={button.label} type="button" onClick={() => onPatch(button.patch)} className="min-h-9 rounded-lg border px-2.5 text-xs hover:bg-muted">{button.label}</button>)}
+            </div>
+          ) : (
+            <label key={field.label} className={cn("min-w-0 rounded-lg bg-muted/50 px-2 py-1", (field.edit?.text || field.wide) && "col-span-3")}>
+              <span className="block truncate text-[10px] text-muted-foreground">{field.label}{field.edit && !field.edit.text ? ` (${field.edit.plain ?? unit})` : ""}</span>
+              {field.edit ? <SheetNumber key={`${selection.id}:${field.edit.key}:${field.edit.value}`} label={field.label} value={field.edit.value} unit={field.edit.text || field.edit.plain ? null : unit} text={field.edit.text} plain={Boolean(field.edit.plain)} signed={field.edit.signed} autoFocus={autoFocus === field.label} onCommit={(value) => onPatch({ [field.edit!.key]: value })} /> : <span className={cn("block text-xs font-medium tabular-nums", field.wide ? "whitespace-normal" : "truncate")}>{field.value}</span>}
             </label>
           ))}
         </div>
@@ -246,7 +259,18 @@ const ACTION_LABEL: Record<SheetAction, string> = {
   properties: "More properties",
 };
 
-type SheetField = { label: string; value?: string; edit?: { key: string; value: number | string; text?: boolean } };
+type SheetField = {
+  label: string;
+  value?: string;
+  wide?: boolean;
+  /** `plain` names a unit of its own (°, risers) — not a length; `signed` lets a position be zero or less. */
+  edit?: { key: string; value: number | string; text?: boolean; plain?: string; signed?: boolean };
+  choice?: { key: string; value: string | number; options: [string, string][]; numeric?: boolean };
+  buttons?: { label: string; patch: HousePatch }[];
+};
+
+const ROTATIONS: [string, string][] = [["0", "0°"], ["90", "90°"], ["180", "180°"], ["270", "270°"]];
+const round1 = (value: number) => Math.round(value * 10) / 10;
 
 function sheetContent(project: HouseProject, selection: HouseSelection, unit: DisplayUnits): { kind: string; title: string; subtitle?: string; fields: SheetField[]; actions: SheetAction[] } | null {
   switch (selection.kind) {
@@ -273,10 +297,22 @@ function sheetContent(project: HouseProject, selection: HouseSelection, unit: Di
       const number = `${selection.kind === "door" ? "D" : "W"}${list.findIndex((item) => item.id === opening.id) + 1}`;
       return {
         kind: selection.kind === "door" ? "Door" : "Window", title: `${selection.kind === "door" ? "Door" : "Window"} ${number}`, subtitle: formatSize(opening.width, opening.height, unit),
-        fields: [
+        fields: selection.kind === "door" ? [
+          { label: "Type", choice: { key: "style", value: doorType(opening.style), options: DOOR_TYPES.map((item) => [item.id, item.name] as [string, string]) } },
           { label: "Width", edit: { key: "width", value: opening.width } },
           { label: "Height", edit: { key: "height", value: opening.height } },
-          ...(selection.kind === "window" ? [{ label: "Sill height", edit: { key: "sillHeight", value: opening.sillHeight } }] : []),
+          { label: "Position along wall", edit: { key: "offset", value: opening.offset, signed: true } },
+          { label: "Swing", choice: { key: "swing", value: opening.swing, options: [["in-left", "In · left"], ["in-right", "In · right"], ["out-left", "Out · left"], ["out-right", "Out · right"]] } },
+          { label: "Flip", buttons: [
+            { label: "Flip inside / outside", patch: { swing: `${opening.swing.startsWith("out") ? "in" : "out"}-${opening.swing.endsWith("left") ? "left" : "right"}` } },
+            { label: "Flip left / right", patch: { swing: `${opening.swing.startsWith("out") ? "out" : "in"}-${opening.swing.endsWith("left") ? "right" : "left"}` } },
+          ] },
+        ] : [
+          { label: "Type", choice: { key: "style", value: windowType(opening.style), options: WINDOW_TYPES.map((item) => [item.id, item.name] as [string, string]) } },
+          { label: "Width", edit: { key: "width", value: opening.width } },
+          { label: "Height", edit: { key: "height", value: opening.height } },
+          { label: "Sill height", edit: { key: "sillHeight", value: opening.sillHeight, signed: true } },
+          { label: "Position along wall", edit: { key: "offset", value: opening.offset, signed: true } },
         ],
         actions: selection.kind === "door" ? ["flip", "move", "delete", "agenda"] : ["move", "delete", "agenda"],
       };
@@ -290,6 +326,10 @@ function sheetContent(project: HouseProject, selection: HouseSelection, unit: Di
           { label: "Width", edit: { key: "width", value: item.width } },
           { label: "Depth", edit: { key: "depth", value: item.depth } },
           { label: "Height", edit: { key: "height", value: item.height } },
+          { label: "Position X", edit: { key: "x", value: item.x, signed: true } },
+          { label: "Position Y", edit: { key: "y", value: item.y, signed: true } },
+          { label: "Rotation", edit: { key: "rotation", value: item.rotation, plain: "°", signed: true } },
+          { label: "Turn to", choice: { key: "rotation", value: ((Math.round(item.rotation) % 360) + 360) % 360, options: ROTATIONS, numeric: true } },
         ],
         actions: ["rotate", "move", "duplicate", "delete", "agenda"],
       };
@@ -314,10 +354,17 @@ function sheetContent(project: HouseProject, selection: HouseSelection, unit: Di
       const column = project.structuralColumns.find((item) => item.id === selection.id);
       if (!column) return null;
       return {
-        kind: "Column", title: "Column",
+        kind: "Column", title: COLUMN_SHAPES.find((item) => item.id === columnShape(column.type))!.name,
         fields: [
-          { label: "Width", edit: { key: "width", value: column.width } },
-          { label: "Depth", edit: { key: "depth", value: column.depth } },
+          { label: "Shape", choice: { key: "type", value: columnShape(column.type), options: COLUMN_SHAPES.map((item) => [item.id, item.name.replace(" column", "")] as [string, string]) } },
+          ...(column.type === "circular" ? [{ label: "Diameter", edit: { key: "width", value: column.width } }] : [
+            { label: "Width", edit: { key: "width", value: column.width } },
+            ...(column.type === "square" ? [] : [{ label: "Depth", edit: { key: "depth", value: column.depth } }]),
+            { label: "Rotation", edit: { key: "rotation", value: column.rotation ?? 0, plain: "°", signed: true } },
+          ]),
+          { label: "Position X", edit: { key: "x", value: column.x, signed: true } },
+          { label: "Position Y", edit: { key: "y", value: column.y, signed: true } },
+          { label: "Quick sizes", buttons: COLUMN_SIZES.filter(([w, d]) => column.type !== "circular" && column.type !== "square" ? true : w === d).map(([w, d]) => ({ label: column.type === "circular" ? `Ø ${w}` : `${w}×${d}`, patch: { width: w, depth: d } })) },
         ],
         actions: ["move", "delete", "agenda"],
       };
@@ -325,11 +372,26 @@ function sheetContent(project: HouseProject, selection: HouseSelection, unit: Di
     case "stair": {
       const stair = project.stairs.find((item) => item.id === selection.id);
       if (!stair) return null;
+      const params = stairParams(stair);
+      const geometry = stairGeometry(params);
       return {
-        kind: "Stair", title: "Stair", subtitle: `${stair.steps} steps`,
+        kind: "Stair", title: STAIR_TYPES.find((item) => item.id === stair.type)?.name ?? "Stair", subtitle: `${stair.steps} risers`,
         fields: [
-          { label: "Width", edit: { key: "width", value: stair.width } },
-          { label: "Length", edit: { key: "length", value: stair.length } },
+          { label: "Stair type", choice: { key: "type", value: stair.type, options: STAIR_TYPES.map((item) => [item.id, item.name.replace(" stair", "")] as [string, string]) } },
+          { label: "Total width", edit: { key: "width", value: stair.width } },
+          { label: "Total length", edit: { key: "length", value: stair.length } },
+          { label: "Floor-to-floor height", edit: { key: "height", value: params.height } },
+          { label: "Stair width", edit: { key: "stairWidth", value: params.stairWidth } },
+          { label: "Riser height", edit: { key: "riserHeight", value: round1(params.height / params.risers) } },
+          { label: "Tread depth", edit: { key: "treadDepth", value: params.treadDepth } },
+          { label: "Number of risers", edit: { key: "risers", value: params.risers, plain: "risers" } },
+          { label: "Number of treads", edit: { key: "treads", value: geometry.treads, plain: "treads" } },
+          ...(["l-shaped", "u-shaped", "dog-legged", "switchback"].includes(stair.type) ? [{ label: "Landing length", edit: { key: "landing", value: params.landing } }, { label: "Landing width", value: formatLength(stair.type === "l-shaped" ? params.stairWidth : stair.width, unit) }] : []),
+          { label: "Direction", value: params.reversed ? "UP from the other end" : "UP from the start" },
+          { label: "Rotation", edit: { key: "rotation", value: stair.rotation, plain: "°", signed: true } },
+          { label: "Turn to", choice: { key: "rotation", value: ((Math.round(stair.rotation) % 360) + 360) % 360, options: ROTATIONS, numeric: true } },
+          { label: "Reverse", buttons: [{ label: "Reverse direction", patch: { reversed: "toggle" } }] },
+          ...stairWarnings(params).map((warning) => ({ label: "Check", value: warning, wide: true })),
         ],
         actions: ["rotate", "move", "delete", "agenda"],
       };
@@ -351,15 +413,16 @@ function sheetContent(project: HouseProject, selection: HouseSelection, unit: Di
 }
 
 /** A number edited in the sheet: typed in the project's units, saved in millimetres on Enter or leaving the field. */
-function SheetNumber({ label, value, unit, text, autoFocus, onCommit }: { label: string; value: number | string; unit: DisplayUnits | null; text?: boolean; autoFocus?: boolean; onCommit: (value: number | string) => void }) {
-  const shown = typeof value === "number" && unit ? String(displayLength(Math.round(value * 1000) / 1000, unit)) : String(value);
+function SheetNumber({ label, value, unit, text, plain = false, signed = false, autoFocus, onCommit }: { label: string; value: number | string; unit: DisplayUnits | null; text?: boolean; plain?: boolean; signed?: boolean; autoFocus?: boolean; onCommit: (value: number | string) => void }) {
+  const shown = typeof value === "number" && unit ? String(displayLength(Math.round(value * 1000) / 1000, unit)) : typeof value === "number" ? String(Math.round(value * 1000) / 1000) : String(value);
   const [draft, setDraft] = useState(shown);
   const commit = () => {
     if (draft === shown) return;
     if (text) { if (draft.trim()) onCommit(draft.trim()); return; }
-    const number = Number(draft);
-    if (!Number.isFinite(number) || number <= 0 || !unit) { setDraft(shown); return; }
-    onCommit(modelLength(number, unit));
+    const number = Number(draft.replace(",", "."));
+    // A rotation or a position may be 0 or below; a size may not.
+    if (!Number.isFinite(number) || (number <= 0 && !signed) || (!unit && !plain)) { setDraft(shown); return; }
+    onCommit(plain ? number : modelLength(number, unit!));
   };
   return (
     <span className="relative block">

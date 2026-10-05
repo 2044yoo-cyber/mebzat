@@ -5,6 +5,7 @@ import { Canvas, useStore, useThree } from "@react-three/fiber";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as THREE from "three";
 import { pitchedRise } from "../services/roof-geometry";
+import { ColumnMesh, FurnitureMesh, StairMesh } from "./house-object-meshes";
 
 import { RoomShell } from "@/features/berchuma-studio/components/viewer/room-shell";
 import { roomWalls } from "@/features/berchuma-studio/services/room-geometry";
@@ -22,9 +23,7 @@ import {
   type HouseRoof,
   type HouseSelection,
   type HouseSlab,
-  type HouseStair,
   type HouseStructuralBeam,
-  type HouseStructuralColumn,
   type HouseStructuralGrid,
   type HouseSite,
   type HouseVeranda,
@@ -145,10 +144,10 @@ export function HousePreview({
           <BalconyMesh key={balcony.id} balcony={balcony} bounds={bounds} selected={highlighted.has(balcony.id)} onSelect={() => choose({ kind: "balcony", id: balcony.id })} />
         ))}
         {!hiddenKinds.has("stair") && project.stairs.filter((stair) => visible("stair", stair.id, stair.levelId)).map((stair) => (
-          <group key={stair.id} name={stair.id}><StairMesh stair={stair} bounds={bounds} selected={highlighted.has(stair.id)} onSelect={() => choose({ kind: "stair", id: stair.id })} /></group>
+          <group key={stair.id} name={stair.id}><StairMesh stair={stair} centre={bounds} selected={highlighted.has(stair.id)} onSelect={() => choose({ kind: "stair", id: stair.id })} /></group>
         ))}
         {!hiddenKinds.has("column") && project.structuralColumns.filter((column) => visible("column", column.id, column.levelId)).map((column) => (
-          <group key={column.id} name={column.id}><ColumnMesh column={column} bounds={bounds} selected={highlighted.has(column.id)} onSelect={() => choose({ kind: "column", id: column.id })} /></group>
+          <group key={column.id} name={column.id}><ColumnMesh column={column} centre={bounds} selected={highlighted.has(column.id)} onSelect={() => choose({ kind: "column", id: column.id })} /></group>
         ))}
         {!hiddenKinds.has("beam") && project.structuralBeams.filter((beam) => visible("beam", beam.id, beam.levelId)).map((beam) => (
           <group key={beam.id} name={beam.id}><BeamMesh beam={beam} bounds={bounds} selected={highlighted.has(beam.id)} onSelect={() => choose({ kind: "beam", id: beam.id })} /></group>
@@ -164,7 +163,7 @@ export function HousePreview({
         ))}
 
         {!hiddenKinds.has("foundation") && project.foundations.filter((item) => visible("foundation", item.id, item.levelId)).map((item) => <group key={item.id} name={item.id}><BoxObjectMesh x={item.x} y={item.y} elevation={item.elevation} width={item.width} height={item.thickness} depth={item.depth} bounds={bounds} selected={highlighted.has(item.id)} color="#8f969e" onSelect={() => choose({ kind: "foundation", id: item.id })} /></group>)}
-        {!hiddenKinds.has("component") && project.components.filter((item) => visible("component", item.id, item.levelId)).map((item) => <group key={item.id} name={item.id}><BoxObjectMesh x={item.x} y={item.y} elevation={item.elevation} width={item.width} height={item.height} depth={item.depth} rotation={item.rotation} bounds={bounds} selected={highlighted.has(item.id)} color={item.material.toLowerCase().includes("wood") ? "#9d7350" : "#d5d0c8"} onSelect={() => choose({ kind: "component", id: item.id })} /></group>)}
+        {!hiddenKinds.has("component") && project.components.filter((item) => visible("component", item.id, item.levelId)).map((item) => <group key={item.id} name={item.id}><FurnitureMesh item={item} flipped={Boolean(project.objectInstances[item.id]?.flipped)} centre={bounds} selected={highlighted.has(item.id)} onSelect={() => choose({ kind: "component", id: item.id })} /></group>)}
         {!hiddenKinds.has("railing") && project.railings.filter((item) => visible("railing", item.id, item.levelId)).map((item) => <LineObjectMesh key={item.id} start={item.start} end={item.end} elevation={item.elevation} height={item.height} bounds={bounds} selected={highlighted.has(item.id)} color="#56616c" onSelect={() => choose({ kind: "railing", id: item.id })} />)}
         {!hiddenKinds.has("reference-plane") && project.referencePlanes.filter((item) => visible("reference-plane", item.id, item.levelId)).map((item) => <LineObjectMesh key={item.id} start={item.start} end={item.end} elevation={project.levels.find((level) => level.id === item.levelId)?.elevation ?? 0} height={25} bounds={bounds} selected={highlighted.has(item.id)} color="#de3c8d" onSelect={() => choose({ kind: "reference-plane", id: item.id })} />)}
 
@@ -371,41 +370,6 @@ function VerandaMesh({ veranda, bounds, selected, onSelect }: { veranda: HouseVe
         </mesh>
       ))}
     </group>
-  );
-}
-
-function StairMesh({ stair, bounds, selected, onSelect }: { stair: HouseStair; bounds: Bounds; selected: boolean; onSelect: () => void }) {
-  const tread = stair.length / stair.steps;
-  const rise = stair.height / stair.steps;
-  return (
-    <group
-      position={[(stair.x - bounds.centreX) * MM, stair.elevation * MM, -(stair.y - bounds.centreY) * MM]}
-      rotation={[0, (-stair.rotation * Math.PI) / 180, 0]}
-      onClick={(event) => { event.stopPropagation(); onSelect(); }}
-    >
-      {Array.from({ length: stair.steps }, (_, index) => (
-        <mesh
-          key={index}
-          position={[
-            (stair.width / 2) * MM,
-            (rise * (index + 1) / 2) * MM,
-            -(tread * (index + 0.5)) * MM,
-          ]}
-        >
-          <boxGeometry args={[stair.width * MM, rise * (index + 1) * MM, tread * MM]} />
-          <meshStandardMaterial color={selected ? "#1473e6" : "#bdb7ad"} roughness={0.9} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-function ColumnMesh({ column, bounds, selected, onSelect }: { column: HouseStructuralColumn; bounds: Bounds; selected: boolean; onSelect: () => void }) {
-  return (
-    <mesh position={[(column.x - bounds.centreX) * MM, (column.elevation + column.height / 2) * MM, -(column.y - bounds.centreY) * MM]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
-      <boxGeometry args={[column.width * MM, column.height * MM, column.depth * MM]} />
-      <meshStandardMaterial color={selected ? "#1473e6" : "#9e9a92"} roughness={0.92} transparent opacity={selected ? 1 : 0.72} />
-    </mesh>
   );
 }
 

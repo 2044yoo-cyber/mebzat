@@ -36,6 +36,7 @@ export function PlanCanvas({
   formatLength = (value: number) => Number(value.toFixed(2)),
   className,
   viewBox,
+  openingSymbols = true,
 }: {
   room: Room;
   onChange: (room: Room) => void;
@@ -47,6 +48,8 @@ export function PlanCanvas({
   /** A host that pans and zooms draws this under its own layer, so it hands
    * over the frame instead of letting the plan fit itself. */
   viewBox?: { x: number; y: number; width: number; height: number };
+  /** Off when the host draws its own door and window symbols over the holes. */
+  openingSymbols?: boolean;
 }) {
   const svg = useRef<SVGSVGElement>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -237,6 +240,7 @@ export function PlanCanvas({
                 opening={opening}
                 wall={wall}
                 thickness={room.wallThickness}
+                symbol={openingSymbols}
                 onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); setDragging(`opening:${opening.id}`); }}
               />
             ))}
@@ -264,7 +268,7 @@ export function PlanCanvas({
         return (
           <g key={wall.id}>
             <line x1={wall.start.x} y1={wall.start.y} x2={wall.end.x} y2={wall.end.y} strokeWidth={wall.thickness} className={cn("cursor-pointer", selected ? "stroke-brand" : "stroke-foreground/65")} onPointerDown={() => onSelectWall?.(selected ? null : wall.id)} />
-            {renderedWall ? openingsOn(room, wall.id).map((opening) => <OpeningMark key={opening.id} opening={opening} wall={renderedWall} thickness={wall.thickness} onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); setDragging(`opening:${opening.id}`); }} />) : null}
+            {renderedWall ? openingsOn(room, wall.id).map((opening) => <OpeningMark key={opening.id} opening={opening} wall={renderedWall} thickness={wall.thickness} symbol={openingSymbols} onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); setDragging(`opening:${opening.id}`); }} />) : null}
             {(["start", "end"] as const).map((end) => (
               <circle key={end} cx={wall[end].x} cy={wall[end].y} r={HANDLE / 2.5} strokeWidth={stroke} className="cursor-grab fill-background stroke-foreground/60" onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); setDragging(`iw-${end}:${wall.id}`); }} />
             ))}
@@ -347,11 +351,13 @@ function OpeningMark({
   opening,
   wall,
   thickness,
+  symbol = true,
   onPointerDown,
 }: {
   opening: RoomOpening;
   wall: ReturnType<typeof roomWalls>[number];
   thickness: number;
+  symbol?: boolean;
   onPointerDown?: React.PointerEventHandler<SVGGElement>;
 }) {
   const dx = (wall.end.x - wall.start.x) / wall.length;
@@ -378,7 +384,7 @@ function OpeningMark({
         strokeLinecap="butt"
         className="stroke-background"
       />
-      {opening.kind === "window" ? (
+      {!symbol ? null : opening.kind === "window" ? (
         <line
           x1={from.x}
           y1={from.y}

@@ -350,31 +350,34 @@ async function checkFurnitureAndMeasure(page, at) {
   await newHouse(page);
   const { drag, tapAt } = await gestures(page);
   await rail(page).getByRole("button", { name: "Furniture", exact: true }).click();
-  const picker = page.getByRole("radiogroup", { name: "Furniture" });
-  assert.deepEqual((await picker.getByRole("radio").allInnerTexts()).map((text) => text.split("\n")[0]), ["Bed", "Single bed", "Sofa", "Chair", "Table", "Wardrobe", "Kitchen counter", "Refrigerator", "Sink", "Toilet", "Shower", "Cabinet"], `${at}: basic furniture to choose from`);
-  await picker.getByRole("radio", { name: /^Sofa/ }).click();
+  const library = page.getByRole("dialog", { name: "Furniture library" });
+  for (const category of ["Living", "Bedroom", "Dining", "Kitchen", "Bathroom", "Office", "Other"]) assert.equal(await library.getByRole("tab", { name: category }).count(), 1, `${at}: furniture by category: ${category}`);
+  await library.getByRole("tab", { name: "Living" }).click();
+  await library.getByRole("button", { name: "3-seat sofa", exact: true }).click();
   await tapAt(4000, 3000);
-  const sofa = page.locator(`${PLAN} g[aria-label="Sofa"]`);
+  const sofa = page.locator(`${PLAN} g[aria-label="3-seat sofa"]`);
   assert.equal(await sofa.count(), 1, `${at}: the sofa is on the plan, named`);
   assert.equal(await bar(page).getAttribute("aria-label"), "Furniture actions", `${at}: and selected`);
-  assert.deepEqual(await barButtons(page), ["Move", "↻ 90°", "Duplicate", "More actions"], `${at}: furniture moves, rotates, duplicates`);
+  assert.deepEqual(await barButtons(page), ["Move", "↻ 90°", "Mirror", "Duplicate", "More actions"], `${at}: furniture moves, rotates, mirrors, duplicates`);
   await more(page, "Properties");
-  assert.equal(await sheet(page).getAttribute("aria-label"), "Sofa properties");
-  assert.equal(await sheet(page).getByLabel("Width").inputValue(), "2000");
+  assert.equal(await sheet(page).getAttribute("aria-label"), "3-seat sofa properties");
+  assert.equal(await sheet(page).getByLabel("Width").inputValue(), "2200");
   assert.equal(await sheet(page).getByLabel("Depth").inputValue(), "900");
   await sheet(page).getByRole("button", { name: "Close" }).click();
   await bar(page).getByRole("button", { name: "↻ 90°" }).click();
-  assert.match(await sofa.getAttribute("transform"), /^rotate\(90 4000 3000\)$/, `${at}: Rotate turns it a quarter`);
+  assert.match(await sofa.getAttribute("transform"), /^translate\(4000 3000\) rotate\(90\)$/, `${at}: Rotate turns it a quarter`);
   await drag([4000, 3000], [5000, 3500]);
-  assert.match(await sofa.getAttribute("transform"), /^rotate\(90 5000 3500\)$/, `${at}: dragging the selected sofa moves it`);
+  assert.match(await sofa.getAttribute("transform"), /^translate\(5000 3500\) rotate\(90\)$/, `${at}: dragging the selected sofa moves it`);
+  await bar(page).getByRole("button", { name: "Mirror" }).click();
+  assert.match(await sofa.getAttribute("transform"), /scale\(-1 1\)$/, `${at}: Mirror flips it`);
   await bar(page).getByRole("button", { name: "Duplicate" }).click();
-  assert.equal(await page.locator(`${PLAN} g[aria-label="Sofa"]`).count(), 2, `${at}: Duplicate makes a second`);
+  assert.equal(await page.locator(`${PLAN} g[aria-label="3-seat sofa"]`).count(), 2, `${at}: Duplicate makes a second`);
   await more(page, "Delete");
-  assert.equal(await page.locator(`${PLAN} g[aria-label="Sofa"]`).count(), 1, `${at}: Delete removes the copy`);
+  assert.equal(await page.locator(`${PLAN} g[aria-label="3-seat sofa"]`).count(), 1, `${at}: Delete removes the copy`);
   await tapAt(5000, 3500);
   await bar(page).getByRole("button", { name: "Move" }).click();
   await tapAt(2000, 2000);
-  assert.match(await page.locator(`${PLAN} g[aria-label="Sofa"]`).getAttribute("transform"), /^rotate\(90 2000 2000\)$/, `${at}: Move then a tap puts it there`);
+  assert.match(await page.locator(`${PLAN} g[aria-label="3-seat sofa"]`).getAttribute("transform"), /^translate\(2000 2000\) rotate\(90\)/, `${at}: Move then a tap puts it there`);
 
   // Measure: two taps, and the distance is recorded.
   await rail(page).getByRole("button", { name: "Measure", exact: true }).click();
@@ -386,7 +389,7 @@ async function checkFurnitureAndMeasure(page, at) {
   assert.match(text, /Measurement M1\s+3625 mm/, `${at}: a measurement is listed`);
   assert.match(text, /Room 1\s+8000 × 6500 mm · 52\.00 m² · perimeter 29000 mm/, `${at}: the room's size, area and perimeter`);
   assert.match(text, /Wall A \(Room 1\)\s+8000 mm · thickness 150 mm · height 3000 mm/, `${at}: each wall, named with its room`);
-  assert.match(text, /Sofa\s+2000 × 900 mm · height 850 mm/, `${at}: the furniture`);
+  assert.match(text, /3-seat sofa\s+2200 × 900 mm · height 850 mm/, `${at}: the furniture`);
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await drawer.getByRole("button", { name: "Copy all" }).click();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
@@ -482,9 +485,11 @@ async function checkThreeD(page, at) {
   await plan();
 
   await rail(page).getByRole("button", { name: "Stair", exact: true }).click();
+  await page.getByRole("dialog", { name: "Stairs library" }).getByRole("button", { name: "Straight stair", exact: true }).click();
   await tapAt(2000, 3000);
   await rail(page).getByRole("button", { name: "Furniture", exact: true }).click();
-  await page.getByRole("radiogroup", { name: "Furniture" }).getByRole("radio", { name: /^Bed/ }).click();
+  await page.getByRole("dialog", { name: "Furniture library" }).getByRole("tab", { name: "Bedroom" }).click();
+  await page.getByRole("dialog", { name: "Furniture library" }).getByRole("button", { name: "Queen bed", exact: true }).click();
   await tapAt(6000, 3500);
   await open3D(page);
   const shown = await liveScene(page);
