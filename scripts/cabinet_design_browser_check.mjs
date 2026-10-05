@@ -155,9 +155,11 @@ try {
     await next(page);
     assert.equal(await page.getByRole("group", { name: "Templates" }).getByRole("button", { pressed: true }).locator("span").nth(1).textContent(), "Tall shoe cabinet", `${size}: the gallery's template already chosen`);
     await next(page);
+    await page.getByRole("radiogroup", { name: "Material" }).getByRole("radio", { name: /walnut/i }).click();
     await page.getByRole("button", { name: /^Create tall shoe cabinet/ }).click();
     const shoes = await started(page);
     assert.equal(shoes.cabinets[0].size.height, 2000, `${size}: built to the space`);
+    assert.equal(shoes.carcass.board.id, "mdf-18-walnut", `${size}: in the material chosen last`);
 
     assert.deepEqual(errors, [], `${size}: page errors`);
     await page.close();

@@ -100,6 +100,7 @@ const heights = (spec: DesignSpec) => { const lower = first(spec); const upper =
   equal(planHeights(white, id, 2350).recommended, [2350], "Auto never divides what can be one carcass");
   equal(planHeights(white, id, 2600).recommended, [2100, 500], "2600 in 2440 board: 2100 + 500");
   equal(PREFERRED_LOWER, 2100, "2100 is the default lower module");
+  equal(MIN_HEIGHT_MODULE, 250, "and 250 the shortest module");
   // Turned on the sheet only where the board has no grain to show it.
   const white18 = findBoard("mdf-18-white")!;
   const oak18 = findBoard("mdf-18-oak")!;
