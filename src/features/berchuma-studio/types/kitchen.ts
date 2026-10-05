@@ -16,6 +16,13 @@ export const REFERENCE_KITCHEN_DETAILS: KitchenDetails = {
   stove: { runId: "kitchen-back", offset: 1500, width: 600 },
 };
 
+export const kitchenWindowSchema = z.object({
+  wall: z.enum(["back", "left", "right"]),
+  offset: z.number().nonnegative(),
+  width: z.number().min(200).max(4000),
+});
+export type KitchenWindow = z.infer<typeof kitchenWindowSchema>;
+
 export const kitchenSetupSchema = z.object({
   placementMode: z.enum(["auto", "plan"]).default("auto"),
   fridgePlacement: z.enum(["left", "right", "custom"]).default("left"),
@@ -28,6 +35,13 @@ export const kitchenSetupSchema = z.object({
   topHeight: z.number().min(0).max(1000),
   islandWidth: z.number().min(600).max(4000),
   details: kitchenDetailsSchema.optional(),
+  /**
+   * Windows in the kitchen's walls, as obstacles: no wall cabinet is hung
+   * across one. Measured along the wall — the back wall from its left end,
+   * a side wall from the back corner — because that is how a tape is run.
+   * Optional, so every kitchen saved before it existed is unchanged.
+   */
+  windows: z.array(kitchenWindowSchema).max(4).optional(),
 });
 export type KitchenSetup = z.infer<typeof kitchenSetupSchema>;
 export const DEFAULT_KITCHEN_SETUP: KitchenSetup = {

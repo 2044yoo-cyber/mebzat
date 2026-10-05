@@ -39,11 +39,14 @@ export function StartPanel({
   onOpenChat,
   initialKind,
   initialWidth,
+  initialTemplate,
 }: {
   onStart: (spec: DesignSpec) => void;
   onOpenChat: () => void;
   initialKind?: DesignKind;
   initialWidth?: number;
+  /** A template chosen in the gallery, to be sized to the space. */
+  initialTemplate?: string;
 }) {
   const [route, setRoute] = useState<"design" | "photo" | "opening" | "plan">("design");
 
@@ -218,7 +221,7 @@ export function StartPanel({
       ) : (
         // Cabinet Design's own way in: type, space, layout, template,
         // material. Every card in it is a real design laid out to the space.
-        <CabinetStart onStart={onStart} initialKind={initialKind} initialWidth={initialWidth} />
+        <CabinetStart onStart={onStart} initialKind={initialKind} initialWidth={initialWidth} initialTemplate={initialTemplate} />
       )}
 
       <button

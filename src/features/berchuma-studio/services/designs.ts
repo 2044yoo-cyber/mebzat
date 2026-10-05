@@ -7,7 +7,8 @@ import { buildCutList, sheetCountsOf } from "./cutlist";
 import { buildParts } from "./geometry";
 import { marketRates } from "./rates";
 import type { DesignVisibility } from "@/types/database.types";
-import { parseSpec, type DesignSpec } from "../types/spec";
+import { parseSpec, type DesignSpec, type ProjectStatus } from "../types/spec";
+import { frontDrawing, type FrontDrawingData } from "./front-drawing";
 
 /**
  * Designs, stored.
@@ -452,6 +453,17 @@ export type DesignCard = {
   ownerName: string | null;
   ownerUsername: string | null;
   ownerAvatarUrl: string | null;
+  /** What My Projects shows of the member's own designs. Absent on public cards. */
+  project?: {
+    status: ProjectStatus;
+    visibility: string;
+    updatedAt: string;
+    width: number;
+    height: number;
+    depth: number;
+    material: string;
+    drawing: FrontDrawingData | null;
+  };
 };
 
 export async function listPublicDesigns(options: {
@@ -491,6 +503,63 @@ export async function listPublicDesigns(options: {
   }
 }
 
+// ---------------------------------------------------------------------------
+// My Projects: the owner's own housekeeping
+// ---------------------------------------------------------------------------
+
+/** One of the caller's own designs, read and decoded. RLS decides what is theirs. */
+async function ownSpec(designId: string): Promise<{ ok: true; spec: DesignSpec } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sign in to manage your designs." };
+  const { data } = await supabase.from("designs").select("spec, owner_id").eq("id", designId).maybeSingle();
+  if (!data || data.owner_id !== user.id) return { ok: false, error: "That design is not one of yours." };
+  const decoded = parseSpec(data.spec);
+  return decoded.ok ? { ok: true, spec: decoded.spec } : { ok: false, error: "That design could not be read." };
+}
+
+/** A new name, saved as a new version so the history shows it. */
+export async function renameDesign(designId: string, title: string) {
+  const name = title.trim().slice(0, 160);
+  if (!name) return { ok: false as const, error: "A design needs a name." };
+  const own = await ownSpec(designId);
+  if (!own.ok) return own;
+  return saveDesign({ designId, spec: { ...own.spec, title: name }, note: "Renamed" });
+}
+
+/**
+ * A copy of one of your own designs, as a new private draft. Not a remix: a
+ * remix records lineage and counts on the original, and copying your own
+ * wardrobe to try a variation is neither.
+ */
+export async function duplicateDesign(designId: string) {
+  const own = await ownSpec(designId);
+  if (!own.ok) return own;
+  const title = `${own.spec.title} (copy)`.slice(0, 160);
+  return saveDesign({ spec: { ...own.spec, title, meta: { ...own.spec.meta, status: "draft" } }, note: "Duplicated" });
+}
+
+/**
+ * Gone, with its versions — the foreign keys cascade. Only the owner's delete
+ * policy lets this through.
+ *
+ * A published design, or one sent to a workshop, is kept: its link is out in
+ * the world, and the cascade would take a maker's manufacturing request with
+ * it — somebody else's record, deleted by a tap on a card.
+ */
+export async function deleteDesign(designId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const { data: row } = await supabase.from("designs").select("visibility").eq("id", designId).maybeSingle();
+  if (!row) return { ok: false, error: "That design could not be deleted." };
+  if (row.visibility !== "private") return { ok: false, error: "Published designs are kept so their links keep working." };
+  const { count } = await supabase.from("manufacturing_requests").select("id", { count: "exact", head: true }).eq("design_id", designId);
+  if (count) return { ok: false, error: "This design has been sent to a workshop, so it is kept." };
+  const { data, error } = await supabase.from("designs").delete().eq("id", designId).select("id");
+  return error || !data?.length ? { ok: false, error: "That design could not be deleted." } : { ok: true };
+}
+
 /** The designs the signed-in member owns, newest first. */
 export async function listOwnDesigns(limit = 24): Promise<DesignCard[]> {
   try {
@@ -503,13 +572,28 @@ export async function listOwnDesigns(limit = 24): Promise<DesignCard[]> {
     const { data } = await supabase
       .from("designs")
       .select(
-        "id, slug, kind, title, cover_url, currency, estimated_cost, remix_count, view_count",
+        "id, slug, kind, title, cover_url, currency, estimated_cost, remix_count, view_count, spec, updated_at, visibility",
       )
       .eq("owner_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(limit);
 
-    return (data ?? []).map((row) => ({
+    return (data ?? []).map((row) => {
+      // Read through the same parser as everything else; a design that no
+      // longer parses still gets its card, just without the drawing.
+      const decoded = parseSpec(row.spec);
+      const spec = decoded.ok ? decoded.spec : null;
+      return {
+      project: {
+        status: spec?.meta.status ?? "draft",
+        visibility: row.visibility,
+        updatedAt: row.updated_at,
+        width: spec?.envelope.width ?? 0,
+        height: spec?.envelope.height ?? 0,
+        depth: spec?.envelope.depth ?? 0,
+        material: spec?.carcass.board.label ?? "",
+        drawing: spec ? frontDrawing(spec) : null,
+      },
       id: row.id,
       slug: row.slug,
       kind: row.kind,
@@ -522,7 +606,8 @@ export async function listOwnDesigns(limit = 24): Promise<DesignCard[]> {
       ownerName: null,
       ownerUsername: null,
       ownerAvatarUrl: null,
-    }));
+      };
+    });
   } catch {
     return [];
   }

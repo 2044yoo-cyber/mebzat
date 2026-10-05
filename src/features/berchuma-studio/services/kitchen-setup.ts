@@ -3,14 +3,16 @@ import { createDetailedKitchen } from "./kitchen-detail";
 import { placeOnRun, solveLayout } from "./layout";
 import { validateSpec, type Cabinet, type DesignSpec } from "../types/spec";
 import { layoutLabel, type RunSpec } from "../types/layout";
-import { kitchenSetupError, placeFridgeAtRunEdge, type KitchenSetup } from "../types/kitchen";
+import { buildParts } from "./geometry";
+import { partWorldBounds } from "./part-transform";
+import { kitchenSetupError, placeFridgeAtRunEdge, type KitchenSetup, type KitchenWindow } from "../types/kitchen";
 
 /** Build actual cabinets on measured runs, with separate overhead carcasses. */
 export function createKitchenDesign(options: KitchenSetup): DesignSpec {
   options = placeFridgeAtRunEdge(options);
   const error = kitchenSetupError(options);
   if (error) throw new Error(error);
-  if (options.details) return createDetailedKitchen(options);
+  if (options.details) return clearWindows(createDetailedKitchen(options), options.windows);
   const spec = startingDesign("kitchen");
   spec.cornerKind = "blind";
   spec.kitchenSetup = { ...options };
@@ -66,7 +68,55 @@ export function createKitchenDesign(options: KitchenSetup): DesignSpec {
     "Base units 870 mm high and 600 mm deep. Upper cabinets begin at 1450 mm; space above the hob is left clear.",
     "Confirm appliance, extractor, door and window positions before manufacturing.",
   ];
-  return validateSpec(spec).spec;
+  return clearWindows(validateSpec(spec).spec, options.windows);
+}
+
+/**
+ * No wall cabinet across a window.
+ *
+ * Done on the finished layout, in room coordinates, rather than inside each
+ * generator: the simple and the detailed kitchens lay their upper runs out in
+ * different frames (the detailed back run is anchored from the right and
+ * turned round), and a window is a hole in the room, not in a run. Every wall
+ * cabinet whose boards reach into a window's span on its wall is taken out,
+ * with anything stacked on it. Base cabinets stay: a window sits above the
+ * worktop.
+ */
+export function clearWindows(spec: DesignSpec, windows: KitchenWindow[] | undefined): DesignSpec {
+  if (!windows?.length) return spec;
+  const { parts } = buildParts(spec);
+  const wallOf = (cabinet: Cabinet): KitchenWindow["wall"] | null =>
+    /left/.test(cabinet.runId ?? "") ? "left" : /right/.test(cabinet.runId ?? "") ? "right" : /back/.test(cabinet.runId ?? "") ? "back" : null;
+  const blocked = new Set<string>();
+  for (const cabinet of spec.cabinets) {
+    if (cabinet.kind !== "wall") continue;
+    const wall = wallOf(cabinet);
+    const own = parts.filter((part) => part.cabinetId === cabinet.id);
+    if (!wall || !own.length) continue;
+    // Along the back wall is x; along a side wall, from the back corner, is z.
+    const spans = own.flatMap((part) => part.placements.map((placement) => partWorldBounds(part, placement)));
+    const from = Math.min(...spans.map((bounds) => (wall === "back" ? bounds.min.x : bounds.min.z)));
+    const to = Math.max(...spans.map((bounds) => (wall === "back" ? bounds.max.x : bounds.max.z)));
+    if (windows.some((window) => window.wall === wall && window.offset < to - 1 && window.offset + window.width > from + 1)) blocked.add(cabinet.id);
+  }
+  if (!blocked.size) return spec;
+  // Whatever stands on a removed cabinet goes with it.
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const cabinet of spec.cabinets) {
+      if (cabinet.stackedOn && blocked.has(cabinet.stackedOn) && !blocked.has(cabinet.id)) {
+        blocked.add(cabinet.id);
+        grew = true;
+      }
+    }
+  }
+  const named = windows.map((window) => `${window.wall} wall at ${Math.round(window.offset)} mm, ${Math.round(window.width)} mm wide`).join("; ");
+  return validateSpec({
+    ...spec,
+    cabinets: spec.cabinets.filter((cabinet) => !blocked.has(cabinet.id)),
+    meta: { ...spec.meta, assumptions: [...spec.meta.assumptions, `No wall cabinets across the window${windows.length > 1 ? "s" : ""} (${named}).`] },
+  }).spec;
 }
 
 function upperCabinet(lower: Cabinet, id: string, y: number, height: number): Cabinet {

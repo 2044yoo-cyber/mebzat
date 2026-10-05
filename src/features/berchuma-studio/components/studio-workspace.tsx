@@ -98,7 +98,7 @@ export function StudioWorkspace({
    * that wardrobe at that width rather than back at the picker. Absent for a
    * plain visit, which still gets the start panel.
    */
-  opening?: { kind: DesignKind; width?: number } | null;
+  opening?: { kind: DesignKind; width?: number; template?: string } | null;
   /**
    * A saved design to open for editing, from `/studio?design=<slug>`.
    *
@@ -123,7 +123,8 @@ export function StudioWorkspace({
     // A saved design wins: somebody who pressed "Open in Studio" is looking at
     // a particular design and means that one.
     if (editing) return editing.spec;
-    return opening && opening.kind !== "kitchen"
+    // A template opens the start steps on it, to be sized, not a finished design.
+    return opening && opening.kind !== "kitchen" && !opening.template
       ? startingDesign(opening.kind, opening.width ? { width: opening.width } : {})
       : null;
   });
@@ -131,7 +132,7 @@ export function StudioWorkspace({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(
-    editing || opening?.kind === "kitchen" ? "design" : "chat",
+    editing || opening?.kind === "kitchen" || opening?.template ? "design" : "chat",
   );
   // `tab` defaults to "chat" so a phone opens on the conversational entry
   // point — that default says nothing about whether a desktop reader asked
@@ -557,6 +558,7 @@ export function StudioWorkspace({
             <StartPanel
               initialKind={opening?.kind}
               initialWidth={opening?.width}
+              initialTemplate={opening?.template}
               onStart={(spec) => {
                 // A starting design has already been validated, so it arrives
                 // with no outstanding issues — which is the point of it.

@@ -11,6 +11,7 @@ import {
   type DesignKind,
   type DesignSpec,
 } from "@/features/berchuma-studio/types/spec";
+import { CABINET_TYPES, findTemplate } from "@/features/berchuma-studio/services/cabinet-templates";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -35,7 +36,7 @@ export const metadata: Metadata = {
  * you are, and that failing is worth saying out loud rather than crashing.
  */
 export default async function StudioPage(props: {
-  searchParams: Promise<{ kind?: string; width?: string; design?: string }>;
+  searchParams: Promise<{ kind?: string; width?: string; design?: string; template?: string }>;
 }) {
   const session = await currentUser();
 
@@ -56,7 +57,7 @@ export default async function StudioPage(props: {
     rates = [];
   }
 
-  const { kind, width, design } = await props.searchParams;
+  const { kind, width, design, template } = await props.searchParams;
 
   /**
    * Opened from a saved design: /studio?design=<slug>.
@@ -87,8 +88,14 @@ export default async function StudioPage(props: {
   // Anything that is not a real design kind is ignored rather than trusted, so
   // a hand-edited URL gets the ordinary start panel instead of a crash.
   const parsedWidth = Number(width);
+  // Or from the template gallery's "Use Template": /studio?template=<id>. The
+  // start steps open on that template, asking for the space it is to fit.
+  const chosenTemplate = template ? findTemplate(template) : undefined;
+  const templateKind = chosenTemplate ? CABINET_TYPES.find((entry) => entry.type === chosenTemplate.type)?.kind : undefined;
   const opening =
-    !editing && kind && (designKinds as readonly string[]).includes(kind)
+    !editing && chosenTemplate && templateKind
+      ? { kind: templateKind, template: chosenTemplate.id }
+      : !editing && kind && (designKinds as readonly string[]).includes(kind)
       ? {
           kind: kind as DesignKind,
           width: Number.isFinite(parsedWidth) && parsedWidth > 0 ? parsedWidth : undefined,

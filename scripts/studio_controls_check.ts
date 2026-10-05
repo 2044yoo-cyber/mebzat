@@ -156,7 +156,8 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
 
   check(
     "the length field has a box to type into",
-    /inputMode="numeric"/.test(field),
+    // The decimal keypad for millimetres (782.5 mm), the numeric one for counts.
+    /inputMode=\{decimals > 0 \? "decimal" : "numeric"\}/.test(field),
     "a slider alone cannot accept the number somebody took off the wall with a tape",
   );
   check(

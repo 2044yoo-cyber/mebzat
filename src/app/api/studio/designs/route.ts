@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 
 import {
+  deleteDesign,
+  duplicateDesign,
   publishDesign,
   remixDesign,
+  renameDesign,
   saveDesign,
 } from "@/features/berchuma-studio/services/designs";
 import { requestQuote } from "@/features/berchuma-studio/services/quotes";
@@ -69,6 +72,23 @@ export async function POST(request: Request) {
     return result.ok
       ? NextResponse.json({ slug: result.slug })
       : NextResponse.json({ error: result.error }, { status: 400 });
+  }
+
+  // My Projects' card actions. Each is the owner acting on their own design;
+  // the services check ownership and RLS enforces it again underneath.
+  if (action === "rename" || action === "duplicate" || action === "delete") {
+    if (typeof body.designId !== "string") {
+      return NextResponse.json({ error: "Which design?" }, { status: 400 });
+    }
+    if (action === "delete") {
+      const result = await deleteDesign(body.designId);
+      return result.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    const result =
+      action === "rename"
+        ? await renameDesign(body.designId, typeof body.title === "string" ? body.title : "")
+        : await duplicateDesign(body.designId);
+    return result.ok ? NextResponse.json(result.design) : NextResponse.json({ error: result.error }, { status: 400 });
   }
 
   if (action === "quote") {

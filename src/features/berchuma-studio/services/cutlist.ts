@@ -95,7 +95,8 @@ export function buildCutList(
   // is not enough: a 600×500 shelf in walnut and one in white are two rows.
   const groups = new Map<string, { part: Part; quantity: number; cabinets: string[] }>();
   const codes = cabinetCodes(spec);
-  const cabinetLabels = new Map(spec.cabinets.map((cabinet) => [codes.get(cabinet.id)!, cabinet.label ?? ""]));
+  const shared = `${designLetter(spec)}00`;
+  const cabinetLabels = new Map([[shared, "Runs and corners"], ...spec.cabinets.map((cabinet): [string, string] => [codes.get(cabinet.id)!, cabinet.label ?? ""])]);
 
   for (const part of cutParts) {
     const key = [
@@ -110,7 +111,7 @@ export function buildCutList(
       ...(part.module ? [part.module.name, part.label] : []),
     ].join("|");
 
-    const code = (part.cabinetId && codes.get(part.cabinetId)) || "C00";
+    const code = (part.cabinetId && codes.get(part.cabinetId)) || shared;
     const existing = groups.get(key);
     if (existing) {
       existing.quantity += part.quantity;
@@ -273,15 +274,23 @@ export function buildCutList(
  * wardrobe" is what a fitter says; a top cabinet is a cabinet of its own.
  */
 export function cabinetCodes(spec: DesignSpec): Map<string, string> {
-  const letter =
-    spec.kind === "wardrobe" ? "W"
+  const letter = designLetter(spec);
+  return new Map(spec.cabinets.map((cabinet, index) => [cabinet.id, `${letter}${String(index + 1).padStart(2, "0")}`]));
+}
+
+/**
+ * The letter a design's codes start with. A piece that belongs to no one
+ * cabinet — a worktop along a run, a corner unit — is numbered 00 under it:
+ * K00 is the kitchen's runs and corners.
+ */
+export function designLetter(spec: DesignSpec): string {
+  return spec.kind === "wardrobe" ? "W"
     : spec.kind === "kitchen" ? "K"
     : spec.kind === "vanity" ? "V"
     : spec.kind === "tv_unit" ? "TV"
     : spec.kind === "office_storage" ? "OF"
     : spec.kind === "bookshelf" || spec.kind === "shelving" ? "S"
     : "C";
-  return new Map(spec.cabinets.map((cabinet, index) => [cabinet.id, `${letter}${String(index + 1).padStart(2, "0")}`]));
 }
 
 /** Two or three letters for the kind of piece: LS left side, SH shelf, DR door. */

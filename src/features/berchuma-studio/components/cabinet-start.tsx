@@ -13,6 +13,7 @@ import {
   CABINET_MATERIALS,
   CABINET_TYPES,
   buildTemplate,
+  findTemplate,
   templatesFor,
   withMaterial,
   type CabinetTemplate,
@@ -99,21 +100,25 @@ export function CabinetStart({
   onStart,
   initialKind,
   initialWidth,
+  initialTemplate,
 }: {
   onStart: (spec: DesignSpec) => void;
   initialKind?: DesignKind;
   initialWidth?: number;
+  /** Opened from the gallery's "Use Template": that type, that template, then the space. */
+  initialTemplate?: string;
 }) {
-  const initialType = typeOfKind(initialKind);
+  const fromGallery = initialTemplate ? findTemplate(initialTemplate) : undefined;
+  const initialType = fromGallery?.type ?? typeOfKind(initialKind);
   const [type, setType] = useState<CabinetType | null>(initialType);
   const [step, setStep] = useState<Step>(initialType ? (initialType === "kitchen" ? "template" : "space") : "type");
   const [space, setSpace] = useState<Space>(() => {
     const base = CABINET_TYPES.find((entry) => entry.type === initialType)?.space ?? CABINET_TYPES[0]!.space;
     return { ...base, width: initialWidth ?? base.width };
   });
-  const [layout, setLayout] = useState<WardrobeLayout>("straight");
+  const [layout, setLayout] = useState<WardrobeLayout>(fromGallery?.layouts?.[0] ?? "straight");
   const [walls, setWalls] = useState<number[]>([]);
-  const [templateId, setTemplateId] = useState<string | null>(null);
+  const [templateId, setTemplateId] = useState<string | null>(fromGallery?.id ?? null);
   const [boardId, setBoardId] = useState<string>(CABINET_MATERIALS[0]?.id ?? "mdf-18-white");
   const [priority, setPriority] = useState<"storage" | "balanced" | "decorative">("balanced");
   const [ends, setEnds] = useState<{ leftEnd: "wall" | "open"; rightEnd: "wall" | "open" }>({ leftEnd: "wall", rightEnd: "wall" });
@@ -131,6 +136,15 @@ export function CabinetStart({
     [type, layout],
   );
   const template = templates.find((entry) => entry.id === templateId) ?? templates[0] ?? null;
+
+  // The cards' designs, built once per space rather than on every render: a
+  // grid of ten wardrobes is ten sets of parts.
+  const wallKey = currentWalls.join(",");
+  const previews = useMemo(() => {
+    if (step !== "template") return new Map<string, DesignSpec | null>();
+    const walls = wallKey.split(",").map(Number);
+    return new Map(templates.map((entry) => [entry.id, entry.build ? buildTemplate(entry.id, space, { layout, walls }) : null]));
+  }, [step, templates, space, layout, wallKey]);
 
   const choose = (next: CabinetType) => {
     setType(next);
@@ -256,7 +270,7 @@ export function CabinetStart({
           <span className="text-sm font-medium">Choose a template</span>
           <div className="grid grid-cols-2 gap-2 @lg/ws:grid-cols-3" role="group" aria-label="Templates">
             {templates.map((entry) => (
-              <TemplateCard key={entry.id} template={entry} selected={template?.id === entry.id} spec={entry.build ? build(entry) : null} onSelect={() => setTemplateId(entry.id)} />
+              <TemplateCard key={entry.id} template={entry} selected={template?.id === entry.id} spec={previews.get(entry.id) ?? null} onSelect={() => setTemplateId(entry.id)} />
             ))}
           </div>
         </div>

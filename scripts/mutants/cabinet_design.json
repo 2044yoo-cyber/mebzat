@@ -1,0 +1,272 @@
+[
+ {
+  "name": "hinged doors not limited to 600",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "Math.max(1, Math.ceil(opening(carcassModule) / LIMITS.hingedLeafWidth))",
+  "to": "1"
+ },
+ {
+  "name": "door count not shared by width",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "Math.max(least[index]!, Math.round((wanted * carcassModule.width) / total))",
+  "to": "Math.round((wanted * carcassModule.width) / total) || 1"
+ },
+ {
+  "name": "pairs whatever the door width",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "const pairs = sliding || opening(carcassModule) / doors <= 450;",
+  "to": "const pairs = true;"
+ },
+ {
+  "name": "sliding doors single",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "const perModule = sliding ? shared.map((count) => count + (count % 2)) : shared;",
+  "to": "const perModule = shared;"
+ },
+ {
+  "name": "bays ignore transport modules",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "    const interior = moduleInterior(carcassModule, leaves.length, T);",
+  "to": "    const interior = moduleInterior({ ...carcassModule, width: carcassModule.width + T }, leaves.length, T);"
+ },
+ {
+  "name": "no note when door count changes",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "  if (laid.doors !== doors) {",
+  "to": "  if (false) {"
+ },
+ {
+  "name": "height not capped by the space",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "const height = Math.min(options.height ?? space.height, 2700);",
+  "to": "const height = 2100;"
+ },
+ {
+  "name": "internal drawers not internal",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "...(internal ? { internal: true } : {})",
+  "to": "...({})"
+ },
+ {
+  "name": "top cabinet not added",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "      return addTopCabinet(spec, main(spec).id, top);",
+  "to": "      return spec;"
+ },
+ {
+  "name": "side display leaves width",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "straightWardrobe({ ...space, width: space.width - shelf }, 4, \"hinged\")",
+  "to": "straightWardrobe(space, 4, \"hinged\")"
+ },
+ {
+  "name": "material only on carcass",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "carcass: { ...spec.carcass, board, frontBoard: board, interiorBoard: board,",
+  "to": "carcass: { ...spec.carcass, board,"
+ },
+ {
+  "name": "priority dropped",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "if (template.type === \"wardrobe\" && options.priority) {",
+  "to": "if (false) {"
+ },
+ {
+  "name": "shoe depth unbounded",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "depth: Math.min(space.depth, 450) }",
+  "to": "depth: 450 }"
+ },
+ {
+  "name": "sketch template not sketch",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "...startingDesign(\"custom\", { width: space.width }), sketchMode: true }",
+  "to": "...startingDesign(\"custom\", { width: space.width }) }"
+ },
+ {
+  "name": "part ID without module",
+  "file": "src/features/berchuma-studio/services/cutlist.ts",
+  "from": "...(entry.part.module ? [`M${entry.part.module.index + 1}`] : [])",
+  "to": "...([])"
+ },
+ {
+  "name": "part IDs not made unique",
+  "file": "src/features/berchuma-studio/services/cutlist.ts",
+  "from": "      if (count > 1) row.partId = `${row.partId}${count}`;",
+  "to": ""
+ },
+ {
+  "name": "left and right sides alike",
+  "file": "src/features/berchuma-studio/services/cutlist.ts",
+  "from": "return /\\bright\\b/.test(label) ? \"RS\" : /\\bleft\\b/.test(label) ? \"LS\" : \"SD\";",
+  "to": "return \"LS\";"
+ },
+ {
+  "name": "cabinet column only the first",
+  "file": "src/features/berchuma-studio/services/cutlist.ts",
+  "from": "      if (!existing.cabinets.includes(code)) existing.cabinets.push(code);",
+  "to": ""
+ },
+ {
+  "name": "windows ignored",
+  "file": "src/features/berchuma-studio/services/kitchen-setup.ts",
+  "from": "    if (windows.some((window) => window.wall === wall && window.offset < to - 1 && window.offset + window.width > from + 1)) blocked.add(cabinet.id);",
+  "to": ""
+ },
+ {
+  "name": "window on the wrong axis",
+  "file": "src/features/berchuma-studio/services/kitchen-setup.ts",
+  "from": "const from = Math.min(...spans.map((bounds) => (wall === \"back\" ? bounds.min.x : bounds.min.z)));",
+  "to": "const from = Math.min(...spans.map((bounds) => bounds.min.x));"
+ },
+ {
+  "name": "stacked tops left floating",
+  "file": "src/features/berchuma-studio/services/kitchen-setup.ts",
+  "from": "      if (cabinet.stackedOn && blocked.has(cabinet.stackedOn) && !blocked.has(cabinet.id)) {",
+  "to": "      if (false) {"
+ },
+ {
+  "name": "base cabinets cleared too",
+  "file": "src/features/berchuma-studio/services/kitchen-setup.ts",
+  "from": "    if (cabinet.kind !== \"wall\") continue;",
+  "to": ""
+ },
+ {
+  "name": "detailed kitchens ignore windows",
+  "file": "src/features/berchuma-studio/services/kitchen-setup.ts",
+  "from": "if (options.details) return clearWindows(createDetailedKitchen(options), options.windows);",
+  "to": "if (options.details) return createDetailedKitchen(options);"
+ },
+ {
+  "name": "status any string",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "    status: z.enum(projectStatuses).optional(),",
+  "to": "    status: z.string().optional(),"
+ },
+ {
+  "name": "nav keeps the chair",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "label: \"Cabinet Design\",\n    emoji: \"🗄️\",\n    icon: Cabinet,",
+  "to": "label: \"Cabinet Design\",\n    emoji: \"🗄️\",\n    icon: Armchair,"
+ },
+ {
+  "name": "nav old hint",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "hint: \"Design cabinets and get a price\"",
+  "to": "hint: \"Design fitted furniture and get a price\""
+ },
+ {
+  "name": "amharic not translated",
+  "file": "src/lib/i18n/translations.ts",
+  "from": "berchuma: \"ካቢኔት ዲዛይን\"",
+  "to": "berchuma: \"በርቹማ ስቱዲዮ\""
+ },
+ {
+  "name": "material view stays white",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "return surface === \"material\" ? materialColour(part.board, spec) : accentColour(part, spec) ?? boardColour(part.board, spec);",
+  "to": "return accentColour(part, spec) ?? boardColour(part.board, spec);"
+ },
+ {
+  "name": "mesh not told the view",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "color={colourFor(part, spec, surface)}",
+  "to": "color={colourFor(part, spec)}"
+ },
+ {
+  "name": "toggle not passed to model",
+  "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+  "from": "              hideFronts={hideFronts}\n              surface={surface}",
+  "to": "              hideFronts={hideFronts}"
+ },
+ {
+  "name": "quick duplicate removes",
+  "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+  "from": "<QuickAction label=\"Duplicate\" onClick={() => onChange(duplicateCabinet(spec, selected.id))}>",
+  "to": "<QuickAction label=\"Duplicate\" onClick={() => onChange(removeCabinet(spec, selected.id))}>"
+ },
+ {
+  "name": "move pad always shown",
+  "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+  "from": "{view === \"solid\" && selected && movePad ? (",
+  "to": "{view === \"solid\" && selected ? ("
+ },
+ {
+  "name": "integers only",
+  "file": "src/features/berchuma-studio/components/ui/length-field.tsx",
+  "from": "decimals = unit === \"mm\" ? 1 : 0,",
+  "to": "decimals = 0,"
+ },
+ {
+  "name": "comma not decimal",
+  "file": "src/features/berchuma-studio/components/ui/length-field.tsx",
+  "from": "    const next = Number(draft.replace(\",\", \".\"));",
+  "to": "    const next = Number(draft);"
+ },
+ {
+  "name": "lock leaves box editable",
+  "file": "src/features/berchuma-studio/components/ui/length-field.tsx",
+  "from": "step={step} unit={unit} disabled={locked} onChange={onChange} />",
+  "to": "step={step} unit={unit} onChange={onChange} />"
+ },
+ {
+  "name": "reset keeps the joints",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "<Chip onClick={() => onChange(divideForTransport(spec, owner.id))}><RotateCcw",
+  "to": "<Chip onClick={() => onChange(divideForTransport(spec, owner.id, joints.map((joint) => joint.at)))}><RotateCcw"
+ },
+ {
+  "name": "delete of published allowed",
+  "file": "src/features/berchuma-studio/services/designs.ts",
+  "from": "  if (row.visibility !== \"private\") return { ok: false, error: \"Published designs are kept so their links keep working.\" };",
+  "to": ""
+ },
+ {
+  "name": "delete of quoted allowed",
+  "file": "src/features/berchuma-studio/services/designs.ts",
+  "from": "  if (count) return { ok: false, error: \"This design has been sent to a workshop, so it is kept.\" };",
+  "to": ""
+ },
+ {
+  "name": "duplicate overwrites",
+  "file": "src/features/berchuma-studio/services/designs.ts",
+  "from": "return saveDesign({ spec: { ...own.spec, title, meta: { ...own.spec.meta, status: \"draft\" } }, note: \"Duplicated\" });",
+  "to": "return saveDesign({ designId, spec: { ...own.spec, title, meta: { ...own.spec.meta, status: \"draft\" } }, note: \"Duplicated\" });"
+ },
+ {
+  "name": "delete not routed",
+  "file": "src/app/api/studio/designs/route.ts",
+  "from": "      const result = await deleteDesign(body.designId);",
+  "to": "      const result = { ok: true as const };"
+ },
+ {
+  "name": "template param ignored",
+  "file": "src/app/studio/page.tsx",
+  "from": "      ? { kind: templateKind, template: chosenTemplate.id }",
+  "to": "      ? null"
+ },
+ {
+  "name": "status not saved",
+  "file": "src/features/berchuma-studio/components/publish-bar.tsx",
+  "from": "const spec: DesignSpec = { ...design, meta: { ...design.meta, status } };",
+  "to": "const spec: DesignSpec = design;"
+ },
+ {
+  "name": "kitchen material lost",
+  "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
+  "from": "onStart={(spec) => onStart(withMaterial(spec, boardId))}",
+  "to": "onStart={(spec) => onStart(spec)}"
+ },
+ {
+  "name": "wizard skips layout",
+  "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
+  "from": "if (type === \"wardrobe\") return [\"type\", \"space\", \"layout\", \"template\", \"material\"];",
+  "to": "if (type === \"wardrobe\") return [\"type\", \"space\", \"template\", \"material\"];"
+ },
+ {
+  "name": "start panel without wizard template",
+  "file": "src/features/berchuma-studio/components/start-panel.tsx",
+  "from": " initialTemplate={initialTemplate} />",
+  "to": " />"
+ }
+]
