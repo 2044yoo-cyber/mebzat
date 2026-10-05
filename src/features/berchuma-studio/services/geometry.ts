@@ -13,7 +13,7 @@ import {
 } from "./corners";
 export { hingesPerLeaf } from "./corners";
 import { bayLabelSuffix } from "./bay-layout";
-import { bayLayout, connectorsPerJoint, jointsOf, modulesOf } from "./transport-modules";
+import { bayLayout, connectorsPerJoint, jointsOf, moduleLabel, modulesOf, stackRoleOf } from "./transport-modules";
 import { resolveDrawerConstruction } from "./drawer-construction";
 import {
   distributeDimension,
@@ -574,9 +574,14 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   const modules = modulesOf(cabinet);
   const modular = modules.length > 1;
   const layout = bayLayout(cabinet, t);
-  const moduleName = (index: number) => `${cabinet.stackedOn ? "Top" : "Base"} module ${index + 1}`;
+  // A wardrobe is a grid of modules: across, its transport modules; up, its
+  // height modules — a lower carcass and the upper one stacked on it. Its
+  // parts are named by both ("Lower module 1", "Upper module 2"); one in a
+  // single height is "Module 1". Kitchens keep their own words.
+  const tagged = modular || stackRoleOf(spec, cabinet) !== null;
+  const moduleName = (index: number) => moduleLabel(spec, cabinet, index, modular);
   const moduleTag = (index: number): Pick<Part, "module"> =>
-    modular ? { module: { name: moduleName(index), index, width: modules[index]!.width } } : {};
+    tagged ? { module: { name: moduleName(index), index, width: modules[index]!.width } } : {};
 
   // ---- Gables ------------------------------------------------------------
   // Full-height outer sides. Only the front edge shows. At a transport joint
@@ -588,7 +593,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     push({
       id: first ? "gable-left" : `module-${carcassModule.index + 1}-gable-left`,
       role: "gable",
-      label: modular ? `${moduleName(carcassModule.index)} — left side` : "Left gable",
+      label: tagged ? `${moduleName(carcassModule.index)} — left side` : "Left gable",
       board,
       length: carcassHeight,
       width: shellDepth,
@@ -602,7 +607,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     push({
       id: last ? "gable-right" : `module-${carcassModule.index + 1}-gable-right`,
       role: "gable",
-      label: modular ? `${moduleName(carcassModule.index)} — right side` : "Right gable",
+      label: tagged ? `${moduleName(carcassModule.index)} — right side` : "Right gable",
       board,
       length: carcassHeight,
       width: shellDepth,
@@ -637,7 +642,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       push({
         id: `${prefix}bottom${suffix}`,
         role: "bottom",
-        label: modular ? `${moduleName(carcassModule.index)} — bottom${sectionLabel}` : `Bottom${sectionLabel}`,
+        label: tagged ? `${moduleName(carcassModule.index)} — bottom${sectionLabel}` : `Bottom${sectionLabel}`,
         board,
         length: section.length,
         width: shellDepth,
@@ -651,7 +656,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       push({
         id: `${prefix}top${suffix}`,
         role: "top",
-        label: modular ? `${moduleName(carcassModule.index)} — top${sectionLabel}` : `Top${sectionLabel}`,
+        label: tagged ? `${moduleName(carcassModule.index)} — top${sectionLabel}` : `Top${sectionLabel}`,
         board,
         length: section.length,
         width: shellDepth,
@@ -2021,19 +2026,39 @@ function hardwareFor(
   // Joining transport modules: connectors along every joint's height, base
   // and top cabinets alike, of the kind each cabinet says.
   const connectorIds = { confirmat: "connector-confirmat", bolt: "connector-bolt", dowel_screw: "connector-dowel-screw", cam: "connector-cam" } as const;
-  const connectors = new Map<string, { count: number; joints: number }>();
+  const connectors = new Map<string, { count: number; joints: number; heightJoints: number }>();
   for (const cabinet of spec.cabinets) {
     const joints = jointsOf(cabinet).length;
     if (!joints || !cabinet.transport) continue;
     const id = connectorIds[cabinet.transport.connector ?? "confirmat"];
-    const entry = connectors.get(id) ?? { count: 0, joints: 0 };
+    const entry = connectors.get(id) ?? { count: 0, joints: 0, heightJoints: 0 };
     entry.count += joints * connectorsPerJoint(cabinet.size.height - cabinet.plinthHeight);
     entry.joints += joints;
     connectors.set(id, entry);
   }
+  // Joining height modules: the lower module's top to the upper's bottom,
+  // a row along the front and one along the back of each upper module. Only
+  // for wardrobes divided as height modules; a top cabinet saved before they
+  // existed keeps the hardware list it had.
+  if (spec.furnitureType === "wardrobe") {
+    for (const upper of spec.cabinets) {
+      const lower = upper.stackedOn ? spec.cabinets.find((cabinet) => cabinet.id === upper.stackedOn) : undefined;
+      if (!lower?.heightModules) continue;
+      const id = connectorIds[lower.transport?.connector ?? "confirmat"];
+      const entry = connectors.get(id) ?? { count: 0, joints: 0, heightJoints: 0 };
+      for (const carcassModule of modulesOf(upper)) entry.count += 2 * connectorsPerJoint(carcassModule.width);
+      entry.heightJoints += modulesOf(upper).length;
+      connectors.set(id, entry);
+    }
+  }
   for (const [id, entry] of connectors) {
     const connector = spec.hardware.find((item) => item.id === id) ?? findHardware(id);
-    if (connector) lines.push({ hardware: connector, quantity: entry.count, note: `Joining transport modules — ${entry.joints} joint${entry.joints === 1 ? "" : "s"}, screwed together from inside` });
+    const across = entry.joints ? `${entry.joints} joint${entry.joints === 1 ? "" : "s"}` : "";
+    const up = entry.heightJoints ? `${entry.heightJoints} lower-to-upper joint${entry.heightJoints === 1 ? "" : "s"}` : "";
+    const note = entry.heightJoints
+      ? `Joining modules — ${[across, up].filter(Boolean).join(", ")}, screwed together from inside`
+      : `Joining transport modules — ${across}, screwed together from inside`;
+    if (connector) lines.push({ hardware: connector, quantity: entry.count, note });
   }
 
   // Open-display lighting, by the metre the geometry lays.

@@ -89,15 +89,15 @@ const wardrobe = fresh.cabinets[0]!;
 equal(wardrobe.transport?.auto, true, "a new wardrobe is on the 1600 mm rule");
 equal(widths(fresh), [1600, 800], "2400 → 1600 + 800, not three equal 800s");
 const gables = of(fresh, wardrobe.id, "gable").sort((a, b) => a.placements[0]!.x - b.placements[0]!.x);
-equal(gables.map((part) => [part.label, part.placements[0]!.x]), [["Base module 1 — left side", 0], ["Base module 1 — right side", 1582], ["Base module 2 — left side", 1600], ["Base module 2 — right side", 2382]], "four sides: each module its own left and right");
+equal(gables.map((part) => [part.label, part.placements[0]!.x]), [["Module 1 — left side", 0], ["Module 1 — right side", 1582], ["Module 2 — left side", 1600], ["Module 2 — right side", 2382]], "four sides: each module its own left and right");
 ok(gables[1]!.placements[0]!.x + t === gables[2]!.placements[0]!.x, "at the joint the two side panels stand directly against each other");
 ok(!of(fresh, wardrobe.id, "divider").some((part) => part.placements.some((at) => at.x >= 1570 && at.x <= 1610)), "and no shared divider stands at the joint");
 for (const role of ["top", "bottom"] as const) {
-  equal(of(fresh, wardrobe.id, role).map((part) => [part.module?.name, part.placements[0]!.x, part.length]), [["Base module 1", 18, 1564], ["Base module 2", 1618, 764]], `each module has its own ${role}, between its own sides`);
+  equal(of(fresh, wardrobe.id, role).map((part) => [part.module?.name, part.placements[0]!.x, part.length]), [["Module 1", 18, 1564], ["Module 2", 1618, 764]], `each module has its own ${role}, between its own sides`);
 }
 const backs = of(fresh, wardrobe.id, "back");
-ok(["Base module 1", "Base module 2"].every((name) => backs.some((part) => part.module?.name === name)), "each module has its own back");
-ok(backs.every((part) => part.placements.every((at) => (part.module?.name === "Base module 1" ? at.x + part.size.x <= 1600 : at.x >= 1600))), "and no back panel crosses the joint");
+ok(["Module 1", "Module 2"].every((name) => backs.some((part) => part.module?.name === name)), "each module has its own back");
+ok(backs.every((part) => part.placements.every((at) => (part.module?.name === "Module 1" ? at.x + part.size.x <= 1600 : at.x >= 1600))), "and no back panel crosses the joint");
 const layout = bayLayout(wardrobe, t);
 equal(layout.map((place) => place.module), [0, 0, 1], "the three bays sit in their modules: two in the first, one in the second");
 equal(fresh.cabinets[0]!.bays.map((bay) => bay.fitting.kind), ["hanging", "stack", "shelves"], "the interior layout is kept");
@@ -126,12 +126,12 @@ equal(connectors(single), [], "no joint, no connectors");
 // 18 — The cut list names each module's parts.
 // ---------------------------------------------------------------------------
 const rows = buildCutList(fresh, buildParts(fresh)).rows;
-for (const name of ["Base module 1 — left side", "Base module 1 — right side", "Base module 1 — top", "Base module 1 — bottom", "Base module 2 — left side", "Base module 2 — right side", "Base module 2 — top", "Base module 2 — bottom"]) {
+for (const name of ["Module 1 — left side", "Module 1 — right side", "Module 1 — top", "Module 1 — bottom", "Module 2 — left side", "Module 2 — right side", "Module 2 — top", "Module 2 — bottom"]) {
   ok(rows.some((row) => row.label === name && row.quantity === 1), `the cut list has ${name}`);
 }
 ok(rows.filter((row) => row.module).every((row) => row.label.startsWith(row.module!)), "every module part's row starts with its module");
 const sheet = assemblySheet(fresh)!;
-ok(sheet.rows.some((row) => row[1] === "Base module 1" && row[3] === 1600) && sheet.rows.some((row) => row[1] === "Base module 2" && row[3] === 800), "the export's Assembly sheet lists the modules and widths");
+ok(sheet.rows.some((row) => row[1] === "Module 1" && row[3] === 1600) && sheet.rows.some((row) => row[1] === "Module 2" && row[3] === 800), "the export's Assembly sheet lists the modules and widths");
 ok(sheet.rows.some((row) => typeof row[5] === "string" && row[5].startsWith(`${connectorsPerJoint(carcass)} × Confirmat`)), "and what joins them");
 equal(assemblySheet(single), null, "a one-carcass design has no Assembly sheet");
 
@@ -141,7 +141,7 @@ equal(assemblySheet(single), null, "a one-carcass design has no Assembly sheet")
 const withTop = addTopCabinet(fresh, wardrobe.id, 600);
 const top = withTop.cabinets.find((cabinet) => cabinet.stackedOn === wardrobe.id)!;
 equal(widths(withTop, top.id), [1600, 800], "the top cabinet: 1600 + 800, over the base's joint");
-equal(of(withTop, top.id, "gable").map((part) => part.label).sort(), ["Top module 1 — left side", "Top module 1 — right side", "Top module 2 — left side", "Top module 2 — right side"], "with its own double wall");
+equal(of(withTop, top.id, "gable").map((part) => part.label).sort(), ["Upper module 1 — left side", "Upper module 1 — right side", "Upper module 2 — left side", "Upper module 2 — right side"], "with its own double wall");
 const baseTop = of(withTop, wardrobe.id, "top");
 const topBottom = of(withTop, top.id, "bottom");
 ok(baseTop.length === 2 && topBottom.length === 2 && baseTop.every((part) => part.placements[0]!.y + t <= topBottom[0]!.placements[0]!.y), "the base's top and the top cabinet's bottom are separate boards, one on the other");
@@ -225,7 +225,7 @@ const nicheBay = niche.cabinets[0]!.bays.find((bay) => bay.display)!;
 equal(cabinetFronts(niche, niche.cabinets[0]!).leaves.filter((leaf) => leaf.bayId === nicheBay.id), [], "an open niche in a module has no door");
 noClashes(niche, "a niche in a module");
 const internal = setBayInternalDrawers(setBayFitting(fresh, wardrobe.id, wardrobe.bays[2]!.id, { kind: "drawers", count: 3 }), wardrobe.id, wardrobe.bays[2]!.id, true);
-ok(of(internal, wardrobe.id, "drawer_front").every((part) => part.internal || part.module?.name !== "Base module 2"), "internal drawers in module 2 stay behind its doors");
+ok(of(internal, wardrobe.id, "drawer_front").every((part) => part.internal || part.module?.name !== "Module 2"), "internal drawers in module 2 stay behind its doors");
 noClashes(internal, "internal drawers in a module");
 const l = validateSpec(wardrobeShapeDesign({ shape: "l_shaped", walls: [3400, 2400], depth: 600, height: 2400 })).spec;
 equal(l.cabinets.map((cabinet) => cabinet.transport), [undefined, undefined], "a turned run is not divided by itself — its corner end needs a joint placed for it");

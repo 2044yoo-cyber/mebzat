@@ -9,8 +9,9 @@ import { cn } from "@/lib/utils";
 import { KitchenSetup } from "./kitchen-setup";
 import { TemplateThumb } from "./template-thumb";
 import { LengthField } from "./ui/length-field";
+import { ConstructionDecision, DEFAULT_CONSTRUCTION, MaterialPicker, ModulePartition, useConstructionPlan, type Construction } from "./wardrobe-construction";
 import {
-  CABINET_MATERIALS,
+  CABINET_DECORS,
   CABINET_TYPES,
   buildTemplate,
   findTemplate,
@@ -36,7 +37,7 @@ import type { DesignKind, DesignSpec } from "../types/spec";
  * same generators, so what you pick is what you get, and all of it editable.
  */
 
-type Step = "type" | "space" | "layout" | "template" | "material";
+type Step = "type" | "space" | "layout" | "template" | "material" | "review";
 
 const ICONS: Record<CabinetType, typeof ChefHat> = {
   wardrobe: Cabinet,
@@ -90,11 +91,13 @@ function typeOfKind(kind: DesignKind | undefined): CabinetType | null {
 
 function stepsFor(type: CabinetType | null): Step[] {
   if (type === "kitchen") return ["type", "template", "material"];
-  if (type === "wardrobe") return ["type", "space", "layout", "template", "material"];
+  // A wardrobe's material and construction are decided with its size, and
+  // the decision is shown again before it is made.
+  if (type === "wardrobe") return ["type", "space", "layout", "template", "review"];
   return ["type", "space", "template", "material"];
 }
 
-const STEP_LABELS: Record<Step, string> = { type: "Type", space: "Space", layout: "Layout", template: "Template", material: "Material" };
+const STEP_LABELS: Record<Step, string> = { type: "Type", space: "Space", layout: "Layout", template: "Template", material: "Material", review: "Review" };
 
 export function CabinetStart({
   onStart,
@@ -119,11 +122,21 @@ export function CabinetStart({
   const [layout, setLayout] = useState<WardrobeLayout>(fromGallery?.layouts?.[0] ?? "straight");
   const [walls, setWalls] = useState<number[]>([]);
   const [templateId, setTemplateId] = useState<string | null>(fromGallery?.id ?? null);
-  const [boardId, setBoardId] = useState<string>(CABINET_MATERIALS[0]?.id ?? "mdf-18-white");
+  const [construction, setConstruction] = useState<Construction>(DEFAULT_CONSTRUCTION);
+  const [customizing, setCustomizing] = useState(false);
+  const boardId = construction.boardId;
+  const setBoardId = (next: string) => setConstruction((current) => ({ ...current, boardId: next }));
   const [priority, setPriority] = useState<"storage" | "balanced" | "decorative">("balanced");
   const [ends, setEnds] = useState<{ leftEnd: "wall" | "open"; rightEnd: "wall" | "open" }>({ leftEnd: "wall", rightEnd: "wall" });
 
   const steps = stepsFor(type);
+  const isWardrobe = type === "wardrobe";
+  const plan = useConstructionPlan(space, construction, isWardrobe);
+  // For a wardrobe: its board, its height modules and its width modules.
+  const built = isWardrobe && plan
+    ? { boardId, heights: plan.plan.modules, heightAuto: construction.heightMode === "auto", joints: construction.joints ?? undefined }
+    : {};
+  const blocked = isWardrobe && plan ? [...plan.plan.problems, ...plan.widthProblems] : [];
   const at = steps.indexOf(step);
   const chosenType = CABINET_TYPES.find((entry) => entry.type === type) ?? null;
 
@@ -140,11 +153,13 @@ export function CabinetStart({
   // The cards' designs, built once per space rather than on every render: a
   // grid of ten wardrobes is ten sets of parts.
   const wallKey = currentWalls.join(",");
+  const builtKey = JSON.stringify(built);
   const previews = useMemo(() => {
     if (step !== "template") return new Map<string, DesignSpec | null>();
     const walls = wallKey.split(",").map(Number);
-    return new Map(templates.map((entry) => [entry.id, entry.build ? buildTemplate(entry.id, space, { layout, walls }) : null]));
-  }, [step, templates, space, layout, wallKey]);
+    const options = JSON.parse(builtKey) as typeof built;
+    return new Map(templates.map((entry) => [entry.id, entry.build ? buildTemplate(entry.id, space, { layout, walls, ...options }) : null]));
+  }, [step, templates, space, layout, wallKey, builtKey]);
 
   const choose = (next: CabinetType) => {
     setType(next);
@@ -157,7 +172,7 @@ export function CabinetStart({
   };
 
   const build = (entry: CabinetTemplate, material?: string): DesignSpec | null =>
-    buildTemplate(entry.id, space, { layout, walls: currentWalls, boardId: material, priority, ends: layout === "straight" ? ends : undefined });
+    buildTemplate(entry.id, space, { layout, walls: currentWalls, boardId: material, ...built, priority, ends: layout === "straight" ? ends : undefined });
 
   const go = (direction: 1 | -1) => {
     const next = steps[at + direction];
@@ -217,6 +232,13 @@ export function CabinetStart({
           <LengthField label="Width" value={space.width} min={300} max={8000} step={50} onChange={(width) => setSpace((current) => ({ ...current, width }))} />
           <LengthField label="Height" value={space.height} min={300} max={3200} step={50} onChange={(height) => setSpace((current) => ({ ...current, height }))} />
           <LengthField label="Depth" value={space.depth} min={150} max={900} step={10} onChange={(depth) => setSpace((current) => ({ ...current, depth }))} />
+          {isWardrobe && plan ? (
+            <>
+              <span className="block pt-2 text-sm font-medium">Material</span>
+              <MaterialPicker boardId={boardId} onChange={setBoardId} />
+              <ModulePartition space={space} construction={construction} plan={plan} customizing={customizing} onCustomize={setCustomizing} onChange={setConstruction} />
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -280,7 +302,7 @@ export function CabinetStart({
         <div className="space-y-3 rounded-xl border p-4">
           <span className="text-sm font-medium">Material</span>
           <div className="grid grid-cols-2 gap-2 @lg/ws:grid-cols-3" role="radiogroup" aria-label="Material">
-            {CABINET_MATERIALS.map((board) => (
+            {CABINET_DECORS.map((board) => (
               <button
                 key={board.id}
                 type="button"
@@ -298,8 +320,39 @@ export function CabinetStart({
             ))}
           </div>
 
-          {type === "wardrobe" ? (
-            <div className="space-y-1.5">
+          {type === "kitchen" ? (
+            // The kitchen's own setup takes it from here: the room, the
+            // shape, and where the fridge, sink and stove go. The template
+            // chose its starting shape; the material is applied to what it
+            // makes.
+            <KitchenSetup
+              key={template?.id}
+              initial={template?.kitchen}
+              submitLabel="Create kitchen"
+              onStart={(spec) => onStart(withMaterial(spec, boardId))}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      {step === "review" && isWardrobe && plan && template ? (
+        <div className="space-y-3 rounded-xl border p-4" aria-label="Review" role="region">
+          <span className="text-sm font-medium">{template.label}</span>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+            <dt className="text-muted-foreground">Overall</dt>
+            <dd className="tabular-nums">W {Math.round(space.width)} × H {Math.round(space.height)} × D {Math.round(space.depth)} mm</dd>
+            <dt className="text-muted-foreground">Material</dt>
+            <dd>{plan.board.label}</dd>
+            <dt className="text-muted-foreground">Sheet</dt>
+            <dd className="tabular-nums">{plan.board.sheet.width} × {plan.board.sheet.length} mm</dd>
+            <dt className="text-muted-foreground">Width modules</dt>
+            <dd className="tabular-nums">{plan.widths.map(Math.round).join(" + ")}</dd>
+            <dt className="text-muted-foreground">Height modules</dt>
+            <dd className="tabular-nums" data-review-heights>{layout !== "straight" ? `One module — ${layout === "l_shaped" ? "an L" : "a U"} is made in one height` : plan.plan.modules.length === 1 ? `Single ${Math.round(plan.plan.modules[0]!)} mm` : plan.plan.modules.map(Math.round).join(" + ")}</dd>
+          </dl>
+          <ConstructionDecision space={space} construction={construction} plan={plan} onChange={setConstruction} onCustomize={() => { setCustomizing(true); setStep("space"); }} />
+          <button type="button" onClick={() => setStep("space")} className="rounded-md border px-2.5 py-1.5 text-xs hover:border-brand">Change size, material or modules</button>
+          <div className="space-y-1.5">
               <span className="text-[11px] text-muted-foreground">Design priority</span>
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="Design priority">
                 {PRIORITIES.map((entry) => (
@@ -334,21 +387,7 @@ export function CabinetStart({
                   ))}
                 </div>
               ) : null}
-            </div>
-          ) : null}
-
-          {type === "kitchen" ? (
-            // The kitchen's own setup takes it from here: the room, the
-            // shape, and where the fridge, sink and stove go. The template
-            // chose its starting shape; the material is applied to what it
-            // makes.
-            <KitchenSetup
-              key={template?.id}
-              initial={template?.kitchen}
-              submitLabel="Create kitchen"
-              onStart={(spec) => onStart(withMaterial(spec, boardId))}
-            />
-          ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -363,11 +402,11 @@ export function CabinetStart({
             Back
           </button>
         ) : null}
-        {step === "type" ? null : step === "material" ? (
+        {step === "type" ? null : step === "material" || step === "review" ? (
           type === "kitchen" ? null : (
             <button
               type="button"
-              disabled={!template}
+              disabled={!template || blocked.length > 0}
               onClick={() => {
                 const spec = template ? build(template, boardId) : null;
                 if (spec) onStart(spec);

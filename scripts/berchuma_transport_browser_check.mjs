@@ -148,7 +148,7 @@ try {
   await page.waitForFunction(() => window.__spec.cabinets[0].transport.joints[0].at === 1400);
   assert.match(await jointPanel.textContent(), /Left module 1400 mm · Right module 1000 mm/, "typed 1400: 1400 + 1000");
   const sides = await page.evaluate(() => window.__parts().filter((part) => part.role === "gable" && part.cabinetId === window.__spec.cabinets[0].id).map((part) => part.label).sort());
-  assert.deepEqual(sides, ["Base module 1 — left side", "Base module 1 — right side", "Base module 2 — left side", "Base module 2 — right side"], "the double wall moved with it: real side panels");
+  assert.deepEqual(sides, ["Module 1 — left side", "Module 1 — right side", "Module 2 — left side", "Module 2 — right side"], "the double wall moved with it: real side panels");
   await jointPanel.getByRole("button", { name: "Lock" }).click();
   await page.waitForFunction(() => window.__spec.cabinets[0].transport.joints[0].locked === true);
   assert.equal(await page.locator('[data-joint-handle="0"]').count(), 0, "a locked joint has no handle");
@@ -157,10 +157,12 @@ try {
   await jointPanel.getByRole("button", { name: "Done" }).click();
 
   // ---- A top cabinet: its own modules, aligned ------------------------------------
-  await page.getByRole("button", { name: "Add 700 mm" }).click();
+  // Height modules: typed to 2800, a 2440 sheet cannot make one carcass that tall.
+  await page.getByLabel("Overall height in mm").fill("2800");
+  await page.getByLabel("Overall height in mm").press("Enter");
   await page.waitForFunction(() => window.__spec.cabinets.length === 2);
   assert.deepEqual(await modules(page, 1), [1400, 1000], "the top cabinet's joint is over the wardrobe's");
-  assert.ok(await svg.locator("text", { hasText: "Top module 1 — 1400" }).count() === 1, "and named as top modules");
+  assert.ok(await svg.locator("text", { hasText: "Upper module 1 — 1400" }).count() === 1, "and named as upper modules");
   await page.getByRole("button", { name: "Wardrobe", exact: true }).first().click().catch(() => undefined);
   await panel(page).getByRole("button", { name: "Align Top Modules" }).waitFor();
   assert.equal(await panel(page).getByRole("button", { name: "Align Top Modules" }).getAttribute("aria-pressed"), "true", "Align Top Modules is on");

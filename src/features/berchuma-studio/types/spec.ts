@@ -488,6 +488,21 @@ export const cabinetSchema = z.object({
   /** The lower wardrobe cabinet this separate overhead carcass sits on. */
   stackedOn: z.string().min(1).optional(),
   /**
+   * Height modules, on the lower cabinet of a wardrobe: whether the division
+   * between it and the upper module follows the material (`auto`), whether
+   * the boundary is locked, and whether it runs across the cabinets beside it
+   * at the same height (`align`). The upper module is the cabinet stacked on
+   * this one. Absent is a wardrobe saved before this existed, which keeps
+   * whatever it had.
+   */
+  heightModules: z
+    .object({
+      auto: z.boolean().default(true),
+      locked: z.boolean().optional(),
+      align: z.boolean().default(true),
+    })
+    .optional(),
+  /**
    * Transport modules: where the carcass is made as separate cabinets, joined
    * side to side on site with a double wall. `at` is the joint's distance from
    * the cabinet's left side, mm. `auto` keeps the 1600 mm rule as the width

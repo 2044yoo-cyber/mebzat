@@ -1,7 +1,7 @@
 import { buildCutList, sheetCountsOf, type CutList } from "./cutlist";
 import { calculateCost } from "./costing";
 import { buildParts } from "./geometry";
-import { connectorsPerJoint, modulesOf } from "./transport-modules";
+import { connectorsPerJoint, moduleLabel, modulesOf, stackRoleOf } from "./transport-modules";
 import { constructionMaterials } from "./wardrobe-materials";
 import { buildXlsx, type Sheet } from "./xlsx";
 import type { CostBreakdown, MarketRate } from "../types/cost";
@@ -233,24 +233,29 @@ function layoutSheet(cutList: CutList): Sheet {
  * in modules; a one-carcass design has nothing to assemble.
  */
 export function assemblySheet(spec: ExportInput["spec"]): Sheet | null {
-  const modular = spec.cabinets.filter((cabinet) => modulesOf(cabinet).length > 1);
+  const stacked = (cabinet: (typeof spec.cabinets)[number]) => stackRoleOf(spec, cabinet) !== null;
+  const modular = spec.cabinets.filter((cabinet) => modulesOf(cabinet).length > 1 || stacked(cabinet));
   if (!modular.length) return null;
   const connectorNames = { confirmat: "Confirmat screws", bolt: "Connector bolts", dowel_screw: "Dowel and screw", cam: "Cam connectors" } as const;
-  const rows: (string | number | null)[][] = [["Cabinet", "Module", "From (mm)", "Width (mm)", "Joint on its right", "Connectors"]];
+  const rows: (string | number | null)[][] = [["Cabinet", "Module", "From (mm)", "Width (mm)", "Joint on its right", "Connectors", "Height (mm)"]];
   for (const cabinet of modular) {
     const modules = modulesOf(cabinet);
     const perJoint = connectorsPerJoint(cabinet.size.height - cabinet.plinthHeight);
     const kind = connectorNames[cabinet.transport?.connector ?? "confirmat"];
+    const role = stackRoleOf(spec, cabinet);
     rows.push([]);
-    rows.push([`${cabinet.label}${cabinet.stackedOn ? " (top cabinet, a separate assembly above)" : ""}`]);
+    rows.push([`${cabinet.label}${role === "Upper" ? " (upper module, a separate assembly above)" : role === "Lower" ? " (lower module)" : cabinet.stackedOn ? " (top cabinet, a separate assembly above)" : ""}`]);
     for (const carcassModule of modules) {
       const last = carcassModule.index === modules.length - 1;
-      rows.push([null, `${cabinet.stackedOn ? "Top" : "Base"} module ${carcassModule.index + 1}`, Math.round(carcassModule.from), Math.round(carcassModule.width), last ? null : `at ${Math.round(carcassModule.to)} mm — double side panel`, last ? null : `${perJoint} × ${kind}, from inside`]);
+      rows.push([null, moduleLabel(spec, cabinet, carcassModule.index, modules.length > 1), Math.round(carcassModule.from), Math.round(carcassModule.width), last ? null : `at ${Math.round(carcassModule.to)} mm — double side panel`, last ? null : `${perJoint} × ${kind}, from inside`, Math.round(cabinet.size.height)]);
     }
   }
   rows.push([]);
   rows.push(["Each module is a complete cabinet with its own sides, top, bottom and back. Stand the modules in order, clamp each double side panel flush at the front, and screw through from inside."]);
-  return { name: "Assembly", rows, widths: [30, 18, 11, 11, 34, 34] };
+  if (spec.cabinets.some((cabinet) => stacked(cabinet))) {
+    rows.push(["Height modules: set each upper module on the lower module under it, fronts flush, and screw down through the upper's bottom into the lower's top — two separate boards — in a row along the front and one along the back."]);
+  }
+  return { name: "Assembly", rows, widths: [30, 18, 11, 11, 34, 34, 11] };
 }
 
 function hardwareSheet(parts: ReturnType<typeof buildParts>): Sheet {

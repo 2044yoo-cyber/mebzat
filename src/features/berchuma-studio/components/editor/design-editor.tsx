@@ -5,6 +5,8 @@ import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } fro
 import {
   Box,
   ChevronDown,
+  ClipboardCopy,
+  ClipboardPaste,
   Copy,
   Loader2,
   Grid2x2,
@@ -37,7 +39,11 @@ import {
 import {
   displayExists,
   doorLeafOf,
+  copyCabinet,
   duplicateCabinet,
+  pasteCabinet,
+  type CabinetClip,
+  moveHeightPartition,
   moveJoint,
   resizeDisplayEdge,
   type DisplayRef,
@@ -139,6 +145,8 @@ export function DesignEditor({
   const [selectedDisplay, setSelectedDisplay] = useState<DisplayRef | null>(null);
   // A transport joint being moved: which cabinet's, and which.
   const [selectedJoint, setSelectedJoint] = useState<JointRef | null>(null);
+  // A wardrobe's height boundary being moved, by its lower cabinet.
+  const [selectedPartition, setSelectedPartition] = useState<string | null>(null);
   const [selectedSketchId, setSelectedSketchId] = useState<string | null>(null);
   const [sketchEnabled, setSketchEnabled] = useState(spec.sketchMode);
   const [sketchTool, setSketchTool] = useState<SketchTool>("select");
@@ -146,6 +154,8 @@ export function DesignEditor({
   const [surface, setSurface] = useState<SurfaceView>("model");
   // The move pad, shown with a selection; the Move action hides and shows it.
   const [movePad, setMovePad] = useState(true);
+  // A cabinet copied, to paste after another — in this design or the next.
+  const [clip, setClip] = useState<CabinetClip | null>(null);
   const [showCountertop, setShowCountertop] = useState(false);
 
   // ---- how tall the drawing is on a phone ---------------------------------
@@ -178,7 +188,20 @@ export function DesignEditor({
     setDoorProblem(null);
     setSelectedDisplay(null);
     setSelectedJoint(null);
+    setSelectedPartition(null);
   }
+
+  /** The height boundary tapped: its wardrobe selected, the panel opened on it. */
+  function selectPartition(lowerId: string | null) {
+    setSelectedPartition(lowerId);
+    if (!lowerId) return;
+    setSelectedId(lowerId);
+    setSelectedDoor(null);
+    setSelectedDisplay(null);
+    setSelectedJoint(null);
+    requestAnimationFrame(() => document.querySelector("[data-height-modules-panel]")?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+  }
+  const partition = selectedPartition && spec.cabinets.some((cabinet) => cabinet.stackedOn === selectedPartition) ? selectedPartition : null;
 
   // The joint as the owner holds it: a top cabinet aligned to the wardrobe
   // below moves the wardrobe's joints.
@@ -461,6 +484,9 @@ export function DesignEditor({
                   selectedJoint={joint}
                   onSelectJoint={selectJoint}
                   onJointMove={(ref, at) => onChange(moveJoint(spec, ref.cabinetId, ref.index, at))}
+                  selectedPartition={partition}
+                  onSelectPartition={selectPartition}
+                  onPartitionMove={(lowerId, height) => onChange(moveHeightPartition(spec, lowerId, height))}
                 />
               )}
             </div>
@@ -695,6 +721,14 @@ export function DesignEditor({
                   <QuickAction label="Duplicate" onClick={() => onChange(duplicateCabinet(spec, selected.id))}>
                     <Copy className="size-3.5" aria-hidden />
                   </QuickAction>
+                  <QuickAction label="Copy" onClick={() => setClip(copyCabinet(spec, selected.id))}>
+                    <ClipboardCopy className="size-3.5" aria-hidden />
+                  </QuickAction>
+                  {clip ? (
+                    <QuickAction label="Paste" onClick={() => onChange(pasteCabinet(spec, clip, selected.id))}>
+                      <ClipboardPaste className="size-3.5" aria-hidden />
+                    </QuickAction>
+                  ) : null}
                   <QuickAction
                     label="Delete"
                     danger
@@ -761,6 +795,8 @@ export function DesignEditor({
           onSelectDisplay={selectDisplay}
           joint={joint}
           onSelectJoint={selectJoint}
+          partition={partition}
+          onSelectPartition={selectPartition}
         />
       </div>
     </div>
