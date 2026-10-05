@@ -60,6 +60,10 @@ export function WardrobeShapeSetup({
   }));
   const [depth, setDepth] = useState(600);
   const [height, setHeight] = useState(2400);
+  // How the facade should be composed. Nothing is added because of these:
+  // they decide which open displays Medosha suggests once the wardrobe is made.
+  const [priority, setPriority] = useState<"storage" | "balanced" | "decorative">("balanced");
+  const [ends, setEnds] = useState<{ leftEnd: "wall" | "open"; rightEnd: "wall" | "open" }>({ leftEnd: "wall", rightEnd: "wall" });
 
   const named = wardrobeWalls(shape);
   const lengths = walls[shape];
@@ -145,10 +149,50 @@ export function WardrobeShapeSetup({
         />
       </div>
 
+      <div className="space-y-1.5">
+        <span className="text-[11px] text-muted-foreground">Design priority</span>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Design priority">
+          {(["storage", "balanced", "decorative"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={priority === value}
+              onClick={() => setPriority(value)}
+              className={cn(
+                "flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors",
+                priority === value ? "border-brand bg-brand/5 text-foreground" : "text-muted-foreground hover:border-brand",
+              )}
+            >
+              {value === "storage" ? "Maximum Storage" : value === "balanced" ? "Balanced" : "Decorative"}
+            </button>
+          ))}
+        </div>
+        {shape === "straight" ? (
+          <div className="grid grid-cols-2 gap-1.5">
+            {(["leftEnd", "rightEnd"] as const).map((end) => (
+              <label key={end} className="space-y-0.5 text-[11px] text-muted-foreground">
+                {end === "leftEnd" ? "Left end" : "Right end"}
+                <select
+                  value={ends[end]}
+                  onChange={(event) => setEnds((previous) => ({ ...previous, [end]: event.target.value as "wall" | "open" }))}
+                  className="h-8 w-full rounded-md border bg-background px-1.5 text-xs text-foreground"
+                >
+                  <option value="wall">Against a wall</option>
+                  <option value="open">Open to the room</option>
+                </select>
+              </label>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
       <button
         type="button"
         onClick={() =>
-          onStart(wardrobeShapeDesign({ shape, walls: lengths, depth, height }))
+          onStart({
+            ...wardrobeShapeDesign({ shape, walls: lengths, depth, height }),
+            wardrobePlan: { priority, ...(shape === "straight" ? ends : { leftEnd: "wall", rightEnd: "wall" }) },
+          })
         }
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 pr-actions-safe text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
       >

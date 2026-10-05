@@ -28,7 +28,9 @@ export type PartRole =
   | "leg"
   | "worktop"
   | "backsplash"
-  | "rail";
+  | "rail"
+  /** An LED strip in an open display. Bought by the metre, never cut. */
+  | "led";
 
 /** Which edges of a part are visible and therefore banded. */
 export type BandedEdges = {
@@ -127,6 +129,11 @@ export type Part = {
    * in the viewer say which door it was.
    */
   doorLeaf?: { run: number; first: number };
+  /**
+   * A drawer front behind the wardrobe's doors rather than on its face: it is
+   * not taken off with the doors to show inside, and takes no handle.
+   */
+  internal?: boolean;
 };
 
 export type HardwareLine = {

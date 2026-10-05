@@ -181,12 +181,51 @@ export type Hardware = z.infer<typeof hardwareSchema>;
 // ---------------------------------------------------------------------------
 
 /**
+ * An open display: a part of a wardrobe built on purpose with no door over
+ * it — shelves on show, often in another material, sometimes lit. Not the
+ * same as a door taken off: it can have its own back, its own board and its
+ * own light, and every one of those is a part that is cut or bought.
+ *
+ * `boardId` is the accent board (a catalogue id) for the shelves and back
+ * the opening shows; absent is "same as the wardrobe". `back` false leaves
+ * the opening without a back of its own. `depth` sets how deep the display
+ * is from the front — its back stands there. `lighting` is a simple LED
+ * strip: under the top, under each shelf, or up both sides.
+ */
+export const displayLightings = ["off", "top", "shelf", "vertical"] as const;
+export type DisplayLighting = (typeof displayLightings)[number];
+export const displaySchema = z.object({
+  back: z.boolean().default(true),
+  boardId: z.string().min(1).optional(),
+  depth: z.number().positive().optional(),
+  lighting: z.enum(displayLightings).default("off"),
+});
+export type DisplayOptions = z.infer<typeof displaySchema>;
+
+/**
+ * Drawers behind the wardrobe's doors rather than on its face. Their boxes
+ * are set back and narrowed to clear the door hinges, on runner packers, and
+ * closed by a plain inner front; the doors run uninterrupted in front of
+ * them. Their width is the bay's, less the packers. Depth and the inner
+ * fronts' board can be given; absent is what fits.
+ */
+const internalDrawerFields = {
+  internal: z.boolean().optional(),
+  /** The drawer box's depth, mm. */
+  boxDepth: z.number().positive().optional(),
+  /** The inner fronts' board, a catalogue id. */
+  frontBoardId: z.string().min(1).optional(),
+};
+
+/**
  * What is inside one bay.
  *
  * A bay is a vertical slice of a casework unit between two dividers. It is the
  * unit people actually talk about — "make the middle one drawers" — so it is
  * the unit the spec models.
  */
+export const stackSectionKinds = ["hanging", "shelves", "drawers", "open", "display", "shoes"] as const;
+
 export const bayFittingSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("shelves"),
@@ -209,6 +248,7 @@ export const bayFittingSchema = z.discriminatedUnion("kind", [
      * is what most people mean and nobody says.
      */
     frontHeights: z.array(z.number().positive()).optional(),
+    ...internalDrawerFields,
   }),
   /**
    * A bay divided into stacked sections.
@@ -235,7 +275,12 @@ export const bayFittingSchema = z.discriminatedUnion("kind", [
       .array(
         z.object({
           id: z.string().min(1),
-          kind: z.enum(["hanging", "shelves", "drawers", "open"]),
+          /**
+           * `open` is an empty zone behind the door. `display` is an open
+           * display: no door over it. `shoes` is shoe shelves. `drawers` are
+           * exterior fronts unless `internal`, when they sit behind the door.
+           */
+          kind: z.enum(stackSectionKinds),
           /** Relative height. Normalised across the stack. */
           share: z.number().positive().default(1),
           /** For shelves. */
@@ -244,6 +289,9 @@ export const bayFittingSchema = z.discriminatedUnion("kind", [
           rails: z.number().int().min(1).max(2).optional(),
           /** For drawers. */
           drawers: z.number().int().min(1).max(12).optional(),
+          ...internalDrawerFields,
+          /** For an open display zone. */
+          display: displaySchema.optional(),
         }),
       )
       .min(2)
@@ -303,9 +351,24 @@ export const baySchema = z.object({
     )
     .max(12)
     .optional(),
+  /**
+   * The whole bay is an open display — no door, whatever `door` says. A
+   * `niche` stands between the wardrobe's other bays; a `side` display is a
+   * shelving unit of its own beside the wardrobe (`attachedTo` names the
+   * wardrobe, `side` which end), and its whole carcass is the display. Its
+   * shelves are the bay's `shelves` fitting.
+   */
+  display: displaySchema
+    .extend({
+      style: z.enum(["niche", "side"]),
+      side: z.enum(["left", "right"]).optional(),
+      attachedTo: z.string().min(1).optional(),
+    })
+    .optional(),
 });
 
 export type Bay = z.infer<typeof baySchema>;
+export type BayDisplay = NonNullable<Bay["display"]>;
 
 // ---------------------------------------------------------------------------
 // The spec
@@ -650,6 +713,18 @@ export const designSpecSchema = z.object({
   hardware: z.array(hardwareSchema),
   finish: finishSchema,
   lighting: lightingSchema.optional(),
+  /**
+   * How a wardrobe should be composed, from its setup: whether storage or
+   * looks comes first, and whether each end meets a wall or the room. Only
+   * the recommendations read it — nothing is added to a design because of it.
+   */
+  wardrobePlan: z
+    .object({
+      priority: z.enum(["storage", "balanced", "decorative"]).default("balanced"),
+      leftEnd: z.enum(["wall", "open"]).default("wall"),
+      rightEnd: z.enum(["wall", "open"]).default("wall"),
+    })
+    .optional(),
   worktop: worktopSchema.optional(),
   kitchenSetup: kitchenSetupSchema.optional(),
 
@@ -1316,6 +1391,11 @@ function repairMinimumWardrobeBays(
     ),
   );
   if (target < cabinet.bays.length * minimum) return;
+  // Only a bay that is actually too narrow is repaired. Redistributing every
+  // time pulled unequal bays a step closer to equal on each validation — a
+  // typed width, or a 400 mm niche between 900 mm bays, drifted with every
+  // later edit, a rename included.
+  if (cabinet.bays.every((bay) => bay.width >= minimum)) return;
 
   const widths = distributeDimension(
     cabinet.bays.map((bay) => bay.width),
@@ -1746,8 +1826,10 @@ function validateCabinet(
     if (
       bay.door === "hinged" &&
       // A drawer bay is fronted by its drawers. Counting leaves for it warned
-      // about a door that was never going to exist.
-      bay.fitting.kind !== "drawers" &&
+      // about a door that was never going to exist. Internal drawers are
+      // behind a door, so theirs is counted; an open display has none.
+      (bay.fitting.kind !== "drawers" || bay.fitting.internal === true) &&
+      !bay.display &&
       bay.doorLeaves === 1 &&
       bay.width > LIMITS.hingedLeafWidth
     ) {

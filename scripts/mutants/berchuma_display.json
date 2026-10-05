@@ -1,0 +1,176 @@
+[
+ {
+  "name": "internal drawers get exterior fronts",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "    if (bay.fitting.kind === \"drawers\" && !bay.fitting.internal) {\n      drawerFaces(",
+  "to": "    if (bay.fitting.kind === \"drawers\") {\n      drawerFaces("
+ },
+ {
+  "name": "internal zone breaks the door run",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "  if (section.kind === \"drawers\") return section.internal === true;",
+  "to": "  if (section.kind === \"drawers\") return false;"
+ },
+ {
+  "name": "door over an open display zone",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "  if (section.kind === \"display\") return false;",
+  "to": "  if (section.kind === \"display\") return true;"
+ },
+ {
+  "name": "door over a niche",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "    // An open display has no door, whatever the bay's door says.\n    if (bay.display) continue;",
+  "to": "    // An open display has no door, whatever the bay's door says."
+ },
+ {
+  "name": "inner front not marked internal",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "            role: \"drawer_front\",\n            internal: true,",
+  "to": "            role: \"drawer_front\","
+ },
+ {
+  "name": "inner fronts on the face",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "            placements: [{ x: x + packer + gap, y: face.floor, z: INTERNAL_DRAWER_SETBACK }],",
+  "to": "            placements: [{ x: x + packer + gap, y: face.floor, z: -18 }],"
+ },
+ {
+  "name": "no runner packers",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "          quantity: 2,\n          edges: { ...NO_EDGES, front: true },\n          edgeBand: interiorBand,\n          placements: [\n            { x, y, z: INTERNAL_DRAWER_SETBACK },",
+  "to": "          quantity: 0,\n          edges: { ...NO_EDGES, front: true },\n          edgeBand: interiorBand,\n          placements: [\n            { x, y, z: INTERNAL_DRAWER_SETBACK },"
+ },
+ {
+  "name": "box depth ignored",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "bay.fitting.boxDepth ? bay.fitting.boxDepth + 50 : Number.POSITIVE_INFINITY",
+  "to": "Number.POSITIVE_INFINITY"
+ },
+ {
+  "name": "inner front board ignored",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "const innerBoard = internal ? (findBoard(bay.fitting.frontBoardId ?? \"\") ?? board) : board;",
+  "to": "const innerBoard = board;"
+ },
+ {
+  "name": "display shelves in the wardrobe board",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "  const accent = displayBoard(spec, zone);\n  const band",
+  "to": "  const accent = constructionMaterials(spec).interior;\n  const band"
+ },
+ {
+  "name": "no display back",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "  const ownBack = zone.back && (Boolean(zone.boardId) || zone.depth !== undefined);",
+  "to": "  const ownBack = false;"
+ },
+ {
+  "name": "back off ignored",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "      const openBacked = bay.display?.back === false;",
+  "to": "      const openBacked = false;"
+ },
+ {
+  "name": "one LED strip whatever the shelves",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "(zone.lighting === \"shelf\" && heights.length ? heights : [y + interiorHeight])",
+  "to": "[y + interiorHeight]"
+ },
+ {
+  "name": "LED not bought",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "  if (led) {\n    lines.push({ hardware: led,",
+  "to": "  if (led && false) {\n    lines.push({ hardware: led,"
+ },
+ {
+  "name": "side display carcass not accent",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "  const board = sideDisplay?.boardId ? displayBoard(spec, sideDisplay) : materials.body;",
+  "to": "  const board = materials.body;"
+ },
+ {
+  "name": "handle bought for an inner front",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "part.role === \"drawer_front\" && !part.internal);",
+  "to": "part.role === \"drawer_front\");"
+ },
+ {
+  "name": "left side display does not make room",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    shiftAfter(draft, targetRow, x, width);\n    const added: Cabinet = {\n      id: freshId(\"display\"),",
+  "to": "    const added: Cabinet = {\n      id: freshId(\"display\"),"
+ },
+ {
+  "name": "closing a display leaves no door",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "      delete bay.display;\n      bay.door = \"hinged\";\n      leavesFor(bay);\n      return;",
+  "to": "      delete bay.display;\n      leavesFor(bay);\n      return;"
+ },
+ {
+  "name": "niche does not keep the wardrobe width",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    shareWidths(others, interior - width, floor);",
+  "to": "    shareWidths(others, interior, floor);"
+ },
+ {
+  "name": "bays drift towards equal",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "  if (cabinet.bays.every((bay) => bay.width >= minimum)) return;\n",
+  "to": ""
+ },
+ {
+  "name": "zone heights ignore the drawer floor",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "share: Math.max(1, Math.round(height - (zone.kind === \"drawers\" ? 90 : 0)))",
+  "to": "share: Math.max(1, Math.round(height))"
+ },
+ {
+  "name": "niche edge moves every bay",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    own.width = width;\n    other.width = pair - width;",
+  "to": "    own.width = width;\n    other.width = pair - width;\n    for (const entry of target.bays) if (entry !== own && entry !== other) entry.width -= 30;"
+ },
+ {
+  "name": "storage still suggests",
+  "file": "src/features/berchuma-studio/services/display-ideas.ts",
+  "from": "  if (priority === \"storage\") return 0;",
+  "to": "  if (priority === \"storage\") return 1;"
+ },
+ {
+  "name": "side shelves suggested against a wall",
+  "file": "src/features/berchuma-studio/services/display-ideas.ts",
+  "from": "    if ((end === \"left\" ? plan.leftEnd : plan.rightEnd) === \"open\" && !sideAt(end)) {",
+  "to": "    if (!sideAt(end)) {"
+ },
+ {
+  "name": "accent always oak",
+  "file": "src/features/berchuma-studio/services/display-ideas.ts",
+  "from": "  return front === \"oak\" || front === \"walnut\" ? \"mdf-18-white\" : \"mdf-18-oak\";",
+  "to": "  return \"mdf-18-oak\";"
+ },
+ {
+  "name": "closed option keeps niches",
+  "file": "src/features/berchuma-studio/services/display-ideas.ts",
+  "from": "    if (bay.display?.style === \"niche\") {",
+  "to": "    if (bay.display?.style === \"niche\" && false) {"
+ },
+ {
+  "name": "zone parts select nothing",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    if (section?.kind === \"display\") return { cabinetId: cabinet.id, bayId: bay.id, sectionId: section.id };",
+  "to": "    void section;"
+ },
+ {
+  "name": "no centring snap",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  targets.x.push(middle - rect.width / 2, middle + rect.width / 2);",
+  "to": "  void middle;"
+ },
+ {
+  "name": "narrow wardrobes get niches",
+  "file": "src/features/berchuma-studio/services/display-ideas.ts",
+  "from": "  if (width < NARROW) return priority === \"decorative\" ? 1 : 0;",
+  "to": "  if (width < NARROW) return 1;"
+ }
+]
