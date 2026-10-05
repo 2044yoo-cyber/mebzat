@@ -34,6 +34,7 @@ import {
   displayExists,
   doorLeafOf,
   duplicateCabinet,
+  moveJoint,
   resizeDisplayEdge,
   type DisplayRef,
   moveCabinet,
@@ -44,6 +45,7 @@ import {
 } from "../../services/operations";
 import type { DoorEdge, FrontRect } from "../../services/door-layout";
 import { isSideDisplay } from "../../services/geometry";
+import type { JointRef } from "./transport-panel";
 import { Elevation } from "../viewer/elevation";
 import { Plan } from "../viewer/plan";
 import type { DesignSpec } from "../../types/spec";
@@ -129,6 +131,8 @@ export function DesignEditor({
   const [doorProblem, setDoorProblem] = useState<string | null>(null);
   // An open display being edited: a niche, a zone, or a side unit.
   const [selectedDisplay, setSelectedDisplay] = useState<DisplayRef | null>(null);
+  // A transport joint being moved: which cabinet's, and which.
+  const [selectedJoint, setSelectedJoint] = useState<JointRef | null>(null);
   const [selectedSketchId, setSelectedSketchId] = useState<string | null>(null);
   const [sketchEnabled, setSketchEnabled] = useState(spec.sketchMode);
   const [sketchTool, setSketchTool] = useState<SketchTool>("select");
@@ -164,6 +168,19 @@ export function DesignEditor({
     setSelectedDoor(null);
     setDoorProblem(null);
     setSelectedDisplay(null);
+    setSelectedJoint(null);
+  }
+
+  // The joint as the owner holds it: a top cabinet aligned to the wardrobe
+  // below moves the wardrobe's joints.
+  const joint = selectedJoint && selectedJoint.cabinetId === selectedId ? selectedJoint : null;
+  function selectJoint(next: JointRef | null) {
+    setSelectedJoint(next);
+    if (next) {
+      setSelectedId(next.cabinetId);
+      setSelectedDoor(null);
+      setSelectedDisplay(null);
+    }
   }
 
   function selectDoor(next: DoorRef | null) {
@@ -431,6 +448,9 @@ export function DesignEditor({
                   selectedDisplay={display}
                   onSelectDisplay={selectDisplay}
                   onDisplayResize={resizeDisplay}
+                  selectedJoint={joint}
+                  onSelectJoint={selectJoint}
+                  onJointMove={(ref, at) => onChange(moveJoint(spec, ref.cabinetId, ref.index, at))}
                 />
               )}
             </div>
@@ -688,6 +708,8 @@ export function DesignEditor({
           onDoorProblem={setDoorProblem}
           display={display}
           onSelectDisplay={selectDisplay}
+          joint={joint}
+          onSelectJoint={selectJoint}
         />
       </div>
     </div>

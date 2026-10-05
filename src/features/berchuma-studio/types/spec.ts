@@ -11,6 +11,7 @@ import {
   resolveDrawerFaces,
 } from "../services/drawer-construction";
 import { cornerFits } from "../services/layout";
+import { carcassInterior, defaultJoints, fitBaysToModules, jointsOf } from "../services/transport-modules";
 import { designWorldBounds } from "../services/resolve";
 import { openingClashes, openingFaults } from "../services/room-geometry";
 import { roomSchema } from "./room";
@@ -139,6 +140,8 @@ export const hardwareKinds = [
   "lift_mechanism",
   "sliding_gear",
   "lock",
+  /** What joins two transport modules on site. */
+  "connector",
 ] as const;
 
 export type HardwareKind = (typeof hardwareKinds)[number];
@@ -474,6 +477,22 @@ export const cabinetSchema = z.object({
   plinthHeight: z.number().nonnegative().default(0),
   /** The lower wardrobe cabinet this separate overhead carcass sits on. */
   stackedOn: z.string().min(1).optional(),
+  /**
+   * Transport modules: where the carcass is made as separate cabinets, joined
+   * side to side on site with a double wall. `at` is the joint's distance from
+   * the cabinet's left side, mm. `auto` keeps the 1600 mm rule as the width
+   * changes, until somebody sets a joint by hand. On a lower cabinet,
+   * `alignTop` keeps the top cabinet's joints over its own. Absent is one
+   * carcass, which is every cabinet saved before this existed.
+   */
+  transport: z
+    .object({
+      joints: z.array(z.object({ at: z.number().positive(), locked: z.boolean().optional() })).max(12).default([]),
+      auto: z.boolean().default(true),
+      alignTop: z.boolean().default(true),
+      connector: z.enum(["confirmat", "bolt", "dowel_screw", "cam"]).default("confirmat"),
+    })
+    .optional(),
 });
 
 export type Cabinet = z.infer<typeof cabinetSchema>;
@@ -1196,6 +1215,8 @@ export function validateSpec(input: DesignSpec): ValidationResult {
   // depth before cabinet geometry is derived from them.
   normaliseDiagonalWardrobeCornerDepths(spec, issues);
 
+  prepareTransportModules(spec);
+
   for (const [index, cabinet] of spec.cabinets.entries()) {
     validateCabinet(cabinet, index, t, spec, issues);
   }
@@ -1527,6 +1548,31 @@ function repairWardrobeDrawerBank(
  * the third unit and a door too wide on the seventh gets told about both,
  * naming the cabinet, rather than being checked as one impossible 4 m box.
  */
+/**
+ * Transport joints before the cabinets are checked: a wardrobe still on the
+ * 1600 mm rule gets the rule's joints for its width as it is now, and a top
+ * cabinet aligned to the wardrobe below takes that wardrobe's joints. Only
+ * cabinets that have transport modules at all; one saved without them is
+ * one carcass, as it was.
+ */
+function prepareTransportModules(spec: DesignSpec): void {
+  if (spec.furnitureType !== "wardrobe") return;
+  for (const cabinet of spec.cabinets) {
+    const transport = cabinet.transport;
+    if (!transport || cabinet.stackedOn) continue;
+    if (transport.auto !== false && !transport.joints.some((joint) => joint.locked)) {
+      transport.joints = defaultJoints(cabinet.size.width).map((at) => ({ at }));
+    }
+    transport.joints = jointsOf(cabinet).map((at) => ({ at, ...(transport.joints.find((joint) => joint.at === at)?.locked ? { locked: true } : {}) }));
+  }
+  for (const top of spec.cabinets) {
+    const lower = top.stackedOn ? spec.cabinets.find((cabinet) => cabinet.id === top.stackedOn) : undefined;
+    if (!lower?.transport || lower.transport.alignTop === false) continue;
+    top.transport = { joints: lower.transport.joints.map((joint) => ({ at: joint.at })), auto: false, alignTop: true, connector: top.transport?.connector ?? lower.transport.connector ?? "confirmat" };
+    top.transport.joints = jointsOf(top).map((at) => ({ at }));
+  }
+}
+
 function validateCabinet(
   cabinet: Cabinet,
   index: number,
@@ -1610,13 +1656,15 @@ function validateCabinet(
     // First reduce malformed over-segmentation, then later split only the
     // remaining practical bays. Reversing that order can create 24 zero-width
     // modules before the repair gets a chance to distribute usable width.
-    repairMinimumWardrobeBays(cabinet, t, at, named, issues);
+    // A cabinet in transport modules has its bays fitted to its modules
+    // below, a narrow last module's bay included.
+    if (!jointsOf(cabinet).length) repairMinimumWardrobeBays(cabinet, t, at, named, issues);
   }
 
   // Bay widths must account for the material they sit between: the interior is
-  // the cabinet less its two gables and its internal dividers.
-  const interior =
-    cabinet.size.width - 2 * t - Math.max(0, cabinet.bays.length - 1) * t;
+  // the cabinet less its two gables and its internal dividers — and, at each
+  // transport joint, the second side panel.
+  const interior = carcassInterior(cabinet, t);
 
   if (interior <= 0) {
     const fits = Math.max(
@@ -1632,8 +1680,7 @@ function validateCabinet(
     cabinet.bays = cabinet.bays.slice(0, fits);
   }
 
-  const target =
-    cabinet.size.width - 2 * t - Math.max(0, cabinet.bays.length - 1) * t;
+  const target = carcassInterior(cabinet, t);
   const declared = cabinet.bays.reduce((total, bay) => total + bay.width, 0);
 
   // Rescale rather than reject when the declared widths do not add up. Somebody
@@ -1665,6 +1712,8 @@ function validateCabinet(
     // divider-supported modules from the actual clear width, not stale prompt
     // proportions. Its added dividers are physical panels in buildParts.
     splitWideWardrobeBays(cabinet, t, at, named, issues);
+    // Then each module's bays share that module's own clear width exactly.
+    fitBaysToModules(cabinet, t);
   }
 
   for (const [bayIndex, bay] of cabinet.bays.entries()) {

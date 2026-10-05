@@ -34,6 +34,7 @@ import {
 import { startingDesign } from "../src/features/berchuma-studio/services/starting-designs.ts";
 import { buildParts } from "../src/features/berchuma-studio/services/geometry.ts";
 import { resolveDesign } from "../src/features/berchuma-studio/services/resolve.ts";
+import { modulesOf } from "../src/features/berchuma-studio/services/transport-modules.ts";
 import {
   partCentre,
   partRotationRadians,
@@ -341,7 +342,8 @@ for (const [label, shape, walls] of [
 
   const wrong = spec.cabinets.filter((cabinet) => {
     const openings = cabinet.bays.reduce((total, bay) => total + bay.width, 0);
-    const boards = (cabinet.bays.length - 1) * t + 2 * t;
+    // Two sides per transport module: a joint is a second side, not a divider.
+    const boards = (cabinet.bays.length - 1) * t + 2 * t + (modulesOf(cabinet).length - 1) * t;
     return Math.abs(openings + boards - cabinet.size.width) > 1;
   });
 

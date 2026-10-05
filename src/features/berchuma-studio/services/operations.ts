@@ -5,6 +5,7 @@ import type { Bay, Cabinet, CabinetKind, DesignSpec } from "../types/spec";
 import { drawerFrontHeights } from "./drawer-construction";
 import { cabinetFaceBoards, cabinetFronts, sectionBands as sectionBandsOf, type DoorLeaf } from "./geometry";
 import { doorRectProblem, doorSnapTargets, equalLeaves, MIN_DOOR, type FrontRect } from "./door-layout";
+import { bayLayout, bayModules, carcassInterior, defaultJoints, jointSnapTargets, MIN_MODULE, moduleInterior, modulesOf } from "./transport-modules";
 
 /**
  * What somebody can do to a design.
@@ -649,10 +650,7 @@ function reflowRow(spec: DesignSpec, target: CabinetRow): void {
 
 /** Equal bays filling the interior exactly. */
 function redivide(cabinet: Cabinet, thickness: number): void {
-  const interior =
-    cabinet.size.width -
-    2 * thickness -
-    Math.max(0, cabinet.bays.length - 1) * thickness;
+  const interior = carcassInterior(cabinet, thickness);
   const each = Math.max(1, Math.round(interior / cabinet.bays.length));
 
   for (const bay of cabinet.bays) {
@@ -709,11 +707,8 @@ export function removeBay(
  * much is left rather than making them work it out from the outside width.
  */
 export function interiorWidthOf(cabinet: Cabinet, boardThickness: number): number {
-  return (
-    cabinet.size.width -
-    2 * boardThickness -
-    Math.max(0, cabinet.bays.length - 1) * boardThickness
-  );
+  // Two side panels per transport module, where a cabinet is made in modules.
+  return carcassInterior(cabinet, boardThickness);
 }
 
 /**
@@ -758,10 +753,16 @@ export function setBayWidth(
     const index = cabinet.bays.findIndex((entry) => entry.id === bayId);
     if (index < 0) return;
 
-    const others = cabinet.bays.filter((_, i) => i !== index);
+    // In a cabinet made in transport modules the width is shared inside the
+    // bay's own module: the joints stay where they are.
+    const owners = bayModules(cabinet, draft.carcass.board.thickness);
+    const modular = modulesOf(cabinet).length > 1;
+    const others = cabinet.bays.filter((_, i) => i !== index && (!modular || owners[i] === owners[index]));
     if (others.length === 0) return;
 
-    const interior = interiorWidthOf(cabinet, draft.carcass.board.thickness);
+    const interior = modular
+      ? moduleInterior(modulesOf(cabinet)[owners[index]!]!, others.length + 1, draft.carcass.board.thickness)
+      : interiorWidthOf(cabinet, draft.carcass.board.thickness);
     const floor = LIMITS.minBayWidth;
 
     // What this section may become: no narrower than the floor, and no wider
@@ -1508,7 +1509,8 @@ export function addNiche(spec: DesignSpec, cabinetId: string, options: { width?:
     const cabinet = find(draft, cabinetId);
     if (!cabinet || cabinet.bays.length >= 24) return;
     const t = draft.carcass.board.thickness;
-    const interior = cabinet.size.width - 2 * t - cabinet.bays.length * t;
+    // The interior once the niche's divider is added.
+    const interior = carcassInterior(cabinet, t) - t;
     const floor = bayFloor(draft);
     const width = clamp(Math.round(options.width ?? 450), floor, Math.max(floor, interior - cabinet.bays.length * floor));
     const others = cabinet.bays;
@@ -1557,7 +1559,7 @@ export function removeNiche(spec: DesignSpec, cabinetId: string, bayId: string):
     if (!cabinet || cabinet.bays.length <= 1) return;
     const t = draft.carcass.board.thickness;
     cabinet.bays = cabinet.bays.filter((bay) => bay.id !== bayId);
-    shareWidths(cabinet.bays, cabinet.size.width - 2 * t - (cabinet.bays.length - 1) * t, bayFloor(draft));
+    shareWidths(cabinet.bays, carcassInterior(cabinet, t), bayFloor(draft));
     for (const bay of cabinet.bays) delete bay.doorOverrides;
   });
 }
@@ -1819,12 +1821,7 @@ export function displayExists(spec: DesignSpec, ref: DisplayRef): boolean {
 
 /** The left edge of each bay's clear opening, in its cabinet's frame. */
 function bayStarts(cabinet: Cabinet, t: number): number[] {
-  let x = t;
-  return cabinet.bays.map((bay) => {
-    const at = x;
-    x += bay.width + t;
-    return at;
-  });
+  return bayLayout(cabinet, t).map((place) => place.x);
 }
 
 /** The display's opening, in its cabinet's frame (x from the left side, y up from the floor). */
@@ -1921,3 +1918,200 @@ export function displaySnapTargetsOf(spec: DesignSpec, ref: DisplayRef): { x: nu
   for (const zone of zoneHeightsOf(spec, cabinet.id, ref.bayId)) targets.y.push(zone.floor, zone.floor + zone.height);
   return targets;
 }
+
+// ---------------------------------------------------------------------------
+// Transport modules
+// ---------------------------------------------------------------------------
+
+/** The cabinet whose joints a cabinet's modules follow: a top cabinet aligned to the one below follows that one. */
+export function jointOwnerOf(spec: DesignSpec, cabinetId: string): Cabinet | null {
+  const cabinet = find(spec, cabinetId);
+  if (!cabinet) return null;
+  const lower = cabinet.stackedOn ? find(spec, cabinet.stackedOn) : undefined;
+  return lower?.transport && lower.transport.alignTop !== false ? lower : cabinet;
+}
+
+function editTransport(spec: DesignSpec, cabinetId: string, edit: (transport: NonNullable<Cabinet["transport"]>, cabinet: Cabinet) => void): DesignSpec {
+  const owner = jointOwnerOf(spec, cabinetId);
+  if (!owner) return spec;
+  return change(spec, (draft) => {
+    const cabinet = find(draft, owner.id)!;
+    cabinet.transport ??= { joints: [], auto: true, alignTop: true, connector: "confirmat" };
+    edit(cabinet.transport, cabinet);
+    cabinet.transport.joints.sort((a, b) => a.at - b.at);
+    for (const bay of cabinet.bays) delete bay.doorOverrides;
+  });
+}
+
+/**
+ * Made in transport modules. With no joints given, by the rule — 1600 mm
+ * modules from the left, the rest in the last one — and kept to the rule as
+ * the width changes. With joints given, exactly there, by hand.
+ */
+export function divideForTransport(spec: DesignSpec, cabinetId: string, joints?: number[]): DesignSpec {
+  return editTransport(spec, cabinetId, (transport, cabinet) => {
+    transport.auto = joints === undefined;
+    transport.joints = (joints ?? defaultJoints(cabinet.size.width)).map((at) => ({ at: Math.round(at) }));
+  });
+}
+
+/** Back to one carcass. */
+export function removeTransport(spec: DesignSpec, cabinetId: string): DesignSpec {
+  const owner = jointOwnerOf(spec, cabinetId);
+  if (!owner) return spec;
+  return change(spec, (draft) => {
+    for (const cabinet of draft.cabinets) {
+      if (cabinet.id === owner.id || cabinet.stackedOn === owner.id) {
+        if (cabinet.id !== owner.id && owner.transport?.alignTop === false) continue;
+        delete cabinet.transport;
+        redivide(cabinet, draft.carcass.board.thickness);
+      }
+    }
+  });
+}
+
+/** The partition centres a joint can sit on — where two side panels replace one divider. */
+export function partitionCentresOf(spec: DesignSpec, cabinetId: string): number[] {
+  const cabinet = find(spec, cabinetId);
+  if (!cabinet) return [];
+  const t = spec.carcass.board.thickness;
+  const layout = bayLayout(cabinet, t);
+  return layout.slice(0, -1).map((place, index) => (place.x + place.width + layout[index + 1]!.x) / 2);
+}
+
+/** Where a joint can usefully go: partitions, door boundaries, the centre line, the 1600 mm positions. */
+export function transportSnapTargetsOf(spec: DesignSpec, cabinetId: string): number[] {
+  const cabinet = find(spec, cabinetId);
+  if (!cabinet) return [];
+  const t = spec.carcass.board.thickness;
+  const leaves = cabinetFronts(spec, cabinet).leaves;
+  const doorEdges = leaves.slice(0, -1).map((leaf, index) => (leaf.x + leaf.width + leaves[index + 1]!.x) / 2);
+  return jointSnapTargets(cabinet, t, doorEdges);
+}
+
+/**
+ * One joint to a new place, by hand: the rule stops applying, the modules
+ * either side change width, and the bays in them are refitted — real
+ * geometry, not a line on the drawing. Kept to a buildable module either
+ * side. A top cabinet aligned to this one follows.
+ */
+export function moveJoint(spec: DesignSpec, cabinetId: string, index: number, at: number): DesignSpec {
+  return editTransport(spec, cabinetId, (transport, cabinet) => {
+    const joint = transport.joints[index];
+    if (!joint || joint.locked) return;
+    const before = transport.joints[index - 1]?.at ?? 0;
+    const after = transport.joints[index + 1]?.at ?? cabinet.size.width;
+    transport.auto = false;
+    joint.at = clamp(Math.round(at), before + MIN_MODULE, after - MIN_MODULE);
+  });
+}
+
+export function addJoint(spec: DesignSpec, cabinetId: string, at: number): DesignSpec {
+  return editTransport(spec, cabinetId, (transport, cabinet) => {
+    const position = clamp(Math.round(at), MIN_MODULE, cabinet.size.width - MIN_MODULE);
+    if (transport.joints.some((joint) => Math.abs(joint.at - position) < MIN_MODULE)) return;
+    transport.auto = false;
+    transport.joints.push({ at: position });
+  });
+}
+
+export function removeJoint(spec: DesignSpec, cabinetId: string, index: number): DesignSpec {
+  return editTransport(spec, cabinetId, (transport) => {
+    if (!transport.joints[index] || transport.joints[index]!.locked) return;
+    transport.auto = false;
+    transport.joints.splice(index, 1);
+  });
+}
+
+/** A locked joint stays put: the rule, a drag and Delete all leave it alone. */
+export function lockJoint(spec: DesignSpec, cabinetId: string, index: number, locked: boolean): DesignSpec {
+  return editTransport(spec, cabinetId, (transport) => {
+    const joint = transport.joints[index];
+    if (!joint) return;
+    if (locked) {
+      joint.locked = true;
+      transport.auto = false;
+    } else delete joint.locked;
+  });
+}
+
+/** A joint onto the nearest partition, so it replaces a divider rather than resizing the bays around it. */
+export function snapJointToPartition(spec: DesignSpec, cabinetId: string, index: number): DesignSpec {
+  const owner = jointOwnerOf(spec, cabinetId);
+  const joint = owner?.transport?.joints[index];
+  if (!owner || !joint) return spec;
+  // The partitions as they would be with this joint gone.
+  const without = structuredClone(owner);
+  without.transport!.joints = without.transport!.joints.filter((_, at) => at !== index);
+  const candidates = partitionCentresOf({ ...spec, cabinets: spec.cabinets.map((cabinet) => (cabinet.id === owner.id ? without : cabinet)) }, owner.id).filter((centre) => !owner.transport!.joints.some((other, at) => at !== index && Math.abs(other.at - centre) < MIN_MODULE));
+  if (!candidates.length) return spec;
+  const nearest = candidates.reduce((best, centre) => (Math.abs(centre - joint.at) < Math.abs(best - joint.at) ? centre : best));
+  return moveJoint(spec, owner.id, index, nearest);
+}
+
+/** The last two modules made equal — the "Adjust division" answer to a narrow last module. */
+export function balanceLastModules(spec: DesignSpec, cabinetId: string): DesignSpec {
+  const owner = jointOwnerOf(spec, cabinetId);
+  const joints = owner ? modulesOf(owner) : [];
+  if (!owner || joints.length < 2) return spec;
+  const lastTwo = joints.slice(-2);
+  return moveJoint(spec, owner.id, joints.length - 2, (lastTwo[0]!.from + lastTwo[1]!.to) / 2);
+}
+
+/** Top modules over the base modules, or — off — a top cabinet with joints of its own. */
+export function setAlignTop(spec: DesignSpec, lowerId: string, align: boolean): DesignSpec {
+  return change(spec, (draft) => {
+    const lower = find(draft, lowerId);
+    if (!lower?.transport) return;
+    lower.transport.alignTop = align;
+    // Turned off, the top keeps the joints it had, now its own to change.
+    for (const top of draft.cabinets) {
+      if (top.stackedOn === lower.id && !align && top.transport) top.transport.auto = false;
+    }
+  });
+}
+
+export function setConnector(spec: DesignSpec, cabinetId: string, connector: NonNullable<Cabinet["transport"]>["connector"]): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, cabinetId);
+    if (!cabinet?.transport) return;
+    cabinet.transport.connector = connector;
+    for (const top of draft.cabinets) if (top.stackedOn === cabinet.id && top.transport) top.transport.connector = connector;
+  });
+}
+
+/** What a narrow last module, or a joint through a bay, is worth saying. */
+export function transportWarnings(spec: DesignSpec, cabinetId: string): string[] {
+  const cabinet = find(spec, cabinetId);
+  if (!cabinet) return [];
+  const modules = modulesOf(cabinet);
+  const warnings: string[] = [];
+  const last = modules.at(-1);
+  // Kept on purpose — the last joint locked where it is — it is not worth saying again.
+  const kept = cabinet.transport?.joints.at(-1)?.locked === true;
+  if (modules.length > 1 && last && last.width < 600 && !kept) warnings.push(`Final module is only ${Math.round(last.width)} mm wide.`);
+  return warnings;
+}
+
+/**
+ * What dividing a one-carcass cabinet by the rule would do to it, before it
+ * is done: the modules, and any joint that would not land on a partition —
+ * where the bays either side would be resized, or a module given a bay of
+ * its own because none of the existing ones falls in it.
+ */
+export function transportProposal(spec: DesignSpec, cabinetId: string): { joints: number[]; widths: number[]; offPartition: number[]; snapped: number[] } {
+  const cabinet = find(spec, cabinetId);
+  if (!cabinet) return { joints: [], widths: [], offPartition: [], snapped: [] };
+  const joints = defaultJoints(cabinet.size.width);
+  const partitions = partitionCentresOf(spec, cabinetId);
+  const near = (at: number) => partitions.some((centre) => Math.abs(centre - at) <= 25);
+  const snapped: number[] = [];
+  for (const at of joints) {
+    const options = partitions.filter((centre) => centre - (snapped.at(-1) ?? 0) >= MIN_MODULE && cabinet.size.width - centre >= MIN_MODULE && !snapped.includes(centre));
+    const best = options.length ? options.reduce((a, b) => (Math.abs(b - at) < Math.abs(a - at) ? b : a)) : at;
+    if (!snapped.includes(best)) snapped.push(best);
+  }
+  const edges = [0, ...joints, cabinet.size.width];
+  return { joints, widths: edges.slice(1).map((edge, index) => edge - edges[index]!), offPartition: joints.filter((at) => !near(at)), snapped };
+}
+

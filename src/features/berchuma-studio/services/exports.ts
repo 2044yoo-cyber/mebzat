@@ -1,6 +1,7 @@
 import { buildCutList, sheetCountsOf, type CutList } from "./cutlist";
 import { calculateCost } from "./costing";
 import { buildParts } from "./geometry";
+import { connectorsPerJoint, modulesOf } from "./transport-modules";
 import { constructionMaterials } from "./wardrobe-materials";
 import { buildXlsx, type Sheet } from "./xlsx";
 import type { CostBreakdown, MarketRate } from "../types/cost";
@@ -60,6 +61,7 @@ export function buildExport(input: ExportInput): ExportBundle {
     layoutSheet(cutList),
     hardwareSheet(parts),
     summarySheet(input, cutList, cost),
+    ...(assemblySheet(input.spec) ? [assemblySheet(input.spec)!] : []),
   ]);
 
   return { cutList, cost, workbook, stem: filenameStem(input.spec.title) };
@@ -217,6 +219,32 @@ function layoutSheet(cutList: CutList): Sheet {
     rows,
     widths: [26, 7, 5, 34, 10, 10, 12, 12, 30],
   };
+}
+
+/**
+ * How the wardrobe goes together on site: each cabinet's transport modules,
+ * left to right, their widths, and what joins them. Only for a design made
+ * in modules; a one-carcass design has nothing to assemble.
+ */
+export function assemblySheet(spec: ExportInput["spec"]): Sheet | null {
+  const modular = spec.cabinets.filter((cabinet) => modulesOf(cabinet).length > 1);
+  if (!modular.length) return null;
+  const connectorNames = { confirmat: "Confirmat screws", bolt: "Connector bolts", dowel_screw: "Dowel and screw", cam: "Cam connectors" } as const;
+  const rows: (string | number | null)[][] = [["Cabinet", "Module", "From (mm)", "Width (mm)", "Joint on its right", "Connectors"]];
+  for (const cabinet of modular) {
+    const modules = modulesOf(cabinet);
+    const perJoint = connectorsPerJoint(cabinet.size.height - cabinet.plinthHeight);
+    const kind = connectorNames[cabinet.transport?.connector ?? "confirmat"];
+    rows.push([]);
+    rows.push([`${cabinet.label}${cabinet.stackedOn ? " (top cabinet, a separate assembly above)" : ""}`]);
+    for (const carcassModule of modules) {
+      const last = carcassModule.index === modules.length - 1;
+      rows.push([null, `${cabinet.stackedOn ? "Top" : "Base"} module ${carcassModule.index + 1}`, Math.round(carcassModule.from), Math.round(carcassModule.width), last ? null : `at ${Math.round(carcassModule.to)} mm — double side panel`, last ? null : `${perJoint} × ${kind}, from inside`]);
+    }
+  }
+  rows.push([]);
+  rows.push(["Each module is a complete cabinet with its own sides, top, bottom and back. Stand the modules in order, clamp each double side panel flush at the front, and screw through from inside."]);
+  return { name: "Assembly", rows, widths: [30, 18, 11, 11, 34, 34] };
 }
 
 function hardwareSheet(parts: ReturnType<typeof buildParts>): Sheet {

@@ -16,6 +16,7 @@ import {
 } from "../types/spec";
 import type { CornerKind, RunSpec } from "../types/layout";
 import { solveLayout } from "./layout";
+import { applyTransportDefaults } from "./transport-modules";
 
 /**
  * A finished design, the moment somebody picks a category.
@@ -212,6 +213,13 @@ function shell(
       ? cabinet
       : { ...cabinet, runId: "run-1", offset: Math.max(0, cabinet.position.x) },
   );
+  // A new wardrobe is made in transport modules: 1600 mm from the left, the
+  // rest in the last one. A run that turns a corner is left one carcass to be
+  // divided by hand: its corner end needs a module wide enough for the corner
+  // opening, which the rule alone does not leave.
+  if (furnitureType === "wardrobe" && (extras.layout ?? "straight") === "straight") {
+    for (const cabinet of bound) if (cabinet.kind === "tall") applyTransportDefaults(cabinet, board.thickness);
+  }
 
   return {
     version: 3,
