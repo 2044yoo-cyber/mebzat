@@ -1,15 +1,7 @@
 import { BOARDS, findEdgeBand } from "../types/catalogue";
 import type { Board, DesignSpec, EdgeBand } from "../types/spec";
 
-/**
- * The board assigned to each manufactured zone.
- *
- * These fallbacks are deliberate compatibility behaviour. Existing saved
- * designs had one carcass board, so reading one must still produce the same
- * physical material for every zone until its owner chooses a different board.
- * New wardrobes write all four assignments, which lets a body, fronts,
- * interior and plinth be priced, nested and rendered independently.
- */
+/** The board assigned to each manufactured zone. */
 export type ConstructionMaterials = {
   body: Board;
   fronts: Board;
@@ -18,49 +10,12 @@ export type ConstructionMaterials = {
   plinth: Board;
 };
 
-/**
- * Stock boards compatible with the shared 18 mm wardrobe construction.
- *
- * Keeping this beside the construction rules means the material picker cannot
- * offer a finish that the validator will later repair away. New coloured MDF
- * products become selectable automatically once they are added to `BOARDS`.
- */
+/** Stock boards compatible with the shared 18 mm wardrobe construction. */
 export function wardrobeStructuralBoards(): Board[] {
   return BOARDS.filter((board) => Math.abs(board.thickness - 18) < 0.1);
 }
 
-/**
- * Stock boards a carcass can be built from, for furniture that is not a
- * wardrobe.
- *
- * ## Why this is not `wardrobeStructuralBoards`
- *
- * It was. Every board picker in the studio called that function, including the
- * one on a TV unit, and it filters to exactly 18 mm — so the only carcass
- * material a TV unit could ever be given was 18 mm, and a board added to the
- * catalogue at any other thickness was invisible to the whole application. The
- * name said what it was for and the code was used for something else.
- *
- * Wardrobes genuinely are restricted: `normaliseWardrobeBoards` resets a
- * carcass that is not 18 mm, so offering anything else there would be offering
- * a choice the validator undoes a moment later. Nothing else is restricted,
- * and a 15 mm foam board shopfitting cabinet is an ordinary thing to want.
- *
- * ## What is excluded, and why it is measurements rather than a list
- *
- * Back panels, by thickness: a 4 mm HDF panel cannot hold a screw in its edge.
- *
- * Worktops, by the shape of the stock. They are sold as strips — 3000 x 650,
- * 3000 x 640 — because a worktop is a strip, and a carcass is cut from a full
- * sheet. Thickness alone does not separate them: a 20 mm quartz worktop sits
- * inside any sensible thickness range for a carcass and is still a worktop,
- * which is how it appeared in the first version of this list.
- *
- * Both expressed as measurements rather than a list of ids, so that the next
- * board added to the catalogue is offered or not on its own merits. That is
- * the property that let the old function keep working as products were added,
- * and it is worth keeping.
- */
+/** Stock full-sheet boards usable as a furniture carcass. */
 export function carcassBoards(): Board[] {
   return BOARDS.filter(
     (board) =>
@@ -77,7 +32,6 @@ export function wardrobeBackBoards(): Board[] {
 
 export function constructionMaterials(spec: DesignSpec): ConstructionMaterials {
   const body = spec.carcass.board;
-
   return {
     body,
     fronts: spec.carcass.frontBoard ?? body,
@@ -87,22 +41,8 @@ export function constructionMaterials(spec: DesignSpec): ConstructionMaterials {
   };
 }
 
-/**
- * How this design is put together, with every default supplied once.
- *
- * The construction settings are optional on the spec so that a design saved
- * before they existed still parses and still cuts exactly as it did. That
- * leaves somebody to decide what an absent setting means, and it has to be one
- * somebody: a back panel sized as an overlay by the cut list and as an inset by
- * the 3D view is two different cabinets wearing one drawing.
- *
- * The defaults are what Medosha's shops already do and what every existing
- * design was already cut as, so reading an old spec through this changes
- * nothing about it.
- */
 export function constructionMethods(spec: DesignSpec): ConstructionMethods {
   const carcass = spec.carcass;
-
   return {
     backFixing: carcass.backFixing ?? "overlay",
     backGrooveDepth: carcass.backGrooveDepth ?? 8,
@@ -113,21 +53,12 @@ export function constructionMethods(spec: DesignSpec): ConstructionMethods {
 
 export type ConstructionMethods = {
   backFixing: "overlay" | "inset";
-  /** How far an inset back sits into its groove, per edge. */
   backGrooveDepth: number;
   drawerBottomFixing: "under" | "grooved";
-  /** How far a grooved drawer bottom sits into its groove, per edge. */
   drawerBottomGrooveDepth: number;
 };
 
-/**
- * Uses a stocked matching PVC edge for a coloured board when one exists.
- *
- * Edge banding is a physical manufacturing finish, not a viewer tint: an oak
- * door with a white cut-list edge band is an instruction to manufacture the
- * wrong part. The design-level band remains the fallback for materials that
- * do not have a stocked match yet.
- */
+/** Uses a stocked matching PVC edge for a coloured board when one exists. */
 export function edgeBandForBoard(board: Board, fallback: EdgeBand): EdgeBand {
   const colour = board.appearance?.colour.toLowerCase();
   const matchingId =
@@ -142,14 +73,9 @@ export function edgeBandForBoard(board: Board, fallback: EdgeBand): EdgeBand {
             : colour === "white"
               ? "pvc-1-white"
               : undefined;
-
   return (matchingId ? findEdgeBand(matchingId) : undefined) ?? fallback;
 }
 
-/**
- * Coloured edge matching is part of the new wardrobe construction system.
- * Other furniture retains its established explicit edge-band selection.
- */
 export function edgeBandForConstructionBoard(
   spec: DesignSpec,
   board: Board,
@@ -161,21 +87,14 @@ export function edgeBandForConstructionBoard(
 }
 
 /**
- * Neutral white used by the Studio modelling viewport.
- *
- * The editor is a modelling view first: keeping cabinet faces white gives the
- * geometry and panel gaps the same clear, neutral read as SketchUp. Material
- * choices remain in the design spec for pricing, cut lists and later rendered
- * presentation views; this function only controls the modelling/elevation
- * display colour.
+ * Neutral modelling colour for the Studio viewport.
+ * Material selections remain stored in the spec for manufacturing and pricing.
  */
 export function boardColour(_board: Board, _spec: DesignSpec): string {
   if (typeof document !== "undefined") {
     requestAnimationFrame(() => {
       document.querySelectorAll<HTMLCanvasElement>("canvas").forEach((canvas) => {
-        if (canvas.parentElement?.closest("[data-studio-viewport]")) {
-          canvas.style.backgroundColor = "#e5e5e5";
-        }
+        canvas.style.backgroundColor = "#e5e5e5";
       });
     });
   }
