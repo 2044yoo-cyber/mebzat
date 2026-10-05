@@ -1,0 +1,128 @@
+[
+ {
+  "name": "typed sizes ignored",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "    if (override) Object.assign(leaf, { x: override.x, y: override.y, width: override.width, height: override.height, manual: true });",
+  "to": "    void override;"
+ },
+ {
+  "name": "saved sizes not validated",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "      if (!problem) continue;\n      warnings.push(",
+  "to": "      if (problem || !problem) continue;\n      warnings.push("
+ },
+ {
+  "name": "manual run kept as one shared part",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "    if (leavesOfRun.every((leaf) => !leaf.manual)) {",
+  "to": "    if (leavesOfRun.length > 0) {"
+ },
+ {
+  "name": "aligned kitchen door ignores its typed size",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "          length: leaf.height, width: leaf.width, quantity: 1,\n          edges: { front: true, back: false, top: true, bottom: false },",
+  "to": "          length: leaf.auto.height, width: leaf.auto.width, quantity: 1,\n          edges: { front: true, back: false, top: true, bottom: false },"
+ },
+ {
+  "name": "part placed at the automatic spot",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "      parts.push(shared(leaf, `${bay.id}-door${idSuffix}-leaf-${leaf.leaf}`, `Door${bayLabelSuffix(cabinet, bay.id)}${leavesOfRun.length > 1 ? ` ${leaf.leaf + 1} of ${leavesOfRun.length}` : \"\"}`, 1, [{ x: leaf.x, y: leaf.y, z: -frontThickness }]));",
+  "to": "      parts.push(shared(leaf, `${bay.id}-door${idSuffix}-leaf-${leaf.leaf}`, `Door${bayLabelSuffix(cabinet, bay.id)}${leavesOfRun.length > 1 ? ` ${leaf.leaf + 1} of ${leavesOfRun.length}` : \"\"}`, 1, [{ x: leaf.auto.x, y: leaf.auto.y, z: -frontThickness }]));"
+ },
+ {
+  "name": "no width limit",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "  if (rect.width > cabinet.width + 0.5) return",
+  "to": "  if (rect.width > cabinet.width * 9) return"
+ },
+ {
+  "name": "no minimum door",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "  if (rect.width < MIN_DOOR || rect.height < MIN_DOOR) return",
+  "to": "  if (rect.width < 0 || rect.height < 0) return"
+ },
+ {
+  "name": "no overlap check",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "  if (others.some((other) => rectsOverlap(rect, other))) return",
+  "to": "  if (others.some((other) => rectsOverlap(rect, other) && false)) return"
+ },
+ {
+  "name": "edits not validated",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    const problem = doorRectProblem(entry.rect, cabinet.size, [...fronts.drawers, ...after.filter((_, other) => other !== index)]);",
+  "to": "    const problem = null as string | null;"
+ },
+ {
+  "name": "partner does not give way",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "      if (right - start >= MIN_DOOR) changes.push(",
+  "to": "      if (right - start >= MIN_DOOR * 99) changes.push("
+ },
+ {
+  "name": "right leaf anchors left",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  const x = size.x ?? (size.width !== undefined && partnerLeft ? leaf.x + leaf.width - width : leaf.x);",
+  "to": "  const x = size.x ?? leaf.x;"
+ },
+ {
+  "name": "make equal ignores the gap",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  const shares = equalLeaves(left, right, row.length, spec.carcass.doorGap);",
+  "to": "  const shares = equalLeaves(left, right, row.length, 0);"
+ },
+ {
+  "name": "reset leaves broken sizes behind",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "      other.doorOverrides = other.doorOverrides.filter((item) => fronts.leaves.some((leaf) => leaf.bayId === other.id && leaf.run === item.run && leaf.leaf === item.leaf && leaf.manual));",
+  "to": "      other.doorOverrides = other.doorOverrides.filter(() => true);"
+ },
+ {
+  "name": "door style change keeps sizes",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    bay.door = door;\n    delete bay.doorOverrides;",
+  "to": "    bay.door = door;"
+ },
+ {
+  "name": "snap ignores tolerance",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "if (Math.abs(target - value) <= tolerance &&",
+  "to": "if (Math.abs(target - value) <= tolerance * 100 &&"
+ },
+ {
+  "name": "snap off still snaps",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "  const landed = options.snap ? snapValue(value, targets, options.tolerance ?? 12) : { value, snapped: false };",
+  "to": "  const landed = snapValue(value, targets, options.tolerance ?? 12);"
+ },
+ {
+  "name": "no gap targets beside other doors",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "    for (const value of [other.x, other.x + other.width, other.x - gap, other.x + other.width + gap]) x.add(value);",
+  "to": "    for (const value of [other.x, other.x + other.width]) x.add(value);"
+ },
+ {
+  "name": "no equal-door targets",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "      x.add(share.x);\n      x.add(share.x + share.width);",
+  "to": "      void share;"
+ },
+ {
+  "name": "no shelf targets",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "      for (const value of [board.minY, board.maxY, board.minY - gap, board.maxY + gap]) y.add(value);",
+  "to": "      void board;"
+ },
+ {
+  "name": "drag past the other edge folds the door",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "      const x = Math.min(at, right - MIN_DOOR);",
+  "to": "      const x = at;"
+ },
+ {
+  "name": "elevation reads the bay formula",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "  const fronts = cabinetFronts(spec, cabinet);\n  const isSelected",
+  "to": "  const fronts = { leaves: [] as ReturnType<typeof cabinetFronts>[\"leaves\"] };\n  const isSelected"
+ }
+]

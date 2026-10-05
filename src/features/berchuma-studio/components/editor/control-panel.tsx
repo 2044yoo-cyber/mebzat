@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  DoorOpen,
   Layers,
   Minus,
   Palette,
@@ -60,6 +61,14 @@ import {
   setCabinetKind,
   addTopCabinet,
   removeTopCabinet,
+  doorFrontsOf,
+  doorLeafOf,
+  doorRowOf,
+  makeDoorsEqual,
+  resetDoorSize,
+  setDoorManual,
+  setDoorSize,
+  type DoorRef,
 } from "../../services/operations";
 import {
   LIMITS,
@@ -90,6 +99,13 @@ export type ControlPanelProps = {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onChange: (next: DesignSpec) => void;
+  /** A door of the selected cabinet, tapped in the drawing to size it. */
+  door?: DoorRef | null;
+  onSelectDoor?: (door: DoorRef | null) => void;
+  snap?: boolean;
+  onSnapChange?: (snap: boolean) => void;
+  doorProblem?: string | null;
+  onDoorProblem?: (problem: string | null) => void;
 };
 
 export function ControlPanel({
@@ -97,6 +113,12 @@ export function ControlPanel({
   selectedId,
   onSelect,
   onChange,
+  door = null,
+  onSelectDoor,
+  snap = true,
+  onSnapChange,
+  doorProblem = null,
+  onDoorProblem,
 }: ControlPanelProps) {
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
@@ -138,12 +160,27 @@ export function ControlPanel({
         it on a screen this size.
       */}
       <div className="space-y-3 bg-background/70 p-3 backdrop-blur-xl @4xl/ws:border-l @4xl/ws:border-white/10">
+        {/* The door being sized, first: it was just tapped in the drawing. */}
+        {selected && door ? (
+          <DoorSizing
+            spec={spec}
+            door={door}
+            snap={snap}
+            problem={doorProblem}
+            onSnapChange={(next) => onSnapChange?.(next)}
+            onProblem={(problem) => onDoorProblem?.(problem)}
+            onDone={() => onSelectDoor?.(null)}
+            onChange={onChange}
+          />
+        ) : null}
+
         <CabinetPicker
           spec={spec}
           selectedId={selectedId}
           onSelect={onSelect}
           onChange={onChange}
         />
+
 
         {selected ? (
           <>
@@ -224,6 +261,91 @@ export function ControlPanel({
         <Materials spec={spec} onChange={onChange} />
       </div>
     </div>
+  );
+}
+
+/**
+ * One door's size. Automatic by default — the bay shares its opening between
+ * its leaves — and typed or dragged once it is Manual. Every size goes through
+ * `setDoorSize`, which refuses one that cannot be built and says why; the
+ * reason shows here, small, and nothing breaks.
+ */
+function DoorSizing({
+  spec,
+  door,
+  snap,
+  problem,
+  onSnapChange,
+  onProblem,
+  onDone,
+  onChange,
+}: {
+  spec: DesignSpec;
+  door: DoorRef;
+  snap: boolean;
+  problem: string | null;
+  onSnapChange: (snap: boolean) => void;
+  onProblem: (problem: string | null) => void;
+  onDone: () => void;
+  onChange: (next: DesignSpec) => void;
+}) {
+  const leaf = doorLeafOf(spec, door);
+  if (!leaf) return null;
+  const warnings = doorFrontsOf(spec, door.cabinetId)?.warnings ?? [];
+  const sharesRow = doorRowOf(spec, door).length > 1;
+  const apply = (result: { spec: DesignSpec; problem: string | null }) => {
+    onProblem(result.problem);
+    if (!result.problem) onChange(result.spec);
+  };
+  const toggle = (active: boolean) =>
+    cn(
+      "flex-1 rounded-md border px-2 py-1 text-[11px] transition-colors",
+      active ? "border-brand bg-brand text-brand-foreground" : "hover:border-brand hover:bg-brand/5",
+    );
+
+  return (
+    <Section title="Door" icon={DoorOpen} defaultOpen>
+      <p className="text-[11px] text-muted-foreground">
+        {leaf.style === "sliding" ? "Sliding" : leaf.style === "bifold" ? "Bifold" : "Hinged"} door
+        {leaf.leaves > 1 ? ` · leaf ${leaf.leaf + 1} of ${leaf.leaves}` : ""}
+        {leaf.manual ? " · sized by hand" : ""}
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
+          Width
+          <span className="flex items-center gap-1">
+            <LengthInput label="Door width" value={leaf.width} min={1} max={99999} step={5} onChange={(width) => apply(setDoorSize(spec, door, { width }))} />
+            mm
+          </span>
+        </label>
+        <label className="flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
+          Height
+          <span className="flex items-center gap-1">
+            <LengthInput label="Door height" value={leaf.height} min={1} max={99999} step={5} onChange={(height) => apply(setDoorSize(spec, door, { height }))} />
+            mm
+          </span>
+        </label>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-12 text-[11px] text-muted-foreground">Sizing</span>
+        <div className="flex flex-1 gap-1" role="group" aria-label="Door sizing">
+          <button type="button" aria-pressed={!leaf.manual} className={toggle(!leaf.manual)} onClick={() => { onProblem(null); onChange(resetDoorSize(spec, door, true)); }}>Auto</button>
+          <button type="button" aria-pressed={leaf.manual} className={toggle(leaf.manual)} onClick={() => { onProblem(null); onChange(setDoorManual(spec, door)); }}>Manual</button>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-12 text-[11px] text-muted-foreground">Snap</span>
+        <button type="button" aria-pressed={snap} aria-label="Snap door edges" className={toggle(snap)} onClick={() => onSnapChange(!snap)}>{snap ? "ON" : "OFF"}</button>
+      </div>
+      <div className="flex gap-1.5">
+        <SmallButton icon={Ruler} label="Make Equal" disabled={!sharesRow} onClick={() => apply(makeDoorsEqual(spec, door))} />
+        <SmallButton icon={Layers} label="Reset to Auto" disabled={!leaf.manual && !warnings.length} onClick={() => { onProblem(null); onChange(resetDoorSize(spec, door, true)); }} />
+      </div>
+      {problem ? <p role="alert" className="text-[11px] text-amber-600 dark:text-amber-400">{problem}</p> : null}
+      {warnings.map((warning) => <p key={warning} className="text-[11px] text-amber-600 dark:text-amber-400">{warning}</p>)}
+      <p className="text-[10px] text-muted-foreground">Drag the dots on the door&apos;s edges to resize it. Auto: {Math.round(leaf.auto.width)} × {Math.round(leaf.auto.height)} mm.</p>
+      <button type="button" onClick={onDone} className="w-full rounded-md border px-2 py-1 text-[11px] hover:border-brand">Done</button>
+    </Section>
   );
 }
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   RAIL_SHELF_HEIGHTS,
+  cabinetFronts,
   evenShelfHeights,
   hingesPerLeaf,
   sectionBands,
@@ -22,6 +23,8 @@ import {
   layOutBays,
 } from "../../services/bay-layout";
 import { resolveDesign } from "../../services/resolve";
+import { dragDoorEdge, type DoorEdge, type FrontRect } from "../../services/door-layout";
+import { doorSnapTargetsOf, type DoorRef } from "../../services/operations";
 import type { Bay, Cabinet, DesignSpec } from "../../types/spec";
 
 /**
@@ -57,13 +60,27 @@ export function Elevation({
   spec,
   selectedCabinetId,
   onSelectCabinet,
+  selectedDoor = null,
+  onSelectDoor,
+  onDoorResize,
+  snap = true,
 }: {
   spec: DesignSpec;
   /** Drawn with a highlight, so the flat view agrees with the 3D one. */
   selectedCabinetId?: string | null;
   onSelectCabinet?: (id: string) => void;
+  /** A leaf of the selected cabinet: tapped once the cabinet is selected. */
+  selectedDoor?: DoorRef | null;
+  onSelectDoor?: (door: DoorRef | null) => void;
+  /** An edge of the selected door pulled to here, in its cabinet's frame. */
+  onDoorResize?: (door: DoorRef, rect: FrontRect) => void;
+  snap?: boolean;
 }) {
   const gradientId = useId();
+  // Millimetres of drawing per screen pixel, so a handle is a finger's size
+  // whatever the zoom.
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [mmPerPixel, setMmPerPixel] = useState(4);
   const { envelope } = spec;
   const resolved = resolveDesign(spec);
   // A front elevation is an orthographic view of one wall. Projecting an L or
@@ -92,9 +109,25 @@ export function Elevation({
       elevationCabinets.map(({ cabinet }) => Math.round(cabinet.size.height)),
     ).size > 1;
   const bottomMargin = MARGIN + (chained ? CHAIN_DEPTH : 0);
+  const viewWidth = envelope.width + MARGIN * 2;
+  const viewHeight = envelope.height + MARGIN + bottomMargin;
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const box = svg.getBoundingClientRect();
+      if (box.width > 0 && box.height > 0) setMmPerPixel(Math.max(viewWidth / box.width, viewHeight / box.height));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, [viewWidth, viewHeight]);
 
   return (
     <svg
+      ref={svgRef}
       viewBox={`${-MARGIN} ${-MARGIN} ${envelope.width + MARGIN * 2} ${envelope.height + MARGIN + bottomMargin}`}
       className="h-full w-full"
       role="img"
@@ -140,6 +173,11 @@ export function Elevation({
             cabinet={cabinet}
             gradientId={gradientId}
             selected={cabinet.id === selectedCabinetId}
+            selectedDoor={selectedDoor?.cabinetId === cabinet.id ? selectedDoor : null}
+            onSelectDoor={cabinet.id === selectedCabinetId ? onSelectDoor : undefined}
+            onDoorResize={onDoorResize}
+            snap={snap}
+            mmPerPixel={mmPerPixel}
           />
         </g>
       )) : (
@@ -216,11 +254,21 @@ function CabinetDrawing({
   cabinet,
   gradientId,
   selected,
+  selectedDoor,
+  onSelectDoor,
+  onDoorResize,
+  snap,
+  mmPerPixel,
 }: {
   spec: DesignSpec;
   cabinet: Cabinet;
   gradientId: string;
   selected: boolean;
+  selectedDoor: DoorRef | null;
+  onSelectDoor?: (door: DoorRef | null) => void;
+  onDoorResize?: (door: DoorRef, rect: FrontRect) => void;
+  snap: boolean;
+  mmPerPixel: number;
 }) {
   const materials = constructionMaterials(spec);
   const t = spec.carcass.board.thickness;
@@ -268,12 +316,27 @@ function CabinetDrawing({
           bottom={plinth + t}
           height={height - plinth - 2 * t}
           top={top}
-          gap={spec.carcass.doorGap}
           board={t}
           frontColour={boardColour(materials.fronts, spec)}
           interiorColour={boardColour(materials.interior, spec)}
         />
       ))}
+
+      {/*
+        The doors, from the one place their sizes come from — the same
+        rectangles the cut list cuts, automatic or sized by hand.
+      */}
+      <DoorLeaves
+        spec={spec}
+        cabinet={cabinet}
+        top={top}
+        colour={boardColour(materials.fronts, spec)}
+        selectedDoor={selectedDoor}
+        onSelectDoor={onSelectDoor}
+        onDoorResize={onDoorResize}
+        snap={snap}
+        mmPerPixel={mmPerPixel}
+      />
 
       {/*
         The clear opening of each bay, written inside it.
@@ -316,7 +379,6 @@ type BayProps = {
   bottom: number;
   height: number;
   top: (heightAboveFloor: number) => number;
-  gap: number;
   /** Board thickness, in mm. A stack's dividers are cut from it. */
   board: number;
   frontColour: string;
@@ -330,7 +392,6 @@ function BayDrawing({
   bottom,
   height,
   top,
-  gap,
   board,
   frontColour,
   interiorColour,
@@ -361,39 +422,9 @@ function BayDrawing({
         interiorColour={interiorColour}
       />
 
-      {/* A drawer bay has fronts, not doors — and `buildParts` makes none, so
-          drawing them here would put a door in the picture that nobody is
-          cutting and nobody is paying for.
-
-          A stack is the same rule applied section by section: its drawer bands
-          show fronts and the rest is behind a door, so its doors are drawn
-          from inside `Fitting` where the bands are known. */}
-      {bay.door !== "none" &&
-      bay.fitting.kind !== "drawers" &&
-      bay.fitting.kind !== "stack" ? (
-        <Doors
-          bay={bay}
-          x={x}
-          width={width}
-          y={openingTop}
-          height={height}
-          gap={gap}
-          colour={frontColour}
-        />
-      ) : null}
-
-      {bay.door !== "none" && bay.fitting.kind === "stack" ? (
-        <StackDoors
-          bay={bay}
-          x={x}
-          width={width}
-          y={openingTop}
-          height={height}
-          gap={gap}
-          board={board}
-          colour={frontColour}
-        />
-      ) : null}
+      {/* The doors are drawn over the whole cabinet by `DoorLeaves`, from
+          `cabinetFronts` — a drawer bay has none, a stack has them only over
+          the sections that are not drawers, exactly as they are cut. */}
     </g>
   );
 }
@@ -420,55 +451,6 @@ function bandBoxes(
     top: y + height - (band.floor + band.height),
     height: band.height,
   }));
-}
-
-/** The doors over the parts of a stacked bay that are not drawer fronts. */
-function StackDoors({
-  bay,
-  x,
-  width,
-  y,
-  height,
-  gap,
-  board,
-  colour,
-}: Box & { bay: Bay; gap: number; board: number; colour: string }) {
-  if (bay.fitting.kind !== "stack") return null;
-
-  const boxes = bandBoxes(bay.fitting.sections, y, height, board);
-
-  // Consecutive non-drawer bands share one door, the same as in the geometry:
-  // a rail above a shelf is one opening to reach into, not two.
-  const runs: { top: number; bottom: number }[] = [];
-  for (const [index, box] of boxes.entries()) {
-    if (box.section.kind === "drawers") continue;
-
-    const previous = boxes[index - 1];
-    const open = runs[runs.length - 1];
-
-    if (open && previous && previous.section.kind !== "drawers") {
-      open.bottom = box.top + box.height;
-    } else {
-      runs.push({ top: box.top, bottom: box.top + box.height });
-    }
-  }
-
-  return (
-    <>
-      {runs.map((run) => (
-        <Doors
-          key={run.top}
-          bay={bay}
-          x={x}
-          width={width}
-          y={run.top}
-          height={run.bottom - run.top}
-          gap={gap}
-          colour={colour}
-        />
-      ))}
-    </>
-  );
 }
 
 type Box = { x: number; width: number; y: number; height: number };
@@ -679,63 +661,197 @@ function Fitting({
   return null;
 }
 
-function Doors({
-  bay,
-  x,
-  width,
-  y,
-  height,
-  gap,
+/**
+ * Every door of a cabinet, drawn where `cabinetFronts` puts it. A door of the
+ * selected cabinet can be tapped to size it; the selected one shows a handle
+ * on each edge to pull, and the size it is being pulled to.
+ */
+function DoorLeaves({
+  spec,
+  cabinet,
+  top,
   colour,
-}: Box & { bay: Bay; gap: number; colour: string }) {
-  const leaves = bay.door === "hinged" ? bay.doorLeaves : bay.door === "sliding" ? 2 : 2;
-  const leafWidth = (width - gap * (leaves + 1)) / leaves;
+  selectedDoor,
+  onSelectDoor,
+  onDoorResize,
+  snap,
+  mmPerPixel,
+}: {
+  spec: DesignSpec;
+  cabinet: Cabinet;
+  top: (heightAboveFloor: number) => number;
+  colour: string;
+  selectedDoor: DoorRef | null;
+  onSelectDoor?: (door: DoorRef | null) => void;
+  onDoorResize?: (door: DoorRef, rect: FrontRect) => void;
+  snap: boolean;
+  mmPerPixel: number;
+}) {
+  const fronts = cabinetFronts(spec, cabinet);
+  const isSelected = (leaf: { bayId: string; run: number; leaf: number }) =>
+    selectedDoor !== null && leaf.bayId === selectedDoor.bayId && leaf.run === selectedDoor.run && leaf.leaf === selectedDoor.leaf;
+  const chosen = fronts.leaves.find(isSelected) ?? null;
 
   return (
     <g>
-      {Array.from({ length: leaves }, (_, index) => {
-        const leafX = x + gap + index * (leafWidth + gap);
-        // A sliding pair overlaps in reality; drawing them offset in depth is
-        // what tells a reader at a glance that these do not swing.
-        const offset = bay.door === "sliding" && index === 1 ? -14 : 0;
-
+      {fronts.leaves.map((leaf) => {
+        // A sliding pair overlaps in reality; drawing the second leaf a little
+        // higher is what tells a reader at a glance that these do not swing.
+        const offset = leaf.style === "sliding" && leaf.leaf === 1 ? -14 : 0;
+        const rect = leaf;
+        const svgTop = top(rect.y + rect.height) + offset;
+        const hingeLeft = leaf.leaves === 1 || leaf.leaf === 0;
+        const ref = { cabinetId: cabinet.id, bayId: leaf.bayId, run: leaf.run, leaf: leaf.leaf };
         return (
-          <g key={index}>
+          <g
+            key={`${leaf.bayId}-${leaf.run}-${leaf.leaf}`}
+            data-door={`${leaf.bayId}:${leaf.run}:${leaf.leaf}`}
+            onClick={onSelectDoor ? (event) => { event.stopPropagation(); onSelectDoor(ref); } : undefined}
+          >
             <rect
-              x={leafX}
-              y={y + gap + offset}
-              width={leafWidth}
-              height={height - gap * 2}
+              x={rect.x}
+              y={svgTop}
+              width={rect.width}
+              height={rect.height}
               fill={colour}
               fillOpacity={0.8}
-              stroke={colour}
-              strokeWidth={6}
+              stroke={chosen === leaf ? "#f4a63a" : colour}
+              strokeWidth={chosen === leaf ? 12 : 6}
+              strokeDasharray={leaf.manual && chosen !== leaf ? "30 14" : undefined}
               rx={8}
             />
-            {bay.door === "hinged" ? (
-              <Hinges
-                x={index === 0 ? leafX + 14 : leafX + leafWidth - 14}
-                y={y}
-                height={height}
-              />
+            {leaf.style === "hinged" ? (
+              <Hinges x={hingeLeft ? rect.x + 14 : rect.x + rect.width - 14} y={svgTop - offset} height={rect.height} />
             ) : null}
-            {/* Handle: on the meeting stile for a pair, on the leading edge
-                for a single. */}
+            {/* Handle: on the meeting stile for a pair, on the leading edge for a single. */}
             <circle
-              cx={
-                leaves === 1
-                  ? leafX + leafWidth - 60
-                  : index === 0
-                    ? leafX + leafWidth - 60
-                    : leafX + 60
-              }
-              cy={y + height / 2}
+              cx={hingeLeft ? rect.x + rect.width - 60 : rect.x + 60}
+              cy={svgTop + rect.height / 2}
               r={26}
               className="fill-foreground/45"
             />
           </g>
         );
       })}
+
+      {chosen && selectedDoor && onDoorResize ? (
+        <DoorEdgeHandles
+          key={`${chosen.bayId}-${chosen.run}-${chosen.leaf}`}
+          rect={chosen}
+          cabinetHeight={cabinet.size.height}
+          targets={() => doorSnapTargetsOf(spec, selectedDoor)}
+          snap={snap}
+          mmPerPixel={mmPerPixel}
+          onDrag={(rect) => onDoorResize(selectedDoor, rect)}
+        />
+      ) : null}
+    </g>
+  );
+}
+
+/**
+ * A handle on each edge of the selected door: a small dot inside a target a
+ * finger can hit. A press does nothing until the pointer has moved a few
+ * pixels, so a tap or a scroll that starts on one does not resize the door.
+ * While an edge is held, the size it is at is written across the door.
+ */
+function DoorEdgeHandles({
+  rect,
+  cabinetHeight,
+  targets,
+  snap,
+  mmPerPixel,
+  onDrag,
+}: {
+  rect: FrontRect;
+  cabinetHeight: number;
+  /** Read when a drag starts, not on every render. */
+  targets: () => { x: number[]; y: number[] };
+  snap: boolean;
+  mmPerPixel: number;
+  onDrag: (rect: FrontRect) => void;
+}) {
+  const drag = useRef<{ edge: DoorEdge; start: FrontRect; matrix: DOMMatrix; x: number; y: number; moving: boolean; targets: { x: number[]; y: number[] } } | null>(null);
+  const [live, setLive] = useState<{ edge: DoorEdge; rect: FrontRect; snapped: boolean } | null>(null);
+  const shown = live?.rect ?? rect;
+  const svgTop = cabinetHeight - (shown.y + shown.height);
+  const handles: { edge: DoorEdge; cx: number; cy: number }[] = [
+    { edge: "left", cx: shown.x, cy: svgTop + shown.height / 2 },
+    { edge: "right", cx: shown.x + shown.width, cy: svgTop + shown.height / 2 },
+    { edge: "top", cx: shown.x + shown.width / 2, cy: svgTop },
+    { edge: "bottom", cx: shown.x + shown.width / 2, cy: svgTop + shown.height },
+  ];
+
+  function begin(edge: DoorEdge, event: React.PointerEvent<SVGCircleElement>) {
+    event.stopPropagation();
+    // No mouse events follow, so a pull with a mouse does not select the
+    // drawing's text as it goes.
+    event.preventDefault();
+    const matrix = event.currentTarget.getScreenCTM();
+    if (!matrix) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    drag.current = { edge, start: rect, matrix: matrix.inverse(), x: event.clientX, y: event.clientY, moving: false, targets: targets() };
+  }
+
+  function move(event: React.PointerEvent<SVGCircleElement>) {
+    const state = drag.current;
+    if (!state) return;
+    if (!state.moving && Math.hypot(event.clientX - state.x, event.clientY - state.y) < 4) return;
+    state.moving = true;
+    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(state.matrix);
+    const value = state.edge === "left" || state.edge === "right" ? point.x : cabinetHeight - point.y;
+    const result = dragDoorEdge(state.start, state.edge, value, { targets: state.targets, snap, tolerance: Math.max(5, 10 * mmPerPixel) });
+    setLive({ edge: state.edge, ...result });
+    onDrag(result.rect);
+  }
+
+  function end() {
+    drag.current = null;
+    setLive(null);
+  }
+
+  return (
+    <g>
+      {live ? (
+        <rect x={shown.x} y={svgTop} width={shown.width} height={shown.height} fill="none" stroke={live.snapped ? "#16a34a" : "#f4a63a"} strokeWidth={3 * mmPerPixel} pointerEvents="none" />
+      ) : null}
+      {handles.map((handle) => (
+        <g key={handle.edge}>
+          <circle cx={handle.cx} cy={handle.cy} r={6 * mmPerPixel} fill="#f4a63a" stroke="white" strokeWidth={1.5 * mmPerPixel} pointerEvents="none" />
+          {/* The touch target: a finger's width, not drawn. */}
+          <circle
+            data-door-handle={handle.edge}
+            cx={handle.cx}
+            cy={handle.cy}
+            r={22 * mmPerPixel}
+            fill="transparent"
+            style={{ touchAction: "none", cursor: handle.edge === "left" || handle.edge === "right" ? "ew-resize" : "ns-resize" }}
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => begin(handle.edge, event)}
+            onPointerMove={move}
+            onPointerUp={end}
+            onPointerCancel={end}
+          />
+        </g>
+      ))}
+      {live ? (
+        <text
+          x={shown.x + shown.width / 2}
+          y={svgTop + shown.height / 2}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontSize={Math.max(60, 16 * mmPerPixel)}
+          className="fill-foreground font-semibold"
+          // A halo, so the number reads over the door, its handle and its hinges.
+          stroke="white"
+          strokeWidth={Math.max(60, 16 * mmPerPixel) * 0.25}
+          paintOrder="stroke"
+          strokeLinejoin="round"
+          pointerEvents="none"
+        >
+          {live.edge === "left" || live.edge === "right" ? `← ${Math.round(live.rect.width)} mm →` : `↕ ${Math.round(live.rect.height)} mm`}
+        </text>
+      ) : null}
     </g>
   );
 }

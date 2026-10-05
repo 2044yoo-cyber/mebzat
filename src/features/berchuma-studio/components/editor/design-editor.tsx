@@ -31,11 +31,15 @@ import {
   typingInto,
 } from "../../services/nudge";
 import {
+  doorLeafOf,
   duplicateCabinet,
   moveCabinet,
   removeCabinet,
   resizeCabinet,
+  setDoorSize,
+  type DoorRef,
 } from "../../services/operations";
+import type { FrontRect } from "../../services/door-layout";
 import { Elevation } from "../viewer/elevation";
 import { Plan } from "../viewer/plan";
 import type { DesignSpec } from "../../types/spec";
@@ -114,6 +118,11 @@ export function DesignEditor({
 }) {
   const [view, setView] = useState<View>("solid");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // One door of the selected cabinet, being sized; whether its dragged edges
+  // snap; and why the last size asked for could not be built.
+  const [selectedDoor, setSelectedDoor] = useState<DoorRef | null>(null);
+  const [snap, setSnap] = useState(true);
+  const [doorProblem, setDoorProblem] = useState<string | null>(null);
   const [selectedSketchId, setSelectedSketchId] = useState<string | null>(null);
   const [sketchEnabled, setSketchEnabled] = useState(spec.sketchMode);
   const [sketchTool, setSketchTool] = useState<SketchTool>("select");
@@ -133,6 +142,26 @@ export function DesignEditor({
 
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
+  const door = selectedDoor && selectedDoor.cabinetId === selectedId && doorLeafOf(spec, selectedDoor) ? selectedDoor : null;
+
+  /** Choosing a cabinet lets go of any door that was being sized. */
+  function selectCabinet(id: string | null) {
+    setSelectedId(id);
+    setSelectedDoor(null);
+    setDoorProblem(null);
+  }
+
+  function selectDoor(next: DoorRef | null) {
+    setSelectedDoor(next);
+    setDoorProblem(null);
+  }
+
+  /** A door to a new size: kept when it can be built, otherwise the reason why. */
+  function resizeDoor(ref: DoorRef, rect: FrontRect) {
+    const result = setDoorSize(spec, ref, rect);
+    setDoorProblem(result.problem);
+    if (!result.problem) onChange(result.spec);
+  }
 
   /**
    * One step along an axis, from a button or from a key.
@@ -201,6 +230,7 @@ export function DesignEditor({
           // The selection is dropped first: leaving it pointing at a cabinet
           // that no longer exists leaves the panel showing controls for
           // nothing.
+          setSelectedDoor(null);
           setSelectedId(null);
           onChange(removeCabinet(spec, selected.id));
           return;
@@ -208,7 +238,9 @@ export function DesignEditor({
           onChange(duplicateCabinet(spec, selected.id));
           return;
         case "deselect":
-          setSelectedId(null);
+          // A door first, then the cabinet it belongs to.
+          if (door) selectDoor(null);
+          else selectCabinet(null);
           return;
       }
     }
@@ -266,14 +298,18 @@ export function DesignEditor({
               hideFronts={hideFronts}
               hideCountertop={spec.furnitureType === "kitchen" && !showCountertop}
               selectedCabinetId={selectedId}
+              selectedDoor={door}
+              onSelectDoor={selectDoor}
+              onDoorResize={resizeDoor}
+              snap={snap}
               onSelectCabinet={(id) => {
-                setSelectedId(id);
+                selectCabinet(id);
                 if (id) setSelectedSketchId(null);
               }}
               selectedSketchId={selectedSketchId}
               onSelectSketch={(id) => {
                 setSelectedSketchId(id);
-                if (id) setSelectedId(null);
+                if (id) selectCabinet(null);
                 if (id && sketchEnabled && sketchTool === "push-pull") {
                   onChange(pushPullSketchObject(spec, id, 400));
                   setSketchTool("select");
@@ -348,13 +384,17 @@ export function DesignEditor({
                 <Plan
                   spec={spec}
                   selectedCabinetId={selectedId}
-                  onSelectCabinet={setSelectedId}
+                  onSelectCabinet={selectCabinet}
                 />
               ) : (
                 <Elevation
                   spec={spec}
                   selectedCabinetId={selectedId}
-                  onSelectCabinet={setSelectedId}
+                  onSelectCabinet={selectCabinet}
+                  selectedDoor={door}
+                  onSelectDoor={selectDoor}
+                  onDoorResize={resizeDoor}
+                  snap={snap}
                 />
               )}
             </div>
@@ -602,8 +642,14 @@ export function DesignEditor({
         <ControlPanel
           spec={spec}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={selectCabinet}
           onChange={onChange}
+          door={door}
+          onSelectDoor={selectDoor}
+          snap={snap}
+          onSnapChange={setSnap}
+          doorProblem={doorProblem}
+          onDoorProblem={setDoorProblem}
         />
       </div>
     </div>

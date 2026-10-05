@@ -3,6 +3,8 @@ import { placeOnRun, solveLayout } from "./layout";
 import { LIMITS, practicalDrawerCount, validateSpec } from "../types/spec";
 import type { Bay, Cabinet, CabinetKind, DesignSpec } from "../types/spec";
 import { drawerFrontHeights } from "./drawer-construction";
+import { cabinetFaceBoards, cabinetFronts, type DoorLeaf } from "./geometry";
+import { doorRectProblem, doorSnapTargets, equalLeaves, MIN_DOOR, type FrontRect } from "./door-layout";
 
 /**
  * What somebody can do to a design.
@@ -845,6 +847,8 @@ export function setBayFitting(
     const bay = find(draft, cabinetId)?.bays.find((entry) => entry.id === bayId);
     if (!bay) return;
     bay.fitting = fitting;
+    // Doors sized by hand belong to the fronts this fitting had.
+    delete bay.doorOverrides;
 
     // Drawers are fronted by their own fronts, so a hinged door over them is a
     // door nobody cuts. Switching to drawers switches the front with it.
@@ -865,6 +869,7 @@ export function setBayDoor(
     const bay = target?.bays.find((entry) => entry.id === bayId);
     if (!bay) return;
     bay.door = door;
+    delete bay.doorOverrides;
     if (door === "hinged") {
       bay.doorLeaves = bay.width > LIMITS.hingedLeafWidth ? 2 : 1;
     }
@@ -1209,4 +1214,158 @@ export function hasCustomFronts(
 ): boolean {
   const fitting = drawersIn(spec, cabinetId, bayId);
   return (fitting?.frontHeights?.length ?? 0) > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Doors sized by hand
+// ---------------------------------------------------------------------------
+
+/** Which door: its cabinet, its bay, the run of the bay it closes, the leaf. */
+export type DoorRef = { cabinetId: string; bayId: string; run: number; leaf: number };
+
+/** A cabinet's doors and drawer fronts as they will be cut. */
+export function doorFrontsOf(spec: DesignSpec, cabinetId: string) {
+  const cabinet = find(spec, cabinetId);
+  return cabinet ? cabinetFronts(spec, cabinet) : null;
+}
+
+export function doorLeafOf(spec: DesignSpec, ref: DoorRef): DoorLeaf | null {
+  return doorFrontsOf(spec, ref.cabinetId)?.leaves.find((leaf) => leaf.bayId === ref.bayId && leaf.run === ref.run && leaf.leaf === ref.leaf) ?? null;
+}
+
+const sameLeaf = (leaf: DoorLeaf, ref: Pick<DoorRef, "bayId" | "run" | "leaf">) => leaf.bayId === ref.bayId && leaf.run === ref.run && leaf.leaf === ref.leaf;
+
+/**
+ * Doors given new sizes at once, all or nothing: each must fit inside its
+ * cabinet and clear of every other door and drawer front, as they will all
+ * stand afterwards. Returns why not instead of a model with a door through
+ * another one.
+ */
+function setDoorRects(spec: DesignSpec, cabinetId: string, changes: { ref: Pick<DoorRef, "bayId" | "run" | "leaf">; rect: FrontRect }[]): { spec: DesignSpec; problem: string | null } {
+  const cabinet = find(spec, cabinetId);
+  const fronts = cabinet ? cabinetFronts(spec, cabinet) : null;
+  if (!cabinet || !fronts) return { spec, problem: "That door is not on the design" };
+  const after = fronts.leaves.map((leaf) => changes.find((entry) => sameLeaf(leaf, entry.ref))?.rect ?? leaf);
+  for (const entry of changes) {
+    const index = fronts.leaves.findIndex((leaf) => sameLeaf(leaf, entry.ref));
+    if (index < 0) return { spec, problem: "That door is not on the design" };
+    const problem = doorRectProblem(entry.rect, cabinet.size, [...fronts.drawers, ...after.filter((_, other) => other !== index)]);
+    if (problem) return { spec, problem };
+  }
+  const next = change(spec, (draft) => {
+    const target = find(draft, cabinetId);
+    for (const entry of changes) {
+      const bay = target?.bays.find((item) => item.id === entry.ref.bayId);
+      if (!bay) continue;
+      const round = (value: number) => Math.round(value * 10) / 10;
+      const rect = { x: round(entry.rect.x), y: round(entry.rect.y), width: round(entry.rect.width), height: round(entry.rect.height) };
+      bay.doorOverrides = [...(bay.doorOverrides ?? []).filter((item) => !(item.run === entry.ref.run && item.leaf === entry.ref.leaf)), { run: entry.ref.run, leaf: entry.ref.leaf, ...rect }];
+    }
+  });
+  return { spec: next, problem: null };
+}
+
+/**
+ * One door to a size and place — typed, or dragged edge by edge. A width
+ * that is typed keeps the door's outer edge where it is (its left edge, or
+ * for the right leaf of a pair its right edge), a height keeps its bottom
+ * edge. When the change runs into the other leaf of its pair, that leaf's
+ * meeting edge gives way, a door gap clear — the pair shares its opening,
+ * each leaf its own size — as long as it stays a door.
+ */
+export function setDoorSize(spec: DesignSpec, ref: DoorRef, size: Partial<FrontRect>): { spec: DesignSpec; problem: string | null } {
+  const fronts = doorFrontsOf(spec, ref.cabinetId);
+  const leaf = fronts?.leaves.find((item) => sameLeaf(item, ref));
+  if (!fronts || !leaf) return { spec, problem: "That door is not on the design" };
+  const partners = fronts.leaves.filter((item) => item.bayId === leaf.bayId && item.run === leaf.run && item !== leaf);
+  const partnerLeft = partners.find((item) => item.x < leaf.x);
+  const width = size.width ?? leaf.width;
+  const x = size.x ?? (size.width !== undefined && partnerLeft ? leaf.x + leaf.width - width : leaf.x);
+  const rect = { x, y: size.y ?? leaf.y, width, height: size.height ?? leaf.height };
+  const gap = spec.carcass.doorGap;
+  const changes: { ref: Pick<DoorRef, "bayId" | "run" | "leaf">; rect: FrontRect }[] = [{ ref, rect }];
+  for (const partner of partners) {
+    const sharesHeight = Math.min(partner.y + partner.height, rect.y + rect.height) > Math.max(partner.y, rect.y);
+    if (!sharesHeight) continue;
+    if (partner.x > leaf.x && rect.x + rect.width + gap > partner.x) {
+      const right = partner.x + partner.width;
+      const start = rect.x + rect.width + gap;
+      if (right - start >= MIN_DOOR) changes.push({ ref: partner, rect: { ...partner, x: start, width: right - start } });
+    } else if (partner.x < leaf.x && partner.x + partner.width + gap > rect.x) {
+      const width = rect.x - gap - partner.x;
+      if (width >= MIN_DOOR) changes.push({ ref: partner, rect: { ...partner, width } });
+    }
+  }
+  return setDoorRects(spec, ref.cabinetId, changes.map(({ ref: target, rect: next }) => ({ ref: target, rect: { x: next.x, y: next.y, width: next.width, height: next.height } })));
+}
+
+/** Where a dragged edge of this door can snap to, in its cabinet's frame. */
+export function doorSnapTargetsOf(spec: DesignSpec, ref: DoorRef): { x: number[]; y: number[] } {
+  const cabinet = find(spec, ref.cabinetId);
+  const fronts = cabinet ? cabinetFronts(spec, cabinet) : null;
+  const leaf = fronts?.leaves.find((item) => sameLeaf(item, ref));
+  if (!cabinet || !fronts || !leaf) return { x: [], y: [] };
+  const row = doorRowOf(spec, ref);
+  return doorSnapTargets({
+    cabinet: cabinet.size,
+    gap: spec.carcass.doorGap,
+    boards: cabinetFaceBoards(spec, cabinet),
+    others: [...fronts.drawers, ...fronts.leaves.filter((item) => item !== leaf)],
+    row: row.length > 1 ? { left: row[0]!.x, right: row.at(-1)!.x + row.at(-1)!.width, count: row.length } : null,
+  });
+}
+
+/** Manual sizing switched on: the door keeps the size it has, now as its own. */
+export function setDoorManual(spec: DesignSpec, ref: DoorRef): DesignSpec {
+  const leaf = doorLeafOf(spec, ref);
+  if (!leaf || leaf.manual) return spec;
+  return setDoorRects(spec, ref.cabinetId, [{ ref, rect: leaf }]).spec;
+}
+
+/**
+ * Back to the automatic size: one door, or with `wholeRun` every leaf of its
+ * run. A door beside it that was sized into the space this one takes back
+ * cannot keep its size either, so it goes back too — Reset never leaves a size
+ * behind that the cut list would refuse.
+ */
+export function resetDoorSize(spec: DesignSpec, ref: DoorRef, wholeRun = false): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, ref.cabinetId);
+    const bay = cabinet?.bays.find((item) => item.id === ref.bayId);
+    if (!cabinet || !bay?.doorOverrides) return;
+    bay.doorOverrides = bay.doorOverrides.filter((item) => !(item.run === ref.run && (wholeRun || item.leaf === ref.leaf)));
+    const fronts = cabinetFronts(draft, cabinet);
+    for (const other of cabinet.bays) {
+      if (!other.doorOverrides) continue;
+      other.doorOverrides = other.doorOverrides.filter((item) => fronts.leaves.some((leaf) => leaf.bayId === other.id && leaf.run === item.run && leaf.leaf === item.leaf && leaf.manual));
+      if (!other.doorOverrides.length) delete other.doorOverrides;
+    }
+  });
+}
+
+/**
+ * The doors that share this one's row: its pair, or — for a single leaf —
+ * the doors beside it across the cabinet at the same height. Left to right.
+ */
+export function doorRowOf(spec: DesignSpec, ref: DoorRef): DoorLeaf[] {
+  const fronts = doorFrontsOf(spec, ref.cabinetId);
+  const leaf = fronts?.leaves.find((item) => sameLeaf(item, ref));
+  if (!fronts || !leaf) return [];
+  const pair = fronts.leaves.filter((item) => item.bayId === leaf.bayId && item.run === leaf.run);
+  if (pair.length > 1) return pair.sort((a, b) => a.x - b.x);
+  const overlapsInHeight = (item: DoorLeaf) => Math.min(item.y + item.height, leaf.y + leaf.height) - Math.max(item.y, leaf.y) > Math.min(item.height, leaf.height) * 0.5;
+  return fronts.leaves.filter(overlapsInHeight).sort((a, b) => a.x - b.x);
+}
+
+/**
+ * Make Equal: the row shares its span equally, a door gap between each — the
+ * outer edges stay, the meeting edges move.
+ */
+export function makeDoorsEqual(spec: DesignSpec, ref: DoorRef): { spec: DesignSpec; problem: string | null } {
+  const row = doorRowOf(spec, ref);
+  if (row.length < 2) return { spec, problem: "There is no other door beside this one to share with" };
+  const left = row[0]!.x;
+  const right = row.at(-1)!.x + row.at(-1)!.width;
+  const shares = equalLeaves(left, right, row.length, spec.carcass.doorGap);
+  return setDoorRects(spec, ref.cabinetId, row.map((leaf, index) => ({ ref: leaf, rect: { x: shares[index]!.x, y: leaf.y, width: shares[index]!.width, height: leaf.height } })));
 }

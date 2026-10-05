@@ -121,6 +121,12 @@ export type Part = {
   size: Vec3;
   /** Which axis the part's thickness runs along, for the viewer. */
   axis: "x" | "y" | "z";
+  /**
+   * For a door: which run of its bay it closes, and the leaf its first
+   * placement is — placement i is leaf `first + i`. What lets a tap on a door
+   * in the viewer say which door it was.
+   */
+  doorLeaf?: { run: number; first: number };
 };
 
 export type HardwareLine = {
