@@ -24,7 +24,16 @@ import {
 } from "../../services/bay-layout";
 import { resolveDesign } from "../../services/resolve";
 import { dragDoorEdge, type DoorEdge, type FrontRect } from "../../services/door-layout";
-import { doorSnapTargetsOf, type DoorRef } from "../../services/operations";
+import {
+  displayEdgesOf,
+  displayRectOf,
+  displaySnapTargetsOf,
+  doorSnapTargetsOf,
+  type DisplayRef,
+  type DoorRef,
+} from "../../services/operations";
+import { findBoard } from "../../types/catalogue";
+import type { DisplayOptions } from "../../types/spec";
 import type { Bay, Cabinet, DesignSpec } from "../../types/spec";
 
 /**
@@ -64,6 +73,9 @@ export function Elevation({
   onSelectDoor,
   onDoorResize,
   snap = true,
+  selectedDisplay = null,
+  onSelectDisplay,
+  onDisplayResize,
 }: {
   spec: DesignSpec;
   /** Drawn with a highlight, so the flat view agrees with the 3D one. */
@@ -75,6 +87,10 @@ export function Elevation({
   /** An edge of the selected door pulled to here, in its cabinet's frame. */
   onDoorResize?: (door: DoorRef, rect: FrontRect) => void;
   snap?: boolean;
+  /** An open display of the selected cabinet, tapped to edit it. */
+  selectedDisplay?: DisplayRef | null;
+  onSelectDisplay?: (display: DisplayRef | null) => void;
+  onDisplayResize?: (display: DisplayRef, edge: DoorEdge, rect: FrontRect) => void;
 }) {
   const gradientId = useId();
   // Millimetres of drawing per screen pixel, so a handle is a finger's size
@@ -178,6 +194,9 @@ export function Elevation({
             onDoorResize={onDoorResize}
             snap={snap}
             mmPerPixel={mmPerPixel}
+            selectedDisplay={selectedDisplay?.cabinetId === cabinet.id ? selectedDisplay : null}
+            onSelectDisplay={cabinet.id === selectedCabinetId ? onSelectDisplay : undefined}
+            onDisplayResize={onDisplayResize}
           />
         </g>
       )) : (
@@ -259,6 +278,9 @@ function CabinetDrawing({
   onDoorResize,
   snap,
   mmPerPixel,
+  selectedDisplay,
+  onSelectDisplay,
+  onDisplayResize,
 }: {
   spec: DesignSpec;
   cabinet: Cabinet;
@@ -269,6 +291,9 @@ function CabinetDrawing({
   onDoorResize?: (door: DoorRef, rect: FrontRect) => void;
   snap: boolean;
   mmPerPixel: number;
+  selectedDisplay: DisplayRef | null;
+  onSelectDisplay?: (display: DisplayRef | null) => void;
+  onDisplayResize?: (display: DisplayRef, edge: DoorEdge, rect: FrontRect) => void;
 }) {
   const materials = constructionMaterials(spec);
   const t = spec.carcass.board.thickness;
@@ -326,6 +351,16 @@ function CabinetDrawing({
         The doors, from the one place their sizes come from — the same
         rectangles the cut list cuts, automatic or sized by hand.
       */}
+      <DisplayLayer
+        spec={spec}
+        cabinet={cabinet}
+        selectedDisplay={selectedDisplay}
+        onSelectDisplay={onSelectDisplay}
+        onDisplayResize={onDisplayResize}
+        snap={snap}
+        mmPerPixel={mmPerPixel}
+      />
+
       <DoorLeaves
         spec={spec}
         cabinet={cabinet}
@@ -464,8 +499,39 @@ function Fitting({
   board,
   frontColour,
   interiorColour,
-}: Box & { bay: Bay; board: number; frontColour: string; interiorColour: string }) {
+  display = bay.display ?? null,
+}: Box & { bay: Bay; board: number; frontColour: string; interiorColour: string; display?: DisplayOptions | null }) {
   const fitting = bay.fitting;
+
+  // An open display: its accent board behind the shelves, and its light.
+  if (display && fitting.kind === "shelves") {
+    const accent = (display.boardId ? findBoard(display.boardId)?.appearance?.hex : undefined) ?? interiorColour;
+    const shelves = evenShelfHeights(fitting.count, 0, height, board);
+    const shelfY = (underside: number) => y + height - underside - board / 2;
+    const led = "#f5b301";
+    return (
+      <g data-display-zone="">
+        <rect x={x} y={y} width={width} height={height} fill={accent} fillOpacity={display.back ? 0.55 : 0.18} />
+        <g stroke={display.boardId ? accent : interiorColour} strokeWidth={9}>
+          {shelves.map((underside, index) => (
+            <line key={index} x1={x} x2={x + width} y1={shelfY(underside)} y2={shelfY(underside)} />
+          ))}
+        </g>
+        {display.lighting === "off" ? null : (
+          <g stroke={led} strokeWidth={8} strokeLinecap="round" data-display-led="">
+            {display.lighting === "vertical" ? (
+              <>
+                <line x1={x + 8} x2={x + 8} y1={y + 10} y2={y + height - 10} />
+                <line x1={x + width - 8} x2={x + width - 8} y1={y + 10} y2={y + height - 10} />
+              </>
+            ) : (display.lighting === "shelf" && shelves.length ? shelves.map(shelfY).map((at) => at + board / 2 + 8) : [y + 10]).map((at) => (
+              <line key={at} x1={x + 20} x2={x + width - 20} y1={at} y2={at} />
+            ))}
+          </g>
+        )}
+      </g>
+    );
+  }
 
   if (fitting.kind === "stack") {
     // Each band drawn by the same code that draws a plain bay of that kind, so
@@ -477,7 +543,7 @@ function Fitting({
         {boxes.map((box, index) => (
           <g key={box.section.id}>
             <Fitting
-              bay={{ ...bay, fitting: sectionFitting(box.section) }}
+              bay={{ ...bay, fitting: sectionFitting(box.section), display: undefined }}
               x={x}
               width={width}
               y={box.top}
@@ -485,6 +551,7 @@ function Fitting({
               board={board}
               frontColour={frontColour}
               interiorColour={interiorColour}
+              display={box.section.kind === "display" ? { back: true, lighting: "off", ...box.section.display } : null}
             />
             {/* The fixed shelf between this band and the one below. */}
             {index < boxes.length - 1 ? (
@@ -602,6 +669,28 @@ function Fitting({
       frontHeights: fitting.frontHeights,
     });
 
+    // Behind the doors: drawn dashed, set in on their packers, no handle —
+    // seen through the door, as the elevation shows everything inside.
+    if (fitting.internal) {
+      return (
+        <g data-internal-drawers="">
+          {stack.map((drawer, index) => (
+            <rect
+              key={index}
+              x={x + board + 6}
+              y={drawerFaceSvgTop(drawer, y, height) + 4}
+              width={width - 2 * board - 12}
+              height={drawer.height - 8}
+              fill="none"
+              className="stroke-foreground/45"
+              strokeWidth={5}
+              strokeDasharray="26 16"
+            />
+          ))}
+        </g>
+      );
+    }
+
     return (
       <g>
         {stack.map((drawer, index) => (
@@ -659,6 +748,72 @@ function Fitting({
   }
 
   return null;
+}
+
+/**
+ * The open displays of a cabinet, as places to tap: a whole-bay niche or side
+ * unit, or a zone of a stacked bay. The selected one is outlined and has a
+ * handle on each edge that can move.
+ */
+function DisplayLayer({
+  spec,
+  cabinet,
+  selectedDisplay,
+  onSelectDisplay,
+  onDisplayResize,
+  snap,
+  mmPerPixel,
+}: {
+  spec: DesignSpec;
+  cabinet: Cabinet;
+  selectedDisplay: DisplayRef | null;
+  onSelectDisplay?: (display: DisplayRef | null) => void;
+  onDisplayResize?: (display: DisplayRef, edge: DoorEdge, rect: FrontRect) => void;
+  snap: boolean;
+  mmPerPixel: number;
+}) {
+  const refs: DisplayRef[] = cabinet.bays.flatMap((bay) => [
+    ...(bay.display ? [{ cabinetId: cabinet.id, bayId: bay.id }] : []),
+    ...(bay.fitting.kind === "stack" ? bay.fitting.sections.filter((section) => section.kind === "display").map((section) => ({ cabinetId: cabinet.id, bayId: bay.id, sectionId: section.id })) : []),
+  ]);
+  const same = (a: DisplayRef, b: DisplayRef | null) => b !== null && a.bayId === b.bayId && (a.sectionId ?? null) === (b.sectionId ?? null);
+  const top = (y: number) => cabinet.size.height - y;
+  return (
+    <g>
+      {refs.map((ref) => {
+        const rect = displayRectOf(spec, ref);
+        if (!rect) return null;
+        const chosen = same(ref, selectedDisplay);
+        return (
+          <g key={`${ref.bayId}-${ref.sectionId ?? ""}`}>
+            <rect
+              data-display={`${ref.bayId}${ref.sectionId ? `:${ref.sectionId}` : ""}`}
+              x={rect.x}
+              y={top(rect.y + rect.height)}
+              width={rect.width}
+              height={rect.height}
+              fill="transparent"
+              stroke={chosen ? "#f4a63a" : "none"}
+              strokeWidth={chosen ? 12 : 0}
+              className={onSelectDisplay ? "cursor-pointer" : undefined}
+              onClick={onSelectDisplay ? (event) => { event.stopPropagation(); onSelectDisplay(ref); } : undefined}
+            />
+            {chosen && onDisplayResize ? (
+              <DoorEdgeHandles
+                rect={rect}
+                cabinetHeight={cabinet.size.height}
+                targets={() => displaySnapTargetsOf(spec, ref)}
+                snap={snap}
+                mmPerPixel={mmPerPixel}
+                edges={displayEdgesOf(spec, ref)}
+                onDrag={(next, edge) => onDisplayResize(ref, edge, next)}
+              />
+            ) : null}
+          </g>
+        );
+      })}
+    </g>
+  );
 }
 
 /**
@@ -762,6 +917,7 @@ function DoorEdgeHandles({
   snap,
   mmPerPixel,
   onDrag,
+  edges = ["left", "right", "top", "bottom"],
 }: {
   rect: FrontRect;
   cabinetHeight: number;
@@ -769,7 +925,9 @@ function DoorEdgeHandles({
   targets: () => { x: number[]; y: number[] };
   snap: boolean;
   mmPerPixel: number;
-  onDrag: (rect: FrontRect) => void;
+  onDrag: (rect: FrontRect, edge: DoorEdge) => void;
+  /** Which edges have a handle. */
+  edges?: readonly DoorEdge[];
 }) {
   const drag = useRef<{ edge: DoorEdge; start: FrontRect; matrix: DOMMatrix; x: number; y: number; moving: boolean; targets: { x: number[]; y: number[] } } | null>(null);
   const [live, setLive] = useState<{ edge: DoorEdge; rect: FrontRect; snapped: boolean } | null>(null);
@@ -800,9 +958,11 @@ function DoorEdgeHandles({
     state.moving = true;
     const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(state.matrix);
     const value = state.edge === "left" || state.edge === "right" ? point.x : cabinetHeight - point.y;
-    const result = dragDoorEdge(state.start, state.edge, value, { targets: state.targets, snap, tolerance: Math.max(5, 10 * mmPerPixel) });
+    // About six pixels of pull, but never more than 25 mm: on a phone a
+    // pixel is 7 mm of wardrobe, and a wider net made free movement a fight.
+    const result = dragDoorEdge(state.start, state.edge, value, { targets: state.targets, snap, tolerance: Math.min(25, Math.max(5, 6 * mmPerPixel)) });
     setLive({ edge: state.edge, ...result });
-    onDrag(result.rect);
+    onDrag(result.rect, state.edge);
   }
 
   function end() {
@@ -815,7 +975,7 @@ function DoorEdgeHandles({
       {live ? (
         <rect x={shown.x} y={svgTop} width={shown.width} height={shown.height} fill="none" stroke={live.snapped ? "#16a34a" : "#f4a63a"} strokeWidth={3 * mmPerPixel} pointerEvents="none" />
       ) : null}
-      {handles.map((handle) => (
+      {handles.filter((handle) => edges.includes(handle.edge)).map((handle) => (
         <g key={handle.edge}>
           <circle cx={handle.cx} cy={handle.cy} r={6 * mmPerPixel} fill="#f4a63a" stroke="white" strokeWidth={1.5 * mmPerPixel} pointerEvents="none" />
           {/* The touch target: a finger's width, not drawn. */}

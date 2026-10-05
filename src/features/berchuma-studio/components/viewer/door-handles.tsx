@@ -57,6 +57,7 @@ export function DoorHandles({
   snap,
   onDrag,
   onDragState,
+  edges = ["left", "right", "top", "bottom"],
 }: {
   /** The door's face in its cabinet's frame, millimetres. */
   rect: FrontRect;
@@ -64,8 +65,10 @@ export function DoorHandles({
   origin: { x: number; y: number; z: number };
   targets: { x: number[]; y: number[] };
   snap: boolean;
-  onDrag: (rect: FrontRect) => void;
+  onDrag: (rect: FrontRect, edge: DoorEdge) => void;
   onDragState: (dragging: boolean) => void;
+  /** Which edges have a handle; an open niche, say, only resizes sideways. */
+  edges?: readonly DoorEdge[];
 }) {
   const camera = useThree((state) => state.camera);
   const domElement = useThree((state) => state.gl.domElement);
@@ -106,7 +109,7 @@ export function DoorHandles({
       // screen, never so much that a door cannot be put just short of a line.
       const result = dragDoorEdge(state.start, state.edge, value, { targets, snap, tolerance: Math.max(6, Math.min(30, 10 * scale)) });
       setLive(result);
-      onDrag(result.rect);
+      onDrag(result.rect, state.edge);
       invalidate();
     };
     const onUp = () => {
@@ -161,7 +164,7 @@ export function DoorHandles({
       <lineSegments geometry={outline} position={centre} renderOrder={3} raycast={() => null}>
         <lineBasicMaterial color={live?.snapped ? "#16a34a" : "#f4a63a"} depthTest={false} transparent />
       </lineSegments>
-      {handles.map(({ edge, at }) => (
+      {handles.filter(({ edge }) => edges.includes(edge)).map(({ edge, at }) => (
         <group key={edge} position={at}>
           {/* What the finger hits: big, and not drawn. */}
           <mesh name={`door-handle-${edge}`} onPointerDown={(event) => begin(edge, event)} renderOrder={4}>

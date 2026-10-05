@@ -3,7 +3,7 @@ import { placeOnRun, solveLayout } from "./layout";
 import { LIMITS, practicalDrawerCount, validateSpec } from "../types/spec";
 import type { Bay, Cabinet, CabinetKind, DesignSpec } from "../types/spec";
 import { drawerFrontHeights } from "./drawer-construction";
-import { cabinetFaceBoards, cabinetFronts, type DoorLeaf } from "./geometry";
+import { cabinetFaceBoards, cabinetFronts, sectionBands as sectionBandsOf, type DoorLeaf } from "./geometry";
 import { doorRectProblem, doorSnapTargets, equalLeaves, MIN_DOOR, type FrontRect } from "./door-layout";
 
 /**
@@ -1368,4 +1368,556 @@ export function makeDoorsEqual(spec: DesignSpec, ref: DoorRef): { spec: DesignSp
   const right = row.at(-1)!.x + row.at(-1)!.width;
   const shares = equalLeaves(left, right, row.length, spec.carcass.doorGap);
   return setDoorRects(spec, ref.cabinetId, row.map((leaf, index) => ({ ref: leaf, rect: { x: shares[index]!.x, y: leaf.y, width: shares[index]!.width, height: leaf.height } })));
+}
+
+// ---------------------------------------------------------------------------
+// Internal drawers, open displays and zones
+// ---------------------------------------------------------------------------
+
+/**
+ * An open display: a whole bay (a niche, or the one bay of a side display),
+ * or — with `sectionId` — one zone of a stacked bay.
+ */
+export type DisplayRef = { cabinetId: string; bayId: string; sectionId?: string };
+
+const DISPLAY_DEFAULTS = { back: true, lighting: "off" as const };
+
+function leavesFor(bay: Bay): void {
+  if (bay.door === "hinged") bay.doorLeaves = bay.width > LIMITS.hingedLeafWidth ? 2 : 1;
+}
+
+/**
+ * Drawers behind the doors (`internal`) or on the face. Behind the doors the
+ * bay keeps — or gets — its door, which then runs the full height in front
+ * of them; on the face the fronts are the front, as drawers always were.
+ */
+export function setBayInternalDrawers(spec: DesignSpec, cabinetId: string, bayId: string, internal: boolean): DesignSpec {
+  return change(spec, (draft) => {
+    const bay = find(draft, cabinetId)?.bays.find((entry) => entry.id === bayId);
+    if (!bay || bay.fitting.kind !== "drawers") return;
+    delete bay.doorOverrides;
+    if (internal) {
+      bay.fitting.internal = true;
+      if (bay.door === "none") bay.door = "hinged";
+      leavesFor(bay);
+    } else {
+      delete bay.fitting.internal;
+      delete bay.fitting.boxDepth;
+      delete bay.fitting.frontBoardId;
+    }
+  });
+}
+
+/** Box depth and inner-front board for internal drawers, whole bay or zone. */
+export function setInternalDrawerOptions(spec: DesignSpec, ref: DisplayRef, options: { boxDepth?: number | null; frontBoardId?: string | null }): DesignSpec {
+  return change(spec, (draft) => {
+    const bay = find(draft, ref.cabinetId)?.bays.find((entry) => entry.id === ref.bayId);
+    if (!bay) return;
+    const target = ref.sectionId && bay.fitting.kind === "stack" ? bay.fitting.sections.find((section) => section.id === ref.sectionId) : bay.fitting.kind === "drawers" ? bay.fitting : null;
+    if (!target) return;
+    if (options.boxDepth !== undefined) {
+      if (options.boxDepth === null) delete target.boxDepth;
+      else target.boxDepth = clamp(Math.round(options.boxDepth), 250, 700);
+    }
+    if (options.frontBoardId !== undefined) {
+      if (options.frontBoardId === null) delete target.frontBoardId;
+      else target.frontBoardId = options.frontBoardId;
+    }
+  });
+}
+
+/**
+ * A whole bay as an open display — a niche between the other bays — or, with
+ * null, back to a closed bay with its doors. Becoming a display, the bay is
+ * shelves (four, unless it already had shelves) and has no door; closing it
+ * hangs hinged doors on it again, a pair if it is wide.
+ */
+export function setBayDisplay(spec: DesignSpec, cabinetId: string, bayId: string, display: Partial<Omit<NonNullable<Bay["display"]>, "style">> | null): DesignSpec {
+  return change(spec, (draft) => {
+    const bay = find(draft, cabinetId)?.bays.find((entry) => entry.id === bayId);
+    if (!bay) return;
+    delete bay.doorOverrides;
+    if (display === null) {
+      if (!bay.display) return;
+      delete bay.display;
+      bay.door = "hinged";
+      leavesFor(bay);
+      return;
+    }
+    bay.display = { ...DISPLAY_DEFAULTS, ...bay.display, ...display, style: bay.display?.style ?? "niche" };
+    if (bay.fitting.kind !== "shelves") bay.fitting = { kind: "shelves", count: 4, adjustable: true };
+    bay.door = "none";
+  });
+}
+
+/** A display's options: back, accent board, depth, light, shelf count. */
+export function updateDisplay(spec: DesignSpec, ref: DisplayRef, patch: { back?: boolean; boardId?: string | null; depth?: number | null; lighting?: NonNullable<Bay["display"]>["lighting"]; shelves?: number }): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, ref.cabinetId);
+    const bay = cabinet?.bays.find((entry) => entry.id === ref.bayId);
+    if (!cabinet || !bay) return;
+    const section = ref.sectionId && bay.fitting.kind === "stack" ? bay.fitting.sections.find((entry) => entry.id === ref.sectionId) : null;
+    if (ref.sectionId && (!section || section.kind !== "display")) return;
+    if (!section && !bay.display) return;
+    const display = section ? (section.display ??= { ...DISPLAY_DEFAULTS }) : bay.display!;
+    if (patch.back !== undefined) display.back = patch.back;
+    if (patch.lighting !== undefined) display.lighting = patch.lighting;
+    if (patch.boardId !== undefined) {
+      if (patch.boardId === null) delete display.boardId;
+      else display.boardId = patch.boardId;
+    }
+    if (patch.depth !== undefined) {
+      if (patch.depth === null) delete display.depth;
+      else display.depth = clamp(Math.round(patch.depth), 150, cabinet.size.depth);
+    }
+    if (patch.shelves !== undefined) {
+      const count = clamp(Math.round(patch.shelves), 0, 20);
+      if (section) section.count = count;
+      else if (bay.fitting.kind === "shelves") bay.fitting.count = count;
+    }
+  });
+}
+
+/**
+ * The narrowest bay worth building: a wardrobe's validator repairs anything
+ * under 300 mm, so a wardrobe's operations stop there.
+ */
+function bayFloor(spec: DesignSpec): number {
+  return spec.furnitureType === "wardrobe" ? 300 : LIMITS.minBayWidth;
+}
+
+/** The bays share `total` in proportion to the widths they have, each at least the floor. */
+function shareWidths(bays: Bay[], total: number, floor: number = LIMITS.minBayWidth): void {
+  const sum = bays.reduce((acc, bay) => acc + bay.width, 0);
+  let handed = 0;
+  bays.forEach((bay, index) => {
+    const next = index === bays.length - 1 ? total - handed : Math.max(floor, Math.round(sum > 0 ? (bay.width / sum) * total : total / bays.length));
+    bay.width = Math.max(floor, next);
+    handed += bay.width;
+    leavesFor(bay);
+  });
+}
+
+/**
+ * A narrow open niche between the wardrobe's bays: a new bay of its own,
+ * `width` wide, at `index` (the middle when not given). The other bays give
+ * up the width in proportion, so the wardrobe stays the size it was.
+ */
+export function addNiche(spec: DesignSpec, cabinetId: string, options: { width?: number; index?: number; shelves?: number; boardId?: string; lighting?: NonNullable<Bay["display"]>["lighting"] } = {}): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, cabinetId);
+    if (!cabinet || cabinet.bays.length >= 24) return;
+    const t = draft.carcass.board.thickness;
+    const interior = cabinet.size.width - 2 * t - cabinet.bays.length * t;
+    const floor = bayFloor(draft);
+    const width = clamp(Math.round(options.width ?? 450), floor, Math.max(floor, interior - cabinet.bays.length * floor));
+    const others = cabinet.bays;
+    shareWidths(others, interior - width, floor);
+    const index = clamp(options.index ?? Math.ceil(others.length / 2), 0, others.length);
+    const niche: Bay = {
+      id: freshId("niche"),
+      width,
+      fitting: { kind: "shelves", count: options.shelves ?? 4, adjustable: true },
+      door: "none",
+      doorLeaves: 1,
+      display: { ...DISPLAY_DEFAULTS, style: "niche", ...(options.boardId ? { boardId: options.boardId } : {}), ...(options.lighting ? { lighting: options.lighting } : {}) },
+    };
+    cabinet.bays.splice(index, 0, niche);
+    for (const bay of cabinet.bays) delete bay.doorOverrides;
+  });
+}
+
+/** A bay to another place in its cabinet — Left, Center, Right, or one step. */
+export function moveBay(spec: DesignSpec, cabinetId: string, bayId: string, to: "left" | "center" | "right" | -1 | 1): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, cabinetId);
+    const from = cabinet?.bays.findIndex((bay) => bay.id === bayId) ?? -1;
+    if (!cabinet || from < 0) return;
+    const [bay] = cabinet.bays.splice(from, 1);
+    const last = cabinet.bays.length;
+    const index = to === "left" ? 0 : to === "right" ? last : to === "center" ? Math.ceil(last / 2) : clamp(from + to, 0, last);
+    cabinet.bays.splice(index, 0, bay!);
+    for (const entry of cabinet.bays) delete entry.doorOverrides;
+  });
+}
+
+/** A copy of a niche beside it; the other bays give up its width. */
+export function duplicateBay(spec: DesignSpec, cabinetId: string, bayId: string): DesignSpec {
+  const cabinet = find(spec, cabinetId);
+  const index = cabinet?.bays.findIndex((bay) => bay.id === bayId) ?? -1;
+  const bay = index >= 0 ? cabinet!.bays[index]! : null;
+  if (!bay?.display) return spec;
+  return addNiche(spec, cabinetId, { width: bay.width, index: index + 1, shelves: bay.fitting.kind === "shelves" ? bay.fitting.count : 4, boardId: bay.display.boardId, lighting: bay.display.lighting });
+}
+
+/** A niche taken out: its width goes back to the bays either side of it. */
+export function removeNiche(spec: DesignSpec, cabinetId: string, bayId: string): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, cabinetId);
+    if (!cabinet || cabinet.bays.length <= 1) return;
+    const t = draft.carcass.board.thickness;
+    cabinet.bays = cabinet.bays.filter((bay) => bay.id !== bayId);
+    shareWidths(cabinet.bays, cabinet.size.width - 2 * t - (cabinet.bays.length - 1) * t, bayFloor(draft));
+    for (const bay of cabinet.bays) delete bay.doorOverrides;
+  });
+}
+
+/** The wardrobe a side display stands beside, and which end. */
+export function sideDisplayOf(spec: DesignSpec, cabinetId: string): { wardrobe: Cabinet | null; side: "left" | "right" } | null {
+  const cabinet = find(spec, cabinetId);
+  const display = cabinet?.bays[0]?.display;
+  if (!cabinet || display?.style !== "side") return null;
+  return { wardrobe: display.attachedTo ? find(spec, display.attachedTo) ?? null : null, side: display.side ?? "right" };
+}
+
+/**
+ * Open shelves beside a wardrobe: a shelving unit of its own on the same
+ * run, standing against the wardrobe's left or right end, as tall as it and
+ * on the same plinth. On the left, the wardrobe and everything after it move
+ * along to make room. Its width and depth can be changed afterwards like any
+ * cabinet's.
+ */
+export function addSideDisplay(spec: DesignSpec, wardrobeId: string, options: { side: "left" | "right"; width?: number; depth?: number; shelves?: number; boardId?: string; lighting?: NonNullable<Bay["display"]>["lighting"] }): DesignSpec {
+  return change(spec, (draft) => {
+    const wardrobe = find(draft, wardrobeId);
+    if (!wardrobe) return;
+    const lower = wardrobe.stackedOn ? find(draft, wardrobe.stackedOn) ?? wardrobe : wardrobe;
+    const top = draft.cabinets.find((cabinet) => cabinet.stackedOn === lower.id);
+    const t = draft.carcass.board.thickness;
+    const width = clamp(Math.round(options.width ?? 450), LIMITS.minWidth, 1200);
+    const depth = clamp(Math.round(options.depth ?? lower.size.depth), 200, lower.size.depth);
+    const height = lower.size.height + (top?.size.height ?? 0);
+    const targetRow = rowOf(lower);
+    const x = options.side === "left" ? along(lower) : along(lower) + lower.size.width;
+    shiftAfter(draft, targetRow, x, width);
+    const added: Cabinet = {
+      id: freshId("display"),
+      label: options.side === "left" ? "Side display, left" : "Side display, right",
+      kind: "open",
+      position: { x, y: lower.position.y, z: lower.position.z },
+      size: { width, height, depth },
+      bays: [{
+        id: freshId("bay"),
+        width: width - 2 * t,
+        fitting: { kind: "shelves", count: options.shelves ?? 5, adjustable: true },
+        door: "none",
+        doorLeaves: 1,
+        display: { ...DISPLAY_DEFAULTS, style: "side", side: options.side, attachedTo: lower.id, ...(options.boardId ? { boardId: options.boardId } : {}), ...(options.lighting ? { lighting: options.lighting } : {}) },
+      }],
+      plinthHeight: lower.plinthHeight,
+    };
+    bindToRow(added, targetRow, x);
+    draft.cabinets.push(added);
+  });
+}
+
+/** A side display moved to the wardrobe's other end. */
+export function setSideDisplaySide(spec: DesignSpec, cabinetId: string, side: "left" | "right"): DesignSpec {
+  const info = sideDisplayOf(spec, cabinetId);
+  const cabinet = find(spec, cabinetId);
+  if (!info?.wardrobe || !cabinet || info.side === side) return spec;
+  const bay = cabinet.bays[0]!;
+  const removed = removeCabinet(spec, cabinetId);
+  return addSideDisplay(removed, info.wardrobe.id, { side, width: cabinet.size.width, depth: cabinet.size.depth, shelves: bay.fitting.kind === "shelves" ? bay.fitting.count : 5, boardId: bay.display?.boardId, lighting: bay.display?.lighting });
+}
+
+// ---- Zones of a stacked bay -------------------------------------------------
+
+export type ZoneKind = "door" | "display" | "internal_drawers" | "drawers" | "shelves" | "hanging" | "shoes";
+type Section = Extract<Bay["fitting"], { kind: "stack" }>["sections"][number];
+
+/** What a zone is, as the panel names it. */
+export function zoneKindOf(section: Section): ZoneKind {
+  if (section.kind === "open") return "door";
+  if (section.kind === "drawers") return section.internal ? "internal_drawers" : "drawers";
+  return section.kind;
+}
+
+function sectionFor(kind: ZoneKind, id: string, share: number): Section {
+  switch (kind) {
+    case "door": return { id, kind: "open", share };
+    case "display": return { id, kind: "display", share, count: 1, display: { ...DISPLAY_DEFAULTS } };
+    case "internal_drawers": return { id, kind: "drawers", share, drawers: 2, internal: true };
+    case "drawers": return { id, kind: "drawers", share, drawers: 2 };
+    case "shelves": return { id, kind: "shelves", share, count: 2 };
+    case "hanging": return { id, kind: "hanging", share, rails: 1 };
+    case "shoes": return { id, kind: "shoes", share, count: 3 };
+  }
+}
+
+/**
+ * Zones given heights in mm. `sectionBands` gives a drawer zone a 90 mm floor
+ * before sharing out the rest, so a zone's share is its height less that
+ * floor — which is what makes a typed height come out exactly.
+ */
+function withHeights(zones: Section[], heights: Map<string, number>): Section[] {
+  return zones.map((zone) => {
+    const height = heights.get(zone.id);
+    return height === undefined ? zone : { ...zone, share: Math.max(1, Math.round(height - (zone.kind === "drawers" ? 90 : 0))) };
+  });
+}
+
+/** The bay's zones, top to bottom: its stack, or the bay as one zone. */
+function zonesOf(bay: Bay): Section[] {
+  if (bay.fitting.kind === "stack") return bay.fitting.sections;
+  const fitting = bay.fitting;
+  switch (fitting.kind) {
+    case "hanging": return [{ id: "zone-1", kind: "hanging", share: 1, rails: fitting.rails }];
+    case "drawers": return [{ id: "zone-1", kind: "drawers", share: 1, drawers: fitting.count, ...(fitting.internal ? { internal: true } : {}) }];
+    case "shelves": return [bay.display ? { id: "zone-1", kind: "display", share: 1, count: fitting.count, display: { back: bay.display.back, lighting: bay.display.lighting, ...(bay.display.boardId ? { boardId: bay.display.boardId } : {}) } } : { id: "zone-1", kind: "shelves", share: 1, count: fitting.count }];
+    default: return [{ id: "zone-1", kind: "open", share: 1 }];
+  }
+}
+
+/** Writes zones back: two or more make a stack; one is the bay's own fitting. */
+function writeZones(bay: Bay, sections: Section[]): void {
+  delete bay.doorOverrides;
+  if (sections.length >= 2) {
+    bay.fitting = { kind: "stack", sections: sections.slice(0, 6) };
+    delete bay.display;
+    if (bay.door === "none") bay.door = "hinged";
+    leavesFor(bay);
+    return;
+  }
+  const only = sections[0]!;
+  delete bay.display;
+  if (bay.door === "none") bay.door = "hinged";
+  switch (only.kind) {
+    case "hanging": bay.fitting = { kind: "hanging", rails: only.rails ?? 1, shelfAbove: true }; break;
+    case "drawers": bay.fitting = { kind: "drawers", count: only.drawers ?? 3, ...(only.internal ? { internal: true } : {}) }; break;
+    case "shelves": case "shoes": bay.fitting = { kind: "shelves", count: only.count ?? 3, adjustable: only.kind === "shelves" }; break;
+    case "display": bay.fitting = { kind: "shelves", count: only.count ?? 4, adjustable: true }; bay.display = { ...DISPLAY_DEFAULTS, ...only.display, style: "niche" }; bay.door = "none"; break;
+    default: bay.fitting = { kind: "open" };
+  }
+  leavesFor(bay);
+}
+
+function editZones(spec: DesignSpec, cabinetId: string, bayId: string, edit: (zones: Section[], bay: Bay, cabinet: Cabinet) => Section[] | void): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, cabinetId);
+    const bay = cabinet?.bays.find((entry) => entry.id === bayId);
+    if (!cabinet || !bay) return;
+    const zones = structuredClone(zonesOf(bay));
+    const next = edit(zones, bay, cabinet) ?? zones;
+    if (next.length) writeZones(bay, next);
+  });
+}
+
+/**
+ * A partial opening: the bay divided into closed / open display / closed —
+ * a door over the top, an open zone across the middle, a door over the rest.
+ * What the bay held is kept in the lower closed zone.
+ */
+export function addPartialOpening(spec: DesignSpec, cabinetId: string, bayId: string): DesignSpec {
+  return editZones(spec, cabinetId, bayId, (zones) => {
+    if (zones.length > 1) return [...zones.slice(0, 5), sectionFor("display", freshId("zone"), 2)];
+    const kept = zones[0]!.kind === "display" ? sectionFor("shelves", freshId("zone"), 6) : { ...zones[0]!, id: freshId("zone"), share: 6 };
+    return [sectionFor("door", freshId("zone"), 3), sectionFor("display", freshId("zone"), 3), kept];
+  });
+}
+
+/**
+ * A zone added at the bottom of the bay, a height that suits it — two
+ * drawers, an open shelf, a shoe rack — the zones above giving way in
+ * proportion. Heights are written as the shares, so they are exact.
+ */
+export function addZone(spec: DesignSpec, cabinetId: string, bayId: string, kind: ZoneKind = "shelves"): DesignSpec {
+  const heights = zoneHeightsOf(spec, cabinetId, bayId);
+  const usable = heights.reduce((sum, zone) => sum + zone.height, 0) - spec.carcass.board.thickness;
+  const wanted = kind === "drawers" || kind === "internal_drawers" ? 460 : kind === "display" ? 420 : kind === "shoes" ? 520 : 600;
+  const height = clamp(wanted, 100, Math.max(100, usable - heights.length * 100));
+  const rest = heights.reduce((sum, zone) => sum + zone.height, 0);
+  return editZones(spec, cabinetId, bayId, (zones) => {
+    if (zones.length >= 6) return zones;
+    const added = sectionFor(kind, freshId("zone"), 1);
+    const sized = new Map(zones.map((zone) => [zone.id, ((heights.find((entry) => entry.id === zone.id)?.height ?? 1) / rest) * (usable - height)]));
+    sized.set(added.id, height);
+    return withHeights([...zones, added], sized);
+  });
+}
+
+export function removeZone(spec: DesignSpec, cabinetId: string, bayId: string, sectionId: string): DesignSpec {
+  return editZones(spec, cabinetId, bayId, (zones) => (zones.length <= 1 ? zones : zones.filter((zone) => zone.id !== sectionId)));
+}
+
+export function moveZone(spec: DesignSpec, cabinetId: string, bayId: string, sectionId: string, by: -1 | 1): DesignSpec {
+  return editZones(spec, cabinetId, bayId, (zones) => {
+    const from = zones.findIndex((zone) => zone.id === sectionId);
+    const to = from + by;
+    if (from < 0 || to < 0 || to >= zones.length) return zones;
+    const [zone] = zones.splice(from, 1);
+    zones.splice(to, 0, zone!);
+    return zones;
+  });
+}
+
+/** A zone becomes another kind, keeping its height. */
+export function setZoneKind(spec: DesignSpec, cabinetId: string, bayId: string, sectionId: string, kind: ZoneKind): DesignSpec {
+  return editZones(spec, cabinetId, bayId, (zones) => zones.map((zone) => (zone.id === sectionId ? sectionFor(kind, zone.id, zone.share) : zone)));
+}
+
+/** A zone's count: shelves, rails or drawers, whichever it has. */
+export function setZoneCount(spec: DesignSpec, cabinetId: string, bayId: string, sectionId: string, count: number): DesignSpec {
+  return editZones(spec, cabinetId, bayId, (zones) => zones.map((zone) => {
+    if (zone.id !== sectionId) return zone;
+    if (zone.kind === "hanging") return { ...zone, rails: clamp(count, 1, 2) };
+    if (zone.kind === "drawers") return { ...zone, drawers: clamp(count, 1, 12) };
+    return { ...zone, count: clamp(count, 0, 20) };
+  }));
+}
+
+/** The zones' clear heights, mm, top to bottom, as they will be built. */
+export function zoneHeightsOf(spec: DesignSpec, cabinetId: string, bayId: string): { id: string; floor: number; height: number }[] {
+  const cabinet = find(spec, cabinetId);
+  const bay = cabinet?.bays.find((entry) => entry.id === bayId);
+  if (!cabinet || !bay) return [];
+  const t = spec.carcass.board.thickness;
+  const opening = cabinet.size.height - cabinet.plinthHeight - 2 * t;
+  return sectionBandsOf(zonesOf(bay), cabinet.plinthHeight + t, opening, t).map((band) => ({ id: band.section.id, floor: band.floor, height: band.height }));
+}
+
+/**
+ * One zone to a height in mm; the others give way in proportion, so the
+ * zones still fill the bay. The height is kept to what leaves every other
+ * zone at least 100 mm.
+ */
+export function setZoneHeight(spec: DesignSpec, cabinetId: string, bayId: string, sectionId: string, height: number): DesignSpec {
+  const heights = zoneHeightsOf(spec, cabinetId, bayId);
+  const usable = heights.reduce((sum, zone) => sum + zone.height, 0);
+  const others = heights.filter((zone) => zone.id !== sectionId);
+  if (!others.length || others.length === heights.length) return spec;
+  const target = clamp(Math.round(height), 100, usable - others.length * 100);
+  const rest = others.reduce((sum, zone) => sum + zone.height, 0);
+  return editZones(spec, cabinetId, bayId, (zones) => withHeights(zones, new Map(zones.map((zone) => {
+    const now = heights.find((entry) => entry.id === zone.id)?.height ?? 0;
+    return [zone.id, zone.id === sectionId ? target : (now / rest) * (usable - target)];
+  }))));
+}
+
+// ---- Selecting and resizing an open display --------------------------------
+
+/** The open display a part belongs to, when it belongs to one. */
+export function displayOfPart(spec: DesignSpec, part: { cabinetId?: string; bayId?: string }): DisplayRef | null {
+  const cabinet = part.cabinetId ? find(spec, part.cabinetId) : undefined;
+  if (!cabinet || !part.bayId) return null;
+  for (const bay of cabinet.bays) {
+    if (bay.display && (part.bayId === bay.id || part.bayId.startsWith(`${bay.id}-`))) return { cabinetId: cabinet.id, bayId: bay.id };
+    if (bay.fitting.kind !== "stack") continue;
+    const section = bay.fitting.sections.find((entry) => part.bayId === `${bay.id}-${entry.id}`);
+    if (section?.kind === "display") return { cabinetId: cabinet.id, bayId: bay.id, sectionId: section.id };
+  }
+  return null;
+}
+
+/** Whether a reference still names an open display on the design. */
+export function displayExists(spec: DesignSpec, ref: DisplayRef): boolean {
+  const bay = find(spec, ref.cabinetId)?.bays.find((entry) => entry.id === ref.bayId);
+  if (!bay) return false;
+  if (!ref.sectionId) return Boolean(bay.display);
+  return bay.fitting.kind === "stack" && bay.fitting.sections.some((section) => section.id === ref.sectionId && section.kind === "display");
+}
+
+/** The left edge of each bay's clear opening, in its cabinet's frame. */
+function bayStarts(cabinet: Cabinet, t: number): number[] {
+  let x = t;
+  return cabinet.bays.map((bay) => {
+    const at = x;
+    x += bay.width + t;
+    return at;
+  });
+}
+
+/** The display's opening, in its cabinet's frame (x from the left side, y up from the floor). */
+export function displayRectOf(spec: DesignSpec, ref: DisplayRef): FrontRect | null {
+  const cabinet = find(spec, ref.cabinetId);
+  const index = cabinet?.bays.findIndex((bay) => bay.id === ref.bayId) ?? -1;
+  if (!cabinet || index < 0) return null;
+  const t = spec.carcass.board.thickness;
+  const bay = cabinet.bays[index]!;
+  const x = bayStarts(cabinet, t)[index]!;
+  if (ref.sectionId) {
+    const zone = zoneHeightsOf(spec, cabinet.id, bay.id).find((entry) => entry.id === ref.sectionId);
+    return zone ? { x, y: zone.floor, width: bay.width, height: zone.height } : null;
+  }
+  return { x, y: cabinet.plinthHeight + t, width: bay.width, height: cabinet.size.height - cabinet.plinthHeight - 2 * t };
+}
+
+/**
+ * Which edges of a display can be pulled: a niche's sides (its neighbour
+ * gives or takes the width), a zone's top and bottom (the zone beyond gives
+ * way), a side display's edge away from its own outer end.
+ */
+export function displayEdgesOf(spec: DesignSpec, ref: DisplayRef): ("left" | "right" | "top" | "bottom")[] {
+  const cabinet = find(spec, ref.cabinetId);
+  const index = cabinet?.bays.findIndex((bay) => bay.id === ref.bayId) ?? -1;
+  if (!cabinet || index < 0) return [];
+  if (ref.sectionId) {
+    const bay = cabinet.bays[index]!;
+    const zones = bay.fitting.kind === "stack" ? bay.fitting.sections : [];
+    const at = zones.findIndex((zone) => zone.id === ref.sectionId);
+    return [...(at > 0 ? (["top"] as const) : []), ...(at >= 0 && at < zones.length - 1 ? (["bottom"] as const) : [])];
+  }
+  if (cabinet.bays[index]!.display?.style === "side") return ["right"];
+  return [...(index > 0 ? (["left"] as const) : []), ...(index < cabinet.bays.length - 1 ? (["right"] as const) : [])];
+}
+
+/**
+ * A display's edge pulled to where `rect` puts it. A niche's side moves the
+ * boundary with the bay beside it, and only that bay changes; a zone's top
+ * or bottom moves the boundary with the zone beyond; a side display's width
+ * changes as a cabinet's does, the wardrobe moving along with it.
+ */
+export function resizeDisplayEdge(spec: DesignSpec, ref: DisplayRef, edge: "left" | "right" | "top" | "bottom", rect: FrontRect): DesignSpec {
+  const cabinet = find(spec, ref.cabinetId);
+  const index = cabinet?.bays.findIndex((bay) => bay.id === ref.bayId) ?? -1;
+  if (!cabinet || index < 0 || !displayEdgesOf(spec, ref).includes(edge)) return spec;
+  const t = spec.carcass.board.thickness;
+  const bay = cabinet.bays[index]!;
+  if (bay.display?.style === "side") return resizeCabinet(spec, cabinet.id, { width: Math.round(rect.width + 2 * t) });
+
+  if (ref.sectionId) {
+    const zones = zoneHeightsOf(spec, cabinet.id, bay.id);
+    const at = zones.findIndex((zone) => zone.id === ref.sectionId);
+    const beyond = zones[edge === "top" ? at - 1 : at + 1];
+    const zone = zones[at];
+    if (!zone || !beyond) return spec;
+    const pair = zone.height + beyond.height;
+    const height = clamp(Math.round(rect.height), 100, pair - 100);
+    return editZones(spec, cabinet.id, bay.id, (sections) => withHeights(sections, new Map(sections.map((section) => {
+      const now = zones.find((entry) => entry.id === section.id)?.height ?? 1;
+      return [section.id, section.id === zone.id ? height : section.id === beyond.id ? pair - height : now];
+    }))));
+  }
+
+  const neighbour = cabinet.bays[edge === "left" ? index - 1 : index + 1];
+  if (!neighbour) return spec;
+  const pair = bay.width + neighbour.width;
+  const floor = bayFloor(spec);
+  const width = clamp(Math.round(rect.width), floor, pair - floor);
+  return change(spec, (draft) => {
+    const target = find(draft, cabinet.id)!;
+    const own = target.bays[index]!;
+    const other = target.bays.find((entry) => entry.id === neighbour.id)!;
+    own.width = width;
+    other.width = pair - width;
+    leavesFor(other);
+    delete other.doorOverrides;
+  });
+}
+
+/**
+ * Where a display's dragged edge can land: the wardrobe's sides and centre
+ * line, the bay boundaries and partitions, shelf levels and the top of the
+ * carcass, and — for a niche — the places that would centre it.
+ */
+export function displaySnapTargetsOf(spec: DesignSpec, ref: DisplayRef): { x: number[]; y: number[] } {
+  const cabinet = find(spec, ref.cabinetId);
+  const rect = displayRectOf(spec, ref);
+  if (!cabinet || !rect) return { x: [], y: [] };
+  const fronts = cabinetFronts(spec, cabinet);
+  const targets = doorSnapTargets({ cabinet: cabinet.size, gap: 0, boards: cabinetFaceBoards(spec, cabinet), others: [...fronts.drawers, ...fronts.leaves], row: null });
+  const middle = cabinet.size.width / 2;
+  targets.x.push(middle - rect.width / 2, middle + rect.width / 2);
+  for (const zone of zoneHeightsOf(spec, cabinet.id, ref.bayId)) targets.y.push(zone.floor, zone.floor + zone.height);
+  return targets;
 }

@@ -31,15 +31,19 @@ import {
   typingInto,
 } from "../../services/nudge";
 import {
+  displayExists,
   doorLeafOf,
   duplicateCabinet,
+  resizeDisplayEdge,
+  type DisplayRef,
   moveCabinet,
   removeCabinet,
   resizeCabinet,
   setDoorSize,
   type DoorRef,
 } from "../../services/operations";
-import type { FrontRect } from "../../services/door-layout";
+import type { DoorEdge, FrontRect } from "../../services/door-layout";
+import { isSideDisplay } from "../../services/geometry";
 import { Elevation } from "../viewer/elevation";
 import { Plan } from "../viewer/plan";
 import type { DesignSpec } from "../../types/spec";
@@ -123,6 +127,8 @@ export function DesignEditor({
   const [selectedDoor, setSelectedDoor] = useState<DoorRef | null>(null);
   const [snap, setSnap] = useState(true);
   const [doorProblem, setDoorProblem] = useState<string | null>(null);
+  // An open display being edited: a niche, a zone, or a side unit.
+  const [selectedDisplay, setSelectedDisplay] = useState<DisplayRef | null>(null);
   const [selectedSketchId, setSelectedSketchId] = useState<string | null>(null);
   const [sketchEnabled, setSketchEnabled] = useState(spec.sketchMode);
   const [sketchTool, setSketchTool] = useState<SketchTool>("select");
@@ -144,16 +150,39 @@ export function DesignEditor({
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
   const door = selectedDoor && selectedDoor.cabinetId === selectedId && doorLeafOf(spec, selectedDoor) ? selectedDoor : null;
 
-  /** Choosing a cabinet lets go of any door that was being sized. */
+  // A side display is nothing but its display, so selecting it selects that.
+  const display =
+    selectedDisplay && selectedDisplay.cabinetId === selectedId && displayExists(spec, selectedDisplay)
+      ? selectedDisplay
+      : selected && isSideDisplay(selected)
+        ? { cabinetId: selected.id, bayId: selected.bays[0]!.id }
+        : null;
+
+  /** Choosing a cabinet lets go of any door or display that was being edited. */
   function selectCabinet(id: string | null) {
     setSelectedId(id);
     setSelectedDoor(null);
     setDoorProblem(null);
+    setSelectedDisplay(null);
   }
 
   function selectDoor(next: DoorRef | null) {
     setSelectedDoor(next);
     setDoorProblem(null);
+    if (next) setSelectedDisplay(null);
+  }
+
+  function selectDisplay(next: DisplayRef | null) {
+    setSelectedDisplay(next);
+    if (next) {
+      setSelectedId(next.cabinetId);
+      setSelectedDoor(null);
+      setDoorProblem(null);
+    }
+  }
+
+  function resizeDisplay(ref: DisplayRef, edge: DoorEdge, rect: FrontRect) {
+    onChange(resizeDisplayEdge(spec, ref, edge, rect));
   }
 
   /** A door to a new size: kept when it can be built, otherwise the reason why. */
@@ -238,8 +267,9 @@ export function DesignEditor({
           onChange(duplicateCabinet(spec, selected.id));
           return;
         case "deselect":
-          // A door first, then the cabinet it belongs to.
+          // A door or a display first, then the cabinet it belongs to.
           if (door) selectDoor(null);
+          else if (selectedDisplay) setSelectedDisplay(null);
           else selectCabinet(null);
           return;
       }
@@ -302,6 +332,9 @@ export function DesignEditor({
               onSelectDoor={selectDoor}
               onDoorResize={resizeDoor}
               snap={snap}
+              selectedDisplay={display}
+              onSelectDisplay={selectDisplay}
+              onDisplayResize={resizeDisplay}
               onSelectCabinet={(id) => {
                 selectCabinet(id);
                 if (id) setSelectedSketchId(null);
@@ -395,6 +428,9 @@ export function DesignEditor({
                   onSelectDoor={selectDoor}
                   onDoorResize={resizeDoor}
                   snap={snap}
+                  selectedDisplay={display}
+                  onSelectDisplay={selectDisplay}
+                  onDisplayResize={resizeDisplay}
                 />
               )}
             </div>
@@ -650,6 +686,8 @@ export function DesignEditor({
           onSnapChange={setSnap}
           doorProblem={doorProblem}
           onDoorProblem={setDoorProblem}
+          display={display}
+          onSelectDisplay={selectDisplay}
         />
       </div>
     </div>

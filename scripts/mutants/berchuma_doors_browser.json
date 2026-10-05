@@ -14,8 +14,8 @@
  {
   "name": "elevation drag ignores snap",
   "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
-  "from": "    const result = dragDoorEdge(state.start, state.edge, value, { targets: state.targets, snap, tolerance: Math.max(5, 10 * mmPerPixel) });",
-  "to": "    const result = dragDoorEdge(state.start, state.edge, value, { targets: state.targets, snap: false, tolerance: Math.max(5, 10 * mmPerPixel) });"
+  "from": "const result = dragDoorEdge(state.start, state.edge, value, { targets: state.targets, snap, tolerance: Math.min(25, Math.max(5, 6 * mmPerPixel)) });",
+  "to": "const result = dragDoorEdge(state.start, state.edge, value, { targets: state.targets, snap: false, tolerance: Math.min(25, Math.max(5, 6 * mmPerPixel)) });"
  },
  {
   "name": "no live size in the elevation",

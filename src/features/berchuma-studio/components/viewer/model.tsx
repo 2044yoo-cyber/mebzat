@@ -11,7 +11,18 @@ import { CabinetHandles, DimensionLabel, type DragChange } from "./handles";
 import { CabinetDimensionLines } from "./dimensions";
 import { DoorHandles } from "./door-handles";
 import type { FrontRect } from "../../services/door-layout";
-import { doorLeafOf, doorSnapTargetsOf, type DoorRef } from "../../services/operations";
+import {
+  displayEdgesOf,
+  displayOfPart,
+  displayRectOf,
+  displaySnapTargetsOf,
+  doorLeafOf,
+  doorSnapTargetsOf,
+  type DisplayRef,
+  type DoorRef,
+} from "../../services/operations";
+import type { DoorEdge } from "../../services/door-layout";
+import { constructionMaterials } from "../../services/wardrobe-materials";
 import { cabinetDimensions } from "../../services/interior-dimensions";
 import {
   bayDimensionsWorthDrawing,
@@ -68,6 +79,9 @@ export default function Model({
   onSelectDoor,
   onDoorResize,
   snap = true,
+  selectedDisplay = null,
+  onSelectDisplay,
+  onDisplayResize,
 }: {
   spec: DesignSpec;
   /** Takes the doors and drawer fronts off, to show what is inside. */
@@ -93,14 +107,20 @@ export default function Model({
   onDoorResize?: (door: DoorRef, rect: FrontRect) => void;
   /** Whether a dragged door edge snaps to the boards and fronts near it. */
   snap?: boolean;
+  /** An open display of the selected cabinet: tapped once the cabinet is selected. */
+  selectedDisplay?: DisplayRef | null;
+  onSelectDisplay?: (display: DisplayRef | null) => void;
+  /** An edge of the selected display pulled to here, in its cabinet's frame. */
+  onDisplayResize?: (display: DisplayRef, edge: DoorEdge, rect: FrontRect) => void;
 }) {
   // Every part, fronts included: the dimensions measure the drawer fronts
   // even while they are taken off to show what is inside.
   const allParts = useMemo(() => visibleKitchenParts(buildParts(spec).parts, hideCountertop), [spec, hideCountertop]);
   const parts = useMemo(() => {
     if (!hideFronts) return allParts;
+    // Internal drawers' inner fronts are inside: they stay.
     return allParts.filter(
-      (part) => part.role !== "door" && part.role !== "drawer_front",
+      (part) => part.role !== "door" && !(part.role === "drawer_front" && !part.internal),
     );
   }, [allParts, hideFronts]);
 
@@ -140,6 +160,9 @@ export default function Model({
   const doorLeaf = useMemo(() => (selectedDoor ? doorLeafOf(spec, selectedDoor) : null), [spec, selectedDoor]);
   const doorTargets = useMemo(() => (selectedDoor && doorLeaf ? doorSnapTargetsOf(spec, selectedDoor) : null), [spec, selectedDoor, doorLeaf]);
   const frontThickness = allParts.find((part) => part.role === "door")?.size.z ?? 18;
+  const displayRect = useMemo(() => (selectedDisplay ? displayRectOf(spec, selectedDisplay) : null), [spec, selectedDisplay]);
+  const displayTargets = useMemo(() => (selectedDisplay && displayRect ? displaySnapTargetsOf(spec, selectedDisplay) : null), [spec, selectedDisplay, displayRect]);
+  const displayEdges = useMemo(() => (selectedDisplay ? displayEdgesOf(spec, selectedDisplay) : []), [spec, selectedDisplay]);
 
   // Orbiting and dragging an edge are both "the pointer moved", so one of them
   // has to stand down. Without this, pulling a cabinet wider also swung the
@@ -231,8 +254,15 @@ export default function Model({
                           onSelectDoor({ cabinetId: part.cabinetId!, bayId: part.bayId, run: part.doorLeaf.run, leaf: part.doorLeaf.first + index });
                           return;
                         }
+                        // Likewise a part of an open display: its shelves, its back.
+                        const display = onSelectDisplay && part.cabinetId === selectedCabinetId ? displayOfPart(spec, part) : null;
+                        if (display) {
+                          onSelectDisplay!(display);
+                          return;
+                        }
                         onSelectCabinet(part.cabinetId!);
                         onSelectDoor?.(null);
+                        onSelectDisplay?.(null);
                       }
                     : // A worktop belongs to a run rather than to one cabinet,
                       // and it covers every base unit under it. Clicking it
@@ -283,7 +313,7 @@ export default function Model({
               cabinet={positionedSelected}
               rotation={selectedPlacement?.rotation ?? 0}
             />
-            {onResize && !doorLeaf && (selectedPlacement?.rotation ?? 0) === 0 ? (
+            {onResize && !doorLeaf && !displayRect && (selectedPlacement?.rotation ?? 0) === 0 ? (
               <CabinetHandles
                 cabinet={positionedSelected}
                 offset={{ x: 0, z: 0 }}
@@ -299,6 +329,17 @@ export default function Model({
                 snap={snap}
                 onDragState={setDragging}
                 onDrag={(rect) => onDoorResize(selectedDoor, rect)}
+              />
+            ) : null}
+            {displayRect && selectedDisplay && displayTargets && onDisplayResize && selectedPlacement && (selectedPlacement.rotation ?? 0) === 0 && selectedDisplay.cabinetId === positionedSelected.id ? (
+              <DoorHandles
+                rect={displayRect}
+                origin={{ x: selectedPlacement.x, y: selectedPlacement.y, z: -selectedPlacement.z * MM + 0.004 }}
+                targets={displayTargets}
+                snap={snap}
+                edges={displayEdges}
+                onDragState={setDragging}
+                onDrag={(rect, edge) => onDisplayResize(selectedDisplay, edge, rect)}
               />
             ) : null}
             {measured && !dragging && !doorLeaf ? <CabinetDimensionLines dimensions={measured} scale={Math.max(1, reach * 0.5)} /> : null}
@@ -423,8 +464,10 @@ function PartMesh({
         // Lit rather than tinted. Tinting the selection changed what the
         // material looked like, which is the one thing somebody choosing a
         // finish must be able to trust.
-        emissive={doorSelected ? DOOR_GLOW : selected ? SELECTION_GLOW : BLACK}
-        emissiveIntensity={doorSelected ? 0.35 : selected ? 0.22 : 0}
+        // An accent board keeps its true colour when its cabinet is selected:
+        // tinted blue, oak reads as mauve.
+        emissive={part.role === "led" ? LED_GLOW : doorSelected ? DOOR_GLOW : selected && !accentColour(part, spec) ? SELECTION_GLOW : BLACK}
+        emissiveIntensity={part.role === "led" ? 1.4 : doorSelected ? 0.35 : selected && !accentColour(part, spec) ? 0.22 : 0}
       />
     </mesh>
   );
@@ -495,6 +538,7 @@ function boundsWithSketch(spec: DesignSpec) {
 
 const SELECTION_GLOW = new THREE.Color("#4c8dff");
 const DOOR_GLOW = new THREE.Color("#f4a63a");
+const LED_GLOW = new THREE.Color("#ffd27a");
 const BLACK = new THREE.Color("#000000");
 
 /**
@@ -569,11 +613,26 @@ function colourFor(part: Part, spec: DesignSpec): string {
     // which reads as nothing at all.
     case "rail":
       return "#b9bfc6";
+    // A lit LED strip: warm white.
+    case "led":
+      return "#ffe3a3";
     case "drawer_side":
     case "drawer_back":
     default:
-      return boardColour(part.board, spec);
+      return accentColour(part, spec) ?? boardColour(part.board, spec);
   }
+}
+
+/**
+ * An open display's accent board, in its own colour. The studio draws the
+ * wardrobe's own boards in its white working style; a board that is none of
+ * them was chosen to stand out, and drawing it white too would hide the
+ * one thing it was chosen for.
+ */
+function accentColour(part: Part, spec: DesignSpec): string | null {
+  const materials = constructionMaterials(spec);
+  const own = [materials.body, materials.fronts, materials.interior, materials.back, materials.plinth].map((board) => board.id);
+  return own.includes(part.board.id) ? null : part.board.appearance?.hex ?? null;
 }
 
 /** Melamine is not gloss lacquer, and gloss lacquer is not matt foil. */

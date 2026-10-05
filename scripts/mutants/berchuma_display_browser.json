@@ -1,0 +1,122 @@
+[
+ {
+  "name": "Show inside drops the inner fronts",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "(part) => part.role !== \"door\" && !(part.role === \"drawer_front\" && !part.internal),",
+  "to": "(part) => part.role !== \"door\" && part.role !== \"drawer_front\","
+ },
+ {
+  "name": "accent drawn white",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "  return own.includes(part.board.id) ? null : part.board.appearance?.hex ?? null;",
+  "to": "  return own.includes(part.board.id) ? null : null;"
+ },
+ {
+  "name": "LED not lit",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "emissiveIntensity={part.role === \"led\" ? 1.4 :",
+  "to": "emissiveIntensity={part.role === \"led\" ? 0 :"
+ },
+ {
+  "name": "Internal Drawers makes exterior ones",
+  "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+  "from": "{ id: \"internal\", label: \"Internal Drawers\", pick: () => onChange(setBayInternalDrawers(plain(fittingFor(\"drawers\")), cabinet.id, bay.id, true)) },",
+  "to": "{ id: \"internal\", label: \"Internal Drawers\", pick: () => onChange(setBayInternalDrawers(plain(fittingFor(\"drawers\")), cabinet.id, bay.id, false)) },"
+ },
+ {
+  "name": "Open Display does not select it",
+  "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+  "from": "        onSelectDisplay({ cabinetId: cabinet.id, bayId: bay.id });\n      },",
+  "to": "      },"
+ },
+ {
+  "name": "material picker does nothing",
+  "file": "src/features/berchuma-studio/components/editor/display-panel.tsx",
+  "from": "<MaterialPicker spec={spec} value={look.boardId} onChange={(boardId) => update({ boardId })} />",
+  "to": "<MaterialPicker spec={spec} value={look.boardId} onChange={() => undefined} />"
+ },
+ {
+  "name": "lighting chips do nothing",
+  "file": "src/features/berchuma-studio/components/editor/display-panel.tsx",
+  "from": "onClick={() => update({ lighting: light })}",
+  "to": "onClick={() => undefined}"
+ },
+ {
+  "name": "type switch does nothing",
+  "file": "src/features/berchuma-studio/components/editor/display-panel.tsx",
+  "from": "onClick={() => convert(entry.id)}",
+  "to": "onClick={() => undefined}"
+ },
+ {
+  "name": "Closed door does nothing",
+  "file": "src/features/berchuma-studio/components/editor/display-panel.tsx",
+  "from": "<Action icon={DoorClosed} label=\"Closed door\" onClick={close} />",
+  "to": "<Action icon={DoorClosed} label=\"Closed door\" onClick={() => undefined} />"
+ },
+ {
+  "name": "side display always on the right",
+  "file": "src/features/berchuma-studio/components/editor/display-panel.tsx",
+  "from": "selectNew(addSideDisplay(spec, wardrobe.id, { side, width, depth, shelves }));",
+  "to": "selectNew(addSideDisplay(spec, wardrobe.id, { side: \"right\", width, depth, shelves }));"
+ },
+ {
+  "name": "shelf count ignored",
+  "file": "src/features/berchuma-studio/components/editor/display-panel.tsx",
+  "from": "selectNew(addSideDisplay(spec, wardrobe.id, { side, width, depth, shelves }));",
+  "to": "selectNew(addSideDisplay(spec, wardrobe.id, { side, width, depth }));"
+ },
+ {
+  "name": "Try another does nothing",
+  "file": "src/features/berchuma-studio/components/editor/display-panel.tsx",
+  "from": "onClick={() => setIdeaIndex((index) => index + 1)}",
+  "to": "onClick={() => undefined}"
+ },
+ {
+  "name": "No thanks does nothing",
+  "file": "src/features/berchuma-studio/components/editor/display-panel.tsx",
+  "from": "<Action icon={Trash2} label=\"No thanks\" onClick={() => setDismissed(true)} />",
+  "to": "<Action icon={Trash2} label=\"No thanks\" onClick={() => undefined} />"
+ },
+ {
+  "name": "no preview on the recommendation",
+  "file": "src/features/berchuma-studio/components/editor/display-panel.tsx",
+  "from": "aria-label=\"Preview\"><Elevation spec={idea.spec} /></div>",
+  "to": "aria-label=\"Preview\"></div>"
+ },
+ {
+  "name": "facade option does nothing",
+  "file": "src/features/berchuma-studio/components/editor/display-panel.tsx",
+  "from": "onClick={() => onChange(option.spec)}",
+  "to": "onClick={() => undefined}"
+ },
+ {
+  "name": "elevation tap on a display selects nothing",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "onClick={onSelectDisplay ? (event) => { event.stopPropagation(); onSelectDisplay(ref); } : undefined}",
+  "to": "onClick={undefined}"
+ },
+ {
+  "name": "elevation shows every handle on a niche",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "                edges={displayEdgesOf(spec, ref)}",
+  "to": "                edges={[\"left\", \"right\", \"top\", \"bottom\"]}"
+ },
+ {
+  "name": "niche drag not applied",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "                onDrag={(next, edge) => onDisplayResize(ref, edge, next)}",
+  "to": "                onDrag={() => undefined}"
+ },
+ {
+  "name": "setup ignores priority",
+  "file": "src/features/berchuma-studio/components/wardrobe-shape-setup.tsx",
+  "from": "wardrobePlan: { priority, ...(shape === \"straight\" ? ends : { leftEnd: \"wall\", rightEnd: \"wall\" }) },",
+  "to": "wardrobePlan: { priority: \"balanced\", ...(shape === \"straight\" ? ends : { leftEnd: \"wall\", rightEnd: \"wall\" }) },"
+ },
+ {
+  "name": "setup forces a display",
+  "file": "src/features/berchuma-studio/components/wardrobe-shape-setup.tsx",
+  "from": "            ...wardrobeShapeDesign({ shape, walls: lengths, depth, height }),",
+  "to": "            ...wardrobeShapeDesign({ shape, walls: lengths, depth, height }), cabinets: wardrobeShapeDesign({ shape, walls: lengths, depth, height }).cabinets.map((cabinet) => ({ ...cabinet, bays: cabinet.bays.map((bay, index) => (index === 0 ? { ...bay, display: { style: \"niche\" as const, back: true, lighting: \"off\" as const } } : bay)) })),"
+ }
+]

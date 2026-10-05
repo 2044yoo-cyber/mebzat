@@ -5,7 +5,7 @@ import type {
   Part,
   PartsBreakdown,
 } from "../types/parts";
-import { findHardware } from "../types/catalogue";
+import { findBoard, findHardware } from "../types/catalogue";
 import {
   cornerHardware,
   cornerParts,
@@ -34,8 +34,10 @@ import {
 } from "./wardrobe-plinth";
 import type {
   Bay,
+  Board,
   Cabinet,
   DesignSpec,
+  DisplayOptions,
   Hardware,
   StackSection,
 } from "../types/spec";
@@ -81,6 +83,14 @@ export { WARDROBE_PLINTH_VISIBLE_RECESS } from "./wardrobe-plinth";
 const RAIL_DROP = 45;
 /** The rail stops short of each gable so its sockets have something to sit on. */
 const RAIL_INSET = 12;
+
+/**
+ * How far an internal drawer bank stands behind the carcass's front edge, mm:
+ * clear of the door's hinge cups when the door is shut.
+ */
+export const INTERNAL_DRAWER_SETBACK = 25;
+/** An LED strip's section, mm: an aluminium profile with its diffuser. */
+const LED_SECTION = { width: 12, height: 8 };
 
 const NO_EDGES: BandedEdges = {
   front: false,
@@ -520,7 +530,10 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   const envelope = cabinet.size;
   const bays = cabinet.bays;
   const materials = constructionMaterials(spec);
-  const board = materials.body;
+  // A side display is a shelving unit of its own, its whole carcass the
+  // display: cut from its accent board when it has one.
+  const sideDisplay = isSideDisplay(cabinet) ? cabinet.bays[0]!.display! : null;
+  const board = sideDisplay?.boardId ? displayBoard(spec, sideDisplay) : materials.body;
   const bodyBand = edgeBandForConstructionBoard(spec, board, carcass.edgeBand);
   const backBand = edgeBandForConstructionBoard(
     spec,
@@ -638,6 +651,8 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     for (const [index, bay] of bays.entries()) {
       const first = index === 0;
       const last = index === bays.length - 1;
+      // An open display with its back off is open to the wall behind it.
+      const openBacked = bay.display?.back === false;
       /*
        * How wide this piece of back is, which depends on how it is fixed.
        *
@@ -674,7 +689,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       const pieceCount = Math.max(1, Math.ceil(backHeight / maximumLength));
       const nominalLength = Math.ceil(backHeight / pieceCount);
 
-      for (let piece = 0; piece < pieceCount; piece += 1) {
+      for (let piece = 0; piece < pieceCount && !openBacked; piece += 1) {
         const backFloor = plinth + (inset ? t - methods.backGrooveDepth : 0);
         const pieceY = backFloor + piece * nominalLength;
         const length = Math.min(nominalLength, backFloor + backHeight - pieceY);
@@ -790,17 +805,34 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
 /** Whether this cabinet actually generates a proud door or drawer front. */
 function cabinetHasVisibleFronts(cabinet: Cabinet): boolean {
   return cabinet.bays.some((bay) => {
-    if (bay.fitting.kind === "drawers") return true;
+    if (bay.display) return false;
+    if (bay.fitting.kind === "drawers" && !bay.fitting.internal) return true;
     if (bay.fitting.kind !== "stack") return bay.door !== "none";
 
     const hasDrawers = bay.fitting.sections.some(
-      (section) => section.kind === "drawers",
+      (section) => section.kind === "drawers" && !section.internal,
     );
     const hasDoorableSection = bay.fitting.sections.some(
-      (section) => section.kind !== "drawers",
+      (section) => doorSection(section),
     );
     return hasDrawers || (bay.door !== "none" && hasDoorableSection);
   });
+}
+
+/**
+ * Whether a zone of a stacked bay sits behind the bay's door. Exterior
+ * drawers have fronts of their own and an open display has nothing over it;
+ * everything else — internal drawers included — is closed by the door.
+ */
+export function doorSection(section: Pick<StackSection, "kind" | "internal">): boolean {
+  if (section.kind === "display") return false;
+  if (section.kind === "drawers") return section.internal === true;
+  return true;
+}
+
+/** A shelving unit beside a wardrobe, every bay of it an open display. */
+export function isSideDisplay(cabinet: Cabinet): boolean {
+  return cabinet.bays.length > 0 && cabinet.bays.every((bay) => bay.display?.style === "side");
 }
 
 /** Divider centre lines are safe structural joints for long horizontal boards. */
@@ -838,8 +870,17 @@ function bayParts(input: {
   y: number;
   interiorHeight: number;
   interiorDepth: number;
+  /**
+   * An open display zone of a stacked bay. A whole-bay display comes from the
+   * bay's own `display`; a zone of a stack is passed here, `partial` marking
+   * that the carcass back behind it is shared with the closed zones.
+   */
+  zoneDisplay?: (DisplayOptions & { partial: boolean }) | null;
+  /** What a shelf is called here — "Shoe shelf" in a shoe zone. */
+  shelfLabel?: string;
 }): Part[] {
   const { spec, bay, bayName, x, y, interiorHeight, interiorDepth } = input;
+  const zone = input.zoneDisplay ?? (bay.display ? { ...bay.display, partial: false } : null);
   const materials = constructionMaterials(spec);
   const board = materials.interior;
   const interiorBand = edgeBandForConstructionBoard(
@@ -867,38 +908,47 @@ function bayParts(input: {
     heights: number[],
     note: string,
     adjustable = false,
+    // An open display's shelves are cut from its accent board, and stop at
+    // its own back rather than the carcass's.
+    shelfBoard = board,
+    shelfDepth = interiorDepth - setback,
+    shelfBand = interiorBand,
   ): Part => ({
     id,
     role: "shelf",
     label: note,
     bayId: bay.id,
-    board,
+    board: shelfBoard,
     length: bay.width,
     // A shelf stops short of the front edge and short of the back panel.
-    width: interiorDepth - setback,
+    width: shelfDepth,
     quantity: heights.length,
     edges: { ...NO_EDGES, front: true },
-    edgeBand: interiorBand,
+    edgeBand: shelfBand,
     adjustable,
     placements: heights.map((shelfY) => ({ x, y: shelfY, z: setback })),
-    size: { x: bay.width, y: board.thickness, z: interiorDepth - setback },
+    size: { x: bay.width, y: shelfBoard.thickness, z: shelfDepth },
     axis: "y",
   });
 
   switch (bay.fitting.kind) {
     case "shelves": {
-      if (bay.fitting.count > 0) {
-        // n shelves make n + 1 spaces, equal and clear of the boards — the top
-        // one below the ceiling of the bay rather than against it.
-        parts.push(
-          shelf(
-            `${bay.id}-shelf`,
-            evenShelfHeights(bay.fitting.count, y, interiorHeight, board.thickness),
-            `Shelf${bayName}${bay.fitting.adjustable ? "" : " (fixed)"}`,
-            bay.fitting.adjustable,
-          ),
-        );
+      if (!zone) {
+        if (bay.fitting.count > 0) {
+          // n shelves make n + 1 spaces, equal and clear of the boards — the top
+          // one below the ceiling of the bay rather than against it.
+          parts.push(
+            shelf(
+              `${bay.id}-shelf`,
+              evenShelfHeights(bay.fitting.count, y, interiorHeight, board.thickness),
+              `${input.shelfLabel ?? "Shelf"}${bayName}${bay.fitting.adjustable ? "" : " (fixed)"}`,
+              bay.fitting.adjustable,
+            ),
+          );
+        }
+        break;
       }
+      parts.push(...displayParts({ spec, bay, bayName, x, y, interiorHeight, interiorDepth, zone, count: bay.fitting.count, adjustable: bay.fitting.adjustable, shelf }));
       break;
     }
 
@@ -976,16 +1026,27 @@ function bayParts(input: {
     }
 
     case "drawers": {
+      // Behind the doors: packers on both sides bring the runners clear of
+      // the hinge plates, the bank stands back from the front edge, and each
+      // drawer is closed by a plain inner front.
+      const internal = bay.fitting.internal === true;
+      const innerBoard = internal ? (findBoard(bay.fitting.frontBoardId ?? "") ?? board) : board;
+      const packer = internal ? board.thickness : 0;
+      const innerSetback = internal ? INTERNAL_DRAWER_SETBACK + innerBoard.thickness : 0;
+      const openingWidth = bay.width - 2 * packer;
+      const usableDepth = internal
+        ? Math.min(interiorDepth - innerSetback, bay.fitting.boxDepth ? bay.fitting.boxDepth + 50 : Number.POSITIVE_INFINITY)
+        : interiorDepth;
       const construction = drawerConstructionFor(
         spec,
-        bay.width,
+        openingWidth,
         interiorHeight,
         y,
-        interiorDepth,
+        usableDepth,
         bay.fitting.count,
         bay.fitting.frontHeights,
       );
-      const boxX = x + construction.sideClearance;
+      const boxX = x + packer + construction.sideClearance;
 
       for (const [i, face] of construction.faces.entries()) {
         const sideHeight = construction.sideHeights[i] ?? 0;
@@ -1005,11 +1066,11 @@ function bayParts(input: {
           edgeBand: interiorBand,
           // Left and right, a runner's clearance inside the opening.
           placements: [
-            { x: boxX, y: sideFloor, z: construction.frontSetback },
+            { x: boxX, y: sideFloor, z: innerSetback + construction.frontSetback },
             {
               x: boxX + construction.boxWidth - board.thickness,
               y: sideFloor,
-              z: construction.frontSetback,
+              z: innerSetback + construction.frontSetback,
             },
           ],
           size: {
@@ -1036,12 +1097,13 @@ function bayParts(input: {
             {
               x: boxX + board.thickness,
               y: sideFloor,
-              z: construction.frontSetback,
+              z: innerSetback + construction.frontSetback,
             },
             {
               x: boxX + board.thickness,
               y: sideFloor,
               z:
+                innerSetback +
                 construction.frontSetback +
                 construction.boxDepth -
                 board.thickness,
@@ -1070,7 +1132,7 @@ function bayParts(input: {
             {
               x: boxX,
               y: boxFloor,
-              z: construction.frontSetback,
+              z: innerSetback + construction.frontSetback,
             },
           ],
           size: {
@@ -1080,6 +1142,49 @@ function bayParts(input: {
           },
           axis: "y",
         });
+      }
+      if (internal) {
+        const innerBand = edgeBandForConstructionBoard(spec, innerBoard, spec.carcass.edgeBand);
+        const gap = spec.carcass.doorGap;
+        const bankDepth = innerSetback + construction.frontSetback + construction.boxDepth - INTERNAL_DRAWER_SETBACK;
+        // The packers: a strip of board on each side for the runners to
+        // screw to, the bank's height and depth.
+        parts.push({
+          id: `${bay.id}-drawer-packers`,
+          role: "drawer_side",
+          label: `Runner packer${bayName}`,
+          bayId: bay.id,
+          board,
+          length: Math.round(interiorHeight),
+          width: Math.round(bankDepth),
+          quantity: 2,
+          edges: { ...NO_EDGES, front: true },
+          edgeBand: interiorBand,
+          placements: [
+            { x, y, z: INTERNAL_DRAWER_SETBACK },
+            { x: x + bay.width - packer, y, z: INTERNAL_DRAWER_SETBACK },
+          ],
+          size: { x: packer, y: Math.round(interiorHeight), z: Math.round(bankDepth) },
+          axis: "x",
+        });
+        for (const [i, face] of construction.faces.entries()) {
+          parts.push({
+            id: `${bay.id}-drawer-${i}-inner-front`,
+            role: "drawer_front",
+            internal: true,
+            label: `Inner drawer front ${i + 1}${bayName}`,
+            bayId: bay.id,
+            board: innerBoard,
+            length: face.height,
+            width: openingWidth - 2 * gap,
+            quantity: 1,
+            edges: { front: true, back: true, top: true, bottom: true },
+            edgeBand: innerBand,
+            placements: [{ x: x + packer + gap, y: face.floor, z: INTERNAL_DRAWER_SETBACK }],
+            size: { x: openingWidth - 2 * gap, y: face.height, z: innerBoard.thickness },
+            axis: "z",
+          });
+        }
       }
       break;
     }
@@ -1116,7 +1221,10 @@ function bayParts(input: {
               // in the viewer's keys or on the cut list.
               id: `${bay.id}-${section.id}`,
               fitting: sectionFitting(section),
+              display: undefined,
             },
+            zoneDisplay: section.kind === "display" ? { back: true, lighting: "off", ...section.display, partial: true } : null,
+            shelfLabel: section.kind === "shoes" ? "Shoe shelf" : undefined,
             // The enclosing bay's name, carried down unchanged: a drawer in
             // the lower half of bay 2 is still in bay 2. The synthetic id
             // above exists so two sections cannot collide in the viewer's
@@ -1165,6 +1273,97 @@ function bayParts(input: {
       break;
   }
 
+  return parts;
+}
+
+/** The board an open display shows: its accent board, or the wardrobe's interior. */
+export function displayBoard(spec: DesignSpec, display: { boardId?: string } | null | undefined): Board {
+  return (display?.boardId ? findBoard(display.boardId) : undefined) ?? constructionMaterials(spec).interior;
+}
+
+/**
+ * An open display, as parts: its shelves in its own board, a back panel of
+ * its own when it has one in another board or at another depth, and its LED
+ * strips. A display that is a whole bay keeps the carcass back behind it
+ * unless its back is off (see cabinetParts); a zone of a stacked bay shares
+ * the carcass back with the closed zones, so its own back is a panel in front.
+ */
+function displayParts(input: {
+  spec: DesignSpec;
+  bay: Bay;
+  bayName: string;
+  x: number;
+  y: number;
+  interiorHeight: number;
+  interiorDepth: number;
+  zone: DisplayOptions & { partial: boolean };
+  count: number;
+  adjustable: boolean;
+  shelf: (id: string, heights: number[], note: string, adjustable: boolean, board: Board, depth: number, band: Part["edgeBand"]) => Part;
+}): Part[] {
+  const { spec, bay, bayName, x, y, interiorHeight, interiorDepth, zone, count } = input;
+  const parts: Part[] = [];
+  const accent = displayBoard(spec, zone);
+  const band = edgeBandForConstructionBoard(spec, accent, spec.carcass.edgeBand);
+  const setback = spec.carcass.shelfSetback;
+  // Where the display's back stands, from the front edge.
+  const backAt = zone.depth ? Math.min(zone.depth, interiorDepth) : interiorDepth;
+  const ownBack = zone.back && (Boolean(zone.boardId) || zone.depth !== undefined);
+  const backThickness = ownBack ? accent.thickness : 0;
+  const shelfDepth = Math.max(50, backAt - backThickness - setback);
+  const heights = evenShelfHeights(count, y, interiorHeight, accent.thickness);
+
+  if (count > 0) parts.push(input.shelf(`${bay.id}-display-shelf`, heights, `Display shelf${bayName}`, input.adjustable, accent, shelfDepth, band));
+  if (ownBack) {
+    parts.push({
+      id: `${bay.id}-display-back`,
+      role: "back",
+      label: `Display back${bayName}`,
+      bayId: bay.id,
+      board: accent,
+      length: Math.round(interiorHeight),
+      width: Math.round(bay.width),
+      quantity: 1,
+      edges: { ...NO_EDGES },
+      edgeBand: band,
+      placements: [{ x, y, z: backAt - backThickness }],
+      size: { x: Math.round(bay.width), y: Math.round(interiorHeight), z: backThickness },
+      axis: "z",
+    });
+  }
+
+  // The light: a strip under the top, under every shelf, or up both sides.
+  if (zone.lighting !== "off") {
+    const front = setback + 20;
+    const across = Math.max(0, bay.width - 2 * RAIL_INSET);
+    const strips: { length: number; placements: Part["placements"]; size: Part["size"]; axis: Part["axis"] }[] =
+      zone.lighting === "vertical"
+        ? [{ length: Math.round(interiorHeight), axis: "y", size: { x: LED_SECTION.height, y: Math.round(interiorHeight), z: LED_SECTION.width }, placements: [{ x, y, z: front }, { x: x + bay.width - LED_SECTION.height, y, z: front }] }]
+        : [{
+            length: Math.round(across),
+            axis: "x",
+            size: { x: Math.round(across), y: LED_SECTION.height, z: LED_SECTION.width },
+            placements: (zone.lighting === "shelf" && heights.length ? heights : [y + interiorHeight]).map((under) => ({ x: x + RAIL_INSET, y: under - LED_SECTION.height, z: front })),
+          }];
+    for (const [index, strip] of strips.entries()) {
+      parts.push({
+        id: `${bay.id}-display-led${index ? `-${index}` : ""}`,
+        role: "led",
+        label: `LED strip${bayName}, ${zone.lighting === "vertical" ? "vertical" : zone.lighting === "shelf" ? "under the shelves" : "under the top"}`,
+        bayId: bay.id,
+        board: accent,
+        manufacture: "purchased",
+        length: strip.length,
+        width: LED_SECTION.width,
+        quantity: strip.placements.length,
+        edges: { ...NO_EDGES },
+        edgeBand: band,
+        placements: strip.placements,
+        size: strip.size,
+        axis: strip.axis,
+      });
+    }
+  }
   return parts;
 }
 
@@ -1237,21 +1436,24 @@ function railsInBand(rails: number, floor: number, height: number): number[] {
 }
 
 /** One stacked section, as the single-kind fitting the geometry already knows. */
-export function sectionFitting(section: {
-  kind: "hanging" | "shelves" | "drawers" | "open";
-  count?: number;
-  rails?: number;
-  drawers?: number;
-}): Bay["fitting"] {
+export function sectionFitting(section: Omit<StackSection, "id" | "share">): Bay["fitting"] {
   switch (section.kind) {
     case "hanging":
       return { kind: "hanging", rails: section.rails ?? 1, shelfAbove: false };
     case "shelves":
       return { kind: "shelves", count: section.count ?? 2, adjustable: true };
     case "drawers":
-      return { kind: "drawers", count: section.drawers ?? 2 };
+      return section.internal
+        ? { kind: "drawers", count: section.drawers ?? 2, internal: true, boxDepth: section.boxDepth, frontBoardId: section.frontBoardId }
+        : { kind: "drawers", count: section.drawers ?? 2 };
     case "open":
       return { kind: "open" };
+    // An open display zone is shelves on show; its board, back and light come
+    // with the zone (see bayParts).
+    case "display":
+      return { kind: "shelves", count: section.count ?? 1, adjustable: true };
+    case "shoes":
+      return { kind: "shelves", count: section.count ?? 3, adjustable: false };
   }
 }
 
@@ -1374,7 +1576,9 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
       }
     };
 
-    if (bay.fitting.kind === "drawers") {
+    // An open display has no door, whatever the bay's door says.
+    if (bay.display) continue;
+    if (bay.fitting.kind === "drawers" && !bay.fitting.internal) {
       drawerFaces(bay.fitting.count, bay.fitting.frontHeights, openingFloor, opening);
       continue;
     }
@@ -1389,9 +1593,9 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
         run = null;
       };
       for (const band of bands) {
-        if (band.section.kind === "drawers") {
+        if (!doorSection(band.section)) {
           closeRun();
-          drawerFaces(band.section.drawers ?? 2, undefined, band.floor, band.height);
+          if (band.section.kind === "drawers") drawerFaces(band.section.drawers ?? 2, undefined, band.floor, band.height);
           continue;
         }
         const top = band.floor + band.height;
@@ -1568,7 +1772,8 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       }
     };
 
-    if (bay.fitting.kind === "drawers") {
+    if (bay.display) continue;
+    if (bay.fitting.kind === "drawers" && !bay.fitting.internal) {
       // Drawers have fronts, not doors. The fronts cover the opening.
       drawerFronts(
         bay.id,
@@ -1595,8 +1800,10 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         inRun = false;
       };
       for (const band of bands) {
-        if (band.section.kind !== "drawers") { inRun = true; continue; }
+        if (doorSection(band.section)) { inRun = true; continue; }
         closeRun();
+        // An open display zone closes the door run and has no front at all.
+        if (band.section.kind !== "drawers") continue;
         drawerFronts(
           `${bay.id}-${band.section.id}`,
           band.section.drawers ?? 2,
@@ -1648,7 +1855,8 @@ function hardwareFor(
     (fallbackHardware[kind] ? findHardware(fallbackHardware[kind]!) : undefined);
 
   const doors = parts.filter((part) => part.role === "door");
-  const drawerFronts = parts.filter((part) => part.role === "drawer_front");
+  // An inner front behind a door is pulled by a finger-grip, not a handle.
+  const drawerFronts = parts.filter((part) => part.role === "drawer_front" && !part.internal);
   const shelves = parts.filter((part) => part.role === "shelf");
 
   const hingedDoors = doors.filter(
@@ -1770,6 +1978,13 @@ function hardwareFor(
         note: "Front and back rows",
       });
     }
+  }
+
+  // Open-display lighting, by the metre the geometry lays.
+  const ledMetres = parts.filter((part) => part.role === "led").reduce((total, part) => total + (part.length / 1000) * part.quantity, 0);
+  const led = ledMetres > 0 ? (spec.hardware.find((item) => item.id === "led-strip") ?? findHardware("led-strip")) : undefined;
+  if (led) {
+    lines.push({ hardware: led, quantity: round(ledMetres, 2), note: "Open display lighting" });
   }
 
   const sliding = pick("sliding_gear");

@@ -20,6 +20,8 @@ import {
 import { cn } from "@/lib/utils";
 
 import { LengthField, LengthInput } from "../ui/length-field";
+import { DisplayPanel, WardrobeDisplayTools, ZoneEditor } from "./display-panel";
+import { isSideDisplay } from "../../services/geometry";
 
 import { BOARDS, EDGE_BANDS, findBoard, findEdgeBand } from "../../types/catalogue";
 import { KITCHEN_MODULES, MODULE_GROUPS } from "../../services/kitchen-modules";
@@ -55,6 +57,7 @@ import {
   removeCabinet,
   renameCabinet,
   resizeCabinet,
+  setBayDisplay,
   setBayDoor,
   setBayFitting,
   setBayWidth,
@@ -68,6 +71,8 @@ import {
   resetDoorSize,
   setDoorManual,
   setDoorSize,
+  setBayInternalDrawers,
+  type DisplayRef,
   type DoorRef,
 } from "../../services/operations";
 import {
@@ -106,6 +111,9 @@ export type ControlPanelProps = {
   onSnapChange?: (snap: boolean) => void;
   doorProblem?: string | null;
   onDoorProblem?: (problem: string | null) => void;
+  /** An open display of the selected cabinet, being edited. */
+  display?: DisplayRef | null;
+  onSelectDisplay?: (display: DisplayRef | null) => void;
 };
 
 export function ControlPanel({
@@ -119,6 +127,8 @@ export function ControlPanel({
   onSnapChange,
   doorProblem = null,
   onDoorProblem,
+  display = null,
+  onSelectDisplay = () => undefined,
 }: ControlPanelProps) {
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
@@ -160,6 +170,11 @@ export function ControlPanel({
         it on a screen this size.
       */}
       <div className="space-y-3 bg-background/70 p-3 backdrop-blur-xl @4xl/ws:border-l @4xl/ws:border-white/10">
+        {/* The open display being edited, first: it was just tapped. */}
+        {selected && display ? (
+          <DisplayPanel spec={spec} display={display} onChange={onChange} onSelectDisplay={onSelectDisplay} />
+        ) : null}
+
         {/* The door being sized, first: it was just tapped in the drawing. */}
         {selected && door ? (
           <DoorSizing
@@ -196,7 +211,10 @@ export function ControlPanel({
               onChange={onChange}
             /> : null}
             {spec.furnitureType === "kitchen" && selected.kind === "base" ? <SmallButton icon={Layers} label="Add upper cabinet above" onClick={() => onChange(addKitchenUpper(spec, selected.id))} /> : null}
-            <Structure spec={spec} cabinet={selected} onChange={onChange} />
+            {!isSideDisplay(selected) ? <Structure spec={spec} cabinet={selected} onChange={onChange} onSelectDisplay={onSelectDisplay} /> : null}
+            {spec.furnitureType === "wardrobe" ? (
+              <WardrobeDisplayTools spec={spec} cabinet={selected} onChange={onChange} onSelect={onSelect} onSelectDisplay={onSelectDisplay} />
+            ) : null}
             <Components
               spec={spec}
               cabinet={selected}
@@ -546,11 +564,14 @@ function Structure({
   spec,
   cabinet,
   onChange,
+  onSelectDisplay,
 }: {
   spec: DesignSpec;
   cabinet: Cabinet;
   onChange: (next: DesignSpec) => void;
+  onSelectDisplay: (display: DisplayRef | null) => void;
 }) {
+  const wardrobe = spec.furnitureType === "wardrobe";
   return (
     <Section title="Structure" icon={Layers} defaultOpen>
       {cabinet.bays.map((bay, index) => (
@@ -605,7 +626,16 @@ function Structure({
             </p>
           )}
 
-          <div className="flex flex-wrap gap-1">
+          {wardrobe ? (
+            <WardrobeFittings
+              spec={spec}
+              cabinet={cabinet}
+              bay={bay}
+              onChange={onChange}
+              onSelectDisplay={onSelectDisplay}
+            />
+          ) : null}
+          <div className={cn("flex flex-wrap gap-1", wardrobe && "hidden")}>
             {FITTINGS.map((entry) => (
               <button
                 key={entry.id}
@@ -652,6 +682,10 @@ function Structure({
             />
           ) : null}
 
+          {wardrobe ? (
+            <ZoneEditor spec={spec} cabinet={cabinet} bay={bay} onChange={onChange} onSelectDisplay={onSelectDisplay} />
+          ) : null}
+
           {bay.fitting.kind === "drawers" ? (
             <DrawerList
               spec={spec}
@@ -661,7 +695,8 @@ function Structure({
             />
           ) : null}
 
-          <div className="flex flex-wrap gap-1">
+          {/* An open display has no door to choose. */}
+          <div className={cn("flex flex-wrap gap-1", bay.display && "hidden")}>
             {(["hinged", "sliding", "none"] as const).map((door) => (
               <button
                 key={door}
@@ -688,6 +723,75 @@ function Structure({
         onClick={() => onChange(addBay(spec, cabinet.id))}
       />
     </Section>
+  );
+}
+
+/**
+ * What a wardrobe bay is, in the words used for wardrobes: shelves, drawers
+ * on the face, drawers behind the doors, hanging, or an open display with no
+ * door at all. Zones — a bay divided top to bottom — are edited below.
+ */
+function WardrobeFittings({
+  spec,
+  cabinet,
+  bay,
+  onChange,
+  onSelectDisplay,
+}: {
+  spec: DesignSpec;
+  cabinet: Cabinet;
+  bay: Bay;
+  onChange: (next: DesignSpec) => void;
+  onSelectDisplay: (display: DisplayRef | null) => void;
+}) {
+  const kind = bay.display
+    ? "display"
+    : bay.fitting.kind === "drawers"
+      ? bay.fitting.internal ? "internal" : "drawers"
+      : bay.fitting.kind;
+  const plain = (fitting: Bay["fitting"]) => {
+    // Out of a display first, so the bay has its doors again.
+    const closed = bay.display ? setBayDisplay(spec, cabinet.id, bay.id, null) : spec;
+    return setBayFitting(closed, cabinet.id, bay.id, fitting);
+  };
+  const choices: { id: string; label: string; pick: () => void }[] = [
+    { id: "shelves", label: "Shelves", pick: () => onChange(plain(fittingFor("shelves"))) },
+    { id: "drawers", label: "Drawers", pick: () => onChange(setBayInternalDrawers(plain(fittingFor("drawers")), cabinet.id, bay.id, false)) },
+    { id: "internal", label: "Internal Drawers", pick: () => onChange(setBayInternalDrawers(plain(fittingFor("drawers")), cabinet.id, bay.id, true)) },
+    { id: "hanging", label: "Hanging", pick: () => onChange(plain(fittingFor("hanging"))) },
+    {
+      id: "display",
+      label: "Open Display",
+      pick: () => {
+        onChange(setBayDisplay(spec, cabinet.id, bay.id, {}));
+        onSelectDisplay({ cabinetId: cabinet.id, bayId: bay.id });
+      },
+    },
+  ];
+  return (
+    <div className="flex flex-wrap gap-1" role="group" aria-label="Section type">
+      {choices.map((choice) => (
+        <button
+          key={choice.id}
+          type="button"
+          aria-pressed={kind === choice.id}
+          onClick={choice.pick}
+          className={cn(
+            "rounded-md border px-1.5 py-0.5 text-[11px] transition-colors",
+            kind === choice.id
+              ? "border-brand bg-brand text-brand-foreground"
+              : "text-muted-foreground hover:border-brand/50",
+          )}
+        >
+          {choice.label}
+        </button>
+      ))}
+      {bay.display ? (
+        <button type="button" onClick={() => onSelectDisplay({ cabinetId: cabinet.id, bayId: bay.id })} className="rounded-md border px-1.5 py-0.5 text-[11px] text-brand hover:border-brand">
+          Edit display
+        </button>
+      ) : null}
+    </div>
   );
 }
 
