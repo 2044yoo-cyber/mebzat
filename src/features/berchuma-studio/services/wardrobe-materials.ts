@@ -87,14 +87,17 @@ export function edgeBandForConstructionBoard(
 }
 
 /**
- * Neutral modelling colour for the Studio viewport.
+ * Neutral SketchUp-like modelling colour for the Studio viewport.
+ * The cabinet stays clean white, the canvas stays light grey, and the small
+ * display filter lifts Three.js' filmic grey cast without flattening all depth.
  * Material selections remain stored in the spec for manufacturing and pricing.
  */
 export function boardColour(_board: Board, _spec: DesignSpec): string {
   if (typeof document !== "undefined") {
     requestAnimationFrame(() => {
       document.querySelectorAll<HTMLCanvasElement>("canvas").forEach((canvas) => {
-        canvas.style.backgroundColor = "#e5e5e5";
+        canvas.style.backgroundColor = "#eeeeee";
+        canvas.style.filter = "brightness(1.18) contrast(0.94)";
       });
     });
   }
