@@ -35,7 +35,7 @@ import {
   type DoorRef,
 } from "../../services/operations";
 import { findBoard } from "../../types/catalogue";
-import { moduleLabel, modulesOf } from "../../services/transport-modules";
+import { moduleLabel, modulesOf, stackRoleOf } from "../../services/transport-modules";
 import { snapValue } from "../../services/door-layout";
 import type { DisplayOptions } from "../../types/spec";
 import type { Bay, Cabinet, DesignSpec } from "../../types/spec";
@@ -858,7 +858,7 @@ function TransportJoints({
     <g data-transport-joints="">
       {modules.map((module) => (
         <text key={module.index} x={module.from + module.width / 2} y={labelY} textAnchor="middle" dominantBaseline="middle" fontSize={Math.min(56, module.width / 9)} className="fill-foreground/60" pointerEvents="none">
-          {`${moduleLabel(spec, cabinet, module.index, true)} — ${Math.round(module.width)}`}
+          {`${moduleLabel(spec, cabinet, module.index, true)} — ${Math.round(module.width)}${stackRoleOf(spec, cabinet) ? ` × ${Math.round(cabinet.size.height)}` : ""}`}
         </text>
       ))}
       {modules.slice(1).map((module, index) => {
@@ -982,7 +982,9 @@ function HeightPartitions({
         return (
           <g key={lower.id}>
             <line x1={x} x2={x + lower.size.width} y1={at} y2={at} stroke={chosen ? (live?.snapped ? "#16a34a" : "#f4a63a") : "#0ea5e9"} strokeWidth={chosen ? 10 : 6} strokeDasharray="28 18" pointerEvents="none" />
-            {lower.size.width >= 600 ? (
+            {/* With width modules each is already named with its width and
+                height; on its own the division names its two modules here. */}
+            {lower.size.width >= 600 && modulesOf(lower).length < 2 ? (
               <>
                 <text x={x + lower.size.width - 30} y={at - 30} textAnchor="end" fontSize={label} className="fill-foreground/60" pointerEvents="none">{`Upper module — ${Math.round(total - lowerHeight)}`}</text>
                 <text x={x + lower.size.width - 30} y={at + 30 + label} textAnchor="end" fontSize={label} className="fill-foreground/60" pointerEvents="none">{`Lower module — ${Math.round(lowerHeight)}`}</text>

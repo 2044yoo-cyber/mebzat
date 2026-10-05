@@ -1,0 +1,92 @@
+[
+ {
+  "name": "decision hides the reason",
+  "file": "src/features/berchuma-studio/components/wardrobe-construction.tsx",
+  "from": "A {Math.round(space.height)} mm wardrobe in one carcass needs a {single.length} mm {single.label}; the selected board is {single.board.sheet.length} mm.",
+  "to": "One carcass is not possible."
+ },
+ {
+  "name": "no long-sheet offer",
+  "file": "src/features/berchuma-studio/components/wardrobe-construction.tsx",
+  "from": "    const longer = plan.singleFits ? null : sheetVariants(boardId).find(",
+  "to": "    const longer = true ? null : sheetVariants(boardId).find("
+ },
+ {
+  "name": "sheet chips not offered",
+  "file": "src/features/berchuma-studio/components/wardrobe-construction.tsx",
+  "from": "        {sheets.map((board) => (",
+  "to": "        {sheets.slice(0, 1).map((board) => ("
+ },
+ {
+  "name": "first module height ignored",
+  "file": "src/features/berchuma-studio/components/wardrobe-construction.tsx",
+  "from": "onChange={(lowerHeight) => set({ lowerHeight })}",
+  "to": "onChange={() => undefined}"
+ },
+ {
+  "name": "width customisation lost",
+  "file": "src/features/berchuma-studio/components/wardrobe-construction.tsx",
+  "from": "    onChange({ ...construction, joints: next.slice(0, -1).map((width) => (at += width)) });",
+  "to": "    onChange({ ...construction });"
+ },
+ {
+  "name": "review hides heights",
+  "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
+  "from": "plan.plan.modules.length === 1 ? `Single ${Math.round(plan.plan.modules[0]!)} mm` : plan.plan.modules.map(Math.round).join(\" + \")}</dd>",
+  "to": "\"\"}</dd>"
+ },
+ {
+  "name": "built without joints",
+  "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
+  "from": "joints: construction.joints ?? undefined }",
+  "to": "joints: undefined }"
+ },
+ {
+  "name": "partition not tappable",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "              onClick={onSelect ? (event) => { event.stopPropagation(); onSelect(lower.id); } : undefined}",
+  "to": "              onClick={undefined}"
+ },
+ {
+  "name": "drag does nothing",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "    onMove(state.lowerId, lower);",
+  "to": ""
+ },
+ {
+  "name": "no live heights",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "                {`Lower ${Math.round(live.lower)} · Upper ${Math.round(total - live.lower)}`}",
+  "to": "                {\"\"}"
+ },
+ {
+  "name": "handle while locked",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "            {chosen && onMove && !locked ? (",
+  "to": "            {chosen && onMove ? ("
+ },
+ {
+  "name": "upper typed moves nothing",
+  "file": "src/features/berchuma-studio/components/editor/height-modules-panel.tsx",
+  "from": "onChange={(value) => onChange(setUpperModuleHeight(spec, lower.id, value))}",
+  "to": "onChange={() => undefined}"
+ },
+ {
+  "name": "overall typed ignored",
+  "file": "src/features/berchuma-studio/components/editor/height-modules-panel.tsx",
+  "from": "onChange={(value) => onChange(setOverallHeight(spec, lower.id, value))}",
+  "to": "onChange={() => undefined}"
+ },
+ {
+  "name": "reset not offered",
+  "file": "src/features/berchuma-studio/components/editor/height-modules-panel.tsx",
+  "from": "onClick={() => onChange(resetHeightModules(spec, lower.id))}",
+  "to": "onClick={() => undefined}"
+ },
+ {
+  "name": "module labels without height",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "${stackRoleOf(spec, cabinet) ? ` × ${Math.round(cabinet.size.height)}` : \"\"}",
+  "to": ""
+ }
+]

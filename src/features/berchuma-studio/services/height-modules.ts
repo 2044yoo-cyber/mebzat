@@ -41,7 +41,8 @@ export type HeightPlan = {
   problems: string[];
 };
 
-function fits(part: Part, trim = DEFAULT_TRIM): boolean {
+/** Whether a part can be cut from its sheet: as it lies, or turned where the board has no grain. */
+export function partFits(part: Pick<Part, "length" | "width" | "board">, trim = DEFAULT_TRIM): boolean {
   const length = part.board.sheet.length - 2 * trim;
   const width = part.board.sheet.width - 2 * trim;
   if (part.length <= length && part.width <= width) return true;
@@ -69,7 +70,7 @@ function noun(part: Part): string {
  * stacked, on no plinth.
  */
 export function moduleFit(spec: DesignSpec, cabinetId: string, height: number, upper = false): ModuleFit {
-  const misfitsAt = (at: number): Part[] | null => {
+  const partsAt = (at: number): Part[] | null => {
     const draft = structuredClone(spec);
     const cabinet = draft.cabinets.find((entry) => entry.id === cabinetId);
     if (!cabinet) return null;
@@ -78,18 +79,24 @@ export function moduleFit(spec: DesignSpec, cabinetId: string, height: number, u
     // Only this cabinet is made; whatever stands on it is another carcass.
     draft.cabinets = [cabinet];
     try {
-      return buildParts(draft).parts.filter((part) => part.manufacture !== "purchased" && !fits(part));
+      return buildParts(draft).parts.filter((part) => part.manufacture !== "purchased");
     } catch {
       return null;
     }
   };
-  const misfits = misfitsAt(height);
-  if (!misfits) return { ok: false, misfit: null };
-  // A part that is too long whatever the height — a plinth along a very wide
-  // carcass — is not this question's answer: the height is judged on what
-  // the height changes.
-  const regardless = new Set((misfitsAt(MIN_HEIGHT_MODULE * 2) ?? []).map((part) => part.id));
-  const worst = misfits.filter((part) => !regardless.has(part.id)).sort((a, b) => b.length - a.length)[0];
+  const parts = partsAt(height);
+  if (!parts) return { ok: false, misfit: null };
+  // The height is judged on what the height changes. A part that cannot be
+  // cut at any height — too deep for the sheet, say — is another question; a
+  // part counts when it would be cut at a low height, or when it has grown
+  // with the height past the longest the sheet gives.
+  const low = new Map((partsAt(MIN_HEIGHT_MODULE * 2) ?? []).map((part) => [part.id, part]));
+  const longest = (board: Board) => (board.grain === "none" ? Math.max(board.sheet.length, board.sheet.width) : board.sheet.length) - 2 * DEFAULT_TRIM;
+  const heightCaused = (part: Part) => {
+    const before = low.get(part.id);
+    return !before || partFits(before) || (part.length > before.length && part.length > longest(part.board));
+  };
+  const worst = parts.filter((part) => !partFits(part) && heightCaused(part)).sort((a, b) => b.length - a.length)[0];
   return worst ? { ok: false, misfit: { label: noun(worst), length: Math.round(worst.length), width: Math.round(worst.width), board: worst.board } } : { ok: true, misfit: null };
 }
 

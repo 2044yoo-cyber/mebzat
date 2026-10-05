@@ -14,7 +14,7 @@
  {
   "name": "elevation does not name modules",
   "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
-  "from": "{`${moduleLabel(spec, cabinet, module.index, true)} — ${Math.round(module.width)}`}",
+  "from": "{`${moduleLabel(spec, cabinet, module.index, true)} — ${Math.round(module.width)}${stackRoleOf(spec, cabinet) ? ` × ${Math.round(cabinet.size.height)}` : \"\"}`}",
   "to": "{\"\"}"
  },
  {

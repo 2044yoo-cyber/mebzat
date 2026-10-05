@@ -20,7 +20,7 @@ import { buildCutList } from "../src/features/berchuma-studio/services/cutlist";
 import { calculateCost } from "../src/features/berchuma-studio/services/costing";
 import { assemblySheet } from "../src/features/berchuma-studio/services/exports";
 import { buildParts } from "../src/features/berchuma-studio/services/geometry";
-import { MIN_HEIGHT_MODULE, PREFERRED_LOWER, misfitMessage, moduleFit, planHeights, tallestModule } from "../src/features/berchuma-studio/services/height-modules";
+import { MIN_HEIGHT_MODULE, PREFERRED_LOWER, misfitMessage, moduleFit, partFits, planHeights, tallestModule } from "../src/features/berchuma-studio/services/height-modules";
 import {
   addSideDisplay,
   addTopCabinet,
@@ -100,7 +100,22 @@ const heights = (spec: DesignSpec) => { const lower = first(spec); const upper =
   equal(planHeights(white, id, 2350).recommended, [2350], "Auto never divides what can be one carcass");
   equal(planHeights(white, id, 2600).recommended, [2100, 500], "2600 in 2440 board: 2100 + 500");
   equal(PREFERRED_LOWER, 2100, "2100 is the default lower module");
-  equal(MIN_HEIGHT_MODULE, 250, "and 250 the shortest module");
+  // Turned on the sheet only where the board has no grain to show it.
+  const white18 = findBoard("mdf-18-white")!;
+  const oak18 = findBoard("mdf-18-oak")!;
+  ok(partFits({ length: 1000, width: 1300, board: white18 }) && !partFits({ length: 1000, width: 1300, board: oak18 }), "a 1000 × 1300 piece fits a plain sheet turned, not an oak one");
+  ok(partFits({ length: 2440, width: 1220, board: oak18 }) && !partFits({ length: 2441, width: 600, board: white18 }), "a whole sheet fits; a millimetre over does not");
+  // A part that cannot be cut whatever the height — here a side panel too
+  // deep for a narrow, grained test sheet — does not decide the height: the
+  // height is judged on what the height changes.
+  const narrowSheet = structuredClone(white);
+  narrowSheet.carcass.board = { ...narrowSheet.carcass.board, grain: "length", sheet: { length: 2440, width: 500 } };
+  narrowSheet.carcass.frontBoard = narrowSheet.carcass.board;
+  narrowSheet.carcass.interiorBoard = narrowSheet.carcass.board;
+  const narrowId = first(narrowSheet).id;
+  ok(buildParts(narrowSheet).parts.some((part) => !partFits(part)), "(the test sheet is too narrow for the side panels at any height)");
+  ok(moduleFit(narrowSheet, narrowId, 2300).ok, "so 2300 mm is not refused for it");
+  ok(!moduleFit(narrowSheet, narrowId, 2700).ok && moduleFit(narrowSheet, narrowId, 2700).misfit!.length === 2600, "while 2700 still is, for the 2600 mm length");
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +142,9 @@ const heights = (spec: DesignSpec) => { const lower = first(spec); const upper =
   for (const name of ["Lower module 1 — left side", "Lower module 2 — right side", "Upper module 1 — left side", "Upper module 2 — top", "Lower module 1 — top", "Upper module 1 — bottom"]) ok(cut.rows.some((row) => row.label === name), `the cut list has ${name}`);
   ok(cut.rows.some((row) => row.partId === "W01-M1-LS") && cut.rows.some((row) => row.partId === "W02-M2-RS"), "part IDs by cabinet and module: W01 below, W02 above");
   const joiners = buildParts(spec).hardware.find((line) => line.hardware.kind === "connector")!;
+  // 6 up the 2000 mm lower joint, 3 up the 600 mm upper one, and front and
+  // back rows on each upper module: 2 × 5 over 1600, 2 × 3 over 800.
+  equal(joiners.quantity, 6 + 3 + 2 * 5 + 2 * 3, "connectors counted: width joints by height, height joints by width");
   ok(/2 joints, 2 lower-to-upper joints/.test(joiners.note ?? ""), `connectors for the width joints below and above, and both height joints (${joiners.note})`);
   const single = buildParts(wardrobe()).hardware.find((line) => line.hardware.kind === "connector")!;
   ok(joiners.quantity > single.quantity, "more connectors than the wardrobe in one height");
@@ -137,6 +155,8 @@ const heights = (spec: DesignSpec) => { const lower = first(spec); const upper =
   // A wardrobe narrower than one width module divided in height only.
   const narrow = applyHeightModules(wardrobe("mdf-18-white", 1200), first(wardrobe("mdf-18-white", 1200)).id, [2100, 600]);
   ok(buildCutList(narrow, buildParts(narrow)).rows.some((row) => row.label === "Upper module — left side"), "a height-only division names its parts Lower/Upper module");
+  const narrowSheet = assemblySheet(narrow);
+  ok(narrowSheet && narrowSheet.rows.some((row) => row[1] === "Upper module" && row[6] === 600) && narrowSheet.rows.some((row) => row[1] === "Lower module" && row[6] === 2100), "and has an Assembly sheet for its two height modules");
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +175,8 @@ const heights = (spec: DesignSpec) => { const lower = first(spec); const upper =
   equal(first(locked).heightModules?.locked, true, "locked");
   equal(moveHeightPartition(locked, id, 2000), locked, "a locked boundary does not move");
   equal(heights(setOverallHeight(locked, id, 2900)), [2200, 700], "and the lower keeps its height when the total changes");
+  equal(setOverallHeight(locked, id, 2300), locked, "a total that would leave less than 250 mm above a locked lower is refused");
+  equal(heights(setOverallHeight(spec, id, 2300)), [2050, 250], "unlocked, the lower gives way instead");
   const reset = resetHeightModules(locked, id);
   equal([heights(reset), first(reset).heightModules?.auto, first(reset).heightModules?.locked], [[2100, 600], true, undefined], "Reset to Recommended: 2100 + 600, Auto, unlocked");
   equal(heights(setOverallHeight(reset, id, 2300)), [2300], "on Auto, a lower ceiling makes it one carcass again");
