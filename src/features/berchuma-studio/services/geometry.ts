@@ -13,6 +13,7 @@ import {
 } from "./corners";
 export { hingesPerLeaf } from "./corners";
 import { bayLabelSuffix } from "./bay-layout";
+import { bayLayout, connectorsPerJoint, jointsOf, modulesOf } from "./transport-modules";
 import { resolveDrawerConstruction } from "./drawer-construction";
 import {
   distributeDimension,
@@ -566,76 +567,102 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   const push = (part: Omit<Part, "edgeBand">, edgeBand = bodyBand) =>
     parts.push({ ...part, edgeBand });
 
+  // ---- Transport modules ------------------------------------------------
+  // A wardrobe made in several carcasses has a complete cabinet per module:
+  // its own sides, top, bottom and back. One with no joints is one carcass,
+  // built exactly as it always was.
+  const modules = modulesOf(cabinet);
+  const modular = modules.length > 1;
+  const layout = bayLayout(cabinet, t);
+  const moduleName = (index: number) => `${cabinet.stackedOn ? "Top" : "Base"} module ${index + 1}`;
+  const moduleTag = (index: number): Pick<Part, "module"> =>
+    modular ? { module: { name: moduleName(index), index, width: modules[index]!.width } } : {};
+
   // ---- Gables ------------------------------------------------------------
-  // Full-height outer sides. Only the front edge shows.
-  push({
-    id: "gable-left",
-    role: "gable",
-    label: "Left gable",
-    board,
-    length: carcassHeight,
-    width: shellDepth,
-    quantity: 1,
-    edges: { ...NO_EDGES, front: true },
-    placements: [{ x: 0, y: plinth, z: 0 }],
-    size: { x: t, y: carcassHeight, z: shellDepth },
-    axis: "x",
-  });
-  push({
-    id: "gable-right",
-    role: "gable",
-    label: "Right gable",
-    board,
-    length: carcassHeight,
-    width: shellDepth,
-    quantity: 1,
-    edges: { ...NO_EDGES, front: true },
-    placements: [{ x: envelope.width - t, y: plinth, z: 0 }],
-    size: { x: t, y: carcassHeight, z: shellDepth },
-    axis: "x",
-  });
+  // Full-height outer sides. Only the front edge shows. At a transport joint
+  // there are two: the right side of one module against the left side of the
+  // next, screwed together on site.
+  for (const carcassModule of modules) {
+    const first = carcassModule.index === 0;
+    const last = carcassModule.index === modules.length - 1;
+    push({
+      id: first ? "gable-left" : `module-${carcassModule.index + 1}-gable-left`,
+      role: "gable",
+      label: modular ? `${moduleName(carcassModule.index)} — left side` : "Left gable",
+      board,
+      length: carcassHeight,
+      width: shellDepth,
+      quantity: 1,
+      edges: { ...NO_EDGES, front: true },
+      placements: [{ x: carcassModule.from, y: plinth, z: 0 }],
+      size: { x: t, y: carcassHeight, z: shellDepth },
+      axis: "x",
+      ...moduleTag(carcassModule.index),
+    });
+    push({
+      id: last ? "gable-right" : `module-${carcassModule.index + 1}-gable-right`,
+      role: "gable",
+      label: modular ? `${moduleName(carcassModule.index)} — right side` : "Right gable",
+      board,
+      length: carcassHeight,
+      width: shellDepth,
+      quantity: 1,
+      edges: { ...NO_EDGES, front: true },
+      placements: [{ x: carcassModule.to - t, y: plinth, z: 0 }],
+      size: { x: t, y: carcassHeight, z: shellDepth },
+      axis: "x",
+      ...moduleTag(carcassModule.index),
+    });
+  }
 
   // ---- Top and bottom ----------------------------------------------------
   // Housed between the gables, so their total length is the envelope less
   // both. Wide wardrobes use sections that meet at divider centre lines: each
   // join is carried by a real vertical divider instead of asking a shop to cut
   // one unplaceable 3–6 m board or hiding an unsupported visual seam.
-  const spanWidth = envelope.width - 2 * t;
   const dividerCentres = cabinetDividerCentres(cabinet, t);
-  const horizontalSections = splitSpanAtSupports(
-    spanWidth,
-    board,
-    dividerCentres.map((centre) => centre - t),
-  );
-  for (const [index, section] of horizontalSections.entries()) {
-    const suffix = horizontalSections.length === 1 ? "" : `-${index + 1}`;
-    const sectionLabel = horizontalSections.length === 1 ? "" : ` — section ${index + 1}`;
-    push({
-      id: `carcass-bottom${suffix}`,
-      role: "bottom",
-      label: `Bottom${sectionLabel}`,
+  for (const carcassModule of modules) {
+    const spanWidth = carcassModule.width - 2 * t;
+    const horizontalSections = splitSpanAtSupports(
+      spanWidth,
       board,
-      length: section.length,
-      width: shellDepth,
-      quantity: 1,
-      edges: { ...NO_EDGES, front: true },
-      placements: [{ x: t + section.offset, y: plinth, z: 0 }],
-      size: { x: section.length, y: t, z: shellDepth },
-      axis: "y",
-    });
-    push({
-      id: `carcass-top${suffix}`,
-      role: "top",
-      label: `Top${sectionLabel}`,
-      board,
-      length: section.length,
-      width: shellDepth,
-      quantity: 1,
-      edges: { ...NO_EDGES, front: true },
-      placements: [{ x: t + section.offset, y: envelope.height - t, z: 0 }],
-      size: { x: section.length, y: t, z: shellDepth },
-      axis: "y",
-    });
+      dividerCentres
+        .filter((centre) => centre > carcassModule.from && centre < carcassModule.to)
+        .map((centre) => centre - carcassModule.from - t),
+    );
+    const prefix = modular ? `module-${carcassModule.index + 1}-` : "carcass-";
+    for (const [index, section] of horizontalSections.entries()) {
+      const suffix = horizontalSections.length === 1 ? "" : `-${index + 1}`;
+      const sectionLabel = horizontalSections.length === 1 ? "" : ` — section ${index + 1}`;
+      push({
+        id: `${prefix}bottom${suffix}`,
+        role: "bottom",
+        label: modular ? `${moduleName(carcassModule.index)} — bottom${sectionLabel}` : `Bottom${sectionLabel}`,
+        board,
+        length: section.length,
+        width: shellDepth,
+        quantity: 1,
+        edges: { ...NO_EDGES, front: true },
+        placements: [{ x: carcassModule.from + t + section.offset, y: plinth, z: 0 }],
+        size: { x: section.length, y: t, z: shellDepth },
+        axis: "y",
+        ...moduleTag(carcassModule.index),
+      });
+      push({
+        id: `${prefix}top${suffix}`,
+        role: "top",
+        label: modular ? `${moduleName(carcassModule.index)} — top${sectionLabel}` : `Top${sectionLabel}`,
+        board,
+        length: section.length,
+        width: shellDepth,
+        quantity: 1,
+        edges: { ...NO_EDGES, front: true },
+        placements: [{ x: carcassModule.from + t + section.offset, y: envelope.height - t, z: 0 }],
+        size: { x: section.length, y: t, z: shellDepth },
+        axis: "y",
+        ...moduleTag(carcassModule.index),
+      });
+    }
   }
 
   // ---- Back --------------------------------------------------------------
@@ -649,8 +676,12 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   {
     let backX = 0;
     for (const [index, bay] of bays.entries()) {
-      const first = index === 0;
-      const last = index === bays.length - 1;
+      // A back's outer edges are its module's sides: each module is backed
+      // on its own, so it can be carried and stood up as a cabinet.
+      const place = layout[index]!;
+      const first = index === 0 || place.jointLeft;
+      const last = index === bays.length - 1 || place.jointRight;
+      if (place.jointLeft) backX = modules[place.module]!.from;
       // An open display with its back off is open to the wall behind it.
       const openBacked = bay.display?.back === false;
       /*
@@ -713,6 +744,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
           placements: [{ x: backX, y: pieceY, z: depth - backThickness }],
           size: { x: Math.round(width), y: length, z: backThickness },
           axis: "z",
+          ...moduleTag(place.module),
         });
       }
 
@@ -746,7 +778,8 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       materials.plinth,
       t,
       visibleFrontThickness,
-      dividerCentres,
+      // A transport joint is a support line for the plinth as well.
+      [...dividerCentres, ...jointsOf(cabinet)].sort((a, b) => a - b),
     )) {
       push(part, plinthBand);
     }
@@ -755,11 +788,11 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   // ---- Bays --------------------------------------------------------------
   // Walk left to right, accumulating x. Each bay's interior starts after the
   // gable or the previous divider.
-  let x = t;
-
   for (const [index, bay] of bays.entries()) {
-    const isLast = index === bays.length - 1;
-    const bayX = x;
+    const place = layout[index]!;
+    // The last bay of a module is followed by the module's own side, not a divider.
+    const isLast = index === bays.length - 1 || place.jointRight;
+    const bayX = place.x;
 
     parts.push(
       ...bayParts({
@@ -770,10 +803,10 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         y: plinth + t,
         interiorHeight,
         interiorDepth,
-      }),
+      }).map((part) => ({ ...part, ...moduleTag(place.module) })),
     );
 
-    x += bay.width;
+    const x = bayX + bay.width;
 
     // A divider between this bay and the next.
     if (!isLast) {
@@ -789,15 +822,17 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         placements: [{ x, y: plinth + t, z: 0 }],
         size: { x: t, y: interiorHeight, z: shellDepth },
         axis: "x",
+        ...moduleTag(place.module),
       });
-      x += t;
     }
   }
 
   // ---- Doors -------------------------------------------------------------
   // Doors are added after the bays so they sit last in the list, which is the
   // order a shop wants them: carcass first, fronts last.
-  parts.push(...doorParts(spec, cabinet));
+  // Each front is hung on the module its bay is in.
+  const moduleOfBay = (bayId: string | undefined) => layout.find((place) => bayId === place.bay.id || bayId?.startsWith(`${place.bay.id}-`))?.module ?? 0;
+  parts.push(...doorParts(spec, cabinet).map((part) => ({ ...part, ...moduleTag(moduleOfBay(part.bayId)) })));
 
   return parts;
 }
@@ -835,20 +870,14 @@ export function isSideDisplay(cabinet: Cabinet): boolean {
   return cabinet.bays.length > 0 && cabinet.bays.every((bay) => bay.display?.style === "side");
 }
 
-/** Divider centre lines are safe structural joints for long horizontal boards. */
+/**
+ * Divider centre lines are safe structural joints for long horizontal boards.
+ * Only the dividers inside a module: at a transport joint the two modules'
+ * own sides stand, and nothing spans it.
+ */
 function cabinetDividerCentres(cabinet: Cabinet, thickness: number): number[] {
-  const centres: number[] = [];
-  let x = thickness;
-
-  for (const [index, bay] of cabinet.bays.entries()) {
-    x += bay.width;
-    if (index < cabinet.bays.length - 1) {
-      centres.push(x + thickness / 2);
-      x += thickness;
-    }
-  }
-
-  return centres;
+  const layout = bayLayout(cabinet, thickness);
+  return layout.slice(0, -1).filter((place) => !place.jointRight).map((place) => place.x + place.width + thickness / 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -1504,6 +1533,18 @@ function drawerConstructionFor(
 // Doors
 // ---------------------------------------------------------------------------
 
+/**
+ * The width a bay's fronts share. A bay's own opening, except at a transport
+ * joint: there the double wall is two boards, so the fronts either side each
+ * reach over half of it, and the gap between them is what it is at an
+ * ordinary divider. The facade does not show where the modules meet.
+ */
+export function frontSpanOf(place: { x: number; width: number; jointLeft: boolean; jointRight: boolean }, t: number): { x: number; width: number } {
+  const left = place.jointLeft ? t / 2 : 0;
+  const right = place.jointRight ? t / 2 : 0;
+  return { x: place.x - left, width: place.width + left + right };
+}
+
 /** A door leaf as it will be cut: where its face is in the cabinet, and how it came to be that size. */
 export type DoorLeaf = FrontRect & {
   bayId: string;
@@ -1554,24 +1595,23 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
   const leaves: DoorLeaf[] = [];
   const drawers: CabinetFronts["drawers"] = [];
 
-  let x = t;
-  for (const bay of cabinet.bays) {
-    const bayX = x;
-    x += bay.width + t;
+  for (const place of bayLayout(cabinet, t)) {
+    const bay = place.bay;
+    const span = frontSpanOf(place, t);
     const opening = height - plinth - 2 * t;
     const openingFloor = plinth + t;
 
     const drawerFaces = (count: number, explicit: number[] | undefined, bandFloor: number, bandHeight: number) => {
       const construction = drawerConstructionFor(spec, bay.width, bandHeight, bandFloor, interiorDepth, count, explicit);
-      for (const face of construction.faces) drawers.push({ bayId: bay.id, x: bayX + gap, y: face.floor, width: bay.width - 2 * gap, height: face.height });
+      for (const face of construction.faces) drawers.push({ bayId: bay.id, x: span.x + gap, y: face.floor, width: span.width - 2 * gap, height: face.height });
     };
     const doorRun = (run: number, bandFloor: number, bandHeight: number) => {
       const count = bay.doorLeaves;
-      const leafWidth = Math.floor((bay.width - gap * (count + 1)) / count);
+      const leafWidth = Math.floor((span.width - gap * (count + 1)) / count);
       const leafHeight = bandHeight - 2 * gap;
       if (leafHeight <= 0 || leafWidth <= 0) return;
       for (let leaf = 0; leaf < count; leaf += 1) {
-        const auto = { x: bayX + gap + leaf * (leafWidth + gap), y: bandFloor + gap, width: leafWidth, height: leafHeight };
+        const auto = { x: span.x + gap + leaf * (leafWidth + gap), y: bandFloor + gap, width: leafWidth, height: leafHeight };
         leaves.push({ ...auto, bayId: bay.id, run, leaf, leaves: count, style: bay.door, manual: false, auto, aligned: false });
       }
     };
@@ -1718,11 +1758,9 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     }
   };
 
-  let x = t;
-
-  for (const bay of cabinet.bays) {
-    const bayX = x;
-    x += bay.width + t;
+  for (const place of bayLayout(cabinet, t)) {
+    const bay = place.bay;
+    const span = frontSpanOf(place, t);
 
     const opening = height - plinth - 2 * t;
     const openingFloor = plinth + t;
@@ -1752,7 +1790,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
           bayId: bay.id,
           board,
           length: face.height,
-          width: bay.width - 2 * gap,
+          width: span.width - 2 * gap,
           quantity: 1,
           // A front shows on all four edges.
           edges: { front: true, back: true, top: true, bottom: true },
@@ -1760,10 +1798,10 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
           // Stacked on the same floors as the boxes behind them, and standing
           // proud of the carcass — hence the negative z.
           placements: [
-            { x: bayX + gap, y: face.floor, z: -frontThickness },
+            { x: span.x + gap, y: face.floor, z: -frontThickness },
           ],
           size: {
-            x: bay.width - 2 * gap,
+            x: span.width - 2 * gap,
             y: face.height,
             z: frontThickness,
           },
@@ -1978,6 +2016,24 @@ function hardwareFor(
         note: "Front and back rows",
       });
     }
+  }
+
+  // Joining transport modules: connectors along every joint's height, base
+  // and top cabinets alike, of the kind each cabinet says.
+  const connectorIds = { confirmat: "connector-confirmat", bolt: "connector-bolt", dowel_screw: "connector-dowel-screw", cam: "connector-cam" } as const;
+  const connectors = new Map<string, { count: number; joints: number }>();
+  for (const cabinet of spec.cabinets) {
+    const joints = jointsOf(cabinet).length;
+    if (!joints || !cabinet.transport) continue;
+    const id = connectorIds[cabinet.transport.connector ?? "confirmat"];
+    const entry = connectors.get(id) ?? { count: 0, joints: 0 };
+    entry.count += joints * connectorsPerJoint(cabinet.size.height - cabinet.plinthHeight);
+    entry.joints += joints;
+    connectors.set(id, entry);
+  }
+  for (const [id, entry] of connectors) {
+    const connector = spec.hardware.find((item) => item.id === id) ?? findHardware(id);
+    if (connector) lines.push({ hardware: connector, quantity: entry.count, note: `Joining transport modules — ${entry.joints} joint${entry.joints === 1 ? "" : "s"}, screwed together from inside` });
   }
 
   // Open-display lighting, by the metre the geometry lays.

@@ -1,0 +1,188 @@
+[
+ {
+  "name": "equal modules instead of 1600 + remainder",
+  "file": "src/features/berchuma-studio/services/transport-modules.ts",
+  "from": "  for (let at = MAX_MODULE; at < width - 0.5; at += MAX_MODULE) joints.push(at);",
+  "to": "  const count = Math.ceil(width / MAX_MODULE);\n  for (let index = 1; index < count; index += 1) joints.push(Math.round((index * width) / count));"
+ },
+ {
+  "name": "no minimum last module",
+  "file": "src/features/berchuma-studio/services/transport-modules.ts",
+  "from": "  if (joints.length && width - joints.at(-1)! < MIN_MODULE) joints[joints.length - 1] = width - MIN_MODULE;",
+  "to": ""
+ },
+ {
+  "name": "one shared panel at the joint",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "    push({\n      id: last ? \"gable-right\" : `module-${carcassModule.index + 1}-gable-right`,",
+  "to": "    if (last) push({\n      id: last ? \"gable-right\" : `module-${carcassModule.index + 1}-gable-right`,"
+ },
+ {
+  "name": "top and bottom across the joint",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "    const spanWidth = carcassModule.width - 2 * t;",
+  "to": "    const spanWidth = carcassModule.index === 0 ? envelope.width - 2 * t : 0;"
+ },
+ {
+  "name": "backs ignore the modules",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "      const first = index === 0 || place.jointLeft;\n      const last = index === bays.length - 1 || place.jointRight;\n      if (place.jointLeft) backX = modules[place.module]!.from;",
+  "to": "      const first = index === 0;\n      const last = index === bays.length - 1;"
+ },
+ {
+  "name": "a divider at the joint too",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "    const isLast = index === bays.length - 1 || place.jointRight;",
+  "to": "    const isLast = index === bays.length - 1;"
+ },
+ {
+  "name": "interior ignores the second side",
+  "file": "src/features/berchuma-studio/services/transport-modules.ts",
+  "from": "  return cabinet.size.width - t * (cabinet.bays.length + modulesOf(cabinet).length);",
+  "to": "  return cabinet.size.width - t * (cabinet.bays.length + 1);"
+ },
+ {
+  "name": "empty module left empty",
+  "file": "src/features/berchuma-studio/services/transport-modules.ts",
+  "from": "    if (owners.includes(carcassModule.index)) continue;",
+  "to": "    if (owners.includes(carcassModule.index) || true) continue;"
+ },
+ {
+  "name": "bays not fitted to modules",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "    fitBaysToModules(cabinet, t);\n  }",
+  "to": "  }"
+ },
+ {
+  "name": "no connectors",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "    if (connector) lines.push({ hardware: connector,",
+  "to": "    if (connector && false) lines.push({ hardware: connector,"
+ },
+ {
+  "name": "one connector per joint",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "    entry.count += joints * connectorsPerJoint(cabinet.size.height - cabinet.plinthHeight);",
+  "to": "    entry.count += joints;"
+ },
+ {
+  "name": "cut list merges modules",
+  "file": "src/features/berchuma-studio/services/cutlist.ts",
+  "from": "      ...(part.module ? [part.module.name, part.label] : []),",
+  "to": ""
+ },
+ {
+  "name": "cut list rows unnamed",
+  "file": "src/features/berchuma-studio/services/cutlist.ts",
+  "from": "      label: entry.part.module && !entry.part.label.startsWith(entry.part.module.name) ? `${entry.part.module.name} \u2014 ${entry.part.label}` : entry.part.label,",
+  "to": "      label: entry.part.label,"
+ },
+ {
+  "name": "backs not tagged",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "          axis: \"z\",\n          ...moduleTag(place.module),",
+  "to": "          axis: \"z\","
+ },
+ {
+  "name": "top cabinet not aligned",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "    if (!lower?.transport || lower.transport.alignTop === false) continue;",
+  "to": "    if (!lower?.transport || lower.transport.alignTop === false || true) continue;"
+ },
+ {
+  "name": "rule not kept on resize",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "    if (transport.auto !== false && !transport.joints.some((joint) => joint.locked)) {",
+  "to": "    if (transport.auto !== false && !transport.joints.some((joint) => joint.locked) && transport.joints.length === 0) {"
+ },
+ {
+  "name": "locked joint moves",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    if (!joint || joint.locked) return;\n    const before",
+  "to": "    if (!joint) return;\n    const before"
+ },
+ {
+  "name": "a hand-set joint keeps the rule",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    transport.auto = false;\n    joint.at = clamp(",
+  "to": "    joint.at = clamp("
+ },
+ {
+  "name": "align top off ignored",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    lower.transport.alignTop = align;",
+  "to": "    lower.transport.alignTop = true;"
+ },
+ {
+  "name": "doors stop at the double wall",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "  const left = place.jointLeft ? t / 2 : 0;\n  const right = place.jointRight ? t / 2 : 0;",
+  "to": "  const left = 0;\n  const right = 0;"
+ },
+ {
+  "name": "no narrow-module warning",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "last.width < 600 && !kept",
+  "to": "last.width < 300 && !kept"
+ },
+ {
+  "name": "kept warning repeated",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  const kept = cabinet.transport?.joints.at(-1)?.locked === true;",
+  "to": "  const kept = false;"
+ },
+ {
+  "name": "adjust division does nothing",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  return moveJoint(spec, owner.id, joints.length - 2, (lastTwo[0]!.from + lastTwo[1]!.to) / 2);",
+  "to": "  return spec;"
+ },
+ {
+  "name": "snap does nothing",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  return moveJoint(spec, owner.id, index, nearest);\n}",
+  "to": "  return spec;\n}"
+ },
+ {
+  "name": "new wardrobes one carcass",
+  "file": "src/features/berchuma-studio/services/starting-designs.ts",
+  "from": "    for (const cabinet of bound) if (cabinet.kind === \"tall\") applyTransportDefaults(cabinet, board.thickness);",
+  "to": ""
+ },
+ {
+  "name": "turned runs divided by themselves",
+  "file": "src/features/berchuma-studio/services/starting-designs.ts",
+  "from": "  if (furnitureType === \"wardrobe\" && (extras.layout ?? \"straight\") === \"straight\") {",
+  "to": "  if (furnitureType === \"wardrobe\") {"
+ },
+ {
+  "name": "model wardrobes one carcass",
+  "file": "src/features/berchuma-studio/services/hydrate.ts",
+  "from": "isRecord(cabinet) && cabinet.kind === \"tall\" && !cabinet.stackedOn && !cabinet.transport ?",
+  "to": "isRecord(cabinet) && false ?"
+ },
+ {
+  "name": "no assembly sheet",
+  "file": "src/features/berchuma-studio/services/exports.ts",
+  "from": "  if (!modular.length) return null;",
+  "to": "  if (modular.length >= 0) return null;"
+ },
+ {
+  "name": "corner run not fitted to modules",
+  "file": "src/features/berchuma-studio/services/resolve.ts",
+  "from": "  if (modulesOf(cabinet).length > 1) {\n    const result",
+  "to": "  if (modulesOf(cabinet).length > 99) {\n    const result"
+ },
+ {
+  "name": "saved wardrobes divided on opening",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "    if (!transport || cabinet.stackedOn) continue;",
+  "to": "    if (cabinet.stackedOn) continue;\n    if (!transport && spec.furnitureType === \"wardrobe\") { cabinet.transport = { joints: [], auto: true, alignTop: true, connector: \"confirmat\" }; }\n    if (!cabinet.transport) continue;"
+ },
+ {
+  "name": "two sides with one id",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "      id: last ? \"gable-right\" : `module-${carcassModule.index + 1}-gable-right`,",
+  "to": "      id: \"gable-right\","
+ }
+]

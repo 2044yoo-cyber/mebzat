@@ -353,6 +353,14 @@ export default function Model({
         ) : null}
       </group>
 
+      {/* Transport modules named on the carcass — only with the fronts off,
+          which is the manufacturing and assembly view; the exterior stays clean. */}
+      {hideFronts ? (
+        <group position={[-originX * MM, 0, originZ * MM]}>
+          <ModuleLabels parts={allParts} scale={Math.max(1, reach * 0.5)} />
+        </group>
+      ) : null}
+
       {/* The overall size, under the design, always. It is the number
           somebody checks against the wall they are fitting this into. */}
       <DimensionLabel
@@ -381,6 +389,33 @@ export default function Model({
         panOnly={sketchTool === "pan"}
       />
     </Canvas>
+  );
+}
+
+/**
+ * "Module 1 — 1600 mm" on each transport module, between its own two side
+ * panels — read off the parts, so it is where the module really is, turned
+ * runs included.
+ */
+function ModuleLabels({ parts, scale }: { parts: Part[]; scale: number }) {
+  const labels = new Map<string, { text: string; points: THREE.Vector3[] }>();
+  for (const part of parts) {
+    if (part.role !== "gable" || !part.module) continue;
+    const key = `${part.cabinetId}|${part.module.index}`;
+    const entry = labels.get(key) ?? { text: `${part.module.name} — ${Math.round(part.module.width)} mm`, points: [] };
+    for (const placement of part.placements) {
+      const centre = partCentre(part, placement);
+      entry.points.push(new THREE.Vector3(centre.x * MM, (placement.y + 350) * MM, -centre.z * MM + 0.05));
+    }
+    labels.set(key, entry);
+  }
+  return (
+    <group name="module-labels">
+      {[...labels.entries()].map(([key, entry]) => {
+        const middle = entry.points.reduce((sum, point) => sum.add(point), new THREE.Vector3()).divideScalar(Math.max(1, entry.points.length));
+        return <DimensionLabel key={key} text={entry.text} position={[middle.x, middle.y, middle.z]} scale={scale * 1.1} />;
+      })}
+    </group>
   );
 }
 

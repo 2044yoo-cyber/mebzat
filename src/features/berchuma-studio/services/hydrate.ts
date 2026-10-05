@@ -128,8 +128,14 @@ export function hydrateSpec(input: unknown, prompt: string): HydrateResult {
   // placeholder goes in here and `validateSpec` replaces it with the real
   // bounding box a moment later. Requiring the model to compute it would be
   // asking it to do arithmetic it gets wrong, over a value we can derive.
+  // A wardrobe Medosha makes is made in transport modules by default; the
+  // validator gives each carcass the 1600 mm rule's joints for its width.
+  const cabinets = wardrobe && Array.isArray(input.cabinets)
+    ? input.cabinets.map((cabinet) => (isRecord(cabinet) && cabinet.kind === "tall" && !cabinet.stackedOn && !cabinet.transport ? { ...cabinet, transport: { joints: [], auto: true, alignTop: true, connector: "confirmat" } } : cabinet))
+    : input.cabinets;
   const candidate = {
     ...input,
+    cabinets,
     envelope: isRecord(input.envelope)
       ? input.envelope
       : { width: 1, height: 1, depth: 1 },

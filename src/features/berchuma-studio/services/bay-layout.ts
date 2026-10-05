@@ -1,4 +1,5 @@
 import type { Bay, Cabinet } from "../types/spec";
+import { bayLayout } from "./transport-modules";
 
 /**
  * Where each bay's opening starts, and how wide it is.
@@ -17,13 +18,8 @@ import type { Bay, Cabinet } from "../types/spec";
 export type BayPlacement = { bay: Bay; x: number; width: number };
 
 export function layOutBays(cabinet: Cabinet, board: number): BayPlacement[] {
-  let cursor = board;
-
-  return cabinet.bays.map((bay) => {
-    const x = cursor;
-    cursor += bay.width + board;
-    return { bay, x, width: bay.width };
-  });
+  // Transport modules put two side panels at each joint; the layout knows.
+  return bayLayout(cabinet, board).map(({ bay, x, width }) => ({ bay, x, width }));
 }
 
 /**

@@ -1,0 +1,110 @@
+[
+ {
+  "name": "module names in the exterior 3D view",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "      {hideFronts ? (\n        <group position={[-originX * MM, 0, originZ * MM]}>\n          <ModuleLabels",
+  "to": "      {true ? (\n        <group position={[-originX * MM, 0, originZ * MM]}>\n          <ModuleLabels"
+ },
+ {
+  "name": "no module names inside",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "    if (part.role !== \"gable\" || !part.module) continue;",
+  "to": "    if (part.role !== \"gable\" || !part.module || true) continue;"
+ },
+ {
+  "name": "elevation does not name modules",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "          {`${cabinet.stackedOn ? \"Top module\" : \"Module\"} ${module.index + 1} \u2014 ${Math.round(module.width)}`}",
+  "to": "          {\"\"}"
+ },
+ {
+  "name": "joint tap selects nothing",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "              onClick={onSelectJoint ? (event) => { event.stopPropagation(); select(index); } : undefined}",
+  "to": "              onClick={undefined}"
+ },
+ {
+  "name": "no dead zone on the joint handle",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "    if (!state.moving && Math.abs(event.clientX - state.x) < 4) return;",
+  "to": ""
+ },
+ {
+  "name": "no live widths",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "                {`${Math.round(live.at - modules[index]!.from)} | ${Math.round(modules[index + 1]!.to - live.at)}`}",
+  "to": "                {\"\"}"
+ },
+ {
+  "name": "drag not applied",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "    onJointMove({ cabinetId: cabinet.id, index: state.index }, landed.value);",
+  "to": ""
+ },
+ {
+  "name": "locked joint keeps its handle",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "            {chosen && onJointMove && !locked ? (",
+  "to": "            {chosen && onJointMove ? ("
+ },
+ {
+  "name": "editor drops joint moves",
+  "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+  "from": "                  onJointMove={(ref, at) => onChange(moveJoint(spec, ref.cabinetId, ref.index, at))}",
+  "to": "                  onJointMove={() => undefined}"
+ },
+ {
+  "name": "typed position ignored",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "onChange={(at) => onChange(moveJoint(spec, owner.id, index, at))}",
+  "to": "onChange={() => undefined}"
+ },
+ {
+  "name": "lock button does nothing",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "onClick={() => onChange(lockJoint(spec, owner.id, index, !joint.locked))}",
+  "to": "onClick={() => undefined}"
+ },
+ {
+  "name": "locked position still typed",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "step={10} disabled={joint.locked} onChange",
+  "to": "step={10} onChange"
+ },
+ {
+  "name": "divide button does nothing",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "<Chip onClick={() => onChange(divideForTransport(spec, owner.id))}><Scissors className=\"size-3\" />Divide",
+  "to": "<Chip onClick={() => undefined}><Scissors className=\"size-3\" />Divide"
+ },
+ {
+  "name": "keep does not keep",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "<Chip onClick={() => onChange(lockJoint(spec, owner.id, joints.length - 1, true))}>Keep",
+  "to": "<Chip onClick={() => undefined}>Keep"
+ },
+ {
+  "name": "no warning shown",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "          {warnings.map((warning) => (",
+  "to": "          {([] as string[]).map((warning) => ("
+ },
+ {
+  "name": "small wardrobes cannot be divided",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "            {owner.size.width <= MAX_MODULE ? (",
+  "to": "            {false ? ("
+ },
+ {
+  "name": "align top toggle shows off",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "<Chip active={transport.alignTop !== false} label=\"Align Top Modules\"",
+  "to": "<Chip active={false} label=\"Align Top Modules\""
+ },
+ {
+  "name": "modules not listed",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "<li key={module.index} className=\"flex justify-between tabular-nums\"><span>{name(cabinet, module.index)}</span><span>{Math.round(module.width)} mm</span></li>",
+  "to": "<li key={module.index} />"
+ }
+]

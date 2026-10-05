@@ -11,6 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { buildCutList } from "../src/features/berchuma-studio/services/cutlist";
 import { calculateCost } from "../src/features/berchuma-studio/services/costing";
@@ -40,7 +41,7 @@ import {
   updateDisplay,
   zoneHeightsOf,
 } from "../src/features/berchuma-studio/services/operations";
-import { startingDesign, wardrobeShapeDesign } from "../src/features/berchuma-studio/services/starting-designs";
+import { wardrobeShapeDesign } from "../src/features/berchuma-studio/services/starting-designs";
 import { findBoard } from "../src/features/berchuma-studio/types/catalogue";
 import type { Part } from "../src/features/berchuma-studio/types/parts";
 import { validateSpec, type DesignSpec } from "../src/features/berchuma-studio/types/spec";
@@ -82,10 +83,16 @@ const fingerprint = (spec: DesignSpec) => {
   const breakdown = buildParts(spec);
   return createHash("sha256").update(JSON.stringify({ parts: strip(breakdown.parts), hardware: breakdown.hardware, totals: breakdown.totals, cut: buildCutList(spec, breakdown).rows })).digest("hex").slice(0, 16);
 };
+// The saved ones are designs exactly as main saved them (scripts/data), so they
+// are opened, not regenerated: a new wardrobe is made in transport modules
+// now, and an old one must not become one by being opened.
+const savedProjects = JSON.parse(readFileSync("scripts/data/berchuma_saved_wardrobes.json", "utf8")) as Record<string, DesignSpec>;
+const openSaved = (name: string) => () => validateSpec(JSON.parse(JSON.stringify(savedProjects[name]))).spec;
 const OLD: Record<string, [() => DesignSpec, string]> = {
   "three-bay wardrobe": [() => wardrobeExample(), "0eb1c2ea7f5f915a"],
-  "starting wardrobe": [() => startingDesign("wardrobe"), "f3f6822a54e6b7de"],
-  "L-shaped wardrobe": [() => wardrobeShapeDesign({ shape: "l_shaped", walls: [2400, 1800], depth: 600, height: 2400 }), "91ca541ba47d49ca"],
+  "saved starting wardrobe, 2400": [openSaved("starting wardrobe 2400"), "f3f6822a54e6b7de"],
+  "saved starting wardrobe, 3600": [openSaved("starting wardrobe 3600"), "07d746a96249ff0f"],
+  "saved L-shaped wardrobe": [openSaved("L-shaped wardrobe"), "9d1a8ae84ac62e99"],
   "kitchen": [() => kitchenExample(), "84440007294f88db"],
   "TV unit": [() => tvUnitExample(), "a604fe6c94f6fafe"],
 };

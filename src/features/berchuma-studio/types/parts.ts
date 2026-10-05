@@ -134,6 +134,8 @@ export type Part = {
    * not taken off with the doors to show inside, and takes no handle.
    */
   internal?: boolean;
+  /** The transport module this part is made for: "Base module 1", "Top module 2". */
+  module?: { name: string; index: number; width: number };
 };
 
 export type HardwareLine = {

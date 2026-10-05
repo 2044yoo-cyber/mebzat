@@ -15,6 +15,7 @@ import {
 
 import { BOARDS, EDGE_BANDS, findBoard, findEdgeBand } from "../../types/catalogue";
 import { LIMITS, doorStyles, type Bay, type DesignSpec } from "../../types/spec";
+import { carcassInterior } from "../../services/transport-modules";
 
 /**
  * The design, editable without saying a word.
@@ -84,10 +85,7 @@ export function ConfigRail({
   const redistribute = (draft: DesignSpec) => {
     const thickness = draft.carcass.board.thickness;
     const unit = target(draft);
-    const interior =
-      unit.size.width -
-      2 * thickness -
-      Math.max(0, unit.bays.length - 1) * thickness;
+    const interior = carcassInterior(unit, thickness);
     const each = Math.max(1, Math.round(interior / unit.bays.length));
     for (const bay of unit.bays) bay.width = each;
   };

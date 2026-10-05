@@ -19,6 +19,8 @@ import type { DesignSpec } from "../types/spec";
 export type CutListRow = {
   /** Sequence number on the printed sheet. */
   index: number;
+  /** The transport module the piece is for, when the cabinet has modules. */
+  module?: string;
   label: string;
   boardId: string;
   boardLabel: string;
@@ -92,6 +94,9 @@ export function buildCutList(
       part.edgeBand.id,
       edgeKey(part),
       part.role,
+      // Parts of different transport modules are made and stacked apart, and
+      // within a module each is listed by name — left side, right side, top.
+      ...(part.module ? [part.module.name, part.label] : []),
     ].join("|");
 
     const existing = groups.get(key);
@@ -106,7 +111,10 @@ export function buildCutList(
     .map((entry) => ({
       // Filled in below, once the rows are in the order they are read in.
       index: 0,
-      label: entry.part.label,
+      // Named by its module, so the pieces of each carcass can be stacked
+      // and labelled together.
+      label: entry.part.module && !entry.part.label.startsWith(entry.part.module.name) ? `${entry.part.module.name} — ${entry.part.label}` : entry.part.label,
+      ...(entry.part.module ? { module: entry.part.module.name } : {}),
       boardId: entry.part.board.id,
       boardLabel: entry.part.board.label,
       length: Math.round(entry.part.length),

@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 import { LengthField, LengthInput } from "../ui/length-field";
 import { DisplayPanel, WardrobeDisplayTools, ZoneEditor } from "./display-panel";
+import { JointPanel, TransportPanel, type JointRef } from "./transport-panel";
 import { isSideDisplay } from "../../services/geometry";
 
 import { BOARDS, EDGE_BANDS, findBoard, findEdgeBand } from "../../types/catalogue";
@@ -114,6 +115,9 @@ export type ControlPanelProps = {
   /** An open display of the selected cabinet, being edited. */
   display?: DisplayRef | null;
   onSelectDisplay?: (display: DisplayRef | null) => void;
+  /** A transport joint tapped in the elevation. */
+  joint?: JointRef | null;
+  onSelectJoint?: (joint: JointRef | null) => void;
 };
 
 export function ControlPanel({
@@ -129,6 +133,8 @@ export function ControlPanel({
   onDoorProblem,
   display = null,
   onSelectDisplay = () => undefined,
+  joint = null,
+  onSelectJoint = () => undefined,
 }: ControlPanelProps) {
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
@@ -170,6 +176,9 @@ export function ControlPanel({
         it on a screen this size.
       */}
       <div className="space-y-3 bg-background/70 p-3 backdrop-blur-xl @4xl/ws:border-l @4xl/ws:border-white/10">
+        {/* A transport joint, first when it was just tapped. */}
+        {selected && joint ? <JointPanel spec={spec} joint={joint} onChange={onChange} onSelectJoint={onSelectJoint} /> : null}
+
         {/* The open display being edited, first: it was just tapped. */}
         {selected && display ? (
           <DisplayPanel spec={spec} display={display} onChange={onChange} onSelectDisplay={onSelectDisplay} />
@@ -212,6 +221,7 @@ export function ControlPanel({
             /> : null}
             {spec.furnitureType === "kitchen" && selected.kind === "base" ? <SmallButton icon={Layers} label="Add upper cabinet above" onClick={() => onChange(addKitchenUpper(spec, selected.id))} /> : null}
             {!isSideDisplay(selected) ? <Structure spec={spec} cabinet={selected} onChange={onChange} onSelectDisplay={onSelectDisplay} /> : null}
+            <TransportPanel spec={spec} cabinet={selected} onChange={onChange} onSelectJoint={onSelectJoint} selectedJoint={joint} />
             {spec.furnitureType === "wardrobe" ? (
               <WardrobeDisplayTools spec={spec} cabinet={selected} onChange={onChange} onSelect={onSelect} onSelectDisplay={onSelectDisplay} />
             ) : null}

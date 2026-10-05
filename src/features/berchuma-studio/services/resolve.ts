@@ -6,6 +6,7 @@ import {
 } from "./part-transform";
 import type { Cabinet, DesignSpec } from "../types/spec";
 import type { RunPlacement } from "../types/layout";
+import { bayModules, fitBaysToModules, modulesOf } from "./transport-modules";
 
 /**
  * Turning a spec into placed geometry.
@@ -133,6 +134,8 @@ export function resolveDesign(spec: DesignSpec): ResolvedDesign {
         size: { ...cabinet.size, width: placement.usableLength },
         bays: cabinet.bays.map((bay) => ({ ...bay, width: oldOpenings > 0 ? available * bay.width / oldOpenings : 0 })),
       };
+      // Made in modules, the bays are refitted to them at the new span.
+      if (modulesOf(effectiveCabinet).length > 1) fitBaysToModules(effectiveCabinet, t, { owners: bayModules(cabinet, t) });
     }
     if (spec.furnitureType === "wardrobe") {
       effectiveCabinet = applyOwnedCornerBays(effectiveCabinet, placement, layout.corners, spec.carcass.board.thickness, spec.cornerSettings);
@@ -231,6 +234,13 @@ function applyOwnedCornerBays(
       ...bays[index]!,
       width: oldOrdinary > 0 ? remaining * bays[index]!.width / oldOrdinary : remaining / ordinary.length,
     };
+  }
+  // A run made in transport modules shares width module by module, the
+  // corner opening keeping its width inside the module at that end.
+  if (modulesOf(cabinet).length > 1) {
+    const result = { ...cabinet, bays };
+    fitBaysToModules(result, thickness, { owners: bayModules(cabinet, thickness), fixed: new Map([...reserved].map(([index, entry]) => [index, entry.width])) });
+    return result;
   }
   return { ...cabinet, bays };
 }

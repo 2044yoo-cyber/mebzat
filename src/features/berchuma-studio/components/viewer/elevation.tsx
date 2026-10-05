@@ -29,10 +29,14 @@ import {
   displayRectOf,
   displaySnapTargetsOf,
   doorSnapTargetsOf,
+  jointOwnerOf,
+  transportSnapTargetsOf,
   type DisplayRef,
   type DoorRef,
 } from "../../services/operations";
 import { findBoard } from "../../types/catalogue";
+import { modulesOf } from "../../services/transport-modules";
+import { snapValue } from "../../services/door-layout";
 import type { DisplayOptions } from "../../types/spec";
 import type { Bay, Cabinet, DesignSpec } from "../../types/spec";
 
@@ -76,6 +80,9 @@ export function Elevation({
   selectedDisplay = null,
   onSelectDisplay,
   onDisplayResize,
+  selectedJoint = null,
+  onSelectJoint,
+  onJointMove,
 }: {
   spec: DesignSpec;
   /** Drawn with a highlight, so the flat view agrees with the 3D one. */
@@ -91,6 +98,10 @@ export function Elevation({
   selectedDisplay?: DisplayRef | null;
   onSelectDisplay?: (display: DisplayRef | null) => void;
   onDisplayResize?: (display: DisplayRef, edge: DoorEdge, rect: FrontRect) => void;
+  /** A transport joint of the selected cabinet, tapped to move it. */
+  selectedJoint?: { cabinetId: string; index: number } | null;
+  onSelectJoint?: (joint: { cabinetId: string; index: number } | null) => void;
+  onJointMove?: (joint: { cabinetId: string; index: number }, at: number) => void;
 }) {
   const gradientId = useId();
   // Millimetres of drawing per screen pixel, so a handle is a finger's size
@@ -197,6 +208,9 @@ export function Elevation({
             selectedDisplay={selectedDisplay?.cabinetId === cabinet.id ? selectedDisplay : null}
             onSelectDisplay={cabinet.id === selectedCabinetId ? onSelectDisplay : undefined}
             onDisplayResize={onDisplayResize}
+            selectedJoint={selectedJoint?.cabinetId === cabinet.id ? selectedJoint.index : null}
+            onSelectJoint={cabinet.id === selectedCabinetId ? onSelectJoint : undefined}
+            onJointMove={onJointMove}
           />
         </g>
       )) : (
@@ -281,6 +295,9 @@ function CabinetDrawing({
   selectedDisplay,
   onSelectDisplay,
   onDisplayResize,
+  selectedJoint,
+  onSelectJoint,
+  onJointMove,
 }: {
   spec: DesignSpec;
   cabinet: Cabinet;
@@ -294,6 +311,9 @@ function CabinetDrawing({
   selectedDisplay: DisplayRef | null;
   onSelectDisplay?: (display: DisplayRef | null) => void;
   onDisplayResize?: (display: DisplayRef, edge: DoorEdge, rect: FrontRect) => void;
+  selectedJoint: number | null;
+  onSelectJoint?: (joint: { cabinetId: string; index: number } | null) => void;
+  onJointMove?: (joint: { cabinetId: string; index: number }, at: number) => void;
 }) {
   const materials = constructionMaterials(spec);
   const t = spec.carcass.board.thickness;
@@ -372,6 +392,18 @@ function CabinetDrawing({
         snap={snap}
         mmPerPixel={mmPerPixel}
       />
+
+      {/* Over the doors: a joint is tapped where the doors meet. */}
+      <TransportJoints
+        spec={spec}
+        cabinet={cabinet}
+        selectedJoint={selectedJoint}
+        onSelectJoint={onSelectJoint}
+        onJointMove={onJointMove}
+        snap={snap}
+        mmPerPixel={mmPerPixel}
+      />
+
 
       {/*
         The clear opening of each bay, written inside it.
@@ -748,6 +780,118 @@ function Fitting({
   }
 
   return null;
+}
+
+/**
+ * A cabinet's transport modules on the drawing: each joint a dashed line
+ * through its double side panel, each module named with its width in the
+ * plinth band ("Module 1 — 1600"). A joint of the selected cabinet can be
+ * tapped, and the selected one dragged by its handle; it snaps to
+ * partitions, door boundaries and the centre line, and says where it is.
+ */
+function TransportJoints({
+  spec,
+  cabinet,
+  selectedJoint,
+  onSelectJoint,
+  onJointMove,
+  snap,
+  mmPerPixel,
+}: {
+  spec: DesignSpec;
+  cabinet: Cabinet;
+  selectedJoint: number | null;
+  onSelectJoint?: (joint: { cabinetId: string; index: number } | null) => void;
+  onJointMove?: (joint: { cabinetId: string; index: number }, at: number) => void;
+  snap: boolean;
+  mmPerPixel: number;
+}) {
+  const drag = useRef<{ index: number; matrix: DOMMatrix; x: number; moving: boolean; targets: number[] } | null>(null);
+  const [live, setLive] = useState<{ at: number; snapped: boolean } | null>(null);
+  const modules = modulesOf(cabinet);
+  if (modules.length < 2) return null;
+  const { height } = cabinet.size;
+  const plinth = cabinet.plinthHeight;
+  // In the plinth band of a base, along the foot of a top cabinet — clear of
+  // the bay widths written along the top.
+  const labelY = plinth > 0 ? height - plinth / 2 : height - 45;
+  const owner = jointOwnerOf(spec, cabinet.id);
+  const select = (index: number) => onSelectJoint?.({ cabinetId: cabinet.id, index });
+
+  function move(event: React.PointerEvent<SVGCircleElement>) {
+    const state = drag.current;
+    if (!state || !onJointMove) return;
+    if (!state.moving && Math.abs(event.clientX - state.x) < 4) return;
+    state.moving = true;
+    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(state.matrix).x;
+    const landed = snap ? snapValue(raw, state.targets, Math.min(25, Math.max(5, 6 * mmPerPixel))) : { value: raw, snapped: false };
+    setLive({ at: landed.value, snapped: landed.snapped });
+    onJointMove({ cabinetId: cabinet.id, index: state.index }, landed.value);
+  }
+  const end = () => {
+    drag.current = null;
+    setLive(null);
+  };
+
+  return (
+    <g data-transport-joints="">
+      {modules.map((module) => (
+        <text key={module.index} x={module.from + module.width / 2} y={labelY} textAnchor="middle" dominantBaseline="middle" fontSize={Math.min(56, module.width / 9)} className="fill-foreground/60" pointerEvents="none">
+          {`${cabinet.stackedOn ? "Top module" : "Module"} ${module.index + 1} — ${Math.round(module.width)}`}
+        </text>
+      ))}
+      {modules.slice(1).map((module, index) => {
+        const chosen = selectedJoint === index;
+        const at = chosen && live ? live.at : module.from;
+        const locked = owner?.transport?.joints[index]?.locked === true;
+        return (
+          <g key={`joint-${index}`}>
+            <line x1={at} x2={at} y1={0} y2={height - plinth} stroke={chosen ? (live?.snapped ? "#16a34a" : "#f4a63a") : "#7c3aed"} strokeWidth={chosen ? 10 : 6} strokeDasharray="28 18" pointerEvents="none" />
+            <rect
+              data-transport-joint={index}
+              x={at - Math.max(15, 8 * mmPerPixel)}
+              y={0}
+              width={2 * Math.max(15, 8 * mmPerPixel)}
+              height={height}
+              fill="transparent"
+              className={onSelectJoint ? "cursor-pointer" : undefined}
+              onClick={onSelectJoint ? (event) => { event.stopPropagation(); select(index); } : undefined}
+            />
+            {chosen && onJointMove && !locked ? (
+              <g>
+                <circle cx={at} cy={(height - plinth) / 2} r={7 * mmPerPixel} fill="#f4a63a" stroke="white" strokeWidth={1.5 * mmPerPixel} pointerEvents="none" />
+                <circle
+                  data-joint-handle={index}
+                  cx={at}
+                  cy={(height - plinth) / 2}
+                  r={22 * mmPerPixel}
+                  fill="transparent"
+                  style={{ touchAction: "none", cursor: "ew-resize" }}
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    const matrix = event.currentTarget.getScreenCTM();
+                    if (!matrix) return;
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
+                    drag.current = { index, matrix: matrix.inverse(), x: event.clientX, moving: false, targets: transportSnapTargetsOf(spec, cabinet.id) };
+                  }}
+                  onPointerMove={move}
+                  onPointerUp={end}
+                  onPointerCancel={end}
+                />
+              </g>
+            ) : null}
+            {chosen && live ? (
+              <text x={at} y={(height - plinth) / 2 - 22 * mmPerPixel - 20} textAnchor="middle" fontSize={Math.max(60, 16 * mmPerPixel)} className="fill-foreground font-semibold" stroke="white" strokeWidth={Math.max(60, 16 * mmPerPixel) * 0.25} paintOrder="stroke" pointerEvents="none">
+                {`${Math.round(live.at - modules[index]!.from)} | ${Math.round(modules[index + 1]!.to - live.at)}`}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
+    </g>
+  );
 }
 
 /**
