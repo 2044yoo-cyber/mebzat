@@ -26,6 +26,8 @@ export type HousePlacementOptions = {
   columnType?: string;
   /** A stair's parameters; its footprint follows from them. */
   stair?: StairParams;
+  /** Internal: the second half of a corner window, which is not paired again. */
+  cornerPair?: boolean;
 };
 
 export function deleteHouseSelections(project: HouseProject, selections: readonly HouseSelection[], options?: { footprintEditable?: boolean }): HouseCommandMutation {
@@ -375,7 +377,12 @@ export function createHouseObjectFromGesture(
     const openingWidth = Math.min(width || (kind === "door" ? 900 : 1200), Math.max(200, Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y) - 100));
     const openingHeight = options.height ?? (kind === "door" ? 2100 : 1500);
     const sillHeight = kind === "door" ? 0 : Math.max(0, options.sillHeight ?? 900);
-    const offset = wallOffsetAtPoint(wall, start, openingWidth);
+    const wallLength = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+    // A corner window starts at the corner nearer the tap, and turns it.
+    const corner = kind === "window" && options.style === "corner"
+      ? (Math.hypot(start.x - wall.start.x, start.y - wall.start.y) <= Math.hypot(start.x - wall.end.x, start.y - wall.end.y) ? "start" as const : "end" as const)
+      : null;
+    const offset = corner === "start" ? 0 : corner === "end" ? Math.max(0, wallLength - openingWidth) : wallOffsetAtPoint(wall, start, openingWidth);
     const opening: HouseProject["doors"][number] = { id: objectId, sourceOpeningId, levelId: level.id, wallId: wall.id, width: openingWidth, height: openingHeight, sillHeight, offset, type: planKind, style: tool === "opening" ? "open" : options.style ?? (kind === "door" ? "single" : "fixed"), material: kind === "door" ? "Timber" : "Aluminium", swing: tool === "door" ? "in-right" : "none" };
     next = {
       ...next,
@@ -384,6 +391,24 @@ export function createHouseObjectFromGesture(
       levels: next.levels.map((item) => item.id === level.id && item.plan ? { ...item, plan: { ...item.plan, openings: [...item.plan.openings, { id: sourceOpeningId, kind: planKind, wallId: wall.sourceWallId!, offset, width: openingWidth, height: openingHeight, sill: sillHeight, swing: tool === "door" ? "in-right" as const : "none" as const, label: tool }] } } : item),
     };
     selection = { kind, id: objectId };
+    if (corner && !options.cornerPair) {
+      // Its other half, on the wall that meets this one at that corner.
+      const point = corner === "start" ? wall.start : wall.end;
+      const meeting = next.walls.find((item) => item.levelId === level.id && item.id !== wall.id && item.sourceWallId
+        && [item.start, item.end].some((end) => Math.hypot(end.x - point.x, end.y - point.y) < 5)
+        && Math.abs((item.end.x - item.start.x) * (wall.end.y - wall.start.y) - (item.end.y - item.start.y) * (wall.end.x - wall.start.x)) > 1);
+      if (meeting) {
+        const away = Math.hypot(meeting.start.x - point.x, meeting.start.y - point.y) < 5 ? meeting.end : meeting.start;
+        const length = Math.hypot(away.x - point.x, away.y - point.y) || 1;
+        const inside = { x: point.x + (away.x - point.x) * Math.min(openingWidth / 2, length / 3) / length, y: point.y + (away.y - point.y) * Math.min(openingWidth / 2, length / 3) / length };
+        const pair = createHouseObjectFromGesture(next, "window", level.id, inside, inside, { ...options, cornerPair: true });
+        if (!pair.blocked.length && pair.selections[0]) {
+          const groupId = `group-${crypto.randomUUID()}`;
+          next = { ...pair.project, objectInstances: { ...pair.project.objectInstances, [pair.selections[0].id]: { ...(pair.project.objectInstances[pair.selections[0].id] ?? emptyInstance()), groupId }, [objectId]: { ...emptyInstance(), typeId: defaultType(kind), groupId } } };
+          return { project: next, selections: [selection, pair.selections[0]], blocked: [] };
+        }
+      }
+    }
   } else if (tool === "column") {
     const shape = options.columnType === "circular" || options.columnType === "square" ? options.columnType : "rectangular";
     next = { ...next, structuralColumns: [...next.structuralColumns, { id, levelId: level.id, x: start.x, y: start.y, elevation: level.elevation, width, depth: shape === "rectangular" ? depth : width, height, type: shape, material: "Reinforced concrete", rotation: options.rotation ?? 0 }] };

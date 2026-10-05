@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room";
 import { createHouseObjectFromGesture, roomOutline } from "../src/features/house-designer/services/model-commands";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
-import { definitionOf, DOOR_TYPES, OBJECT_CATEGORIES, OBJECT_LIBRARY, objectDefinition, placeAgainstWall, searchObjects, WINDOW_TYPES } from "../src/features/house-designer/services/object-library";
+import { definitionOf, DOOR_TYPES, OBJECT_CATEGORIES, OBJECT_LIBRARY, objectDefinition, placeAgainstWall, searchObjects, snapToFurniture, WINDOW_TYPES } from "../src/features/house-designer/services/object-library";
 import { establishLevelOutline, openSpace, patchHouseObject } from "../src/features/house-designer/services/project-edit";
 import { applyStairEdit, fitStairs, risersFor, stairFields, stairGeometry, stairParams, stairPreset, STAIR_TYPES, stairWarnings } from "../src/features/house-designer/services/stair-geometry";
 import { applyModelingOptions, modelingPreset } from "../src/features/house-designer/services/workspace-options";
@@ -148,6 +148,28 @@ step = createHouseObjectFromGesture(project, "window", ground, { x: 6000, y: 600
 project = patchHouseObject(step.project, step.selections[0]!, { offset: 500, sillHeight: 1000, style: "awning" });
 const window = project.windows.find((item) => item.id === step.selections[0]!.id) ?? project.windows.at(-1)!;
 assert.deepEqual([window.offset, window.sillHeight, window.style], [500, 1000, "awning"], "a window's position, sill and type");
+
+// A corner window: one window each side of the corner, grouped.
+const before = project.windows.length;
+step = createHouseObjectFromGesture(project, "window", ground, { x: 7600, y: 6000 }, undefined, { width: 1000, height: 1200, sillHeight: 900, style: "corner" });
+assert.equal(step.project.windows.length, before + 2, "a corner window is two windows");
+const [first, second] = step.selections.map((selection) => step.project.windows.find((item) => item.id === selection.id)!);
+const wallOf = (opening: typeof first) => step.project.walls.find((wall) => wall.id === opening!.wallId)!;
+const at = (opening: typeof first, offset: number) => { const wall = wallOf(opening); const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y); return { x: wall.start.x + (wall.end.x - wall.start.x) * offset / length, y: wall.start.y + (wall.end.y - wall.start.y) * offset / length }; };
+const ends = (opening: typeof first) => [at(opening, opening!.offset), at(opening, opening!.offset + opening!.width)];
+assert.notEqual(first!.wallId, second!.wallId, "on the two walls that meet");
+assert.ok(ends(first).some((point) => point.x === 8000 && point.y === 6000) && ends(second).some((point) => point.x === 8000 && point.y === 6000), "both reaching the corner tapped near");
+assert.ok(first!.style === "corner" && second!.style === "corner");
+assert.ok(step.project.objectInstances[first!.id]?.groupId && step.project.objectInstances[first!.id]?.groupId === step.project.objectInstances[second!.id]?.groupId, "and grouped");
+assert.equal(createHouseObjectFromGesture(project, "window", ground, { x: 4000, y: 6000 }, undefined, { width: 1000, style: "sliding" }).selections.length, 1, "any other window is one window");
+
+// Edge to edge: a bedside table brought near a bed lands against it.
+const side = snapToFurniture(project, ground, { x: 2550 - 240, y: 1300, width: 450, depth: 400, rotation: 0 }, { reach: 150 });
+const bedNow = project.components.find((item) => item.family === "double-bed")!;
+const bedBox = { minX: bedNow.x - (bedNow.rotation % 180 ? bedNow.depth : bedNow.width) / 2 };
+assert.equal(side.x + 225, bedBox.minX, `a bedside table snaps against the bed's side (${side.x})`);
+assert.deepEqual(snapToFurniture(project, ground, { x: 600, y: 4500, width: 450, depth: 400, rotation: 0 }), { x: 600, y: 4500 }, "out of reach of anything, it stays");
+assert.equal(snapToFurniture(project, ground, { x: 2550 - 240, y: 1300, width: 450, depth: 400, rotation: 0 }, { along: "y" }).x, 2310, "kept to one axis when against a wall");
 
 // Columns: shapes, sizes, turned.
 step = createHouseObjectFromGesture(project, "column", ground, { x: 4000, y: 3000 }, undefined, { width: 400, depth: 250, columnType: "circular" });

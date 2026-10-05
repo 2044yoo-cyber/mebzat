@@ -260,6 +260,17 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     return { minX: base.minX + dx, minY: base.minY + dy, maxX: base.maxX + dx, maxY: base.maxY + dy };
   }
 
+  /**
+   * Where a tap lands for the tool in hand. Furniture and stairs are placed
+   * finer than walls are drawn: the metre grid would only let a sofa stand
+   * on whole metres, so between real snaps they step 50 mm.
+   */
+  function toolPoint(raw: HousePlanPoint): SnapPoint {
+    const point = snapped(raw);
+    if (!snapEnabled || point.label !== "Grid" || (activeTool !== "furniture" && activeTool !== "stair")) return point;
+    return { x: Math.round(raw.x / 50) * 50, y: Math.round(raw.y / 50) * 50, label: "Grid" };
+  }
+
   function snapped(raw: HousePlanPoint, from: HousePlanPoint | null = draftStart, moving?: string): SnapPoint {
     const draftStart = from;
     if (!snapEnabled) return { ...raw, label: "Nearest" };
@@ -379,7 +390,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       const hit = pins.find((pin) => Math.hypot(raw.x - pin.x, raw.y - (pin.y - 14 * mmPerPx)) <= reach);
       if (hit) { cancelLongPress(); onPinTap(hit.id); return; }
     }
-    const point = snapped(raw);
+    const point = toolPoint(raw);
     setCurrent(point);
     if (selectMode && proposals?.length) {
       const reach = 18 * mmPerPx;
@@ -644,7 +655,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     {/* The verified plan underneath, in the same frame, so it pans and zooms
         with the model rather than staying put behind it. */}
     {plan ? <div className="pointer-events-none absolute inset-0"><PlanCanvas room={plan} onChange={noop} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} openingSymbols={false} viewBox={{ x: effective.minX, y: effective.minY, width: effective.maxX - effective.minX, height: effective.maxY - effective.minY }} /></div> : null}
-    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (placementDrag && placementDrag.pointerId === event.pointerId) { const raw = modelPoint(event); if (raw && onPlacementMove) onPlacementMove(...placementSnap(raw, placementDrag.grab)); return; } if (hold && hold.pointerId === event.pointerId) { holdSlide(event); return; } if (moveEnd(event) || moveProposal(event) || moveItem(event) || moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(snapped(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => {
+    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (placementDrag && placementDrag.pointerId === event.pointerId) { const raw = modelPoint(event); if (raw && onPlacementMove) onPlacementMove(...placementSnap(raw, placementDrag.grab)); return; } if (hold && hold.pointerId === event.pointerId) { holdSlide(event); return; } if (moveEnd(event) || moveProposal(event) || moveItem(event) || moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(toolPoint(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => {
         if (swallowRelease.current) { swallowRelease.current = false; event.preventDefault(); return; }
         // The canvas has had the tap. The click a browser makes of it after
         // the finger lifts would land on whatever the tap just opened there —

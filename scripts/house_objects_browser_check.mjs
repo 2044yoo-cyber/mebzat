@@ -177,6 +177,46 @@ try {
   await place("Column", async (columns) => { await columns.getByRole("radio", { name: "Circular column" }).click(); await columns.getByRole("button", { name: "Ø 300" }).click(); }, 4000, 7000);
   assert.equal(await page.locator(`${PLAN} g[aria-label="Column"] circle`).count(), 1, "a round column");
 
+  // Furniture against furniture: a second base cabinet put down a little off lands edge to edge.
+  await place("Furniture", furniture("Kitchen", "Base cabinet"), 6000, 10000);
+  await place("Furniture", furniture("Kitchen", "Base cabinet"), 6680, 10060);
+  await page.waitForTimeout(1200);
+  const cabinets = (await draft()).components.filter((item) => item.family === "base-cabinet");
+  assert.equal(cabinets.length, 2);
+  assert.deepEqual([Math.abs(cabinets[1].x - cabinets[0].x), cabinets[1].y - cabinets[0].y], [600, 0], "the second cabinet snaps beside the first, in line");
+  // Dragged to just below the first and a little off, it lands flush under it and lined up.
+  await drag([cabinets[1].x, cabinets[1].y], [cabinets[0].x + 40, cabinets[0].y + 680]);
+  await page.waitForTimeout(1200);
+  const dragged = (await draft()).components.filter((item) => item.family === "base-cabinet");
+  assert.deepEqual([dragged[1].x, dragged[1].y], [cabinets[0].x, cabinets[0].y + 600], "a dragged cabinet snaps edge to edge, lined up");
+
+  // A corner window: both walls at the corner.
+  const windowsBefore = (await draft()).windows.length;
+  await place("Window", async (windows) => windows.getByRole("button", { name: "Corner window", exact: true }).click(), 7700, 0);
+  await page.waitForTimeout(1200);
+  const corner = (await draft()).windows.filter((item) => item.style === "corner");
+  assert.equal((await draft()).windows.length, windowsBefore + 2, "a corner window is a window on each wall");
+  assert.notEqual(corner[0].wallId, corner[1].wallId);
+
+  // Auto fit into a space drawn on the plan.
+  await rail.getByRole("button", { name: "Stair", exact: true }).click();
+  await page.getByRole("dialog", { name: "Stairs library" }).getByRole("button", { name: "Draw the space" }).click();
+  assert.equal(await page.getByRole("dialog", { name: "Stairs library" }).count(), 0, "the sheet gets out of the way to draw");
+  const stairsBefore = (await draft()).stairs.length;
+  await drag([1000, 9000], [4000, 12000]);
+  const fitted = page.getByRole("dialog", { name: "Stairs library" });
+  await fitted.getByRole("list", { name: "Stairs that fit" }).waitFor();
+  assert.match(await fitted.innerText(), /Drawn on the plan: 3000 × 3000 mm/, "the space drawn is measured");
+  await fitted.getByRole("list", { name: "Stairs that fit" }).getByRole("listitem").first().click();
+  assert.equal(await fitted.count(), 0);
+  await page.waitForTimeout(1200);
+  const all = (await draft()).stairs;
+  assert.equal(all.length, stairsBefore + 1, "the stair chosen is placed");
+  const put = all.at(-1);
+  const turned = Math.abs(Math.round(put.rotation / 90)) % 2 === 1;
+  assert.deepEqual([put.x, put.y], [2500, 10500], "in the middle of the space drawn");
+  assert.ok((turned ? put.length : put.width) <= 3000 && (turned ? put.width : put.length) <= 3000, "and inside it");
+
   // 12–13. Reloaded: everything still there.
   await page.waitForTimeout(1500);
   const saved = await draft();
