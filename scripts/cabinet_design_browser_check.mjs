@@ -112,25 +112,25 @@ try {
     assert.ok(!(await width.isDisabled()), `${size}: unlocked again`);
     await page.getByLabel("Height in mm").fill("2700");
     await page.getByLabel("Height in mm").press("Enter");
+    // A wardrobe's material is chosen with its size: it decides how it is built.
+    await page.getByRole("radiogroup", { name: "Material" }).getByRole("radio", { name: /oak/i }).click();
     await next(page);
     await page.getByRole("group", { name: "Wardrobe layout" }).getByRole("button", { name: "Straight" }).click();
     await next(page);
     const cards = page.getByRole("group", { name: "Templates" }).getByRole("button");
-    assert.ok(await cards.count() >= 8, `${size}: wardrobe templates offered (${await cards.count()})`);
+    assert.ok(await cards.count() >= 7, `${size}: wardrobe templates offered (${await cards.count()})`);
     assert.equal(await page.getByRole("group", { name: "Templates" }).locator("svg[role=img] rect").count() > 100, true, `${size}: each card is drawn from its parts`);
     await noSideScroll(page, `${size} template step`);
     if (shots) await page.screenshot({ path: join(shots, `cabinet_templates_${size}.png`), fullPage: true });
-    await cards.filter({ hasText: "Wardrobe with top cabinet" }).click();
+    await cards.filter({ hasText: "4-door wardrobe" }).click();
     await next(page);
-    const materials = page.getByRole("radiogroup", { name: "Material" });
-    await materials.getByRole("radio", { name: /oak/i }).click();
     await page.getByRole("group", { name: "Design priority" }).getByRole("button", { name: "Decorative" }).click();
-    await page.getByRole("button", { name: /^Create wardrobe with top cabinet/ }).click();
+    await page.getByRole("button", { name: /^Create 4-door wardrobe/ }).click();
     const wardrobe = await started(page);
     const base = wardrobe.cabinets.find((cabinet) => !cabinet.stackedOn);
     const top = wardrobe.cabinets.find((cabinet) => cabinet.stackedOn);
     assert.equal(base.size.width, 2437.5, `${size}: the wardrobe is the width measured`);
-    assert.ok(top && Math.round(base.size.height + top.size.height) === 2700, `${size}: with a top cabinet to the ceiling`);
+    assert.ok(top && Math.round(base.size.height + top.size.height) === 2700, `${size}: in height modules to the ceiling`);
     assert.equal(wardrobe.carcass.board.id, "mdf-18-oak", `${size}: in the board chosen`);
     assert.equal(wardrobe.wardrobePlan?.priority, "decorative", `${size}: with the priority chosen`);
 
@@ -155,9 +155,11 @@ try {
     await next(page);
     assert.equal(await page.getByRole("group", { name: "Templates" }).getByRole("button", { pressed: true }).locator("span").nth(1).textContent(), "Tall shoe cabinet", `${size}: the gallery's template already chosen`);
     await next(page);
+    await page.getByRole("radiogroup", { name: "Material" }).getByRole("radio", { name: /walnut/i }).click();
     await page.getByRole("button", { name: /^Create tall shoe cabinet/ }).click();
     const shoes = await started(page);
     assert.equal(shoes.cabinets[0].size.height, 2000, `${size}: built to the space`);
+    assert.equal(shoes.carcass.board.id, "mdf-18-walnut", `${size}: in the material chosen last`);
 
     assert.deepEqual(errors, [], `${size}: page errors`);
     await page.close();
@@ -187,7 +189,7 @@ try {
   await page.getByRole("button", { name, exact: true }).click();
   const actions = page.getByRole("toolbar", { name: "Selected cabinet" });
   await actions.waitFor();
-  assert.deepEqual(await actions.getByRole("button").allTextContents(), ["Move", "Resize", "Duplicate", "Delete"], "the selected cabinet's quick actions");
+  assert.deepEqual(await actions.getByRole("button").allTextContents(), ["Move", "Resize", "Duplicate", "Copy", "Delete"], "the selected cabinet's quick actions");
   const pad = () => page.getByRole("button", { name: new RegExp(`^Move ${name} `) }).count();
   assert.ok(await pad() > 0, "the move pad is shown with the selection");
   await actions.getByRole("button", { name: "Move" }).click();
@@ -202,6 +204,14 @@ try {
   await page.waitForFunction(() => window.__spec.cabinets[0].size.width === 2399.5);
   await actions.getByRole("button", { name: "Duplicate" }).click();
   await page.waitForFunction(() => window.__spec.cabinets.length === 2);
+  await actions.getByRole("button", { name: "Delete" }).click();
+  await page.waitForFunction(() => window.__spec.cabinets.length === 1);
+  await page.getByRole("button", { name: await page.evaluate(() => window.__spec.cabinets[0].label), exact: true }).click();
+  await actions.getByRole("button", { name: "Copy" }).click();
+  assert.deepEqual(await actions.getByRole("button").allTextContents(), ["Move", "Resize", "Duplicate", "Copy", "Paste", "Delete"], "Paste appears once something is copied");
+  await actions.getByRole("button", { name: "Paste" }).click();
+  await page.waitForFunction(() => window.__spec.cabinets.length === 2);
+  assert.equal(await page.evaluate(() => Math.round(window.__spec.envelope.width)), 4800, "Paste: the copy beside it, the row twice as long");
   await actions.getByRole("button", { name: "Delete" }).click();
   await page.waitForFunction(() => window.__spec.cabinets.length === 1);
 

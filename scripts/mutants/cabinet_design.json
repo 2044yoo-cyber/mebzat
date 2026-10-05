@@ -32,8 +32,8 @@
  {
   "name": "height not capped by the space",
   "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
-  "from": "  const height = Math.min(options.height ?? space.height, tallest);",
-  "to": "  const height = Math.min(options.height ?? space.height, 2700);"
+  "from": "  const height = Math.min(options.heights?.[0] ?? space.height, tallest);",
+  "to": "  const height = Math.min(options.heights?.[0] ?? space.height, 2700);"
  },
  {
   "name": "internal drawers not internal",
@@ -42,16 +42,10 @@
   "to": "...({})"
  },
  {
-  "name": "top cabinet not added",
-  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
-  "from": "      return addTopCabinet(spec, main(spec).id, top);",
-  "to": "      return spec;"
- },
- {
   "name": "side display leaves width",
   "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
-  "from": "straightWardrobe({ ...space, width: space.width - shelf }, 4, \"hinged\")",
-  "to": "straightWardrobe(space, 4, \"hinged\")"
+  "from": "straightWardrobe({ ...space, width: space.width - shelf }, 4, \"hinged\",",
+  "to": "straightWardrobe(space, 4, \"hinged\","
  },
  {
   "name": "material only on carcass",
@@ -254,8 +248,8 @@
  {
   "name": "wizard skips layout",
   "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
-  "from": "if (type === \"wardrobe\") return [\"type\", \"space\", \"layout\", \"template\", \"material\"];",
-  "to": "if (type === \"wardrobe\") return [\"type\", \"space\", \"template\", \"material\"];"
+  "from": "if (type === \"wardrobe\") return [\"type\", \"space\", \"layout\", \"template\", \"review\"];",
+  "to": "if (type === \"wardrobe\") return [\"type\", \"space\", \"template\", \"review\"];"
  },
  {
   "name": "start panel without wizard template",
@@ -266,13 +260,13 @@
  {
   "name": "shaped wardrobe over height",
   "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
-  "from": "height: Math.min(space.height, tallest) });",
-  "to": "height: Math.min(space.height, 2700) });"
+  "from": "height: Math.min(wanted, tallest) })",
+  "to": "height: Math.min(wanted, 2700) })"
  },
  {
   "name": "no note for a tall room",
   "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
-  "from": "  if (options.height === undefined && space.height > tallest) spec = note(",
+  "from": "  if (!options.heights && space.height > tallest) spec = note(",
   "to": "  if (false) spec = note("
  },
  {

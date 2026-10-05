@@ -1,4 +1,4 @@
-import type { Bay, Cabinet } from "../types/spec";
+import type { Bay, Cabinet, DesignSpec } from "../types/spec";
 
 /**
  * A wardrobe's transport modules: the separate carcasses it is built, carried
@@ -206,4 +206,27 @@ export function applyTransportDefaults(cabinet: Cabinet, t: number): void {
   if (cabinet.transport || cabinet.stackedOn) return;
   cabinet.transport = { joints: defaultJoints(cabinet.size.width).map((at) => ({ at })), auto: true, alignTop: true, connector: "confirmat" };
   fitBaysToModules(cabinet, t);
+}
+
+/**
+ * Where a cabinet sits in a wardrobe's stack of height modules: the upper
+ * carcass stacked on another, the lower one something stands on, or neither.
+ * Kitchens stack too — an extra top row — but call it their own way.
+ */
+export function stackRoleOf(spec: Pick<DesignSpec, "furnitureType" | "cabinets">, cabinet: Pick<Cabinet, "id" | "stackedOn">): "Upper" | "Lower" | null {
+  if (spec.furnitureType !== "wardrobe") return null;
+  if (cabinet.stackedOn) return "Upper";
+  return spec.cabinets.some((other) => other.stackedOn === cabinet.id) ? "Lower" : null;
+}
+
+/**
+ * A module's name, the same on the drawing, in the panel and on the cut list:
+ * "Lower module 1", "Upper module 2", "Module 1" for a wardrobe in one height,
+ * "Upper module" for a height module with no width joints. `numbered` is
+ * whether the cabinet has more than one width module.
+ */
+export function moduleLabel(spec: Pick<DesignSpec, "furnitureType" | "cabinets">, cabinet: Pick<Cabinet, "id" | "stackedOn">, index: number, numbered: boolean): string {
+  if (spec.furnitureType !== "wardrobe") return `${cabinet.stackedOn ? "Top" : "Base"} module ${index + 1}`;
+  const role = stackRoleOf(spec, cabinet);
+  return role ? `${role} module${numbered ? ` ${index + 1}` : ""}` : `Module ${index + 1}`;
 }

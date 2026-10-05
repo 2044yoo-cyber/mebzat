@@ -98,6 +98,53 @@ export const BOARDS: Board[] = [
     priceKey: "Solid UV 18mm",
     fallbackRate: 11000,
   },
+
+  // Long sheets. A 1220 × 2440 sheet cannot give a 2600 mm gable, so a tall
+  // wardrobe in standard board is made in two height modules; one cut from a
+  // long sheet can be a single carcass to the ceiling. Their own price keys,
+  // because a live rate for a standard sheet is not the price of a long one;
+  // the fallback is the standard sheet's rate pro rata by area — an estimate
+  // to be confirmed with the supplier, not a quoted price.
+  {
+    id: "mdf-18-white-2750",
+    label: "18 mm MDF, white melamine — long sheet 1220 × 2750",
+    thickness: 18,
+    sheet: { length: 2750, width: 1220 },
+    grain: "none",
+    appearance: { colour: "White", hex: "#f2f0ec", sheen: "satin" },
+    priceKey: "MDF 18mm melamine 2750",
+    fallbackRate: 6420,
+  },
+  {
+    id: "mdf-18-oak-2750",
+    label: "18 mm MDF, oak laminate — long sheet 1220 × 2750",
+    thickness: 18,
+    sheet: { length: 2750, width: 1220 },
+    grain: "length",
+    appearance: { colour: "Oak", hex: "#b88757", sheen: "satin" },
+    priceKey: "MDF 18mm melamine 2750",
+    fallbackRate: 6420,
+  },
+  {
+    id: "mdf-18-walnut-2750",
+    label: "18 mm MDF, walnut laminate — long sheet 1220 × 2750",
+    thickness: 18,
+    sheet: { length: 2750, width: 1220 },
+    grain: "length",
+    appearance: { colour: "Walnut", hex: "#6b4a32", sheen: "satin" },
+    priceKey: "MDF 18mm melamine 2750",
+    fallbackRate: 6420,
+  },
+  {
+    id: "mdf-18-white-2800",
+    label: "18 mm MDF, white melamine — long sheet 1220 × 2800",
+    thickness: 18,
+    sheet: { length: 2800, width: 1220 },
+    grain: "none",
+    appearance: { colour: "White", hex: "#f2f0ec", sheen: "satin" },
+    priceKey: "MDF 18mm melamine 2800",
+    fallbackRate: 6540,
+  },
   {
     id: "mdf-6-white",
     label: "6 mm MDF back panel, white",

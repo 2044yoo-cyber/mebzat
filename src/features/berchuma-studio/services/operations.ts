@@ -1,9 +1,10 @@
+import { MIN_HEIGHT_MODULE, PREFERRED_LOWER, heightStackOf, planHeights } from "./height-modules";
 import { findModule } from "./kitchen-modules";
 import { placeOnRun, solveLayout } from "./layout";
 import { LIMITS, practicalDrawerCount, validateSpec } from "../types/spec";
 import type { Bay, Cabinet, CabinetKind, DesignSpec } from "../types/spec";
 import { drawerFrontHeights } from "./drawer-construction";
-import { cabinetFaceBoards, cabinetFronts, sectionBands as sectionBandsOf, type DoorLeaf } from "./geometry";
+import { cabinetFaceBoards, cabinetFronts, isSideDisplay, sectionBands as sectionBandsOf, type DoorLeaf } from "./geometry";
 import { doorRectProblem, doorSnapTargets, equalLeaves, MIN_DOOR, type FrontRect } from "./door-layout";
 import { bayLayout, bayModules, carcassInterior, defaultJoints, jointSnapTargets, MIN_MODULE, moduleInterior, modulesOf } from "./transport-modules";
 
@@ -417,6 +418,55 @@ export function duplicateCabinet(spec: DesignSpec, id: string): DesignSpec {
 
     shiftAfter(draft, rowOf(target), insertAt, target.size.width);
     draft.cabinets.push(copy);
+    // A wardrobe module is copied with what stands on it: the copy is the
+    // same height, made the same way, not a lower module on its own.
+    copyUpper(draft, target.id, copy.id);
+  });
+}
+
+function copyUpper(draft: DesignSpec, fromId: string, toId: string, upper = draft.cabinets.find((cabinet) => cabinet.stackedOn === fromId)): void {
+  if (!upper || draft.furnitureType !== "wardrobe") return;
+  const top = structuredClone(upper);
+  top.id = freshId(upper.kind);
+  top.stackedOn = toId;
+  top.bays = top.bays.map((bay) => ({ ...bay, id: freshId("bay") }));
+  draft.cabinets.push(top);
+}
+
+/** A copied cabinet, and the upper module standing on it when it has one. */
+export type CabinetClip = { cabinet: Cabinet; upper?: Cabinet };
+
+/** What Copy keeps: the cabinet as it is now, with its upper module. */
+export function copyCabinet(spec: DesignSpec, id: string): CabinetClip | null {
+  const target = find(spec, id);
+  if (!target) return null;
+  const lower = target.stackedOn ? find(spec, target.stackedOn) ?? target : target;
+  const upper = spec.cabinets.find((cabinet) => cabinet.stackedOn === lower.id);
+  return { cabinet: structuredClone(lower), ...(upper ? { upper: structuredClone(upper) } : {}) };
+}
+
+/**
+ * A copied cabinet put in after `afterId` — or at the end of the floor row —
+ * pushing the rest along: a fresh cabinet, its bays and upper module new.
+ */
+export function pasteCabinet(spec: DesignSpec, clip: CabinetClip, afterId?: string | null): DesignSpec {
+  return change(spec, (draft) => {
+    if (draft.cabinets.length >= 40) return;
+    const picked = afterId ? find(draft, afterId) : undefined;
+    const anchorBase = picked?.stackedOn ? find(draft, picked.stackedOn) : picked;
+    const floor = draft.cabinets.filter((cabinet) => !cabinet.stackedOn && cabinet.kind !== "wall");
+    const anchor = anchorBase ?? floor.sort((a, b) => along(b) + b.size.width - (along(a) + a.size.width))[0];
+    const copy = structuredClone(clip.cabinet);
+    copy.id = freshId(copy.kind);
+    copy.bays = copy.bays.map((bay) => ({ ...bay, id: freshId("bay") }));
+    delete copy.stackedOn;
+    if (anchor) {
+      const insertAt = along(anchor) + anchor.size.width;
+      bindToRow(copy, rowOf(anchor), insertAt);
+      shiftAfter(draft, rowOf(anchor), insertAt, copy.size.width);
+    }
+    draft.cabinets.push(copy);
+    copyUpper(draft, clip.cabinet.id, copy.id, clip.upper);
   });
 }
 
@@ -472,31 +522,181 @@ export function addTopCabinet(spec: DesignSpec, lowerId: string, height = 700): 
     const lower = find(draft, lowerId);
     if (!lower || lower.stackedOn || draft.cabinets.some((cabinet) => cabinet.stackedOn === lower.id)) return;
     if (draft.furnitureType === "kitchen" && draft.kitchenSetup && lower.position.y + lower.size.height + height > draft.kitchenSetup.roomHeight) return;
-    const width = lower.size.width;
-    draft.cabinets.push({
+    pushUpper(draft, lower, height);
+  });
+}
+
+/**
+ * A carcass stacked on another: the same width, depth and door layout, its
+ * own sides, top, bottom and back. On a wardrobe it is the upper height
+ * module; on a kitchen unit, an extra top row.
+ */
+function pushUpper(draft: DesignSpec, lower: Cabinet, height: number): Cabinet {
+  const width = lower.size.width;
+  const upper: Cabinet = {
       id: freshId("top-cabinet"),
-      label: "Top cabinet",
+      label: draft.furnitureType === "wardrobe" ? (isSideDisplay(lower) ? `${lower.label}, upper module` : "Upper module") : "Top cabinet",
       kind: lower.kind,
       position: { x: lower.position.x, y: lower.position.y + lower.size.height, z: lower.position.z },
       runId: lower.runId,
       offset: lower.offset,
       size: { width, height: clamp(height, 200, LIMITS.maxHeight), depth: lower.size.depth },
-      // Keep only the lower cabinet's vertical and door layout upstairs.
+      // Keep only the lower cabinet's vertical and door layout upstairs. An
+      // open display stays one: shelves, about one every 350 mm.
       bays: lower.bays.map((bay) => ({
         ...bay,
         id: freshId("bay"),
-        fitting: { kind: "open" as const },
+        fitting: bay.display && bay.fitting.kind === "shelves" ? { ...bay.fitting, count: Math.max(1, Math.floor(height / 350)) } : { kind: "open" as const },
       })),
       plinthHeight: 0,
       stackedOn: lower.id,
-    });
-  });
+  };
+  draft.cabinets.push(upper);
+  return upper;
 }
 
 /** Remove only the independently built overhead cabinet. */
 export function removeTopCabinet(spec: DesignSpec, lowerId: string): DesignSpec {
   return change(spec, (draft) => {
     draft.cabinets = draft.cabinets.filter((cabinet) => cabinet.stackedOn !== lowerId);
+  });
+}
+
+// ---- Height modules -----------------------------------------------------------
+//
+// A wardrobe divided in height is a lower carcass with an upper one stacked on
+// it — each with its own sides, top, bottom and back, joined on site through
+// the lower's top and the upper's bottom. The division runs across the
+// cabinets standing beside it at the same height — a side display, a second
+// wardrobe — unless the owner turns that off, so the whole front reads as one
+// grid of modules. See `height-modules.ts` for what the material allows.
+
+/** The lower cabinets one height division runs across. */
+function heightGroup(draft: DesignSpec, lower: Cabinet): Cabinet[] {
+  if (draft.furnitureType !== "wardrobe" || lower.heightModules?.align === false) return [lower];
+  const total = (cabinet: Cabinet) => cabinet.size.height + (draft.cabinets.find((other) => other.stackedOn === cabinet.id)?.size.height ?? 0);
+  const row = rowOf(lower);
+  return draft.cabinets.filter(
+    (cabinet) =>
+      cabinet.id === lower.id ||
+      (!cabinet.stackedOn && cabinet.kind !== "wall" && cabinet.heightModules?.align !== false && (cabinet.runId ?? null) === row.runId && cabinet.position.y === row.y && Math.abs(total(cabinet) - total(lower)) < 0.5),
+  );
+}
+
+function lowerOf(draft: DesignSpec, cabinetId: string): Cabinet | undefined {
+  const cabinet = find(draft, cabinetId);
+  return cabinet?.stackedOn ? find(draft, cabinet.stackedOn) : cabinet;
+}
+
+/**
+ * The heights of a wardrobe's modules, floor up: one height for one carcass,
+ * two for a lower and an upper. Applied across its height group; the overall
+ * height is whatever they add up to.
+ */
+export function applyHeightModules(spec: DesignSpec, cabinetId: string, heights: number[], options: { auto?: boolean; locked?: boolean } = {}): DesignSpec {
+  return change(spec, (draft) => {
+    const lower = lowerOf(draft, cabinetId);
+    if (!lower || !heights.length) return;
+    for (const member of heightGroup(draft, lower)) {
+      const upper = draft.cabinets.find((cabinet) => cabinet.stackedOn === member.id);
+      member.heightModules = { auto: options.auto ?? member.heightModules?.auto ?? false, align: member.heightModules?.align ?? true, ...(options.locked ?? member.heightModules?.locked ? { locked: true } : {}) };
+      if (heights.length === 1) {
+        member.size.height = clamp(heights[0]!, 100, LIMITS.maxHeight);
+        if (upper) draft.cabinets = draft.cabinets.filter((cabinet) => cabinet.id !== upper.id);
+        continue;
+      }
+      member.size.height = clamp(heights[0]!, MIN_HEIGHT_MODULE, LIMITS.maxHeight);
+      if (upper) upper.size.height = clamp(heights[1]!, MIN_HEIGHT_MODULE, LIMITS.maxHeight);
+      else pushUpper(draft, member, heights[1]!);
+    }
+  });
+}
+
+/**
+ * The boundary between the lower and upper module moved: the lower module
+ * becomes `lowerHeight`, the upper takes the rest, and the overall height
+ * stays what it was. Refused while the boundary is locked.
+ */
+export function moveHeightPartition(spec: DesignSpec, cabinetId: string, lowerHeight: number): DesignSpec {
+  const stack = heightStackOf(spec, cabinetId);
+  if (!stack?.upper || stack.lower.heightModules?.locked) return spec;
+  const total = stack.lower.size.height + stack.upper.size.height;
+  const lower = Math.min(total - MIN_HEIGHT_MODULE, Math.max(MIN_HEIGHT_MODULE, lowerHeight));
+  return applyHeightModules(spec, stack.lower.id, [lower, total - lower], { auto: false });
+}
+
+/** The upper module's height typed: the lower takes the difference, the total kept. */
+export function setUpperModuleHeight(spec: DesignSpec, cabinetId: string, upperHeight: number): DesignSpec {
+  const stack = heightStackOf(spec, cabinetId);
+  if (!stack?.upper) return spec;
+  return moveHeightPartition(spec, cabinetId, stack.lower.size.height + stack.upper.size.height - upperHeight);
+}
+
+/**
+ * A new overall height. A locked boundary keeps the lower module and the
+ * upper takes the change; on Auto the material decides again; otherwise the
+ * upper module takes the change while it can, and the lower gives way below
+ * the shortest upper module.
+ */
+export function setOverallHeight(spec: DesignSpec, cabinetId: string, total: number): DesignSpec {
+  const stack = heightStackOf(spec, cabinetId);
+  if (!stack) return spec;
+  const { lower, upper } = stack;
+  if (lower.heightModules?.auto) return applyHeightModules(spec, lower.id, planHeights(spec, lower.id, total).recommended, { auto: true });
+  // One carcass taller than its board can make is divided as recommended,
+  // rather than quietly cut short.
+  if (!upper) {
+    const plan = planHeights(spec, lower.id, total);
+    return applyHeightModules(spec, lower.id, plan.singleFits ? [total] : plan.recommended);
+  }
+  if (lower.heightModules?.locked) return total - lower.size.height >= MIN_HEIGHT_MODULE ? applyHeightModules(spec, lower.id, [lower.size.height, total - lower.size.height]) : spec;
+  const below = Math.min(lower.size.height, total - MIN_HEIGHT_MODULE);
+  return applyHeightModules(spec, lower.id, [below, total - below]);
+}
+
+/** Back to what the material recommends, on Auto, the lock released. */
+export function resetHeightModules(spec: DesignSpec, cabinetId: string): DesignSpec {
+  const stack = heightStackOf(spec, cabinetId);
+  if (!stack) return spec;
+  const total = stack.lower.size.height + (stack.upper?.size.height ?? 0);
+  const next = applyHeightModules(spec, stack.lower.id, planHeights(spec, stack.lower.id, total).recommended, { auto: true });
+  return lockHeightPartition(next, stack.lower.id, false);
+}
+
+/** One carcass again — refused where the material cannot make the whole height in one. */
+export function removeHeightPartition(spec: DesignSpec, cabinetId: string): DesignSpec {
+  const stack = heightStackOf(spec, cabinetId);
+  if (!stack?.upper) return spec;
+  const total = stack.lower.size.height + stack.upper.size.height;
+  if (!planHeights(spec, stack.lower.id, total, "single").singleFits) return spec;
+  return applyHeightModules(spec, stack.lower.id, [total], { auto: false });
+}
+
+/** Divided at the recommended height, or `lowerHeight`. */
+export function divideHeight(spec: DesignSpec, cabinetId: string, lowerHeight?: number): DesignSpec {
+  const stack = heightStackOf(spec, cabinetId);
+  if (!stack || stack.upper) return spec;
+  const total = stack.lower.size.height;
+  const plan = planHeights(spec, stack.lower.id, total, "partitioned", lowerHeight ?? Math.min(PREFERRED_LOWER, total - MIN_HEIGHT_MODULE));
+  if (plan.modules[1]! < MIN_HEIGHT_MODULE) return spec;
+  return applyHeightModules(spec, stack.lower.id, plan.modules, { auto: false });
+}
+
+export function lockHeightPartition(spec: DesignSpec, cabinetId: string, locked: boolean): DesignSpec {
+  return change(spec, (draft) => {
+    const lower = lowerOf(draft, cabinetId);
+    if (!lower) return;
+    for (const member of heightGroup(draft, lower)) {
+      member.heightModules = { auto: locked ? false : member.heightModules?.auto ?? false, align: member.heightModules?.align ?? true, ...(locked ? { locked: true } : {}) };
+    }
+  });
+}
+
+/** Whether this cabinet's height division runs across its neighbours. */
+export function setHeightAlign(spec: DesignSpec, cabinetId: string, align: boolean): DesignSpec {
+  return change(spec, (draft) => {
+    const lower = lowerOf(draft, cabinetId);
+    if (lower) lower.heightModules = { auto: lower.heightModules?.auto ?? false, ...lower.heightModules, align };
   });
 }
 
@@ -1589,7 +1789,11 @@ export function addSideDisplay(spec: DesignSpec, wardrobeId: string, options: { 
     const t = draft.carcass.board.thickness;
     const width = clamp(Math.round(options.width ?? 450), LIMITS.minWidth, 1200);
     const depth = clamp(Math.round(options.depth ?? lower.size.depth), 200, lower.size.depth);
-    const height = lower.size.height + (top?.size.height ?? 0);
+    // Beside a wardrobe divided in height, the shelves are divided the same
+    // way — a lower module and an upper — so the front is one grid. Kept
+    // whole only where the wardrobe's own division is not shared.
+    const divided = draft.furnitureType === "wardrobe" && top && lower.heightModules?.align !== false;
+    const height = divided ? lower.size.height : lower.size.height + (top?.size.height ?? 0);
     const targetRow = rowOf(lower);
     const x = options.side === "left" ? along(lower) : along(lower) + lower.size.width;
     shiftAfter(draft, targetRow, x, width);
@@ -1611,6 +1815,10 @@ export function addSideDisplay(spec: DesignSpec, wardrobeId: string, options: { 
     };
     bindToRow(added, targetRow, x);
     draft.cabinets.push(added);
+    if (divided) {
+      added.heightModules = { auto: lower.heightModules?.auto ?? false, align: true, ...(lower.heightModules?.locked ? { locked: true } : {}) };
+      pushUpper(draft, added, top!.size.height);
+    }
   });
 }
 

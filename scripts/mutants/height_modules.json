@@ -1,0 +1,260 @@
+[
+ {
+  "name": "grain ignored when turning",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "return part.board.grain === \"none\" && part.length <= width && part.width <= length;",
+  "to": "return part.length <= width && part.width <= length;"
+ },
+ {
+  "name": "height-independent misfits counted",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "const worst = parts.filter((part) => !partFits(part) && heightCaused(part))",
+  "to": "const worst = parts.filter((part) => !partFits(part))"
+ },
+ {
+  "name": "upper keeps its plinth",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "    if (upper) cabinet.plinthHeight = 0;",
+  "to": ""
+ },
+ {
+  "name": "misfit word wrong",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "      return \"side panel\";",
+  "to": "      return \"panel\";"
+ },
+ {
+  "name": "message gives the part not the sheet",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "but the selected board is ${misfit.board.sheet.length} mm.",
+  "to": "but the selected board is ${misfit.board.sheet.width} mm."
+ },
+ {
+  "name": "tallest ignores the overshoot",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "    height = Math.floor(height - over);",
+  "to": "    height = Math.floor(height - 100);"
+ },
+ {
+  "name": "preferred lower ignored",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "const recommendedLower = Math.max(MIN_HEIGHT_MODULE, Math.min(PREFERRED_LOWER, tallestLower, total - MIN_HEIGHT_MODULE));",
+  "to": "const recommendedLower = Math.max(MIN_HEIGHT_MODULE, Math.min(tallestLower, total - MIN_HEIGHT_MODULE));"
+ },
+ {
+  "name": "always divide",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "const recommended = whole.ok ? [total] : [recommendedLower, total - recommendedLower];",
+  "to": "const recommended = [recommendedLower, total - recommendedLower];"
+ },
+ {
+  "name": "short upper allowed",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "      if (heights[1]! < MIN_HEIGHT_MODULE) problems.push(",
+  "to": "      if (false) problems.push("
+ },
+ {
+  "name": "lower not checked",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "      if (!below.ok && below.misfit) problems.push(`Lower module: ${misfitMessage(below.misfit)}`);",
+  "to": ""
+ },
+ {
+  "name": "single not checked",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "    } else if (!whole.ok && whole.misfit) {",
+  "to": "    } else if (false) {"
+ },
+ {
+  "name": "partitioned mode ignored",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": "    : mode === \"partitioned\" ? [lower, total - lower]",
+  "to": "    : mode === \"partitioned\" ? recommended"
+ },
+ {
+  "name": "upper not created",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "      else pushUpper(draft, member, heights[1]!);",
+  "to": ""
+ },
+ {
+  "name": "single leaves the upper",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "        if (upper) draft.cabinets = draft.cabinets.filter((cabinet) => cabinet.id !== upper.id);",
+  "to": ""
+ },
+ {
+  "name": "auto not recorded",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "      member.heightModules = { auto: options.auto ?? member.heightModules?.auto ?? false,",
+  "to": "      member.heightModules = { auto: false,"
+ },
+ {
+  "name": "side not aligned",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "      (!cabinet.stackedOn && cabinet.kind !== \"wall\" && cabinet.heightModules?.align !== false && (cabinet.runId ?? null) === row.runId && cabinet.position.y === row.y && Math.abs(total(cabinet) - total(lower)) < 0.5),",
+  "to": "      false,"
+ },
+ {
+  "name": "align off ignored",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  if (draft.furnitureType !== \"wardrobe\" || lower.heightModules?.align === false) return [lower];",
+  "to": "  if (draft.furnitureType !== \"wardrobe\") return [lower];"
+ },
+ {
+  "name": "move ignores lock",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  if (!stack?.upper || stack.lower.heightModules?.locked) return spec;",
+  "to": "  if (!stack?.upper) return spec;"
+ },
+ {
+  "name": "move changes total",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  return applyHeightModules(spec, stack.lower.id, [lower, total - lower], { auto: false });",
+  "to": "  return applyHeightModules(spec, stack.lower.id, [lower, stack.upper.size.height], { auto: false });"
+ },
+ {
+  "name": "move past minimum",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  const lower = Math.min(total - MIN_HEIGHT_MODULE, Math.max(MIN_HEIGHT_MODULE, lowerHeight));",
+  "to": "  const lower = lowerHeight;"
+ },
+ {
+  "name": "overall on locked moves lower",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  if (lower.heightModules?.locked) return total - lower.size.height >= MIN_HEIGHT_MODULE ? applyHeightModules(spec, lower.id, [lower.size.height, total - lower.size.height]) : spec;",
+  "to": ""
+ },
+ {
+  "name": "overall auto ignored",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  if (lower.heightModules?.auto) return applyHeightModules(spec, lower.id, planHeights(spec, lower.id, total).recommended, { auto: true });",
+  "to": ""
+ },
+ {
+  "name": "tall single cut short",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    return applyHeightModules(spec, lower.id, plan.singleFits ? [total] : plan.recommended);",
+  "to": "    return applyHeightModules(spec, lower.id, [total]);"
+ },
+ {
+  "name": "reset keeps lock",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  return lockHeightPartition(next, stack.lower.id, false);",
+  "to": "  return next;"
+ },
+ {
+  "name": "remove ignores the board",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  if (!planHeights(spec, stack.lower.id, total, \"single\").singleFits) return spec;",
+  "to": ""
+ },
+ {
+  "name": "side display full height",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    const height = divided ? lower.size.height : lower.size.height + (top?.size.height ?? 0);",
+  "to": "    const height = lower.size.height + (top?.size.height ?? 0);"
+ },
+ {
+  "name": "duplicate drops upper",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    copyUpper(draft, target.id, copy.id);\n  });",
+  "to": "  });"
+ },
+ {
+  "name": "paste drops upper",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    copyUpper(draft, clip.cabinet.id, copy.id, clip.upper);",
+  "to": ""
+ },
+ {
+  "name": "copy from upper copies the upper",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  const lower = target.stackedOn ? find(spec, target.stackedOn) ?? target : target;",
+  "to": "  const lower = target;"
+ },
+ {
+  "name": "height connectors missing",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "      for (const carcassModule of modulesOf(upper)) entry.count += 2 * connectorsPerJoint(carcassModule.width);",
+  "to": ""
+ },
+ {
+  "name": "old top cabinets get connectors",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "      if (!lower?.heightModules) continue;",
+  "to": "      if (!lower) continue;"
+ },
+ {
+  "name": "height-only modules untagged",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "  const tagged = modular || stackRoleOf(spec, cabinet) !== null;",
+  "to": "  const tagged = modular;"
+ },
+ {
+  "name": "upper named lower",
+  "file": "src/features/berchuma-studio/services/transport-modules.ts",
+  "from": "  if (cabinet.stackedOn) return \"Upper\";",
+  "to": "  if (cabinet.stackedOn) return \"Lower\";"
+ },
+ {
+  "name": "templates ignore heights",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "    spec = applyHeightModules(spec, main(spec).id, options.heights, { auto: options.heightAuto ?? false });",
+  "to": ""
+ },
+ {
+  "name": "template board applied late",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "  if (options.boardId) base = withMaterial(base, options.boardId);",
+  "to": ""
+ },
+ {
+  "name": "L divided anyway",
+  "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
+  "from": "if (template.type === \"wardrobe\" && (options.layout ?? \"straight\") === \"straight\" && options.heights?.length) {",
+  "to": "if (template.type === \"wardrobe\" && options.heights?.length) {"
+ },
+ {
+  "name": "long sheet priced as standard",
+  "file": "src/features/berchuma-studio/types/catalogue.ts",
+  "from": "    priceKey: \"MDF 18mm melamine 2750\",\n    fallbackRate: 6420,\n  },\n  {\n    id: \"mdf-18-oak-2750\"",
+  "to": "    priceKey: \"MDF 18mm melamine\",\n    fallbackRate: 5700,\n  },\n  {\n    id: \"mdf-18-oak-2750\""
+ },
+ {
+  "name": "assembly omits height",
+  "file": "src/features/berchuma-studio/services/exports.ts",
+  "from": "  const modular = spec.cabinets.filter((cabinet) => modulesOf(cabinet).length > 1 || stacked(cabinet));",
+  "to": "  const modular = spec.cabinets.filter((cabinet) => modulesOf(cabinet).length > 1);"
+ },
+ {
+  "name": "wizard builds without heights",
+  "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
+  "from": "heights: plan.plan.modules, heightAuto",
+  "to": "heights: undefined, heightAuto"
+ },
+ {
+  "name": "create not blocked",
+  "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
+  "from": "disabled={!template || blocked.length > 0}",
+  "to": "disabled={!template}"
+ },
+ {
+  "name": "panel remove always enabled",
+  "file": "src/features/berchuma-studio/components/editor/height-modules-panel.tsx",
+  "from": "                disabled={!plan.singleFits}",
+  "to": "                disabled={false}"
+ },
+ {
+  "name": "kitchen loses its top row",
+  "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+  "from": "{spec.furnitureType === \"kitchen\" && [\"wall\", \"tall\"].includes(selected.kind) ? <TopCabinet",
+  "to": "{false ? <TopCabinet"
+ },
+ {
+  "name": "a part grown too long but also too deep is ignored",
+  "file": "src/features/berchuma-studio/services/height-modules.ts",
+  "from": " || (part.length > before.length && part.length > longest(part.board));",
+  "to": ";"
+ }
+]

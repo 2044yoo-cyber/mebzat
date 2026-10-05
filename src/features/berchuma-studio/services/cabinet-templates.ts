@@ -1,8 +1,9 @@
-import { addNiche, addSideDisplay, addTopCabinet, resizeCabinet } from "./operations";
+import { addNiche, addSideDisplay, applyHeightModules, resizeCabinet } from "./operations";
 import { moduleInterior, modulesOf, type CabinetModule } from "./transport-modules";
 import { startingDesign, wardrobeShapeDesign } from "./starting-designs";
 import { edgeBandForBoard } from "./wardrobe-materials";
 import { BOARDS, findBoard } from "../types/catalogue";
+import type { Board } from "../types/spec";
 import { LIMITS, maximumWardrobeHeight, validateSpec, type Bay, type Cabinet, type DesignKind, type DesignSpec } from "../types/spec";
 import type { KitchenSetup } from "../types/kitchen";
 
@@ -24,7 +25,22 @@ import type { KitchenSetup } from "../types/kitchen";
 export type CabinetType = "wardrobe" | "kitchen" | "vanity" | "tv_unit" | "shoe" | "storage" | "office" | "custom";
 export type Space = { width: number; height: number; depth: number };
 export type WardrobeLayout = "straight" | "l_shaped" | "u_shaped";
-export type TemplateOptions = { layout?: WardrobeLayout; walls?: number[] };
+export type TemplateOptions = {
+  layout?: WardrobeLayout;
+  walls?: number[];
+  /** The board the design is made in, chosen before it is laid out: it decides how tall one carcass can be. */
+  boardId?: string;
+  /**
+   * A wardrobe's height modules, floor up: one height for one carcass, two
+   * for a lower module and an upper one. Absent is one carcass to the space's
+   * height, as far as the board allows.
+   */
+  heights?: number[];
+  /** Whether the height division follows the material from now on. */
+  heightAuto?: boolean;
+  /** Width module joints chosen by hand, from the left, mm. Absent is the 1600 mm rule. */
+  joints?: number[];
+};
 
 export type CabinetTemplate = {
   id: string;
@@ -141,18 +157,21 @@ function wardrobeBaysFor(cabinet: Cabinet, wanted: number, style: Bay["door"], i
   return { bays, doors: perModule.reduce((sum, value) => sum + value, 0) };
 }
 
-/** A straight wardrobe of a template's composition, laid out in the space. */
-function straightWardrobe(space: Space, doors: number, style: Bay["door"], options: { internalDrawers?: boolean; height?: number } = {}): DesignSpec {
-  const base = startingDesign("wardrobe", { width: space.width });
-  // No taller than a gable cut from a stocked sheet: past that the space is
-  // for a top cabinet, which is its own template.
+/** A straight wardrobe of a template's composition, laid out in the space, in its board. */
+function straightWardrobe(space: Space, doors: number, style: Bay["door"], options: TemplateOptions & { internalDrawers?: boolean } = {}): DesignSpec {
+  let base = startingDesign("wardrobe", { width: space.width });
+  if (options.boardId) base = withMaterial(base, options.boardId);
+  // Laid out at the lower module's height: an upper module is stacked on it
+  // afterwards, by `buildTemplate`. One carcass is no taller than its boards
+  // can make it.
   const tallest = maximumWardrobeHeight(base.carcass.board, base.carcass.frontBoard ?? base.carcass.board, main(base).plinthHeight);
-  const height = Math.min(options.height ?? space.height, tallest);
-  const sized = { ...main(base), size: { ...main(base).size, height, depth: Math.min(space.depth, 900) } };
+  const height = Math.min(options.heights?.[0] ?? space.height, tallest);
+  const sized: Cabinet = { ...main(base), size: { ...main(base).size, height, depth: Math.min(space.depth, 900) } };
+  if (options.joints) sized.transport = { ...(sized.transport ?? { alignTop: true, connector: "confirmat" as const }), joints: options.joints.map((at) => ({ at })), auto: false };
   const laid = wardrobeBaysFor(sized, doors, style, options.internalDrawers);
   const cabinet = { ...sized, bays: laid.bays };
   let spec = validateSpec({ ...base, cabinets: base.cabinets.map((entry) => (entry.id === cabinet.id ? cabinet : entry)) }).spec;
-  if (options.height === undefined && space.height > tallest) spec = note(spec, `The space is ${space.height} mm high; a wardrobe carcass stops at ${tallest} mm, the longest gable a stocked sheet gives. "Wardrobe with top cabinet" fills the rest.`);
+  if (!options.heights && space.height > tallest) spec = note(spec, `The space is ${space.height} mm high; one carcass in ${base.carcass.board.label} stops at ${tallest} mm. Divide the height into modules, or choose a longer sheet, to fill the rest.`);
   if (laid.doors !== doors) {
     const modules = modulesOf(main(spec)).length;
     spec = note(spec, `Laid out with ${laid.doors} doors to suit ${space.width} mm: doors are kept to a width that ${style === "sliding" ? "runs" : "hangs"} well${modules > 1 ? `, across ${modules} transport modules` : ""}.`);
@@ -163,39 +182,36 @@ function straightWardrobe(space: Space, doors: number, style: Bay["door"], optio
 function shapedWardrobe(space: Space, options: TemplateOptions): DesignSpec {
   const shape = options.layout ?? "straight";
   const walls = options.walls ?? (shape === "l_shaped" ? [space.width, 1800] : shape === "u_shaped" ? [1800, space.width, 1800] : [space.width]);
-  const probe = startingDesign("wardrobe");
+  let probe = startingDesign("wardrobe");
+  if (options.boardId) probe = withMaterial(probe, options.boardId);
   const tallest = maximumWardrobeHeight(probe.carcass.board, probe.carcass.frontBoard ?? probe.carcass.board, main(probe).plinthHeight);
-  const spec = wardrobeShapeDesign({ shape, walls, depth: Math.min(space.depth, 900), height: Math.min(space.height, tallest) });
-  return validateSpec(spec).spec;
+  const wanted = options.heights ? options.heights.reduce((sum, value) => sum + value, 0) : space.height;
+  let spec = validateSpec(wardrobeShapeDesign({ shape, walls, depth: Math.min(space.depth, 900), height: Math.min(wanted, tallest) })).spec;
+  if (options.boardId) spec = withMaterial(spec, options.boardId);
+  // The corner unit of an L or U is one piece floor to top, so these are
+  // made in one height module: as tall as the board allows.
+  if (wanted > tallest) spec = note(spec, `${shape === "l_shaped" ? "An L" : "A U"} wardrobe is made in one height module; in ${probe.carcass.board.label} that stops at ${tallest} mm. A longer sheet makes it taller.`);
+  return spec;
 }
 
 export const CABINET_TEMPLATES: CabinetTemplate[] = [
-  { id: "wardrobe-2-door", type: "wardrobe", label: "2-door wardrobe", blurb: "Hanging over drawers behind a pair of doors.", layouts: ["straight"], build: (space) => straightWardrobe(space, 2, "hinged") },
-  { id: "wardrobe-3-door", type: "wardrobe", label: "3-door wardrobe", blurb: "A pair for hanging, a single door over shelves and drawers.", layouts: ["straight"], build: (space) => straightWardrobe(space, 3, "hinged") },
-  { id: "wardrobe-4-door", type: "wardrobe", label: "4-door wardrobe", blurb: "Hanging, drawers and shelves behind four doors.", layouts: ["straight"], build: (space) => straightWardrobe(space, 4, "hinged") },
-  { id: "wardrobe-sliding", type: "wardrobe", label: "Sliding wardrobe", blurb: "Sliding doors in pairs — no swing space needed.", layouts: ["straight"], build: (space) => straightWardrobe(space, 2, "sliding") },
-  { id: "wardrobe-internal-drawers", type: "wardrobe", label: "Wardrobe with internal drawers", blurb: "Drawers behind the doors; the outside stays clean.", layouts: ["straight"], build: (space) => straightWardrobe(space, 4, "hinged", { internalDrawers: true }) },
-  {
-    id: "wardrobe-top-cabinet", type: "wardrobe", label: "Wardrobe with top cabinet", blurb: "A full wardrobe and a separate cabinet above it to the ceiling.", layouts: ["straight"],
-    build: (space) => {
-      const baseHeight = Math.min(2100, Math.max(1500, space.height - 300));
-      const spec = straightWardrobe(space, 4, "hinged", { height: baseHeight });
-      const top = Math.max(300, Math.min(900, space.height - baseHeight));
-      return addTopCabinet(spec, main(spec).id, top);
-    },
-  },
+  { id: "wardrobe-2-door", type: "wardrobe", label: "2-door wardrobe", blurb: "Hanging over drawers behind a pair of doors.", layouts: ["straight"], build: (space, options) => straightWardrobe(space, 2, "hinged", options) },
+  { id: "wardrobe-3-door", type: "wardrobe", label: "3-door wardrobe", blurb: "A pair for hanging, a single door over shelves and drawers.", layouts: ["straight"], build: (space, options) => straightWardrobe(space, 3, "hinged", options) },
+  { id: "wardrobe-4-door", type: "wardrobe", label: "4-door wardrobe", blurb: "Hanging, drawers and shelves behind four doors.", layouts: ["straight"], build: (space, options) => straightWardrobe(space, 4, "hinged", options) },
+  { id: "wardrobe-sliding", type: "wardrobe", label: "Sliding wardrobe", blurb: "Sliding doors in pairs — no swing space needed.", layouts: ["straight"], build: (space, options) => straightWardrobe(space, 2, "sliding", options) },
+  { id: "wardrobe-internal-drawers", type: "wardrobe", label: "Wardrobe with internal drawers", blurb: "Drawers behind the doors; the outside stays clean.", layouts: ["straight"], build: (space, options) => straightWardrobe(space, 4, "hinged", { ...options, internalDrawers: true }) },
   {
     id: "wardrobe-side-display", type: "wardrobe", label: "Wardrobe with side display shelves", blurb: "Open shelves at one end, in an accent board.", layouts: ["straight"],
-    build: (space) => {
+    build: (space, options) => {
       const shelf = space.width >= 2000 ? 450 : 350;
-      const spec = straightWardrobe({ ...space, width: space.width - shelf }, 4, "hinged");
+      const spec = straightWardrobe({ ...space, width: space.width - shelf }, 4, "hinged", { ...options, joints: options.joints?.filter((at) => at < space.width - shelf) });
       return addSideDisplay(spec, main(spec).id, { side: "left", width: shelf, depth: Math.min(space.depth, 900), shelves: 5, boardId: "mdf-18-oak" });
     },
   },
   {
     id: "wardrobe-center-niche", type: "wardrobe", label: "Wardrobe with center display niche", blurb: "Two closed sections, an open niche between them.", layouts: ["straight"],
-    build: (space) => {
-      const spec = straightWardrobe(space, 4, "hinged");
+    build: (space, options) => {
+      const spec = straightWardrobe(space, 4, "hinged", options);
       return addNiche(spec, main(spec).id, { width: space.width >= 3000 ? 500 : 400, boardId: "mdf-18-oak", lighting: "shelf" });
     },
   },
@@ -292,6 +308,15 @@ export function findTemplate(templateId: string): CabinetTemplate | undefined {
 /** Boards a cabinet can be made in: the stocked 18 mm sheets. */
 export const CABINET_MATERIALS = BOARDS.filter((board) => board.thickness === 18 && !board.id.startsWith("worktop"));
 
+const LONG_SHEET = /-(\d{4})$/;
+/** The decors offered, each once, in its standard sheet. A longer sheet of the same board is a variant of it. */
+export const CABINET_DECORS = CABINET_MATERIALS.filter((board) => !LONG_SHEET.test(board.id));
+/** The same board in each sheet it is stocked in, shortest first: 1220 × 2440, then the long sheets. */
+export function sheetVariants(boardId: string): Board[] {
+  const base = boardId.replace(LONG_SHEET, "");
+  return CABINET_MATERIALS.filter((board) => board.id.replace(LONG_SHEET, "") === base).sort((a, b) => a.sheet.length - b.sheet.length);
+}
+
 /**
  * A design in another board: carcass, fronts and interior, the edge band
  * that matches it, and the finish the render and the gallery read. The plinth
@@ -313,6 +338,11 @@ export function buildTemplate(templateId: string, space: Space, options: Templat
   if (!template?.build) return null;
   let spec = template.build(space, options);
   if (options.boardId) spec = withMaterial(spec, options.boardId);
+  // The height modules, across the wardrobe and whatever stands beside it:
+  // an upper module stacked on each, or one carcass recorded as such.
+  if (template.type === "wardrobe" && (options.layout ?? "straight") === "straight" && options.heights?.length) {
+    spec = applyHeightModules(spec, main(spec).id, options.heights, { auto: options.heightAuto ?? false });
+  }
   if (template.type === "wardrobe" && options.priority) {
     spec = { ...spec, wardrobePlan: { priority: options.priority, ...(options.ends ?? { leftEnd: "wall", rightEnd: "wall" }) } };
   }

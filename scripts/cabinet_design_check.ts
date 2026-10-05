@@ -103,11 +103,14 @@ for (const id of ["wardrobe-2-door", "wardrobe-3-door", "wardrobe-4-door", "ward
 {
   const spec = buildTemplate("wardrobe-internal-drawers", { width: 2400, height: 2400, depth: 600 }, {})!;
   ok(buildParts(spec).parts.some((part) => part.role === "drawer_front" && part.internal), "internal drawers template: drawers behind the doors");
-  const top = buildTemplate("wardrobe-top-cabinet", { width: 2400, height: 2700, depth: 600 }, {})!;
+  // Height modules replaced the top-cabinet template: any wardrobe template
+  // can be divided in height (scripts/height_modules_check.ts).
+  ok(!findTemplate("wardrobe-top-cabinet"), "there is no special top-cabinet template any more");
+  const top = buildTemplate("wardrobe-4-door", { width: 2400, height: 2700, depth: 600 }, { heights: [2100, 600] })!;
   const above = top.cabinets.find((cabinet) => cabinet.stackedOn);
-  ok(above, "top cabinet template: a cabinet stacked on the wardrobe");
+  ok(above, "a wardrobe built in two height modules: an upper module stacked on it");
   equal(Math.round(main(top).size.height + above!.size.height), 2700, "and together they reach the ceiling");
-  equal(jointsOf(above!), jointsOf(main(top)), "its modules over the modules below");
+  equal(jointsOf(above!), jointsOf(main(top)), "its width modules over the modules below");
   const side = buildTemplate("wardrobe-side-display", { width: 2400, height: 2400, depth: 600 }, {})!;
   equal(side.cabinets.reduce((sum, cabinet) => sum + cabinet.size.width, 0), 2400, "side display template: wardrobe and shelves fill the width");
   ok(side.cabinets.some((cabinet) => cabinet.bays.some((bay) => bay.display)), "and the shelves are an open display");
@@ -193,7 +196,7 @@ equal(withMaterial(startingDesign("wardrobe"), "not-a-board"), startingDesign("w
   equal(clearWindows(spec, undefined), spec, "clearWindows without windows returns the design itself");
   const lofty = buildTemplate("wardrobe-4-door", { width: 2400, height: 3000, depth: 600 }, {})!;
   equal([main(lofty).size.height, lofty.meta.corrections], [2540, []], "in a 3000 mm room a wardrobe stops at 2540 mm, the longest gable a sheet gives — with nothing to correct");
-  ok(lofty.meta.assumptions.some((line) => /Wardrobe with top cabinet/.test(line)), "and points at the top cabinet template for the rest");
+  ok(lofty.meta.assumptions.some((line) => /Divide the height into modules, or choose a longer sheet/.test(line)), "and says how to fill the rest: height modules or a longer sheet");
   equal(buildTemplate("wardrobe-l", { width: 2400, height: 3000, depth: 600 }, { layout: "l_shaped" })!.meta.corrections, [], "an L wardrobe in a tall room is not over height either");
   // A top cabinet narrower than the cabinet it stands on, clear of the
   // window, still goes when the cabinet under it does.
@@ -261,7 +264,7 @@ equal(withMaterial(startingDesign("wardrobe"), "not-a-board"), startingDesign("w
   ok(/<OpeningPanel/.test(start) && /<PlanEditor/.test(start) && /<ImageToDesign/.test(start), "and keeps the photo, window and plan routes");
   const wizard = code("src/features/berchuma-studio/components/cabinet-start.tsx");
   const steps = functionText(wizard, "stepsFor");
-  ok(/kitchen"\) return \["type", "template", "material"\]/.test(steps) && /wardrobe"\) return \["type", "space", "layout", "template", "material"\]/.test(steps) && /return \["type", "space", "template", "material"\]/.test(steps), "type → space → layout → template → material, by type");
+  ok(/kitchen"\) return \["type", "template", "material"\]/.test(steps) && /wardrobe"\) return \["type", "space", "layout", "template", "review"\]/.test(steps) && /return \["type", "space", "template", "material"\]/.test(steps), "type → space → layout → template → review for a wardrobe (material and modules with its size), material last for the rest");
   ok(/onStart=\{\(spec\) => onStart\(withMaterial\(spec, boardId\)\)\}/.test(wizard), "a kitchen gets the chosen material");
   ok(/const spec = template \? build\(template, boardId\) : null;\s*if \(spec\) onStart\(spec\);/.test(wizard), "Create builds the chosen template in the chosen board");
 

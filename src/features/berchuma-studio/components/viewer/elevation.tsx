@@ -35,7 +35,7 @@ import {
   type DoorRef,
 } from "../../services/operations";
 import { findBoard } from "../../types/catalogue";
-import { modulesOf } from "../../services/transport-modules";
+import { moduleLabel, modulesOf, stackRoleOf } from "../../services/transport-modules";
 import { snapValue } from "../../services/door-layout";
 import type { DisplayOptions } from "../../types/spec";
 import type { Bay, Cabinet, DesignSpec } from "../../types/spec";
@@ -83,6 +83,9 @@ export function Elevation({
   selectedJoint = null,
   onSelectJoint,
   onJointMove,
+  selectedPartition = null,
+  onSelectPartition,
+  onPartitionMove,
 }: {
   spec: DesignSpec;
   /** Drawn with a highlight, so the flat view agrees with the 3D one. */
@@ -102,6 +105,11 @@ export function Elevation({
   selectedJoint?: { cabinetId: string; index: number } | null;
   onSelectJoint?: (joint: { cabinetId: string; index: number } | null) => void;
   onJointMove?: (joint: { cabinetId: string; index: number }, at: number) => void;
+  /** A wardrobe's height boundary, by its lower cabinet: tapped to select, dragged to move. */
+  selectedPartition?: string | null;
+  onSelectPartition?: (lowerId: string | null) => void;
+  /** The boundary dragged: the lower module's new height. */
+  onPartitionMove?: (lowerId: string, lowerHeight: number) => void;
 }) {
   const gradientId = useId();
   // Millimetres of drawing per screen pixel, so a handle is a finger's size
@@ -233,6 +241,19 @@ export function Elevation({
           </text>
         </g>
       )}
+
+      {supportsFrontElevation ? (
+        <HeightPartitions
+          spec={spec}
+          placed={elevationCabinets}
+          floor={envelope.height}
+          selected={selectedPartition}
+          onSelect={onSelectPartition}
+          onMove={onPartitionMove}
+          snap={snap}
+          mmPerPixel={mmPerPixel}
+        />
+      ) : null}
 
       {supportsFrontElevation ? (
         <Dimensions width={envelope.width} height={envelope.height} />
@@ -837,7 +858,7 @@ function TransportJoints({
     <g data-transport-joints="">
       {modules.map((module) => (
         <text key={module.index} x={module.from + module.width / 2} y={labelY} textAnchor="middle" dominantBaseline="middle" fontSize={Math.min(56, module.width / 9)} className="fill-foreground/60" pointerEvents="none">
-          {`${cabinet.stackedOn ? "Top module" : "Module"} ${module.index + 1} — ${Math.round(module.width)}`}
+          {`${moduleLabel(spec, cabinet, module.index, true)} — ${Math.round(module.width)}${stackRoleOf(spec, cabinet) ? ` × ${Math.round(cabinet.size.height)}` : ""}`}
         </text>
       ))}
       {modules.slice(1).map((module, index) => {
@@ -885,6 +906,128 @@ function TransportJoints({
             {chosen && live ? (
               <text x={at} y={(height - plinth) / 2 - 22 * mmPerPixel - 20} textAnchor="middle" fontSize={Math.max(60, 16 * mmPerPixel)} className="fill-foreground font-semibold" stroke="white" strokeWidth={Math.max(60, 16 * mmPerPixel) * 0.25} paintOrder="stroke" pointerEvents="none">
                 {`${Math.round(live.at - modules[index]!.from)} | ${Math.round(modules[index + 1]!.to - live.at)}`}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/**
+ * A wardrobe's height boundaries: where each lower module ends and the upper
+ * one stacked on it begins. A line across the module, a band to tap, and —
+ * once tapped and unless locked — a handle to drag it up or down, with the
+ * two heights shown live. The overall height does not change; the upper
+ * module takes what the lower gives. Snaps to whole 100 mm and to the 2100
+ * mm that suits hanging.
+ */
+function HeightPartitions({
+  spec,
+  placed,
+  floor,
+  selected,
+  onSelect,
+  onMove,
+  snap,
+  mmPerPixel,
+}: {
+  spec: DesignSpec;
+  placed: { cabinet: Cabinet; x: number; y: number }[];
+  floor: number;
+  selected: string | null;
+  onSelect?: (lowerId: string | null) => void;
+  onMove?: (lowerId: string, lowerHeight: number) => void;
+  snap: boolean;
+  mmPerPixel: number;
+}) {
+  const drag = useRef<{ lowerId: string; matrix: DOMMatrix; y: number; moving: boolean; base: number; total: number } | null>(null);
+  const [live, setLive] = useState<{ lower: number; snapped: boolean } | null>(null);
+  if (spec.furnitureType !== "wardrobe") return null;
+  const stacks = placed
+    .map(({ cabinet, x, y }) => ({ lower: cabinet, x, y, upper: spec.cabinets.find((other) => other.stackedOn === cabinet.id) }))
+    .filter((entry): entry is { lower: Cabinet; x: number; y: number; upper: Cabinet } => Boolean(entry.upper) && !entry.lower.stackedOn);
+  if (!stacks.length) return null;
+  const grip = Math.max(15, 8 * mmPerPixel);
+
+  function move(event: React.PointerEvent<SVGCircleElement>) {
+    const state = drag.current;
+    if (!state || !onMove) return;
+    if (!state.moving && Math.abs(event.clientY - state.y) < 4) return;
+    state.moving = true;
+    const raw = state.base - new DOMPoint(event.clientX, event.clientY).matrixTransform(state.matrix).y;
+    const targets = [2100, ...Array.from({ length: Math.floor(state.total / 100) }, (_, index) => (index + 1) * 100)].filter((value) => value >= 250 && value <= state.total - 250);
+    const landed = snap ? snapValue(raw, targets, Math.min(30, Math.max(8, 6 * mmPerPixel))) : { value: raw, snapped: false };
+    const lower = Math.round(Math.min(state.total - 250, Math.max(250, landed.value)));
+    setLive({ lower, snapped: landed.snapped });
+    onMove(state.lowerId, lower);
+  }
+  const end = () => {
+    drag.current = null;
+    setLive(null);
+  };
+
+  return (
+    <g data-height-partitions="">
+      {stacks.map(({ lower, upper, x, y }) => {
+        const chosen = selected === lower.id;
+        const total = lower.size.height + upper.size.height;
+        const lowerHeight = chosen && live ? live.lower : lower.size.height;
+        // The boundary, in the drawing's frame: y runs down from the top.
+        const base = floor - y;
+        const at = base - lowerHeight;
+        const locked = lower.heightModules?.locked === true;
+        const label = Math.min(56, lower.size.width / 10);
+        return (
+          <g key={lower.id}>
+            <line x1={x} x2={x + lower.size.width} y1={at} y2={at} stroke={chosen ? (live?.snapped ? "#16a34a" : "#f4a63a") : "#0ea5e9"} strokeWidth={chosen ? 10 : 6} strokeDasharray="28 18" pointerEvents="none" />
+            {/* With width modules each is already named with its width and
+                height; on its own the division names its two modules here. */}
+            {lower.size.width >= 600 && modulesOf(lower).length < 2 ? (
+              <>
+                <text x={x + lower.size.width - 30} y={at - 30} textAnchor="end" fontSize={label} className="fill-foreground/60" pointerEvents="none">{`Upper module — ${Math.round(total - lowerHeight)}`}</text>
+                <text x={x + lower.size.width - 30} y={at + 30 + label} textAnchor="end" fontSize={label} className="fill-foreground/60" pointerEvents="none">{`Lower module — ${Math.round(lowerHeight)}`}</text>
+              </>
+            ) : null}
+            <rect
+              data-height-partition={lower.id}
+              x={x}
+              y={at - grip}
+              width={lower.size.width}
+              height={2 * grip}
+              fill="transparent"
+              className={onSelect ? "cursor-pointer" : undefined}
+              onClick={onSelect ? (event) => { event.stopPropagation(); onSelect(lower.id); } : undefined}
+            />
+            {chosen && onMove && !locked ? (
+              <g>
+                <circle cx={x + lower.size.width / 2} cy={at} r={7 * mmPerPixel} fill="#f4a63a" stroke="white" strokeWidth={1.5 * mmPerPixel} pointerEvents="none" />
+                <circle
+                  data-partition-handle={lower.id}
+                  cx={x + lower.size.width / 2}
+                  cy={at}
+                  r={22 * mmPerPixel}
+                  fill="transparent"
+                  style={{ touchAction: "none", cursor: "ns-resize" }}
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    const matrix = event.currentTarget.getScreenCTM();
+                    if (!matrix) return;
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
+                    drag.current = { lowerId: lower.id, matrix: matrix.inverse(), y: event.clientY, moving: false, base, total };
+                  }}
+                  onPointerMove={move}
+                  onPointerUp={end}
+                  onPointerCancel={end}
+                />
+              </g>
+            ) : null}
+            {chosen && live ? (
+              <text x={x + lower.size.width / 2} y={at - 22 * mmPerPixel - 20} textAnchor="middle" fontSize={Math.max(60, 16 * mmPerPixel)} className="fill-foreground font-semibold" stroke="white" strokeWidth={Math.max(60, 16 * mmPerPixel) * 0.25} paintOrder="stroke" pointerEvents="none" data-partition-live>
+                {`Lower ${Math.round(live.lower)} · Upper ${Math.round(total - live.lower)}`}
               </text>
             ) : null}
           </g>

@@ -14,8 +14,8 @@
  {
   "name": "elevation does not name modules",
   "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
-  "from": "          {`${cabinet.stackedOn ? \"Top module\" : \"Module\"} ${module.index + 1} \u2014 ${Math.round(module.width)}`}",
-  "to": "          {\"\"}"
+  "from": "{`${moduleLabel(spec, cabinet, module.index, true)} — ${Math.round(module.width)}${stackRoleOf(spec, cabinet) ? ` × ${Math.round(cabinet.size.height)}` : \"\"}`}",
+  "to": "{\"\"}"
  },
  {
   "name": "joint tap selects nothing",
@@ -104,7 +104,7 @@
  {
   "name": "modules not listed",
   "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
-  "from": "<li key={module.index} className=\"flex justify-between tabular-nums\"><span>{name(cabinet, module.index)}</span><span>{Math.round(module.width)} mm</span></li>",
+  "from": "<li key={module.index} className=\"flex justify-between tabular-nums\"><span>{moduleLabel(spec, cabinet, module.index, true)}</span><span>{Math.round(module.width)} mm</span></li>",
   "to": "<li key={module.index} />"
  }
 ]

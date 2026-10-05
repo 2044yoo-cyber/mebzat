@@ -22,7 +22,7 @@ import {
   transportProposal,
   transportWarnings,
 } from "../../services/operations";
-import { MAX_MODULE, defaultJoints, modulesOf } from "../../services/transport-modules";
+import { MAX_MODULE, defaultJoints, moduleLabel, modulesOf } from "../../services/transport-modules";
 import { isSideDisplay } from "../../services/geometry";
 import type { Cabinet, DesignSpec } from "../../types/spec";
 
@@ -74,7 +74,6 @@ function Panel({ title, defaultOpen, children }: { title: string; defaultOpen?: 
   );
 }
 
-const name = (cabinet: Cabinet, index: number) => `${cabinet.stackedOn ? "Top module" : "Module"} ${index + 1}`;
 
 /** One joint: where it is, the modules either side, and what can be done to it. */
 function JointRow({ spec, owner, index, onChange, onSelectJoint, selected }: { spec: DesignSpec; owner: Cabinet; index: number; onChange: Change; onSelectJoint: (joint: JointRef | null) => void; selected: boolean }) {
@@ -132,7 +131,7 @@ export function TransportPanel({ spec, cabinet, onChange, onSelectJoint, selecte
     <Panel title="Transport modules" defaultOpen={Boolean(transport && joints.length) || owner.size.width > MAX_MODULE}>
       <ul className="space-y-0.5 text-[11px]" aria-label="Modules">
         {modules.map((module) => (
-          <li key={module.index} className="flex justify-between tabular-nums"><span>{name(cabinet, module.index)}</span><span>{Math.round(module.width)} mm</span></li>
+          <li key={module.index} className="flex justify-between tabular-nums"><span>{moduleLabel(spec, cabinet, module.index, true)}</span><span>{Math.round(module.width)} mm</span></li>
         ))}
       </ul>
       {following ? <p className="text-[10px] text-muted-foreground">A separate cabinet above, its joints over the wardrobe&apos;s below. Changes here move both.</p> : null}

@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 import { LengthField, LengthInput } from "../ui/length-field";
 import { DisplayPanel, WardrobeDisplayTools, ZoneEditor } from "./display-panel";
+import { HeightModulesPanel } from "./height-modules-panel";
 import { JointPanel, TransportPanel, type JointRef } from "./transport-panel";
 import { isSideDisplay } from "../../services/geometry";
 
@@ -118,6 +119,9 @@ export type ControlPanelProps = {
   /** A transport joint tapped in the elevation. */
   joint?: JointRef | null;
   onSelectJoint?: (joint: JointRef | null) => void;
+  /** A wardrobe's height boundary tapped in the elevation: its lower cabinet. */
+  partition?: string | null;
+  onSelectPartition?: (lowerId: string | null) => void;
 };
 
 export function ControlPanel({
@@ -135,6 +139,8 @@ export function ControlPanel({
   onSelectDisplay = () => undefined,
   joint = null,
   onSelectJoint = () => undefined,
+  partition = null,
+  onSelectPartition = () => undefined,
 }: ControlPanelProps) {
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
@@ -213,7 +219,17 @@ export function ControlPanel({
               cabinet={selected}
               onChange={onChange}
             />
-            {spec.furnitureType === "wardrobe" || (spec.furnitureType === "kitchen" && ["wall", "tall"].includes(selected.kind)) ? <TopCabinet
+            {/* A wardrobe is built in height modules; a kitchen unit can carry an extra top row. */}
+            {spec.furnitureType === "wardrobe" ? (
+              <HeightModulesPanel
+                spec={spec}
+                cabinet={selected}
+                onChange={onChange}
+                selected={partition !== null && (partition === selected.id || partition === selected.stackedOn)}
+                onSelectPartition={onSelectPartition}
+              />
+            ) : null}
+            {spec.furnitureType === "kitchen" && ["wall", "tall"].includes(selected.kind) ? <TopCabinet
               spec={spec}
               cabinet={selected}
               onSelect={onSelect}
