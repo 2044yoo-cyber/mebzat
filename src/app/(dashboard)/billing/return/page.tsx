@@ -69,7 +69,7 @@ export default async function PaymentReturnPage({
           href="/studio"
           className={cn(buttonVariants({ variant: "outline" }))}
         >
-          Open Berchuma Studio
+          Open Cabinet Design
         </Link>
       </div>
     </div>

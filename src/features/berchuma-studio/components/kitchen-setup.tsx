@@ -120,6 +120,27 @@ export function KitchenSetup({ initial, onStart, submitLabel = "Create my kitche
         <option value={0}>No extra row</option>{[300, 400, 500, 700, 1000].map((height) => <option key={height} value={height}>{height / 10} cm high</option>)}
       </select></label>
     </div> : null}
+    {settings.wallCabinets ? <fieldset className="space-y-2 border-t pt-3">
+      <legend className="text-sm font-medium">Windows</legend>
+      <p className="text-[11px] text-muted-foreground">No upper cabinet is hung across a window. Back wall measured from its left end; side walls from the back corner.</p>
+      {(settings.windows ?? []).map((window, index) => <div key={index} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+        <label className="text-xs">Wall<select aria-label={`Window ${index + 1} wall`} className="mt-1 w-full rounded-md border bg-background p-2" value={window.wall}
+          onChange={(event) => setSettings({ ...settings, windows: (settings.windows ?? []).map((entry, at) => at === index ? { ...entry, wall: event.target.value as typeof entry.wall } : entry) })}>
+          <option value="back">Back</option>
+          {settings.shape !== "straight" && settings.shape !== "island" ? <option value="right">Right</option> : null}
+          {["u_shaped", "g_shaped"].includes(settings.shape) ? <option value="left">Left</option> : null}
+        </select></label>
+        {(["offset", "width"] as const).map((key) => <label key={key} className="text-xs">{key === "offset" ? "From (cm)" : "Width (cm)"}
+          <input aria-label={`Window ${index + 1} ${key === "offset" ? "position" : "width"} in cm`} type="number" required min={key === "offset" ? 0 : 20} max={1200} step={0.5}
+            className="mt-1 w-full rounded-md border bg-background p-2" value={window[key] / 10}
+            onChange={(event) => setSettings({ ...settings, windows: (settings.windows ?? []).map((entry, at) => at === index ? { ...entry, [key]: Number(event.target.value) * 10 } : entry) })} />
+        </label>)}
+        <button type="button" aria-label={`Remove window ${index + 1}`} className="h-9 rounded-md border px-2 text-xs hover:bg-muted"
+          onClick={() => setSettings({ ...settings, windows: (settings.windows ?? []).filter((_, at) => at !== index) })}>Remove</button>
+      </div>)}
+      {(settings.windows ?? []).length < 4 ? <button type="button" className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+        onClick={() => setSettings({ ...settings, windows: [...(settings.windows ?? []), { wall: "back", offset: Math.max(0, Math.round(settings.roomWidth / 2 - 500)), width: 1000 }] })}>Add a window</button> : null}
+    </fieldset> : null}
     <p className="text-[11px] text-muted-foreground">Reference construction: {detail.baseDepth / 10} cm base depth, {detail.upperDepth / 10} cm upper depth and {detail.plinthHeight / 10} cm recessed Zekolo. Upper cabinets connect around corners. The countertop starts hidden so you can inspect the cutting parts.</p>
     {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
     <button type="submit" disabled={!!error} className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">{settings.placementMode === "plan" ? "Generate kitchen from plan" : submitLabel}</button>

@@ -540,7 +540,8 @@ check(
 );
 check(
   "the opening panel's button steps clear of them",
-  /pr-actions-safe/.test(start),
+  // The Create button lives in the cabinet start the panel hosts.
+  /pr-actions-safe/.test(code("src/features/berchuma-studio/components/cabinet-start.tsx")),
 );
 check(
   "without lifting the whole panel above them",

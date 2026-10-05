@@ -6,29 +6,43 @@ import { Lock, Unlock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function LengthInput({
-  label, value, min, max, step = 10, unit = "mm", className, disabled = false, onChange,
+  label, value, min, max, step = 10, unit = "mm", decimals = unit === "mm" ? 1 : 0, className, disabled = false, onChange,
 }: {
   label: string; value: number; min: number; max: number; step?: number; unit?: string;
+  /**
+   * Places after the point a typed value keeps. A millimetre length keeps one
+   * — 782.5 mm is a real size when a door is split around a 1 mm gap — and a
+   * count keeps none.
+   */
+  decimals?: number;
   className?: string; disabled?: boolean; onChange: (value: number) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
-  const rounded = Math.round(value);
+  const factor = 10 ** decimals;
+  const rounded = Math.round(value * factor) / factor;
   const [seen, setSeen] = useState(rounded);
   if (seen !== rounded) { setSeen(rounded); setDraft(null); }
-  const clamp = (next: number) => Math.min(max, Math.max(min, Math.round(next)));
+  const clamp = (next: number) => Math.min(max, Math.max(min, Math.round(next * factor) / factor));
   const commit = () => {
     if (disabled || draft === null) return;
-    const next = Number(draft);
+    // A comma is a decimal point on most of the keyboards this is typed on.
+    const next = Number(draft.replace(",", "."));
     setDraft(null);
     if (draft.trim() !== "" && Number.isFinite(next)) onChange(clamp(next));
+  };
+  // Digits, and one decimal separator when decimals are kept.
+  const clean = (typed: string) => {
+    const digits = typed.replace(decimals > 0 ? /[^0-9.,]/g : /[^0-9]/g, "");
+    const at = digits.search(/[.,]/);
+    return at < 0 ? digits : digits.slice(0, at + 1) + digits.slice(at + 1).replace(/[.,]/g, "").slice(0, decimals);
   };
 
   return (
     <input
-      type="text" inputMode="numeric" pattern="[0-9]*"
+      type="text" inputMode={decimals > 0 ? "decimal" : "numeric"}
       aria-label={`${label} in ${unit || "units"}`} disabled={disabled}
       value={draft ?? String(rounded)}
-      onChange={(event) => !disabled && setDraft(event.target.value.replace(/[^0-9]/g, ""))}
+      onChange={(event) => !disabled && setDraft(clean(event.target.value))}
       onBlur={commit}
       onKeyDown={(event) => {
         if (disabled) return;
@@ -36,7 +50,7 @@ export function LengthInput({
         if (event.key === "Escape") { setDraft(null); event.currentTarget.blur(); }
         if (event.key === "ArrowUp" || event.key === "ArrowDown") {
           event.preventDefault();
-          const from = draft === null ? rounded : Number(draft) || rounded;
+          const from = draft === null ? rounded : Number(draft.replace(",", ".")) || rounded;
           onChange(clamp(from + (event.key === "ArrowUp" ? step : -step)));
         }
       }}

@@ -1,16 +1,20 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Box,
   ChevronDown,
+  Copy,
   Loader2,
   Grid2x2,
   Minus,
+  Move,
   Plus,
   Ruler,
+  Scaling,
   Shapes,
+  Trash2,
   Undo2,
 } from "lucide-react";
 
@@ -48,6 +52,8 @@ import { isSideDisplay } from "../../services/geometry";
 import type { JointRef } from "./transport-panel";
 import { Elevation } from "../viewer/elevation";
 import { Plan } from "../viewer/plan";
+import { SurfaceToggle } from "../viewer/surface-toggle";
+import type { SurfaceView } from "../../services/wardrobe-materials";
 import type { DesignSpec } from "../../types/spec";
 import {
   addSketchObject,
@@ -137,6 +143,9 @@ export function DesignEditor({
   const [sketchEnabled, setSketchEnabled] = useState(spec.sketchMode);
   const [sketchTool, setSketchTool] = useState<SketchTool>("select");
   const [hideFronts, setHideFronts] = useState(false);
+  const [surface, setSurface] = useState<SurfaceView>("model");
+  // The move pad, shown with a selection; the Move action hides and shows it.
+  const [movePad, setMovePad] = useState(true);
   const [showCountertop, setShowCountertop] = useState(false);
 
   // ---- how tall the drawing is on a phone ---------------------------------
@@ -343,6 +352,7 @@ export function DesignEditor({
             <Model
               spec={spec}
               hideFronts={hideFronts}
+              surface={surface}
               hideCountertop={spec.furnitureType === "kitchen" && !showCountertop}
               selectedCabinetId={selectedId}
               selectedDoor={door}
@@ -588,7 +598,7 @@ export function DesignEditor({
           over it. Vertically centred, so the pad is under the thumb of a hand
           holding the phone rather than at the top of a reach.
         */}
-        {view === "solid" && selected ? (
+        {view === "solid" && selected && movePad ? (
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center p-2">
             {/*
               No panel behind the buttons.
@@ -660,6 +670,43 @@ export function DesignEditor({
                   {Math.round(selected.size.height)} · D{" "}
                   {Math.round(selected.size.depth)} mm
                 </span>
+                {/*
+                  What can be done to the selection, under the thumb. A phone
+                  has no Delete key and no Ctrl+D, and these were only
+                  reachable through them. Resize goes to the cabinet's own
+                  width box rather than inventing a second one.
+                */}
+                <div className="pointer-events-auto mt-1 flex flex-wrap gap-1" role="toolbar" aria-label="Selected cabinet">
+                  {view === "solid" ? (
+                    <QuickAction label="Move" pressed={movePad} onClick={() => setMovePad((shown) => !shown)}>
+                      <Move className="size-3.5" aria-hidden />
+                    </QuickAction>
+                  ) : null}
+                  <QuickAction
+                    label="Resize"
+                    onClick={() => {
+                      const field = document.querySelector<HTMLInputElement>('[data-editor-panel] input[aria-label="Width in mm"]');
+                      field?.scrollIntoView({ block: "center", behavior: "smooth" });
+                      field?.focus({ preventScroll: true });
+                    }}
+                  >
+                    <Scaling className="size-3.5" aria-hidden />
+                  </QuickAction>
+                  <QuickAction label="Duplicate" onClick={() => onChange(duplicateCabinet(spec, selected.id))}>
+                    <Copy className="size-3.5" aria-hidden />
+                  </QuickAction>
+                  <QuickAction
+                    label="Delete"
+                    danger
+                    onClick={() => {
+                      setSelectedDoor(null);
+                      setSelectedId(null);
+                      onChange(removeCabinet(spec, selected.id));
+                    }}
+                  >
+                    <Trash2 className="size-3.5" aria-hidden />
+                  </QuickAction>
+                </div>
               </>
             ) : (
               <span className="tabular-nums text-muted-foreground">
@@ -671,6 +718,9 @@ export function DesignEditor({
             )}
           </div>
 
+          {/* Bottom right, clear of the toolbar along the top, which is full
+              on a phone: Model or Material view. */}
+          {view === "solid" ? <SurfaceToggle value={surface} onChange={setSurface} className="pointer-events-auto shrink-0" /> : null}
         </div>
       </div>
 
@@ -689,6 +739,7 @@ export function DesignEditor({
         and updates as they are used.
       */}
       <div
+        data-editor-panel
         className={cn(
           "w-full min-w-0 max-w-full overflow-x-hidden border-t",
           "@4xl/ws:h-full @4xl/ws:min-h-0 @4xl/ws:w-[300px] @4xl/ws:shrink-0",
@@ -717,6 +768,24 @@ export function DesignEditor({
 }
 
 /** One half of an axis pair. Dimmed rather than hidden at the end of its range. */
+function QuickAction({ label, onClick, pressed, danger = false, children }: { label: string; onClick: () => void; pressed?: boolean; danger?: boolean; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={pressed}
+      className={cn(
+        // 32 px tall: a thumb's target, small enough to leave the model visible.
+        "flex h-8 items-center gap-1 rounded-md border bg-background/80 px-2 text-[11px] transition-colors",
+        pressed ? "border-primary text-primary" : danger ? "text-destructive hover:border-destructive" : "hover:border-primary",
+      )}
+    >
+      {children}
+      {label}
+    </button>
+  );
+}
+
 function NudgeButton({
   label,
   onClick,

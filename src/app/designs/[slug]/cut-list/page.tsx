@@ -148,14 +148,16 @@ export default async function CutListPage({
           </h2>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-sm">
+            <table className="w-full min-w-[820px] border-collapse text-sm">
               {/* `thead` repeats on every printed page in every browser that
                   has ever supported printing a table. A shop sheet whose
                   second page has no headers is a shop sheet somebody misreads. */}
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
                   <th className="py-1.5 pr-2 font-medium">#</th>
+                  <th className="py-1.5 pr-2 font-medium">Part ID</th>
                   <th className="py-1.5 pr-2 font-medium">Part</th>
+                  <th className="py-1.5 pr-2 font-medium">Cabinet / module</th>
                   <th className="py-1.5 pr-2 text-right font-medium">Length</th>
                   <th className="py-1.5 pr-2 text-right font-medium">Width</th>
                   <th className="py-1.5 pr-2 text-right font-medium">Qty</th>
@@ -169,7 +171,9 @@ export default async function CutListPage({
                     <td className="py-1.5 pr-2 tabular-nums text-muted-foreground">
                       {row.index}
                     </td>
+                    <td className="py-1.5 pr-2 font-mono text-xs whitespace-nowrap">{row.partId}</td>
                     <td className="py-1.5 pr-2">{row.label}</td>
+                    <td className="py-1.5 pr-2 text-xs text-muted-foreground">{[row.cabinet, row.module].filter(Boolean).join(" · ")}</td>
                     <td className="py-1.5 pr-2 text-right tabular-nums">
                       {row.length}
                     </td>

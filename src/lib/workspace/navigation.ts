@@ -48,6 +48,7 @@ import {
   Users,
   Warehouse,
 } from "lucide-react";
+import { Cabinet } from "@/components/icons/cabinet";
 
 /**
  * The workspace navigation manifest.
@@ -213,26 +214,28 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
 
-  // Berchuma Studio is its own section rather than a row under AI. It is a
-  // different kind of thing from a conversation — a parametric editor with
-  // saved projects and a gallery — and burying it in a list of AI tools
-  // undersold it.
+  // Cabinet Design (formerly Berchuma Studio) is its own section rather than a
+  // row under AI. It is a different kind of thing from a conversation — a
+  // parametric cabinet editor with saved projects and a template gallery — and
+  // burying it in a list of AI tools undersold it. The ids and routes keep the
+  // Berchuma names: they are in saved links, translations and analytics.
   {
     id: "berchuma",
-    label: "Berchuma Studio",
-    emoji: "🪑",
-    icon: Armchair,
+    label: "Cabinet Design",
+    emoji: "🗄️",
+    icon: Cabinet,
     items: [
       {
         id: "berchuma-studio",
         label: "Design Studio",
-        icon: Armchair,
+        icon: Cabinet,
         href: "/studio",
         private: true,
-        hint: "Design fitted furniture and get a price",
+        hint: "Design cabinets and get a price",
         keywords: [
-          "furniture", "wardrobe", "kitchen", "joinery", "cabinet",
-          "berchuma", "cut list",
+          "cabinet", "cabinet design", "wardrobe", "kitchen", "vanity",
+          "tv unit", "shoe cabinet", "joinery", "furniture", "berchuma",
+          "cut list",
         ],
       },
       {
@@ -245,16 +248,16 @@ export const NAV_SECTIONS: NavSection[] = [
         // this one: a Berchuma project is a design, not a build.
         href: "/designs?mine=1",
         private: true,
-        hint: "Everything you have designed",
-        keywords: ["my designs", "saved", "drafts"],
+        hint: "All your cabinet designs",
+        keywords: ["my designs", "my cabinets", "saved", "drafts"],
       },
       {
         id: "berchuma-gallery",
         label: "Gallery",
         icon: Boxes,
         href: "/designs",
-        hint: "Published designs you can remix",
-        keywords: ["designs", "gallery", "remix", "templates"],
+        hint: "Cabinet designs and templates you can customize",
+        keywords: ["designs", "gallery", "remix", "templates", "cabinet templates"],
       },
     ],
   },

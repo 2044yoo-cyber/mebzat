@@ -6,7 +6,7 @@ import { Check, Globe, Loader2, LogOut, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-import type { DesignSpec } from "../types/spec";
+import { PROJECT_STATUS_LABELS, projectStatuses, type DesignSpec, type ProjectStatus } from "../types/spec";
 
 /**
  * Save, then publish.
@@ -25,7 +25,7 @@ import type { DesignSpec } from "../types/spec";
 type Saved = { id: string; slug: string };
 
 export function PublishBar({
-  spec,
+  spec: design,
   lastBrief,
   initialSaved = null,
 }: {
@@ -43,6 +43,10 @@ export function PublishBar({
   initialSaved?: Saved | null;
 }) {
   const router = useRouter();
+  // The project's status travels in the spec, so it is saved, versioned and
+  // reloaded with the design rather than kept somewhere it could drift from it.
+  const [status, setStatus] = useState<ProjectStatus>(design.meta.status ?? "draft");
+  const spec: DesignSpec = { ...design, meta: { ...design.meta, status } };
   const [saved, setSaved] = useState<Saved | null>(initialSaved);
   const [published, setPublished] = useState(false);
   const [busy, setBusy] = useState<"save" | "publish" | "exit" | null>(null);
@@ -169,6 +173,16 @@ export function PublishBar({
     // useful the first time and furniture every time after.
     <div className="space-y-2 sm:rounded-xl sm:border sm:bg-card sm:p-3">
       <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label="Project status"
+          value={status}
+          onChange={(event) => setStatus(event.target.value as ProjectStatus)}
+          className="h-8 rounded-md border bg-background px-1.5 text-xs"
+        >
+          {projectStatuses.map((value) => (
+            <option key={value} value={value}>{PROJECT_STATUS_LABELS[value]}</option>
+          ))}
+        </select>
         <Button
           size="sm"
           variant={saved && !dirty ? "outline" : "default"}

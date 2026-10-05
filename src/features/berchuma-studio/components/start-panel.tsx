@@ -1,32 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { KitchenSetup } from "./kitchen-setup";
 import {
-  Armchair,
-  Boxes,
-  ChefHat,
-  Droplets,
   ImageUp,
-  Library,
   MessageSquare,
-  Monitor,
   PanelsTopLeft,
   Ruler,
-  Shapes,
   Sparkles,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import { LengthField } from "./ui/length-field";
-
+import { CabinetStart } from "./cabinet-start";
 import { ImageToDesign } from "./image-to-design";
 import { OpeningPanel } from "./openings/opening-panel";
 import { PlanEditor } from "./plan/plan-editor";
 import { runsFromRoom } from "../services/room-geometry";
 import { startingDesign } from "../services/starting-designs";
-import { WardrobeShapeSetup } from "./wardrobe-shape-setup";
 import { validateSpec, type DesignKind, type DesignSpec } from "../types/spec";
 
 /**
@@ -44,40 +34,21 @@ import { validateSpec, type DesignKind, type DesignSpec } from "../types/spec";
  * studio and a demonstration of one.
  */
 
-const CATEGORIES: {
-  kind: DesignKind;
-  label: string;
-  icon: typeof ChefHat;
-  hint: string;
-}[] = [
-  { kind: "kitchen", label: "Kitchen", icon: ChefHat, hint: "Base run, wall units, worktop" },
-  { kind: "wardrobe", label: "Wardrobe", icon: Armchair, hint: "Hanging, drawers, shelves" },
-  { kind: "tv_unit", label: "TV Unit", icon: Monitor, hint: "Low unit and a wall shelf" },
-  { kind: "vanity", label: "Vanity", icon: Droplets, hint: "Wall hung, with a mirror cabinet" },
-  { kind: "bookshelf", label: "Bookshelf", icon: Library, hint: "Open shelving, floor to eye" },
-  { kind: "office_storage", label: "Office Storage", icon: Boxes, hint: "Cupboards under open filing" },
-  { kind: "custom", label: "Sketch 3D", icon: Shapes, hint: "Draw custom furniture and simple forms" },
-];
-
-/** Run lengths people actually ask for, so nobody types a number to begin. */
-const SIZES = [1800, 2400, 3000, 3600, 4200, 5000];
-
 export function StartPanel({
   onStart,
   onOpenChat,
   initialKind,
   initialWidth,
+  initialTemplate,
 }: {
   onStart: (spec: DesignSpec) => void;
   onOpenChat: () => void;
   initialKind?: DesignKind;
   initialWidth?: number;
+  /** A template chosen in the gallery, to be sized to the space. */
+  initialTemplate?: string;
 }) {
-  const [kind, setKind] = useState<DesignKind | null>(initialKind ?? null);
-  const [width, setWidth] = useState(initialWidth ?? 3600);
   const [route, setRoute] = useState<"design" | "photo" | "opening" | "plan">("design");
-
-  const chosen = CATEGORIES.find((entry) => entry.kind === kind);
 
   return (
     /**
@@ -141,10 +112,10 @@ export function StartPanel({
       >
       {route === "opening" || route === "plan" ? null : (
         <div className="text-center">
-          <h1 className="text-xl font-semibold">What are you making?</h1>
+          <h1 className="text-xl font-semibold">What cabinet are you designing?</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pick one and a complete design appears. Change anything in it
-            afterwards — nothing here is fixed.
+            Pick a type and a template and a complete design appears, sized to
+            your space. Change anything in it afterwards — nothing is fixed.
           </p>
         </div>
       )}
@@ -248,104 +219,9 @@ export function StartPanel({
       ) : route === "photo" ? (
         <ImageToDesign compact onDesign={(spec) => onStart(spec)} />
       ) : (
-      <>
-      <div className="grid grid-cols-2 gap-2 @lg/ws:grid-cols-3">
-        {CATEGORIES.map((entry) => (
-          <button
-            key={entry.kind}
-            type="button"
-            aria-pressed={kind === entry.kind}
-            onClick={() => {
-              setKind(entry.kind);
-              // A wardrobe is not 3600 wide and a vanity is not 3600 wide. The
-              // slider starts wherever that category usually starts.
-              setWidth(defaultWidth(entry.kind));
-            }}
-            className={cn(
-              "rounded-xl border p-3 text-left transition-colors",
-              kind === entry.kind
-                ? "border-brand bg-brand/5"
-                : "hover:border-brand/50 hover:bg-muted/40",
-            )}
-          >
-            <entry.icon className="size-5 text-brand" aria-hidden />
-            <span className="mt-1.5 block text-sm font-medium">{entry.label}</span>
-            <span className="block text-[11px] leading-snug text-muted-foreground">
-              {entry.hint}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {chosen?.kind === "kitchen" ? <KitchenSetup initial={initialWidth ? { roomWidth: initialWidth } : undefined} onStart={onStart} />
-      : chosen?.kind === "wardrobe" ? (
-        // A wardrobe can turn a corner, so it asks about walls rather than
-        // about one width. Straight is still one wall and still produces the
-        // wardrobe the card behind it always did.
-        <WardrobeShapeSetup initialWidth={initialWidth} onStart={onStart} />
-      ) : chosen ? (
-        <div className="space-y-3 rounded-xl border p-4">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm font-medium">
-              How wide is the space?
-            </span>
-            <span className="text-sm tabular-nums text-muted-foreground">
-              {width} mm
-            </span>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {SIZES.map((size) => (
-              <button
-                key={size}
-                type="button"
-                aria-pressed={width === size}
-                onClick={() => setWidth(size)}
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-xs tabular-nums transition-colors",
-                  width === size
-                    ? "border-brand bg-brand text-brand-foreground"
-                    : "hover:border-brand hover:bg-brand/5",
-                )}
-              >
-                {size}
-              </button>
-            ))}
-          </div>
-
-          {/*
-            The presets above are the common sizes; this is for the wall that
-            is not a common size. It was a slider alone, which meant a room
-            measured at 2437 had to be approximated to the nearest hundred
-            before the design even started.
-          */}
-          <LengthField
-            label="Width"
-            value={width}
-            min={600}
-            max={6000}
-            step={100}
-            onChange={setWidth}
-          />
-
-          <button
-            type="button"
-            onClick={() => {
-              const spec = startingDesign(chosen.kind, { width });
-              onStart(chosen.kind === "custom" ? { ...spec, sketchMode: true } : spec);
-            }}
-            // `pr-actions-safe` keeps the label clear of the floating stack
-            // in the corner without the whole panel being pushed above it. The
-            // button still spans the width; its text simply stops before the
-            // buttons do. Zero from lg up, where the rail moves them aside.
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 pr-actions-safe text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
-          >
-            <Sparkles className="size-4" aria-hidden />
-            Start with a {chosen.label.toLowerCase()}
-          </button>
-        </div>
-      ) : null}
-      </>
+        // Cabinet Design's own way in: type, space, layout, template,
+        // material. Every card in it is a real design laid out to the space.
+        <CabinetStart onStart={onStart} initialKind={initialKind} initialWidth={initialWidth} initialTemplate={initialTemplate} />
       )}
 
       <button
@@ -359,23 +235,4 @@ export function StartPanel({
       </div>
     </div>
   );
-}
-
-function defaultWidth(kind: DesignKind): number {
-  switch (kind) {
-    case "kitchen":
-      return 3600;
-    case "wardrobe":
-      return 2400;
-    case "tv_unit":
-    case "bookshelf":
-    case "shelving":
-      return 1800;
-    case "vanity":
-      return 1200;
-    case "office_storage":
-      return 2000;
-    default:
-      return 1200;
-  }
 }

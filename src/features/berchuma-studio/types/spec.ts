@@ -119,6 +119,16 @@ export const boardSchema = z.object({
 
 export type Board = z.infer<typeof boardSchema>;
 
+/** A project's progress, as My Projects shows it. */
+export const projectStatuses = ["draft", "ready", "in_production", "installed"] as const;
+export type ProjectStatus = (typeof projectStatuses)[number];
+export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
+  draft: "Draft",
+  ready: "Ready for Production",
+  in_production: "In Production",
+  installed: "Installed",
+};
+
 export const edgeBandSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
@@ -773,6 +783,12 @@ export const designSpecSchema = z.object({
     assumptions: z.array(z.string()).default([]),
     /** Corrections the validator made. Same reasoning as `assumptions`. */
     corrections: z.array(z.string()).default([]),
+    /**
+     * Where the job is: designed, ready to cut, being made, fitted. Kept in
+     * the spec rather than a column so it needs no migration, and optional so
+     * every design saved before it existed reads as a draft.
+     */
+    status: z.enum(projectStatuses).optional(),
   }),
 });
 

@@ -944,8 +944,9 @@ export function setCabinetKind(
   });
 }
 
+/** Within limits, to a tenth of a millimetre: 782.5 mm is a size people measure. */
 function clamp(value: number, low: number, high: number): number {
-  return Math.min(high, Math.max(low, Math.round(value)));
+  return Math.min(high, Math.max(low, Math.round(value * 10) / 10));
 }
 
 // ---------------------------------------------------------------------------

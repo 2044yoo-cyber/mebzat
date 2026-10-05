@@ -139,7 +139,10 @@ function functionText(source: string, name: string, indent = ""): string {
 const FIELD = "src/features/berchuma-studio/components/ui/length-field.tsx";
 const PANEL = "src/features/berchuma-studio/components/editor/control-panel.tsx";
 const RAIL = "src/features/berchuma-studio/components/config/config-rail.tsx";
-const START = "src/features/berchuma-studio/components/start-panel.tsx";
+// Where a new design's sizes are typed. That was the start panel itself until
+// Cabinet Design moved the type → space → template steps into their own
+// component; the start panel now only hosts it.
+const START = "src/features/berchuma-studio/components/cabinet-start.tsx";
 const EDITOR = "src/features/berchuma-studio/components/editor/design-editor.tsx";
 const ELEVATION = "src/features/berchuma-studio/components/viewer/elevation.tsx";
 const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
@@ -153,7 +156,8 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
 
   check(
     "the length field has a box to type into",
-    /inputMode="numeric"/.test(field),
+    // The decimal keypad for millimetres (782.5 mm), the numeric one for counts.
+    /inputMode=\{decimals > 0 \? "decimal" : "numeric"\}/.test(field),
     "a slider alone cannot accept the number somebody took off the wall with a tape",
   );
   check(
@@ -214,7 +218,7 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   for (const [label, source, path] of [
     ["the cabinet panel", panel, PANEL],
     ["the config rail", rail, RAIL],
-    ["the start panel", start, START],
+    ["the cabinet start", start, START],
   ] as [string, string, string][]) {
     check(
       `${label} imports the shared field`,
@@ -503,7 +507,8 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   );
   check(
     "and lands on the Design tab, not the chat",
-    /editing \|\| opening\?\.kind === "kitchen" \? "design" : "chat"/.test(workspace),
+    // A gallery template opens on the Design tab as well, at the start steps.
+    /editing \|\| opening\?\.kind === "kitchen" \|\| opening\?\.template \? "design" : "chat"/.test(workspace),
     "somebody who pressed Open in Studio is looking at a design, not starting a conversation",
   );
   check(
@@ -1103,7 +1108,8 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
 
   check(
     "the pad is on the drawing, and only with something selected",
-    /\{view === "solid" && selected \? \(/.test(editor),
+    // `movePad` is the quick action that hides it; it starts shown.
+    /\{view === "solid" && selected && movePad \? \(/.test(editor) && /const \[movePad, setMovePad\] = useState\(true\)/.test(editor),
     "three dimmed pairs of buttons with nothing selected is three controls that do nothing",
   );
   check(
@@ -1605,7 +1611,7 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   // Scoped to the pad. "Show inside" is also an overlay and legitimately keeps
   // its frosted card — a file-wide search for the blur matched that instead
   // and failed on correct code.
-  const padStart = editor.indexOf('{view === "solid" && selected ? (');
+  const padStart = editor.indexOf('{view === "solid" && selected && movePad ? (');
   const padEnd = editor.indexOf("{NUDGE_STEP} mm", padStart);
   const padRegion =
     padStart === -1 || padEnd === -1 ? "" : editor.slice(padStart, padEnd);

@@ -43,7 +43,7 @@ export async function generateMetadata({
   const size = `${design.spec.envelope.width} × ${design.spec.envelope.height} × ${design.spec.envelope.depth} mm`;
 
   return {
-    title: `${design.title} — Berchuma Studio`,
+    title: `${design.title} — Cabinet Design`,
     description: `${label(design.kind)}, ${size}. Designed on Medosha with a full parts list and a price from Ethiopian supplier rates.`,
     // A private design must not be indexable even if the URL leaks; the page
     // itself is already gated by row-level security, this stops the summary

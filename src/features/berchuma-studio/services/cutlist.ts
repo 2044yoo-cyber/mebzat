@@ -19,6 +19,15 @@ import type { DesignSpec } from "../types/spec";
 export type CutListRow = {
   /** Sequence number on the printed sheet. */
   index: number;
+  /**
+   * The piece's name on the shop floor: cabinet, module and part, as in
+   * `W01-M1-LS` — wardrobe 1, module 1, left side. Unique on the list. A row
+   * that gathers identical pieces from several cabinets is named by the first
+   * and lists them all in `cabinet`.
+   */
+  partId: string;
+  /** The cabinet (or cabinets) the pieces are for: "W01 Wardrobe". */
+  cabinet: string;
   /** The transport module the piece is for, when the cabinet has modules. */
   module?: string;
   label: string;
@@ -84,7 +93,10 @@ export function buildCutList(
 
   // Group by everything that makes two pieces genuinely different. Size alone
   // is not enough: a 600×500 shelf in walnut and one in white are two rows.
-  const groups = new Map<string, { part: Part; quantity: number }>();
+  const groups = new Map<string, { part: Part; quantity: number; cabinets: string[] }>();
+  const codes = cabinetCodes(spec);
+  const shared = `${designLetter(spec)}00`;
+  const cabinetLabels = new Map([[shared, "Runs and corners"], ...spec.cabinets.map((cabinet): [string, string] => [codes.get(cabinet.id)!, cabinet.label ?? ""])]);
 
   for (const part of cutParts) {
     const key = [
@@ -99,9 +111,12 @@ export function buildCutList(
       ...(part.module ? [part.module.name, part.label] : []),
     ].join("|");
 
+    const code = (part.cabinetId && codes.get(part.cabinetId)) || shared;
     const existing = groups.get(key);
-    if (existing) existing.quantity += part.quantity;
-    else groups.set(key, { part, quantity: part.quantity });
+    if (existing) {
+      existing.quantity += part.quantity;
+      if (!existing.cabinets.includes(code)) existing.cabinets.push(code);
+    } else groups.set(key, { part, quantity: part.quantity, cabinets: [code] });
   }
 
   const rows: CutListRow[] = [...groups.values()]
@@ -111,6 +126,8 @@ export function buildCutList(
     .map((entry) => ({
       // Filled in below, once the rows are in the order they are read in.
       index: 0,
+      partId: [entry.cabinets[0], ...(entry.part.module ? [`M${entry.part.module.index + 1}`] : []), partCode(entry.part)].join("-"),
+      cabinet: entry.cabinets.map((code) => `${code} ${cabinetLabels.get(code) ?? ""}`.trim()).join(", "),
       // Named by its module, so the pieces of each carcass can be stacked
       // and labelled together.
       label: entry.part.module && !entry.part.label.startsWith(entry.part.module.name) ? `${entry.part.module.name} — ${entry.part.label}` : entry.part.label,
@@ -148,6 +165,17 @@ export function buildCutList(
         sequence += 1;
         row.index = sequence;
       }
+    }
+  }
+
+  // A part ID names one row. Two rows of the same cabinet, module and kind of
+  // part — a fixed shelf and an adjustable one — are told apart by a number.
+  {
+    const seen = new Map<string, number>();
+    for (const row of [...rows].sort((a, b) => a.index - b.index)) {
+      const count = (seen.get(row.partId) ?? 0) + 1;
+      seen.set(row.partId, count);
+      if (count > 1) row.partId = `${row.partId}${count}`;
     }
   }
 
@@ -237,6 +265,75 @@ export function buildCutList(
     unplaced,
     notes,
   };
+}
+
+/**
+ * Each cabinet's short code: a letter for what it is and its place in the
+ * design — W01 for the first wardrobe carcass, K02 for the second kitchen
+ * cabinet. The letter is the design's type, because "the second cabinet of the
+ * wardrobe" is what a fitter says; a top cabinet is a cabinet of its own.
+ */
+export function cabinetCodes(spec: DesignSpec): Map<string, string> {
+  const letter = designLetter(spec);
+  return new Map(spec.cabinets.map((cabinet, index) => [cabinet.id, `${letter}${String(index + 1).padStart(2, "0")}`]));
+}
+
+/**
+ * The letter a design's codes start with. A piece that belongs to no one
+ * cabinet — a worktop along a run, a corner unit — is numbered 00 under it:
+ * K00 is the kitchen's runs and corners.
+ */
+export function designLetter(spec: DesignSpec): string {
+  return spec.kind === "wardrobe" ? "W"
+    : spec.kind === "kitchen" ? "K"
+    : spec.kind === "vanity" ? "V"
+    : spec.kind === "tv_unit" ? "TV"
+    : spec.kind === "office_storage" ? "OF"
+    : spec.kind === "bookshelf" || spec.kind === "shelving" ? "S"
+    : "C";
+}
+
+/** Two or three letters for the kind of piece: LS left side, SH shelf, DR door. */
+export function partCode(part: Pick<Part, "role" | "label">): string {
+  const label = part.label.toLowerCase();
+  switch (part.role) {
+    case "gable":
+      return /\bright\b/.test(label) ? "RS" : /\bleft\b/.test(label) ? "LS" : "SD";
+    case "top":
+      return "TP";
+    case "bottom":
+      return "BT";
+    case "back":
+      return "BK";
+    case "divider":
+      return "DV";
+    case "shelf":
+      return /fixed|rail/.test(label) ? "FS" : "SH";
+    case "door":
+      return "DR";
+    case "drawer_front":
+      return "DF";
+    case "drawer_side":
+      return "DS";
+    case "drawer_back":
+      return "DB";
+    case "drawer_base":
+      return "DBS";
+    case "plinth":
+      return "PL";
+    case "worktop":
+      return "WT";
+    case "backsplash":
+      return "SP";
+    case "rail":
+      return "RL";
+    case "leg":
+      return "LG";
+    case "led":
+      return "LED";
+    default:
+      return "PT";
+  }
 }
 
 /**

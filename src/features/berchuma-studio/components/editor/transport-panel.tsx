@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, ChevronDown, Lock, Magnet, Plus, Scissors, Trash2, Truck, Unlock } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Lock, Magnet, Plus, RotateCcw, Scissors, Trash2, Truck, Unlock } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -22,7 +22,7 @@ import {
   transportProposal,
   transportWarnings,
 } from "../../services/operations";
-import { MAX_MODULE, modulesOf } from "../../services/transport-modules";
+import { MAX_MODULE, defaultJoints, modulesOf } from "../../services/transport-modules";
 import { isSideDisplay } from "../../services/geometry";
 import type { Cabinet, DesignSpec } from "../../types/spec";
 
@@ -178,6 +178,12 @@ export function TransportPanel({ spec, cabinet, onChange, onSelectJoint, selecte
           <div className="flex flex-wrap gap-1">
             <Chip onClick={() => onChange(addJoint(spec, owner.id, ((modulesOf(owner).reduce((a, b) => (b.width > a.width ? b : a)).from + modulesOf(owner).reduce((a, b) => (b.width > a.width ? b : a)).to) / 2)))}><Plus className="size-3" />Add joint</Chip>
             <Chip active={transport?.auto !== false} onClick={() => onChange(transport?.auto !== false ? divideForTransport(spec, owner.id, joints.map((joint) => joint.at)) : divideForTransport(spec, owner.id))}>{MAX_MODULE} mm rule {transport?.auto !== false ? "ON" : "OFF"}</Chip>
+            {/* Back to the workshop's rule — 1600 mm from the left, the rest
+                last — with every lock released. Shown only when something
+                differs from it, so it never offers to do nothing. */}
+            {transport?.auto === false || joints.some((joint) => joint.locked) || defaultJoints(owner.size.width).join() !== joints.map((joint) => Math.round(joint.at)).join() ? (
+              <Chip onClick={() => onChange(divideForTransport(spec, owner.id))}><RotateCcw className="size-3" />Reset to Recommended</Chip>
+            ) : null}
             <Chip onClick={() => { onSelectJoint(null); onChange(removeTransport(spec, owner.id)); }}><Trash2 className="size-3" />One carcass</Chip>
           </div>
         </>

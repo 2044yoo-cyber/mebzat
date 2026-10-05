@@ -113,12 +113,14 @@ check(
 
 {
   const startPanel = code("src/features/berchuma-studio/components/start-panel.tsx");
-  check("the studio's Start button steps around the buttons", /pr-actions-safe/.test(startPanel));
+  // The Start (now Create) button moved into the cabinet start the panel hosts.
+  const cabinetStart = code("src/features/berchuma-studio/components/cabinet-start.tsx");
+  check("the studio's Start button steps around the buttons", /onStart\(spec\)[\s\S]{0,400}pr-actions-safe/.test(cabinetStart));
   // Two earlier versions of this reserved height here, and one of them stacked
   // with the shell's to leave 368px of nothing under a clipped button.
   check(
     "and no longer reserves their height",
-    !/pb-actions-safe/.test(startPanel) && !/pb-\[var\(--floating-actions-h\)\]/.test(startPanel),
+    !/pb-actions-safe/.test(startPanel) && !/pb-actions-safe/.test(code("src/features/berchuma-studio/components/cabinet-start.tsx")) && !/pb-\[var\(--floating-actions-h\)\]/.test(startPanel),
   );
 }
 

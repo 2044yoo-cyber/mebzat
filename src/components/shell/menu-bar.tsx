@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Armchair, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { Cabinet } from "@/components/icons/cabinet";
 
 import { cn } from "@/lib/utils";
 import { I18nText } from "@/components/i18n/i18n-text";
@@ -118,7 +119,7 @@ export function MenuBar({ signedIn }: { signedIn: boolean }) {
           landmarks with the same name is a screen reader announcing the same
           thing twice with no way to tell them apart. */}
       <nav aria-label={t("navigation.allMedosha")} className="flex items-center gap-0.5">
-        {/* Berchuma has its own place on the bar rather than only a row inside
+        {/* Cabinet Design (Berchuma) has its own place on the bar rather than only a row inside
             the Medosha AI menu. It is the thing on this platform that exists
             nowhere else, and two hovers deep is where features go to be never
             found. */}
@@ -133,7 +134,7 @@ export function MenuBar({ signedIn }: { signedIn: boolean }) {
           )}
           onMouseEnter={() => setOpen(null)}
         >
-          <Armchair className="size-3.5" aria-hidden />
+          <Cabinet className="size-3.5" aria-hidden />
           <I18nText textKey="navigation.berchuma" secondary />
         </Link>
 
