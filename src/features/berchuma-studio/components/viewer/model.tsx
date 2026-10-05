@@ -8,6 +8,8 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as THREE from "three";
 
 import { CabinetHandles, DimensionLabel, type DragChange } from "./handles";
+import { CabinetDimensionLines } from "./dimensions";
+import { cabinetDimensions } from "../../services/interior-dimensions";
 import {
   bayDimensionsWorthDrawing,
   layOutBays,
@@ -78,13 +80,15 @@ export default function Model({
   onPlaceSketch?: (position: { x: number; y: number; z: number }, axis: SketchAxis, direction: -1 | 1) => void;
   onMoveSketch?: (position: { x: number; y: number; z: number }) => void;
 }) {
+  // Every part, fronts included: the dimensions measure the drawer fronts
+  // even while they are taken off to show what is inside.
+  const allParts = useMemo(() => visibleKitchenParts(buildParts(spec).parts, hideCountertop), [spec, hideCountertop]);
   const parts = useMemo(() => {
-    const all = visibleKitchenParts(buildParts(spec).parts, hideCountertop);
-    if (!hideFronts) return all;
-    return all.filter(
+    if (!hideFronts) return allParts;
+    return allParts.filter(
       (part) => part.role !== "door" && part.role !== "drawer_front",
     );
-  }, [spec, hideFronts, hideCountertop]);
+  }, [allParts, hideFronts]);
 
   const resolved = useMemo(() => resolveDesign(spec), [spec]);
   const bounds = useMemo(() => boundsWithSketch(spec), [spec]);
@@ -109,6 +113,14 @@ export default function Model({
           },
         }
       : selected;
+
+  // The selected cabinet measured from its parts, when it stands square to the run.
+  const measured = useMemo(() => {
+    const cabinet = spec.cabinets.find((item) => item.id === selectedCabinetId);
+    const placed = cabinet ? resolved.cabinets.find((item) => item.cabinet.id === cabinet.id) : null;
+    if (!cabinet || !placed || (placed.rotation ?? 0) !== 0) return null;
+    return cabinetDimensions({ ...cabinet, position: { ...cabinet.position, x: placed.x, y: placed.y, z: placed.z } }, allParts);
+  }, [spec, selectedCabinetId, resolved, allParts]);
 
   // Orbiting and dragging an edge are both "the pointer moved", so one of them
   // has to stand down. Without this, pulling a cabinet wider also swung the
@@ -247,10 +259,12 @@ export default function Model({
                 onDrag={(change) => onResize(positionedSelected.id, change)}
               />
             ) : null}
+            {measured && !dragging ? <CabinetDimensionLines dimensions={measured} scale={Math.max(1, reach * 0.5)} /> : null}
             <SelectionLabels
               cabinet={positionedSelected}
               reach={reach}
               board={spec.carcass.board.thickness}
+              measured={Boolean(measured)}
             />
           </>
         ) : null}
@@ -837,11 +851,14 @@ function SelectionLabels({
   cabinet,
   reach,
   board,
+  measured = false,
 }: {
   cabinet: Cabinet;
   reach: number;
   /** Carcass board thickness, which is what the openings are set in from. */
   board: number;
+  /** Drawn as a full set of dimension lines: W, H and the bays are on those. */
+  measured?: boolean;
 }) {
   const { position, size } = cabinet;
   // Scaled to the whole design rather than to the cabinet. Sizing a label to
@@ -852,6 +869,16 @@ function SelectionLabels({
   const centreX = (position.x + size.width / 2) * MM;
   const centreY = (position.y + size.height / 2) * MM;
   const front = -(position.z * MM) - 0.02;
+
+  if (measured) {
+    return (
+      <DimensionLabel
+        text={`D ${Math.round(size.depth)}`}
+        position={[(position.x + size.width) * MM + 0.16, position.y * MM + 0.08, -(position.z + size.depth / 2) * MM]}
+        scale={scale}
+      />
+    );
+  }
 
   return (
     <>
