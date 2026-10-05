@@ -507,7 +507,8 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   );
   check(
     "and lands on the Design tab, not the chat",
-    /editing \|\| opening\?\.kind === "kitchen" \? "design" : "chat"/.test(workspace),
+    // A gallery template opens on the Design tab as well, at the start steps.
+    /editing \|\| opening\?\.kind === "kitchen" \|\| opening\?\.template \? "design" : "chat"/.test(workspace),
     "somebody who pressed Open in Studio is looking at a design, not starting a conversation",
   );
   check(
@@ -1107,7 +1108,8 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
 
   check(
     "the pad is on the drawing, and only with something selected",
-    /\{view === "solid" && selected \? \(/.test(editor),
+    // `movePad` is the quick action that hides it; it starts shown.
+    /\{view === "solid" && selected && movePad \? \(/.test(editor) && /const \[movePad, setMovePad\] = useState\(true\)/.test(editor),
     "three dimmed pairs of buttons with nothing selected is three controls that do nothing",
   );
   check(
@@ -1609,7 +1611,7 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   // Scoped to the pad. "Show inside" is also an overlay and legitimately keeps
   // its frosted card — a file-wide search for the blur matched that instead
   // and failed on correct code.
-  const padStart = editor.indexOf('{view === "solid" && selected ? (');
+  const padStart = editor.indexOf('{view === "solid" && selected && movePad ? (');
   const padEnd = editor.indexOf("{NUDGE_STEP} mm", padStart);
   const padRegion =
     padStart === -1 || padEnd === -1 ? "" : editor.slice(padStart, padEnd);

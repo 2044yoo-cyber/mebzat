@@ -102,7 +102,7 @@ try {
     assert.equal(await width.inputValue(), "2437.5", `${size}: a width typed to the half millimetre is kept`);
     await width.fill("2437,25");
     await width.press("Enter");
-    assert.equal(await width.inputValue(), "2437.3", `${size}: a comma is a decimal point, to one place`);
+    assert.equal(await width.inputValue(), "2437.2", `${size}: a comma is a decimal point, and a second decimal is not taken`);
     await width.fill("2437.5");
     await width.press("Enter");
     await page.getByRole("button", { name: "Lock Width" }).click();

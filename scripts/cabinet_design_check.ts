@@ -20,6 +20,7 @@ import { frontDrawing } from "../src/features/berchuma-studio/services/front-dra
 import { buildParts, cabinetFronts } from "../src/features/berchuma-studio/services/geometry";
 import { clearWindows, createKitchenDesign } from "../src/features/berchuma-studio/services/kitchen-setup";
 import { partWorldBounds } from "../src/features/berchuma-studio/services/part-transform";
+import { resizeCabinet } from "../src/features/berchuma-studio/services/operations";
 import { startingDesign } from "../src/features/berchuma-studio/services/starting-designs";
 import { defaultJoints, jointsOf } from "../src/features/berchuma-studio/services/transport-modules";
 import { DEFAULT_KITCHEN_SETUP, REFERENCE_KITCHEN_DETAILS, type KitchenWindow } from "../src/features/berchuma-studio/types/kitchen";
@@ -44,7 +45,6 @@ function functionText(source: string, name: string): string {
   return end === -1 ? source.slice(at) : source.slice(at, at + end + 2);
 }
 
-const T = 18;
 const main = (spec: DesignSpec) => [...spec.cabinets].filter((cabinet) => !cabinet.stackedOn && cabinet.kind !== "wall").sort((a, b) => b.size.width - a.size.width)[0]!;
 
 // ---------------------------------------------------------------------------
@@ -225,6 +225,15 @@ equal(withMaterial(startingDesign("wardrobe"), "not-a-board"), startingDesign("w
   equal([Math.round(drawing.width), drawing.boxes.some((box) => box.front)], [2400, true], "a project card's drawing is the design's own front, doors and all");
 }
 
+// A typed 782.5 mm has to reach the design, not just the box it was typed in.
+{
+  const typed = startingDesign("wardrobe", { width: 2437.5 });
+  equal(typed.cabinets[0]!.size.width, 2437.5, "a new design keeps a half-millimetre width");
+  equal(resizeCabinet(typed, typed.cabinets[0]!.id, { width: 2399.5 }).cabinets[0]!.size.width, 2399.5, "and so does a resize");
+  equal(resizeCabinet(typed, typed.cabinets[0]!.id, { width: 2399.54 }).cabinets[0]!.size.width, 2399.5, "to a tenth of a millimetre");
+  equal(buildTemplate("wardrobe-4-door", { width: 2437.5, height: 2400, depth: 600 }, {})!.cabinets[0]!.size.width, 2437.5, "a template too");
+}
+
 // ---------------------------------------------------------------------------
 // 7 — The rebrand: what people read changed; ids and routes did not.
 // ---------------------------------------------------------------------------
@@ -262,7 +271,7 @@ equal(withMaterial(startingDesign("wardrobe"), "not-a-board"), startingDesign("w
   ok(/color=\{colourFor\(part, spec, surface\)\}/.test(functionText(model, "PartMesh")), "and every part mesh is coloured for the chosen view");
   ok(/surface=\{surface\}/.test(model), "the model hands the view to its parts");
   const editor = code("src/features/berchuma-studio/components/editor/design-editor.tsx");
-  ok(/<SurfaceToggle value=\{surface\} onChange=\{setSurface\} \/>/.test(editor) && /<Model[\s\S]{0,200}surface=\{surface\}/.test(editor), "the editor has the Model / Material toggle and passes it on");
+  ok(/<SurfaceToggle value=\{surface\} onChange=\{setSurface\}[^>]*\/>/.test(editor) && /<Model[\s\S]{0,200}surface=\{surface\}/.test(editor), "the editor has the Model / Material toggle and passes it on");
   ok(/<QuickAction label="Duplicate" onClick=\{\(\) => onChange\(duplicateCabinet\(spec, selected\.id\)\)\}/.test(editor), "quick action: Duplicate");
   ok(/label="Delete"[\s\S]{0,200}onChange\(removeCabinet\(spec, selected\.id\)\)/.test(editor), "quick action: Delete");
   ok(/label="Move" pressed=\{movePad\}/.test(editor) && /view === "solid" && selected && movePad \?/.test(editor), "quick action: Move shows and hides the move pad");

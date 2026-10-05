@@ -1,0 +1,74 @@
+[
+ {
+  "name": "lock leaves box editable",
+  "file": "src/features/berchuma-studio/components/ui/length-field.tsx",
+  "from": "step={step} unit={unit} disabled={locked} onChange={onChange} />",
+  "to": "step={step} unit={unit} onChange={onChange} />"
+ },
+ {
+  "name": "decimal stripped while typing",
+  "file": "src/features/berchuma-studio/components/ui/length-field.tsx",
+  "from": "const digits = typed.replace(decimals > 0 ? /[^0-9.,]/g : /[^0-9]/g, \"\");",
+  "to": "const digits = typed.replace(/[^0-9]/g, \"\");"
+ },
+ {
+  "name": "next skips a step",
+  "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
+  "from": "    const next = steps[at + direction];",
+  "to": "    const next = steps[at + direction * 2] ?? steps[at + direction];"
+ },
+ {
+  "name": "material not applied on create",
+  "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
+  "from": "const spec = template ? build(template, boardId) : null;",
+  "to": "const spec = template ? build(template) : null;"
+ },
+ {
+  "name": "kitchen preset ignored",
+  "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
+  "from": "              initial={template?.kitchen}",
+  "to": "              initial={undefined}"
+ },
+ {
+  "name": "gallery template not preselected",
+  "file": "src/features/berchuma-studio/components/cabinet-start.tsx",
+  "from": "useState<string | null>(fromGallery?.id ?? null)",
+  "to": "useState<string | null>(null)"
+ },
+ {
+  "name": "windows not passed (the setup form's detailed kitchen)",
+  "file": "src/features/berchuma-studio/services/kitchen-setup.ts",
+  "from": "if (options.details) return clearWindows(createDetailedKitchen(options), options.windows);",
+  "to": "if (options.details) return createDetailedKitchen(options);"
+ },
+ {
+  "name": "material toggle dead",
+  "file": "src/features/berchuma-studio/components/viewer/surface-toggle.tsx",
+  "from": "          onClick={() => onChange(entry)}",
+  "to": "          onClick={() => undefined}"
+ },
+ {
+  "name": "resize focuses nothing",
+  "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+  "from": "                      field?.focus({ preventScroll: true });",
+  "to": ""
+ },
+ {
+  "name": "quick actions not rendered",
+  "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+  "from": "<div className=\"pointer-events-auto mt-1 flex flex-wrap gap-1\" role=\"toolbar\" aria-label=\"Selected cabinet\">",
+  "to": "<div className=\"pointer-events-auto mt-1 flex flex-wrap gap-1\" role=\"toolbar\" aria-label=\"Selection\">"
+ },
+ {
+  "name": "reset always shown",
+  "file": "src/features/berchuma-studio/components/editor/transport-panel.tsx",
+  "from": "{transport?.auto === false || joints.some((joint) => joint.locked) || defaultJoints(owner.size.width).join() !== joints.map((joint) => Math.round(joint.at)).join() ? (",
+  "to": "{true ? ("
+ },
+ {
+  "name": "ops round decimals",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  return Math.min(high, Math.max(low, Math.round(value * 10) / 10));",
+  "to": "  return Math.min(high, Math.max(low, Math.round(value)));"
+ }
+]

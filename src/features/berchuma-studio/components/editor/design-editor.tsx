@@ -562,7 +562,6 @@ export function DesignEditor({
               />
               Show inside
             </label>
-            <SurfaceToggle value={surface} onChange={setSurface} />
             </div>
           ) : null}
           {view === "solid" && spec.furnitureType === "kitchen" ? <label className="pointer-events-auto flex items-center gap-1.5 rounded-lg border bg-background/80 px-2 py-1.5 text-[11px]">
@@ -719,6 +718,9 @@ export function DesignEditor({
             )}
           </div>
 
+          {/* Bottom right, clear of the toolbar along the top, which is full
+              on a phone: Model or Material view. */}
+          {view === "solid" ? <SurfaceToggle value={surface} onChange={setSurface} className="pointer-events-auto shrink-0" /> : null}
         </div>
       </div>
 

@@ -83,7 +83,7 @@ const fingerprint = (spec: DesignSpec) => {
   const breakdown = buildParts(spec);
   return createHash("sha256").update(JSON.stringify({ parts: strip(breakdown.parts), hardware: breakdown.hardware, totals: breakdown.totals, // Part IDs and the cabinet column were added to each row by Cabinet
     // Design; every field that existed before is hashed as it was.
-    cut: buildCutList(spec, breakdown).rows.map(({ partId: _partId, cabinet: _cabinet, ...row }) => row) })).digest("hex").slice(0, 16);
+    cut: buildCutList(spec, breakdown).rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => key !== "partId" && key !== "cabinet"))) })).digest("hex").slice(0, 16);
 };
 // The saved ones are designs exactly as main saved them (scripts/data), so they
 // are opened, not regenerated: a new wardrobe is made in transport modules

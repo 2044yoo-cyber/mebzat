@@ -274,5 +274,17 @@
   "file": "src/features/berchuma-studio/services/cabinet-templates.ts",
   "from": "  if (options.height === undefined && space.height > tallest) spec = note(",
   "to": "  if (false) spec = note("
+ },
+ {
+  "name": "resize rounds to whole mm",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  return Math.min(high, Math.max(low, Math.round(value * 10) / 10));",
+  "to": "  return Math.min(high, Math.max(low, Math.round(value)));"
+ },
+ {
+  "name": "start rounds to whole mm",
+  "file": "src/features/berchuma-studio/services/starting-designs.ts",
+  "from": "  return Math.min(high, Math.max(low, Math.round(value * 10) / 10));",
+  "to": "  return Math.min(high, Math.max(low, Math.round(value)));"
  }
 ]
