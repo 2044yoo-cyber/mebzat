@@ -14,9 +14,9 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Berchuma Studio",
+  title: "Cabinet Design",
   description:
-    "Describe fitted furniture and get a drawing, a parts list and a price built from live Ethiopian supplier rates.",
+    "Design cabinets — wardrobes, kitchens, vanities, TV units and more — and get a drawing, a cut list and a price built from live Ethiopian supplier rates.",
 };
 
 /**
@@ -154,7 +154,7 @@ function Unreachable({ detail }: { detail: string }) {
   return (
     <div className="mx-auto w-full max-w-lg p-6">
       <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5">
-        <h1 className="text-lg font-semibold">Berchuma cannot reach Medosha</h1>
+        <h1 className="text-lg font-semibold">Cabinet Design cannot reach Medosha</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           The studio needs to know who you are before it can save anything, and
           the database did not answer. Everything else here is unaffected — this

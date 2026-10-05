@@ -10,9 +10,9 @@ import {
 import { designKinds } from "@/features/berchuma-studio/types/spec";
 
 export const metadata: Metadata = {
-  title: "Designs — Berchuma Studio",
+  title: "Cabinet Template Gallery — Cabinet Design",
   description:
-    "Fitted furniture designed on Medosha, with parts lists and prices from Ethiopian supplier rates. Remix any of them.",
+    "Cabinet designs and templates you can customize, with cut lists and prices from Ethiopian supplier rates.",
 };
 
 export const dynamic = "force-dynamic";
@@ -52,12 +52,12 @@ export default async function DesignsPage({
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">
-            {onlyMine ? "My designs" : "Designs"}
+            {onlyMine ? "My Projects" : "Cabinet Template Gallery"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {onlyMine
-              ? "Everything you have designed in Berchuma Studio, published or not."
-              : "Fitted furniture designed on Medosha. Every one carries its own parts list and a price built from supplier rates — open any of them and remix it into your own."}
+              ? "All your cabinet designs, published or not."
+              : "Cabinets designed on Medosha. Every one carries its own parts list and a price built from supplier rates — open any of them and remix it into your own."}
           </p>
         </div>
         {/* The way in was only ever shown on the empty state, so as soon as
@@ -110,14 +110,14 @@ export default async function DesignsPage({
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             {onlyMine
-              ? "Anything you design in Berchuma Studio appears here, published or not."
-              : "Design something in Berchuma Studio and publish it — it will appear here and on the feed."}
+              ? "Any cabinet you design appears here, published or not."
+              : "Design a cabinet and publish it — it will appear here and on the feed."}
           </p>
           <Link
             href="/studio"
             className="mt-3 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
           >
-            Open Berchuma Studio
+            Open Cabinet Design
           </Link>
         </div>
       )}

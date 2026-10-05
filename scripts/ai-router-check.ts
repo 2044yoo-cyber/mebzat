@@ -458,8 +458,8 @@ for (const word of ["facade", "interior", "upscale", "background", "sketch"]) {
 }
 
 check(
-  "Berchuma Studio is its own section",
-  nav.includes('label: "Berchuma Studio"'),
+  "Cabinet Design (Berchuma) is its own section",
+  nav.includes('label: "Cabinet Design"'),
 );
 for (const row of ["Design Studio", "My Projects", "Gallery"]) {
   check(`with a ${row} row`, nav.includes(`label: "${row}"`));

@@ -226,7 +226,7 @@ async function postToFeed(
     author_id: userId,
     author_key: `profile:${userId}`,
     author_name: name,
-    author_role: "Berchuma Studio",
+    author_role: "Cabinet Design",
     author_avatar_url: profile?.avatar_url ?? null,
     author_location: place || null,
     author_verified: profile?.verification_status === "verified",

@@ -139,7 +139,10 @@ function functionText(source: string, name: string, indent = ""): string {
 const FIELD = "src/features/berchuma-studio/components/ui/length-field.tsx";
 const PANEL = "src/features/berchuma-studio/components/editor/control-panel.tsx";
 const RAIL = "src/features/berchuma-studio/components/config/config-rail.tsx";
-const START = "src/features/berchuma-studio/components/start-panel.tsx";
+// Where a new design's sizes are typed. That was the start panel itself until
+// Cabinet Design moved the type → space → template steps into their own
+// component; the start panel now only hosts it.
+const START = "src/features/berchuma-studio/components/cabinet-start.tsx";
 const EDITOR = "src/features/berchuma-studio/components/editor/design-editor.tsx";
 const ELEVATION = "src/features/berchuma-studio/components/viewer/elevation.tsx";
 const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
@@ -214,7 +217,7 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   for (const [label, source, path] of [
     ["the cabinet panel", panel, PANEL],
     ["the config rail", rail, RAIL],
-    ["the start panel", start, START],
+    ["the cabinet start", start, START],
   ] as [string, string, string][]) {
     check(
       `${label} imports the shared field`,

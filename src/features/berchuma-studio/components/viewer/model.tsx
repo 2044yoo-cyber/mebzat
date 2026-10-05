@@ -35,7 +35,7 @@ import {
   designWorldBounds,
   resolveDesign,
 } from "../../services/resolve";
-import { boardColour, boardSheen } from "../../services/wardrobe-materials";
+import { boardColour, boardSheen, materialColour, type SurfaceView } from "../../services/wardrobe-materials";
 import type { Part } from "../../types/parts";
 import type { Cabinet, DesignSpec } from "../../types/spec";
 import type { SketchAxis, SketchTool } from "../../services/sketch";
@@ -65,6 +65,7 @@ const MM = 0.001;
 export default function Model({
   spec,
   hideFronts = false,
+  surface = "model",
   hideCountertop = spec.furnitureType === "kitchen",
   onReady,
   selectedCabinetId = null,
@@ -86,6 +87,12 @@ export default function Model({
   spec: DesignSpec;
   /** Takes the doors and drawer fronts off, to show what is inside. */
   hideFronts?: boolean;
+  /**
+   * How the boards are drawn: "model" is the clean white working view,
+   * "material" draws each board in its own decor — oak as oak, walnut as
+   * walnut — so the choice can be judged before it is ordered.
+   */
+  surface?: SurfaceView;
   hideCountertop?: boolean;
   /** Fired once the first frame is on screen, so the skeleton can go. */
   onReady?: () => void;
@@ -233,6 +240,7 @@ export default function Model({
               part={part}
               placement={placement}
               spec={spec}
+              surface={surface}
               selected={
                 selectedCabinetId !== null && part.cabinetId === selectedCabinetId
               }
@@ -427,6 +435,7 @@ function PartMesh({
   part,
   placement,
   spec,
+  surface = "model",
   selected,
   doorSelected = false,
   onSelect,
@@ -435,6 +444,7 @@ function PartMesh({
   part: Part;
   placement: { x: number; y: number; z: number };
   spec: DesignSpec;
+  surface?: SurfaceView;
   selected: boolean;
   /** The one door being sized, lit more strongly than its cabinet. */
   doorSelected?: boolean;
@@ -493,7 +503,7 @@ function PartMesh({
     >
       {shapedGeometry ? <primitive object={shapedGeometry} attach="geometry" /> : <boxGeometry args={size} />}
       <meshStandardMaterial
-        color={colourFor(part, spec)}
+        color={colourFor(part, spec, surface)}
         roughness={roughnessFor(part, spec)}
         metalness={0.02}
         // Lit rather than tinted. Tinting the selection changed what the
@@ -634,7 +644,7 @@ function SelectionBox({
  * plinth boards are the same manufacturing materials used by the cut list and
  * quote. There is no visual-only tint that can drift from what gets ordered.
  */
-function colourFor(part: Part, spec: DesignSpec): string {
+function colourFor(part: Part, spec: DesignSpec, surface: SurfaceView = "model"): string {
   switch (part.role) {
     // Legs are hardware, not carcass. Drawn in their own colour rather than a
     // shade of the body, because a Zekolo leg is a black steel or dark timber
@@ -654,7 +664,7 @@ function colourFor(part: Part, spec: DesignSpec): string {
     case "drawer_side":
     case "drawer_back":
     default:
-      return accentColour(part, spec) ?? boardColour(part.board, spec);
+      return surface === "material" ? materialColour(part.board, spec) : accentColour(part, spec) ?? boardColour(part.board, spec);
   }
 }
 

@@ -7,6 +7,8 @@ import { Box, Loader2, Ruler } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { Elevation } from "./elevation";
+import { SurfaceToggle } from "./surface-toggle";
+import type { SurfaceView } from "../../services/wardrobe-materials";
 import type { DesignSpec } from "../../types/spec";
 
 /**
@@ -35,6 +37,7 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
   // Closed doors are what the unit looks like; open ones are what the customer
   // is actually buying. The first thing anyone does to a wardrobe is open it.
   const [hideFronts, setHideFronts] = useState(false);
+  const [surface, setSurface] = useState<SurfaceView>("model");
   const [showCountertop, setShowCountertop] = useState(false);
   // Once loaded, three.js stays loaded — but the canvas is only mounted while
   // it is being looked at, so switching back to the elevation releases the
@@ -64,6 +67,8 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
         </div>
 
         {view === "solid" ? (
+          <div className="flex items-center gap-2">
+          <SurfaceToggle value={surface} onChange={setSurface} />
           <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <input
               type="checkbox"
@@ -73,6 +78,7 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
             />
             Show inside
           </label>
+          </div>
         ) : null}
       </div>
 
@@ -84,6 +90,7 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
           <Model
             spec={spec}
             hideFronts={hideFronts}
+            surface={surface}
             hideCountertop={spec.furnitureType === "kitchen" && !showCountertop}
             onReady={() => setReady(true)}
           />

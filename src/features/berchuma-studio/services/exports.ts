@@ -82,7 +82,9 @@ function cutSheet(cutList: CutList): Sheet {
   const rows: (string | number | null)[][] = [
     [
       "#",
+      "Part ID",
       "Part",
+      "Cabinet / module",
       "Board",
       "Length (mm)",
       "Width (mm)",
@@ -106,7 +108,9 @@ function cutSheet(cutList: CutList): Sheet {
     for (const row of board.rows) {
       rows.push([
         row.index,
+        row.partId,
         row.label,
+        [row.cabinet, row.module].filter(Boolean).join(" · "),
         row.boardLabel,
         row.length,
         row.width,
@@ -125,7 +129,9 @@ function cutSheet(cutList: CutList): Sheet {
   rows.push([]);
   rows.push([
     "Total",
+    null,
     `${cutList.totals.pieces} pieces`,
+    null,
     null,
     null,
     null,
@@ -273,7 +279,7 @@ function summarySheet(
   cost: CostBreakdown,
 ): Sheet {
   const rows: (string | number | null)[][] = [
-    ["Berchuma Studio — cut list and costing", null, null, null],
+    ["Cabinet Design — cut list and costing", null, null, null],
     [],
     ["Design", input.spec.title],
     ["Type", input.spec.kind.replace(/_/g, " ")],

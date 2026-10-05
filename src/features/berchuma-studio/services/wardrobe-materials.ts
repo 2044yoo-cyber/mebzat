@@ -104,6 +104,27 @@ export function boardColour(_board: Board, _spec: DesignSpec): string {
   return "#ffffff";
 }
 
+/** How the 3D view draws boards: the white working model, or the real decors. */
+export type SurfaceView = "model" | "material";
+
+/**
+ * A board in its own decor, for the material view. Where a board records no
+ * appearance the design's finish is the best statement of what it looks like.
+ * The working view's display filter is lifted while this is shown: it brightens
+ * white board, and would wash a walnut out to something that is not walnut.
+ */
+export function materialColour(board: Board, spec: DesignSpec): string {
+  if (typeof document !== "undefined") {
+    requestAnimationFrame(() => {
+      document.querySelectorAll<HTMLCanvasElement>("canvas").forEach((canvas) => {
+        canvas.style.backgroundColor = "#eeeeee";
+        canvas.style.filter = "none";
+      });
+    });
+  }
+  return board.appearance?.hex ?? spec.finish.hex ?? "#d9d4cc";
+}
+
 /** The board's own sheen wins; legacy designs retain their recorded finish. */
 export function boardSheen(
   board: Board,

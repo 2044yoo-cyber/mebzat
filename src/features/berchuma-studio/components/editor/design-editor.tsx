@@ -48,6 +48,8 @@ import { isSideDisplay } from "../../services/geometry";
 import type { JointRef } from "./transport-panel";
 import { Elevation } from "../viewer/elevation";
 import { Plan } from "../viewer/plan";
+import { SurfaceToggle } from "../viewer/surface-toggle";
+import type { SurfaceView } from "../../services/wardrobe-materials";
 import type { DesignSpec } from "../../types/spec";
 import {
   addSketchObject,
@@ -137,6 +139,7 @@ export function DesignEditor({
   const [sketchEnabled, setSketchEnabled] = useState(spec.sketchMode);
   const [sketchTool, setSketchTool] = useState<SketchTool>("select");
   const [hideFronts, setHideFronts] = useState(false);
+  const [surface, setSurface] = useState<SurfaceView>("model");
   const [showCountertop, setShowCountertop] = useState(false);
 
   // ---- how tall the drawing is on a phone ---------------------------------
@@ -343,6 +346,7 @@ export function DesignEditor({
             <Model
               spec={spec}
               hideFronts={hideFronts}
+              surface={surface}
               hideCountertop={spec.furnitureType === "kitchen" && !showCountertop}
               selectedCabinetId={selectedId}
               selectedDoor={door}
@@ -552,6 +556,7 @@ export function DesignEditor({
               />
               Show inside
             </label>
+            <SurfaceToggle value={surface} onChange={setSurface} />
             </div>
           ) : null}
           {view === "solid" && spec.furnitureType === "kitchen" ? <label className="pointer-events-auto flex items-center gap-1.5 rounded-lg border bg-background/80 px-2 py-1.5 text-[11px]">

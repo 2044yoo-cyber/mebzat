@@ -29,7 +29,7 @@ export default function StudioError({
   return (
     <div className="mx-auto w-full max-w-lg p-6">
       <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5">
-        <h1 className="text-lg font-semibold">Berchuma Studio did not load</h1>
+        <h1 className="text-lg font-semibold">Cabinet Design did not load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Something failed while building this page. Your saved designs are not
           affected — they live in the database, not in this page.
