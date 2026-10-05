@@ -6,7 +6,8 @@
 import assert from "node:assert/strict";
 
 import { wardrobeExample, tvUnitExample } from "../src/features/berchuma-studio/services/examples";
-import { buildParts } from "../src/features/berchuma-studio/services/geometry";
+import { buildParts, evenShelfHeights } from "../src/features/berchuma-studio/services/geometry";
+import { readFileSync } from "node:fs";
 import { cabinetDimensions } from "../src/features/berchuma-studio/services/interior-dimensions";
 
 const spec = wardrobeExample();
@@ -29,9 +30,18 @@ assert.deepEqual(stack!.gaps.map((gap) => gap.size), [1140, 428], "a bank of dra
 assert.deepEqual(stack!.rails.map((rail) => rail.hang?.size), [1095], "hanging down to the shelf over the drawers");
 // Right: five shelves, six equal spaces.
 assert.equal(shelves!.gaps.length, 6, "five shelves make six spaces");
-// As built: the first space is taller (the shelves are spaced from the carcass
-// base, under the bottom board), the rest are equal — the drawing says what is cut.
-assert.deepEqual(shelves!.gaps.map((gap) => gap.size), [377, 359, 359, 359, 359, 359], "the spaces as the shelves are placed");
+// (2264 opening − 5 × 18 shelves) / 6 = 362.3: every space the same, the bottom one included.
+assert.deepEqual(shelves!.gaps.map((gap) => gap.size), [362, 362, 362, 362, 362, 362], "five shelves, six equal spaces");
+assert.deepEqual(evenShelfHeights(3, 0, 1054, 18), [250, 518, 786], "three shelves in 1054: four spaces of 250");
+const cut = parts.find((part) => part.bayId === wardrobe.bays[2]!.id && part.role === "shelf")!;
+assert.deepEqual(cut.placements.map((at) => Math.round(at.y * 1000) / 1000), evenShelfHeights(5, 118, 2264, 18).map((value) => Math.round(value * 1000) / 1000), "the cut list's shelves are where the rule puts them");
+// The elevation draws its shelves by the same rule, not a second formula.
+const elevation = readFileSync("src/features/berchuma-studio/components/viewer/elevation.tsx", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const branch = elevation.slice(elevation.indexOf('if (fitting.kind === "shelves")'), elevation.indexOf('if (fitting.kind === "hanging")'));
+assert.ok(branch.length > 100, "the elevation's shelves branch was found");
+assert.match(branch, /evenShelfHeights\(fitting\.count, 0, height, board\)/, "the elevation places shelves with evenShelfHeights");
+assert.doesNotMatch(branch, /\/ \(fitting\.count \+ 1\)/, "and not by dividing the opening");
+
 // Every chain adds up to the opening it divides, boards and all.
 for (const column of measured.columns) {
   const boards = parts.filter((part) => part.cabinetId === wardrobe.id && ["shelf", "top", "bottom"].includes(part.role)).flatMap((part) => part.placements.filter((at) => at.x <= (column.from + column.to) / 2 && at.x + part.size.x >= (column.from + column.to) / 2).map(() => part.size.y)).reduce((sum, value) => sum + value, 0);
