@@ -160,11 +160,26 @@ export function edgeBandForConstructionBoard(
     : fallback;
 }
 
-/** The material colour used by both the 3D and elevation renderers. */
-export function boardColour(board: Board, spec: DesignSpec): string {
-  return spec.furnitureType === "wardrobe"
-    ? board.appearance?.hex ?? spec.finish.hex
-    : spec.finish.hex;
+/**
+ * Neutral white used by the Studio modelling viewport.
+ *
+ * The editor is a modelling view first: keeping cabinet faces white gives the
+ * geometry and panel gaps the same clear, neutral read as SketchUp. Material
+ * choices remain in the design spec for pricing, cut lists and later rendered
+ * presentation views; this function only controls the modelling/elevation
+ * display colour.
+ */
+export function boardColour(_board: Board, _spec: DesignSpec): string {
+  if (typeof document !== "undefined") {
+    requestAnimationFrame(() => {
+      document.querySelectorAll<HTMLCanvasElement>("canvas").forEach((canvas) => {
+        if (canvas.parentElement?.closest("[data-studio-viewport]")) {
+          canvas.style.backgroundColor = "#e5e5e5";
+        }
+      });
+    });
+  }
+  return "#ffffff";
 }
 
 /** The board's own sheen wins; legacy designs retain their recorded finish. */
