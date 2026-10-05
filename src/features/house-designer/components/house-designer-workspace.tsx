@@ -82,10 +82,10 @@ import {
 import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong } from "../services/project-edit";
 import { PLAN_TEMPLATES, ROOM_SAMPLES } from "../services/plan-templates";
 import { HouseTemplateLibrary } from "./house-template-library";
-import { ObjectLibrarySheet, type LibraryChoice, type LibraryKind } from "./house-object-library";
+import { ObjectLibrarySheet, type LibraryChoice, type LibraryKind, type StairSpace } from "./house-object-library";
 import { ObjectSymbol, StairSymbol } from "./plan-symbols";
 import { ColumnSymbol } from "./house-plan-selection-overlay";
-import { placeAgainstWall } from "../services/object-library";
+import { placeAgainstWall, snapToFurniture } from "../services/object-library";
 import { stairGeometry } from "../services/stair-geometry";
 import { planDescriptionError } from "../services/plan-analysis";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
@@ -715,7 +715,9 @@ function PlanEditor({
   // The object library open over the plan, and what was chosen from it to put down.
   const [libraryFor, setLibraryFor] = useState<LibraryKind | null>(null);
   const [placing, setPlacing] = useState<LibraryChoice | null>(null);
-  const [stairSpace, setStairSpace] = useState<{ width: number; length: number } | null>(null);
+  const [stairSpace, setStairSpace] = useState<StairSpace | null>(null);
+  // Dragging out the space Auto fit fits a stair into.
+  const [drawingSpace, setDrawingSpace] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [toolSettings, setToolSettings] = useState({
     height: project.levels[0]?.floorToFloorHeight ?? 3000,
@@ -936,6 +938,7 @@ function PlanEditor({
     if (id === "stair") { const room = selections[0]?.kind === "room" ? roomRectangle(project, selections[0].id) : null; setStairSpace(room ? { width: room.width, length: room.depth } : null); }
     setLibraryFor(library);
     setPlacing(null);
+    setDrawingSpace(false);
     setSplitDraft(null);
     setPlacement(null);
     if (id === "select") { setActiveTool("select"); setDraftStart(null); setOutlineSketch([]); return; }
@@ -944,6 +947,13 @@ function PlanEditor({
 
   function chooseFromLibrary(choice: LibraryChoice) {
     setLibraryFor(null);
+    if (choice.kind === "stair" && choice.at) {
+      // Fitted into a space drawn on the plan: it goes in the middle of it.
+      applyMutation(createHouseObjectFromGesture(project, "stair", activeLevelId, choice.at, undefined, { stair: choice.params, rotation: choice.rotation }));
+      setStairSpace(null);
+      setActiveTool("select");
+      return;
+    }
     setPlacing(choice);
     if (choice.kind === "object") setToolSettings((current) => ({ ...current, width: choice.definition.width, depth: choice.definition.depth, height: choice.definition.height }));
     else if (choice.kind === "door") setToolSettings((current) => ({ ...current, width: choice.width, height: 2100, sillHeight: 0 }));
@@ -955,7 +965,11 @@ function PlanEditor({
   /** Where the chosen object lands for a tap at `point`: furniture backs onto a wall within reach. */
   function placementAt(point: HousePlanPoint) {
     if (placing?.kind !== "object") return { x: point.x, y: point.y, rotation: placing?.kind === "stair" ? placing.rotation : 0 };
-    return placeAgainstWall(project, activeLevelId, point, { width: placing.definition.width, depth: placing.definition.depth });
+    const size = { width: placing.definition.width, depth: placing.definition.depth };
+    const wall = placeAgainstWall(project, activeLevelId, point, size);
+    // Then edge to edge with what is there — along the wall, if it is against one.
+    const along = wall.wallId ? (Math.abs(Math.round(wall.rotation / 90)) % 2 === 1 ? "y" as const : "x" as const) : undefined;
+    return { ...wall, ...snapToFurniture(project, activeLevelId, { ...wall, ...size }, { along }) };
   }
 
   function placingGhost(point: HousePlanPoint) {
@@ -969,6 +983,15 @@ function PlanEditor({
 
   function draftObject(start: HousePlanPoint, end: HousePlanPoint) {
     if (!activeTool) return;
+    if (drawingSpace && activeTool === "room") {
+      const width = Math.round(Math.abs(end.x - start.x));
+      const length = Math.round(Math.abs(end.y - start.y));
+      setDrawingSpace(false);
+      setStairSpace({ width, length, x: Math.round((start.x + end.x) / 2), y: Math.round((start.y + end.y) / 2) });
+      setActiveTool("stair");
+      setLibraryFor("stair");
+      return;
+    }
     if (placing && (activeTool === "furniture" || activeTool === "stair" || activeTool === "column")) {
       const at = placementAt(end);
       const result = placing.kind === "object"
@@ -1278,7 +1301,12 @@ function PlanEditor({
               {analysis && showAnalysis ? <p className="flex items-start gap-2 rounded-xl border border-brand/25 bg-brand/5 p-2.5 text-xs">{analysis}<button type="button" onClick={() => setShowAnalysis(false)} aria-label="Dismiss" className="ml-auto shrink-0 text-muted-foreground">✕</button></p> : null}
               <PlanToolbar activeTool={activeTool} onTool={chooseTool} />
               <div className="relative h-[calc(100dvh-26rem)] min-h-[300px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 lg:h-[min(640px,60dvh)] dark:bg-background">
-                {activeLevel ? <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} showGrid={gridVisible} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} sketch={outlineSketch} onCancelDraft={() => { setDraftStart(null); setOutlineSketch([]); }} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => applyMutation(moveHouseSelections(project, [selection], dx, dy, { footprintEditable: true }))} onDraftStart={(point) => { if (chainEnded.current) { chainEnded.current = false; setDraftStart(null); return; } setDraftStart(point); }} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={() => undefined} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch)); }} onGuidance={() => undefined} pins={pins.filter((pin) => pin.source.kind === "plan" && pin.source.level === activeLevelId)} onPinTap={(id) => setActivePinId(id)} focus={planFocus}
+                {activeLevel ? <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} showGrid={gridVisible} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} sketch={outlineSketch} onCancelDraft={() => { setDraftStart(null); setOutlineSketch([]); }} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => {
+                  // Furniture dragged near furniture lands edge to edge with it.
+                  const item = selection.kind === "component" ? project.components.find((entry) => entry.id === selection.id) : null;
+                  const to = item ? snapToFurniture(project, activeLevelId, { ...item, x: item.x + dx, y: item.y + dy }, { ignore: item.id }) : null;
+                  applyMutation(moveHouseSelections(project, [selection], to && item ? to.x - item.x : dx, to && item ? to.y - item.y : dy, { footprintEditable: true }));
+                }} onDraftStart={(point) => { if (chainEnded.current) { chainEnded.current = false; setDraftStart(null); return; } setDraftStart(point); }} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={() => undefined} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch)); }} onGuidance={() => undefined} pins={pins.filter((pin) => pin.source.kind === "plan" && pin.source.level === activeLevelId)} onPinTap={(id) => setActivePinId(id)} focus={planFocus}
                   onWallExtend={(selection, end, delta) => wallEdit(selection, () => extendWall(project, selection.id, end, delta))}
                   onWallEnd={(selection, end, to) => wallEdit(selection, () => moveWallEnd(project, selection.id, end, to))}
                   onWallLength={(selection, end, length) => wallEdit(selection, () => setWallLength(project, selection.id, end, length))}
@@ -1294,7 +1322,7 @@ function PlanEditor({
                   {([["rectangle", "Rectangle"], ["l-shape", "L shape"]] as const).map(([shape, label]) => <button key={shape} type="button" role="radio" aria-checked={roomShape === shape} onClick={() => setRoomShape(shape)} className={cn("min-h-9 rounded-lg px-3", roomShape === shape ? "bg-brand/15 text-brand" : "text-muted-foreground hover:bg-muted")}>{label}</button>)}
                   <button type="button" onClick={() => chooseTool("wall")} className="min-h-9 rounded-lg px-3 text-muted-foreground hover:bg-muted">Free draw</button>
                 </div> : null}
-                {libraryFor ? <ObjectLibrarySheet kind={libraryFor} floorHeight={activeLevel?.floorToFloorHeight ?? 3000} space={stairSpace} onChoose={chooseFromLibrary} onClose={() => setLibraryFor(null)} /> : null}
+                {libraryFor ? <ObjectLibrarySheet key={`${libraryFor}:${stairSpace?.x ?? ""}:${stairSpace?.y ?? ""}`} kind={libraryFor} floorHeight={activeLevel?.floorToFloorHeight ?? 3000} space={stairSpace} onChoose={chooseFromLibrary} onClose={() => setLibraryFor(null)} onDrawSpace={() => { setLibraryFor(null); setDrawingSpace(true); setRoomShape("rectangle"); setActiveTool("room"); setDraftStart(null); toast.info("Drag across the space for the stair"); }} /> : null}
                 {activeTool === "move" ? <p className="pointer-events-none absolute inset-x-2 top-10 z-10 rounded-lg bg-brand px-3 py-2 text-center text-xs font-medium text-brand-foreground">Tap the new position</p> : null}
                 {mergeFrom ? <p className="pointer-events-none absolute inset-x-2 top-10 z-10 rounded-lg bg-brand px-3 py-2 text-center text-xs font-medium text-brand-foreground">Tap the room to merge with</p> : null}
                 {proposals && proposals.levelId === activeLevelId ? <HouseColumnSuggestions items={proposals.items} chosen={proposals.chosen} maxSpan={proposals.maxSpan} onSpan={suggest} onRegenerate={() => suggest(proposals.maxSpan)} onAccept={acceptProposals} onRemove={(item) => setProposals({ ...proposals, items: proposals.items.filter((entry) => entry !== item), chosen: null })} onClear={() => setProposals(null)} /> : null}

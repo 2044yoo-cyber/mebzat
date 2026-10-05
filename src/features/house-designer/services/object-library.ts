@@ -201,3 +201,37 @@ export function placeAgainstWall(project: HouseProject, levelId: string, point: 
   }
   return best ? { x: best.x, y: best.y, rotation: best.rotation, wallId: best.wallId } : { x: Math.round(point.x), y: Math.round(point.y), rotation, wallId: null };
 }
+
+// ---------------------------------------------------------------------------
+// Placing: edge to edge with the furniture already there
+// ---------------------------------------------------------------------------
+
+type Box = { minX: number; maxX: number; minY: number; maxY: number };
+const footprint = (item: { x: number; y: number; width: number; depth: number; rotation: number }): Box => {
+  const turned = Math.abs(Math.round(item.rotation / 90)) % 2 === 1;
+  const w = turned ? item.depth : item.width;
+  const d = turned ? item.width : item.depth;
+  return { minX: item.x - w / 2, maxX: item.x + w / 2, minY: item.y - d / 2, maxY: item.y + d / 2 };
+};
+
+/**
+ * An object brought within reach of another snaps to it: side by side, edge
+ * on edge, or lined up with its edges — a bedside table against the bed, two
+ * base cabinets in a run. `along` keeps a shift to one axis (an object set
+ * against a wall slides along it, it does not leave it).
+ */
+export function snapToFurniture(project: HouseProject, levelId: string, placed: { x: number; y: number; width: number; depth: number; rotation: number }, options: { ignore?: string; along?: "x" | "y"; reach?: number } = {}): { x: number; y: number } {
+  const reach = options.reach ?? 150;
+  const me = footprint(placed);
+  let shiftX: number | null = null;
+  let shiftY: number | null = null;
+  const consider = (current: number | null, value: number) => Math.abs(value) <= reach && (current === null || Math.abs(value) < Math.abs(current)) ? value : current;
+  for (const other of project.components.filter((item) => item.levelId === levelId && item.id !== options.ignore)) {
+    const box = footprint(other);
+    const nearInY = me.minY < box.maxY + reach && me.maxY > box.minY - reach;
+    const nearInX = me.minX < box.maxX + reach && me.maxX > box.minX - reach;
+    if (nearInY && options.along !== "y") for (const value of [box.maxX - me.minX, box.minX - me.maxX, box.minX - me.minX, box.maxX - me.maxX]) shiftX = consider(shiftX, value);
+    if (nearInX && options.along !== "x") for (const value of [box.maxY - me.minY, box.minY - me.maxY, box.minY - me.minY, box.maxY - me.maxY]) shiftY = consider(shiftY, value);
+  }
+  return { x: Math.round(placed.x + (shiftX ?? 0)), y: Math.round(placed.y + (shiftY ?? 0)) };
+}

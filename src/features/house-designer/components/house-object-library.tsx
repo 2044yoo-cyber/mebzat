@@ -24,7 +24,7 @@ import { DoorSymbol, ObjectSymbol, StairSymbol, WindowSymbol } from "./plan-symb
 export type LibraryKind = "furniture" | "stair" | "door" | "window" | "column";
 export type LibraryChoice =
   | { kind: "object"; definition: ObjectDefinition }
-  | { kind: "stair"; params: StairParams; rotation: number }
+  | { kind: "stair"; params: StairParams; rotation: number; at?: { x: number; y: number } }
   | { kind: "door"; style: string; width: number }
   | { kind: "window"; style: string; width: number; height: number; sill: number }
   | { kind: "column"; shape: ColumnShape; width: number; depth: number };
@@ -47,7 +47,10 @@ export function rememberObject(id: string) {
  * The object library, as a bottom sheet over the plan: chosen, it closes and
  * the object follows the finger until it is put down.
  */
-export function ObjectLibrarySheet({ kind, floorHeight, space, onChoose, onClose }: { kind: LibraryKind; floorHeight: number; space?: { width: number; length: number } | null; onChoose: (choice: LibraryChoice) => void; onClose: () => void }) {
+/** A space for a stair: typed, a selected room's, or drawn on the plan (then it has a centre). */
+export type StairSpace = { width: number; length: number; x?: number; y?: number };
+
+export function ObjectLibrarySheet({ kind, floorHeight, space, onChoose, onClose, onDrawSpace }: { kind: LibraryKind; floorHeight: number; space?: StairSpace | null; onChoose: (choice: LibraryChoice) => void; onClose: () => void; onDrawSpace?: () => void }) {
   return (
     <section role="dialog" aria-label={`${TITLES[kind]} library`} className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[70vh] w-full max-w-2xl flex-col rounded-t-2xl border bg-card pb-[env(safe-area-inset-bottom)] shadow-2xl">
       <div className="flex items-center gap-2 px-3 pt-2">
@@ -59,7 +62,7 @@ export function ObjectLibrarySheet({ kind, floorHeight, space, onChoose, onClose
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {kind === "furniture" ? <FurniturePanel onChoose={onChoose} />
-          : kind === "stair" ? <StairPanel floorHeight={floorHeight} space={space ?? null} onChoose={onChoose} />
+          : kind === "stair" ? <StairPanel floorHeight={floorHeight} space={space ?? null} onChoose={onChoose} onDrawSpace={onDrawSpace} />
             : kind === "door" ? <Cards items={DOOR_TYPES.map((item) => ({ id: item.id, name: item.name, size: `${item.width} wide`, preview: <DoorPreview style={item.id} />, choose: () => onChoose({ kind: "door", style: item.id, width: item.width }) }))} />
               : kind === "window" ? <Cards items={WINDOW_TYPES.map((item) => ({ id: item.id, name: item.name, size: `${item.width} × ${item.height}`, preview: <WindowPreview style={item.id} />, choose: () => onChoose({ kind: "window", style: item.id, width: item.width, height: item.height, sill: item.sill }) }))} />
                 : <ColumnPanel onChoose={onChoose} />}
@@ -120,11 +123,13 @@ function FurniturePanel({ onChoose }: { onChoose: (choice: LibraryChoice) => voi
   );
 }
 
-function StairPanel({ floorHeight, space, onChoose }: { floorHeight: number; space: { width: number; length: number } | null; onChoose: (choice: LibraryChoice) => void }) {
+function StairPanel({ floorHeight, space, onChoose, onDrawSpace }: { floorHeight: number; space: StairSpace | null; onChoose: (choice: LibraryChoice) => void; onDrawSpace?: () => void }) {
   const [width, setWidth] = useState(String(space?.width ?? 2800));
   const [length, setLength] = useState(String(space?.length ?? 4500));
   const [height, setHeight] = useState(String(floorHeight));
-  const [fits, setFits] = useState<ReturnType<typeof fitStairs> | null>(null);
+  // A space just drawn on the plan is answered straight away.
+  const drawn = space && space.x !== undefined && space.y !== undefined ? { x: space.x, y: space.y } : null;
+  const [fits, setFits] = useState<ReturnType<typeof fitStairs> | null>(() => (drawn && space ? fitStairs(space, floorHeight) : null));
   const read = (value: string) => Number(value.replace(",", "."));
   return (
     <div className="space-y-3">
@@ -140,12 +145,16 @@ function StairPanel({ floorHeight, space, onChoose }: { floorHeight: number; spa
           <label>Space length (mm)<input aria-label="Space length" inputMode="decimal" value={length} onChange={(event) => setLength(event.target.value)} className="mt-0.5 min-h-10 w-full rounded-lg border bg-background px-2 text-sm text-foreground" /></label>
           <label>Floor height (mm)<input aria-label="Floor-to-floor height" inputMode="decimal" value={height} onChange={(event) => setHeight(event.target.value)} className="mt-0.5 min-h-10 w-full rounded-lg border bg-background px-2 text-sm text-foreground" /></label>
         </div>
-        <button type="submit" className="min-h-10 w-full rounded-lg bg-brand text-sm font-semibold text-brand-foreground">Find stairs that fit</button>
+        <div className="flex gap-1.5">
+          <button type="submit" className="min-h-10 flex-1 rounded-lg bg-brand text-sm font-semibold text-brand-foreground">Find stairs that fit</button>
+          {onDrawSpace ? <button type="button" onClick={onDrawSpace} className="min-h-10 rounded-lg border px-3 text-sm">Draw the space</button> : null}
+        </div>
+        {drawn ? <p className="text-[11px] text-muted-foreground">Drawn on the plan: {space!.width} × {space!.length} mm. A stair chosen here is placed in it.</p> : null}
         {fits ? (fits.length ? (
           <div role="list" aria-label="Stairs that fit" className="space-y-1">
             {fits.map((fit) => {
               const name = STAIR_TYPES.find((type) => type.id === fit.params.type)!.name;
-              return <button key={fit.params.type} type="button" role="listitem" onClick={() => onChoose({ kind: "stair", params: fit.params, rotation: fit.rotated ? 90 : 0 })} className="flex w-full items-center gap-2 rounded-lg border p-1.5 text-left text-xs hover:bg-muted/50">
+              return <button key={fit.params.type} type="button" role="listitem" onClick={() => onChoose({ kind: "stair", params: fit.params, rotation: fit.rotated ? 90 : 0, at: drawn && Number(width) === space!.width && Number(length) === space!.length ? drawn : undefined })} className="flex w-full items-center gap-2 rounded-lg border p-1.5 text-left text-xs hover:bg-muted/50">
                 <span className="text-slate-700 dark:text-slate-200"><Preview width={fit.width} depth={fit.length}><StairSymbol geometry={stairGeometry(fit.params)} label={false} /></Preview></span>
                 <span><strong>{name}</strong><br />{fit.width} × {fit.length} mm{fit.rotated ? " · turned 90°" : ""} · {fit.params.risers} risers of {(fit.params.height / fit.params.risers).toFixed(1)} · treads {fit.params.treadDepth} · {fit.params.stairWidth} wide</span>
               </button>;
