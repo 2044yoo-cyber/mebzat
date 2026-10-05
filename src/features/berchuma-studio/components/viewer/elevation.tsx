@@ -4,6 +4,7 @@ import { useId } from "react";
 
 import {
   RAIL_SHELF_HEIGHTS,
+  evenShelfHeights,
   hingesPerLeaf,
   sectionBands,
   sectionFitting,
@@ -521,18 +522,18 @@ function Fitting({
   }
 
   if (fitting.kind === "shelves") {
-    // Shelves divide the bay into count + 1 gaps, which is what puts the
-    // topmost one below the ceiling of the bay rather than on it.
-    const step = height / (fitting.count + 1);
+    // The same heights the geometry cuts: equal clear spaces between shelves.
+    // Measured up from the bay floor; SVG measures down from the top.
+    const shelves = evenShelfHeights(fitting.count, 0, height, board);
     return (
       <g stroke={interiorColour} strokeWidth={5}>
-        {Array.from({ length: fitting.count }, (_, index) => (
+        {shelves.map((underside, index) => (
           <line
             key={index}
             x1={x}
             x2={x + width}
-            y1={y + step * (index + 1)}
-            y2={y + step * (index + 1)}
+            y1={y + height - underside - board / 2}
+            y2={y + height - underside - board / 2}
           />
         ))}
       </g>

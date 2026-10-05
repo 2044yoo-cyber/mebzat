@@ -887,16 +887,12 @@ function bayParts(input: {
   switch (bay.fitting.kind) {
     case "shelves": {
       if (bay.fitting.count > 0) {
-        // n shelves divide the opening into n + 1 gaps, which is what puts the
-        // top one below the ceiling of the bay rather than against it.
-        const step = interiorHeight / (bay.fitting.count + 1);
+        // n shelves make n + 1 spaces, equal and clear of the boards — the top
+        // one below the ceiling of the bay rather than against it.
         parts.push(
           shelf(
             `${bay.id}-shelf`,
-            Array.from(
-              { length: bay.fitting.count },
-              (_, index) => y + step * (index + 1),
-            ),
+            evenShelfHeights(bay.fitting.count, y, interiorHeight, board.thickness),
             `Shelf${bayName}${bay.fitting.adjustable ? "" : " (fixed)"}`,
             bay.fitting.adjustable,
           ),
@@ -1784,4 +1780,18 @@ function summarise(parts: Part[], hardware: HardwareLine[]): PartsBreakdown {
 function round(value: number, places: number): number {
   const factor = 10 ** places;
   return Math.round(value * factor) / factor;
+}
+
+/**
+ * Where n shelves go so the n + 1 spaces between them are equal, in mm above
+ * the floor — each height the shelf's underside.
+ *
+ * The clear spaces are what is equal, so each shelf's own thickness is taken
+ * out first. Dividing the opening by n + 1 and standing a shelf on each mark
+ * made the bottom space a board thicker than every other: 377 mm under a
+ * stack of 359s in a 2.3 m wardrobe.
+ */
+export function evenShelfHeights(count: number, floor: number, height: number, thickness: number): number[] {
+  const space = (height - count * thickness) / (count + 1);
+  return Array.from({ length: count }, (_, index) => floor + space * (index + 1) + thickness * index);
 }
