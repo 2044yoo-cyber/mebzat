@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createKitchenDesign, addKitchenUpper } from "../src/features/berchuma-studio/services/kitchen-setup";
 import { DEFAULT_KITCHEN_SETUP, REFERENCE_KITCHEN_DETAILS, kitchenSetupError, type KitchenSetup } from "../src/features/berchuma-studio/types/kitchen";
 import { resolveDesign } from "../src/features/berchuma-studio/services/resolve";
-import { buildParts } from "../src/features/berchuma-studio/services/geometry";
+import { buildParts, cabinetFronts } from "../src/features/berchuma-studio/services/geometry";
 import { kitchenConstruction, visibleKitchenParts } from "../src/features/berchuma-studio/services/kitchen-construction";
 import { rotatedRectBounds, partWorldBounds } from "../src/features/berchuma-studio/services/part-transform";
 import { validateSpec } from "../src/features/berchuma-studio/types/spec";
@@ -89,11 +89,15 @@ for (const shape of ["straight", "l_shaped", "u_shaped", "g_shaped", "island"] a
   assert.ok(sinkParts.every((p) => !["shelf", "top", "leg"].includes(p.role)));
   assert.equal(sinkParts.filter((p) => p.role === "plinth").length, 4);
   assert.ok(sinkParts.filter((p) => p.role === "plinth").every((p) => p.size.y === 70));
-  const doors = kitchenConstruction(spec, sink, []).filter((p) => p.role === "door");
+  // The sink unit's doors span its whole front. They are made with every other
+  // door, in cabinetFronts, so the cut parts are checked against the same leaves.
+  const doors = cabinetFronts(spec, sink).leaves;
   const zekolo = kitchenConstruction(spec, sink, []).find((p) => p.id === "zekolo-front")!;
   assert.equal(zekolo.placements[0].z, 40);
-  assert.equal(doors[0].placements[0].x, 1.5);
-  assert.equal(doors.at(-1)!.placements[0].x + doors.at(-1)!.size.x, sink.size.width - 1.5);
+  assert.ok(doors.every((leaf) => leaf.aligned), "the sink unit's doors are hung across its front");
+  assert.equal(doors[0].x, 1.5);
+  assert.equal(doors.at(-1)!.x + doors.at(-1)!.width, sink.size.width - 1.5);
+  assert.deepEqual(sinkParts.filter((p) => p.role === "door").map((p) => p.size.x), doors.map((leaf) => leaf.width), "and the cut doors are those leaves");
   assert.equal(addKitchenUpper(spec, sink.id).cabinets.length, spec.cabinets.length, "Existing connected upper is not duplicated");
 }
 const moved = options("island");

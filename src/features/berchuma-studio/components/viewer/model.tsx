@@ -9,6 +9,9 @@ import * as THREE from "three";
 
 import { CabinetHandles, DimensionLabel, type DragChange } from "./handles";
 import { CabinetDimensionLines } from "./dimensions";
+import { DoorHandles } from "./door-handles";
+import type { FrontRect } from "../../services/door-layout";
+import { doorLeafOf, doorSnapTargetsOf, type DoorRef } from "../../services/operations";
 import { cabinetDimensions } from "../../services/interior-dimensions";
 import {
   bayDimensionsWorthDrawing,
@@ -61,6 +64,10 @@ export default function Model({
   sketchTool = "orbit",
   onPlaceSketch,
   onMoveSketch,
+  selectedDoor = null,
+  onSelectDoor,
+  onDoorResize,
+  snap = true,
 }: {
   spec: DesignSpec;
   /** Takes the doors and drawer fronts off, to show what is inside. */
@@ -79,6 +86,13 @@ export default function Model({
   sketchTool?: SketchTool;
   onPlaceSketch?: (position: { x: number; y: number; z: number }, axis: SketchAxis, direction: -1 | 1) => void;
   onMoveSketch?: (position: { x: number; y: number; z: number }) => void;
+  /** One leaf of the selected cabinet, chosen by tapping it once the cabinet is selected. */
+  selectedDoor?: DoorRef | null;
+  onSelectDoor?: (door: DoorRef | null) => void;
+  /** An edge of the selected door pulled to here, in its cabinet's frame. */
+  onDoorResize?: (door: DoorRef, rect: FrontRect) => void;
+  /** Whether a dragged door edge snaps to the boards and fronts near it. */
+  snap?: boolean;
 }) {
   // Every part, fronts included: the dimensions measure the drawer fronts
   // even while they are taken off to show what is inside.
@@ -121,6 +135,11 @@ export default function Model({
     if (!cabinet || !placed || (placed.rotation ?? 0) !== 0) return null;
     return cabinetDimensions({ ...cabinet, position: { ...cabinet.position, x: placed.x, y: placed.y, z: placed.z } }, allParts);
   }, [spec, selectedCabinetId, resolved, allParts]);
+
+  // The selected door, as the cut list has it, and where its edges can land.
+  const doorLeaf = useMemo(() => (selectedDoor ? doorLeafOf(spec, selectedDoor) : null), [spec, selectedDoor]);
+  const doorTargets = useMemo(() => (selectedDoor && doorLeaf ? doorSnapTargetsOf(spec, selectedDoor) : null), [spec, selectedDoor, doorLeaf]);
+  const frontThickness = allParts.find((part) => part.role === "door")?.size.z ?? 18;
 
   // Orbiting and dragging an edge are both "the pointer moved", so one of them
   // has to stand down. Without this, pulling a cabinet wider also swung the
@@ -194,6 +213,10 @@ export default function Model({
               selected={
                 selectedCabinetId !== null && part.cabinetId === selectedCabinetId
               }
+              doorSelected={Boolean(
+                selectedDoor && part.doorLeaf && part.cabinetId === selectedDoor.cabinetId && part.bayId === selectedDoor.bayId &&
+                  part.doorLeaf.run === selectedDoor.run && part.doorLeaf.first + index === selectedDoor.leaf,
+              )}
               // A design with nothing selected is not clickable at all, so a
               // published design stays a picture rather than becoming an editor
               // that does nothing.
@@ -201,7 +224,16 @@ export default function Model({
                 !onSelectCabinet
                   ? undefined
                   : part.cabinetId
-                    ? () => onSelectCabinet(part.cabinetId!)
+                    ? () => {
+                        // A door of the cabinet already selected selects that
+                        // door, to size; the first tap selects the cabinet.
+                        if (onSelectDoor && part.role === "door" && part.doorLeaf && part.bayId && part.cabinetId === selectedCabinetId) {
+                          onSelectDoor({ cabinetId: part.cabinetId!, bayId: part.bayId, run: part.doorLeaf.run, leaf: part.doorLeaf.first + index });
+                          return;
+                        }
+                        onSelectCabinet(part.cabinetId!);
+                        onSelectDoor?.(null);
+                      }
                     : // A worktop belongs to a run rather than to one cabinet,
                       // and it covers every base unit under it. Clicking it
                       // used to do nothing at all, which reads as the viewer
@@ -251,7 +283,7 @@ export default function Model({
               cabinet={positionedSelected}
               rotation={selectedPlacement?.rotation ?? 0}
             />
-            {onResize && (selectedPlacement?.rotation ?? 0) === 0 ? (
+            {onResize && !doorLeaf && (selectedPlacement?.rotation ?? 0) === 0 ? (
               <CabinetHandles
                 cabinet={positionedSelected}
                 offset={{ x: 0, z: 0 }}
@@ -259,7 +291,17 @@ export default function Model({
                 onDrag={(change) => onResize(positionedSelected.id, change)}
               />
             ) : null}
-            {measured && !dragging ? <CabinetDimensionLines dimensions={measured} scale={Math.max(1, reach * 0.5)} /> : null}
+            {doorLeaf && selectedDoor && doorTargets && onDoorResize && selectedPlacement && (selectedPlacement.rotation ?? 0) === 0 && selectedDoor.cabinetId === positionedSelected.id ? (
+              <DoorHandles
+                rect={doorLeaf}
+                origin={{ x: selectedPlacement.x, y: selectedPlacement.y, z: -(selectedPlacement.z - frontThickness) * MM + 0.004 }}
+                targets={doorTargets}
+                snap={snap}
+                onDragState={setDragging}
+                onDrag={(rect) => onDoorResize(selectedDoor, rect)}
+              />
+            ) : null}
+            {measured && !dragging && !doorLeaf ? <CabinetDimensionLines dimensions={measured} scale={Math.max(1, reach * 0.5)} /> : null}
             <SelectionLabels
               cabinet={positionedSelected}
               reach={reach}
@@ -310,6 +352,7 @@ function PartMesh({
   placement,
   spec,
   selected,
+  doorSelected = false,
   onSelect,
   onDraw,
 }: {
@@ -317,6 +360,8 @@ function PartMesh({
   placement: { x: number; y: number; z: number };
   spec: DesignSpec;
   selected: boolean;
+  /** The one door being sized, lit more strongly than its cabinet. */
+  doorSelected?: boolean;
   /** Given the point in scene space, so a run-wide part can work out which. */
   onSelect?: (point: THREE.Vector3) => void;
   onDraw?: (point: THREE.Vector3, normal: THREE.Vector3) => void;
@@ -378,8 +423,8 @@ function PartMesh({
         // Lit rather than tinted. Tinting the selection changed what the
         // material looked like, which is the one thing somebody choosing a
         // finish must be able to trust.
-        emissive={selected ? SELECTION_GLOW : BLACK}
-        emissiveIntensity={selected ? 0.22 : 0}
+        emissive={doorSelected ? DOOR_GLOW : selected ? SELECTION_GLOW : BLACK}
+        emissiveIntensity={doorSelected ? 0.35 : selected ? 0.22 : 0}
       />
     </mesh>
   );
@@ -449,6 +494,7 @@ function boundsWithSketch(spec: DesignSpec) {
 }
 
 const SELECTION_GLOW = new THREE.Color("#4c8dff");
+const DOOR_GLOW = new THREE.Color("#f4a63a");
 const BLACK = new THREE.Color("#000000");
 
 /**

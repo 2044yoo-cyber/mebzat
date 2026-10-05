@@ -37,21 +37,10 @@ export function kitchenConstruction(spec: DesignSpec, cabinet: Cabinet, original
     }
     return parts;
   }
-  let aligned = original;
-  const bay = cabinet.bays.length === 1 ? cabinet.bays[0] : null;
-  if (bay?.door === "hinged" && !["drawers", "stack"].includes(bay.fitting.kind)) {
-    const gap = spec.carcass.doorGap;
-    const leaves = bay.doorLeaves;
-    const frontWidth = width - (cabinet.frontInsets?.start ?? 0) - (cabinet.frontInsets?.end ?? 0);
-    const leafWidth = (frontWidth - leaves * gap) / leaves;
-    aligned = original.filter((p) => p.role !== "door");
-    for (let i = 0; i < leaves && leafWidth > 0; i++) {
-      const door = panel(`aligned-door-${i}`, "door", { x: leafWidth, y: height - cabinet.plinthHeight - gap, z: materials.fronts.thickness }, { x: (cabinet.frontInsets?.start ?? 0) + gap / 2 + i * (leafWidth + gap), y: cabinet.plinthHeight + gap / 2, z: -materials.fronts.thickness }, "z", materials.fronts);
-      door.doorStyle = "hinged";
-      door.bayId = bay.id;
-      aligned.push(door);
-    }
-  }
+  // A single-bay kitchen unit's doors span its whole front; they are made
+  // with every other door, in geometry's cabinetFronts, so a door sized by
+  // hand is the same door here.
+  const aligned = original;
   if (cabinet.kind !== "base" && cabinet.kind !== "island") return aligned;
   const parts = aligned.filter((p) => p.role !== "top" && p.role !== "leg" && p.role !== "plinth" && !(cabinet.kitchenRole && p.role === "shelf"));
   // Open tops with two vertical stretchers, as in the supplied OBJ. Sink and

@@ -282,6 +282,27 @@ export const baySchema = z.object({
   door: z.enum(doorStyles).default("hinged"),
   /** A pair of doors on one bay, for bays too wide for a single leaf. */
   doorLeaves: z.number().int().min(1).max(2).default(1),
+  /**
+   * Doors sized by hand. One entry per leaf that is: `run` counts a stacked
+   * bay's door runs from the bottom (0 for a plain bay), `leaf` counts left to
+   * right. The rectangle is the leaf's face in the cabinet's own frame — x from
+   * its left side, y up from its floor, millimetres. A leaf with no entry is
+   * sized automatically, which is every leaf of every design saved before
+   * this existed.
+   */
+  doorOverrides: z
+    .array(
+      z.object({
+        run: z.number().int().min(0).default(0),
+        leaf: z.number().int().min(0).max(1),
+        x: z.number(),
+        y: z.number(),
+        width: z.number().positive(),
+        height: z.number().positive(),
+      }),
+    )
+    .max(12)
+    .optional(),
 });
 
 export type Bay = z.infer<typeof baySchema>;

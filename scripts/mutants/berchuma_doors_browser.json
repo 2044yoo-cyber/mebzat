@@ -1,0 +1,98 @@
+[
+ {
+  "name": "elevation draws the automatic door",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "        const rect = leaf;",
+  "to": "        const rect = leaf.auto;"
+ },
+ {
+  "name": "no dead zone on an elevation handle",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "    if (!state.moving && Math.hypot(event.clientX - state.x, event.clientY - state.y) < 4) return;\n    state.moving = true;\n    const point",
+  "to": "    state.moving = true;\n    const point"
+ },
+ {
+  "name": "elevation drag ignores snap",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "    const result = dragDoorEdge(state.start, state.edge, value, { targets: state.targets, snap, tolerance: Math.max(5, 10 * mmPerPixel) });",
+  "to": "    const result = dragDoorEdge(state.start, state.edge, value, { targets: state.targets, snap: false, tolerance: Math.max(5, 10 * mmPerPixel) });"
+ },
+ {
+  "name": "no live size in the elevation",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "          {live.edge === \"left\" || live.edge === \"right\" ? `\u2190 ${Math.round(live.rect.width)} mm \u2192` : `\u2195 ${Math.round(live.rect.height)} mm`}",
+  "to": "          {\"\"}"
+ },
+ {
+  "name": "elevation door tap does not select it",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "            onClick={onSelectDoor ? (event) => { event.stopPropagation(); onSelectDoor(ref); } : undefined}",
+  "to": "            onClick={undefined}"
+ },
+ {
+  "name": "3D drag axis in the group frame",
+  "file": "src/features/berchuma-studio/components/viewer/door-handles.tsx",
+  "from": "    return groupRef.current ? groupRef.current.localToWorld(local) : local;",
+  "to": "    return local;"
+ },
+ {
+  "name": "3D drag line along the cabinet floor",
+  "file": "src/features/berchuma-studio/components/viewer/door-handles.tsx",
+  "from": "scene(0, rect.y + rect.height / 2)",
+  "to": "scene(0, 0)"
+ },
+ {
+  "name": "no live size in 3D",
+  "file": "src/features/berchuma-studio/components/viewer/door-handles.tsx",
+  "from": "      {label ? <DimensionLabel",
+  "to": "      {label && false ? <DimensionLabel"
+ },
+ {
+  "name": "3D door tap selects the cabinet only",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "                        if (onSelectDoor && part.role === \"door\" && part.doorLeaf && part.bayId && part.cabinetId === selectedCabinetId) {",
+  "to": "                        if (false) {"
+ },
+ {
+  "name": "3D taps pick the first leaf of a pair",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "leaf: part.doorLeaf.first + index });",
+  "to": "leaf: part.doorLeaf.first });"
+ },
+ {
+  "name": "door resize discards the size",
+  "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+  "from": "    if (!result.problem) onChange(result.spec);\n  }",
+  "to": "    if (!result.problem) onChange(spec);\n  }"
+ },
+ {
+  "name": "width box writes the height",
+  "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+  "from": "onChange={(width) => apply(setDoorSize(spec, door, { width }))}",
+  "to": "onChange={(width) => apply(setDoorSize(spec, door, { height: width }))}"
+ },
+ {
+  "name": "problem not shown",
+  "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+  "from": "      {problem ? <p role=\"alert\"",
+  "to": "      {problem && false ? <p role=\"alert\""
+ },
+ {
+  "name": "Reset to Auto resets one leaf",
+  "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+  "from": "<SmallButton icon={Layers} label=\"Reset to Auto\" disabled={!leaf.manual && !warnings.length} onClick={() => { onProblem(null); onChange(resetDoorSize(spec, door, true)); }} />",
+  "to": "<SmallButton icon={Layers} label=\"Reset to Auto\" disabled={!leaf.manual && !warnings.length} onClick={() => { onProblem(null); onChange(resetDoorSize(spec, door)); }} />"
+ },
+ {
+  "name": "Make Equal does nothing",
+  "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+  "from": "onClick={() => apply(makeDoorsEqual(spec, door))}",
+  "to": "onClick={() => undefined}"
+ },
+ {
+  "name": "snap toggle stuck on",
+  "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+  "from": "onClick={() => onSnapChange(!snap)}>",
+  "to": "onClick={() => onSnapChange(true)}>"
+ }
+]
