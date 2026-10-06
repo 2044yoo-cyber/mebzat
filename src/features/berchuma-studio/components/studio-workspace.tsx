@@ -136,10 +136,6 @@ export function StudioWorkspace({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("design");
-  // `tab` defaults to "chat" so a phone opens on the conversational entry
-  // point — that default says nothing about whether a desktop reader asked
-  // for the rail. This does: it starts false and only `onOpenChat` sets it.
-  const [chatRequested, setChatRequested] = useState(false);
 
   // ---- the draft ---------------------------------------------------------
   //
@@ -607,7 +603,6 @@ export function StudioWorkspace({
                   replace(spec, []);
                   setTab("design");
                 }}
-                onOpenChat={() => {}}
               />
             </div>
           )}
