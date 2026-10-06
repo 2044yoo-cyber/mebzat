@@ -1644,11 +1644,11 @@ function validateCabinet(
     const standing = cabinet.kind !== "wall" && cabinet.position.y === 0;
     cabinet.plinthHeight = cabinet.zekolo.on && standing ? Math.round(cabinet.zekolo.height ?? (spec.carcass.plinthHeight || 100)) : 0;
   } else if (furnitureType === "wardrobe" && cabinet.stackedOn) {
+    // An upper module stands on the module below it, never on a plinth. Its
+    // bays are its own: shelves, drawers or open, as the owner sets them.
+    // (This used to reset every one of them to "open" on each edit, so a
+    // Shelves button on an upper module changed nothing.)
     cabinet.plinthHeight = 0;
-    cabinet.bays = cabinet.bays.map((bay) => ({
-      ...bay,
-      fitting: { kind: "open" },
-    }));
   } else if (furnitureType === "wardrobe") {
     const standardPlinth = Math.max(50, Math.round(spec.carcass.plinthHeight || 100));
     if (cabinet.plinthHeight !== standardPlinth) {

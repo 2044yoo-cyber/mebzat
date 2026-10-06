@@ -633,7 +633,7 @@ function Fitting({
     // Measured up from the bay floor; SVG measures down from the top.
     const shelves = evenShelfHeights(fitting.count, 0, height, board);
     return (
-      <g stroke={interiorColour} strokeWidth={5}>
+      <g stroke={interiorColour} strokeWidth={5} data-fitting="shelves">
         {shelves.map((underside, index) => (
           <line
             key={index}

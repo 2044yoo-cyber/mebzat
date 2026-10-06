@@ -1,0 +1,20 @@
+[
+ {
+  "name": "stacked bays reset to open again",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "    cabinet.plinthHeight = 0;\n  } else if (furnitureType === \"wardrobe\") {",
+  "to": "    cabinet.plinthHeight = 0;\n    cabinet.bays = cabinet.bays.map((bay) => ({ ...bay, fitting: { kind: \"open\" } }));\n  } else if (furnitureType === \"wardrobe\") {"
+ },
+ {
+  "name": "count step ignored",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "      bay.fitting.count = clamp(bay.fitting.count + delta, 0, 20);",
+  "to": "      bay.fitting.count = clamp(bay.fitting.count, 0, 20);"
+ },
+ {
+  "name": "fitting set on the wrong cabinet",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    const bay = find(draft, cabinetId)?.bays.find((entry) => entry.id === bayId);\n    if (!bay) return;\n\n    delete bay.display;",
+  "to": "    const bay = (find(draft, find(draft, cabinetId)?.stackedOn ?? cabinetId) ?? find(draft, cabinetId))?.bays.find((entry) => entry.id === bayId) ?? find(draft, cabinetId)?.bays.find((entry) => entry.id === bayId);\n    if (!bay) return;\n    if (find(draft, cabinetId)?.stackedOn) return;\n\n    delete bay.display;"
+ }
+]
