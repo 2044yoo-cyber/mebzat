@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { StudioWorkspace } from "@/features/berchuma-studio/components/studio-workspace";
 import { marketRates } from "@/features/berchuma-studio/services/rates";
 import type { MarketRate } from "@/features/berchuma-studio/types/cost";
-import { getDesign } from "@/features/berchuma-studio/services/designs";
+import { getDesign, listOwnDesigns } from "@/features/berchuma-studio/services/designs";
 import {
   designKinds,
   type DesignKind,
@@ -59,6 +59,10 @@ export default async function StudioPage(props: {
 
   const { kind, width, design, template } = await props.searchParams;
 
+  // Cabinet Design opens as a project dashboard: the latest saved work is
+  // visible immediately instead of hiding behind the old Berchuma chat tab.
+  const recentProjects = await listOwnDesigns(6).catch(() => []);
+
   /**
    * Opened from a saved design: /studio?design=<slug>.
    *
@@ -107,6 +111,7 @@ export default async function StudioPage(props: {
       rates={rates}
       opening={opening}
       editing={editing}
+      recentProjects={recentProjects}
       // The draft is keyed by who is looking, so a shared phone never shows
       // one owner's unfinished work to the next person to sign in.
       userId={session.state === "signed-in" ? session.userId : null}
