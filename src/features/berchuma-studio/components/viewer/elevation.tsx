@@ -86,6 +86,7 @@ export function Elevation({
   selectedPartition = null,
   onSelectPartition,
   onPartitionMove,
+  preview = false,
 }: {
   spec: DesignSpec;
   /** Drawn with a highlight, so the flat view agrees with the 3D one. */
@@ -110,6 +111,8 @@ export function Elevation({
   onSelectPartition?: (lowerId: string | null) => void;
   /** The boundary dragged: the lower module's new height. */
   onPartitionMove?: (lowerId: string, lowerHeight: number) => void;
+  /** Small facade-card preview: show the design instead of the L/U editor notice. */
+  preview?: boolean;
 }) {
   const gradientId = useId();
   // Millimetres of drawing per screen pixel, so a handle is a finger's size
@@ -124,7 +127,7 @@ export function Elevation({
   // viewer remains the accurate front/side/perspective inspection for those
   // layouts; straight runs use the resolver below, never stale snapshots.
   const supportsFrontElevation =
-    spec.furnitureType !== "wardrobe" || spec.layout === "straight";
+    preview || spec.furnitureType !== "wardrobe" || spec.layout === "straight";
   const elevationCabinets =
     spec.furnitureType === "wardrobe"
       ? resolved.cabinets
