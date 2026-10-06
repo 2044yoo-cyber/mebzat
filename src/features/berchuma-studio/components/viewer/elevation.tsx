@@ -363,6 +363,7 @@ function CabinetDrawing({
 
       {plinth > 0 ? (
         <rect
+          data-plinth={cabinet.id}
           x={0}
           y={top(plinth)}
           width={width}
