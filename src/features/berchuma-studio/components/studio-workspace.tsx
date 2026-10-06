@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import Link from "next/link";
 import { ChevronUp, FilePlus2, MessageSquare, Ruler, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ import { SendToCalculator } from "./send-to-calculator";
 import { StartPanel } from "./start-panel";
 import { useDesign } from "../hooks/use-design";
 import { startingDesign } from "../services/starting-designs";
+import type { DesignCard } from "../services/designs";
 import {
   differsFrom,
   draftKey,
@@ -78,8 +80,7 @@ function safeRead(key: string): string | null {
 }
 
 const TABS: { id: Tab; label: string; icon: typeof MessageSquare }[] = [
-  { id: "chat", label: "Berchuma", icon: MessageSquare },
-  { id: "design", label: "Design", icon: Ruler },
+  { id: "design", label: "Cabinet Design", icon: Ruler },
   { id: "cost", label: "Price", icon: Wallet },
 ];
 
@@ -88,6 +89,7 @@ export function StudioWorkspace({
   opening,
   editing,
   userId,
+  recentProjects = [],
 }: {
   rates: MarketRate[];
   /**
@@ -110,6 +112,8 @@ export function StudioWorkspace({
   editing?: { spec: DesignSpec; designId: string; slug: string } | null;
   /** Who is looking, for the draft key. Null keeps the draft turned off. */
   userId?: string | null;
+  /** Most recently edited Cabinet Design projects for the landing page. */
+  recentProjects?: DesignCard[];
 }) {
   // `rates` arrives from a server component and never changes for the life of
   // the page, but it is an array literal in props — memoised so the cost
@@ -131,9 +135,7 @@ export function StudioWorkspace({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>(
-    editing || opening?.kind === "kitchen" || opening?.template ? "design" : "chat",
-  );
+  const [tab, setTab] = useState<Tab>("design");
   // `tab` defaults to "chat" so a phone opens on the conversational entry
   // point — that default says nothing about whether a desktop reader asked
   // for the rail. This does: it starts false and only `onOpenChat` sets it.
@@ -314,7 +316,7 @@ export function StudioWorkspace({
   // to do, so it stays off the desktop grid and the picker gets its width —
   // until "Or describe it in your own words" asks for it by name, same as it
   // already does on a phone via the same tab switch.
-  const chatVisible = design.spec !== null || chatRequested;
+  const chatVisible = false;
 
   return (
     <div
@@ -328,7 +330,7 @@ export function StudioWorkspace({
         <div
           role="tablist"
           aria-label="Studio view"
-          className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1"
+          className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
         >
           {TABS.map((entry) => (
             <button
@@ -555,21 +557,59 @@ export function StudioWorkspace({
               </div>
             </>
           ) : (
-            <StartPanel
-              initialKind={opening?.kind}
-              initialWidth={opening?.width}
-              initialTemplate={opening?.template}
-              onStart={(spec) => {
-                // A starting design has already been validated, so it arrives
-                // with no outstanding issues — which is the point of it.
-                replace(spec, []);
-                setTab("design");
-              }}
-              onOpenChat={() => {
-                setTab("chat");
-                setChatRequested(true);
-              }}
-            />
+            <div className="w-full">
+              <div className="mx-auto w-full max-w-2xl px-4 pt-5">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <h1 className="text-2xl font-semibold">Cabinet Design</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Start a cabinet or continue one of your recent projects.
+                    </p>
+                  </div>
+                  <Link
+                    href="/designs?mine=1"
+                    className="shrink-0 text-xs font-medium text-primary"
+                  >
+                    View all
+                  </Link>
+                </div>
+                {recentProjects.length > 0 ? (
+                  <section className="mt-5">
+                    <h2 className="mb-2 text-sm font-medium">Recently created projects</h2>
+                    <div className="grid grid-cols-2 gap-2">
+                      {recentProjects.slice(0, 4).map((project) => (
+                        <Link
+                          key={project.id}
+                          href={`/studio?design=${encodeURIComponent(project.slug)}`}
+                          className="min-w-0 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50"
+                        >
+                          <p className="truncate text-sm font-medium">{project.title}</p>
+                          <p className="mt-1 text-xs capitalize text-muted-foreground">
+                            {project.kind.replace(/_/g, " ")}
+                          </p>
+                          {project.project?.width ? (
+                            <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                              {Math.round(project.project.width)} × {Math.round(project.project.height)} × {Math.round(project.project.depth)} mm
+                            </p>
+                          ) : null}
+                          <p className="mt-2 text-xs font-medium text-primary">Continue design →</p>
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+              </div>
+              <StartPanel
+                initialKind={opening?.kind}
+                initialWidth={opening?.width}
+                initialTemplate={opening?.template}
+                onStart={(spec) => {
+                  replace(spec, []);
+                  setTab("design");
+                }}
+                onOpenChat={() => {}}
+              />
+            </div>
           )}
         </div>
 
