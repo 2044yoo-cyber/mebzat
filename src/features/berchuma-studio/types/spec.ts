@@ -413,6 +413,9 @@ export type DesignKind = (typeof designKinds)[number];
  * branch on them, and getting the kind wrong puts a plinth under a cabinet
  * screwed to a wall.
  */
+/** What a Zekolo can be: a plinth tall enough to fit a toe-kick, short enough to stay a base. */
+export const ZEKOLO_LIMITS = { minHeight: 30, maxHeight: 300, maxSetback: 150 } as const;
+
 export const cabinetKinds = [
   "base",
   "wall",
@@ -485,6 +488,22 @@ export const cabinetSchema = z.object({
    * global number cannot say that.
    */
   plinthHeight: z.number().nonnegative().default(0),
+  /**
+   * The Zekolo — the plinth this cabinet stands on — set for this cabinet
+   * alone. `on` false is no plinth at all: the carcass stands on the floor.
+   * `height` is kept while it is off, so turning it back on restores it.
+   * `setback` is how far its face sits behind the front; `boardId` the board
+   * it is cut from, which also gives its thickness. Absent is a cabinet saved
+   * before this existed: it keeps the design's standard plinth.
+   */
+  zekolo: z
+    .object({
+      on: z.boolean(),
+      height: z.number().min(ZEKOLO_LIMITS.minHeight).max(ZEKOLO_LIMITS.maxHeight).optional(),
+      setback: z.number().min(0).max(ZEKOLO_LIMITS.maxSetback).optional(),
+      boardId: z.string().min(1).optional(),
+    })
+    .optional(),
   /** The lower wardrobe cabinet this separate overhead carcass sits on. */
   stackedOn: z.string().min(1).optional(),
   /**
@@ -1618,7 +1637,13 @@ function validateCabinet(
   // The recessed plinth is structural wardrobe construction, not a decorative
   // option. Every connected wardrobe module uses the same positive height, so
   // a corner or adjacent module cannot develop a step in its continuous base.
-  if (furnitureType === "wardrobe" && cabinet.stackedOn) {
+  // A cabinet with its own Zekolo setting stands on what it says: no plinth
+  // when off, its own height when on. Nothing stacked on another cabinet
+  // stands on a plinth, and nothing hung on a wall does.
+  if (cabinet.zekolo && !cabinet.stackedOn) {
+    const standing = cabinet.kind !== "wall" && cabinet.position.y === 0;
+    cabinet.plinthHeight = cabinet.zekolo.on && standing ? Math.round(cabinet.zekolo.height ?? (spec.carcass.plinthHeight || 100)) : 0;
+  } else if (furnitureType === "wardrobe" && cabinet.stackedOn) {
     cabinet.plinthHeight = 0;
     cabinet.bays = cabinet.bays.map((bay) => ({
       ...bay,

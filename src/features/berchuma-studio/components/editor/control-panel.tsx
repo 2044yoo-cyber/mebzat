@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { LengthField, LengthInput } from "../ui/length-field";
 import { DisplayPanel, WardrobeDisplayTools, ZoneEditor } from "./display-panel";
 import { HeightModulesPanel } from "./height-modules-panel";
+import { ZekoloDesignPanel, ZekoloPanel } from "./zekolo-panel";
 import { JointPanel, TransportPanel, type JointRef } from "./transport-panel";
 import { isSideDisplay } from "../../services/geometry";
 
@@ -211,6 +212,9 @@ export function ControlPanel({
           onChange={onChange}
         />
 
+        {/* Zekolo for the whole design: all on, all off, or cabinet by cabinet. */}
+        <ZekoloDesignPanel spec={spec} onChange={onChange} />
+
 
         {selected ? (
           <>
@@ -219,6 +223,7 @@ export function ControlPanel({
               cabinet={selected}
               onChange={onChange}
             />
+            <ZekoloPanel spec={spec} cabinet={selected} onChange={onChange} />
             {/* A wardrobe is built in height modules; a kitchen unit can carry an extra top row. */}
             {spec.furnitureType === "wardrobe" ? (
               <HeightModulesPanel

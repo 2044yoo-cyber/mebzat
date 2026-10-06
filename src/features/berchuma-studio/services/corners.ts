@@ -62,7 +62,7 @@ export function cornerParts(
     if (spec.kitchenSetup?.details && !corner.baseY) {
       const template = spec.cabinets.find((c) => c.kind === "base" || c.kind === "island");
       if (template) for (const p of kitchenConstruction(spec, { ...template, kitchenRole: undefined,
-        size: { width: corner.width ?? corner.size, height: corner.height, depth: corner.depth ?? corner.size }, plinthHeight: spec.carcass.plinthHeight }, [])) {
+        size: { width: corner.width ?? corner.size, height: corner.height, depth: corner.depth ?? corner.size }, plinthHeight: cornerPlinth(spec, corner) }, [])) {
         if (p.role === "plinth") parts.push({ ...p, id: `${corner.id}/${p.id}`, cabinetId: corner.id, placements: p.placements.map((at) => ({ ...at, x: at.x + corner.x, z: at.z + corner.z })) });
       }
     }
@@ -123,7 +123,7 @@ function partsForCorner(spec: DesignSpec, corner: CornerBlock): Part[] {
 
   // The carcass sits on the plinth like every other base unit, so its panels
   // are shorter than the corner's overall height by it.
-  const plinth = corner.plinthHeight ?? spec.carcass.plinthHeight;
+  const plinth = cornerPlinth(spec, corner);
   const carcassHeight = Math.max(0, height - plinth);
 
   // Inside the two gables.
@@ -545,4 +545,10 @@ export function cornerHardware(
   }
 
   return lines;
+}
+
+/** A corner unit's plinth: none on a wall corner, none when its Zekolo is off, else the design's. */
+function cornerPlinth(spec: DesignSpec, corner: { id: string; plinthHeight?: number }): number {
+  if (corner.plinthHeight !== undefined) return corner.plinthHeight;
+  return spec.cornerSettings?.[corner.id]?.zekolo === false ? 0 : spec.carcass.plinthHeight;
 }

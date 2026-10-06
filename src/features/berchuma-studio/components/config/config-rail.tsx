@@ -139,7 +139,11 @@ export function ConfigRail({
           step={5}
           onChange={(plinthHeight) =>
             onEdit((draft) => {
-              target(draft).plinthHeight = plinthHeight;
+              const cabinet = target(draft);
+              cabinet.plinthHeight = plinthHeight;
+              // A cabinet with its own Zekolo setting keeps it in step: the
+              // validator takes the plinth from it.
+              if (cabinet.zekolo) cabinet.zekolo = { ...cabinet.zekolo, on: plinthHeight > 0, ...(plinthHeight > 0 ? { height: Math.max(30, plinthHeight) } : {}) };
             })
           }
         />

@@ -28,6 +28,7 @@ import {
   constructionMaterials,
   constructionMethods,
   edgeBandForConstructionBoard,
+  zekoloBoardOf,
 } from "./wardrobe-materials";
 import {
   recessedWardrobePlinthParts,
@@ -235,9 +236,12 @@ function standParts(
           board,
           spec.carcass.edgeBand,
         ),
-        carcassThickness: t,
+        // The plinth's own board: a 15 mm plinth is 15 mm panels, whatever
+        // the carcass is made of.
+        carcassThickness: board.thickness,
         frontThickness,
         supportJoints,
+        ...(cabinet.zekolo?.setback !== undefined ? { recess: cabinet.zekolo.setback } : {}),
       },
     );
   }
@@ -541,9 +545,11 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     materials.back,
     carcass.edgeBand,
   );
+  // The Zekolo's board: the cabinet's own where it has one, else the design's.
+  const plinthBoard = zekoloBoardOf(spec, cabinet);
   const plinthBand = edgeBandForConstructionBoard(
     spec,
-    materials.plinth,
+    plinthBoard,
     carcass.edgeBand,
   );
   const t = board.thickness;
@@ -780,7 +786,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       cabinet,
       envelope,
       plinth,
-      materials.plinth,
+      plinthBoard,
       t,
       visibleFrontThickness,
       // A transport joint is a support line for the plinth as well.

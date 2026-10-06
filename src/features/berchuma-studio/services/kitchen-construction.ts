@@ -1,6 +1,6 @@
 import type { Cabinet, DesignSpec } from "../types/spec";
 import type { Part } from "../types/parts";
-import { constructionMaterials } from "./wardrobe-materials";
+import { constructionMaterials, zekoloBoardOf } from "./wardrobe-materials";
 
 /** Refine real cutting parts; the viewer, nesting and costing share this list. */
 export function kitchenConstruction(spec: DesignSpec, cabinet: Cabinet, original: Part[]): Part[] {
@@ -50,11 +50,13 @@ export function kitchenConstruction(spec: DesignSpec, cabinet: Cabinet, original
   }
   const h = cabinet.plinthHeight;
   if (h > 0) {
-    const pt = materials.plinth.thickness;
-    const recess = 40;
-    parts.push(panel("zekolo-front", "plinth", { x: width, y: h, z: pt }, { x: 0, y: 0, z: recess }, "z", materials.plinth));
-    parts.push(panel("zekolo-rear", "plinth", { x: width, y: h, z: pt }, { x: 0, y: 0, z: depth - pt }, "z", materials.plinth));
-    for (const [label, x] of [["left", 0], ["right", width - pt]] as const) parts.push(panel(`zekolo-${label}`, "plinth", { x: pt, y: h, z: depth - recess - 2 * pt }, { x, y: 0, z: recess + pt }, "x", materials.plinth));
+    // The cabinet's own Zekolo board and setback where it has them.
+    const zekolo = zekoloBoardOf(spec, cabinet);
+    const pt = zekolo.thickness;
+    const recess = cabinet.zekolo?.setback ?? 40;
+    parts.push(panel("zekolo-front", "plinth", { x: width, y: h, z: pt }, { x: 0, y: 0, z: recess }, "z", zekolo));
+    parts.push(panel("zekolo-rear", "plinth", { x: width, y: h, z: pt }, { x: 0, y: 0, z: depth - pt }, "z", zekolo));
+    for (const [label, x] of [["left", 0], ["right", width - pt]] as const) parts.push(panel(`zekolo-${label}`, "plinth", { x: pt, y: h, z: depth - recess - 2 * pt }, { x, y: 0, z: recess + pt }, "x", zekolo));
   }
   return parts;
 }
