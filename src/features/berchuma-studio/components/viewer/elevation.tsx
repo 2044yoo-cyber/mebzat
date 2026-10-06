@@ -15,6 +15,7 @@ import {
   resolveDrawerFaces,
 } from "../../services/drawer-construction";
 import {
+  zekoloBoardOf,
   boardColour,
   constructionMaterials,
 } from "../../services/wardrobe-materials";
@@ -365,11 +366,12 @@ function CabinetDrawing({
 
       {plinth > 0 ? (
         <rect
+          data-plinth={cabinet.id}
           x={0}
           y={top(plinth)}
           width={width}
           height={plinth}
-          fill={boardColour(materials.plinth, spec)}
+          fill={boardColour(zekoloBoardOf(spec, cabinet), spec)}
           fillOpacity={0.9}
           className="stroke-foreground/30"
           strokeWidth={4}

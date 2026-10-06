@@ -16,6 +16,8 @@ export type WardrobePlinthOptions = {
   frontThickness: number;
   /** Divider centre lines, measured from the cabinet's left outer edge. */
   supportJoints?: readonly number[];
+  /** How far the plinth face sits behind the outer front, mm. The standard 20 when absent. */
+  recess?: number;
 };
 
 /**
@@ -38,6 +40,7 @@ export function recessedWardrobePlinthParts(
     carcassThickness: t,
     frontThickness,
     supportJoints = [],
+    recess = WARDROBE_PLINTH_VISIBLE_RECESS,
   } = options;
   const noEdges: BandedEdges = {
     front: false,
@@ -53,7 +56,7 @@ export function recessedWardrobePlinthParts(
   // visible reference reveal into the plinth's local coordinate. Otherwise an
   // 18 mm door would accidentally make a 38 mm reveal.
   const frontRecess = Math.min(
-    Math.max(0, WARDROBE_PLINTH_VISIBLE_RECESS - frontThickness),
+    Math.max(0, recess - frontThickness),
     Math.max(0, safeDepth - 2 * t),
   );
   const sideDepth = Math.max(0, safeDepth - frontRecess - t);

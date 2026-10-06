@@ -1,5 +1,5 @@
-import { BOARDS, findEdgeBand } from "../types/catalogue";
-import type { Board, DesignSpec, EdgeBand } from "../types/spec";
+import { BOARDS, findBoard, findEdgeBand } from "../types/catalogue";
+import type { Board, Cabinet, DesignSpec, EdgeBand } from "../types/spec";
 
 /** The board assigned to each manufactured zone. */
 export type ConstructionMaterials = {
@@ -133,4 +133,10 @@ export function boardSheen(
   return spec.furnitureType === "wardrobe"
     ? board.appearance?.sheen ?? spec.finish.sheen
     : spec.finish.sheen;
+}
+
+/** The board a cabinet's Zekolo is cut from: its own choice, or the design's plinth board. */
+export function zekoloBoardOf(spec: DesignSpec, cabinet: Cabinet): Board {
+  const own = cabinet.zekolo?.boardId ? findBoard(cabinet.zekolo.boardId) : undefined;
+  return own ?? constructionMaterials(spec).plinth;
 }

@@ -1,7 +1,8 @@
 import { MIN_HEIGHT_MODULE, PREFERRED_LOWER, heightStackOf, planHeights } from "./height-modules";
 import { findModule } from "./kitchen-modules";
 import { placeOnRun, solveLayout } from "./layout";
-import { LIMITS, practicalDrawerCount, validateSpec } from "../types/spec";
+import { LIMITS, ZEKOLO_LIMITS, practicalDrawerCount, validateSpec } from "../types/spec";
+import { resolveDesign } from "./resolve";
 import type { Bay, Cabinet, CabinetKind, DesignSpec } from "../types/spec";
 import { drawerFrontHeights } from "./drawer-construction";
 import { cabinetFaceBoards, cabinetFronts, isSideDisplay, sectionBands as sectionBandsOf, type DoorLeaf } from "./geometry";
@@ -559,6 +560,61 @@ function pushUpper(draft: DesignSpec, lower: Cabinet, height: number): Cabinet {
 export function removeTopCabinet(spec: DesignSpec, lowerId: string): DesignSpec {
   return change(spec, (draft) => {
     draft.cabinets = draft.cabinets.filter((cabinet) => cabinet.stackedOn !== lowerId);
+  });
+}
+
+// ---- Zekolo (the plinth) ---------------------------------------------------------
+//
+// Each cabinet standing on the floor has its own: on or off, its height, how
+// far it is set back, the board it is cut from. Off is no plinth at all — the
+// carcass comes down to the floor and its sides and doors grow by the height
+// the plinth had, the overall height kept. Nothing stacked on another module
+// stands on a Zekolo, and nothing hung on a wall does.
+
+/** Whether a cabinet can have a Zekolo: it stands on the floor, and nothing is under it. */
+export function zekoloApplies(cabinet: Cabinet): boolean {
+  return !cabinet.stackedOn && cabinet.kind !== "wall" && cabinet.position.y === 0;
+}
+
+export type ZekoloChange = Partial<{ on: boolean; height: number; setback: number; boardId: string }>;
+
+/** One cabinet's Zekolo changed: turned on or off, or its height, setback or board. */
+export function setZekolo(spec: DesignSpec, cabinetId: string, patch: ZekoloChange): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, cabinetId);
+    if (!cabinet || !zekoloApplies(cabinet)) return;
+    applyZekolo(draft, cabinet, patch);
+  });
+}
+
+function applyZekolo(draft: DesignSpec, cabinet: Cabinet, patch: ZekoloChange): void {
+  const standard = draft.carcass.plinthHeight || 100;
+  const current = cabinet.zekolo ?? { on: cabinet.plinthHeight > 0, height: cabinet.plinthHeight > 0 ? cabinet.plinthHeight : standard };
+  const height = patch.height ?? current.height ?? standard;
+  cabinet.zekolo = {
+    on: patch.on ?? (patch.height !== undefined ? true : current.on),
+    height: Math.round(Math.min(ZEKOLO_LIMITS.maxHeight, Math.max(ZEKOLO_LIMITS.minHeight, height))),
+    ...(patch.setback ?? current.setback) !== undefined ? { setback: Math.round(Math.min(ZEKOLO_LIMITS.maxSetback, Math.max(0, (patch.setback ?? current.setback)!))) } : {},
+    ...(patch.boardId ?? current.boardId) !== undefined ? { boardId: (patch.boardId ?? current.boardId)! } : {},
+  };
+}
+
+/** Every Zekolo in the design on, or every one off — corner units included. */
+export function setAllZekolo(spec: DesignSpec, on: boolean): DesignSpec {
+  const corners = resolveDesign(spec).layout.corners.filter((corner) => !corner.baseY && corner.plinthHeight === undefined);
+  return change(spec, (draft) => {
+    for (const cabinet of draft.cabinets) if (zekoloApplies(cabinet)) applyZekolo(draft, cabinet, { on });
+    if (corners.length) {
+      draft.cornerSettings = { ...draft.cornerSettings };
+      for (const corner of corners) draft.cornerSettings[corner.id] = { ...draft.cornerSettings[corner.id], zekolo: on };
+    }
+  });
+}
+
+/** A corner unit's Zekolo on or off. */
+export function setCornerZekolo(spec: DesignSpec, cornerId: string, on: boolean): DesignSpec {
+  return change(spec, (draft) => {
+    draft.cornerSettings = { ...draft.cornerSettings, [cornerId]: { ...draft.cornerSettings?.[cornerId], zekolo: on } };
   });
 }
 

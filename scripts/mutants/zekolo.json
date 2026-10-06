@@ -1,0 +1,146 @@
+[
+ {
+  "name": "off ignored by validator",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "    cabinet.plinthHeight = cabinet.zekolo.on && standing ? Math.round(cabinet.zekolo.height ?? (spec.carcass.plinthHeight || 100)) : 0;",
+  "to": "    cabinet.plinthHeight = Math.round(cabinet.zekolo.height ?? (spec.carcass.plinthHeight || 100));"
+ },
+ {
+  "name": "hung cabinets stand anyway",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "    const standing = cabinet.kind !== \"wall\" && cabinet.position.y === 0;",
+  "to": "    const standing = true;"
+ },
+ {
+  "name": "legacy loses its standard plinth",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "    if (cabinet.plinthHeight !== standardPlinth) {\n    issues.push({",
+  "to": "    if (false) {\n    issues.push({"
+ },
+ {
+  "name": "height not remembered",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  const height = patch.height ?? current.height ?? standard;",
+  "to": "  const height = patch.height ?? standard;"
+ },
+ {
+  "name": "typing a height leaves it off",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    on: patch.on ?? (patch.height !== undefined ? true : current.on),",
+  "to": "    on: patch.on ?? current.on,"
+ },
+ {
+  "name": "height unbounded",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    height: Math.round(Math.min(ZEKOLO_LIMITS.maxHeight, Math.max(ZEKOLO_LIMITS.minHeight, height))),",
+  "to": "    height: Math.round(height),"
+ },
+ {
+  "name": "setback not kept",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    ...(patch.setback ?? current.setback) !== undefined ? { setback: Math.round(Math.min(ZEKOLO_LIMITS.maxSetback, Math.max(0, (patch.setback ?? current.setback)!))) } : {},",
+  "to": ""
+ },
+ {
+  "name": "board not kept",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    ...(patch.boardId ?? current.boardId) !== undefined ? { boardId: (patch.boardId ?? current.boardId)! } : {},",
+  "to": ""
+ },
+ {
+  "name": "all leaves corners",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "      for (const corner of corners) draft.cornerSettings[corner.id] = { ...draft.cornerSettings[corner.id], zekolo: on };",
+  "to": ""
+ },
+ {
+  "name": "all only first cabinet",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    for (const cabinet of draft.cabinets) if (zekoloApplies(cabinet)) applyZekolo(draft, cabinet, { on });",
+  "to": "    for (const cabinet of draft.cabinets.slice(0, 1)) if (zekoloApplies(cabinet)) applyZekolo(draft, cabinet, { on });"
+ },
+ {
+  "name": "corner switch ignored",
+  "file": "src/features/berchuma-studio/services/corners.ts",
+  "from": "  return spec.cornerSettings?.[corner.id]?.zekolo === false ? 0 : spec.carcass.plinthHeight;",
+  "to": "  return spec.carcass.plinthHeight;"
+ },
+ {
+  "name": "own board ignored",
+  "file": "src/features/berchuma-studio/services/wardrobe-materials.ts",
+  "from": "  return own ?? constructionMaterials(spec).plinth;",
+  "to": "  return constructionMaterials(spec).plinth;"
+ },
+ {
+  "name": "panels sized by the carcass",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "        carcassThickness: board.thickness,",
+  "to": "        carcassThickness: t,"
+ },
+ {
+  "name": "setback ignored",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "        ...(cabinet.zekolo?.setback !== undefined ? { recess: cabinet.zekolo.setback } : {}),",
+  "to": ""
+ },
+ {
+  "name": "recess constant",
+  "file": "src/features/berchuma-studio/services/wardrobe-plinth.ts",
+  "from": "    Math.max(0, recess - frontThickness),",
+  "to": "    Math.max(0, WARDROBE_PLINTH_VISIBLE_RECESS - frontThickness),"
+ },
+ {
+  "name": "kitchen setback ignored",
+  "file": "src/features/berchuma-studio/services/kitchen-construction.ts",
+  "from": "    const recess = cabinet.zekolo?.setback ?? 40;",
+  "to": "    const recess = 40;"
+ },
+ {
+  "name": "kitchen board ignored",
+  "file": "src/features/berchuma-studio/services/kitchen-construction.ts",
+  "from": "    const zekolo = zekoloBoardOf(spec, cabinet);",
+  "to": "    const zekolo = materials.plinth;"
+ },
+ {
+  "name": "panel toggle inverted",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "<Toggle label=\"Zekolo\" on={on} onChange={(next) => onChange(setZekolo(spec, cabinet.id, { on: next }))} />",
+  "to": "<Toggle label=\"Zekolo\" on={on} onChange={(next) => onChange(setZekolo(spec, cabinet.id, { on: !next }))} />"
+ },
+ {
+  "name": "panel thickness does nothing",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "                        onChange(setZekolo(spec, cabinet.id, { boardId: next.id }));",
+  "to": ""
+ },
+ {
+  "name": "panel warning gone",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "    target.plinthHeight = 0;\n    const fit = moduleFit(draft, cabinet.id, cabinet.size.height);",
+  "to": "    const fit = moduleFit(draft, cabinet.id, cabinet.size.height);"
+ },
+ {
+  "name": "design all off turns on",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "onClick={() => onChange(setAllZekolo(spec, false))}",
+  "to": "onClick={() => onChange(setAllZekolo(spec, true))}"
+ },
+ {
+  "name": "rail out of step",
+  "file": "src/features/berchuma-studio/components/config/config-rail.tsx",
+  "from": "              if (cabinet.zekolo) cabinet.zekolo = { ...cabinet.zekolo, on: plinthHeight > 0,",
+  "to": "              if (false) cabinet.zekolo = { ...cabinet.zekolo, on: plinthHeight > 0,"
+ },
+ {
+  "name": "elevation plinth from design board",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "fill={boardColour(zekoloBoardOf(spec, cabinet), spec)}",
+  "to": "fill={boardColour(materials.plinth, spec)}"
+ },
+ {
+  "name": "panels not in the control panel",
+  "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+  "from": "            <ZekoloPanel spec={spec} cabinet={selected} onChange={onChange} />",
+  "to": ""
+ }
+]

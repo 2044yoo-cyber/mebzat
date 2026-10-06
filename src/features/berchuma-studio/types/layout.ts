@@ -110,6 +110,8 @@ export const cornerSettingsSchema = z.object({
   depth: z.number().positive().optional(),
   height: z.number().positive().optional(),
   shelves: z.number().int().min(0).max(20).optional(),
+  /** False: this corner unit stands on the floor with no Zekolo. Absent is the design's standard plinth. */
+  zekolo: z.boolean().optional(),
 });
 
 export type CornerSettings = z.infer<typeof cornerSettingsSchema>;

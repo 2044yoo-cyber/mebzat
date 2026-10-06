@@ -1,0 +1,50 @@
+[
+ {
+  "name": "toggle does nothing",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "          onClick={() => onChange(value)}",
+  "to": "          onClick={() => undefined}"
+ },
+ {
+  "name": "elevation keeps the plinth",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "      {plinth > 0 ? (\n        <rect\n          data-plinth={cabinet.id}",
+  "to": "      {true ? (\n        <rect\n          data-plinth={cabinet.id}"
+ },
+ {
+  "name": "height typed ignored",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "onChange={(height) => onChange(setZekolo(spec, cabinet.id, { height }))}",
+  "to": "onChange={() => undefined}"
+ },
+ {
+  "name": "setback typed ignored",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "onChange={(value) => onChange(setZekolo(spec, cabinet.id, { setback: value }))}",
+  "to": "onChange={() => undefined}"
+ },
+ {
+  "name": "material select ignored",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "onChange={(event) => onChange(setZekolo(spec, cabinet.id, { boardId: event.target.value }))}",
+  "to": "onChange={() => undefined}"
+ },
+ {
+  "name": "customize hidden",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "      {customize ? (\n        <ul",
+  "to": "      {false ? (\n        <ul"
+ },
+ {
+  "name": "customize toggle ignored",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "onChange={(next) => onChange(setZekolo(spec, cabinet.id, { on: next }))} />\n            </li>",
+  "to": "onChange={() => undefined} />\n            </li>"
+ },
+ {
+  "name": "all on ignored",
+  "file": "src/features/berchuma-studio/components/editor/zekolo-panel.tsx",
+  "from": "onClick={() => onChange(setAllZekolo(spec, true))}",
+  "to": "onClick={() => undefined}"
+ }
+]
