@@ -74,6 +74,7 @@ import {
   setDoorManual,
   setDoorSize,
   setBayInternalDrawers,
+  setWardrobeBayFitting,
   type DisplayRef,
   type DoorRef,
 } from "../../services/operations";
@@ -775,16 +776,13 @@ function WardrobeFittings({
     : bay.fitting.kind === "drawers"
       ? bay.fitting.internal ? "internal" : "drawers"
       : bay.fitting.kind;
-  const plain = (fitting: Bay["fitting"]) => {
-    // Out of a display first, so the bay has its doors again.
-    const closed = bay.display ? setBayDisplay(spec, cabinet.id, bay.id, null) : spec;
-    return setBayFitting(closed, cabinet.id, bay.id, fitting);
-  };
+  const pickFitting = (fitting: Bay["fitting"], internalDrawers = false) =>
+    onChange(setWardrobeBayFitting(spec, cabinet.id, bay.id, fitting, internalDrawers));
   const choices: { id: string; label: string; pick: () => void }[] = [
-    { id: "shelves", label: "Shelves", pick: () => onChange(plain(fittingFor("shelves"))) },
-    { id: "drawers", label: "Drawers", pick: () => onChange(setBayInternalDrawers(plain(fittingFor("drawers")), cabinet.id, bay.id, false)) },
-    { id: "internal", label: "Internal Drawers", pick: () => onChange(setBayInternalDrawers(plain(fittingFor("drawers")), cabinet.id, bay.id, true)) },
-    { id: "hanging", label: "Hanging", pick: () => onChange(plain(fittingFor("hanging"))) },
+    { id: "shelves", label: "Shelves", pick: () => pickFitting(fittingFor("shelves")) },
+    { id: "drawers", label: "Drawers", pick: () => pickFitting(fittingFor("drawers")) },
+    { id: "internal", label: "Internal Drawers", pick: () => pickFitting(fittingFor("drawers"), true) },
+    { id: "hanging", label: "Hanging", pick: () => pickFitting(fittingFor("hanging")) },
     {
       id: "display",
       label: "Open Display",
