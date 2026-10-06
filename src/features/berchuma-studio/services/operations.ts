@@ -1138,14 +1138,17 @@ export function setWardrobeBayFitting(
     bay.fitting = fitting;
 
     if (fitting.kind === "drawers") {
+      // Narrow the local fitting value first. TypeScript cannot preserve the
+      // discriminated-union narrowing through the mutable bay.fitting property.
+      const drawers = fitting;
       if (internalDrawers) {
-        bay.fitting.internal = true;
+        drawers.internal = true;
         if (bay.door === "none") bay.door = "hinged";
         leavesFor(bay);
       } else {
-        delete bay.fitting.internal;
-        delete bay.fitting.boxDepth;
-        delete bay.fitting.frontBoardId;
+        delete drawers.internal;
+        delete drawers.boxDepth;
+        delete drawers.frontBoardId;
         // External drawers are the visible front, not a door behind them.
         bay.doorLeaves = 1;
       }
