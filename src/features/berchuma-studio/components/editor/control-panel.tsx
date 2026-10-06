@@ -692,19 +692,21 @@ function Structure({
             ))}
           </div>
 
-          <ModulePicker
-            bay={bay}
-            onPick={(config) =>
-              onChange(
-                setBayFitting(
-                  spec,
-                  cabinet.id,
-                  bay.id,
-                  applyConfig(bay, config).fitting,
-                ),
-              )
-            }
-          />
+          {!wardrobe ? (
+            <ModulePicker
+              bay={bay}
+              onPick={(config) =>
+                onChange(
+                  setBayFitting(
+                    spec,
+                    cabinet.id,
+                    bay.id,
+                    applyConfig(bay, config).fitting,
+                  ),
+                )
+              }
+            />
+          ) : null}
 
           {countOf(bay) !== null ? (
             <Stepper
