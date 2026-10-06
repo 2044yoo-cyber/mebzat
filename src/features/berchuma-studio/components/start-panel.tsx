@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   ImageUp,
-  MessageSquare,
   PanelsTopLeft,
   Ruler,
   Sparkles,
@@ -36,13 +35,11 @@ import { validateSpec, type DesignKind, type DesignSpec } from "../types/spec";
 
 export function StartPanel({
   onStart,
-  onOpenChat,
   initialKind,
   initialWidth,
   initialTemplate,
 }: {
   onStart: (spec: DesignSpec) => void;
-  onOpenChat: () => void;
   initialKind?: DesignKind;
   initialWidth?: number;
   /** A template chosen in the gallery, to be sized to the space. */
@@ -224,14 +221,7 @@ export function StartPanel({
         <CabinetStart onStart={onStart} initialKind={initialKind} initialWidth={initialWidth} initialTemplate={initialTemplate} />
       )}
 
-      <button
-        type="button"
-        onClick={onOpenChat}
-        className="flex items-center justify-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <MessageSquare className="size-4" aria-hidden />
-        Or describe it in your own words
-      </button>
+
       </div>
     </div>
   );
