@@ -78,10 +78,16 @@ export const interiorWallSchema = z.object({
 export const planZoneSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(80),
-  boundary: z.array(planPointSchema).min(3).max(16),
+  boundary: z.array(planPointSchema).min(3).max(64),
   floorMaterial: z.string().max(100).default("Unspecified"),
   wallMaterial: z.string().max(100).default("Paint"),
   ceilingMaterial: z.string().max(100).default("Gypsum board"),
+  /**
+   * False while the walls around the room no longer close: it has no floor
+   * or ceiling then, and `boundary` is the outline it last had, by which it
+   * is found again when they close. Absent means enclosed.
+   */
+  enclosed: z.boolean().optional(),
 });
 
 export const planColumnSchema = z.object({

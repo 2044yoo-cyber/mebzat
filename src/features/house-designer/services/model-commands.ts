@@ -1,4 +1,4 @@
-import { deleteRoom, moveRoom, patchHouseObject, removeFootprintCorner } from "./project-edit";
+import { deleteRoom, moveRoom, patchHouseObject, reconcileRooms, removeFootprintCorner } from "./project-edit";
 import { objectDefinition } from "./object-library";
 import { stairFields, stairPreset, type StairParams } from "./stair-geometry";
 import { allHouseSelections, sameSelection } from "./model-state";
@@ -172,6 +172,9 @@ export function moveHouseSelections(project: HouseProject, selections: readonly 
     }
     next = moveSimpleObject(next, selection, dx, dy);
   }
+  // Walls moved together: the rooms are traced from where they all ended up,
+  // not from each wall's step on the way.
+  if (selections.filter((selection) => selection.kind === "wall").length > 1 && !selections.some((selection) => selection.kind === "room")) next = reconcileRooms(project, next);
   return { project: next, selections: [...selections], blocked };
 }
 
@@ -277,7 +280,9 @@ export function splitHouseSelection(project: HouseProject, selection: HouseSelec
       levels: next.levels.map((item) => item.id === wall.levelId && item.plan ? { ...item, plan: { ...item.plan, interiorWalls: [...(item.plan.interiorWalls ?? []), { id: sourceWallId, start: middle, end: oldEnd, thickness: wall.thickness, height: wall.height, label: "Split wall" }] } } : item),
       objectInstances: { ...next.objectInstances, [id]: { ...(project.objectInstances[wall.id] ?? emptyInstance()), mark: `${project.objectInstances[wall.id]?.mark ?? "Wall"} B` } },
     };
-    return { project: next, selections: [selection, { kind: "wall", id }], blocked: [] };
+    // Shortened, the wall was open for a moment; split, it is whole again,
+    // and the rooms either side of it are the rooms they were.
+    return { project: reconcileRooms(project, next), selections: [selection, { kind: "wall", id }], blocked: [] };
   }
   const key = selection.kind === "beam" ? "structuralBeams" : selection.kind === "railing" ? "railings" : selection.kind === "reference-plane" ? "referencePlanes" : null;
   if (!key) return { project, selections: [selection], blocked: [`Split is not available for ${selection.kind}`] };

@@ -203,6 +203,14 @@ export function PlanCanvas({
 
       {zones.map((zone) => {
         const centre = polygonCentre(zone.boundary);
+        // Its walls no longer close: no floor is drawn, only where it was.
+        if (zone.enclosed === false) {
+          return (
+            <text key={zone.id} data-zone-open={zone.id} x={centre.x} y={centre.y} textAnchor="middle" dominantBaseline="middle" fontSize={Math.max(bounds.width, bounds.height) / 46} className="pointer-events-none fill-amber-600 dark:fill-amber-400">
+              {zone.name} · Room not enclosed
+            </text>
+          );
+        }
         return (
           <g key={zone.id} onPointerDown={() => onSelectWall?.(zone.id)} className="cursor-pointer">
             <polygon points={zone.boundary.map((point) => `${point.x},${point.y}`).join(" ")} className={cn("fill-sky-500/10 stroke-sky-500/45", selectedWallId === zone.id && "fill-brand/20 stroke-brand")} strokeWidth={stroke} />
