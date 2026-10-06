@@ -413,7 +413,7 @@ export function WardrobeDisplayTools({ spec, cabinet, onChange, onSelect, onSele
       <div className="grid grid-cols-2 gap-1.5">
         {options.map((option, index) => (
           <button key={option.id} type="button" title={option.description} onClick={() => onChange(option.spec)} className="space-y-1 rounded-md border p-1 text-left text-[10px] leading-tight transition-colors hover:border-brand">
-            <div className="h-16 overflow-hidden rounded bg-background" aria-hidden><Elevation spec={option.spec} /></div>
+            <div className="h-24 overflow-hidden rounded bg-background" aria-hidden><Elevation spec={option.spec} preview /></div>
             <span className="block font-medium">Option {index + 1}</span>
             <span className="block text-muted-foreground">{option.title}</span>
           </button>
