@@ -247,12 +247,14 @@ export function ControlPanel({
             {spec.furnitureType === "wardrobe" ? (
               <WardrobeDisplayTools spec={spec} cabinet={selected} onChange={onChange} onSelect={onSelect} onSelectDisplay={onSelectDisplay} />
             ) : null}
-            <Components
-              spec={spec}
-              cabinet={selected}
-              onSelect={onSelect}
-              onChange={onChange}
-            />
+            {spec.furnitureType === "kitchen" ? (
+              <Components
+                spec={spec}
+                cabinet={selected}
+                onSelect={onSelect}
+                onChange={onChange}
+              />
+            ) : null}
           </>
         ) : selectedCornerId ? (
           <Section title="CORNER" icon={Layers} defaultOpen>
