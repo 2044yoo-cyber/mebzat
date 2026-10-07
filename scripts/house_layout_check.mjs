@@ -83,13 +83,37 @@ try {
   // Tap the room: Split → Vertical. One tap, at the centre.
   await tapAt(2000, 8000);
   assert.equal(await bar(page).getAttribute("aria-label"), "Room actions");
-  for (const box of await bar(page).getByRole("button").evaluateAll((buttons) => buttons.map((button) => { const rect = button.getBoundingClientRect(); return [rect.width, rect.height]; }))) assert.ok(box[0] >= 44 && box[1] >= 44, `every action is at least 44 px (${box})`);
+  // Icons only, as in Revit: small enough not to cover the plan, each named
+  // for touch and screen readers, none with a written name on it.
+  const iconsOnly = async (locator, what) => {
+    const buttons = await locator.evaluateAll((items) => items.map((button) => { const rect = button.getBoundingClientRect(); return { name: button.getAttribute("aria-label"), title: button.getAttribute("title"), text: button.textContent.trim(), icon: Boolean(button.querySelector("svg")), width: rect.width, height: rect.height }; }));
+    assert.ok(buttons.length > 0, `${what}: there are actions`);
+    for (const button of buttons) {
+      assert.ok(button.icon && button.text === "", `${what}: ${button.name} is an icon with no written name (${JSON.stringify(button.text)})`);
+      assert.ok(button.name && button.title === button.name, `${what}: ${button.name} is named, with its name as the tooltip`);
+      assert.ok(button.width >= 32 && button.width <= 40 && button.height >= 32 && button.height <= 40, `${what}: ${button.name} is 32–40 px, not a wide text button (${Math.round(button.width)} × ${Math.round(button.height)})`);
+    }
+    return buttons;
+  };
+  await iconsOnly(bar(page).getByRole("button"), "room actions");
+  assert.match(await bar(page).getByRole("button", { name: "Split", exact: true }).locator("svg").getAttribute("class"), /lucide-square-split-horizontal/, "a room's Split divides it: the split-square icon");
+  const barWidth = await bar(page).evaluate((element) => element.getBoundingClientRect().width);
+  assert.ok(barWidth <= 4 * 40 + 12, `the room's bar is a short row of icons (${Math.round(barWidth)} px)`);
+  await bar(page).getByRole("button", { name: "More actions" }).click();
+  const moreItems = await iconsOnly(page.getByRole("menu", { name: "Room actions: more" }).getByRole("menuitem"), "room actions, more");
+  assert.deepEqual(moreItems.map((item) => item.name), ["Merge with…", "Delete", "Add to Agenda", "Properties"], "the rest under ⋮, as icons");
+  await bar(page).getByRole("button", { name: "More actions" }).click();
   await bar(page).getByRole("button", { name: "Split" }).click();
   assert.equal(await bar(page).getAttribute("aria-label"), "Split room");
   await bar(page).getByRole("button", { name: "│ Vertical" }).click();
   assert.deepEqual(await rooms(page), ["0..4500 x 0..11000", "4500..9000 x 0..11000"], "split down the middle: 4500 | 4500");
   assert.deepEqual(await selectedLine(page), [4500, 0, 4500, 11000], "the new partition is selected");
   assert.equal(await bar(page).getAttribute("aria-label"), "Wall actions");
+  await iconsOnly(bar(page).getByRole("button"), "wall actions");
+  const icon = (name) => bar(page).getByRole("button", { name, exact: true }).locator("svg").getAttribute("class");
+  assert.match(await icon("Duplicate"), /lucide-copy/, "a wall's Duplicate is the copy icon");
+  assert.match(await icon("↻ 90°"), /lucide-rotate-cw/, "its Rotate 90° the turn icon");
+  assert.match(await icon("Split"), /lucide-scissors/, "and its Split cuts the wall: scissors");
   await undo(page);
   assert.deepEqual(await rooms(page), ["0..9000 x 0..11000"], "one undo takes the split back");
   await page.getByRole("button", { name: "Redo", exact: true }).click();

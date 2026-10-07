@@ -1168,7 +1168,7 @@ function PlanEditor({
         return {
           label: "Room actions",
           actions: [
-            { id: "split", label: "Split", onSelect: () => setRoomSplit(selection.id) },
+            { id: "divide", label: "Split", onSelect: () => setRoomSplit(selection.id) },
             { id: "duplicate", label: "Duplicate", onSelect: () => startPlacement(selection.id) },
             { id: "rename", label: "Rename", onSelect: () => setPropertiesFor(selection.id) },
           ],

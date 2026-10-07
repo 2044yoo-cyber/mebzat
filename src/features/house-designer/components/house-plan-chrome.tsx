@@ -3,24 +3,39 @@
 import { useState } from "react";
 import {
   ArrowLeft,
+  ArrowUpDown,
+  CalendarPlus,
   Check,
   ChevronDown,
+  Columns2,
   Columns3,
+  Copy,
   DoorOpen,
+  FlipHorizontal2,
   Footprints,
   Grid3X3,
   LayoutGrid,
   Loader2,
+  Lock,
+  LockOpen,
   Magnet,
+  Merge,
   Minus,
   MoreHorizontal,
   MoreVertical,
   MousePointer2,
+  Move,
+  Pencil,
   RectangleHorizontal,
   Redo2,
+  RotateCw,
+  Rows2,
   Ruler,
+  Scissors,
+  SlidersHorizontal,
   Sofa,
   SplitSquareHorizontal,
+  Trash2,
   Undo2,
   X,
 } from "lucide-react";
@@ -434,21 +449,49 @@ function SheetNumber({ label, value, unit, text, plain = false, signed = false, 
 
 export type QuickAction = { id: string; label: string; onSelect: () => void; pressed?: boolean };
 
+/** Each action's icon: the bar shows icons only, as Revit does; the name is the button's label and tooltip. */
+const ACTION_ICONS: Record<string, typeof Copy> = {
+  duplicate: Copy,
+  rotate: RotateCw,
+  split: Scissors,
+  divide: SplitSquareHorizontal,
+  move: Move,
+  lock: Lock,
+  delete: Trash2,
+  agenda: CalendarPlus,
+  properties: SlidersHorizontal,
+  merge: Merge,
+  rename: Pencil,
+  vertical: Columns2,
+  horizontal: Rows2,
+  cancel: X,
+  flip: FlipHorizontal2,
+  mirror: FlipHorizontal2,
+  reverse: ArrowUpDown,
+};
+
+function ActionIcon({ action }: { action: QuickAction }) {
+  const Icon = (action.id === "lock" && action.label === "Unlock" ? LockOpen : ACTION_ICONS[action.id]) ?? MoreHorizontal;
+  return <Icon className="size-4" aria-hidden />;
+}
+
 /**
  * The selection's own actions, small and beside it — not a bar across the
- * screen. The common few are buttons; the rest are under ⋮.
+ * screen, and not over what is being edited: icons only, 36 px, each named
+ * by its label for touch, screen readers and the tooltip. The common few are
+ * on the bar; the rest open under ⋮ as a second row of icons.
  */
 export function QuickActionBar({ label, actions, more }: { label: string; actions: QuickAction[]; more: QuickAction[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div role="toolbar" aria-label={label} className="relative flex items-center gap-0.5 rounded-full border bg-card/95 p-0.5 shadow-lg backdrop-blur">
       {actions.map((action) => (
-        <button key={action.id} type="button" onClick={() => { setOpen(false); action.onSelect(); }} aria-pressed={action.pressed} className={cn("min-h-11 min-w-11 shrink-0 rounded-full px-3 text-xs font-medium hover:bg-muted", action.pressed && "bg-brand/15 text-brand")}>{action.label}</button>
+        <button key={action.id} type="button" aria-label={action.label} title={action.label} onClick={() => { setOpen(false); action.onSelect(); }} aria-pressed={action.pressed} className={cn("flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted", action.pressed && "bg-brand/15 text-brand")}><ActionIcon action={action} /></button>
       ))}
-      {more.length ? <button type="button" aria-label="More actions" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="flex min-h-11 min-w-11 items-center justify-center rounded-full hover:bg-muted"><MoreVertical className="size-4" /></button> : null}
+      {more.length ? <button type="button" aria-label="More actions" title="More actions" aria-expanded={open} onClick={() => setOpen((value) => !value)} className={cn("flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted", open && "bg-muted")}><MoreVertical className="size-4" aria-hidden /></button> : null}
       {open ? (
-        <div role="menu" aria-label={`${label}: more`} className="absolute right-0 top-full z-30 mt-1 w-48 rounded-xl border bg-card p-1 shadow-xl">
-          {more.map((action) => <button key={action.id} type="button" role="menuitem" onClick={() => { setOpen(false); action.onSelect(); }} className={cn("block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-muted", action.id === "delete" && "text-destructive")}>{action.label}</button>)}
+        <div role="menu" aria-label={`${label}: more`} className="absolute right-0 top-full z-30 mt-1 flex gap-0.5 rounded-full border bg-card p-0.5 shadow-xl">
+          {more.map((action) => <button key={action.id} type="button" role="menuitem" aria-label={action.label} title={action.label} onClick={() => { setOpen(false); action.onSelect(); }} className={cn("flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted", action.id === "delete" && "text-destructive")}><ActionIcon action={action} /></button>)}
         </div>
       ) : null}
     </div>

@@ -1,0 +1,38 @@
+[
+ {
+  "name": "written names back on the bar",
+  "file": "src/features/house-designer/components/house-plan-chrome.tsx",
+  "from": "aria-pressed={action.pressed} className={cn(\"flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted\", action.pressed && \"bg-brand/15 text-brand\")}><ActionIcon action={action} /></button>",
+  "to": "aria-pressed={action.pressed} className={cn(\"flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted\", action.pressed && \"bg-brand/15 text-brand\")}><ActionIcon action={action} />{action.label}</button>"
+ },
+ {
+  "name": "big 44 px buttons again",
+  "file": "src/features/house-designer/components/house-plan-chrome.tsx",
+  "from": "aria-pressed={action.pressed} className={cn(\"flex size-9 shrink-0",
+  "to": "aria-pressed={action.pressed} className={cn(\"flex min-h-11 min-w-11 px-3 shrink-0"
+ },
+ {
+  "name": "more menu as a text list",
+  "file": "src/features/house-designer/components/house-plan-chrome.tsx",
+  "from": "action.id === \"delete\" && \"text-destructive\")}><ActionIcon action={action} /></button>",
+  "to": "action.id === \"delete\" && \"text-destructive\")}>{action.label}</button>"
+ },
+ {
+  "name": "no tooltip",
+  "file": "src/features/house-designer/components/house-plan-chrome.tsx",
+  "from": "<button key={action.id} type=\"button\" aria-label={action.label} title={action.label} onClick",
+  "to": "<button key={action.id} type=\"button\" aria-label={action.label} onClick"
+ },
+ {
+  "name": "room split shows scissors",
+  "file": "src/features/house-designer/components/house-designer-workspace.tsx",
+  "from": "{ id: \"divide\", label: \"Split\"",
+  "to": "{ id: \"split\", label: \"Split\""
+ },
+ {
+  "name": "wall split shows the room icon",
+  "file": "src/features/house-designer/components/house-plan-chrome.tsx",
+  "from": "  split: Scissors,\n",
+  "to": "  split: SplitSquareHorizontal,\n"
+ }
+]
