@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Building2, Calculator, FileImage, Grid2X2, PaintRoller, Ruler, Upload, WandSparkles } from "lucide-react";
+import { ImageTo3DImporter } from "@/features/house-designer/components/image-to-3d-importer";
 
 export const metadata: Metadata = {
   title: "Image to 3D Floor Plan | Medosha",
@@ -27,19 +28,20 @@ export default function ImageTo3DPage() {
         </div>
       </div>
 
+      <ImageTo3DImporter />
+
       <section className="space-y-4 rounded-2xl border bg-card p-4 sm:p-6">
         <h2 className="text-lg font-semibold">Start with an existing floor plan</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
           Use a CAD screenshot, a floor-plan photo or a PDF as a reference.
-          Open House Design, choose <strong>Upload floor plan</strong>, then
+          For manual tracing, open House Design, choose <strong>Upload floor plan</strong>, then
           calibrate a known dimension and trace or correct walls before creating the 3D model.
         </p>
         <Link href="/house-design" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand px-4 font-semibold text-brand-foreground hover:opacity-90">
           <Upload className="size-5" /> Open floor-plan importer <ArrowRight className="size-4" />
         </Link>
         <p className="text-xs text-muted-foreground">
-          Automatic wall recognition from images is a planned addition, not yet available.
-          Existing reference-image tracing and 3D modeling remain available through House Design.
+          Basic straight-wall candidate detection is now available above. Automatic recognition of doors, windows, angled walls and complex scanned drawings is not yet available.
         </p>
       </section>
 
