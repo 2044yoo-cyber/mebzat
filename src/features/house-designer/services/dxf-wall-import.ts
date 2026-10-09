@@ -136,11 +136,12 @@ export function dxfWallPreview(drawing: DxfWallDrawing, visibleLayers: ReadonlyS
   const lines: CandidateLine[] = selectedSegments.slice(0, MAX_REVIEWED_WALLS + 1).map(segment => {
     const a = toPixel(segment.a), b = toPixel(segment.b);
     const dx = b.x - a.x, dy = b.y - a.y;
+    const orientation: CandidateLine["orientation"] =
+      Math.abs(dy) <= Math.abs(dx) * 0.08 ? "h" :
+      Math.abs(dx) <= Math.abs(dy) * 0.08 ? "v" : "diagonal";
     return {
       x1: a.x, y1: a.y, x2: b.x, y2: b.y,
-      layer: segment.layer,
-      orientation: Math.abs(dy) <= Math.abs(dx) * 0.08 ? "h" :
-        Math.abs(dx) <= Math.abs(dy) * 0.08 ? "v" : "diagonal",
+      layer: segment.layer, orientation,
       support: 1,
     };
   }).filter(line => Math.hypot(line.x2 - line.x1, line.y2 - line.y1) >= 2);
