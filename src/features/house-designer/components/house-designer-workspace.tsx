@@ -91,7 +91,7 @@ import { planDescriptionError } from "../services/plan-analysis";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
 import { furnitureItem, type FurnitureItem } from "../services/furniture-catalog";
 import { levelMeasurements, pointInPolygon } from "../services/measurements";
-import { duplicateWallParallel, extendWall, moveWallEnd, roomRectangle, rotateWall90, setWallDistance, setWallLength, splitRoom } from "../services/quick-edit";
+import { duplicateWallParallel, extendWall, moveWallEnd, roomRectangle, rotateWall90, setWallDistance, setWallLength, splitRoom, toggleWallJoints, wallJointsLinked } from "../services/quick-edit";
 import { attachToTask, createPin, createTask, listPins, pinHref, taskStatuses, updatePin, type Pin, type SketchSource } from "../services/sketch-store";
 import {
   createProject,
@@ -1174,10 +1174,20 @@ function PlanEditor({
     switch (selection.kind) {
       case "wall": {
         const locked = Boolean(project.objectInstances[selection.id]?.pinned);
+        const linked = wallJointsLinked(project, selection.id);
         return {
           label: "Wall actions",
           actions: [
             { id: "move", label: "Move", onSelect: run("move") },
+            {
+              id: "junction",
+              label: linked ? "Release connections — move only this wall" : "Link connections — neighbouring walls move together",
+              pressed: linked,
+              onSelect: () => {
+                commit(toggleWallJoints(project, selection.id));
+                toast.info(linked ? "Connections released. This wall moves independently." : "Connections linked. Touching wall ends follow this wall.");
+              },
+            },
             { id: "delete", label: "Delete", onSelect: run("delete") },
             { id: "duplicate", label: "Duplicate", onSelect: () => wallEdit(selection, () => duplicateWallParallel(project, selection.id)) },
             { id: "rotate", label: "↻ 90°", onSelect: () => wallEdit(selection, () => rotateWall90(project, selection.id)) },
