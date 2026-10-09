@@ -503,6 +503,7 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
           key={`${project.id}:${project.freehandSketch && project.walls.length ? "converted" : "draft"}`}
           project={project}
           onProjectChange={updateProject}
+          onOpenFreehand={() => setFreehandOpen(true)}
           tab={tab}
           onTab={setTab}
           status={status}
@@ -670,6 +671,7 @@ function StartScreen({
 function PlanEditor({
   project,
   onProjectChange,
+  onOpenFreehand,
   tab,
   onTab,
   status,
@@ -686,6 +688,7 @@ function PlanEditor({
 }: {
   project: HouseProject;
   onProjectChange: (project: HouseProject) => void;
+  onOpenFreehand: () => void;
   tab: WorkspaceTab;
   onTab: (tab: WorkspaceTab) => void;
   status: SaveStatus;
@@ -964,7 +967,7 @@ function PlanEditor({
       setDraftStart(null);
       setOutlineSketch([]);
       setActiveTool("select");
-      setFreehandOpen(true);
+      onOpenFreehand();
       return;
     }
     const library = (["furniture", "stair", "door", "window", "column"] as const).find((item) => item === id) ?? null;
