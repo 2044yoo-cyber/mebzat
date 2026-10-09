@@ -259,11 +259,14 @@ export function inspectFreehand(
   // Two similarly plausible destinations must be reviewed instead of guessed.
   // Diagnose at graph endpoints (not raw finger sample points), with a
   // zoom-scaled search radius. Exclude self and coincident endpoints.
+  const connectedDirectly = (a: Point, b: Point) => segments.some(edge =>
+    (distance(edge.start, a) < 1e-3 && distance(edge.end, b) < 1e-3) ||
+    (distance(edge.end, a) < 1e-3 && distance(edge.start, b) < 1e-3));
   const openNodes = [...nodes.entries()].filter(([, node]) => node.degree === 1);
   const searchRadius = Math.max(16 * unitsPerPixel, snapPixels * unitsPerPixel * 2.5);
   for (const [key, node] of openNodes) {
     const nearby = openNodes
-      .filter(([otherKey]) => otherKey !== key)
+      .filter(([otherKey, other]) => otherKey !== key && !connectedDirectly(node.point, other.point))
       .map(([, other]) => distance(node.point, other.point))
       .filter(d => d > unitsPerPixel && d < searchRadius)
       .sort((a, b) => a - b);
@@ -377,7 +380,9 @@ export function suggestFreehandRepairs(
     if (used.has(item.id) || ambiguous.has(item.id.slice("open-".length))) continue;
     const candidates = open.filter(other => other.id !== item.id &&
       !used.has(other.id) && !ambiguous.has(other.id.slice("open-".length)) && distance(item.point, other.point) <= maxGap &&
-      distance(item.point, other.point) > Math.max(1e-4, unitsPerPixel));
+      distance(item.point, other.point) > Math.max(1e-4, unitsPerPixel) &&
+      !segments.some(edge => (distance(edge.start, item.point) < 1e-3 && distance(edge.end, other.point) < 1e-3) ||
+        (distance(edge.end, item.point) < 1e-3 && distance(edge.start, other.point) < 1e-3)));
     const ordered = candidates.sort((a,b) => distance(item.point, a.point) - distance(item.point, b.point));
     const chosen = ordered[0];
     if (!chosen) continue;
