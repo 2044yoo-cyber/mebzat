@@ -19,6 +19,41 @@ import {
 
 export type HousePatch = Record<string, string | number>;
 
+/** Wall connections are selected per endpoint and stored on its model instance.
+ * Older plans with linkedJoints=true keep both endpoints connected until edited.
+ */
+export type WallJointEnd = "start" | "end";
+
+export function wallJointLinked(project: HouseProject, wallId: string, end: WallJointEnd): boolean {
+  const properties = project.objectInstances[wallId]?.properties;
+  const override = end === "start" ? properties?.linkStart : properties?.linkEnd;
+  return typeof override === "boolean" ? override : properties?.linkedJoints === true;
+}
+
+export function wallJointsLinked(project: HouseProject, wallId: string): boolean {
+  return wallJointLinked(project, wallId, "start") && wallJointLinked(project, wallId, "end");
+}
+
+export function toggleWallJoints(project: HouseProject, wallId: string, end?: WallJointEnd): HouseProject {
+  if (!project.walls.some((wall) => wall.id === wallId)) return project;
+  const previous = project.objectInstances[wallId];
+  const currentlyStart = wallJointLinked(project, wallId, "start");
+  const currentlyEnd = wallJointLinked(project, wallId, "end");
+  const both = currentlyStart && currentlyEnd;
+  const start = end === "start" ? !currentlyStart : end === "end" ? currentlyStart : !both;
+  const finish = end === "end" ? !currentlyEnd : end === "start" ? currentlyEnd : !both;
+  return {
+    ...project,
+    objectInstances: {
+      ...project.objectInstances,
+      [wallId]: {
+        ...(previous ?? { typeId: null, mark: "", pinned: false, groupId: null, flipped: false, properties: {} }),
+        properties: { ...previous?.properties, linkStart: start, linkEnd: finish, linkedJoints: start && finish },
+      },
+    },
+  };
+}
+
 /**
  * Deleting an exterior wall means deleting the corner it starts from — there
  * is no such thing as erasing one side of a closed footprint and leaving the
@@ -262,23 +297,32 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
   // A wall shares its coordinates with other walls geometrically, but that
   // alone must never give it permission to drag their endpoints. Linking is
   // opt-in and saved with this particular wall.
-  const linkedJoints = project.objectInstances[id]?.properties.linkedJoints === true;
-  const movingGeometry = ["startX", "startY", "endX", "endY"].some((key) => key in effectivePatch);
-  // The footprint is stored as a CLOSED polygon. Moving one of its sides
-  // necessarily moves both neighbouring sides; require explicit consent.
-  if (startIndex >= 0 && movingGeometry && !linkedJoints) return project;
+  const linkedStart = wallJointLinked(project, id, "start");
+  const linkedEnd = wallJointLinked(project, id, "end");
+  const movingStart = numberOr(effectivePatch.startX, wall.start.x) !== wall.start.x ||
+    numberOr(effectivePatch.startY, wall.start.y) !== wall.start.y;
+  const movingEnd = numberOr(effectivePatch.endX, wall.end.x) !== wall.end.x ||
+    numberOr(effectivePatch.endY, wall.end.y) !== wall.end.y;
+  // The footprint is a CLOSED polygon, so moving a corner necessarily
+  // changes the adjoining footprint segment. Permission is specific to the
+  // corner being moved, never inferred from proximity to another wall.
+  if (startIndex >= 0 && ((movingStart && !linkedStart) || (movingEnd && !linkedEnd))) return project;
   if (startIndex < 0) {
     const interior = plan.interiorWalls?.find((item) => item.id === sourceWallId);
     if (!interior) return next;
     const start = { x: numberOr(effectivePatch.startX, interior.start.x), y: numberOr(effectivePatch.startY, interior.start.y) };
     const end = { x: numberOr(effectivePatch.endX, interior.end.x), y: numberOr(effectivePatch.endY, interior.end.y) };
-    // Only an explicitly linked wall may bring its neighbours along.
-    // An independent move preserves every other wall endpoint unchanged.
-    // Exact centreline joints (including a T) may follow when linked, but
-    // merely brushing the face of another thick wall does not link it.
-    const follow = linkedJoints
-      ? attachedTo(interior.start, interior.end, start, end, 1)
-      : (point: { x: number; y: number }) => point;
+    // Preserve all neighbouring geometry in independent mode. In linked
+    // mode ONLY endpoints intentionally attached at this wall's linked
+    // start/end follow. A T intersection midway along the wall remains
+    // separate unless explicitly edited: it is not a hidden group selection.
+    const follow = (point: { x: number; y: number }) => {
+      if (linkedStart && Math.hypot(point.x - interior.start.x, point.y - interior.start.y) <= 1)
+        return { x: start.x, y: start.y };
+      if (linkedEnd && Math.hypot(point.x - interior.end.x, point.y - interior.end.y) <= 1)
+        return { x: end.x, y: end.y };
+      return point;
+    };
     const outside = new Set(plan.corners.map((corner) => `${corner.x},${corner.y}`));
     const keepOutside = (point: { x: number; y: number }) => outside.has(`${point.x},${point.y}`) ? point : follow(point);
     return rebuildLevel(next, level.id, withDerivedZones(plan, {
@@ -310,11 +354,17 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
     }
     return corner;
   });
-  // A footprint move is possible only in linked mode. It can carry exact
-  // interior-wall junctions, but must never absorb nearby unrelated ends.
-  const follow = linkedJoints
-    ? attachedTo(plan.corners[startIndex]!, plan.corners[endIndex]!, corners[startIndex]!, corners[endIndex]!, 1)
-    : (point: { x: number; y: number }) => point;
+  // Each footprint corner has its own link permission. Only an interior
+  // endpoint actually coincident with a moved, linked corner follows.
+  const follow = (point: { x: number; y: number }) => {
+    const oldStart = plan.corners[startIndex]!;
+    const oldEnd = plan.corners[endIndex]!;
+    if (linkedStart && Math.hypot(point.x - oldStart.x, point.y - oldStart.y) <= 1)
+      return { x: corners[startIndex]!.x, y: corners[startIndex]!.y };
+    if (linkedEnd && Math.hypot(point.x - oldEnd.x, point.y - oldEnd.y) <= 1)
+      return { x: corners[endIndex]!.x, y: corners[endIndex]!.y };
+    return point;
+  };
   const changedPlan: Room = withDerivedZones(plan, {
     ...plan,
     corners,
