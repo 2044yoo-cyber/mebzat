@@ -238,10 +238,18 @@ function moveSelectedWallsAsGroup(
 }
 
 export function moveHouseSelections(project: HouseProject, selections: readonly HouseSelection[], dx: number, dy: number, options?: { footprintEditable?: boolean }): HouseCommandMutation {
-  // A direct wall drag (one or many walls) is always an intentional movement.
-  // It does not require the separately controlled endpoint link toggle.
-  if (selections.length && selections.every((selection) => selection.kind === "wall"))
-    return moveSelectedWallsAsGroup(project, selections, dx, dy, options);
+  // Dragging several selected walls must be ONE atomic geometry operation.
+  // For one interior wall with explicit endpoint links, preserve the separate
+  // per-end behaviour used by the handle/link controls. Unlinked wall body
+  // moves and exterior wall body moves are intentional and can move directly.
+  if (selections.length && selections.every((selection) => selection.kind === "wall")) {
+    const one = selections.length === 1 ? project.walls.find((item) => item.id === selections[0]!.id) : null;
+    const plan = one ? project.levels.find((level) => level.id === one.levelId)?.plan : null;
+    const isExterior = !!(one?.sourceWallId && plan?.corners.some((corner) => corner.id === one.sourceWallId));
+    const linked = !!one && (wallJointLinked(project, one.id, "start") || wallJointLinked(project, one.id, "end"));
+    if (!one || !linked || isExterior || selections.length > 1)
+      return moveSelectedWallsAsGroup(project, selections, dx, dy, options);
+  }
   let next = project;
   const blocked: string[] = [];
   for (const selection of selections) {
