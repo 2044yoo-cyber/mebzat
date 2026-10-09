@@ -174,14 +174,96 @@ export function ImageTo3DImporter() {
     } finally { setBusy(false); }
   }
 
-  function pickPoint(event: PointerEvent<HTMLCanvasElement>) {
-    if (mode !== "calibrate") return;
+  function at(event: PointerEvent<HTMLCanvasElement>): Point {
     const rect = event.currentTarget.getBoundingClientRect();
-    const point = {
-      x: (event.clientX - rect.left) * size.width / rect.width,
-      y: (event.clientY - rect.top) * size.height / rect.height,
+    return {
+      x: Math.max(0, Math.min(size.width, (event.clientX - rect.left) * size.width / rect.width)),
+      y: Math.max(0, Math.min(size.height, (event.clientY - rect.top) * size.height / rect.height)),
     };
-    setScalePoints(previous => previous.length >= 2 ? [point] : [...previous, point]);
+  }
+  function distanceToLine(point: Point, line: CandidateLine) {
+    const dx = line.x2 - line.x1, dy = line.y2 - line.y1;
+    const t = Math.max(0, Math.min(1, ((point.x - line.x1) * dx + (point.y - line.y1) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(point.x - line.x1 - t * dx, point.y - line.y1 - t * dy);
+  }
+  function pointerDown(event: PointerEvent<HTMLCanvasElement>) {
+    if (mode !== "review" || selected === null || !lines[selected]) return;
+    const p = at(event);
+    const line = lines[selected]!;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const tolerance = 24 * size.width / (rect.width || 1);
+    const dFirst = Math.hypot(line.x1 - p.x, line.y1 - p.y);
+    const dLast = Math.hypot(line.x2 - p.x, line.y2 - p.y);
+    const end = dFirst < dLast ? "first" : "last";
+    if (Math.min(dFirst, dLast) > tolerance) return;
+    endpointDrag.current = { pointerId: event.pointerId, index: selected, end, before: lines.map(l => ({ ...l })), moved: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function pointerMove(event: PointerEvent<HTMLCanvasElement>) {
+    const drag = endpointDrag.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const p = at(event);
+    const line = drag.before[drag.index];
+    if (!line) return;
+    const changed = drag.end === "first"
+      ? { ...line, x1: p.x, y1: p.y }
+      : { ...line, x2: p.x, y2: p.y };
+    // Candidate line edits may be diagonal; the existing freehand converter
+    // preserves intentional diagonals when it generates editable walls.
+    setLines(current => current.map((l, index) => index === drag.index ? changed : l));
+    drag.moved = true;
+  }
+  function pickPoint(event: PointerEvent<HTMLCanvasElement>) {
+    const p = at(event);
+    const drag = endpointDrag.current;
+    if (drag && drag.pointerId === event.pointerId) {
+      if (drag.moved) {
+        const line = lines[drag.index];
+        const length = line ? Math.hypot(line.x2 - line.x1, line.y2 - line.y1) : 0;
+        if (length < 10) setLines(drag.before);
+        else { setHistory(previous => [...previous.slice(-19), drag.before]); setReviewed(false); }
+      }
+      endpointDrag.current = null;
+      return;
+    }
+    if (mode === "calibrate") {
+      setScalePoints(previous => previous.length >= 2 ? [p] : [...previous, p]);
+      return;
+    }
+    if (mode === "add") {
+      if (!newStart) { setNewStart(p); return; }
+      if (Math.hypot(p.x - newStart.x, p.y - newStart.y) < 12) {
+        setError("Choose an endpoint at least 12 pixels away.");
+        return;
+      }
+      if (lines.length >= 80) { setError("This import supports up to 80 walls. Delete unwanted detections first."); return; }
+      const dx = p.x - newStart.x, dy = p.y - newStart.y;
+      const orientation: CandidateLine["orientation"] = Math.abs(dx) < Math.abs(dy) * 0.08 ? "v" : "h";
+      checkpoint();
+      setLines(current => [...current, { x1: newStart.x, y1: newStart.y, x2: p.x, y2: p.y, orientation, support: 1 }]);
+      setSelected(lines.length);
+      setNewStart(null);
+      setMode("review");
+      setReviewed(false);
+      setError("");
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const tolerance = Math.max(12, 18 * size.width / Math.max(1, rect.width));
+    let closest = -1, best = tolerance;
+    for (const [index, line] of lines.entries()) {
+      const d = distanceToLine(p, line);
+      if (d < best) { closest = index; best = d; }
+    }
+    setSelected(closest >= 0 ? closest : null);
+  }
+
+  function removeSelected() {
+    if (selected === null || !lines[selected]) return;
+    checkpoint();
+    setLines(previous => previous.filter((_, index) => index !== selected));
+    setSelected(null);
+    setReviewed(false);
   }
 
   const pixelLength = scalePoints.length === 2
@@ -191,7 +273,10 @@ export function ImageTo3DImporter() {
   const calibrated = pixelLength >= 12 && Number.isFinite(metres) && metres >= 0.2 && metres <= 100;
 
   function openPlan() {
-    if (!calibrated || !lines.length) { setError("Mark two points on a known dimension and confirm its length."); return; }
+    if (!calibrated || !lines.length || lines.length > 80 || !reviewed) {
+      setError("Calibrate one known distance, check the detected lines and confirm review before importing.");
+      return;
+    }
     // Local hand-off: only verified vectors and scale, never the uploaded
     // image itself. Avoids sending sensitive plans to a paid AI service.
     const payload = {
