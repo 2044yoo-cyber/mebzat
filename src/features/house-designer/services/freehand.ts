@@ -267,6 +267,26 @@ export function inspectFreehand(
   return { segments, issues };
 }
 
+/** Safe, source-level cleanup. Does not infer walls or alter valid stroke points. */
+export function cleanFreehandStrokes(strokes: readonly Stroke[]): {
+  strokes: Stroke[];
+  removed: number;
+} {
+  const seen = new Set<string>(), cleaned: Stroke[] = [];
+  for (const stroke of strokes) {
+    const valid = stroke.points.filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+    if (valid.length < 2 || valid.every(p => distance(p, valid[0]!) < 1e-6)) continue;
+    // Deduplicate only coincident raw strokes with the same thickness.
+    // Reversed input is equivalent, but similar/nearby paths are NOT.
+    const forward = valid.map(p => `${p.x.toFixed(4)},${p.y.toFixed(4)}`).join(";");
+    const backward = [...valid].reverse().map(p => `${p.x.toFixed(4)},${p.y.toFixed(4)}`).join(";");
+    const key = `${stroke.thickness}:${forward < backward ? forward : backward}`;
+    if (seen.has(key)) continue;
+    seen.add(key); cleaned.push(stroke);
+  }
+  return { strokes: cleaned, removed: strokes.length - cleaned.length };
+}
+
 /** Proposed gap closures never change the sketch until approved. */
 export type FreehandRepair = {
   id: string;
