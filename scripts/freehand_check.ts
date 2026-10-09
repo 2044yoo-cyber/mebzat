@@ -14,6 +14,7 @@ import {
   dimensionConflicts,
   applyFreehand,
   convertStrokes,
+  inspectFreehand,
   strokeSegments,
   type Stroke,
 } from "../src/features/house-designer/services/freehand";
@@ -141,6 +142,18 @@ assert.ok(nearAxis.some(w => Math.abs(w.start.y - w.end.y) < 1),
   "rough horizontal line squares onto one axis");
 assert.ok(nearAxis.some(w => Math.abs(w.start.x - w.end.x) < 1),
   "rough vertical line squares onto one axis");
+const closedReview = inspectFreehand(rectangle);
+assert.equal(closedReview.issues.filter(issue => issue.kind === "open-end").length, 0,
+  "a nearly closed rectangle has no open-end warnings");
+const openReview = inspectFreehand([stroke([[0, 0], [200, 0]], "open")]);
+assert.equal(openReview.issues.filter(issue => issue.kind === "open-end").length, 2,
+  "a single isolated wall has two repair warnings");
+const teeReview = inspectFreehand([
+  stroke([[0, 0], [200, 0]], "base"),
+  stroke([[100, 100], [100, 2]], "branch"),
+]);
+assert.equal(teeReview.issues.filter(issue => issue.kind === "open-end").length, 3,
+  "T junction is connected while three outer ends remain open");
 const diagonal = convertStrokes(
   [
     stroke([
