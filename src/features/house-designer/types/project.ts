@@ -618,6 +618,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
       updatedAt: now,
     },
     units: "mm",
+    displayUnits: "m",
     designStyle: input.style,
     originalPlanStrict: input.strict,
     facade,
