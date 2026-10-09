@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import Link from "next/link";
-import { ChevronUp, FilePlus2, MessageSquare, Ruler, Wallet } from "lucide-react";
+import { ChevronUp, FilePlus2, FileSpreadsheet, MessageSquare, Plus, Ruler, Trash2, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,8 @@ import { SendToCalculator } from "./send-to-calculator";
 import { StartPanel } from "./start-panel";
 import { useDesign } from "../hooks/use-design";
 import { startingDesign } from "../services/starting-designs";
+import { addProjectDesign, projectDesigns, removeProjectDesign, updateProjectDesign } from "../services/cabinet-project";
+import { buildParts } from "../services/geometry";
 import type { DesignCard } from "../services/designs";
 import {
   differsFrom,
@@ -136,6 +138,57 @@ export function StudioWorkspace({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("design");
+  // Every entry in a project remains its own validated DesignSpec, not an
+  // incorrectly mixed kitchen/wardrobe geometry. The primary design is always
+  // the saved record's root spec; extras live in its projectItems.
+  const [activeItemId, setActiveItemId] = useState("primary");
+  const [newCabinetKind, setNewCabinetKind] = useState<DesignKind>("wardrobe");
+  const [projectMessage, setProjectMessage] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const projectItems = useMemo(() => design.spec ? projectDesigns(design.spec) : [], [design.spec]);
+  const activeItem = projectItems.find(item => item.id === activeItemId) ?? projectItems[0];
+  const activeSpec = activeItem?.spec ?? null;
+  const activePartCount = useMemo(() => activeSpec ? buildParts(activeSpec).totals.partCount : 0, [activeSpec]);
+  const updateActive = (next: DesignSpec) => {
+    if (!design.spec) return;
+    design.set(updateProjectDesign(design.spec, activeItemId, next));
+  };
+  const addAnotherCabinet = () => {
+    if (!design.spec) return;
+    try {
+      const id = crypto.randomUUID();
+      design.set(addProjectDesign(design.spec, id, newCabinetKind));
+      setActiveItemId(id);
+      setProjectMessage("New cabinet added. Edit it here, then Save to keep the whole project.");
+    } catch (error) {
+      setProjectMessage(error instanceof Error ? error.message : "Could not add cabinet.");
+    }
+  };
+  const downloadCombined = async () => {
+    if (!design.spec) return;
+    setExporting(true);
+    setProjectMessage(null);
+    try {
+      // Load the XLSX writer only on demand, not with the 3D editor.
+      const { buildProjectCutList } = await import("../services/cabinet-project");
+      const result = buildProjectCutList(design.spec);
+      const blob = new Blob([result.workbook.slice().buffer as ArrayBuffer],
+        { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = "medosha-combined-cabinet-cut-list.xlsx";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(href), 1000);
+      setProjectMessage(`Exported ${result.designs} designs, ${result.pieces} cut pieces, grouped by board type.`);
+    } catch (error) {
+      setProjectMessage(error instanceof Error ? error.message : "Could not generate the combined cut list.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // ---- the draft ---------------------------------------------------------
   //
@@ -475,11 +528,11 @@ export function StudioWorkspace({
                     </button>
                     <div className="min-w-0">
                       <h1 className="truncate text-sm font-semibold">
-                        {design.spec.title}
+                        {activeSpec?.title ?? design.spec.title}
                       </h1>
                       <p className="text-[11px] text-muted-foreground">
-                        {design.parts?.totals.partCount ?? 0} parts ·{" "}
-                        {design.spec.carcass.board.label}
+                        {activePartCount} parts ·{" "}
+                        {activeSpec?.carcass.board.label ?? design.spec.carcass.board.label}
                       </p>
                     </div>
                   </div>
@@ -513,6 +566,8 @@ export function StudioWorkspace({
                         if (key) clearDraft(window.localStorage, key);
                         setDismissed(true);
                         design.clear();
+                        setActiveItemId("primary");
+                        setProjectMessage(null);
                         setMessages([]);
                       }}
                       className="flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium"
@@ -522,8 +577,8 @@ export function StudioWorkspace({
                     </button>
 
                     <SendToCalculator
-                      kind={design.spec.kind}
-                      width={design.spec.envelope.width}
+                      kind={activeSpec?.kind ?? design.spec.kind}
+                      width={activeSpec?.envelope.width ?? design.spec.envelope.width}
                     />
                     <PublishBar
                       spec={design.spec}
@@ -536,13 +591,74 @@ export function StudioWorkspace({
                 </div>
               ) : null}
 
+              {/* A single saved project can contain independently editable
+                  wardrobes, vanities, kitchens, etc. Each has its own materials
+                  and joinery rules; the XLSX combines their production output. */}
+              <section aria-label="Cabinets in this project" className="space-y-2 border-b bg-background px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold">Cabinets in project ({projectItems.length})</span>
+                  <button type="button" onClick={() => void downloadCombined()} disabled={exporting}
+                    className="inline-flex min-h-9 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium disabled:opacity-50">
+                    <FileSpreadsheet className="size-4" aria-hidden />
+                    {exporting ? "Preparing…" : "Combined cut list (.xlsx)"}
+                  </button>
+                </div>
+                <div role="tablist" aria-label="Cabinet designs" className="flex gap-2 overflow-x-auto pb-1">
+                  {projectItems.map((item, index) => (
+                    <button key={item.id} type="button" role="tab" aria-selected={activeItemId === item.id}
+                      onClick={() => { setActiveItemId(item.id); setProjectMessage(null); }}
+                      className={cn("max-w-[180px] shrink-0 truncate rounded-lg border px-3 py-2 text-xs",
+                        activeItemId === item.id ? "border-primary bg-primary/10 font-semibold text-primary" : "bg-muted/30")}>
+                      {index + 1}. {item.spec.title}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 text-xs">
+                    Add
+                    <select aria-label="Cabinet design type to add" value={newCabinetKind}
+                      onChange={(event) => setNewCabinetKind(event.target.value as DesignKind)}
+                      className="min-h-10 rounded-lg border bg-background px-2">
+                      <option value="wardrobe">Wardrobe</option>
+                      <option value="vanity">Vanity / bathroom</option>
+                      <option value="kitchen">Kitchen</option>
+                      <option value="tv_unit">TV unit</option>
+                      <option value="office_storage">Office cabinet</option>
+                      <option value="shelving">Shelves</option>
+                      <option value="custom">Custom cabinet</option>
+                    </select>
+                  </label>
+                  <button type="button" onClick={addAnotherCabinet}
+                    className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">
+                    <Plus className="size-4" aria-hidden /> Add cabinet
+                  </button>
+                  {activeItemId !== "primary" ? (
+                    <button type="button" onClick={() => {
+                      if (!design.spec || !window.confirm("Remove this cabinet design from the project? Undo can restore it.")) return;
+                      design.set(removeProjectDesign(design.spec, activeItemId));
+                      setActiveItemId("primary");
+                      setProjectMessage("Cabinet removed from this project. Use Undo to restore it.");
+                    }} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-destructive/50 px-2 text-xs text-destructive">
+                      <Trash2 className="size-3.5" aria-hidden /> Remove design
+                    </button>
+                  ) : null}
+                </div>
+                {projectMessage ? <p role="status" className="text-xs text-muted-foreground">{projectMessage}</p> : null}
+                {projectItems.length > 1 ? <p className="text-[11px] text-muted-foreground">
+                  Save stores all cabinets together. The Excel cut list combines parts,
+                  hardware and board totals; sheet counts are conservatively summed
+                  from each cabinet's nesting.
+                </p> : null}
+              </section>
+
               {/* The editor takes the rest of the column. On a phone that is
                   as much as it wants — the drawing sticks to the top of the
                   page and the controls run past it. */}
               <div className="w-full min-w-0 max-w-full flex-1 overflow-x-hidden @4xl/ws:min-h-0">
                 <DesignEditor
-                  spec={design.spec}
-                  onChange={design.set}
+                  key={activeItemId}
+                  spec={activeSpec ?? design.spec}
+                  onChange={updateActive}
                   onUndo={design.undo}
                   onRedo={design.redo}
                   canUndo={design.canUndo}
