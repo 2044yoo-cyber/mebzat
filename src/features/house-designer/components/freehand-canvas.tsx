@@ -147,7 +147,7 @@ export function FreehandCanvas({
       for (const issue of diagnostics.issues) {
         ctx.beginPath();
         ctx.arc(issue.point.x, issue.point.y, (focusedIssue === issue.id ? 10 : 6) / v.zoom, 0, 2 * Math.PI);
-        ctx.fillStyle = issue.kind === "open-end" ? "#dc2626" : "#d97706";
+        ctx.fillStyle = issue.kind === "open-end" ? "#dc2626" : issue.kind === "dangling-extension" ? "#eab308" : "#d97706";
         ctx.fill();
         ctx.lineWidth = 2 / v.zoom;
         ctx.strokeStyle = "#ffffff";
@@ -561,10 +561,11 @@ export function FreehandCanvas({
           const result = inspectFreehand(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom);
           const open = result.issues.filter(issue => issue.kind === "open-end");
           const short = result.issues.filter(issue => issue.kind === "short-wall");
+          const tails = result.issues.filter(issue => issue.kind === "dangling-extension");
           const repairs = suggestFreehandRepairs(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom).filter(p => !rejectedRepairs.includes(p.id));
           return <div className="max-h-[30dvh] space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
             <strong className="block text-sm">Review Plan · {result.segments.length} walls</strong>
-            <p>{open.length} open endpoints · {short.length} short pieces</p>
+            <p>{open.length} open endpoints · {short.length} short pieces · {tails.length} possible wall tails</p>
             <button type="button" className="w-full rounded-lg border border-slate-300 bg-white p-2 text-left font-medium" onClick={() => {
               const cleaned = cleanFreehandStrokes(sketch.strokes);
               if (!cleaned.removed) {
