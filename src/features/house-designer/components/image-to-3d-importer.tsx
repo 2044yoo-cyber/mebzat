@@ -22,7 +22,28 @@ export function ImageTo3DImporter() {
   const [showLines, setShowLines] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<"calibrate" | "review">("calibrate");
+  const [mode, setMode] = useState<"calibrate" | "review" | "add">("calibrate");
+  const pdfUrl = useRef<string | null>(null);
+  const [pdfPages, setPdfPages] = useState(0);
+  const [pdfPage, setPdfPage] = useState(1);
+  const [reviewed, setReviewed] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [newStart, setNewStart] = useState<Point | null>(null);
+  const [history, setHistory] = useState<CandidateLine[][]>([]);
+  const endpointDrag = useRef<{ pointerId: number; index: number; end: "first" | "last"; before: CandidateLine[]; moved: boolean } | null>(null);
+  useEffect(() => () => { if (pdfUrl.current) URL.revokeObjectURL(pdfUrl.current); }, []);
+  function checkpoint() {
+    setHistory(previous => [...previous.slice(-19), lines.map(line => ({ ...line }))]);
+  }
+  function undoEdit() {
+    const previous = history.at(-1);
+    if (!previous) return;
+    setHistory(current => current.slice(0, -1));
+    setLines(previous);
+    setSelected(null);
+    setReviewed(false);
+    setNewStart(null);
+  }
 
   function draw() {
     const el = canvas.current, original = image.current;
@@ -34,13 +55,24 @@ export function ImageTo3DImporter() {
     ctx.drawImage(original, 0, 0);
     if (showLines) {
       ctx.lineWidth = 2.5;
-      ctx.strokeStyle = "#16a34a";
-      for (const line of lines) {
+      for (const [index, line] of lines.entries()) {
+        ctx.strokeStyle = index === selected ? "#2563eb" : "#16a34a";
         ctx.beginPath();
         ctx.moveTo(line.x1, line.y1);
         ctx.lineTo(line.x2, line.y2);
         ctx.stroke();
       }
+      if (selected !== null && lines[selected]) {
+        ctx.fillStyle = "#2563eb";
+        const line = lines[selected]!;
+        for (const point of [{ x: line.x1, y: line.y1 }, { x: line.x2, y: line.y2 }]) {
+          ctx.beginPath(); ctx.arc(point.x, point.y, 8, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+    if (newStart) {
+      ctx.beginPath(); ctx.arc(newStart.x, newStart.y, 7, 0, Math.PI * 2);
+      ctx.fillStyle = "#2563eb"; ctx.fill();
     }
     ctx.strokeStyle = "#f97316";
     ctx.fillStyle = "#f97316";
@@ -58,7 +90,7 @@ export function ImageTo3DImporter() {
       }
     }
   }
-  useEffect(draw, [lines, scalePoints, showLines, size]);
+  useEffect(draw, [lines, scalePoints, showLines, size, selected, newStart]);
 
   function detect(min: number) {
     const original = image.current;
@@ -68,42 +100,78 @@ export function ImageTo3DImporter() {
     try {
       const result = detectOrthogonalWalls(ctx.getImageData(0, 0, original.width, original.height), min);
       setLines(result);
+      setHistory([]);
+      setSelected(null);
+      setReviewed(false);
+      setNewStart(null);
       setError(result.length ? "" : "No long, straight wall candidates found. Try a clean CAD screenshot or lower the minimum line length.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not inspect the image."); }
+  }
+
+  async function loadRaster(source: HTMLImageElement | ImageBitmap, label: string) {
+    const scale = Math.min(1, 1100 / Math.max(source.width, source.height));
+    const width = Math.max(80, Math.round(source.width * scale));
+    const height = Math.max(80, Math.round(source.height * scale));
+    const original = document.createElement("canvas");
+    original.width = width; original.height = height;
+    const ctx = original.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("Your browser cannot process this image.");
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(source, 0, 0, width, height);
+    if ("close" in source && typeof source.close === "function") source.close();
+    image.current = original;
+    setSize({ width, height });
+    setScalePoints([]);
+    setMode("calibrate");
+    setFileName(label);
+    const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength);
+    setLines(detected);
+    setSelected(null); setNewStart(null); setHistory([]); setReviewed(false);
+    setError(detected.length ? "" : "No straight walls detected. Use a clearer image, add the walls by hand, or lower minimum line length.");
+  }
+
+  async function loadPdfPage(url: string, page: number, label: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const rendered = await renderPdfPage(url, page, 2);
+      const bitmap = await loadImage(rendered.background.url);
+      await loadRaster(bitmap, label);
+      setPdfPage(page);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not render the selected PDF page.");
+    } finally { setBusy(false); }
   }
 
   async function loadFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    event.target.value = "";
     setError("");
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      setError("This first version reads PNG, JPG and WebP. For PDF, export the drawing page to PNG first.");
+    if (!["image/png", "image/jpeg", "image/webp", "application/pdf"].includes(file.type)) {
+      setError("Upload a PNG, JPG, WebP or PDF file. For CAD files, first export to PDF or an image.");
       return;
     }
-    if (file.size > MAX_BYTES) { setError("Choose an image smaller than 12 MB."); return; }
+    if (file.size > MAX_BYTES) { setError("Choose a file smaller than 12 MB."); return; }
+    if (pdfUrl.current) { URL.revokeObjectURL(pdfUrl.current); pdfUrl.current = null; }
+    setPdfPages(0);
     setBusy(true);
     try {
-      const bitmap = await createImageBitmap(file);
-      const scale = Math.min(1, 900 / Math.max(bitmap.width, bitmap.height));
-      const width = Math.round(bitmap.width * scale), height = Math.round(bitmap.height * scale);
-      const original = document.createElement("canvas");
-      original.width = width; original.height = height;
-      const ctx = original.getContext("2d", { willReadFrequently: true });
-      if (!ctx) throw new Error("Your browser cannot process this image.");
-      ctx.fillStyle = "white";
-      ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(bitmap, 0, 0, width, height);
-      bitmap.close();
-      image.current = original;
-      setSize({ width, height });
-      setScalePoints([]);
-      setMode("calibrate");
-      setFileName(file.name);
-      const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength);
-      setLines(detected);
-      if (!detected.length) setError("No straight walls detected. Use a clearer image or lower the line-length setting.");
-    } catch (e) { setError(e instanceof Error ? e.message : "Could not load the image."); }
-    finally { setBusy(false); }
+      if (file.type === "application/pdf") {
+        const url = URL.createObjectURL(file);
+        pdfUrl.current = url;
+        const pages = await pdfPageCount(url);
+        if (pages < 1) throw new Error("This PDF contains no pages.");
+        setPdfPages(pages);
+        await loadPdfPage(url, 1, file.name);
+      } else {
+        const bitmap = await createImageBitmap(file);
+        await loadRaster(bitmap, file.name);
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not load the floor plan.");
+    } finally { setBusy(false); }
   }
 
   function pickPoint(event: PointerEvent<HTMLCanvasElement>) {
