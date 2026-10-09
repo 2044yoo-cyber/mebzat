@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import Link from "next/link";
-import { ChevronUp, FilePlus2, FileSpreadsheet, MessageSquare, Plus, Ruler, Trash2, Wallet } from "lucide-react";
+import { ChevronUp, Copy, FilePlus2, FileSpreadsheet, MessageSquare, Plus, Ruler, Trash2, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -21,7 +21,7 @@ import { SendToCalculator } from "./send-to-calculator";
 import { StartPanel } from "./start-panel";
 import { useDesign } from "../hooks/use-design";
 import { startingDesign } from "../services/starting-designs";
-import { addProjectDesign, projectDesigns, removeProjectDesign, updateProjectDesign } from "../services/cabinet-project";
+import { addProjectDesign, duplicateProjectDesign, projectDesigns, removeProjectDesign, updateProjectDesign } from "../services/cabinet-project";
 import { buildParts } from "../services/geometry";
 import { buildCutList, sheetCountsOf } from "../services/cutlist";
 import { calculateCost } from "../services/costing";
@@ -651,12 +651,28 @@ export function StudioWorkspace({
                                 {Math.round(item.spec.envelope.height)} × {Math.round(item.spec.envelope.depth)} mm
                               </p>
                             </div>
-                            <button type="button" onClick={() => {
-                              setActiveItemId(item.id);
-                              setProjectMessage(null);
-                            }} className="shrink-0 rounded-md border px-2 py-1 text-xs font-medium">
-                              Edit
-                            </button>
+                            <div className="flex shrink-0 gap-1">
+                              <button type="button" onClick={() => {
+                                setActiveItemId(item.id);
+                                setProjectMessage(null);
+                              }} className="rounded-md border px-2 py-1 text-xs font-medium">
+                                Edit
+                              </button>
+                              <button type="button" aria-label={`Duplicate design ${item.spec.title}`}
+                                onClick={() => {
+                                  if (!design.spec) return;
+                                  try {
+                                    const nextId = crypto.randomUUID();
+                                    design.set(duplicateProjectDesign(design.spec, item.id, nextId));
+                                    setActiveItemId(nextId);
+                                    setProjectMessage("A complete copy was added. Save the project to keep it.");
+                                  } catch (error) {
+                                    setProjectMessage(error instanceof Error ? error.message : "Could not duplicate this design.");
+                                  }
+                                }} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium">
+                                <Copy className="size-3" aria-hidden /> Copy
+                              </button>
+                            </div>
                           </div>
                           <TemplateThumb spec={item.spec}
                             className="mt-2 h-28 w-full rounded-md bg-muted/30 p-2 text-foreground" />
