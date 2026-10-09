@@ -420,7 +420,8 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     }
     // Multi-selected walls are a single movable set. Hit any of the selected
     // walls to drag the WHOLE set, without downgrading it to a one-wall pick.
-    if (selectMode && onMoveSelection && selections.filter((item) => item.kind === "wall").length > 1) {
+    if ((selectMode || activeTool === "move") && onMoveSelection &&
+      selections.filter((item) => item.kind === "wall").length >= (activeTool === "move" ? 1 : 2)) {
       const selectedWalls = project.walls.filter((wall) => selections.some((item) => item.kind === "wall" && item.id === wall.id));
       const tolerance = Math.max(16 * mmPerPx, 60);
       const hit = selectedWalls.some((wall) => {
