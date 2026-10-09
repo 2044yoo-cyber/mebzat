@@ -234,7 +234,7 @@ export function convertStrokes(
  */
 export type FreehandIssue = {
   id: string;
-  kind: "open-end" | "short-wall";
+  kind: "open-end" | "short-wall" | "dangling-extension";
   point: Point;
   detail: string;
 };
@@ -264,6 +264,20 @@ export function inspectFreehand(
       issues.push({ id: `short-${i}`, kind: "short-wall",
         point: { x: (segment.start.x + segment.end.x) / 2, y: (segment.start.y + segment.end.y) / 2 },
         detail: "Very short wall piece. Inspect before conversion." });
+  // A short degree-one edge attached to a three-way (or higher) junction may
+  // be an unintended wall tail. It is ONLY a warning; trim requires review.
+  // Limit is tied to the user's screen scale rather than millimetre thickness.
+  const tailLimit = Math.max(12 * unitsPerPixel, snapPixels * unitsPerPixel * 2);
+  for (const [index, edge] of segments.entries()) {
+    const length = distance(edge.start, edge.end);
+    if (length >= tailLimit || length < 2 * unitsPerPixel) continue;
+    const a = nodes.get(keyOf(edge.start))?.degree ?? 0;
+    const b = nodes.get(keyOf(edge.end))?.degree ?? 0;
+    const loose = a === 1 && b >= 3 ? edge.start : b === 1 && a >= 3 ? edge.end : null;
+    if (!loose) continue;
+    issues.push({ id: `tail-${index}`, kind: "dangling-extension",
+      point: loose, detail: "Short dangling wall past a junction. Check whether Trim is appropriate." });
+  }
   return { segments, issues };
 }
 
