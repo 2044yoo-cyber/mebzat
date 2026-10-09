@@ -74,16 +74,24 @@ export const PLAN_TOOLS: { id: HouseCommandId; label: string; icon: React.Compon
   { id: "split", label: "Split", icon: SplitSquareHorizontal },
 ];
 
-export function PlanToolbar({ activeTool, onTool }: { activeTool: HouseCommandId | null; onTool: (id: HouseCommandId) => void }) {
+export function PlanToolbar({ activeTool, onTool, onUndo, canUndo }: { activeTool: HouseCommandId | null; onTool: (id: HouseCommandId) => void; onUndo: () => void; canUndo: boolean }) {
   return (
     <nav aria-label="Modeling tools" className="flex min-w-0 gap-1 overflow-x-auto rounded-xl border bg-card p-1">
       {PLAN_TOOLS.map(({ id, label, icon: Icon }) => {
         const on = (activeTool ?? "select") === id;
         return (
-          <button key={id} type="button" aria-label={label} aria-pressed={on} onClick={() => onTool(id)} className={cn("flex min-h-12 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 text-[10px] text-muted-foreground active:bg-brand/20", on && "bg-brand/15 text-brand")}>
-            <Icon className="size-[18px]" />
-            <span className="leading-none">{label}</span>
-          </button>
+          <div key={id} className="contents">
+            <button type="button" aria-label={label} aria-pressed={on} onClick={() => onTool(id)} className={cn("flex min-h-12 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 text-[10px] text-muted-foreground active:bg-brand/20", on && "bg-brand/15 text-brand")}>
+              <Icon className="size-[18px]" />
+              <span className="leading-none">{label}</span>
+            </button>
+            {id === "select" ? (
+              <button type="button" aria-label="Undo" title="Undo last change" onClick={onUndo} disabled={!canUndo} className="flex min-h-12 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 text-[10px] text-muted-foreground hover:bg-muted active:bg-brand/20 disabled:opacity-30">
+                <Undo2 className="size-[18px]" />
+                <span className="leading-none">Undo</span>
+              </button>
+            ) : null}
+          </div>
         );
       })}
     </nav>
@@ -147,10 +155,8 @@ export function SaveIndicator({ status, onRetry }: { status: SaveStatus; onRetry
   );
 }
 
-export function EditorHeader({ onBack, onUndo, canUndo, levels, activeLevelId, onLevel, onAddFloor, status, onRetry, menu }: {
+export function EditorHeader({ onBack, levels, activeLevelId, onLevel, onAddFloor, status, onRetry, menu }: {
   onBack: () => void;
-  onUndo?: () => void;
-  canUndo?: boolean;
   levels: { id: string; name: string }[];
   activeLevelId: string;
   onLevel: (id: string) => void;
@@ -165,7 +171,6 @@ export function EditorHeader({ onBack, onUndo, canUndo, levels, activeLevelId, o
   return (
     <div className="relative z-30 flex min-w-0 items-center gap-1 rounded-xl border bg-card p-1">
       <button type="button" onClick={onBack} aria-label="Back" className="flex size-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"><ArrowLeft className="size-4" /></button>
-      {onUndo ? <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className="flex size-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30"><Undo2 className="size-4" /></button> : null}
       <div className="relative min-w-0">
         <button type="button" onClick={() => setFloorOpen((value) => !value)} aria-expanded={floorOpen} aria-label={`Floor: ${activeLevel?.name ?? "none"}`} className="flex min-h-10 min-w-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold hover:bg-muted">
           <span className="truncate">{activeLevel?.name ?? "Floor"}</span>
