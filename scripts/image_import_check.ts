@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { detectOrthogonalWalls, IMAGE_IMPORT_KEY } from "../src/features/house-designer/services/image-line-detection";
+import { detectOrthogonalWalls, imageBackgroundPolarity, IMAGE_IMPORT_KEY, MAX_RASTER_WALL_CANDIDATES } from "../src/features/house-designer/services/image-line-detection";
 
 // Synthetic clean CAD-style horizontal and vertical wall lines on a white
 // opaque background. The detector has no network or AI dependency.
@@ -24,7 +24,34 @@ ink(drawing, 150, 80, 156, 245);
 const lines = detectOrthogonalWalls(drawing, 40);
 assert.ok(lines.some(line => line.orientation === "h" && line.x2 - line.x1 > 220 && line.support >= 2), "detect horizontal wall");
 assert.ok(lines.some(line => line.orientation === "v" && line.y2 - line.y1 > 140 && line.support >= 2), "detect vertical wall");
-assert.ok(lines.length <= 80, "the hand-off never exceeds its plan size limit");
+assert.ok(lines.length <= MAX_RASTER_WALL_CANDIDATES, "the hand-off never exceeds its plan size limit");
+// Screenshot of a dark AutoCAD canvas: nearly the entire bitmap is black,
+// white neutral strokes are WALL candidates, orange annotation is NOT one.
+const blackCad = image(420, 360);
+for (let i = 0; i < blackCad.data.length; i += 4)
+  blackCad.data[i] = blackCad.data[i + 1] = blackCad.data[i + 2] = 0;
+for (let y = 45; y <= 52; y++)
+  for (let x = 40; x <= 360; x++) {
+    const p = (y * blackCad.width + x) * 4;
+    blackCad.data[p] = blackCad.data[p + 1] = blackCad.data[p + 2] = 230;
+  }
+for (let x = 70; x <= 77; x++)
+  for (let y = 90; y <= 310; y++) {
+    const p = (y * blackCad.width + x) * 4;
+    blackCad.data[p] = blackCad.data[p + 1] = blackCad.data[p + 2] = 170;
+  }
+// Long orange dimension text line: exclude this CAD annotation color.
+for (let y = 150; y <= 157; y++)
+  for (let x = 120; x <= 410; x++) {
+    const p = (y * blackCad.width + x) * 4;
+    blackCad.data[p] = 240; blackCad.data[p + 1] = 113; blackCad.data[p + 2] = 24;
+  }
+assert.equal(imageBackgroundPolarity(blackCad), "dark", "detect CAD background automatically");
+const darkLines = detectOrthogonalWalls(blackCad, 40);
+assert.ok(darkLines.some(line => line.orientation === "h" && line.y1 >= 40 && line.y1 < 60), "find neutral horizontal CAD wall");
+assert.ok(darkLines.some(line => line.orientation === "v" && line.x1 >= 65 && line.x1 <= 82), "find neutral vertical CAD wall");
+assert.ok(!darkLines.some(line => line.orientation === "h" && line.y1 >= 140 && line.y1 <= 170), "exclude orange dimensions");
+assert.ok(darkLines.length <= MAX_RASTER_WALL_CANDIDATES, "larger plans are limited by a reviewed candidate cap");
 assert.throws(() => detectOrthogonalWalls(image(60, 60)), /80/, "avoid tiny images");
 assert.equal(IMAGE_IMPORT_KEY, "medosha:house-image-detection:v1");
 
@@ -33,6 +60,10 @@ assert.equal(IMAGE_IMPORT_KEY, "medosha:house-image-detection:v1");
 // geometry to the House Designer or a paid AI provider.
 const importer = readFileSync("src/features/house-designer/components/image-to-3d-importer.tsx", "utf8");
 assert.match(importer, /pdfPageCount\(/, "PDF page selection");
+assert.match(importer, /mode === "crop"/, "mobile crop removes toolbars before scan");
+assert.match(importer, /Black CAD background/, "can force dark CAD scanning");
+assert.match(importer, /detectOrthogonalWalls\(ctx\.getImageData\(0, 0, width, height\), minLength, polarity\)/, "initial scan uses selected polarity");
+
 assert.match(importer, /renderPdfPage\(/, "local PDF rasterization");
 assert.match(importer, /onPointerMove=\{pointerMove\}/, "touch endpoint drag");
 assert.match(importer, /function removeSelected\(/, "remove false detections");
