@@ -298,7 +298,10 @@ export function ImageTo3DImporter() {
         setError("Choose an endpoint at least 12 pixels away.");
         return;
       }
-      if (lines.length >= 80) { setError("This import supports up to 80 walls. Delete unwanted detections first."); return; }
+      if (lines.length >= MAX_REVIEWED_WALLS || (sourceKind === "cad" && cadTotal > MAX_REVIEWED_WALLS)) {
+        setError(`The limit is ${MAX_REVIEWED_WALLS} wall segments. Remove unwanted lines or choose fewer CAD layers.`);
+        return;
+      }
       const dx = p.x - newStart.x, dy = p.y - newStart.y;
       const orientation: CandidateLine["orientation"] = Math.abs(dx) < Math.abs(dy) * 0.08 ? "v" : Math.abs(dy) < Math.abs(dx) * 0.08 ? "h" : "diagonal";
       checkpoint();
@@ -366,14 +369,40 @@ export function ImageTo3DImporter() {
         <h2 className="text-lg font-semibold">Detect walls without AI</h2>
       </div>
       <p className="text-sm text-muted-foreground">
-        Upload a CAD screenshot, PNG, JPG, WebP or a PDF floor plan. Medosha detects straight-wall candidates on your phone without AI.
-        Correct the lines and verify one real measurement before turning them into editable 3D walls.
+        Upload a DXF CAD drawing, a floor-plan PDF or a screenshot. DXF uses real vector lines and layer filtering;
+        images and PDFs use on-device straight-line detection. No AI service is called.
+        Review the wall lines and confirm drawing scale before building the editable 3D plan.
       </p>
       <label className="flex min-h-16 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 text-sm font-semibold hover:bg-muted/30">
         <ImageUp className="size-5" />
         {busy ? "Reading drawing…" : fileName ? `Change plan · ${fileName}` : "Upload DXF, PDF, PNG, JPG or WebP floor plan"}
         <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf,.dxf,application/dxf" onChange={event => void loadFile(event)} className="sr-only" />
       </label>
+      {sourceKind === "cad" && dxfDrawing.current ? <div className="space-y-3 rounded-xl border p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-semibold"><FileText className="size-4 text-brand" /> CAD wall layers</div>
+          <span className="text-xs text-muted-foreground">{cadTotal} lines selected</span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Only selected layers become editable walls. Turn off dimensions, furniture, hatches and other non-wall layers before continuing.
+          Changing layers resets your wall edits.
+        </p>
+        <div className="grid max-h-60 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+          {cadLayers.map(layer => <label key={layer.name}
+            className="flex min-h-11 items-center gap-2 rounded-lg border bg-muted/20 px-2 text-xs">
+            <input type="checkbox" checked={selectedLayers.includes(layer.name)}
+              onChange={event => changeDxfLayer(layer.name, event.target.checked)} className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate" title={layer.name}>{layer.name}</span>
+            <span className="shrink-0 text-muted-foreground">{layer.count}</span>
+          </label>)}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          ${cadTotal > MAX_REVIEWED_WALLS
+            ? `Too many segments for one editable import (limit ${MAX_REVIEWED_WALLS}). Deselect non-wall or unnecessary CAD layers.`
+            : `${Math.max(0, MAX_REVIEWED_WALLS - cadTotal)} more segments allowed in this import.`}
+          {dxfDrawing.current.skipped > 0 ? ` ${dxfDrawing.current.skipped} unsupported or curved CAD entities/segments were skipped.` : ""}
+        </p>
+      </div> : null}
       {pdfPages > 1 && pdfUrl.current ? <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3 text-sm">
         <FileText className="size-5 shrink-0 text-brand" />
         <label className="flex flex-1 items-center gap-2">PDF page
@@ -387,7 +416,7 @@ export function ImageTo3DImporter() {
         <>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-semibold">{lines.length} wall segments · {mode === "calibrate" ? "Scale" : mode === "review" ? "Review" : "Add wall"}</span>
+              <span className="text-xs font-semibold">{sourceKind === "cad" ? cadTotal : lines.length} wall candidates · {mode === "calibrate" ? "Scale" : mode === "review" ? "Review" : "Add wall"}</span>
               <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showLines} onChange={e => setShowLines(e.target.checked)} /> Show detected lines</label>
             </div>
             <div className="flex flex-wrap gap-2" role="group" aria-label="Import editing tool">
@@ -424,30 +453,45 @@ export function ImageTo3DImporter() {
             <input type="range" min="25" max="150" step="5" value={minLength}
               onChange={e => setMinLength(Number(e.target.value))}
               className="w-full" />
-            <button type="button" onClick={() => detect(minLength)} className="min-h-10 rounded-lg border px-3 text-xs font-medium"><RotateCcw className="mr-1 inline size-3.5" />Re-scan image (replaces line edits)</button>
+            {sourceKind === "raster" ? <button type="button" onClick={() => detect(minLength)} className="min-h-10 rounded-lg border px-3 text-xs font-medium"><RotateCcw className="mr-1 inline size-3.5" />Re-scan image (replaces line edits)</button> : null}
           </div>
           <div className="space-y-3 rounded-xl border p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="flex items-center gap-2 text-sm font-semibold"><Ruler className="size-4" /> Calibrate real scale</h3>
-              <button type="button" onClick={() => { setMode("calibrate"); setScalePoints([]); }} className="flex items-center gap-1 text-xs text-brand"><RotateCcw className="size-3" /> Pick again</button>
-            </div>
-            <p className="text-xs text-muted-foreground">Tap the two ends of one known length in the image (for example, a printed 3.00 m wall dimension).</p>
-            <label className="flex items-center gap-2 text-sm">
-              Real length
-              <input type="number" min="0.2" max="100" step="0.01" value={knownMetres}
-                onChange={e => setKnownMetres(e.target.value)} className="min-h-11 w-28 rounded-lg border bg-background px-3 text-right" />
-              metres
-            </label>
-            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              {calibrated ? <><Check className="size-4 text-emerald-600" /> Calibrated: {pixelLength.toFixed(0)} px = {metres.toFixed(2)} m</> : `${scalePoints.length}/2 points selected — select two points to continue`}
-            </p>
+            <h3 className="flex items-center gap-2 text-sm font-semibold"><Ruler className="size-4" /> Drawing scale</h3>
+            {sourceKind === "cad" && cadMmPerPixel !== null ? <>
+              <label className="flex min-h-11 items-center gap-2 rounded-lg border bg-muted/20 p-3 text-xs">
+                <input type="checkbox" checked={useCadUnits}
+                  onChange={event => { setUseCadUnits(event.target.checked); setReviewed(false); }}
+                  className="size-4" />
+                <span className="flex-1">Use the units saved in the DXF file
+                  <span className="block text-muted-foreground">{(cadMmPerPixel * 1000).toFixed(2)} mm per 1,000 preview pixels</span>
+                </span>
+              </label>
+              {useCadUnits ? <p className="flex items-center gap-1 text-xs text-emerald-600"><Check className="size-4" /> Read scale from CAD units. Check that the drawing was exported at real scale (1:1).</p> : null}
+            </> : null}
+            {automaticCadScale === null ? <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">Tap both ends of one known printed dimension to calibrate.</p>
+                <button type="button" onClick={() => { setMode("calibrate"); setScalePoints([]); setReviewed(false); }} className="min-h-9 text-xs text-brand"><RotateCcw className="mr-1 inline size-3" />Pick again</button>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                Real length
+                <input type="number" min="0.2" max="100" step="0.01" value={knownMetres}
+                  onChange={e => { setKnownMetres(e.target.value); setReviewed(false); }}
+                  className="min-h-11 w-28 rounded-lg border bg-background px-3 text-right" />
+                metres
+              </label>
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                {manualCalibrated ? <><Check className="size-4 text-emerald-600" /> {pixelLength.toFixed(0)} px = {metres.toFixed(2)} m</>
+                  : `${scalePoints.length}/2 calibration points selected`}
+              </p>
+            </> : null}
           </div>
           <label className="flex items-start gap-3 rounded-xl border bg-muted/30 p-3 text-xs">
             <input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} className="mt-0.5 size-4" />
             <span><strong>I've reviewed these walls.</strong> Missing or wrongly detected segments will need correction in House Design. I will verify all dimensions, rooms, doors and windows before relying on 3D measurements or BOQ.</span>
           </label>
           {error ? <p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{error}</p> : null}
-          <button type="button" disabled={!calibrated || !lines.length || !reviewed || busy} onClick={openPlan}
+          <button type="button" disabled={!calibrated || !lines.length || !reviewed || busy || (sourceKind === "cad" && cadTotal > MAX_REVIEWED_WALLS)} onClick={openPlan}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-brand-foreground disabled:opacity-40">
             Continue to editable Floor Plan & 3D <ArrowRight className="size-4" />
           </button>
