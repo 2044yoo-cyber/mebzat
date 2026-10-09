@@ -510,6 +510,15 @@ export function FreehandCanvas({
               return;
             }
             try {
+              const edges = convertStrokes(sketch.strokes, 1, snap ? 12 : 0, 1 / view.current.zoom);
+              const degree = new Map<string, number>();
+              for (const edge of edges)
+                for (const point of [edge.start, edge.end]) {
+                  const key = `${point.x.toFixed(3)},${point.y.toFixed(3)}`;
+                  degree.set(key, (degree.get(key) ?? 0) + 1);
+                }
+              const gaps = [...degree.values()].filter(value => value === 1).length;
+              if (gaps > 0 && !window.confirm(`${gaps} open wall endpoints remain. They may prevent rooms from closing. Convert anyway? Select Cancel to finish connecting walls first.`)) return;
               onConvert(sketch, snap ? 12 : 0, 1 / view.current.zoom);
             } catch (error) {
               setMessage(
