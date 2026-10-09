@@ -321,7 +321,10 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
         return { x: start.x, y: start.y };
       if (linkedEnd && Math.hypot(point.x - interior.end.x, point.y - interior.end.y) <= 1)
         return { x: end.x, y: end.y };
-      return point;
+      // Linking BOTH ends explicitly chooses connected-wall editing. A real
+      // T junction on the moved wall's centreline may then follow as well.
+      // With either end independently released, no midpoint attachment moves.
+      return linkedStart && linkedEnd ? attachedTo(interior.start, interior.end, start, end, 1)(point) : point;
     };
     const outside = new Set(plan.corners.map((corner) => `${corner.x},${corner.y}`));
     const keepOutside = (point: { x: number; y: number }) => outside.has(`${point.x},${point.y}`) ? point : follow(point);
@@ -363,7 +366,9 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
       return { x: corners[startIndex]!.x, y: corners[startIndex]!.y };
     if (linkedEnd && Math.hypot(point.x - oldEnd.x, point.y - oldEnd.y) <= 1)
       return { x: corners[endIndex]!.x, y: corners[endIndex]!.y };
-    return point;
+    return linkedStart && linkedEnd
+      ? attachedTo(oldStart, oldEnd, corners[startIndex]!, corners[endIndex]!, 1)(point)
+      : point;
   };
   const changedPlan: Room = withDerivedZones(plan, {
     ...plan,
