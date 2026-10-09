@@ -138,9 +138,11 @@ export default async function CutListPage({
                 </tr>)}</tbody>
               </table></div>
               <p className="text-xs text-muted-foreground">
-                Sheet counts sum the separately nested designs conservatively;
-                shared offcuts are not assumed. The Excel file also includes hardware
-                schedules and per-design summaries.
+                Matching material sheets are shared across designs when nesting reduces
+                the sheet count. Total saved versus separate plans:{" "}
+                {combined.sheets.reduce((sum, board) => sum + board.separateSheets - board.sheets, 0)} sheets.
+                The Excel file includes exact cutting positions, hardware schedules,
+                and per-design summaries. Other materials remain separate.
               </p>
             </section>
           </>
