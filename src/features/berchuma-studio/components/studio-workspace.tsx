@@ -574,10 +574,14 @@ export function StudioWorkspace({
                     <h2 className="mb-2 text-sm font-medium">Recently created projects</h2>
                     <div className="grid grid-cols-2 gap-2">
                       {recentProjects.slice(0, 4).map((project) => (
-                        <Link
+                        // Resume a saved editor with a real navigation on mobile.
+                        // Client-side query-only transitions can preserve the
+                        // current useDesign controller and leave Start visible.
+                        <a
                           key={project.id}
                           href={`/studio?design=${encodeURIComponent(project.slug)}`}
-                          className="min-w-0 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50"
+                          aria-label={`Continue design: ${project.title}`}
+                          className="block min-w-0 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         >
                           <p className="truncate text-sm font-medium">{project.title}</p>
                           <p className="mt-1 text-xs capitalize text-muted-foreground">
@@ -589,7 +593,7 @@ export function StudioWorkspace({
                             </p>
                           ) : null}
                           <p className="mt-2 text-xs font-medium text-primary">Continue design →</p>
-                        </Link>
+                        </a>
                       ))}
                     </div>
                   </section>
