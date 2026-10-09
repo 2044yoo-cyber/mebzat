@@ -1,4 +1,5 @@
 import { buildExport } from "@/features/berchuma-studio/services/exports";
+import { buildProjectCutList } from "@/features/berchuma-studio/services/cabinet-project";
 import { getDesign } from "@/features/berchuma-studio/services/designs";
 import { marketRates } from "@/features/berchuma-studio/services/rates";
 
@@ -32,6 +33,26 @@ export async function GET(
 
   if (!design) {
     return new Response("Not found", { status: 404 });
+  }
+
+  // A manufacturing project with mixed cabinets needs a workbook covering
+  // every independent design. Never silently export only the primary one.
+  if (design.spec.projectItems?.length) {
+    try {
+      const collection = buildProjectCutList(design.spec);
+      return new Response(collection.workbook as BodyInit, {
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": 'attachment; filename="medosha-combined-cabinet-cut-list.xlsx"',
+          "content-length": String(collection.workbook.length),
+          "cache-control": "no-store",
+        },
+      });
+    } catch (error) {
+      return new Response(error instanceof Error ? error.message : "This project cannot be exported.", {
+        status: 422, headers: { "content-type": "text/plain; charset=utf-8" },
+      });
+    }
   }
 
   const rates = await marketRates();
