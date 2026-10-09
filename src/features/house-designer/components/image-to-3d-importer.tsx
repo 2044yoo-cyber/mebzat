@@ -238,7 +238,7 @@ export function ImageTo3DImporter() {
       }
       if (lines.length >= 80) { setError("This import supports up to 80 walls. Delete unwanted detections first."); return; }
       const dx = p.x - newStart.x, dy = p.y - newStart.y;
-      const orientation: CandidateLine["orientation"] = Math.abs(dx) < Math.abs(dy) * 0.08 ? "v" : "h";
+      const orientation: CandidateLine["orientation"] = Math.abs(dx) < Math.abs(dy) * 0.08 ? "v" : Math.abs(dy) < Math.abs(dx) * 0.08 ? "h" : "diagonal";
       checkpoint();
       setLines(current => [...current, { x1: newStart.x, y1: newStart.y, x2: p.x, y2: p.y, orientation, support: 1 }]);
       setSelected(lines.length);
