@@ -565,8 +565,6 @@ export function FreehandCanvas({
               if (Math.hypot(to.x - from.x, to.y - from.y) > 5 / view.current.zoom) {
                 const target = sketch.strokes.find(stroke => stroke.id === selectedPoint.strokeId);
                 if (target) {
-                  const anchor = selectedPoint.end === "start" ? target.points[0]! : target.points[target.points.length - 1]!;
-                  const dx = to.x - anchor.x, dy = to.y - anchor.y;
                   const next = sketch.strokes.map(stroke => {
                     if (stroke.id !== target.id) return stroke;
                     const pts = stroke.points.map(p => ({...p}));
