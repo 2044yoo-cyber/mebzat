@@ -135,11 +135,14 @@ export function lockConflict(project: HouseProject, selection: HouseSelection): 
   if (selection.kind !== "wall") return null;
   const wall = project.walls.find((item) => item.id === selection.id);
   if (!wall) return null;
-  // Any wall with an end on this one changes with it: the neighbours that
-  // share its corners, and walls meeting it in a T.
+  // Without an explicit connection the neighbouring walls are not edited,
+  // so even a pinned neighbour cannot block an independent wall move.
+  if (project.objectInstances[wall.id]?.properties.linkedJoints !== true) return null;
+  // A linked joint is a real centreline junction, NOT a wall merely within
+  // half the thickness of this wall (which could be an unrelated wall).
   const attached = project.walls.filter((item) => item.levelId === wall.levelId && item.id !== wall.id
-    && [item.start, item.end].some((point) => pointSegmentDistance(point, wall.start, wall.end) <= wall.thickness / 2 + 5));
-  return attached.some((item) => project.objectInstances[item.id]?.pinned) ? "A locked wall joined to it would have to change — unlock it first" : null;
+    && [item.start, item.end].some((point) => pointSegmentDistance(point, wall.start, wall.end) <= 1));
+  return attached.some((item) => project.objectInstances[item.id]?.pinned) ? "A locked wall meets this linked wall — unlock it or release the wall connection first" : null;
 }
 
 export function moveHouseSelections(project: HouseProject, selections: readonly HouseSelection[], dx: number, dy: number, options?: { footprintEditable?: boolean }): HouseCommandMutation {
@@ -152,6 +155,11 @@ export function moveHouseSelections(project: HouseProject, selections: readonly 
       const wall = next.walls.find((item) => item.id === selection.id);
       const level = wall ? next.levels.find((item) => item.id === wall.levelId) : null;
       if (!wall) continue;
+      const footprint = !!(wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId));
+      if (footprint && next.objectInstances[wall.id]?.properties.linkedJoints !== true) {
+        blocked.push("This is a footprint wall: use the Link joints button to allow moving its connected corners");
+        continue;
+      }
       if (!options?.footprintEditable && next.originalPlanStrict && wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId)) {
         blocked.push("Original Floor Plan Strict protects exterior walls");
         continue;
