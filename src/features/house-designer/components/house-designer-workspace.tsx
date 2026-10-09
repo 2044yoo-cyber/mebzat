@@ -131,6 +131,7 @@ import { createHouseTakeoffPackage, HOUSE_TAKEOFF_SESSION_KEY } from "../service
 import { FreehandCanvas } from "./freehand-canvas";
 import { applyFreehand, dimensionRectangle, dimensionConflicts, calibrateFromWall, rememberWallLength } from "../services/freehand";
 import { IMAGE_IMPORT_KEY } from "../services/image-line-detection";
+import { MAX_REVIEWED_WALLS } from "../services/dxf-wall-import";
 
 type Stage = "start" | "editor" | "loading";
 type Source = "freehand" | "manual" | "rooms" | "upload" | "sketch" | "template" | "describe";
@@ -236,10 +237,10 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
       };
       if (payload.version !== 1 || !payload.createdAt || Date.now() - payload.createdAt > 10 * 60_000 ||
           !Number.isFinite(payload.mmPerUnit) || (payload.mmPerUnit ?? 0) <= 0 ||
-          !Array.isArray(payload.lines) || !payload.lines.length || payload.lines.length > 80 ||
+          !Array.isArray(payload.lines) || !payload.lines.length || payload.lines.length > MAX_REVIEWED_WALLS ||
           payload.lines.some(line => !line || !line.start || !line.end ||
             ![line.start.x, line.start.y, line.end.x, line.end.y].every(Number.isFinite))) {
-        throw new Error("The image conversion expired or contains invalid wall data. Please detect the image again.");
+        throw new Error("The plan import expired or its wall geometry is invalid. Return to Upload Floor Plan and review it again.");
       }
       const sketch: NonNullable<HouseProject["freehandSketch"]> = {
         version: 1,
@@ -271,11 +272,11 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
       setStatus("device");
       setTab("plan");
       setStartTool("select");
-      setPlanAnalysis("Candidate walls imported from image without AI. Verify all positions, close rooms, add openings and correct dimensions before using 3D or estimating floor and painting areas.");
+      setPlanAnalysis("Editable walls imported without AI from the reviewed image, PDF or DXF. Verify wall locations, closed rooms, door/window openings and dimensions before using 3D or quantity estimates.");
       setStage("editor");
-      toast.success("Detected wall candidates imported. Check the geometry before estimating.");
+      toast.success("Floor-plan wall geometry imported. Review and save the plan.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Image import failed.");
+      toast.error(error instanceof Error ? error.message : "Floor-plan import failed.");
     } finally {
       window.history.replaceState(null, "", "/house-design");
     }
