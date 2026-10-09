@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, ImageUp, RotateCcw, Ruler, ScanLine } from "lucide-react";
+import { ArrowRight, Check, FileText, ImageUp, PenLine, RotateCcw, Ruler, ScanLine, Trash2, Undo2 } from "lucide-react";
 import { detectOrthogonalWalls, IMAGE_IMPORT_KEY, type CandidateLine } from "../services/image-line-detection";
+import { loadImage, pdfPageCount, renderPdfPage } from "../services/source-render";
 
 type Point = { x: number; y: number };
 const MAX_BYTES = 12 * 1024 * 1024;
