@@ -20,6 +20,7 @@ import {
   cleanFreehandStrokes,
   inspectFreehand,
   suggestFreehandRepairs,
+  suggestFreehandTrims,
   foot,
   strokeSegments,
   type Point,
@@ -563,6 +564,7 @@ export function FreehandCanvas({
           const short = result.issues.filter(issue => issue.kind === "short-wall");
           const tails = result.issues.filter(issue => issue.kind === "dangling-extension");
           const repairs = suggestFreehandRepairs(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom).filter(p => !rejectedRepairs.includes(p.id));
+          const trims = suggestFreehandTrims(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom).filter(p => !rejectedRepairs.includes(p.id));
           return <div className="max-h-[30dvh] space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
             <strong className="block text-sm">Review Plan · {result.segments.length} walls</strong>
             <p>{open.length} open endpoints · {short.length} short pieces · {tails.length} possible wall tails</p>
@@ -576,6 +578,30 @@ export function FreehandCanvas({
               setReview(true);
               setMessage(`Removed ${cleaned.removed} duplicate/empty strokes. Undo stroke reverses this cleanup.`);
             }}>Auto Fix Safe Issues (exact duplicate / empty strokes)</button>
+            {trims.length ? <div className="space-y-2 rounded-lg border border-yellow-300 bg-yellow-50 p-2">
+              <strong className="block text-yellow-900">{trims.length} independent short wall tails</strong>
+              {trims.map(trim => <div key={trim.id} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-white p-2">
+                <span>{trim.label}</span>
+                <div className="flex gap-2">
+                  <button type="button" className="rounded border px-2 py-2" onClick={() => {
+                    const r = canvas.current?.getBoundingClientRect();
+                    if (r) {
+                      view.current.x = r.width / 2 - trim.point.x * view.current.zoom;
+                      view.current.y = r.height / 2 - trim.point.y * view.current.zoom;
+                    }
+                    setFocusedIssue(trim.id);
+                    schedule();
+                  }}>Locate</button>
+                  <button type="button" className="rounded border border-yellow-500 px-2 py-2" onClick={() => {
+                    if (!window.confirm("Remove this entire short sketch stroke? You can undo this change.")) return;
+                    commit({ ...sketch, strokes: sketch.strokes.filter(stroke => stroke.id !== trim.strokeId) });
+                    setReview(true);
+                    setMessage("Short wall tail removed. Undo stroke restores it.");
+                  }}>Trim</button>
+                  <button type="button" className="rounded border px-2 py-2" onClick={() => setRejectedRepairs(list => [...list, trim.id])}>Keep</button>
+                </div>
+              </div>)}
+            </div> : null}
             {repairs.length ? <div className="space-y-2 rounded-lg border border-green-200 bg-green-50 p-2">
               <strong className="block text-green-900">{repairs.length} suggested endpoint connections</strong>
               {repairs.slice(0, 15).map(proposal => <div key={proposal.id} className="rounded border bg-white p-2">
