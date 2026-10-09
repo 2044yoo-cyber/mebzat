@@ -15,6 +15,7 @@ import {
   applyFreehand,
   convertStrokes,
   inspectFreehand,
+  suggestFreehandRepairs,
   strokeSegments,
   type Stroke,
 } from "../src/features/house-designer/services/freehand";
@@ -174,6 +175,17 @@ const fingerRectangle = stroke([
 ], "finger-rectangle");
 assert.equal(strokeSegments(fingerRectangle).length, 4,
   "one shaky continuous rectangle retains four architectural sides");
+const proposedBridge = suggestFreehandRepairs([
+  stroke([[0, 0], [100, 0]], "bridge-a"),
+  stroke([[120, 0], [220, 0]], "bridge-b"),
+]);
+assert.ok(proposedBridge.some(item => Math.abs(item.length - 20) < 1),
+  "nearby disconnected wall ends receive an explicit repair proposal");
+const noBridge = suggestFreehandRepairs([
+  stroke([[0, 0], [100, 0]], "far-a"),
+  stroke([[240, 0], [340, 0]], "far-b"),
+]);
+assert.equal(noBridge.length, 0, "far apart strokes are not joined by a repair suggestion");
 const diagonal = convertStrokes(
   [
     stroke([
