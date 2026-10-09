@@ -1,6 +1,7 @@
 import { pointInPolygon } from "./measurements";
 import { createHouseObjectFromGesture, moveHouseSelections, type HouseCommandMutation } from "./model-commands";
-import { patchHouseObject, splitRoomAlong, type HousePatch } from "./project-edit";
+import { patchHouseObject, splitRoomAlong, wallJointLinked, wallJointsLinked, toggleWallJoints, type HousePatch } from "./project-edit";
+export { wallJointLinked, wallJointsLinked, toggleWallJoints } from "./project-edit";
 import type { HouseProject, HouseSelection } from "../types/project";
 
 /**
@@ -16,26 +17,6 @@ type Wall = HouseProject["walls"][number];
 export type WallEnd = "start" | "end";
 
 const TOLERANCE = 1;
-
-/** Connection mode persists with the wall. Off (independent) is the safe default. */
-export function wallJointsLinked(project: HouseProject, wallId: string): boolean {
-  return project.objectInstances[wallId]?.properties.linkedJoints === true;
-}
-
-export function toggleWallJoints(project: HouseProject, wallId: string): HouseProject {
-  if (!project.walls.some((wall) => wall.id === wallId)) return project;
-  const previous = project.objectInstances[wallId];
-  return {
-    ...project,
-    objectInstances: {
-      ...project.objectInstances,
-      [wallId]: {
-        ...(previous ?? { typeId: null, mark: "", pinned: false, groupId: null, flipped: false, properties: {} }),
-        properties: { ...previous?.properties, linkedJoints: !wallJointsLinked(project, wallId) },
-      },
-    },
-  };
-}
 
 function plain(project: HouseProject, wall: Wall) {
   const plan = project.levels.find((level) => level.id === wall.levelId)?.plan;
@@ -68,7 +49,7 @@ export function extendWall(project: HouseProject, wallId: string, end: WallEnd, 
   const move = { x: direction.x * delta * sign, y: direction.y * delta * sign };
   const selection: HouseSelection = { kind: "wall", id: wall.id };
   const { outline } = plain(project, wall);
-  if (outline && !wallJointsLinked(project, wallId))
+  if (outline && !wallJointLinked(project, wallId, end))
     return blocked(project, "This exterior wall belongs to the closed footprint. Turn on Link joints before moving its corner.");
   // A connected OUTER wall is a side of a polygon, not a free line.
   // Lengthening it at a square corner translates its perpendicular next side
@@ -120,8 +101,8 @@ export function moveWallEnd(project: HouseProject, wallId: string, end: WallEnd,
   if (!wall) return blocked(project, "Wall not found");
   const selection: HouseSelection = { kind: "wall", id: wallId };
   if (project.objectInstances[wallId]?.pinned) return blocked(project, "This wall is locked — unlock it to change it");
-  const linked = wallJointsLinked(project, wallId);
-  if (plain(project, wall).outline && !linked)
+  const linked = wallJointLinked(project, wallId, end);
+  if (plain(project, wall).outline && !linked
     return blocked(project, "This exterior wall belongs to the closed footprint. Turn on Link joints before moving its corner.");
   const moving = wall[end];
   const fixed = wall[end === "start" ? "end" : "start"];
