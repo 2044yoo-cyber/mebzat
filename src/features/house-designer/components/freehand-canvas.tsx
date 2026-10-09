@@ -69,6 +69,9 @@ export function FreehandCanvas({
     last: Point;
     erase: Set<string>;
   } | null>(null);
+  const contacts = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ cx: number; cy: number; distance: number } | null>(null);
+  const suppressStroke = useRef(false);
   const view = useRef({ x: 0, y: 0, zoom: 1 });
   const frame = useRef(0),
     status = useRef<HTMLSpanElement>(null);
@@ -449,23 +452,52 @@ export function FreehandCanvas({
         className="min-h-0 w-full flex-1"
         style={{ touchAction: "none", overscrollBehavior: "none" }}
         onPointerDown={(e) => {
-          if (gesture.current || e.button !== 0) return;
+          if (e.pointerType === "mouse" && e.button !== 0) return;
           e.preventDefault();
           e.currentTarget.setPointerCapture(e.pointerId);
-          gesture.current = {
-            id: e.pointerId,
-            last: { x: e.clientX, y: e.clientY },
-            erase: new Set(),
-          };
-          const p = point(e);
-          if (tool === "draw") live.current = [p];
-          if (tool === "erase") erase(p);
+          contacts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (contacts.current.size >= 2) {
+            // As soon as a second finger arrives, cancel the pending stroke.
+            // Neither finger may generate an accidental wall on release.
+            suppressStroke.current = true;
+            live.current = [];
+            gesture.current?.erase.clear();
+            const [a, b] = [...contacts.current.values()];
+            pinch.current = { cx: (a!.x + b!.x) / 2, cy: (a!.y + b!.y) / 2,
+              distance: Math.hypot(a!.x - b!.x, a!.y - b!.y) };
+          } else if (!gesture.current) {
+            suppressStroke.current = false;
+            gesture.current = { id: e.pointerId, last: { x: e.clientX, y: e.clientY }, erase: new Set() };
+            if (tool === "draw") live.current = [point(e)];
+            if (tool === "erase") erase(point(e));
+          }
           schedule();
         }}
         onPointerMove={(e) => {
-          const g = gesture.current;
-          if (!g || g.id !== e.pointerId) return;
+          if (!contacts.current.has(e.pointerId)) return;
           e.preventDefault();
+          contacts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (contacts.current.size >= 2) {
+            const [a, b] = [...contacts.current.values()];
+            const cx = (a!.x + b!.x) / 2, cy = (a!.y + b!.y) / 2;
+            const dist = Math.hypot(a!.x - b!.x, a!.y - b!.y);
+            const previous = pinch.current;
+            if (previous && previous.distance > 0 && dist > 0) {
+              const rect = canvas.current!.getBoundingClientRect();
+              const v = view.current, oldZoom = v.zoom;
+              const nextZoom = Math.max(0.25, Math.min(4, oldZoom * dist / previous.distance));
+              const anchorX = (previous.cx - rect.left - v.x) / oldZoom;
+              const anchorY = (previous.cy - rect.top - v.y) / oldZoom;
+              v.zoom = nextZoom;
+              v.x = cx - rect.left - anchorX * nextZoom;
+              v.y = cy - rect.top - anchorY * nextZoom;
+            }
+            pinch.current = { cx, cy, distance: dist };
+            schedule();
+            return;
+          }
+          const g = gesture.current;
+          if (!g || g.id !== e.pointerId || suppressStroke.current) return;
           if (tool === "pan") {
             view.current.x += e.clientX - g.last.x;
             view.current.y += e.clientY - g.last.y;
@@ -474,14 +506,9 @@ export function FreehandCanvas({
           else {
             const events = e.nativeEvent.getCoalescedEvents?.() ?? [];
             for (const sample of events.length ? events : [e]) {
-              const p = point(sample),
-                last = live.current.at(-1);
-              if (
-                live.current.length < 10000 &&
-                (!last ||
-                  Math.hypot(p.x - last.x, p.y - last.y) >
-                    0.4 / view.current.zoom)
-              )
+              const p = point(sample), last = live.current.at(-1);
+              if (live.current.length < 10000 &&
+                (!last || Math.hypot(p.x - last.x, p.y - last.y) > 0.4 / view.current.zoom))
                 live.current.push(p);
             }
           }
@@ -489,37 +516,40 @@ export function FreehandCanvas({
         }}
         onPointerUp={(e) => {
           const g = gesture.current;
-          if (!g || g.id !== e.pointerId) return;
-          if (
-            tool === "draw" &&
-            live.current.length > 1 &&
-            sketch.strokes.length < 500
-          ) {
-            const stroke = {
-              id: crypto.randomUUID(),
-              points: [...live.current, point(e)],
-              thickness,
-            };
-            if (strokeSegments(stroke).length)
-              commit({ ...sketch, strokes: [...sketch.strokes, stroke] });
-          } else if (tool === "erase" && g.erase.size)
-            commit({
-              ...sketch,
-              strokes: sketch.strokes.filter((s) => !g.erase.has(s.id)),
-            });
-          live.current = [];
-          gesture.current = null;
-          e.currentTarget.releasePointerCapture(e.pointerId);
+          const canCommit = contacts.current.size === 1 && !suppressStroke.current;
+          contacts.current.delete(e.pointerId);
+          if (contacts.current.size < 2) pinch.current = null;
+          if (g && g.id === e.pointerId && canCommit) {
+            if (tool === "draw" && live.current.length > 1 && sketch.strokes.length < 500) {
+              const stroke = { id: crypto.randomUUID(), points: [...live.current, point(e)], thickness };
+              if (strokeSegments(stroke).length)
+                commit({ ...sketch, strokes: [...sketch.strokes, stroke] });
+            } else if (tool === "erase" && g.erase.size)
+              commit({ ...sketch, strokes: sketch.strokes.filter(s => !g.erase.has(s.id)) });
+          }
+          if (g?.id === e.pointerId || suppressStroke.current) {
+            live.current = [];
+            gesture.current = null;
+          }
+          if (!contacts.current.size) suppressStroke.current = false;
+          if (e.currentTarget.hasPointerCapture(e.pointerId))
+            e.currentTarget.releasePointerCapture(e.pointerId);
           schedule();
         }}
-        onPointerCancel={() => {
+        onPointerCancel={(e) => {
+          contacts.current.delete(e.pointerId);
+          if (contacts.current.size < 2) pinch.current = null;
           live.current = [];
           gesture.current = null;
+          if (!contacts.current.size) suppressStroke.current = false;
           schedule();
         }}
-        onLostPointerCapture={() => {
+        onLostPointerCapture={(e) => {
+          contacts.current.delete(e.pointerId);
+          if (contacts.current.size < 2) pinch.current = null;
           live.current = [];
           gesture.current = null;
+          if (!contacts.current.size) suppressStroke.current = false;
           schedule();
         }}
       />
