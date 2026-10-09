@@ -145,6 +145,22 @@ try {
   await page.getByLabel("Sketch text").fill("Verify height");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   assert.equal(await page.locator(`${SKETCH} text`, { hasText: "Verify height" }).count(), 1, "a note is written on it");
+  // The new text is selected immediately. Move it by touch and edit the
+  // original shape rather than creating a second note.
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByLabel("Sketch text").fill("Verify opening height");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  assert.equal(await shapes(page, "text"), 1, "editing a note does not duplicate it");
+  const textBefore = Number(await page.locator(`${SKETCH} [data-shape="text"] text`).getAttribute("x"));
+  await touchDrag(page, cdp, SKETCH, [2200, 5680], [2700, 5550]);
+  const textAfter = Number(await page.locator(`${SKETCH} [data-shape="text"] text`).getAttribute("x"));
+  assert.ok(textAfter > textBefore + 350, "selected text is draggable on mobile");
+  // An arrow can also be created by tapping twice, not only by dragging.
+  await tool(page, "Arrow");
+  await tap(page, SKETCH, 500, 6200);
+  await tap(page, SKETCH, 1600, 6400);
+  assert.equal(await shapes(page, "arrow"), 2, "two taps place a visible arrow");
+  assert.equal(await page.locator(`${SKETCH} [data-shape="arrow"] polygon`).count(), 2, "arrow heads render as real SVG polygons on Safari");
   await tool(page, "Measure");
   await touchDrag(page, cdp, SKETCH, [0, 600], [3620, 600]);
   assert.equal(await page.locator(`${SKETCH} [data-shape="measure"] text`).textContent(), "3620 mm", "on the plan, Measure reads millimetres at once");
@@ -368,6 +384,19 @@ try {
   await page.getByRole("checkbox", { name: "FURNITURE" }).uncheck();
   assert.doesNotMatch(await source(), /<circle/, "turning a layer off hides it");
   assert.match(await source(), /5000,0/, "and leaves the rest");
+
+  // Any selected annotation can start its own Agenda discussion. It reuses
+  // exactly the task-comment system already exercised above for plan pins.
+  await tool(page, "Select");
+  await tap(page, SKETCH, 2600, 0);
+  await page.getByRole("button", { name: "Discuss", exact: true }).click();
+  const discussion = page.getByRole("dialog", { name: "New pin" });
+  await discussion.getByLabel("Title").fill("Review CAD measurement");
+  await discussion.getByRole("button", { name: "Create discussion" }).click();
+  await page.waitForFunction(() => window.__fakeDb.read().agenda_tasks.some((item) => item.title === "Review CAD measurement"), null, { timeout: 10000 });
+  const discussed = await db(page);
+  const taskForAnnotation = discussed.agenda_tasks.find((item) => item.title === "Review CAD measurement");
+  assert.ok(discussed.agenda_pins.some((pin) => pin.task_id === taskForAnnotation.id), "a selected annotation creates a linked Agenda discussion");
 
   assert.deepEqual(errors, [], "page errors");
   await page.close();
