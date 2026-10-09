@@ -1382,7 +1382,7 @@ function PlanEditor({
   return (
     <HouseUnitsContext.Provider value={project.displayUnits ?? "mm"}>
       <section className="min-w-0 space-y-2">
-        <EditorHeader onBack={onBack} onUndo={tab === "plan" ? undo : undefined} canUndo={past.length > 0} levels={project.levels} activeLevelId={activeLevelId} onLevel={chooseLevel} onAddFloor={addFloor} status={status} onRetry={onRetry} menu={menu} />
+        <EditorHeader onBack={onBack} levels={project.levels} activeLevelId={activeLevelId} onLevel={chooseLevel} onAddFloor={addFloor} status={status} onRetry={onRetry} menu={menu} />
         <WorkspaceTabs tab={tab} onTab={onTab} />
         {project.freehandSketch ? <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
           <span>{project.freehandSketch.calibrated ? "Sketch scale set; verify remaining measurements." : "Approximate freehand dimensions and areas — calibrate before estimating costs."}</span>
@@ -1397,7 +1397,7 @@ function PlanEditor({
           <div className="grid min-w-0 gap-2 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="min-w-0 space-y-2">
               {analysis && showAnalysis ? <p className="flex items-start gap-2 rounded-xl border border-brand/25 bg-brand/5 p-2.5 text-xs">{analysis}<button type="button" onClick={() => setShowAnalysis(false)} aria-label="Dismiss" className="ml-auto shrink-0 text-muted-foreground">✕</button></p> : null}
-              <PlanToolbar activeTool={activeTool} onTool={chooseTool} />
+              <PlanToolbar activeTool={activeTool} onTool={chooseTool} onUndo={undo} canUndo={past.length > 0} />
               <div className="relative h-[75dvh] min-h-[520px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 sm:h-[78dvh] lg:h-[min(760px,75dvh)] dark:bg-background">
                 {activeLevel ? <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} showGrid={gridVisible} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} sketch={outlineSketch} onCancelDraft={() => { setDraftStart(null); setOutlineSketch([]); }} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => {
                   // Furniture dragged near furniture lands edge to edge with it.
