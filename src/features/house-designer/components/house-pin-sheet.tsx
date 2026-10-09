@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, CircleDot, ExternalLink, Loader2, Send, X } from "lucide-react";
+import { CheckCircle2, CircleDot, ExternalLink, Loader2, RefreshCw, Send, Share2, Users, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
-import { addComment, listComments, type Comment, type Pin } from "../services/sketch-store";
+import { addComment, listComments, pinHref, type Comment, type Pin } from "../services/sketch-store";
 
 /**
  * A pin, and the conversation about it.
@@ -16,10 +16,11 @@ import { addComment, listComments, type Comment, type Pin } from "../services/sk
  * opening the task in Agenda reads and writes. Nothing here is a second
  * messaging system.
  */
-export function HousePinSheet({ pin, userId, projectId, taskStatus, where, onClose, onChange, onAddToAgenda, onShow }: {
+export function HousePinSheet({ pin, userId, projectId, planId, taskStatus, where, onClose, onChange, onAddToAgenda, onShow }: {
   pin: Pin;
   userId: string;
   projectId: string;
+  planId: string;
   taskStatus?: string;
   /** "Ground Floor", "kitchen.jpg · page 2" — what the pin is on. */
   where: string;
@@ -40,6 +41,21 @@ export function HousePinSheet({ pin, userId, projectId, taskStatus, where, onClo
     void listComments(createClient(), userId, taskId).then((items) => { if (live) setComments(items); });
     return () => { live = false; };
   }, [taskId, userId]);
+
+  async function share() {
+    const url = new URL(pinHref(planId, pin), window.location.origin).toString();
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Discussion link copied. Only project members can view it.");
+    } catch {
+      window.prompt("Copy this member-only discussion link", url);
+    }
+  }
+
+  async function refreshComments() {
+    if (!taskId) return;
+    setComments(await listComments(createClient(), userId, taskId));
+  }
 
   async function send() {
     if (!taskId || !message.trim()) return;
@@ -68,6 +84,8 @@ export function HousePinSheet({ pin, userId, projectId, taskStatus, where, onClo
       </div>
       <div className="flex flex-wrap gap-1.5">
         {onShow ? <button type="button" onClick={onShow} className="min-h-10 rounded-lg border px-3 text-xs font-medium hover:bg-muted">Show on drawing</button> : null}
+        <button type="button" onClick={() => void share()} className="flex min-h-10 items-center gap-1 rounded-lg border border-brand/40 px-2 text-xs font-medium text-brand"><Share2 className="size-3.5" />Share link</button>
+        <a href={`/agenda/projects/${projectId}/directory`} className="flex min-h-10 items-center gap-1 rounded-lg border px-2 text-xs font-medium"><Users className="size-3.5" />Team</a>
         {taskId ? (
           <a href={`/agenda/projects/${projectId}/tasks`} className="flex min-h-10 items-center gap-1 rounded-lg border px-3 text-xs font-medium hover:bg-muted"><ExternalLink className="size-3.5" />On the Agenda{taskStatus ? ` · ${taskStatus.replace("_", " ")}` : ""}</a>
         ) : (
@@ -76,7 +94,10 @@ export function HousePinSheet({ pin, userId, projectId, taskStatus, where, onClo
       </div>
       {taskId ? (
         <div aria-label="Discussion" role="region" className="space-y-1.5 border-t pt-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Discussion</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Discussion · Project team</p>
+            <button type="button" onClick={() => void refreshComments()} aria-label="Refresh discussion" className="flex min-h-9 items-center gap-1 rounded-lg border px-2 text-[11px]"><RefreshCw className="size-3.5" />Refresh</button>
+          </div>
           {comments === null ? <p className="text-xs text-muted-foreground">Loading…</p> : comments.length === 0 ? <p className="text-xs text-muted-foreground">No messages yet.</p> : null}
           <ul className="max-h-48 space-y-1.5 overflow-y-auto">
             {comments?.map((comment) => (
