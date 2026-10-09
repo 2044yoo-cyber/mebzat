@@ -249,13 +249,13 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
           id: `image-wall-${index + 1}`,
           thickness: 200,
           points: [
-            { x: line.start.x * payload.mmPerUnit!, y: line.start.y * payload.mmPerUnit! },
-            { x: line.end.x * payload.mmPerUnit!, y: line.end.y * payload.mmPerUnit! },
+            { x: line.start.x, y: line.start.y },
+            { x: line.end.x, y: line.end.y },
           ],
         })),
       };
-      // applyFreehand converts the coordinates as-is. The detector's scale
-      // is applied exactly once above, never again by a paid AI service.
+      // Pixel-space snapping precedes one-time conversion into millimetres
+      // using the user's known measurement; no paid AI service is involved.
       const blank = openSpace(createHouseProject({
         title: "Imported floor plan",
         room: rectangularRoom(8000, 6500),
@@ -264,7 +264,7 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
         floorCount: 1,
         floorToFloorHeight: 3000,
       }));
-      const imported = ensureHouseBimState(applyFreehand(blank, { ...sketch, mmPerUnit: 1 }, 8));
+      const imported = ensureHouseBimState(applyFreehand(blank, sketch, 8));
       setProject({ ...imported, displayUnits: "m" });
       setSource("upload");
       setLink(null);
