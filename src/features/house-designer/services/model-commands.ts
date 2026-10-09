@@ -144,7 +144,8 @@ export function lockConflict(project: HouseProject, selection: HouseSelection): 
   const attached = project.walls.filter((item) => item.levelId === wall.levelId && item.id !== wall.id &&
     [item.start, item.end].some((point) =>
       (atStart && Math.hypot(point.x - wall.start.x, point.y - wall.start.y) <= 1) ||
-      (atEnd && Math.hypot(point.x - wall.end.x, point.y - wall.end.y) <= 1),
+      (atEnd && Math.hypot(point.x - wall.end.x, point.y - wall.end.y) <= 1) ||
+      (atStart && atEnd && pointSegmentDistance(point, wall.start, wall.end) <= 1),
     ));
   return attached.some((item) => project.objectInstances[item.id]?.pinned)
     ? "A locked wall shares a linked endpoint — release the joint or unlock that wall"
