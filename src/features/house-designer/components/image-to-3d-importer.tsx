@@ -128,7 +128,7 @@ export function ImageTo3DImporter() {
       setSelected(null);
       setReviewed(false);
       setNewStart(null);
-      setError(result.length ? "" : "No long, straight wall candidates found. Try a clean CAD screenshot or lower the minimum line length.");
+      setError(result.length >= MAX_REVIEWED_WALLS ? `Found at least ${MAX_REVIEWED_WALLS} candidate lines. Crop to the floor plan and rescan; annotations may be mistaken for walls.` : result.length ? "" : "No long, straight wall candidates found. Try Black CAD background mode or lower the minimum line length.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not inspect the image."); }
   }
 
@@ -157,7 +157,7 @@ export function ImageTo3DImporter() {
     const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity);
     setLines(detected);
     setSelected(null); setNewStart(null); setHistory([]); setReviewed(false);
-    setError(detected.length ? "" : "No straight walls detected. Use a clearer image, add the walls by hand, or lower minimum line length.");
+    setError(detected.length >= MAX_REVIEWED_WALLS ? `Found at least ${MAX_REVIEWED_WALLS} candidate lines. Crop to the drawing, excluding toolbars and labels, then rescan.` : detected.length ? "" : "No straight walls detected. For a dark screenshot select Black CAD background, or use a higher resolution image.");
   }
 
   async function loadPdfPage(url: string, page: number, label: string) {
@@ -331,7 +331,7 @@ export function ImageTo3DImporter() {
       setMode("calibrate");
       const cropped = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity);
       setLines(cropped);
-      setError(cropped.length ? "" : "No straight walls found in this crop. Try Black CAD background mode or a higher-resolution screenshot.");
+      setError(cropped.length >= MAX_REVIEWED_WALLS ? "Still too many lines. Crop more tightly or increase minimum line length." : cropped.length ? "" : "No straight walls found in this crop. Try Black CAD background mode or a higher-resolution screenshot.");
       return;
     }
     const drag = endpointDrag.current;
@@ -399,6 +399,7 @@ export function ImageTo3DImporter() {
 
   function openPlan() {
     if (!calibrated || !lines.length || lines.length > MAX_REVIEWED_WALLS ||
+      (sourceKind === "raster" && lines.length >= MAX_REVIEWED_WALLS) ||
       (sourceKind === "cad" && cadTotal > MAX_REVIEWED_WALLS) || !reviewed) {
       setError("Calibrate one known distance, check the detected lines and confirm review before importing.");
       return;
@@ -579,7 +580,7 @@ export function ImageTo3DImporter() {
             <span><strong>I've reviewed these walls.</strong> Missing or wrongly detected segments will need correction in House Design. I will verify all dimensions, rooms, doors and windows before relying on 3D measurements or BOQ.</span>
           </label>
           {error ? <p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{error}</p> : null}
-          <button type="button" disabled={!calibrated || !lines.length || !reviewed || busy || (sourceKind === "cad" && cadTotal > MAX_REVIEWED_WALLS)} onClick={openPlan}
+          <button type="button" disabled={!calibrated || !lines.length || !reviewed || busy || (sourceKind === "raster" && lines.length >= MAX_REVIEWED_WALLS) || (sourceKind === "cad" && cadTotal > MAX_REVIEWED_WALLS)} onClick={openPlan}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-brand-foreground disabled:opacity-40">
             Continue to editable Floor Plan & 3D <ArrowRight className="size-4" />
           </button>
