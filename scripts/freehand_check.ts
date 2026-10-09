@@ -226,6 +226,18 @@ const intentionalProjection = inspectFreehand([
 ]);
 assert.equal(intentionalProjection.issues.filter(issue => issue.kind === "dangling-extension").length, 0,
   "long projecting walls are not marked as short dangling tails");
+const forkChoice = [
+  stroke([[0, 0], [100, 0]], "ambiguous-base"),
+  stroke([[120, 8], [170, 8]], "ambiguous-upper"),
+  stroke([[120, -8], [170, -8]], "ambiguous-lower"),
+];
+const ambiguousReview = inspectFreehand(forkChoice);
+assert.ok(ambiguousReview.issues.some(issue => issue.kind === "ambiguous-junction"),
+  "near-equidistant open endpoints require user review");
+const ambiguousProposals = suggestFreehandRepairs(forkChoice);
+assert.equal(ambiguousProposals.filter(repair => Math.hypot(repair.start.x - 100, repair.start.y) < 1 ||
+  Math.hypot(repair.end.x - 100, repair.end.y) < 1).length, 0,
+  "ambiguous endpoint does not receive an automatic bridge suggestion");
 const diagonal = convertStrokes(
   [
     stroke([
