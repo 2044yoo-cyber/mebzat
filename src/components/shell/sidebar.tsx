@@ -128,7 +128,7 @@ export function Sidebar({
           // Sections with something in them open; Home and anything empty
           // still go straight there, because a panel listing nothing is a
           // worse answer than the page itself.
-          if (onPickSection && section.items.length > 0 && !section.href) {
+          if (onPickSection && section.items.length > 0 && (!section.href || section.id === "design")) {
             return (
               <button
                 key={section.id}
