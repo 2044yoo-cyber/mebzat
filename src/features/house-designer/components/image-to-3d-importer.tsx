@@ -354,13 +354,13 @@ export function ImageTo3DImporter() {
               <button type="button" onClick={removeSelected} className="flex min-h-10 items-center gap-1 rounded-md border border-destructive/50 px-3 text-destructive"><Trash2 className="size-4" />Remove</button>
             </div> : null}
           </div>
-          <label className="block space-y-2 text-sm">
+          <div className="space-y-2 text-sm">
             <span>Minimum detected line length: {minLength} px</span>
             <input type="range" min="25" max="150" step="5" value={minLength}
               onChange={e => setMinLength(Number(e.target.value))}
               className="w-full" />
             <button type="button" onClick={() => detect(minLength)} className="min-h-10 rounded-lg border px-3 text-xs font-medium"><RotateCcw className="mr-1 inline size-3.5" />Re-scan image (replaces line edits)</button>
-          </label>
+          </div>
           <div className="space-y-3 rounded-xl border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="flex items-center gap-2 text-sm font-semibold"><Ruler className="size-4" /> Calibrate real scale</h3>
