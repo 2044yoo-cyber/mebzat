@@ -1185,6 +1185,8 @@ function PlanEditor({
         return {
           label: "Wall actions",
           actions: [
+            { id: "move", label: "Move", onSelect: run("move") },
+            { id: "delete", label: "Delete", onSelect: run("delete") },
             { id: "duplicate", label: "Duplicate", onSelect: () => wallEdit(selection, () => duplicateWallParallel(project, selection.id)) },
             { id: "rotate", label: "↻ 90°", onSelect: () => wallEdit(selection, () => rotateWall90(project, selection.id)) },
             { id: "split", label: "Split", onSelect: () => wallEdit(selection, () => {
@@ -1195,7 +1197,7 @@ function PlanEditor({
               return input === null ? {project,selections:[selection],blocked:[]} : splitHouseSelection(project,selection,Number(input)*1000/length);
             }) },
           ],
-          more: [move, { id: "lock", label: locked ? "Unlock" : "Lock", onSelect: run("lock") }, ...shared],
+          more: [{ id: "lock", label: locked ? "Unlock" : "Lock", onSelect: run("lock") }, { id: "agenda", label: "Add to Agenda", onSelect: run("agenda") }, { id: "properties", label: "Properties", onSelect: () => setPropertiesFor(selection.id) }],
         };
       }
       case "room":
