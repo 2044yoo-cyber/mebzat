@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, FileText, ImageUp, PenLine, RotateCcw, Ruler, ScanLine, Trash2, Undo2 } from "lucide-react";
 import { detectOrthogonalWalls, IMAGE_IMPORT_KEY, type CandidateLine } from "../services/image-line-detection";
 import { loadImage, pdfPageCount, renderPdfPage } from "../services/source-render";
+import { dxfWallPreview, parseDxfWallDrawing, MAX_REVIEWED_WALLS, type DxfWallDrawing } from "../services/dxf-wall-import";
 
 type Point = { x: number; y: number };
 const MAX_BYTES = 12 * 1024 * 1024;
@@ -15,6 +16,13 @@ export function ImageTo3DImporter() {
   const image = useRef<HTMLCanvasElement | null>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [fileName, setFileName] = useState("");
+  const dxfDrawing = useRef<DxfWallDrawing | null>(null);
+  const [sourceKind, setSourceKind] = useState<"raster" | "cad">("raster");
+  const [cadLayers, setCadLayers] = useState<DxfWallDrawing["layers"]>([]);
+  const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
+  const [cadMmPerPixel, setCadMmPerPixel] = useState<number | null>(null);
+  const [useCadUnits, setUseCadUnits] = useState(true);
+  const [cadTotal, setCadTotal] = useState(0);
   const [lines, setLines] = useState<CandidateLine[]>([]);
   const [minLength, setMinLength] = useState(42);
   const [scalePoints, setScalePoints] = useState<Point[]>([]);
@@ -109,6 +117,9 @@ export function ImageTo3DImporter() {
   }
 
   async function loadRaster(source: HTMLImageElement | ImageBitmap, label: string) {
+    dxfDrawing.current = null;
+    setSourceKind("raster");
+    setCadLayers([]); setSelectedLayers([]); setCadMmPerPixel(null); setCadTotal(0);
     const scale = Math.min(1, 1100 / Math.max(source.width, source.height));
     const width = Math.max(80, Math.round(source.width * scale));
     const height = Math.max(80, Math.round(source.height * scale));
@@ -144,13 +155,54 @@ export function ImageTo3DImporter() {
     } finally { setBusy(false); }
   }
 
+  function refreshDxf(drawing: DxfWallDrawing, layers: readonly string[]) {
+    const selected = new Set(layers);
+    const preview = dxfWallPreview(drawing, selected);
+    const background = document.createElement("canvas");
+    background.width = preview.width; background.height = preview.height;
+    const ctx = background.getContext("2d");
+    if (!ctx) throw new Error("This phone cannot display CAD linework.");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, background.width, background.height);
+    ctx.strokeStyle = "#52525b"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (const line of preview.background) {
+      const a = preview.toPixel(line.a), b = preview.toPixel(line.b);
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    }
+    ctx.stroke();
+    image.current = background;
+    setSize({ width: preview.width, height: preview.height });
+    setCadMmPerPixel(preview.mmPerPixel);
+    setCadTotal(preview.total);
+    setSelectedLayers([...layers]);
+    setLines(preview.lines);
+    setScalePoints([]); setMode("review"); setSelected(null);
+    setNewStart(null); setHistory([]); setReviewed(false); setShowLines(true);
+    setError(preview.total === 0 ? "Choose at least one layer containing walls." :
+      preview.total > MAX_REVIEWED_WALLS
+        ? `This layer selection has ${preview.total} segments. Select fewer wall layers (maximum ${MAX_REVIEWED_WALLS} editable segments per import).`
+        : "");
+  }
+
+  function changeDxfLayer(layer: string, enabled: boolean) {
+    const drawing = dxfDrawing.current;
+    if (!drawing) return;
+    if ((history.length > 0 || reviewed) &&
+      !window.confirm("Changing CAD layers resets wall edits and review. Continue?")) return;
+    const next = enabled
+      ? [...selectedLayers.filter(name => name !== layer), layer]
+      : selectedLayers.filter(name => name !== layer);
+    refreshDxf(drawing, next);
+  }
+
   async function loadFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     event.target.value = "";
     setError("");
-    if (!["image/png", "image/jpeg", "image/webp", "application/pdf"].includes(file.type)) {
-      setError("Upload a PNG, JPG, WebP or PDF file. For CAD files, first export to PDF or an image.");
+    const isDxf = /\.dxf$/i.test(file.name) || ["application/dxf", "image/vnd.dxf", "application/x-dxf"].includes(file.type);
+    if (!isDxf && !["image/png", "image/jpeg", "image/webp", "application/pdf"].includes(file.type)) {
+      setError("Upload an ASCII DXF, PNG, JPG, WebP or PDF. DWG must be exported to DXF first.");
       return;
     }
     if (file.size > MAX_BYTES) { setError("Choose a file smaller than 12 MB."); return; }
@@ -158,7 +210,17 @@ export function ImageTo3DImporter() {
     setPdfPages(0);
     setBusy(true);
     try {
-      if (file.type === "application/pdf") {
+      if (isDxf) {
+        const drawing = await parseDxfWallDrawing(await file.text());
+        dxfDrawing.current = drawing;
+        setSourceKind("cad");
+        setUseCadUnits(true);
+        setCadLayers(drawing.layers);
+        setPdfPages(0);
+        setFileName(file.name);
+        const suggested = drawing.layers.filter(layer => layer.suggested).map(layer => layer.name);
+        refreshDxf(drawing, suggested);
+      } else if (file.type === "application/pdf") {
         const url = URL.createObjectURL(file);
         pdfUrl.current = url;
         const pages = await pdfPageCount(url);
@@ -270,10 +332,13 @@ export function ImageTo3DImporter() {
     ? Math.hypot(scalePoints[1]!.x - scalePoints[0]!.x, scalePoints[1]!.y - scalePoints[0]!.y)
     : 0;
   const metres = Number(knownMetres);
-  const calibrated = pixelLength >= 12 && Number.isFinite(metres) && metres >= 0.2 && metres <= 100;
+  const manualCalibrated = pixelLength >= 12 && Number.isFinite(metres) && metres >= 0.2 && metres <= 100;
+  const automaticCadScale = sourceKind === "cad" && useCadUnits ? cadMmPerPixel : null;
+  const calibrated = automaticCadScale !== null || manualCalibrated;
 
   function openPlan() {
-    if (!calibrated || !lines.length || lines.length > 80 || !reviewed) {
+    if (!calibrated || !lines.length || lines.length > MAX_REVIEWED_WALLS ||
+      (sourceKind === "cad" && cadTotal > MAX_REVIEWED_WALLS) || !reviewed) {
       setError("Calibrate one known distance, check the detected lines and confirm review before importing.");
       return;
     }
@@ -283,7 +348,7 @@ export function ImageTo3DImporter() {
       version: 1,
       createdAt: Date.now(),
       source: fileName,
-      mmPerUnit: metres * 1000 / pixelLength,
+      mmPerUnit: automaticCadScale ?? metres * 1000 / pixelLength,
       lines: lines.map(l => ({ start: { x: l.x1, y: l.y1 }, end: { x: l.x2, y: l.y2 } })),
     };
     try {
@@ -306,8 +371,8 @@ export function ImageTo3DImporter() {
       </p>
       <label className="flex min-h-16 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 text-sm font-semibold hover:bg-muted/30">
         <ImageUp className="size-5" />
-        {busy ? "Reading floor plan…" : fileName ? `Change plan · ${fileName}` : "Upload PNG, JPG, WebP or PDF floor plan"}
-        <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf" onChange={event => void loadFile(event)} className="sr-only" />
+        {busy ? "Reading drawing…" : fileName ? `Change plan · ${fileName}` : "Upload DXF, PDF, PNG, JPG or WebP floor plan"}
+        <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf,.dxf,application/dxf" onChange={event => void loadFile(event)} className="sr-only" />
       </label>
       {pdfPages > 1 && pdfUrl.current ? <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3 text-sm">
         <FileText className="size-5 shrink-0 text-brand" />
