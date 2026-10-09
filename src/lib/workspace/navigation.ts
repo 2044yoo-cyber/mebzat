@@ -100,7 +100,7 @@ export const NAV_SECTIONS: NavSection[] = [
 
   {
     id: "design",
-    label: "Design",
+    label: "Design Home",
     emoji: "✏️",
     icon: Ruler,
     items: [
