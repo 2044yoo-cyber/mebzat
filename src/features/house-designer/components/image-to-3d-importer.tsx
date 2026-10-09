@@ -290,6 +290,7 @@ export function ImageTo3DImporter() {
     }
     if (mode === "calibrate") {
       setScalePoints(previous => previous.length >= 2 ? [p] : [...previous, p]);
+      setReviewed(false);
       return;
     }
     if (mode === "add") {
@@ -384,7 +385,8 @@ export function ImageTo3DImporter() {
           <span className="text-xs text-muted-foreground">{cadTotal} lines selected</span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Only selected layers become editable walls. Turn off dimensions, furniture, hatches and other non-wall layers before continuing.
+          Only selected layers become editable walls. Prefer wall centreline layers if your CAD drawing has them;
+          turn off dimensions, furniture, hatches and other non-wall layers.
           Changing layers resets your wall edits.
         </p>
         <div className="grid max-h-60 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
