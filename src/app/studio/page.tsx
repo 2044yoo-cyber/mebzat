@@ -88,6 +88,29 @@ export default async function StudioPage(props: {
     }
   }
 
+  // Do not silently show the new-design picker when a saved-project link
+  // fails. A missing, inaccessible or invalid design needs an explicit error.
+  if (design && !editing) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 p-6">
+        <h1 className="text-xl font-semibold">Could not open this cabinet design</h1>
+        <p className="text-sm text-muted-foreground">
+          This project may have been deleted, may belong to another account, or
+          may contain design data that can no longer be opened. Your other
+          designs have not been changed.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/designs?mine=1" className="rounded-lg bg-primary px-4 py-3 text-sm text-primary-foreground">
+            My projects
+          </Link>
+          <Link href="/studio" className="rounded-lg border px-4 py-3 text-sm">
+            New cabinet design
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   // Opened from a furniture calculator: /studio?kind=wardrobe&width=2400.
   // Anything that is not a real design kind is ignored rather than trusted, so
   // a hand-edited URL gets the ordinary start panel instead of a crash.
@@ -108,6 +131,10 @@ export default async function StudioPage(props: {
 
   return (
     <StudioWorkspace
+      // The Studio owns an initialised React design controller. Next.js can
+      // preserve it while changing only the search query, so force a fresh
+      // controller when opening another saved design or going back to Start.
+      key={editing ? `saved:${editing.designId}` : opening ? `new:${opening.kind}:${opening.width ?? ""}:${opening.template ?? ""}` : "dashboard"}
       rates={rates}
       opening={opening}
       editing={editing}
