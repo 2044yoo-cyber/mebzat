@@ -123,6 +123,15 @@ export const NAV_SECTIONS: NavSection[] = [
         keywords: ["residential", "floor plan", "house", "architecture", "3d building"],
       },
       {
+        id: "image-to-3d",
+        label: "Image to 3D Floor Plan",
+        icon: Building2,
+        href: "/design/image-to-3d",
+        private: true,
+        hint: "Upload a CAD screenshot, PDF or image; calibrate and prepare for 3D and quantity takeoff",
+        keywords: ["image to 3d", "cad screenshot", "floor plan image", "pdf floor plan", "floor area", "sqm", "paint", "tiles", "estimate"],
+      },
+      {
         id: "cabinet-design",
         label: "Cabinet Design",
         icon: Cabinet,
