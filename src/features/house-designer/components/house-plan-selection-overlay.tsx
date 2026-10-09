@@ -730,7 +730,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       </MmPerPx.Provider>
     </svg>
     {actionBar && selectMode && selections.length && !endDrag && !hold && !wallDrag && !itemDrag && !openingDrag && canvasSize ? <FloatingBar bounds={objects.filter((object) => selectedIds.has(object.selection.id)).map((object) => object.bounds)} view={effective} size={canvasSize}>{actionBar}</FloatingBar> : null}
-    {current ? <span aria-label="Pointer coordinates" className="pointer-events-none absolute right-2 top-3 z-10 rounded-md border bg-background/90 px-2 py-0.5 font-mono text-[11px] tabular-nums">X {displayLength(current.x, unit)} · Y {displayLength(current.y, unit)} {unit}</span> : null}
+    {current ? <span aria-label="Pointer coordinates" className="pointer-events-none absolute right-2 top-3 z-10 rounded-md border bg-background/90 px-2 py-0.5 font-mono text-[11px] tabular-nums">X {Number(displayLength(current.x, unit).toFixed(unit === "m" ? 2 : unit === "cm" ? 1 : 0))} · Y {Number(displayLength(current.y, unit).toFixed(unit === "m" ? 2 : unit === "cm" ? 1 : 0))} {unit}</span> : null}
     {draftStart && activeTool && (activeTool === "room" || lineTools.has(activeTool)) ? <TypedDraft
       key={`${draftStart.x},${draftStart.y}`}
       room={activeTool === "room"}
