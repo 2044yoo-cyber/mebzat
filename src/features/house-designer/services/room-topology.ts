@@ -31,10 +31,11 @@ const MERGE = 1;
 /** The level's walls as centrelines: the outline's sides, then the inside walls. */
 export function planWallLines(plan: Room): WallLine[] {
   const corners = plan.corners;
-  return [
+  const lines: WallLine[] = [
     ...corners.map((corner, index) => ({ start: { x: corner.x, y: corner.y }, end: { x: corners[(index + 1) % corners.length]!.x, y: corners[(index + 1) % corners.length]!.y }, thickness: plan.wallThickness, fixed: true })),
     ...(plan.interiorWalls ?? []).map((wall) => ({ start: { ...wall.start }, end: { ...wall.end }, thickness: wall.thickness })),
   ];
+  return plan.freehand ? lines.map((line) => ({ ...line, fixed: true })) : lines;
 }
 
 /** How near an end must come to another wall to be joined to it: inside that wall, and a little. */
@@ -220,7 +221,7 @@ function traceFaces(points: readonly Point[], edges: readonly [number, number][]
  */
 export function deriveZones(before: Room, after: Room): Room["zones"] {
   const zones = before.zones;
-  if (!zones?.length) return after.zones;
+  if (!zones?.length) return after.freehand ? wallFaces(planWallLines(after)).map((boundary, index) => ({ id: `freehand-room-${index + 1}`, name: `Room ${index + 1}`, boundary, floorMaterial: "Unspecified", wallMaterial: "Paint", ceilingMaterial: "Gypsum board" })) : after.zones;
   const oldFaces = wallFaces(planWallLines(before));
   const newFaces = wallFaces(planWallLines(after));
 

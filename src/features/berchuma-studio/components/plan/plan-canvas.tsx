@@ -83,21 +83,23 @@ export function PlanCanvas({
   ], [columns, dimensions, interiorWalls, platforms, room.corners, stairs, zones]);
 
   const contentBounds = useMemo(() => {
-    const xs = room.corners.map((c) => c.x);
-    const ys = room.corners.map((c) => c.y);
+    const points = planPoints.length ? planPoints : [{ x: 0, y: 0 }, { x: 8000, y: 6000 }];
+    const xs = points.map((c) => c.x);
+    const ys = points.map((c) => c.y);
     return {
       x: Math.min(...xs),
       y: Math.min(...ys),
       width: Math.max(...xs) - Math.min(...xs),
       height: Math.max(...ys) - Math.min(...ys),
     };
-  }, [room.corners]);
+  }, [planPoints]);
 
   // The drawing is in millimetres and the viewBox does the scaling, so a 2 m
   // cloakroom and a 12 m hall both arrive filling the frame.
   const bounds = useMemo(() => {
-    const xs = planPoints.map((c) => c.x);
-    const ys = planPoints.map((c) => c.y);
+    const points = planPoints.length ? planPoints : [{ x: 0, y: 0 }, { x: 8000, y: 6000 }];
+    const xs = points.map((c) => c.x);
+    const ys = points.map((c) => c.y);
     const pad = Math.max(...xs, ...ys, 1000) * 0.18;
     return {
       x: Math.min(...xs) - pad,

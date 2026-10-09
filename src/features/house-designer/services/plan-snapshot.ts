@@ -40,6 +40,7 @@ export function planSnapshot(project: HouseProject, levelId: string): PlanSnapsh
   const parts: string[] = [];
 
   parts.push(`<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="#ffffff"/>`);
+  if (project.freehandSketch && !project.freehandSketch.calibrated) parts.push(`<text x="${x + 100}" y="${y + text}" font-size="${text}" fill="#92400e">APPROXIMATE SKETCH — SCALE NOT VERIFIED</text>`);
   for (const room of rooms) {
     const centre = room.boundary.reduce((sum, point) => ({ x: sum.x + point.x / room.boundary.length, y: sum.y + point.y / room.boundary.length }), { x: 0, y: 0 });
     parts.push(`<polygon points="${room.boundary.map((point) => `${point.x},${point.y}`).join(" ")}" fill="#e0f2fe"/>`);

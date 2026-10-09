@@ -126,8 +126,13 @@ const HousePreview = dynamic(() => import("./house-preview").then((module) => mo
   loading: () => <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl border text-sm text-muted-foreground"><Loader2 className="mr-2 size-4 animate-spin" /> Loading 3D…</div>,
 });
 
+import { exportPlanImage, printPlan } from "../services/plan-export";
+import { createHouseTakeoffPackage, HOUSE_TAKEOFF_SESSION_KEY } from "../services/takeoff-adapter";
+import { FreehandCanvas } from "./freehand-canvas";
+import { applyFreehand, dimensionRectangle, dimensionConflicts, calibrateFromWall, rememberWallLength } from "../services/freehand";
+
 type Stage = "start" | "editor" | "loading";
-type Source = "manual" | "rooms" | "upload" | "sketch" | "template" | "describe";
+type Source = "freehand" | "manual" | "rooms" | "upload" | "sketch" | "template" | "describe";
 
 // The 3D view shows the space: walls, openings, floors, stairs, columns and
 // furniture. Roofs, ceilings, façade dressing and site would hide the rooms or
@@ -142,6 +147,7 @@ const noSubscription = () => () => undefined;
 
 export function HouseDesignerWorkspace({ userId, planId = null, projectId = null, pinId = null, sketchId = null }: { userId: string; planId?: string | null; projectId?: string | null; pinId?: string | null; sketchId?: string | null }) {
   const [stage, setStage] = useState<Stage>(planId ? "loading" : "start");
+  const [freehandOpen, setFreehandOpen] = useState(false);
   const [source, setSource] = useState<Source>("manual");
   const [templateId] = useState(PLAN_TEMPLATES[1]!.id);
   // "" is the empty grid with the Room tool; otherwise a sample room to start from.
@@ -359,12 +365,13 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
     }), modelingOptions)), displayUnits });
     // Drawing from scratch starts on genuinely open space: the project's
     // floors and settings, and nothing on them until it is drawn.
-    setProject(nextSource === "manual" || (nextSource === "rooms" && !template) ? openSpace(built) : built);
+    setProject(nextSource === "freehand" || nextSource === "manual" || (nextSource === "rooms" && !template) ? openSpace(built) : built);
     setLink(null);
     lastSaved.current = null;
     setStatus("device");
     setTab("plan");
     setStage("editor");
+    if (nextSource === "freehand") setFreehandOpen(true);
   }
 
   function updateProject(next: HouseProject) {
@@ -445,16 +452,21 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
   }
 
   const projectMenu: MoreItem[] = project ? [
+    ...(project.freehandSketch ? [{ id: "freehand", label: "Original freehand sketch", onSelect: () => setFreehandOpen(true) }] : []),
     { id: "save", label: link ? "Save now" : "Save project…", onSelect: saveProject },
     ...(link ? [{ id: "agenda", label: `Open ${link.projectName} in Agenda`, onSelect: () => { window.location.href = `/agenda/projects/${link.projectId}/plan`; } }] : []),
     { id: "rename", label: "Rename plan", onSelect: rename },
     { id: "units", label: `Units: ${project.displayUnits ?? "mm"} (change)`, onSelect: () => updateProject({ ...project, displayUnits: nextUnit(project.displayUnits ?? "mm") }) },
+    { id: "png", label: "Export plan image (PNG)", onSelect: () => { void exportPlanImage(project).catch(error => toast.error(error.message)); } },
+    { id: "pdf", label: "Print / Save as PDF", onSelect: () => { try { printPlan(project); } catch (error) { toast.error(error instanceof Error ? error.message : "Print failed"); } } },
+    { id: "boq", label: "Construction quantities / BOQ", onSelect: () => { try { window.sessionStorage.setItem(HOUSE_TAKEOFF_SESSION_KEY, JSON.stringify(createHouseTakeoffPackage(project))); window.location.href = "/takeoff?source=house-design"; } catch { toast.error("Could not prepare quantities. Your plan is unchanged."); } } },
     { id: "download", label: "Download plan data (JSON)", onSelect: download },
     { id: "new", label: "Start a new plan", onSelect: toStart },
   ] : [];
 
   return (
     <main className="mx-auto w-full min-w-0 max-w-[1500px] overflow-x-hidden px-2 pb-6 pt-2 sm:px-5 md:pb-8">
+      {freehandOpen && project ? <FreehandCanvas initial={project.freehandSketch} readOnly={project.walls.length > 0} onClose={() => setFreehandOpen(false)} onSave={(sketch) => { const next = { ...project, freehandSketch: sketch }; updateProject(next); if (!writeHouseDraft(window.localStorage, draftKey, next)) toast.error("Device storage is full. Save this plan to a project before leaving."); }} onConvert={(sketch, snap, unitsPerPixel) => { const next = ensureHouseBimState(applyFreehand(project, sketch, snap, unitsPerPixel)); updateProject(next); setStartTool("select"); setFreehandOpen(false); }} /> : null}
       {stage === "start" ? (
         <>
           <header className="mb-2 flex min-w-0 items-center gap-3 rounded-2xl border bg-card p-2 sm:mb-4 sm:p-4">
@@ -583,6 +595,7 @@ function StartScreen({
 
         <div role="radiogroup" aria-label="How to start" className="grid grid-cols-2 gap-2 xl:grid-cols-3">
           {([
+            ["freehand", <PenLine key="freehand" className="size-5" />, "Freehand Sketch", "Draw naturally, convert to walls · no AI"],
             ["manual", <PencilRuler key="manual" className="size-5" />, "Draw manually", "An empty grid; draw the walls yourself"],
             ["rooms", <LayoutGrid key="rooms" className="size-5" />, "Draw rooms", "Drag out each room; walls join up"],
             ["upload", <FileUp key="upload" className="size-5" />, "Upload floor plan", "JPG, PNG or PDF — trace it or convert it"],
@@ -868,6 +881,11 @@ function PlanEditor({
 
   function commit(next: HouseProject) {
     if (next === project) return;
+    const conflicts = dimensionConflicts(next);
+    if (conflicts.length) {
+      if (!window.confirm("This edit changes a measured wall dimension. Apply the edit and release the affected dimension constraints? Cancel keeps the measured plan.")) return;
+      next = { ...next, measuredWalls: next.measuredWalls?.filter(c => !conflicts.includes(c.id)) };
+    }
     setPast((items) => [...items, project].slice(-60));
     setFuture([]);
     onProjectChange(next);
@@ -1150,7 +1168,13 @@ function PlanEditor({
           actions: [
             { id: "duplicate", label: "Duplicate", onSelect: () => wallEdit(selection, () => duplicateWallParallel(project, selection.id)) },
             { id: "rotate", label: "↻ 90°", onSelect: () => wallEdit(selection, () => rotateWall90(project, selection.id)) },
-            { id: "split", label: "Split", onSelect: () => wallEdit(selection, () => splitHouseSelection(project, selection)) },
+            { id: "split", label: "Split", onSelect: () => wallEdit(selection, () => {
+              const wall = project.walls.find(w => w.id === selection.id)!;
+              if (!project.levels.find(l => l.id === wall.levelId)?.plan?.freehand) return splitHouseSelection(project, selection);
+              const length = Math.hypot(wall.end.x-wall.start.x,wall.end.y-wall.start.y);
+              const input = window.prompt("Split distance from wall start (metres)", (length/2000).toFixed(3));
+              return input === null ? {project,selections:[selection],blocked:[]} : splitHouseSelection(project,selection,Number(input)*1000/length);
+            }) },
           ],
           more: [move, { id: "lock", label: locked ? "Unlock" : "Lock", onSelect: run("lock") }, ...shared],
         };
@@ -1294,6 +1318,14 @@ function PlanEditor({
       <section className="min-w-0 space-y-2">
         <EditorHeader onBack={onBack} levels={project.levels} activeLevelId={activeLevelId} onLevel={chooseLevel} onAddFloor={addFloor} status={status} onRetry={onRetry} menu={menu} />
         <WorkspaceTabs tab={tab} onTab={onTab} />
+        {project.freehandSketch ? <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+          <span>{project.freehandSketch.calibrated ? "Sketch scale set; verify remaining measurements." : "Approximate freehand dimensions and areas — calibrate before estimating costs."}</span>
+          {project.walls.length === 4 && project.rooms.length === 1 ? <button type="button" className="rounded border px-2 py-1 font-semibold" onClick={() => {
+            const width = window.prompt("Rectangle width in metres (wall centrelines)", "4.00"); if (width === null) return;
+            const depth = window.prompt("Rectangle length in metres (wall centrelines)", "5.00"); if (depth === null) return;
+            try { commit(dimensionRectangle(project, Number(width)*1000, Number(depth)*1000)); } catch (error) { toast.error(error instanceof Error ? error.message : "Check dimensions"); }
+          }}>Set rectangle dimensions</button> : null}
+        </div> : null}
 
         {tab === "plan" ? (
           <div className="grid min-w-0 gap-2 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -1309,7 +1341,13 @@ function PlanEditor({
                 }} onDraftStart={(point) => { if (chainEnded.current) { chainEnded.current = false; setDraftStart(null); return; } setDraftStart(point); }} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={() => undefined} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch)); }} onGuidance={() => undefined} pins={pins.filter((pin) => pin.source.kind === "plan" && pin.source.level === activeLevelId)} onPinTap={(id) => setActivePinId(id)} focus={planFocus}
                   onWallExtend={(selection, end, delta) => wallEdit(selection, () => extendWall(project, selection.id, end, delta))}
                   onWallEnd={(selection, end, to) => wallEdit(selection, () => moveWallEnd(project, selection.id, end, to))}
-                  onWallLength={(selection, end, length) => wallEdit(selection, () => setWallLength(project, selection.id, end, length))}
+                  onWallLength={(selection, end, length) => wallEdit(selection, () => {
+                    try {
+                      if (project.freehandSketch && !project.freehandSketch.calibrated) return {project:calibrateFromWall(project,selection.id,length),selections:[selection],blocked:[]};
+                      const result=setWallLength(project,selection.id,end,length);
+                      return {...result,project:rememberWallLength(result.project,selection.id)};
+                    } catch(error) {return {project,selections:[selection],blocked:[error instanceof Error ? error.message : "Check dimension"]};}
+                  })}
                   onWallDistance={(selection, neighbourId, distance) => wallEdit(selection, () => setWallDistance(project, selection.id, neighbourId, distance))}
                   actionBar={quick && propertiesFor !== sheetFor?.id ? <QuickActionBar key={`${sheetFor!.id}:${roomSplit ?? ""}`} label={quick.label} actions={quick.actions} more={quick.more} /> : null}
                   guide={splitGuide ? { ...splitGuide.line, label: `${shortMm(splitDraft!.first, project.displayUnits ?? "mm")} | ${shortMm(splitGuide.span - splitDraft!.first, project.displayUnits ?? "mm")}` } : null}

@@ -268,7 +268,7 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
     // ends keep their place along its line, wherever the line goes. The
     // house's outside corners are never moved by an inside wall. The rooms
     // are not dragged with it: they are traced again from the walls.
-    const follow = attachedTo(interior.start, interior.end, start, end, interior.thickness / 2 + 5);
+    const follow = attachedTo(interior.start, interior.end, start, end, plan.freehand ? 0.01 : interior.thickness / 2 + 5);
     const outside = new Set(plan.corners.map((corner) => `${corner.x},${corner.y}`));
     const keepOutside = (point: { x: number; y: number }) => outside.has(`${point.x},${point.y}`) ? point : follow(point);
     return rebuildLevel(next, level.id, withDerivedZones(plan, {
@@ -532,7 +532,7 @@ function ordinalFloor(index: number) {
 
 // Structure — columns, beams, grid, footings — is never generated here: a
 // plan edit rebuilds the plan and leaves whatever structure exists alone.
-function rebuildLevel(project: HouseProject, levelId: string, plan: Room): HouseProject {
+export function rebuildLevel(project: HouseProject, levelId: string, plan: Room): HouseProject {
   const roomId = project.rooms.find((room) => room.levelId === levelId)?.id ?? `${levelId}:room-1`;
   const oldWalls = new Map(
     project.walls
@@ -627,7 +627,7 @@ export function reconcileRooms(before: HouseProject, after: HouseProject): House
   let next = after;
   for (const level of after.levels) {
     const old = before.levels.find((item) => item.id === level.id)?.plan;
-    if (!old || !level.plan || !old.zones?.length) continue;
+    if (!old || !level.plan || (!old.freehand && !old.zones?.length)) continue;
     const sameWalls = JSON.stringify([old.corners, old.interiorWalls ?? []]) === JSON.stringify([level.plan.corners, level.plan.interiorWalls ?? []]);
     if (sameWalls) continue;
     const plan = withDerivedZones(old, level.plan);
@@ -1064,6 +1064,7 @@ function roomsForPlan(levelId: string, plan: Room, previous: HouseProject["rooms
       };
     });
   }
+  if (plan.freehand) return [];
   const old = previous[0];
   return [{
     id: old?.id ?? `${levelId}:room-1`,

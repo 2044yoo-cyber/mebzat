@@ -1,4 +1,4 @@
-import { deleteRoom, moveRoom, patchHouseObject, reconcileRooms, removeFootprintCorner } from "./project-edit";
+import { rebuildLevel, deleteRoom, moveRoom, patchHouseObject, reconcileRooms, removeFootprintCorner } from "./project-edit";
 import { objectDefinition } from "./object-library";
 import { stairFields, stairPreset, type StairParams } from "./stair-geometry";
 import { allHouseSelections, sameSelection } from "./model-state";
@@ -261,13 +261,26 @@ export function alignHouseSelections(project: HouseProject, selections: readonly
   return { project: next, selections: [...selections], blocked };
 }
 
-export function splitHouseSelection(project: HouseProject, selection: HouseSelection | null): HouseCommandMutation {
+export function splitHouseSelection(project: HouseProject, selection: HouseSelection | null, fraction = 0.5): HouseCommandMutation {
   if (!selection) return { project, selections: [], blocked: ["Select a wall, beam, railing or reference plane"] };
   if (selection.kind === "wall") {
     const wall = project.walls.find((item) => item.id === selection.id);
     const level = wall ? project.levels.find((item) => item.id === wall.levelId) : null;
     if (!wall) return { project, selections: [selection], blocked: ["Wall not found"] };
     if (wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId)) return { project, selections: [selection], blocked: ["An outside wall is the house's outline — to divide a room, select the room and Split it"] };
+    if (level?.plan?.freehand) {
+      const length = Math.hypot(wall.end.x-wall.start.x,wall.end.y-wall.start.y);
+      if (!Number.isFinite(fraction) || fraction*length < 1 || (1-fraction)*length < 1) return { project, selections:[selection], blocked:["Choose a split point inside the wall"] };
+      const offset=length*fraction;
+      if (level.plan.openings.some(o=>o.wallId===wall.sourceWallId && o.offset<offset && o.offset+o.width>offset)) return {project,selections:[selection],blocked:["The split crosses an opening. Choose another point."]};
+      const middle={x:wall.start.x+(wall.end.x-wall.start.x)*fraction,y:wall.start.y+(wall.end.y-wall.start.y)*fraction};
+      const sourceWallId=`interior-${crypto.randomUUID()}`, id=wallObjectId(wall.levelId,sourceWallId);
+      const original=level.plan.interiorWalls!.find(w=>w.id===wall.sourceWallId)!;
+      const plan={...level.plan,interiorWalls:[...level.plan.interiorWalls!.map(w=>w.id===wall.sourceWallId?{...w,end:middle}:w),{...original,id:sourceWallId,start:middle,end:{...wall.end}}],openings:level.plan.openings.map(o=>o.wallId===wall.sourceWallId && o.offset>=offset?{...o,wallId:sourceWallId,offset:o.offset-offset}:o)};
+      let next=rebuildLevel(project,wall.levelId,plan);
+      next={...next,measuredWalls:project.measuredWalls?.flatMap(c=>c.id===wall.id?[{id:wall.id,length:offset},{id,length:length-offset}]:[c])};
+      return {project:reconcileRooms(project,next),selections:[selection,{kind:"wall",id}],blocked:[]};
+    }
     const middle = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
     const oldEnd = { ...wall.end };
     let next = patchHouseObject(project, selection, { endX: middle.x, endY: middle.y });

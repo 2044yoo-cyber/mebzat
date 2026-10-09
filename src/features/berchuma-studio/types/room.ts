@@ -137,7 +137,9 @@ export const roomSchema = z.object({
    * such thing as half a room, and letting one exist means every consumer has
    * to decide what to do about it.
    */
-  corners: z.array(cornerSchema).min(3).max(32),
+  corners: z.array(cornerSchema).max(32),
+  /** Freehand wall graphs may be open and have no perimeter polygon. */
+  freehand: z.boolean().optional(),
 
   /** Structural thickness, drawn on the plan. Does not enter the BOQ. */
   wallThickness: z.number().positive().max(600).default(150),
@@ -175,7 +177,7 @@ export const roomSchema = z.object({
       scale: z.number().positive().optional(),
     })
     .optional(),
-});
+}).refine((room) => room.corners.length >= 3 || (room.freehand === true && room.corners.length === 0), { message: "A closed plan needs at least three corners" });
 
 export type Room = z.infer<typeof roomSchema>;
 
