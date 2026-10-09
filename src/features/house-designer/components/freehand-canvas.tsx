@@ -306,11 +306,47 @@ export function FreehandCanvas({
   }
   function deleteSelectedPoint() {
     if (!selectedPoint || readOnly) return;
-    const next = sketch.strokes.filter(stroke => stroke.id !== selectedPoint.strokeId);
-    // Removing an endpoint removes its stroke rather than leaving a disconnected fragment.
-    commit({ ...sketch, strokes: next });
+    const target = sketch.strokes.find(stroke => stroke.id === selectedPoint.strokeId);
+    if (!target || target.points.length < 2) return;
+    const first = selectedPoint.end === "start";
+    const endpoint = first ? target.points[0]! : target.points[target.points.length - 1]!;
+    const neighbour = first ? target.points[1]! : target.points[target.points.length - 2]!;
+    if (target.points.length > 2) {
+      const points = first ? target.points.slice(1) : target.points.slice(0, -1);
+      commit({ ...sketch, strokes: sketch.strokes.map(stroke => stroke.id === target.id ? { ...stroke, points } : stroke) });
+      setSelectedPoint(null);
+      setMessage("Endpoint removed; the remaining wall is preserved.");
+      return;
+    }
+    // Trim the unwanted overhang to the closest intersection on this wall.
+    // Never erase the entire wall merely because an endpoint was selected.
+    const dx = neighbour.x - endpoint.x, dy = neighbour.y - endpoint.y;
+    const len2 = dx * dx + dy * dy;
+    let best: Point | null = null, bestT = Infinity;
+    if (len2 > 1) for (const other of sketch.strokes) {
+      if (other.id === target.id) continue;
+      for (let i = 1; i < other.points.length; i++) {
+        const p = other.points[i - 1]!, q = other.points[i]!;
+        const ex = q.x - p.x, ey = q.y - p.y;
+        const cross = dx * ey - dy * ex;
+        if (Math.abs(cross) < 0.000001) continue;
+        const rx = p.x - endpoint.x, ry = p.y - endpoint.y;
+        const t = (rx * ey - ry * ex) / cross;
+        const u = (rx * dy - ry * dx) / cross;
+        if (t > 0.01 && t < 0.99 && u >= -0.001 && u <= 1.001 && t < bestT) {
+          bestT = t;
+          best = { x: endpoint.x + t * dx, y: endpoint.y + t * dy };
+        }
+      }
+    }
+    if (!best) {
+      setMessage("No junction found to trim to. Drag this point onto a wall instead; the full line is preserved.");
+      return;
+    }
+    const points = first ? [best, neighbour] : [neighbour, best];
+    commit({ ...sketch, strokes: sketch.strokes.map(stroke => stroke.id === target.id ? { ...stroke, points } : stroke) });
     setSelectedPoint(null);
-    setMessage("Wall segment removed. Undo to restore it.");
+    setMessage("Extra wall extension trimmed to the junction. Undo to restore.");
   }
   function erase(p: Point) {
     for (const s of sketch.strokes)
@@ -463,7 +499,7 @@ export function FreehandCanvas({
           readOnly,
         )}
         {button("Edit endpoints", MousePointer2, () => { setTool("point"); setSelectedPoint(null); }, tool === "point", readOnly)}
-        {tool === "point" ? button("Delete selected wall endpoint and its stroke", Trash2, deleteSelectedPoint, false, !selectedPoint || readOnly) : null}
+        {tool === "point" ? button("Trim selected wall endpoint to nearest junction", Trash2, deleteSelectedPoint, false, !selectedPoint || readOnly) : null}
         {button(
           "Erase stroke",
           Eraser,
