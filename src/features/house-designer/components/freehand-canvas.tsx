@@ -23,6 +23,7 @@ import {
   inspectFreehand,
   suggestFreehandRepairs,
   suggestFreehandTrims,
+  suggestOrthogonalCorrection,
   foot,
   strokeSegments,
   type Point,
@@ -623,6 +624,16 @@ export function FreehandCanvas({
           return <div className="max-h-[30dvh] space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
             <strong className="block text-sm">Review Plan · {result.segments.length} walls</strong>
             <p>{open.length} open endpoints · {short.length} short pieces · {tails.length} possible wall tails · {ambiguous.length} ambiguous junctions</p>
+            <button type="button" className="w-full rounded-lg border border-blue-300 bg-blue-50 p-2 text-left font-medium text-blue-900" onClick={() => {
+              const proposal = suggestOrthogonalCorrection(sketch.strokes);
+              if (!proposal.corrected) {
+                setMessage("No nearly horizontal or vertical walls need correction.");
+                return;
+              }
+              commit({ ...sketch, strokes: proposal.strokes });
+              setReview(true);
+              setMessage(`Straightened ${proposal.corrected} near-horizontal/vertical wall runs. Undo reverses this correction.`);
+            }}>Suggest 90° / rectangle correction (optional · Undo available)</button>
             <button type="button" className="w-full rounded-lg border border-slate-300 bg-white p-2 text-left font-medium" onClick={() => {
               const cleaned = cleanFreehandStrokes(sketch.strokes);
               if (!cleaned.removed) {
