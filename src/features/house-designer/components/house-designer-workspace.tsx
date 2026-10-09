@@ -489,8 +489,8 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
             onRoomSample={setRoomSampleId}
             description={description}
             onDescription={setDescription}
-            onContinue={(ai) => void openEditor(source, ai)}
-            onTemplatePlan={(plan, options) => void openEditor("template", false, { room: plan, floors: options.floors })}
+            onContinue={(ai) => { void openEditor(source, ai).catch((error: unknown) => { setAnalysingPlan(false); setStage("start"); toast.error(error instanceof Error ? `Could not open floor plan: ${error.message}` : "Could not open floor plan. Please try again."); }); }}
+            onTemplatePlan={(plan, options) => { void openEditor("template", false, { room: plan, floors: options.floors }).catch((error: unknown) => { setStage("start"); toast.error(error instanceof Error ? `Could not open template: ${error.message}` : "Could not open template."); }); }}
             onRestore={savedDraft ? () => openLoaded(savedDraft.project, null) : undefined}
             recentPlans={recentPlans}
             onOpenPlan={(id) => void openSaved(id)}
