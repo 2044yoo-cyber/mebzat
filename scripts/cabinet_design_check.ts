@@ -301,6 +301,17 @@ equal(withMaterial(startingDesign("wardrobe"), "not-a-board"), startingDesign("w
   const dup = functionText(designs.replace(/export async function/g, "function"), "duplicateDesign");
   ok(/saveDesign\(\{ spec: \{/.test(dup) && !/designId/.test(dup.slice(dup.indexOf("saveDesign("))), "a duplicate is a new design, not a version of the old one");
   const studio = code("src/app/studio/page.tsx");
+  const workspace = code("src/features/berchuma-studio/components/studio-workspace.tsx");
+  // Saved designs must always reopen the exact saved spec. Using Next's
+  // query-only navigation without remounting kept useDesign's old state.
+  ok(/key=\\{editing \\? \`saved:\\$\\{editing\\.designId\\}\\`/.test(studio),
+    "switching from dashboard to a saved project remounts the design controller");
+  ok(/if \\(design && !editing\\)/.test(studio) && /Could not open this cabinet design/.test(studio),
+    "an unreadable saved design explains the failure instead of showing a fresh design picker");
+  ok(/href=\\{\\`\\/studio\\?design=\\$\\{encodeURIComponent\\(project\\.slug\\)\\}\\`\\}/.test(workspace) &&
+    /aria-label=\\{\\`Continue design: \\$\\{project\\.title\\}\\`\\}/.test(workspace),
+    "each recent design card points to its saved slug with an accessible resume action");
+
   ok(/findTemplate\(template\)/.test(studio) && /\{ kind: templateKind, template: chosenTemplate\.id \}/.test(studio), "/studio?template= opens the start steps on that template");
   const gallery = code("src/app/designs/page.tsx");
   ok(/href=\{`\/studio\?template=\$\{encodeURIComponent\(template\.id\)\}`\}/.test(functionText(gallery, "TemplateGallery")), "the gallery's Use Template goes there");
