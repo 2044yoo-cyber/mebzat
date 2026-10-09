@@ -1417,7 +1417,7 @@ function PlanEditor({
                   // same atomic move command: a group is not reduced to the
                   // wall touched when starting the drag. Furniture snapping
                   // remains a single-object feature.
-                  const targets = Array.isArray(selection) ? [...selection] : [selection];
+                  const targets: HouseSelection[] = "kind" in selection ? [selection] : [...selection];
                   const item = targets.length === 1 && targets[0]?.kind === "component"
                     ? project.components.find((entry) => entry.id === targets[0]?.id)
                     : null;
