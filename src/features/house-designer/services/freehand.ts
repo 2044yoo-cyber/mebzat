@@ -476,9 +476,12 @@ export function applyFreehand(
   );
   if (!segments.length)
     throw new Error("Draw at least one wall before converting.");
-  if (segments.length > 80)
+  // Image/DXF imports legitimately contain more than 80 wall pieces.
+  // Keep a bounded safety limit for mobile geometry calculations, but do
+  // not silently reject an otherwise reviewed architectural drawing.
+  if (segments.length > 400)
     throw new Error(
-      "This editor supports 80 freehand wall pieces. Use separate plans for larger drawings.",
+      `This drawing produced ${segments.length} wall segments (limit 400). Remove dimension, furniture and hatch lines in Review, or crop to one floor and scan again.`,
     );
   let plan = roomSchema.parse({
     version: 1,
