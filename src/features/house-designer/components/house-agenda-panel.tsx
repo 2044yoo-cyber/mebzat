@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, MapPin } from "lucide-react";
+import { ExternalLink, MapPin, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ export function HouseAgendaPanel({ link, pins, statuses, onOpen, where }: {
         <span>Open {link.projectName} in Agenda</span>
         <ExternalLink className="size-4 text-muted-foreground" />
       </a>
+      <a href={`/agenda/projects/${link.projectId}/directory`} className="flex min-h-11 items-center gap-2 rounded-xl border bg-card px-3 text-xs font-medium text-brand hover:bg-muted"><Users className="size-4" />Invite project members to view plans and join discussions <ExternalLink className="ml-auto size-4" /></a>
       {pins.length === 0 ? <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">No pins yet. Select something on the plan and choose Add to Agenda, or drop a Pin on a sketch.</p> : null}
       {[["Open", open], ["Resolved", resolved]].map(([heading, items]) => (items as Pin[]).length ? (
         <div key={heading as string}>
