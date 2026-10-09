@@ -1358,7 +1358,20 @@ function PlanEditor({
   ];
 
   const sheetFor = tab === "plan" && selectMode && selected && selected.kind !== "level" && !proposals && !mergeFrom && !activePinId && selections.length === 1 ? selected : null;
-  const quick = sheetFor ? quickActions(sheetFor) : null;
+  const wallGroup = tab === "plan" && selectMode && !proposals && !mergeFrom && !activePinId
+    ? selections.filter((item) => item.kind === "wall") : [];
+  const groupQuick = wallGroup.length > 1 ? {
+    label: `${wallGroup.length} walls selected`,
+    actions: [
+      { id: "move", label: `Move ${wallGroup.length} selected walls`, onSelect: () => sheetAction("move") },
+      { id: "delete", label: "Delete selected walls", onSelect: deleteSelection },
+    ] as QuickAction[],
+    more: [
+      { id: "lock", label: "Lock selected walls", onSelect: () => commit(pinHouseSelections(project, wallGroup, true)) },
+      { id: "clear", label: "Clear selection", onSelect: () => setSelections([]) },
+    ] as QuickAction[],
+  } : null;
+  const quick = sheetFor ? quickActions(sheetFor) : groupQuick;
   const splitRoomTarget = splitDraft ? project.rooms.find((room) => room.id === splitDraft.roomId) : null;
   const splitGuide = (() => {
     if (!splitDraft || !splitRoomTarget) return null;
@@ -1400,10 +1413,16 @@ function PlanEditor({
               <PlanToolbar activeTool={activeTool} onTool={chooseTool} onUndo={undo} canUndo={past.length > 0} />
               <div className="relative h-[75dvh] min-h-[520px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 sm:h-[78dvh] lg:h-[min(760px,75dvh)] dark:bg-background">
                 {activeLevel ? <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} showGrid={gridVisible} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} sketch={outlineSketch} onCancelDraft={() => { setDraftStart(null); setOutlineSketch([]); }} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => {
-                  // Furniture dragged near furniture lands edge to edge with it.
-                  const item = selection.kind === "component" ? project.components.find((entry) => entry.id === selection.id) : null;
+                  // Dragging one wall or several selected walls uses the
+                  // same atomic move command: a group is not reduced to the
+                  // wall touched when starting the drag. Furniture snapping
+                  // remains a single-object feature.
+                  const targets = Array.isArray(selection) ? [...selection] : [selection];
+                  const item = targets.length === 1 && targets[0]?.kind === "component"
+                    ? project.components.find((entry) => entry.id === targets[0]?.id)
+                    : null;
                   const to = item ? snapToFurniture(project, activeLevelId, { ...item, x: item.x + dx, y: item.y + dy }, { ignore: item.id }) : null;
-                  applyMutation(moveHouseSelections(project, [selection], to && item ? to.x - item.x : dx, to && item ? to.y - item.y : dy, { footprintEditable: true }));
+                  applyMutation(moveHouseSelections(project, targets, to && item ? to.x - item.x : dx, to && item ? to.y - item.y : dy, { footprintEditable: true }));
                 }} onDraftStart={(point) => { if (chainEnded.current) { chainEnded.current = false; setDraftStart(null); return; } setDraftStart(point); }} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={() => undefined} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch)); }} onGuidance={() => undefined} pins={pins.filter((pin) => pin.source.kind === "plan" && pin.source.level === activeLevelId)} onPinTap={(id) => setActivePinId(id)} focus={planFocus}
                   onWallExtend={(selection, end, delta) => wallEdit(selection, () => extendWall(project, selection.id, end, delta))}
                   onWallEnd={(selection, end, to) => wallEdit(selection, () => moveWallEnd(project, selection.id, end, to))}
@@ -1415,7 +1434,7 @@ function PlanEditor({
                     } catch(error) {return {project,selections:[selection],blocked:[error instanceof Error ? error.message : "Check dimension"]};}
                   })}
                   onWallDistance={(selection, neighbourId, distance) => wallEdit(selection, () => setWallDistance(project, selection.id, neighbourId, distance))}
-                  actionBar={quick && propertiesFor !== sheetFor?.id ? <QuickActionBar key={`${sheetFor!.id}:${roomSplit ?? ""}`} label={quick.label} actions={quick.actions} more={quick.more} /> : null}
+                  actionBar={quick && (!sheetFor || propertiesFor !== sheetFor.id) ? <QuickActionBar key={sheetFor ? `${sheetFor.id}:${roomSplit ?? ""}` : `group:${wallGroup.map((wall) => wall.id).join(",")}`} label={quick.label} actions={quick.actions} more={quick.more} /> : null}
                   guide={splitGuide ? { ...splitGuide.line, label: `${shortMm(splitDraft!.first, project.displayUnits ?? "mm")} | ${shortMm(splitGuide.span - splitDraft!.first, project.displayUnits ?? "mm")}` } : null}
                   ghost={placing && (activeTool === "furniture" || activeTool === "stair" || activeTool === "column") ? placingGhost : null}
                 /> : null}
