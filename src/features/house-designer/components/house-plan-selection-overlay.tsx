@@ -420,8 +420,8 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     }
     // Multi-selected walls are a single movable set. Hit any of the selected
     // walls to drag the WHOLE set, without downgrading it to a one-wall pick.
-    if (selectMode && onMoveSelection && selections.length > 1 && selections.every((item) => item.kind === "wall")) {
-      const selectedWalls = project.walls.filter((wall) => selections.some((item) => item.id === wall.id));
+    if (selectMode && onMoveSelection && selections.filter((item) => item.kind === "wall").length > 1) {
+      const selectedWalls = project.walls.filter((wall) => selections.some((item) => item.kind === "wall" && item.id === wall.id));
       const tolerance = Math.max(16 * mmPerPx, 60);
       const hit = selectedWalls.some((wall) => {
         const nearest = closestPointOnSegment(raw, wall.start, wall.end);
@@ -620,7 +620,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     }
     if (wallGroupDrag && wallGroupDrag.pointerId === event.pointerId) {
       if (wallGroupDrag.dx !== 0 || wallGroupDrag.dy !== 0)
-        onMoveSelection?.(selections, wallGroupDrag.dx, wallGroupDrag.dy);
+        onMoveSelection?.(selections.filter((item) => item.kind === "wall"), wallGroupDrag.dx, wallGroupDrag.dy);
       else tapped();
       setWallGroupDrag(null);
       return;
