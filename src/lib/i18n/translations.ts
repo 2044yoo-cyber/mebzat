@@ -27,6 +27,7 @@ export const translations: Record<Language, Dictionary> = {
     },
     language: { label: "Language", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
+      design: "Design Home",
       agenda: "Agenda", "agenda-home": "Agenda", "agenda-projects": "Construction Projects",
       "agenda-tasks": "My Tasks", "agenda-calendar": "Calendar",
       home: "Home", ai: "AI", "ai-home": "Medosha AI", market: "Market", marketplace: "Marketplace",
@@ -194,6 +195,7 @@ export const translations: Record<Language, Dictionary> = {
     },
     language: { label: "ቋንቋ", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
+      design: "የቤት ዲዛይን",
       agenda: "አጀንዳ", "agenda-home": "አጀንዳ", "agenda-projects": "የግንባታ ፕሮጀክቶች",
       "agenda-tasks": "የእኔ ተግባራት", "agenda-calendar": "የቀን መቁጠሪያ",
       home: "መነሻ", ai: "AI", "ai-home": "Medosha AI", market: "ገበያ", marketplace: "ገበያ", property: "ንብረት",
@@ -331,6 +333,7 @@ export const translations: Record<Language, Dictionary> = {
     },
     language: { label: "Afaan", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
+      design: "Dizaayinii Manaa",
       agenda: "Ajandaa", "agenda-home": "Ajandaa", "agenda-projects": "Pirojektoota Ijaarsaa",
       "agenda-tasks": "Hojiiwwan Koo", "agenda-calendar": "Kaalaandarii",
       home: "Mana", ai: "AI", "ai-home": "Medosha AI", market: "Gabaa", marketplace: "Gabaa", property: "Qabeenya",
