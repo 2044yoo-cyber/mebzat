@@ -131,6 +131,29 @@ export function convertStrokes(
   if (lines.length > 500)
     throw new Error("Convert up to 500 wall segments at a time.");
   if (tolerance > 0) {
+    // Square only near-horizontal/vertical walls. Use the SAME coordinate
+    // for neighbouring parallel runs, otherwise every stroke remains slightly
+    // crooked even when it was meant to share an architectural grid.
+    const horizontal = lines.filter(line => Math.abs(line.end.y - line.start.y) <=
+      Math.abs(line.end.x - line.start.x) * 0.12);
+    const vertical = lines.filter(line => Math.abs(line.end.x - line.start.x) <=
+      Math.abs(line.end.y - line.start.y) * 0.12);
+    const align = (group: Segment[], axis: "x" | "y") => {
+      const positions = group.map(line => (line.start[axis] + line.end[axis]) / 2);
+      for (let i = 0; i < group.length; i++) {
+        const peers = positions.filter((value, j) => Math.abs(value - positions[i]!) <= tolerance * 0.6 &&
+          // Avoid averaging a long run with a much shorter, unrelated nearby wall.
+          distance(group[j]!.start, group[j]!.end) > 0);
+        const sorted = peers.sort((a, b) => a - b);
+        const aligned = sorted[Math.floor(sorted.length / 2)]!;
+        group[i]!.start = { ...group[i]!.start, [axis]: aligned };
+        group[i]!.end = { ...group[i]!.end, [axis]: aligned };
+      }
+    };
+    align(horizontal, "y");
+    align(vertical, "x");
+  }
+  if (tolerance > 0) {
     // Cluster all close endpoints together, independent of stroke order.
     // A shared coordinate is essential: independently nudging each end
     // leaves tiny gaps and overlapping circular handles at junctions.
