@@ -469,9 +469,9 @@ const ACTION_ICONS: Record<string, typeof Copy> = {
   horizontal: Rows2,
   cancel: X,
   flip: FlipHorizontal2,
-  door-hinge: FlipHorizontal2,
-  door-swing: FlipVertical2,
-  door-type: DoorOpen,
+  "door-hinge": FlipHorizontal2,
+  "door-swing": FlipVertical2,
+  "door-type": DoorOpen,
   mirror: FlipHorizontal2,
   reverse: ArrowUpDown,
 };
