@@ -18,6 +18,7 @@ import type { HouseProject } from "../types/project";
 import {
   convertStrokes,
   inspectFreehand,
+  suggestFreehandRepairs,
   foot,
   strokeSegments,
   type Point,
@@ -57,6 +58,7 @@ export function FreehandCanvas({
   );
   const [review, setReview] = useState(false);
   const [focusedIssue, setFocusedIssue] = useState<string | null>(null);
+  const [rejectedRepairs, setRejectedRepairs] = useState<string[]>([]);
   const dialog = useRef<HTMLDivElement>(null);
   const preview = useRef<{ strokes: Sketch["strokes"]; snap: boolean; zoom: number; segments: ReturnType<typeof strokeSegments> } | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null),
@@ -148,6 +150,11 @@ export function FreehandCanvas({
         ctx.stroke();
       }
     }
+    if (review) {
+      const proposals = suggestFreehandRepairs(visibleStrokes, state.current.snap ? 12 : 0, 1 / v.zoom);
+      const highlighted = proposals.find(p => p.id === focusedIssue);
+      if (highlighted) draw([highlighted.start, highlighted.end], "#16a34a", 5);
+    }
     for (const p of points.values()) {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 3 / v.zoom, 0, Math.PI * 2);
@@ -214,6 +221,7 @@ export function FreehandCanvas({
     setFuture([]);
     setSketch(next);
     setReview(false);
+    setRejectedRepairs([]);
     onSave(next);
   }
   function undo() {
@@ -522,9 +530,41 @@ export function FreehandCanvas({
           const result = inspectFreehand(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom);
           const open = result.issues.filter(issue => issue.kind === "open-end");
           const short = result.issues.filter(issue => issue.kind === "short-wall");
+          const repairs = suggestFreehandRepairs(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom).filter(p => !rejectedRepairs.includes(p.id));
           return <div className="max-h-[30dvh] space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
             <strong className="block text-sm">Review Plan · {result.segments.length} walls</strong>
             <p>{open.length} open endpoints · {short.length} short pieces</p>
+            {repairs.length ? <div className="space-y-2 rounded-lg border border-green-200 bg-green-50 p-2">
+              <strong className="block text-green-900">{repairs.length} suggested endpoint connections</strong>
+              {repairs.slice(0, 15).map(proposal => <div key={proposal.id} className="rounded border bg-white p-2">
+                <p>{proposal.label} · ~{Math.round(proposal.length * view.current.zoom)} screen px</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" className="rounded border px-3 py-2 text-blue-800" onClick={() => {
+                    setFocusedIssue(proposal.id);
+                    const r = canvas.current?.getBoundingClientRect();
+                    if (r) {
+                      view.current.x = r.width / 2 - ((proposal.start.x + proposal.end.x) / 2) * view.current.zoom;
+                      view.current.y = r.height / 2 - ((proposal.start.y + proposal.end.y) / 2) * view.current.zoom;
+                    }
+                    schedule();
+                  }}>Preview</button>
+                  <button type="button" className="rounded bg-green-700 px-3 py-2 text-white" onClick={() => {
+                    const next: Sketch = {...sketch, strokes: [...sketch.strokes, {
+                      id: crypto.randomUUID(), points: [proposal.start, proposal.end],
+                      thickness: sketch.strokes[0]?.thickness ?? thickness
+                    }]};
+                    commit(next);
+                    setReview(true);
+                    setMessage("Connection added. Undo stroke reverses this repair.");
+                  }}>Accept</button>
+                  <button type="button" className="rounded border px-3 py-2" onClick={() => {
+                    setRejectedRepairs(list => [...list, proposal.id]);
+                    setFocusedIssue(null);
+                  }}>Reject</button>
+                </div>
+              </div>)}
+            </div> : null}
+
             {!sketch.calibrated ? <p className="font-medium text-amber-800">Dimensions are approximate. Set a known wall length before estimating costs.</p> : null}
             {result.issues.length === 0 ? <p className="text-green-700">No open endpoints or tiny pieces detected. Verify the rooms after conversion.</p> : result.issues.slice(0, 30).map((issue, index) =>
               <button key={issue.id} type="button" onClick={() => {
