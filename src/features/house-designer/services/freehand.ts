@@ -131,44 +131,55 @@ export function convertStrokes(
   if (lines.length > 500)
     throw new Error("Convert up to 500 wall segments at a time.");
   if (tolerance > 0) {
-    for (let i = 0; i < lines.length; i++)
-      for (const key of ["start", "end"] as const) {
-        const p = lines[i]![key];
-        let best: Point | null = null,
-          d = Math.min(tolerance, distance(lines[i]!.start, lines[i]!.end) / 4);
-        for (let j = 0; j < i; j++)
-          for (const q of [lines[j]!.start, lines[j]!.end]) {
-            const next = distance(p, q);
-            if (next <= d) {
-              d = next;
-              best = q;
-            }
-          }
-        if (best) lines[i]![key] = { ...best };
+    // Cluster all close endpoints together, independent of stroke order.
+    // A shared coordinate is essential: independently nudging each end
+    // leaves tiny gaps and overlapping circular handles at junctions.
+    const ends = lines.flatMap((line, lineIndex) => [
+      { lineIndex, key: "start" as const, point: { ...line.start } },
+      { lineIndex, key: "end" as const, point: { ...line.end } },
+    ]);
+    const parent = ends.map((_, i) => i);
+    const root = (index: number): number => {
+      while (parent[index] !== index) {
+        parent[index] = parent[parent[index]!]!;
+        index = parent[index]!;
       }
+      return index;
+    };
+    const join = (a: number, b: number) => { const ra = root(a), rb = root(b); if (ra !== rb) parent[rb] = ra; };
+    for (let a = 0; a < ends.length; a++)
+      for (let b = a + 1; b < ends.length; b++) {
+        if (ends[a]!.lineIndex === ends[b]!.lineIndex) continue;
+        const la = lines[ends[a]!.lineIndex]!, lb = lines[ends[b]!.lineIndex]!;
+        const limit = Math.min(tolerance, distance(la.start, la.end) / 4, distance(lb.start, lb.end) / 4);
+        if (distance(ends[a]!.point, ends[b]!.point) <= limit) join(a, b);
+      }
+    const clusters = new Map<number, Point[]>();
+    ends.forEach((end, i) => { const id = root(i); clusters.set(id, [...(clusters.get(id) ?? []), end.point]); });
+    ends.forEach((end, i) => {
+      const group = clusters.get(root(i))!;
+      const mean = { x: group.reduce((sum, p) => sum + p.x, 0) / group.length, y: group.reduce((sum, p) => sum + p.y, 0) / group.length };
+      lines[end.lineIndex]![end.key] = mean;
+    });
+
+    // Snap unmatched endpoints to a nearby wall interior. This closes
+    // rough T-junctions and allows wallGraph to split the receiving wall.
+    // Never pull an endpoint onto its own wall or across a long gap.
     for (let i = 0; i < lines.length; i++)
       for (const key of ["start", "end"] as const) {
-        const p = lines[i]![key];
-        if (
-          lines.some(
-            (s, j) =>
-              j !== i &&
-              (distance(p, s.start) < 1e-6 || distance(p, s.end) < 1e-6),
-          )
-        )
-          continue;
-        let best: Point | null = null,
-          d = Math.min(tolerance, distance(lines[i]!.start, lines[i]!.end) / 4);
-        for (let j = 0; j < lines.length; j++)
-          if (i !== j) {
-            const q = foot(p, lines[j]!.start, lines[j]!.end),
-              next = distance(p, q);
-            if (next < d) {
-              d = next;
-              best = q;
-            }
-          }
-        if (best) lines[i]![key] = best;
+        const line = lines[i]!, p = line[key];
+        if (lines.some((other, j) => j !== i &&
+          (distance(p, other.start) < 1e-6 || distance(p, other.end) < 1e-6))) continue;
+        const limit = Math.min(tolerance, distance(line.start, line.end) / 4);
+        let nearest: Point | null = null, nearestDistance = limit;
+        for (let j = 0; j < lines.length; j++) {
+          if (i === j) continue;
+          const other = lines[j]!;
+          const q = foot(p, other.start, other.end);
+          const d = distance(p, q);
+          if (d < nearestDistance) { nearest = q; nearestDistance = d; }
+        }
+        if (nearest) line[key] = nearest;
       }
   }
   // Fixed disables legacy thickness-based snapping. Exact intersections remain.
