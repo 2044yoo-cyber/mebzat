@@ -301,31 +301,65 @@ export function ImageTo3DImporter() {
         <h2 className="text-lg font-semibold">Detect walls without AI</h2>
       </div>
       <p className="text-sm text-muted-foreground">
-        First version: straight horizontal and vertical walls from clean, high-contrast CAD screenshots.
-        Everything runs in your browser. Check the green lines before opening the editable 3D plan.
+        Upload a CAD screenshot, PNG, JPG, WebP or a PDF floor plan. Medosha detects straight-wall candidates on your phone without AI.
+        Correct the lines and verify one real measurement before turning them into editable 3D walls.
       </p>
       <label className="flex min-h-16 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 text-sm font-semibold hover:bg-muted/30">
         <ImageUp className="size-5" />
-        {busy ? "Reading image…" : fileName ? `Change image · ${fileName}` : "Choose PNG, JPG or WebP floor plan"}
-        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => void loadFile(event)} className="sr-only" />
+        {busy ? "Reading floor plan…" : fileName ? `Change plan · ${fileName}` : "Upload PNG, JPG, WebP or PDF floor plan"}
+        <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf" onChange={event => void loadFile(event)} className="sr-only" />
       </label>
+      {pdfPages > 1 && pdfUrl.current ? <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3 text-sm">
+        <FileText className="size-5 shrink-0 text-brand" />
+        <label className="flex flex-1 items-center gap-2">PDF page
+          <select disabled={busy} value={pdfPage} onChange={event => { if (pdfUrl.current) void loadPdfPage(pdfUrl.current, Number(event.target.value), fileName); }}
+            className="min-h-11 flex-1 rounded-lg border bg-background px-2">
+            {Array.from({ length: pdfPages }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1} of {pdfPages}</option>)}
+          </select>
+        </label>
+      </div> : null}
       {image.current ? (
         <>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-semibold">{lines.length} wall candidates detected</span>
+              <span className="text-xs font-semibold">{lines.length} wall segments · {mode === "calibrate" ? "Scale" : mode === "review" ? "Review" : "Add wall"}</span>
               <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showLines} onChange={e => setShowLines(e.target.checked)} /> Show detected lines</label>
             </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Import editing tool">
+              <button type="button" onClick={() => { setMode("calibrate"); setSelected(null); setNewStart(null); }}
+                aria-pressed={mode === "calibrate"}
+                className={`min-h-11 rounded-lg border px-3 text-xs font-medium ${mode === "calibrate" ? "border-brand bg-brand/10 text-brand" : ""}`}><Ruler className="mr-1 inline size-3.5" />Scale</button>
+              <button type="button" onClick={() => { setMode("review"); setNewStart(null); setShowLines(true); }}
+                aria-pressed={mode === "review"}
+                className={`min-h-11 rounded-lg border px-3 text-xs font-medium ${mode === "review" ? "border-brand bg-brand/10 text-brand" : ""}`}><ScanLine className="mr-1 inline size-3.5" />Review lines</button>
+              <button type="button" onClick={() => { setMode("add"); setSelected(null); setShowLines(true); }}
+                aria-pressed={mode === "add"}
+                className={`min-h-11 rounded-lg border px-3 text-xs font-medium ${mode === "add" ? "border-brand bg-brand/10 text-brand" : ""}`}><PenLine className="mr-1 inline size-3.5" />Add wall</button>
+              <button type="button" onClick={undoEdit} disabled={!history.length}
+                className="min-h-11 rounded-lg border px-3 text-xs disabled:opacity-30"><Undo2 className="mr-1 inline size-3.5" />Undo</button>
+            </div>
             <canvas ref={canvas} width={size.width} height={size.height}
-              onPointerUp={pickPoint} style={{ touchAction: "manipulation" }}
-              className="w-full rounded-lg border bg-white" aria-label="Floor plan image; tap two ends of a known dimension to calibrate" />
-            <p className="text-xs text-muted-foreground">Green = detected wall candidates. Orange = calibration points. Walls and openings must be reviewed after import.</p>
+              onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pickPoint}
+              onPointerCancel={() => { if (endpointDrag.current) setLines(endpointDrag.current.before); endpointDrag.current = null; }}
+              style={{ touchAction: mode === "calibrate" ? "manipulation" : "none" }}
+              className="w-full rounded-lg border bg-white"
+              aria-label="Floor plan image: calibrate distance, select lines, drag endpoints, or tap two points to add a wall" />
+            <p className="text-xs text-muted-foreground">
+              {mode === "calibrate" ? "Orange dots: tap two ends of one known dimension." :
+                mode === "review" ? "Green: detected walls. Tap a line to select it; drag its blue endpoints to adjust. Remove unwanted dimension or text lines." :
+                newStart ? "Tap the second end of the missing wall, or switch to Review to cancel." : "Tap the start and end of a missing wall. Angled walls are allowed."}
+            </p>
+            {mode === "review" && selected !== null ? <div className="flex items-center justify-between gap-2 rounded-lg border border-brand/30 bg-brand/5 p-2 text-xs">
+              <span className="font-medium text-brand">Wall {selected + 1} selected · drag blue endpoints to change its length</span>
+              <button type="button" onClick={removeSelected} className="flex min-h-10 items-center gap-1 rounded-md border border-destructive/50 px-3 text-destructive"><Trash2 className="size-4" />Remove</button>
+            </div> : null}
           </div>
           <label className="block space-y-2 text-sm">
             <span>Minimum detected line length: {minLength} px</span>
             <input type="range" min="25" max="150" step="5" value={minLength}
-              onChange={e => { const value = Number(e.target.value); setMinLength(value); detect(value); }}
+              onChange={e => setMinLength(Number(e.target.value))}
               className="w-full" />
+            <button type="button" onClick={() => detect(minLength)} className="min-h-10 rounded-lg border px-3 text-xs font-medium"><RotateCcw className="mr-1 inline size-3.5" />Re-scan image (replaces line edits)</button>
           </label>
           <div className="space-y-3 rounded-xl border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -343,10 +377,14 @@ export function ImageTo3DImporter() {
               {calibrated ? <><Check className="size-4 text-emerald-600" /> Calibrated: {pixelLength.toFixed(0)} px = {metres.toFixed(2)} m</> : `${scalePoints.length}/2 points selected — select two points to continue`}
             </p>
           </div>
+          <label className="flex items-start gap-3 rounded-xl border bg-muted/30 p-3 text-xs">
+            <input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} className="mt-0.5 size-4" />
+            <span><strong>I've reviewed these walls.</strong> Missing or wrongly detected segments will need correction in House Design. I will verify all dimensions, rooms, doors and windows before relying on 3D measurements or BOQ.</span>
+          </label>
           {error ? <p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{error}</p> : null}
-          <button type="button" disabled={!calibrated || !lines.length} onClick={openPlan}
+          <button type="button" disabled={!calibrated || !lines.length || !reviewed || busy} onClick={openPlan}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-brand-foreground disabled:opacity-40">
-            Open detected walls in House Design <ArrowRight className="size-4" />
+            Continue to editable Floor Plan & 3D <ArrowRight className="size-4" />
           </button>
           <p className="text-xs text-muted-foreground">
             This is a candidate geometry import, not a guaranteed accurate 3D conversion. Confirm wall positions,
