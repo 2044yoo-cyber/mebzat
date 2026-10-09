@@ -199,7 +199,8 @@ export function StudioWorkspace({
       anchor.click();
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(href), 1000);
-      setProjectMessage(`Exported ${result.designs} designs, ${result.pieces} cut pieces, grouped by board type.`);
+      const saved = result.sheets.reduce((total, board) => total + board.separateSheets - board.sheets, 0);
+      setProjectMessage(`Exported ${result.designs} designs and ${result.pieces} cut pieces. Shared sheet nesting saved ${saved} MDF/board sheets versus separate cutting plans.`);
     } catch (error) {
       setProjectMessage(error instanceof Error ? error.message : "Could not generate the combined cut list.");
     } finally {
@@ -665,9 +666,9 @@ export function StudioWorkspace({
                 </div>
                 {projectMessage ? <p role="status" className="text-xs text-muted-foreground">{projectMessage}</p> : null}
                 {projectItems.length > 1 ? <p className="text-[11px] text-muted-foreground">
-                  Save stores all cabinets together. The Excel cut list combines parts,
-                  hardware and board totals; sheet counts are conservatively summed
-                  from each cabinet's nesting.
+                  Save stores all cabinets together. Excel combines cuts and hardware,
+                  and its cutting layout reuses sheets across matching materials
+                  when a shared arrangement reduces waste.
                 </p> : null}
               </section>
 
