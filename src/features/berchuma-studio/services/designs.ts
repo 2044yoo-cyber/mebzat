@@ -634,16 +634,21 @@ export async function recordDesignView(designId: string): Promise<void> {
 /** The price as the server computes it, from live rates. */
 async function priceOf(spec: DesignSpec) {
   const rates = await marketRates();
-  const parts = buildParts(spec);
-  const cutList = buildCutList(spec, parts);
-  const cost = calculateCost(spec, parts, {
-    rates,
-    sheetCounts: sheetCountsOf(cutList),
-    manufacturable: cutList.buildable,
+  // A saved manufacturing project is more than its first cabinet. Price each
+  // independent design with its own materials and nesting, then total them.
+  const designs = [spec, ...(spec.projectItems ?? []).map(item => item.spec as DesignSpec)];
+  const costs = designs.map((item) => {
+    const parts = buildParts(item);
+    const cutList = buildCutList(item, parts);
+    return calculateCost(item, parts, {
+      rates,
+      sheetCounts: sheetCountsOf(cutList),
+      manufacturable: cutList.buildable,
+    });
   });
   return {
-    estimatedCost: Math.round(cost.price),
-    confidence: Math.round(cost.confidence * 100) / 100,
+    estimatedCost: Math.round(costs.reduce((total, cost) => total + cost.price, 0)),
+    confidence: Math.round(Math.min(...costs.map(cost => cost.confidence)) * 100) / 100,
   };
 }
 
