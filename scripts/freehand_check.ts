@@ -117,6 +117,22 @@ assert.equal(
   4,
   "X is split",
 );
+// Stroke order must not matter when rough corners almost touch.
+const separatedCorners = [
+  stroke([[0, 0], [200, 0]], "top"),
+  stroke([[206, 5], [200, 200]], "right"),
+  stroke([[200, 204], [0, 200]], "bottom"),
+  stroke([[-4, 197], [0, -3]], "left"),
+];
+const connected = convertStrokes(separatedCorners, 20);
+assert.equal(connected.length, 4, "nearby endpoints become one four-wall outline");
+const reversed = convertStrokes([...separatedCorners].reverse(), 20);
+assert.equal(reversed.length, 4, "joining does not depend on stroke order");
+const nearT = convertStrokes([
+  stroke([[0, 0], [200, 0]], "base"),
+  stroke([[100, 100], [103, 6]], "branch"),
+], 20);
+assert.equal(nearT.length, 3, "near T endpoint snaps onto a wall and splits it");
 const diagonal = convertStrokes(
   [
     stroke([
