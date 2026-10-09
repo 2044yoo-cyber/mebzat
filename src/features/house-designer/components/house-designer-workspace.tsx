@@ -91,7 +91,7 @@ import { planDescriptionError } from "../services/plan-analysis";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
 import { furnitureItem, type FurnitureItem } from "../services/furniture-catalog";
 import { levelMeasurements, pointInPolygon } from "../services/measurements";
-import { duplicateWallParallel, extendWall, moveWallEnd, roomRectangle, rotateWall90, setWallDistance, setWallLength, splitRoom, toggleWallJoints, wallJointsLinked } from "../services/quick-edit";
+import { duplicateWallParallel, extendWall, moveWallEnd, roomRectangle, rotateWall90, setWallDistance, setWallLength, splitRoom, toggleWallJoints, wallJointLinked, wallJointsLinked } from "../services/quick-edit";
 import { attachToTask, createPin, createTask, listPins, pinHref, taskStatuses, updatePin, type Pin, type SketchSource } from "../services/sketch-store";
 import {
   createProject,
@@ -1175,17 +1175,19 @@ function PlanEditor({
       case "wall": {
         const locked = Boolean(project.objectInstances[selection.id]?.pinned);
         const linked = wallJointsLinked(project, selection.id);
+        const startLinked = wallJointLinked(project, selection.id, "start");
+        const endLinked = wallJointLinked(project, selection.id, "end");
         return {
           label: "Wall actions",
           actions: [
             { id: "move", label: "Move", onSelect: run("move") },
             {
               id: "junction",
-              label: linked ? "Release connections — move only this wall" : "Link connections — neighbouring walls move together",
+              label: linked ? "Release both wall endpoints" : "Link both wall endpoints",
               pressed: linked,
               onSelect: () => {
                 commit(toggleWallJoints(project, selection.id));
-                toast.info(linked ? "Connections released. This wall moves independently." : "Connections linked. Touching wall ends follow this wall.");
+                toast.info(linked ? "Both endpoints released. Move this wall independently." : "Both endpoints linked. Only walls sharing those exact endpoints will follow.");
               },
             },
             { id: "delete", label: "Delete", onSelect: run("delete") },
@@ -1199,7 +1201,13 @@ function PlanEditor({
               return input === null ? {project,selections:[selection],blocked:[]} : splitHouseSelection(project,selection,Number(input)*1000/length);
             }) },
           ],
-          more: [{ id: "lock", label: locked ? "Unlock" : "Lock", onSelect: run("lock") }, { id: "agenda", label: "Add to Agenda", onSelect: run("agenda") }, { id: "properties", label: "Properties", onSelect: () => setPropertiesFor(selection.id) }],
+          more: [
+            { id: "junction-start", label: startLinked ? "Release start joint" : "Link start joint", pressed: startLinked, onSelect: () => commit(toggleWallJoints(project, selection.id, "start")) },
+            { id: "junction-end", label: endLinked ? "Release end joint" : "Link end joint", pressed: endLinked, onSelect: () => commit(toggleWallJoints(project, selection.id, "end")) },
+            { id: "lock", label: locked ? "Unlock" : "Lock", onSelect: run("lock") },
+            { id: "agenda", label: "Add to Agenda", onSelect: run("agenda") },
+            { id: "properties", label: "Properties", onSelect: () => setPropertiesFor(selection.id) },
+          ],
         };
       }
       case "room":
