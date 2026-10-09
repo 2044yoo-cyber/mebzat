@@ -1,44 +1,85 @@
 /**
- * Browser-only, deterministic first-pass wall centreline detection.
- * Intended for high-contrast orthogonal CAD screenshots, not photographs,
- * handwritten plans or reliable extraction of architectural openings.
- * It returns candidate lines for mandatory visual review, never measured areas.
+ * Deterministic on-device line detection for raster architectural plans.
+ * Supports both light paper plans (dark ink) and dark AutoCAD screenshots
+ * (light neutral linework). Colors used for furniture, dimensions and hatches
+ * in CAD are deliberately excluded from dark-plan detection.
+ *
+ * These are CANDIDATES, not authoritative walls or reliable measurements.
+ * Users must crop, calibrate and review geometry before House Design/BOQ.
  */
-export type CandidateLine = { x1: number; y1: number; x2: number; y2: number; orientation: "h" | "v" | "diagonal"; support: number; layer?: string };
+export type CandidateLine = {
+  x1: number; y1: number; x2: number; y2: number;
+  orientation: "h" | "v" | "diagonal";
+  support: number;
+  layer?: string;
+};
+export type DrawingPolarity = "auto" | "light" | "dark";
 export const IMAGE_IMPORT_KEY = "medosha:house-image-detection:v1";
+export const MAX_RASTER_WALL_CANDIDATES = 400;
 
 type Run = { at: number; lo: number; hi: number };
 type Group = { runs: Run[]; lo: number; hi: number; at: number };
-
 function mergeRuns(runs: Run[], thickness: number): Group[] {
   const groups: Group[] = [];
   for (const run of runs) {
-    const matches = groups.filter(g =>
-      run.at - g.at <= thickness + 2 &&
+    const group = groups.find(g =>
+      Math.abs(run.at - g.at) <= thickness + 2 &&
       Math.min(run.hi, g.hi) - Math.max(run.lo, g.lo) >=
         Math.min(run.hi - run.lo, g.hi - g.lo) * 0.58);
-    if (!matches.length) {
+    if (group) {
+      group.runs.push(run);
+      group.lo = Math.min(group.lo, run.lo);
+      group.hi = Math.max(group.hi, run.hi);
+      group.at = Math.round(group.runs.reduce((sum, r) => sum + r.at, 0) / group.runs.length);
+    } else {
       groups.push({ runs: [run], lo: run.lo, hi: run.hi, at: run.at });
-      continue;
     }
-    const group = matches[0]!;
-    group.runs.push(run);
-    group.lo = Math.min(group.lo, run.lo);
-    group.hi = Math.max(group.hi, run.hi);
-    group.at = Math.round(group.runs.reduce((sum, r) => sum + r.at, 0) / group.runs.length);
   }
   return groups;
 }
 
-export function detectOrthogonalWalls(data: ImageData, minimumLength = 38): CandidateLine[] {
+export function imageBackgroundPolarity(data: ImageData): "light" | "dark" {
+  const { width, height } = data;
+  let dark = 0, checked = 0;
+  // Sample through the entire image: screenshots may include small light UI
+  // panels, but the CAD drawing canvas is predominantly black.
+  const stride = Math.max(1, Math.floor(Math.sqrt(width * height / 5000)));
+  for (let y = 0; y < height; y += stride)
+    for (let x = 0; x < width; x += stride) {
+      const i = (y * width + x) * 4;
+      const alpha = data.data[i + 3]! / 255;
+      const luma = (data.data[i]! * 0.299 + data.data[i + 1]! * 0.587 + data.data[i + 2]! * 0.114) * alpha + 255 * (1 - alpha);
+      dark += luma < 80 ? 1 : 0;
+      checked++;
+    }
+  return dark / Math.max(checked, 1) > 0.58 ? "dark" : "light";
+}
+
+export function detectOrthogonalWalls(
+  data: ImageData,
+  minimumLength = 38,
+  polarity: DrawingPolarity = "auto",
+): CandidateLine[] {
   const { width: w, height: h } = data;
   if (w < 80 || h < 80) throw new Error("Use an image at least 80 × 80 pixels.");
-  const binary = new Uint8Array(w * h);
-  for (let i = 0; i < binary.length; i++) {
+  if (!Number.isFinite(minimumLength) || minimumLength < 10 || minimumLength > 1000)
+    throw new Error("Choose a line length between 10 and 1,000 pixels.");
+  const ink = new Uint8Array(w * h);
+  const background = polarity === "auto" ? imageBackgroundPolarity(data) : polarity;
+  for (let i = 0; i < ink.length; i++) {
     const p = i * 4;
     const alpha = data.data[p + 3]! / 255;
-    const luminance = (data.data[p]! * 0.299 + data.data[p + 1]! * 0.587 + data.data[p + 2]! * 0.114) * alpha + 255 * (1 - alpha);
-    binary[i] = luminance < 115 ? 1 : 0;
+    const r = data.data[p]! * alpha + 255 * (1 - alpha);
+    const g = data.data[p + 1]! * alpha + 255 * (1 - alpha);
+    const b = data.data[p + 2]! * alpha + 255 * (1 - alpha);
+    const luminance = r * 0.299 + g * 0.587 + b * 0.114;
+    const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+    // Black AutoCAD canvas is BACKGROUND, not a solid black wall. Detect
+    // neutral light structural strokes; exclude typical orange/yellow text,
+    // cyan dimensions, green furniture and blue door-swing symbols.
+    ink[i] = background === "dark"
+      ? luminance >= 105 && saturation <= 58 && Math.min(r, g, b) >= 90 ? 1 : 0
+      : luminance < 115 && saturation <= 85 ? 1 : 0;
   }
   const scan = (horizontal: boolean): Run[] => {
     const rows = horizontal ? h : w, columns = horizontal ? w : h;
@@ -46,10 +87,9 @@ export function detectOrthogonalWalls(data: ImageData, minimumLength = 38): Cand
     for (let at = 0; at < rows; at++) {
       let begin = -1, last = -1;
       for (let p = 0; p <= columns; p++) {
-        const dark = p < columns && binary[horizontal ? at * w + p : p * w + at] === 1;
-        if (dark) { if (begin < 0) begin = p; last = p; }
-        // Bridge up to 2px gaps caused by antialiasing and dashed lines.
-        if (!dark && begin >= 0 && (p - last > 3 || p === columns)) {
+        const marked = p < columns && ink[horizontal ? at * w + p : p * w + at] === 1;
+        if (marked) { if (begin < 0) begin = p; last = p; }
+        if (!marked && begin >= 0 && (p - last > 3 || p === columns)) {
           if (last - begin + 1 >= minimumLength) result.push({ at, lo: begin, hi: last });
           begin = -1;
         }
@@ -62,15 +102,17 @@ export function detectOrthogonalWalls(data: ImageData, minimumLength = 38): Cand
     ...mergeRuns(scan(false), 9).map(g => ({ ...g, orientation: "v" as const })),
   ];
   const lines = groups
-    .filter(g => g.runs.length >= 2 && g.hi - g.lo >= minimumLength)
+    // CAD geometry is sometimes only a SINGLE pixel. For long, uninterrupted
+    // runs it is safe to offer even that thin line for review.
+    .filter(g => (g.runs.length >= 2 || g.hi - g.lo >= minimumLength * 2.4) && g.hi - g.lo >= minimumLength)
     .map(g => {
       const centre = Math.round(g.runs.reduce((sum, run) => sum + run.at, 0) / g.runs.length);
       return g.orientation === "h"
         ? { x1: g.lo, y1: centre, x2: g.hi, y2: centre, orientation: g.orientation, support: g.runs.length }
         : { x1: centre, y1: g.lo, x2: centre, y2: g.hi, orientation: g.orientation, support: g.runs.length };
     });
-  // Merge parallel linework close together, including double-line wall faces.
-  // Only merge when their longitudinal extents overlap substantially.
+  // Pair the parallel strokes that represent opposite faces of one wall.
+  // Never join side-by-side but longitudinally DISJOINT walls.
   const merged: CandidateLine[] = [];
   for (const line of lines.sort((a, b) => b.support - a.support)) {
     const existing = merged.find(other =>
@@ -93,5 +135,12 @@ export function detectOrthogonalWalls(data: ImageData, minimumLength = 38): Cand
       existing.support = total;
     } else merged.push({ ...line });
   }
-  return merged.sort((a, b) => (b.orientation === "h" ? b.x2 - b.x1 : b.y2 - b.y1) - (a.orientation === "h" ? a.x2 - a.x1 : a.y2 - a.y1)).slice(0, 80);
+  // Offer only the most structurally significant candidates, not the first
+  // 80 in scan order. Excessive noisy linework must be cropped or filtered
+  // manually; never silently treat hundreds of annotations as real walls.
+  return merged
+    .sort((a, b) =>
+      (Math.hypot(b.x2 - b.x1, b.y2 - b.y1) * Math.min(b.support, 8)) -
+      (Math.hypot(a.x2 - a.x1, a.y2 - a.y1) * Math.min(a.support, 8)))
+    .slice(0, MAX_RASTER_WALL_CANDIDATES);
 }
