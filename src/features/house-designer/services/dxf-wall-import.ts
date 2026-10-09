@@ -24,6 +24,7 @@ export type DxfWallDrawing = {
 };
 export type DxfWallPreview = {
   lines: CandidateLine[];
+  total: number;
   width: number;
   height: number;
   /** Real millimetres per preview pixel, or null pending calibration. */
@@ -83,8 +84,13 @@ export function extractDxfWallDrawing(parsed: ParsedDxf): DxfWallDrawing {
     }
   }
   if (!segments.length) throw new Error("No LINE or straight POLYLINE wall segments found. Use a floor-plan DXF, not a 3D model or DWG.");
-  const xs = segments.flatMap(s => [s.a.x, s.b.x]);
-  const ys = segments.flatMap(s => [s.a.y, s.b.y]);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const line of segments) {
+    for (const p of [line.a, line.b]) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+  }
   const units = Number(parsed.header?.["$INSUNITS"] ?? 0);
   const layers = [...counts].map(([name, count]) => ({
     name, count, suggested: WALL_LAYER.test(name) && !ANNOTATION_LAYER.test(name),
@@ -98,7 +104,7 @@ export function extractDxfWallDrawing(parsed: ParsedDxf): DxfWallDrawing {
   return {
     segments,
     layers,
-    bounds: { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) },
+    bounds: { minX, minY, maxX, maxY },
     mmPerDrawingUnit: DXF_UNITS[units] ?? null,
     skipped,
   };
@@ -123,8 +129,11 @@ export function dxfWallPreview(drawing: DxfWallDrawing, visibleLayers: ReadonlyS
     x: (p.x - minX) * pixelsPerUnit + 25,
     y: (maxY - p.y) * pixelsPerUnit + 25,
   });
-  const background = drawing.segments.filter(segment => visibleLayers.has(segment.layer));
-  const lines: CandidateLine[] = background.map(segment => {
+  const selectedSegments = drawing.segments.filter(segment => visibleLayers.has(segment.layer));
+  // Render only the first few thousand geometry lines as a visual reference;
+  // require layer filtering before making >400 editable wall candidates.
+  const background = selectedSegments.slice(0, 4_000);
+  const lines: CandidateLine[] = selectedSegments.slice(0, MAX_REVIEWED_WALLS + 1).map(segment => {
     const a = toPixel(segment.a), b = toPixel(segment.b);
     const dx = b.x - a.x, dy = b.y - a.y;
     return {
@@ -135,6 +144,6 @@ export function dxfWallPreview(drawing: DxfWallDrawing, visibleLayers: ReadonlyS
       support: 1,
     };
   }).filter(line => Math.hypot(line.x2 - line.x1, line.y2 - line.y1) >= 2);
-  return { lines, width, height, toPixel, background,
+  return { lines, total: selectedSegments.length, width, height, toPixel, background,
     mmPerPixel: drawing.mmPerDrawingUnit === null ? null : drawing.mmPerDrawingUnit / pixelsPerUnit };
 }
