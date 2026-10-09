@@ -102,7 +102,7 @@ export function moveWallEnd(project: HouseProject, wallId: string, end: WallEnd,
   const selection: HouseSelection = { kind: "wall", id: wallId };
   if (project.objectInstances[wallId]?.pinned) return blocked(project, "This wall is locked — unlock it to change it");
   const linked = wallJointLinked(project, wallId, end);
-  if (plain(project, wall).outline && !linked
+  if (plain(project, wall).outline && !linked)
     return blocked(project, "This exterior wall belongs to the closed footprint. Turn on Link joints before moving its corner.");
   const moving = wall[end];
   const fixed = wall[end === "start" ? "end" : "start"];
