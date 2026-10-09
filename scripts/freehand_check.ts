@@ -17,6 +17,7 @@ import {
   cleanFreehandStrokes,
   inspectFreehand,
   suggestFreehandRepairs,
+  suggestFreehandTrims,
   strokeSegments,
   type Stroke,
 } from "../src/features/house-designer/services/freehand";
@@ -204,6 +205,20 @@ const tailFixture = inspectFreehand([
 ]);
 assert.ok(tailFixture.issues.some(issue => issue.kind === "dangling-extension"),
   "short dangling extension connected to a junction is flagged for review");
+const trimCandidates = suggestFreehandTrims([
+  stroke([[-100, 0], [100, 0]], "trim-base"),
+  stroke([[0, -100], [0, 0]], "trim-arm"),
+  stroke([[0, 0], [0, 15]], "trim-short"),
+]);
+assert.ok(trimCandidates.some(item => item.strokeId === "trim-short"),
+  "isolated short tail is offered as confirmable trim");
+const complexTailCandidates = suggestFreehandTrims([
+  stroke([[-100, 0], [100, 0]], "complex-base"),
+  stroke([[0, -100], [0, 0]], "complex-arm"),
+  stroke([[0, 0], [0, 15], [0, 40]], "complex-source"),
+]);
+assert.equal(complexTailCandidates.length, 0,
+  "do not suggest deleting a multi-point stroke for a local trim");
 const intentionalProjection = inspectFreehand([
   stroke([[-100, 0], [100, 0]], "base-long"),
   stroke([[0, -100], [0, 0]], "arm-long"),
