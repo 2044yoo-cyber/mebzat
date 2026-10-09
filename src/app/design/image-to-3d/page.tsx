@@ -5,14 +5,14 @@ import { ImageTo3DImporter } from "@/features/house-designer/components/image-to
 
 export const metadata: Metadata = {
   title: "Image to 3D Floor Plan | Medosha",
-  description: "Prepare an uploaded floor-plan image for calibrated tracing, editable house modeling and future material quantity takeoffs.",
+  description: "Import DXF CAD vectors, PDF pages and floor-plan screenshots without AI. Review geometry and build editable 3D house plans.",
 };
 
 /**
  * No paid vision AI is required. The first stage uses deterministic browser
  * line detection on images or selected PDF pages. Users must calibrate and
  * review candidates before opening editable wall geometry in House Design.
- * Direct DXF geometry import and complex opening recognition remain separate work.
+ * Direct straight DXF geometry import is available; complex opening recognition remains future work.
  */
 export default function ImageTo3DPage() {
   return (
@@ -33,15 +33,14 @@ export default function ImageTo3DPage() {
       <section className="space-y-4 rounded-2xl border bg-card p-4 sm:p-6">
         <h2 className="text-lg font-semibold">Start with an existing floor plan</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Upload a CAD screenshot, floor-plan image or PDF above. Select a PDF page, calibrate a known measurement,
-          correct the detected walls with touch controls, then continue to the editable House Design plan and 3D view.
+          Upload a DXF CAD drawing, screenshot, floor-plan image or PDF above. DXF imports real vector lines from selected CAD layers, including saved drawing units when available. For images and PDFs, select the page and calibrate a known measurement. Review and correct walls, then continue to the editable House Design plan and 3D view.
           If the drawing is too complex for line detection, the existing <strong>Upload floor plan</strong> reference workflow remains available.
         </p>
         <Link href="/house-design" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand px-4 font-semibold text-brand-foreground hover:opacity-90">
           <Upload className="size-5" /> Open floor-plan importer <ArrowRight className="size-4" />
         </Link>
         <p className="text-xs text-muted-foreground">
-          Straight wall candidates are detected without AI; missing or diagonal lines can be added manually. Door and window recognition, direct DXF vectors and complex scanned drawings are not yet automatic.
+          Straight wall candidates are detected without AI; DXF LINE and POLYLINE entities can now be imported directly. Missing or angled segments can be corrected manually. Curved CAD geometry, doors, windows and difficult scans still need verification.
         </p>
       </section>
 
@@ -49,8 +48,8 @@ export default function ImageTo3DPage() {
         <h2 className="text-lg font-semibold">Conversion workflow</h2>
         <div className="grid gap-2 sm:grid-cols-2">
           {[
-            { icon: Upload, title: "1. Import", text: "Use a CAD screenshot, image or PDF as your reference." },
-            { icon: Ruler, title: "2. Calibrate", text: "Set scale using one real-world measurement; do not estimate from pixels alone." },
+            { icon: Upload, title: "1. Import", text: "Upload DXF for CAD vector walls, or use a PDF/image for line detection." },
+            { icon: Ruler, title: "2. Set scale", text: "Use DXF drawing units when known; otherwise measure one known length." },
             { icon: Grid2X2, title: "3. Verify geometry", text: "Trace walls and confirm closed rooms, openings and dimensions." },
             { icon: Building2, title: "4. View 3D", text: "Generate an editable house model from the verified floor plan." },
           ].map(({ icon: Icon, title, text }) => (
@@ -76,7 +75,7 @@ export default function ImageTo3DPage() {
         </div>
         <p className="text-xs text-muted-foreground">
           Estimating requires confirmed room boundaries, wall height, door/window openings,
-          material rates and waste allowances. Automatic takeoff from uploaded images is not implemented yet.
+          material rates and waste allowances. Automatic takeoff from unverified uploads is not implemented yet.
         </p>
       </section>
     </main>
