@@ -14,6 +14,7 @@ import {
   dimensionConflicts,
   applyFreehand,
   convertStrokes,
+  cleanFreehandStrokes,
   inspectFreehand,
   suggestFreehandRepairs,
   strokeSegments,
@@ -175,6 +176,16 @@ const fingerRectangle = stroke([
 ], "finger-rectangle");
 assert.equal(strokeSegments(fingerRectangle).length, 4,
   "one shaky continuous rectangle retains four architectural sides");
+const duplicateSource = stroke([[0, 0], [200, 0]], "duplicate");
+const dedupedSketch = cleanFreehandStrokes([
+  duplicateSource, stroke([[0, 0], [200, 0]], "copy"),
+  stroke([[200, 0], [0, 0]], "reverse"),
+  stroke([[1, 1], [1, 1]], "empty"),
+  stroke([[0, 2], [200, 2]], "parallel"),
+]);
+assert.equal(dedupedSketch.removed, 3, "exact duplicates and empty strokes are removed");
+assert.equal(dedupedSketch.strokes.length, 2, "nearby parallel wall remains independent");
+assert.equal(dedupedSketch.strokes[0], duplicateSource, "the original stroke is preserved");
 const proposedBridge = suggestFreehandRepairs([
   stroke([[0, 0], [100, 0]], "bridge-a"),
   stroke([[120, 0], [220, 0]], "bridge-b"),
