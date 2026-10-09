@@ -4,7 +4,7 @@
  * handwritten plans or reliable extraction of architectural openings.
  * It returns candidate lines for mandatory visual review, never measured areas.
  */
-export type CandidateLine = { x1: number; y1: number; x2: number; y2: number; orientation: "h" | "v" | "diagonal"; support: number };
+export type CandidateLine = { x1: number; y1: number; x2: number; y2: number; orientation: "h" | "v" | "diagonal"; support: number; layer?: string };
 export const IMAGE_IMPORT_KEY = "medosha:house-image-detection:v1";
 
 type Run = { at: number; lo: number; hi: number };
