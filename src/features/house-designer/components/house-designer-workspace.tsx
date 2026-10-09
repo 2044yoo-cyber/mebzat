@@ -158,7 +158,7 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
   const [floorPlans, setFloorPlans] = useState<DraftPlan[]>([]);
   const [title] = useState("My house");
   const [floorCount] = useState(1);
-  const [displayUnits, setDisplayUnits] = useState<DisplayUnits>("mm");
+  const [displayUnits, setDisplayUnits] = useState<DisplayUnits>("m");
   const [modelingOptions, setModelingOptions] = useState<ModelingOptions>(() => modelingPreset("house"));
   const [floorHeight] = useState(3000);
   const [style] = useState<HouseStyle>("modern");
