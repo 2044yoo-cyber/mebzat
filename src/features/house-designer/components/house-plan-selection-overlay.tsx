@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { PlanCanvas } from "@/features/berchuma-studio/components/plan/plan-canvas";
-import { levelChains, wallChain, type WallEnd } from "../services/quick-edit";
+import { levelChains, wallChain, wallJointLinked, type WallEnd } from "../services/quick-edit";
 
 import { useHouseUnits } from "./house-units";
 import { displayLength, modelLength } from "../services/workspace-options";
@@ -764,7 +764,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       {/* Editing fields belong to Select. While drawing, they sat where the
           next room or wall was being started and took the touch. */}
       {selectMode && selectedWall && !endDrag && !hold && !wallDrag ? <WallTemporaryDimension wall={selectedWall} margin={margin} selection={selections[0]!} onChange={(selection, length) => onWallLength ? onWallLength(selection, activeEnd, length) : onDimensionChange(selection, { length })} /> : null}
-      {selectMode && selectedWall && onWallExtend ? <WallEndControls wall={selectedWall} controls={wallControls(selectedWall)} preview={endDrag ? { end: endDrag.end, point: endDrag.point } : hold ? { end: hold.end, delta: hold.sign * hold.steps * holdStep } : null} unit={unit} /> : null}
+      {selectMode && selectedWall && onWallExtend ? <WallEndControls wall={selectedWall} controls={wallControls(selectedWall)} links={{ start: wallJointLinked(project, selectedWall.id, "start"), end: wallJointLinked(project, selectedWall.id, "end") }} preview={endDrag ? { end: endDrag.end, point: endDrag.point } : hold ? { end: hold.end, delta: hold.sign * hold.steps * holdStep } : null} unit={unit} /> : null}
       {selectMode && selectedWall && onWallDistance ? <WallChainView project={project} wall={selectedWall} shift={wallDrag ? (Math.abs(wallDrag.normal.x) > Math.abs(wallDrag.normal.y) ? wallDrag.normal.x : wallDrag.normal.y) * wallDrag.distance : 0} editable={!wallDrag && !endDrag && !hold} unit={unit} onDistance={(neighbourId, distance) => onWallDistance(selections[0]!, neighbourId, distance)} /> : null}
       {selectMode && selections.length === 1 && (selectedWall || selections[0]?.kind === "room") || placement ? <LevelChainsView chains={chains} bounds={levelBounds(project, levelId)} unit={unit} /> : null}
       {endDrag ? <g pointerEvents="none"><circle cx={endDrag.point.x} cy={endDrag.point.y} r={9 * mmPerPx} fill="white" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={endDrag.point.x + 14 * mmPerPx} y={endDrag.point.y - 12 * mmPerPx} fontSize={12 * mmPerPx} fill="#1473e6" aria-label="Snap">{endDrag.point.label}</text></g> : null}
@@ -1143,7 +1143,7 @@ function shortLength(mm: number, unit: ReturnType<typeof useHouseUnits>) {
 }
 
 /** A selected wall's end handles and its small + / −, with the live length while changing. */
-function WallEndControls({ wall, controls, preview, unit }: { wall: HouseProject["walls"][number]; controls: { end: WallEnd; kind: "handle" | "plus" | "minus"; at: HousePlanPoint }[]; preview: { end: WallEnd; point: HousePlanPoint } | { end: WallEnd; delta: number } | null; unit: ReturnType<typeof useHouseUnits> }) {
+function WallEndControls({ wall, controls, links, preview, unit }: { wall: HouseProject["walls"][number]; controls: { end: WallEnd; kind: "handle" | "plus" | "minus"; at: HousePlanPoint }[]; links: Record<WallEnd, boolean>; preview: { end: WallEnd; point: HousePlanPoint } | { end: WallEnd; delta: number } | null; unit: ReturnType<typeof useHouseUnits> }) {
   const px = useContext(MmPerPx);
   const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
   let start: HousePlanPoint = wall.start;
@@ -1161,7 +1161,7 @@ function WallEndControls({ wall, controls, preview, unit }: { wall: HouseProject
     <g aria-label="Wall ends">
       {preview ? <g pointerEvents="none"><line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke="#f59e0b" strokeWidth={4} vectorEffect="non-scaling-stroke" /><text aria-label="Live length" x={(start.x + end.x) / 2} y={(start.y + end.y) / 2 - 14 * px} textAnchor="middle" fontSize={15 * px} fontWeight={700} fill="#b45309" paintOrder="stroke" stroke="white" strokeWidth={4 * px}>{shortLength(live, unit)} {unit}</text></g> : null}
       {controls.map((control) => control.kind === "handle"
-        ? <circle key={`${control.end}-handle`} aria-label={`Wall ${control.end} handle`} cx={control.at.x} cy={control.at.y} r={8 * px} fill="white" stroke="#1473e6" strokeWidth={3} vectorEffect="non-scaling-stroke" />
+        ? <circle key={`${control.end}-handle`} aria-label={`Wall ${control.end} handle: ${links[control.end] ? "linked" : "independent"}`} cx={control.at.x} cy={control.at.y} r={8 * px} fill={links[control.end] ? "#dcfce7" : "white"} stroke={links[control.end] ? "#16a34a" : "#1473e6"} strokeWidth={3} vectorEffect="non-scaling-stroke" />
         : <g key={`${control.end}-${control.kind}`} aria-label={`${control.kind === "plus" ? "Lengthen" : "Shorten"} from ${control.end}`}><circle cx={control.at.x} cy={control.at.y} r={11 * px} fill={control.kind === "plus" ? "#1473e6" : "white"} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={control.at.x} y={control.at.y + 5 * px} textAnchor="middle" fontSize={16 * px} fontWeight={700} fill={control.kind === "plus" ? "white" : "#1473e6"}>{control.kind === "plus" ? "+" : "−"}</text></g>)}
     </g>
   );
