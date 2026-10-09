@@ -155,19 +155,22 @@ assert.equal(wallJointLinked(original, initially.a.id, "end"), false);
   assert.equal(tooShort.project, original);
 }
 
-// 7. Outline corners are shared by definition: protect the whole footprint
-// unless the user opts in to moving BOTH ends.
+// 7. Dragging a selected exterior WALL is an explicit edit. The two shared
+// footprint corner vertices shift, but unrelated interior endpoints do not.
+// End-HANDLE drags still require their endpoint link to be enabled.
 {
   const exterior = original.walls.find((item) =>
     original.levels[0]!.plan!.corners.some((corner) => corner.id === item.sourceWallId),
   )!;
   assert.ok(exterior);
   const result = moveHouseSelections(original, [{ kind: "wall", id: exterior.id }], 0, 200, { footprintEditable: true });
-  assert.ok(result.blocked.length > 0);
-  assert.deepEqual(result.project.levels[0]!.plan!.corners, original.levels[0]!.plan!.corners);
-  const oneEnd = toggleWallJoints(original, exterior.id, "start");
-  const stillBlocked = moveHouseSelections(oneEnd, [{ kind: "wall", id: exterior.id }], 0, 200, { footprintEditable: true });
-  assert.ok(stillBlocked.blocked.length > 0, "moving an entire outline side needs BOTH linked ends");
+  assert.deepEqual(result.blocked, [], "dragging an explicitly selected outside wall is allowed");
+  const movedWall = result.project.walls.find((item) => item.id === exterior.id)!;
+  assert.equal(movedWall.start.y, exterior.start.y + 200);
+  assert.equal(movedWall.end.y, exterior.end.y + 200);
+  assert.deepEqual(wall(result.project, "b").start, initially.b.start, "unselected interior walls do not follow exterior movement");
+  const endMove = moveWallEnd(original, exterior.id, "start", { x: exterior.start.x, y: exterior.start.y + 200 });
+  assert.ok(endMove.blocked.length, "a shared footprint CORNER still requires its link toggle");
 }
 
 console.log("Wall connections: 7 regression groups passed.");
