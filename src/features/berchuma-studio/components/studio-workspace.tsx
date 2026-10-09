@@ -144,6 +144,7 @@ export function StudioWorkspace({
   // incorrectly mixed kitchen/wardrobe geometry. The primary design is always
   // the saved record's root spec; extras live in its projectItems.
   const [activeItemId, setActiveItemId] = useState("primary");
+  const [freshProject, setFreshProject] = useState(false);
   const [newCabinetKind, setNewCabinetKind] = useState<DesignKind>("wardrobe");
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -212,7 +213,7 @@ export function StudioWorkspace({
   // studio held it in React state and nothing else had a copy until Save was
   // pressed. This keeps one in localStorage as the design changes, and offers
   // it back on the next visit.
-  const key = userId ? draftKey(userId, editing?.designId ?? null) : null;
+  const key = userId ? draftKey(userId, freshProject ? null : editing?.designId ?? null) : null;
   const [dismissed, setDismissed] = useState(false);
 
   // Open to begin with: somebody arriving needs to see what they are looking
@@ -582,6 +583,7 @@ export function StudioWorkspace({
                         }
                         if (key) clearDraft(window.localStorage, key);
                         setDismissed(true);
+                        setFreshProject(true);
                         design.clear();
                         setActiveItemId("primary");
                         setProjectMessage(null);
@@ -598,10 +600,11 @@ export function StudioWorkspace({
                       width={activeSpec?.envelope.width ?? design.spec.envelope.width}
                     />
                     <PublishBar
+                      key={freshProject ? "new-project" : editing?.designId ?? "unsaved-project"}
                       spec={design.spec}
                       lastBrief={lastBrief}
                       initialSaved={
-                        editing ? { id: editing.designId, slug: editing.slug } : null
+                        !freshProject && editing ? { id: editing.designId, slug: editing.slug } : null
                       }
                     />
                   </div>
