@@ -37,6 +37,29 @@ export function addProjectDesign(
   };
 }
 
+/** Duplicate an entire independently editable design without losing its
+ * configured doors, fittings, materials or internal partitions.
+ */
+export function duplicateProjectDesign(
+  primary: DesignSpec, sourceId: string, id: string,
+): DesignSpec {
+  if (!id || id === "primary" || primary.projectItems?.some(item => item.id === id))
+    throw new Error("This cabinet already exists in the project.");
+  if ((primary.projectItems?.length ?? 0) >= 12)
+    throw new Error("A project supports up to 13 independent cabinet designs.");
+  const source = projectDesigns(primary).find(item => item.id === sourceId);
+  if (!source) throw new Error("The cabinet to duplicate could not be found.");
+  // Only the primary object may own the collection. A copied cabinet is a
+  // complete standalone design and must never recursively embed its siblings.
+  const clone = structuredClone(source.spec);
+  const { projectItems: _siblings, ...individual } = clone;
+  individual.title = `${individual.title.slice(0, 153)} (copy)`;
+  return {
+    ...primary,
+    projectItems: [...(primary.projectItems ?? []), { id, spec: individual }],
+  };
+}
+
 export function updateProjectDesign(
   primary: DesignSpec, id: string, next: DesignSpec,
 ): DesignSpec {
