@@ -1161,7 +1161,10 @@ function WallEndControls({ wall, controls, links, preview, unit }: { wall: House
     <g aria-label="Wall ends">
       {preview ? <g pointerEvents="none"><line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke="#f59e0b" strokeWidth={4} vectorEffect="non-scaling-stroke" /><text aria-label="Live length" x={(start.x + end.x) / 2} y={(start.y + end.y) / 2 - 14 * px} textAnchor="middle" fontSize={15 * px} fontWeight={700} fill="#b45309" paintOrder="stroke" stroke="white" strokeWidth={4 * px}>{shortLength(live, unit)} {unit}</text></g> : null}
       {controls.map((control) => control.kind === "handle"
-        ? <circle key={`${control.end}-handle`} aria-label={`Wall ${control.end} handle: ${links[control.end] ? "linked" : "independent"}`} cx={control.at.x} cy={control.at.y} r={8 * px} fill={links[control.end] ? "#dcfce7" : "white"} stroke={links[control.end] ? "#16a34a" : "#1473e6"} strokeWidth={3} vectorEffect="non-scaling-stroke" />
+        ? <g key={`${control.end}-handle`} aria-label={`Wall ${control.end} handle: ${links[control.end] ? "linked" : "independent"}`}>
+            <circle cx={control.at.x} cy={control.at.y} r={10 * px} fill={links[control.end] ? "#dcfce7" : "white"} stroke={links[control.end] ? "#16a34a" : "#1473e6"} strokeWidth={3} vectorEffect="non-scaling-stroke" />
+            <text x={control.at.x} y={control.at.y + 3.5 * px} textAnchor="middle" fontSize={10 * px} fontWeight={700} fill={links[control.end] ? "#166534" : "#1d4ed8"} pointerEvents="none">{control.end === "start" ? "S" : "E"}</text>
+          </g>
         : <g key={`${control.end}-${control.kind}`} aria-label={`${control.kind === "plus" ? "Lengthen" : "Shorten"} from ${control.end}`}><circle cx={control.at.x} cy={control.at.y} r={11 * px} fill={control.kind === "plus" ? "#1473e6" : "white"} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={control.at.x} y={control.at.y + 5 * px} textAnchor="middle" fontSize={16 * px} fontWeight={700} fill={control.kind === "plus" ? "white" : "#1473e6"}>{control.kind === "plus" ? "+" : "−"}</text></g>)}
     </g>
   );
