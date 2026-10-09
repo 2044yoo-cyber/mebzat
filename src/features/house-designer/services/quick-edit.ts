@@ -73,15 +73,36 @@ export function setWallLength(project: HouseProject, wallId: string, end: WallEn
   return extendWall(project, wallId, end, length - unit(wall).length);
 }
 
-/** One end of a wall dragged to a point; the other end stays put. */
+/**
+ * Move an endpoint together with other wall endpoints at the same junction.
+ * Only exact/near-exact shared endpoints are changed; unrelated crossing
+ * walls and mid-wall T intersections are left untouched.
+ */
 export function moveWallEnd(project: HouseProject, wallId: string, end: WallEnd, to: Point): HouseCommandMutation {
   const wall = project.walls.find((item) => item.id === wallId);
   if (!wall) return blocked(project, "Wall not found");
-  const fixed = end === "end" ? wall.start : wall.end;
-  if (Math.hypot(to.x - fixed.x, to.y - fixed.y) < 200) return blocked(project, "A wall cannot be shorter than 200 mm");
+  const from = wall[end];
   const selection: HouseSelection = { kind: "wall", id: wall.id };
-  const patch: HousePatch = end === "end" ? { endX: to.x, endY: to.y } : { startX: to.x, startY: to.y };
-  return { project: patchHouseObject(project, selection, patch), selections: [selection], blocked: [] };
+  const connected = project.walls.flatMap((item) =>
+    item.levelId !== wall.levelId ? [] : (["start", "end"] as const)
+      .filter((side) => Math.hypot(item[side].x - from.x, item[side].y - from.y) <= TOLERANCE)
+      .map((side) => ({ wall: item, side })),
+  );
+  if (!connected.length) return blocked(project, "Wall endpoint not found");
+  for (const joint of connected) {
+    const fixed = joint.wall[joint.side === "start" ? "end" : "start"];
+    if (Math.hypot(to.x - fixed.x, to.y - fixed.y) < 200) {
+      return blocked(project, "Moving this junction would make a connected wall shorter than 200 mm");
+    }
+  }
+  let next = project;
+  for (const joint of connected) {
+    const patch: HousePatch = joint.side === "end"
+      ? { endX: to.x, endY: to.y }
+      : { startX: to.x, startY: to.y };
+    next = patchHouseObject(next, { kind: "wall", id: joint.wall.id }, patch);
+  }
+  return { project: next, selections: [selection], blocked: [] };
 }
 
 /** An inside wall turned a quarter about its middle. The outline is the house's shape, and is not turned. */
