@@ -462,6 +462,8 @@ const ACTION_ICONS: Record<string, typeof Copy> = {
   divide: SplitSquareHorizontal,
   move: Move,
   junction: Link2,
+  "junction-start": Link2,
+  "junction-end": Link2,
   lock: Lock,
   delete: Trash2,
   agenda: CalendarPlus,
@@ -482,7 +484,7 @@ const ACTION_ICONS: Record<string, typeof Copy> = {
 function ActionIcon({ action }: { action: QuickAction }) {
   const Icon = (action.id === "lock" && action.label === "Unlock"
     ? LockOpen
-    : action.id === "junction" && !action.pressed
+    : action.id.startsWith("junction") && !action.pressed
       ? Unlink2
       : ACTION_ICONS[action.id]) ?? MoreHorizontal;
   return <Icon className="size-4" aria-hidden />;
