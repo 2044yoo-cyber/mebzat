@@ -355,7 +355,7 @@ export const baySchema = z.object({
     .array(
       z.object({
         run: z.number().int().min(0).default(0),
-        leaf: z.number().int().min(0).max(1),
+        leaf: z.number().int().min(0).max(11),
         x: z.number(),
         y: z.number(),
         width: z.number().positive(),
