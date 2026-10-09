@@ -85,7 +85,7 @@ import { HouseTemplateLibrary } from "./house-template-library";
 import { ObjectLibrarySheet, type LibraryChoice, type LibraryKind, type StairSpace } from "./house-object-library";
 import { ObjectSymbol, StairSymbol } from "./plan-symbols";
 import { ColumnSymbol } from "./house-plan-selection-overlay";
-import { placeAgainstWall, snapToFurniture } from "../services/object-library";
+import { doorType, placeAgainstWall, snapToFurniture } from "../services/object-library";
 import { stairGeometry } from "../services/stair-geometry";
 import { planDescriptionError } from "../services/plan-analysis";
 import { acceptColumnProposals, suggestColumns, type ColumnProposal } from "../services/column-suggestions";
@@ -1150,15 +1150,6 @@ function PlanEditor({
     applyMutation(edit());
   }
 
-  function startPlacement(roomId: string) {
-    const rectangle = roomRectangle(project, roomId);
-    const room = project.rooms.find((item) => item.id === roomId);
-    if (!rectangle || !room) { toast.info("A copy can be made of a rectangular room"); return; }
-    const numbered = /^(.*?)(\d+)$/.exec(room.name);
-    setPlacement({ ...rectangle, x: rectangle.x + rectangle.width, name: numbered ? `${numbered[1]}${Number(numbered[2]) + 1}` : `${room.name} 2` });
-    setSelections([]);
-  }
-
   function placeCopy() {
     if (!placement) return;
     const result = createRoomFromGesture(project, activeLevelId, { x: placement.x, y: placement.y }, { x: placement.x + placement.width, y: placement.y + placement.depth }, "rectangle", { wallThickness: 120 });
@@ -1168,6 +1159,21 @@ function PlanEditor({
     commit(named);
     setSelections(created ? [{ kind: "room", id: created.id }] : result.selections);
     setPlacement(null);
+  }
+
+  // Doors stay attached to their wall. Change their hinge and swing rather than
+  // rotating the opening (which would detach it from the wall).
+  function flipDoor(selection: HouseSelection, direction: "hinge" | "swing") {
+    const door = project.doors.find((item) => item.id === selection.id);
+    if (!door) return;
+    const conflict = lockConflict(project, selection);
+    if (conflict) { toast.info(conflict); return; }
+    const side = door.swing.startsWith("out") ? "out" : "in";
+    const hinge = door.swing.endsWith("left") ? "left" : "right";
+    const swing = direction === "hinge"
+      ? `${side}-${hinge === "left" ? "right" : "left"}`
+      : `${side === "in" ? "out" : "in"}-${hinge}`;
+    commit(patchHouseObject(project, selection, { swing }));
   }
 
   function quickActions(selection: HouseSelection): { label: string; actions: QuickAction[]; more: QuickAction[] } {
@@ -1214,13 +1220,26 @@ function PlanEditor({
           label: "Room actions",
           actions: [
             { id: "divide", label: "Split", onSelect: () => setRoomSplit(selection.id) },
-            { id: "duplicate", label: "Duplicate", onSelect: () => startPlacement(selection.id) },
             { id: "rename", label: "Rename", onSelect: () => setPropertiesFor(selection.id) },
           ],
           more: [{ id: "merge", label: "Merge with…", onSelect: run("merge") }, ...shared],
         };
-      case "door":
-        return { label: "Door actions", actions: [{ id: "flip", label: "Flip", onSelect: run("flip") }, duplicate, move], more: shared };
+      case "door": {
+        const door = project.doors.find((item) => item.id === selection.id);
+        const style = doorType(door?.style);
+        const hinged = style === "single" || style === "pivot";
+        const swings = style === "single" || style === "double" || style === "pivot" || style === "folding";
+        return {
+          label: "Door actions",
+          actions: [
+            ...(hinged ? [{ id: "door-hinge", label: "Flip hinge left / right", onSelect: () => flipDoor(selection, "hinge") }] : []),
+            ...(swings ? [{ id: "door-swing", label: "Flip door front / back (in / out)", onSelect: () => flipDoor(selection, "swing") }] : []),
+            move,
+            { id: "door-type", label: "Change door type and swing", onSelect: () => setPropertiesFor(selection.id) },
+          ],
+          more: [duplicate, ...shared],
+        };
+      }
       case "window":
         return { label: "Window actions", actions: [duplicate, move], more: shared };
       case "component":
@@ -1242,6 +1261,11 @@ function PlanEditor({
       case "select": chooseTool("select"); return;
       case "cancel": {
         const now = Date.now();
+        if (placement) {
+          setPlacement(null);
+          escapeRef.current = now;
+          return;
+        }
         if (draftStart || outlineSketch.length) {
           setDraftStart(null);
           setOutlineSketch([]);
@@ -1257,13 +1281,25 @@ function PlanEditor({
       }
       case "finish": setActiveTool("select"); setDraftStart(null); return;
       case "delete": deleteSelection(); return;
-      case "copy": clipboard.current = { sourceProjectId: project.id, selections: [...selections] }; return;
+      case "copy": {
+        const copyable = selections.filter((selection) => selection.kind !== "room");
+        if (copyable.length !== selections.length) toast.info("Rooms cannot be copied. Use the Room tool to draw another.");
+        clipboard.current = copyable.length ? { sourceProjectId: project.id, selections: copyable } : null;
+        return;
+      }
       case "cut": clipboard.current = { sourceProjectId: project.id, selections: [...selections] }; deleteSelection(); return;
       case "paste": {
         if (!clipboard.current || clipboard.current.sourceProjectId !== project.id) return;
-        applyMutation(duplicateHouseSelections(project, clipboard.current.selections, 250)); return;
+        const copyable = clipboard.current.selections.filter((selection) => selection.kind !== "room");
+        if (!copyable.length) { toast.info("Rooms cannot be copied. Use the Room tool to draw another."); return; }
+        applyMutation(duplicateHouseSelections(project, copyable, 250)); return;
       }
-      case "duplicate": applyMutation(duplicateHouseSelections(project, selections)); return;
+      case "duplicate": {
+        const copyable = selections.filter((selection) => selection.kind !== "room");
+        if (copyable.length !== selections.length) toast.info("Rooms cannot be copied. Use the Room tool to draw another.");
+        if (copyable.length) applyMutation(duplicateHouseSelections(project, copyable));
+        return;
+      }
       case "rotate": applyMutation(rotateHouseSelections(project, selections)); return;
       case "flip": applyMutation(mirrorHouseSelections(project, selections)); return;
       case "select-all": setSelections(allHouseSelections(project, activeLevelId).filter((item) => item.kind !== "level")); return;
@@ -1404,6 +1440,10 @@ function PlanEditor({
                   </div>
                 ) : null}
               </div>
+              {placement ? <div role="region" aria-label="Room copy pending" className="flex items-center justify-between gap-2 rounded-xl border border-amber-400/50 bg-card p-2 text-sm">
+                <span className="text-muted-foreground">Room copy not placed</span>
+                <button type="button" onClick={() => setPlacement(null)} className="min-h-11 rounded-lg border px-4 font-semibold">Cancel copy</button>
+              </div> : null}
               <PlanSecondaryBar canRedo={future.length > 0} onRedo={redo} snap={snapEnabled} onSnap={() => setSnapEnabled((value) => !value)} grid={gridVisible} onGrid={() => setGridVisible((value) => !value)} more={moreTools} />
               <HouseMeasurementsDrawer project={project} levelId={activeLevelId} onSelect={(selection) => { setActiveTool("select"); setSelections([selection]); }} onSendToAgenda={link ? (text) => void sendMeasurements(text) : undefined} />
               {bottomActions}
