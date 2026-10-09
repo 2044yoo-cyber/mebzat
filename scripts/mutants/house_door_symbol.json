@@ -1,0 +1,56 @@
+[
+ {
+  "name": "dashed faint swing again",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "d={`M${shut.x},${shut.y} A${length},${length} 0 0 ${sweep} ${open.x},${open.y}`} {...LINE} strokeWidth={0.9} />",
+  "to": "d={`M${shut.x},${shut.y} A${length},${length} 0 0 ${sweep} ${open.x},${open.y}`} {...FAINT} strokeDasharray=\"40 30\" />"
+ },
+ {
+  "name": "hinge on the wall centre",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    const hinge = at(from, hingeAlong, half);",
+  "to": "    const hinge = at(from, hingeAlong, 0);"
+ },
+ {
+  "name": "hinge on the wrong face",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    const hinge = at(from, hingeAlong, half);",
+  "to": "    const hinge = at(from, hingeAlong, -half);"
+ },
+ {
+  "name": "no jambs",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "  const jambs = <>{jamb(0, \"j0\")}{jamb(width, \"j1\")}</>;",
+  "to": "  const jambs = <>{jamb(0, \"j0\")}</>;"
+ },
+ {
+  "name": "jambs only halfway across",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "const p = at(from, along, -half); const q = at(from, along, half); return <line key={key} data-door-part=\"jamb\"",
+  "to": "const p = at(from, along, 0); const q = at(from, along, half); return <line key={key} data-door-part=\"jamb\""
+ },
+ {
+  "name": "leaf a hairline",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    const leafThickness = Math.min(40, length / 10);",
+  "to": "    const leafThickness = 0;"
+ },
+ {
+  "name": "leaf hung on the wrong jamb",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    default: return <g data-door={type}>{jambs}{leaf(hingeAtFrom ? 0 : width, width, direction, \"a\")}</g>;",
+  "to": "    default: return <g data-door={type}>{jambs}{leaf(0, width, direction, \"a\")}</g>;"
+ },
+ {
+  "name": "leaf leaning, not square to the wall",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    const open = at(hinge, 0, length);",
+  "to": "    const open = at(hinge, length * 0.3 * direction, length * 0.95);"
+ },
+ {
+  "name": "double door one leaf",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "{jambs}{leaf(0, width / 2, 1, \"a\")}{leaf(width, width / 2, -1, \"b\")}",
+  "to": "{jambs}{leaf(0, width, 1, \"a\")}"
+ }
+]
