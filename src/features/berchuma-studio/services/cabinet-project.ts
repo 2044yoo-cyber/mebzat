@@ -2,7 +2,9 @@ import type { DesignSpec, DesignKind } from "../types/spec";
 import { parseSpec } from "../types/spec";
 import { startingDesign } from "./starting-designs";
 import { buildParts } from "./geometry";
-import { buildCutList } from "./cutlist";
+import { buildCutList, type CutListRow } from "./cutlist";
+import { nestBoard, type BoardNesting } from "./nesting";
+import { findBoard } from "../types/catalogue";
 import { buildXlsx, type Cell, type Sheet } from "./xlsx";
 
 /**
@@ -74,7 +76,7 @@ function validProjectDesigns(primary: DesignSpec): ProjectItem[] {
 export type ProjectProductionSummary = {
   designs: number;
   pieces: number;
-  sheets: { board: string; sheets: number; pieces: number; area: number }[];
+  sheets: { board: string; sheets: number; separateSheets: number; pieces: number; area: number }[];
   workbook: Uint8Array;
   rows: { design: string; partId: string; cabinet: string; label: string; board: string;
     length: number; width: number; thickness: number; quantity: number; banding: string }[];
@@ -98,6 +100,13 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     "Banding", "Band product", "Grain locked", "Area (m²)"
   ]];
   const boards = new Map<string, { board: string; sheets: number; pieces: number; area: number }>();
+  // Keep parts labeled by design. Their board types may share one cutting
+  // layout without merging separately identifiable manufactured pieces.
+  const sharedInputs = new Map<string, {
+    rows: CutListRow[];
+    separate: { design: string; nesting: BoardNesting }[];
+  }>();
+  let globallyUniqueRow = 0;
   const hardware: Cell[][] = [["Design", "Hardware", "Qty", "Unit", "Note"]];
   const summary: Cell[][] = [["Design", "Category", "Pieces", "Area (m²)", "Sheets"]];
   cuts.forEach(({ title, cut }, index) => {
@@ -122,6 +131,16 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
       entry.pieces += board.pieces;
       entry.area += board.area;
       boards.set(board.boardId, entry);
+      const grouped = sharedInputs.get(board.boardId) ?? { rows: [], separate: [] };
+      for (const row of board.rows) {
+        grouped.rows.push({
+          ...row,
+          index: ++globallyUniqueRow,
+          label: `${title} — ${row.partId} — ${row.label}`,
+        });
+      }
+      grouped.separate.push({ design: title, nesting: board.nesting });
+      sharedInputs.set(board.boardId, grouped);
     });
     cut.hardware.forEach(item => hardware.push([
       title, item.label, item.quantity, item.unit, item.note,
@@ -131,19 +150,57 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
       cut.totals.area, cut.byBoard.reduce((sum, b) => sum + b.sheets, 0),
     ]);
   });
-  const sheetSummary: Cell[][] = [["Board", "Sheets", "Pieces", "Area (m²)"]];
-  const sheets = [...boards.values()].map(item => ({
-    ...item, area: Math.round(item.area * 1000) / 1000,
-  }));
+  const sheetSummary: Cell[][] = [[
+    "Board", "Shared sheets to buy", "Separate-sheet baseline", "Sheets saved", "Pieces", "Area (m²)"
+  ]];
+  const layout: Cell[][] = [["Board", "Sheet", "Part / source design", "X (mm)", "Y (mm)", "Cut width (mm)", "Cut height (mm)", "Rotated"]];
+  const sheets = [...boards.entries()].map(([id, item]) => {
+    const group = sharedInputs.get(id);
+    const board = findBoard(id);
+    if (!group || !board) throw new Error(`Unknown manufacturing board: ${id}`);
+    const shared = nestBoard(board, group.rows);
+    // Shelf packing is a heuristic: with more pieces, it can occasionally
+    // choose a worse arrangement. Keep the separate verified plans whenever
+    // shared nesting does not improve the sheet count.
+    const useShared = shared.unplaced.length === 0 && shared.sheets.length <= item.sheets;
+    if (useShared) {
+      for (const sheet of shared.sheets) for (const place of sheet.placements) {
+        const source = group.rows.find(row => row.index === place.index);
+        layout.push([board.label, sheet.number, source?.label ?? place.label,
+          place.x, place.y, place.width, place.height, place.rotated ? "Yes" : "No"]);
+      }
+    } else {
+      let sheetOffset = 0;
+      for (const source of group.separate) {
+        for (const sheet of source.nesting.sheets) for (const place of sheet.placements) {
+          layout.push([board.label, sheet.number + sheetOffset,
+            `${source.design} — ${place.label}`,
+            place.x, place.y, place.width, place.height,
+            place.rotated ? "Yes" : "No"]);
+        }
+        sheetOffset += source.nesting.sheets.length;
+      }
+    }
+    return {
+      board: item.board,
+      sheets: useShared ? shared.sheets.length : item.sheets,
+      separateSheets: item.sheets,
+      pieces: item.pieces,
+      area: Math.round(item.area * 1000) / 1000,
+    };
+  });
   sheets.forEach(item => sheetSummary.push([
-    item.board, item.sheets, item.pieces, item.area,
+    item.board, item.sheets, item.separateSheets,
+    item.separateSheets - item.sheets, item.pieces, item.area,
   ]));
   sheetSummary.push([]);
-  sheetSummary.push(["Sheet counts are the sum of each design's verified nesting."]);
-  sheetSummary.push(["No shared offcut optimization across separate designs is assumed."]);
+  sheetSummary.push(["Sheet layouts are calculated across matching board materials where doing so saves sheets."]);
+  sheetSummary.push(["Cut part IDs and source cabinet names remain distinct for assembly."]);
+  sheetSummary.push(["Offcuts shared between unrelated board types or grain directions are never assumed."]);
   const workbookSheets: Sheet[] = [
     { name: "Combined cut list", rows: cutting, widths: [11, 32, 22, 32, 25, 23, 16, 16, 17, 12, 24, 20, 14, 14] },
-    { name: "Board totals", rows: sheetSummary, widths: [36, 14, 14, 19] },
+    { name: "Board totals", rows: sheetSummary, widths: [36, 21, 25, 16, 14, 19] },
+    { name: "Cutting layout", rows: layout, widths: [32, 10, 55, 12, 12, 18, 19, 12] },
     { name: "Hardware", rows: hardware, widths: [34, 32, 12, 12, 50] },
     { name: "Design summary", rows: summary, widths: [35, 17, 15, 19, 13] },
   ];
