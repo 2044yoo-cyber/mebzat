@@ -267,6 +267,57 @@ export function inspectFreehand(
   return { segments, issues };
 }
 
+/** Proposed gap closures never change the sketch until approved. */
+export type FreehandRepair = {
+  id: string;
+  start: Point;
+  end: Point;
+  length: number;
+  label: string;
+};
+export function suggestFreehandRepairs(
+  strokes: readonly Stroke[],
+  snapPixels = 12,
+  unitsPerPixel = 1,
+): FreehandRepair[] {
+  const { issues, segments } = inspectFreehand(strokes, snapPixels, unitsPerPixel);
+  const open = issues.filter(issue => issue.kind === "open-end");
+  const maxGap = Math.max(16 * unitsPerPixel, snapPixels * unitsPerPixel * 2.5);
+  const used = new Set<string>(), proposals: FreehandRepair[] = [];
+  for (const item of open) {
+    if (used.has(item.id)) continue;
+    const candidates = open.filter(other => other.id !== item.id &&
+      !used.has(other.id) && distance(item.point, other.point) <= maxGap &&
+      distance(item.point, other.point) > Math.max(1e-4, unitsPerPixel));
+    const ordered = candidates.sort((a,b) => distance(item.point, a.point) - distance(item.point, b.point));
+    const chosen = ordered[0];
+    if (!chosen) continue;
+    const nearest = distance(item.point, chosen.point);
+    // Two similarly plausible destinations are ambiguous; don't guess.
+    if (ordered[1] && distance(item.point, ordered[1]!.point) < nearest * 1.5) continue;
+    const reverse = open.filter(other => other.id !== chosen.id &&
+      distance(chosen.point, other.point) <= maxGap)
+      .sort((a,b) => distance(chosen.point,a.point) - distance(chosen.point,b.point));
+    if (reverse[0]?.id !== item.id) continue;
+    // Avoid adding a bridge across an existing wall segment, or a diagonal
+    // jump between unrelated nearby walls.
+    const crosses = segments.some(edge => {
+      const a = item.point, b = chosen.point, c = edge.start, d = edge.end;
+      const den = (b.x-a.x)*(d.y-c.y)-(b.y-a.y)*(d.x-c.x);
+      if (Math.abs(den) < 1e-8) return false;
+      const t = ((c.x-a.x)*(d.y-c.y)-(c.y-a.y)*(d.x-c.x))/den;
+      const u = ((c.x-a.x)*(b.y-a.y)-(c.y-a.y)*(b.x-a.x))/den;
+      return t > 0.02 && t < 0.98 && u > 0.02 && u < 0.98;
+    });
+    if (crosses) continue;
+    used.add(item.id); used.add(chosen.id);
+    proposals.push({ id: `bridge-${[item.id,chosen.id].sort().join("-")}`,
+      start: item.point, end: chosen.point, length: nearest,
+      label: "Connect these two open wall endpoints" });
+  }
+  return proposals;
+}
+
 /** Convert to native level walls; existing editor, save and takeoff consume them. */
 export function applyFreehand(
   project: HouseProject,
