@@ -1619,7 +1619,7 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   // its frosted card — a file-wide search for the blur matched that instead
   // and failed on correct code.
   const padStart = editor.indexOf('{view === "solid" && selected && movePad ? (');
-  const padEnd = editor.indexOf("{/* Bottom left:", padStart);
+  const padEnd = editor.indexOf('<div className="pointer-events-none absolute inset-x-0 bottom-0', padStart);
   const padRegion =
     padStart === -1 || padEnd === -1 ? "" : editor.slice(padStart, padEnd);
 
