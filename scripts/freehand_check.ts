@@ -133,6 +133,14 @@ const nearT = convertStrokes([
   stroke([[100, 100], [103, 6]], "branch"),
 ], 20);
 assert.equal(nearT.length, 3, "near T endpoint snaps onto a wall and splits it");
+const nearAxis = convertStrokes([
+  stroke([[0, 0], [200, 8]], "slanted-top"),
+  stroke([[203, 0], [204, 200]], "near-vertical"),
+], 20);
+assert.ok(nearAxis.some(w => Math.abs(w.start.y - w.end.y) < 1),
+  "rough horizontal line squares onto one axis");
+assert.ok(nearAxis.some(w => Math.abs(w.start.x - w.end.x) < 1),
+  "rough vertical line squares onto one axis");
 const diagonal = convertStrokes(
   [
     stroke([
