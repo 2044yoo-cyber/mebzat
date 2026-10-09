@@ -551,7 +551,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
       else doors.push(item);
     }
 
-    slabs.push({
+    if (plan.corners.length >= 3) slabs.push({
       id: `${levelId}:slab`,
       levelId,
       boundary: plan.corners.map(copyPoint),
@@ -585,7 +585,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
 
   const top = levels[levels.length - 1];
   const topPlan = top.plan ?? input.room;
-  const roofs: HouseProject["roofs"] = [
+  const roofs: HouseProject["roofs"] = topPlan.corners.length >= 3 ? [
     {
       id: "main-roof",
       levelId: top.id,
@@ -598,7 +598,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
       thickness: 180,
       material: "Reinforced concrete",
     },
-  ];
+  ] : [];
   const facade = facadeSettingsForStyle(input.style, input.referenceImages?.some((image) => image.kind === "facade") ?? false);
   const facadeElements = buildFacadeElements(walls, levels, facade);
   const structuralColumns = buildStructuralColumns(levels);
