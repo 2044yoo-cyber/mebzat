@@ -130,6 +130,7 @@ import { exportPlanImage, printPlan } from "../services/plan-export";
 import { createHouseTakeoffPackage, HOUSE_TAKEOFF_SESSION_KEY } from "../services/takeoff-adapter";
 import { FreehandCanvas } from "./freehand-canvas";
 import { applyFreehand, dimensionRectangle, dimensionConflicts, calibrateFromWall, rememberWallLength } from "../services/freehand";
+import { IMAGE_IMPORT_KEY } from "../services/image-line-detection";
 
 type Stage = "start" | "editor" | "loading";
 type Source = "freehand" | "manual" | "rooms" | "upload" | "sketch" | "template" | "describe";
@@ -217,6 +218,69 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
     // `persist` reads refs; the schedule depends only on what changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project, link, stage]);
+
+  // One-time browser-local handoff from Design → Image to 3D.
+  // No AI endpoint is called; the imported candidate walls stay editable.
+  useEffect(() => {
+    if (planId || new URLSearchParams(window.location.search).get("import") !== "image") return;
+    const raw = window.sessionStorage.getItem(IMAGE_IMPORT_KEY);
+    if (!raw) return;
+    window.sessionStorage.removeItem(IMAGE_IMPORT_KEY);
+    try {
+      const payload = JSON.parse(raw) as {
+        version?: number;
+        createdAt?: number;
+        source?: string;
+        mmPerUnit?: number;
+        lines?: { start: { x: number; y: number }; end: { x: number; y: number } }[];
+      };
+      if (payload.version !== 1 || !payload.createdAt || Date.now() - payload.createdAt > 10 * 60_000 ||
+          !Number.isFinite(payload.mmPerUnit) || (payload.mmPerUnit ?? 0) <= 0 ||
+          !Array.isArray(payload.lines) || !payload.lines.length || payload.lines.length > 80 ||
+          payload.lines.some(line => !line || !line.start || !line.end ||
+            ![line.start.x, line.start.y, line.end.x, line.end.y].every(Number.isFinite))) {
+        throw new Error("The image conversion expired or contains invalid wall data. Please detect the image again.");
+      }
+      const sketch: NonNullable<HouseProject["freehandSketch"]> = {
+        version: 1,
+        calibrated: true,
+        mmPerUnit: payload.mmPerUnit!,
+        strokes: payload.lines.map((line, index) => ({
+          id: `image-wall-${index + 1}`,
+          thickness: 200,
+          points: [
+            { x: line.start.x * payload.mmPerUnit!, y: line.start.y * payload.mmPerUnit! },
+            { x: line.end.x * payload.mmPerUnit!, y: line.end.y * payload.mmPerUnit! },
+          ],
+        })),
+      };
+      // applyFreehand converts the coordinates as-is. The detector's scale
+      // is applied exactly once above, never again by a paid AI service.
+      const blank = openSpace(createHouseProject({
+        title: "Imported floor plan",
+        room: rectangularRoom(8000, 6500),
+        style: "modern",
+        strict: false,
+        floorCount: 1,
+        floorToFloorHeight: 3000,
+      }));
+      const imported = ensureHouseBimState(applyFreehand(blank, { ...sketch, mmPerUnit: 1 }, 8));
+      setProject({ ...imported, displayUnits: "m" });
+      setSource("upload");
+      setLink(null);
+      setStatus("device");
+      setTab("plan");
+      setStartTool("select");
+      setPlanAnalysis("Candidate walls imported from image without AI. Verify all positions, close rooms, add openings and correct dimensions before using 3D or estimating floor and painting areas.");
+      setStage("editor");
+      toast.success("Detected wall candidates imported. Check the geometry before estimating.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Image import failed.");
+    } finally {
+      window.history.replaceState(null, "", "/house-design");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planId]);
 
   // Opened from a link: /house-design?plan=…
   useEffect(() => {
