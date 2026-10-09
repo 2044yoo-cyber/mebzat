@@ -259,16 +259,26 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
   if (!level || !plan || !sourceWallId) return next;
 
   const startIndex = plan.corners.findIndex((corner) => corner.id === sourceWallId);
+  // A wall shares its coordinates with other walls geometrically, but that
+  // alone must never give it permission to drag their endpoints. Linking is
+  // opt-in and saved with this particular wall.
+  const linkedJoints = project.objectInstances[id]?.properties.linkedJoints === true;
+  const movingGeometry = ["startX", "startY", "endX", "endY"].some((key) => key in effectivePatch);
+  // The footprint is stored as a CLOSED polygon. Moving one of its sides
+  // necessarily moves both neighbouring sides; require explicit consent.
+  if (startIndex >= 0 && movingGeometry && !linkedJoints) return project;
   if (startIndex < 0) {
     const interior = plan.interiorWalls?.find((item) => item.id === sourceWallId);
     if (!interior) return next;
     const start = { x: numberOr(effectivePatch.startX, interior.start.x), y: numberOr(effectivePatch.startY, interior.start.y) };
     const end = { x: numberOr(effectivePatch.endX, interior.end.x), y: numberOr(effectivePatch.endY, interior.end.y) };
-    // The walls that meet it (at a corner or a T) stay joined to it: their
-    // ends keep their place along its line, wherever the line goes. The
-    // house's outside corners are never moved by an inside wall. The rooms
-    // are not dragged with it: they are traced again from the walls.
-    const follow = attachedTo(interior.start, interior.end, start, end, plan.freehand ? 0.01 : interior.thickness / 2 + 5);
+    // Only an explicitly linked wall may bring its neighbours along.
+    // An independent move preserves every other wall endpoint unchanged.
+    // Exact centreline joints (including a T) may follow when linked, but
+    // merely brushing the face of another thick wall does not link it.
+    const follow = linkedJoints
+      ? attachedTo(interior.start, interior.end, start, end, 1)
+      : (point: { x: number; y: number }) => point;
     const outside = new Set(plan.corners.map((corner) => `${corner.x},${corner.y}`));
     const keepOutside = (point: { x: number; y: number }) => outside.has(`${point.x},${point.y}`) ? point : follow(point);
     return rebuildLevel(next, level.id, withDerivedZones(plan, {
@@ -300,9 +310,11 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
     }
     return corner;
   });
-  // Inside walls ending on this wall go with it; the rooms are traced again
-  // from the walls, not dragged.
-  const follow = attachedTo(plan.corners[startIndex]!, plan.corners[endIndex]!, corners[startIndex]!, corners[endIndex]!, plan.wallThickness / 2 + 5);
+  // A footprint move is possible only in linked mode. It can carry exact
+  // interior-wall junctions, but must never absorb nearby unrelated ends.
+  const follow = linkedJoints
+    ? attachedTo(plan.corners[startIndex]!, plan.corners[endIndex]!, corners[startIndex]!, corners[endIndex]!, 1)
+    : (point: { x: number; y: number }) => point;
   const changedPlan: Room = withDerivedZones(plan, {
     ...plan,
     corners,
@@ -994,6 +1006,12 @@ function attachedTo(oldStart: { x: number; y: number }, oldEnd: { x: number; y: 
   const lengthSquared = dx * dx + dy * dy;
   return (point: { x: number; y: number }) => {
     if (!lengthSquared) return point;
+    // An endpoint actually pinned to the moving wall's endpoint follows
+    // that same endpoint, including when the selected wall changes length.
+    if (Math.hypot(point.x - oldStart.x, point.y - oldStart.y) <= tolerance)
+      return { x: micron(newStart.x), y: micron(newStart.y) };
+    if (Math.hypot(point.x - oldEnd.x, point.y - oldEnd.y) <= tolerance)
+      return { x: micron(newEnd.x), y: micron(newEnd.y) };
     const t = ((point.x - oldStart.x) * dx + (point.y - oldStart.y) * dy) / lengthSquared;
     if (t < -0.001 || t > 1.001) return point;
     const off = Math.abs((point.x - oldStart.x) * dy - (point.y - oldStart.y) * dx) / Math.sqrt(lengthSquared);
