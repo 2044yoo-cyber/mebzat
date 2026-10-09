@@ -22,6 +22,8 @@ import { useDesign } from "../hooks/use-design";
 import { startingDesign } from "../services/starting-designs";
 import { addProjectDesign, projectDesigns, removeProjectDesign, updateProjectDesign } from "../services/cabinet-project";
 import { buildParts } from "../services/geometry";
+import { buildCutList, sheetCountsOf } from "../services/cutlist";
+import { calculateCost } from "../services/costing";
 import type { DesignCard } from "../services/designs";
 import {
   differsFrom,
@@ -149,10 +151,24 @@ export function StudioWorkspace({
   const activeItem = projectItems.find(item => item.id === activeItemId) ?? projectItems[0];
   const activeSpec = activeItem?.spec ?? null;
   const activePartCount = useMemo(() => activeSpec ? buildParts(activeSpec).totals.partCount : 0, [activeSpec]);
-  const updateActive = (next: DesignSpec) => {
+  const activeCostState = useMemo(() => {
+    if (!activeSpec) return null;
+    if (activeItemId === "primary")
+      return { cost: design.cost, issues: design.issues };
+    const parts = buildParts(activeSpec);
+    const cut = buildCutList(activeSpec, parts);
+    return {
+      cost: calculateCost(activeSpec, parts, {
+        rates: stableRates, sheetCounts: sheetCountsOf(cut),
+        manufacturable: cut.buildable,
+      }),
+      issues: [],
+    };
+  }, [activeSpec, activeItemId, design.cost, design.issues, stableRates]);
+  const updateActive = useCallback((next: DesignSpec) => {
     if (!design.spec) return;
     design.set(updateProjectDesign(design.spec, activeItemId, next));
-  };
+  }, [design.spec, design.set, activeItemId]);
   const addAnotherCabinet = () => {
     if (!design.spec) return;
     try {
@@ -285,7 +301,7 @@ export function StudioWorkspace({
         const body: DesignRequestBody = {
           brief,
           history,
-          current: design.spec,
+          current: activeSpec,
         };
 
         const response = await fetch("/api/studio/design", {
@@ -316,7 +332,8 @@ export function StudioWorkspace({
         ]);
 
         if (payload.spec) {
-          replace(payload.spec, payload.issues);
+          if (design.spec) updateActive(payload.spec);
+          else replace(payload.spec, payload.issues);
           // A phone shows one column at a time, and the thing worth seeing
           // after a design lands is the design.
           setTab("design");
@@ -329,7 +346,7 @@ export function StudioWorkspace({
         setBusy(false);
       }
     },
-    [design.spec, messages, replace],
+    [design.spec, activeSpec, messages, replace, updateActive],
   );
 
   const chat = (
@@ -735,11 +752,11 @@ export function StudioWorkspace({
             tab === "cost" ? "block" : "hidden",
           )}
         >
-          {design.cost && design.spec ? (
+          {activeCostState?.cost && activeSpec ? (
             <CostPanel
-              cost={design.cost}
-              issues={design.issues}
-              assumptions={design.spec.meta.assumptions}
+              cost={activeCostState.cost}
+              issues={activeCostState.issues}
+              assumptions={activeSpec.meta.assumptions}
             />
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground">
