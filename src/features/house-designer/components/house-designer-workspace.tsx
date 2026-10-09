@@ -1268,7 +1268,17 @@ function PlanEditor({
         clipboard.current = copyable.length ? { sourceProjectId: project.id, selections: copyable } : null;
         return;
       }
-      case "cut": clipboard.current = { sourceProjectId: project.id, selections: [...selections] }; deleteSelection(); return;
+      case "cut": {
+        // A room is a shared-wall space, not an independent object that can be
+        // moved by the clipboard. Refuse Cut too: otherwise Paste cannot restore it.
+        if (selections.some((selection) => selection.kind === "room")) {
+          toast.info("Rooms cannot be cut or copied. Use Delete to remove a room.");
+          return;
+        }
+        clipboard.current = { sourceProjectId: project.id, selections: [...selections] };
+        deleteSelection();
+        return;
+      }
       case "paste": {
         if (!clipboard.current || clipboard.current.sourceProjectId !== project.id) return;
         const copyable = clipboard.current.selections.filter((selection) => selection.kind !== "room");
