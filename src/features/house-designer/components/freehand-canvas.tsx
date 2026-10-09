@@ -17,6 +17,7 @@ import {
 import type { HouseProject } from "../types/project";
 import {
   convertStrokes,
+  inspectFreehand,
   foot,
   strokeSegments,
   type Point,
@@ -54,6 +55,8 @@ export function FreehandCanvas({
   const [message, setMessage] = useState(
     "Draw walls with one finger. Lift to straighten. Use Hand to pan.",
   );
+  const [review, setReview] = useState(false);
+  const [focusedIssue, setFocusedIssue] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const preview = useRef<{ strokes: Sketch["strokes"]; snap: boolean; zoom: number; segments: ReturnType<typeof strokeSegments> } | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null),
@@ -133,6 +136,18 @@ export function FreehandCanvas({
       for (const p of [segment.start, segment.end])
         points.set(`${p.x.toFixed(3)}:${p.y.toFixed(3)}`, p);
     }
+    if (review) {
+      const diagnostics = inspectFreehand(visibleStrokes, state.current.snap ? 12 : 0, 1 / v.zoom);
+      for (const issue of diagnostics.issues) {
+        ctx.beginPath();
+        ctx.arc(issue.point.x, issue.point.y, (focusedIssue === issue.id ? 10 : 6) / v.zoom, 0, 2 * Math.PI);
+        ctx.fillStyle = issue.kind === "open-end" ? "#dc2626" : "#d97706";
+        ctx.fill();
+        ctx.lineWidth = 2 / v.zoom;
+        ctx.strokeStyle = "#ffffff";
+        ctx.stroke();
+      }
+    }
     for (const p of points.values()) {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 3 / v.zoom, 0, Math.PI * 2);
@@ -190,7 +205,7 @@ export function FreehandCanvas({
   useEffect(() => {
     preview.current = null;
     schedule();
-  }, [sketch, snap]);
+  }, [sketch, snap, review, focusedIssue]);
   useEffect(() => {
     dialog.current?.focus();
   }, []);
@@ -198,6 +213,7 @@ export function FreehandCanvas({
     setPast((p) => [...p, sketch].slice(-60));
     setFuture([]);
     setSketch(next);
+    setReview(false);
     onSave(next);
   }
   function undo() {
@@ -502,35 +518,51 @@ export function FreehandCanvas({
         <p className="text-xs text-slate-500" role="status">
           {message} <span ref={status} />
         </p>
+        {review && !readOnly ? (() => {
+          const result = inspectFreehand(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom);
+          const open = result.issues.filter(issue => issue.kind === "open-end");
+          const short = result.issues.filter(issue => issue.kind === "short-wall");
+          return <div className="max-h-[30dvh] space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+            <strong className="block text-sm">Review Plan · {result.segments.length} walls</strong>
+            <p>{open.length} open endpoints · {short.length} short pieces</p>
+            {!sketch.calibrated ? <p className="font-medium text-amber-800">Dimensions are approximate. Set a known wall length before estimating costs.</p> : null}
+            {result.issues.length === 0 ? <p className="text-green-700">No open endpoints or tiny pieces detected. Verify the rooms after conversion.</p> : result.issues.slice(0, 30).map((issue, index) =>
+              <button key={issue.id} type="button" onClick={() => {
+                const rect = canvas.current?.getBoundingClientRect();
+                if (rect) {
+                  view.current.x = rect.width / 2 - issue.point.x * view.current.zoom;
+                  view.current.y = rect.height / 2 - issue.point.y * view.current.zoom;
+                }
+                setFocusedIssue(issue.id);
+                schedule();
+              }} className="block w-full rounded-lg border bg-white p-2 text-left text-slate-700">
+                {index + 1}. {issue.detail} <span className="text-blue-700">Show on drawing</span>
+              </button>)}
+            {result.issues.length > 30 ? <p>Showing the first 30 warnings.</p> : null}
+            <p className="text-slate-500">Red markers need review. No walls are added or removed automatically; use Draw / Erase or Undo to repair them.</p>
+          </div>;
+        })() : null}
         <button
           type="button"
           onClick={() => {
-            if (readOnly) {
-              onClose();
-              return;
-            }
+            if (readOnly) { onClose(); return; }
             try {
-              const edges = convertStrokes(sketch.strokes, 1, snap ? 12 : 0, 1 / view.current.zoom);
-              const degree = new Map<string, number>();
-              for (const edge of edges)
-                for (const point of [edge.start, edge.end]) {
-                  const key = `${point.x.toFixed(3)},${point.y.toFixed(3)}`;
-                  degree.set(key, (degree.get(key) ?? 0) + 1);
-                }
-              const gaps = [...degree.values()].filter(value => value === 1).length;
-              if (gaps > 0 && !window.confirm(`${gaps} open wall endpoints remain. They may prevent rooms from closing. Convert anyway? Select Cancel to finish connecting walls first.`)) return;
+              if (!review) { setReview(true); setTool("pan"); schedule(); return; }
+              const result = inspectFreehand(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom);
+              if (!result.segments.length) { setMessage("Draw at least one wall."); return; }
+              const gaps = result.issues.filter(issue => issue.kind === "open-end").length;
+              if (gaps && !window.confirm(`${gaps} open endpoints remain. Convert anyway? Cancel to repair first.`)) return;
               onConvert(sketch, snap ? 12 : 0, 1 / view.current.zoom);
             } catch (error) {
-              setMessage(
-                error instanceof Error ? error.message : "Conversion failed",
-              );
+              setMessage(error instanceof Error ? error.message : "Conversion failed");
             }
           }}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 p-3 text-sm font-semibold text-white"
         >
           <Check className="size-4" />
-          {readOnly ? "Return to editable plan" : "Convert to Plan"}
+          {readOnly ? "Return to editable plan" : review ? "Confirm Conversion" : "Review & Repair Plan"}
         </button>
+        {review && !readOnly ? <button type="button" onClick={() => { setReview(false); setFocusedIssue(null); setTool("draw"); }} className="w-full rounded-lg border p-2 text-sm">Back to Drawing</button> : null}
         <p className="text-center text-[11px] text-slate-500">
           Select, split, doors/windows and exact dimensions are available in
           Plan mode.
