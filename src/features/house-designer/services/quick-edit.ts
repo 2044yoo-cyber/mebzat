@@ -100,9 +100,18 @@ export function moveWallEnd(project: HouseProject, wallId: string, end: WallEnd,
     return blocked(project, "This exterior wall belongs to the closed footprint. Turn on Link joints before moving its corner.");
   const moving = wall[end];
   const fixed = wall[end === "start" ? "end" : "start"];
-  if (!Number.isFinite(to.x) || !Number.isFinite(to.y) || Math.hypot(to.x - fixed.x, to.y - fixed.y) < 200)
+  // Freehand plans are intentionally orthogonal. Dragging an endpoint must
+  // not accidentally turn a horizontal/vertical wall into a diagonal one.
+  // Moving the whole wall still slides it normally.
+  const orthogonal = project.levels.find((level) => level.id === wall.levelId)?.plan?.freehand === true;
+  const target = orthogonal
+    ? Math.abs(wall.end.x - wall.start.x) >= Math.abs(wall.end.y - wall.start.y)
+      ? { x: to.x, y: fixed.y }
+      : { x: fixed.x, y: to.y }
+    : to;
+  if (!Number.isFinite(target.x) || !Number.isFinite(target.y) || Math.hypot(target.x - fixed.x, target.y - fixed.y) < 200)
     return blocked(project, "A wall must be at least 200 mm long");
-  if (Math.hypot(to.x - moving.x, to.y - moving.y) < 0.01)
+  if (Math.hypot(target.x - moving.x, target.y - moving.y) < 0.01)
     return { project, selections: [selection], blocked: [] };
   if (linked) {
     const connected = project.walls.filter((item) =>
@@ -115,13 +124,13 @@ export function moveWallEnd(project: HouseProject, wallId: string, end: WallEnd,
       const side = (["start", "end"] as const).find((key) =>
         Math.hypot(joint[key].x - moving.x, joint[key].y - moving.y) <= TOLERANCE)!;
       const far = joint[side === "start" ? "end" : "start"];
-      if (Math.hypot(to.x - far.x, to.y - far.y) < 200)
+      if (Math.hypot(target.x - far.x, target.y - far.y) < 200)
         return blocked(project, "Moving the joined endpoint would make a neighbouring wall shorter than 200 mm");
     }
   }
   const patch: HousePatch = end === "end"
-    ? { endX: to.x, endY: to.y }
-    : { startX: to.x, startY: to.y };
+    ? { endX: target.x, endY: target.y }
+    : { startX: target.x, startY: target.y };
   return { project: patchHouseObject(project, selection, patch), selections: [selection], blocked: [] };
 }
 
