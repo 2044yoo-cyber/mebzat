@@ -99,6 +99,8 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   const unit = useHouseUnits();
   const [dragStart, setDragStart] = useState<HousePlanPoint | null>(null);
   const [current, setCurrent] = useState<SnapPoint | null>(null);
+  const [originalVisible, setOriginalVisible] = useState(false);
+  const [originalOpacity, setOriginalOpacity] = useState(35);
   // A room can be dragged out in one press as well as tapped corner-to-corner.
   const roomPress = useRef<{ pointerId: number; start: HousePlanPoint } | null>(null);
   // Which way a typed length runs. On a phone there is no hovering pointer to
@@ -681,6 +683,12 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
         <polyline points={sketch.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke="#1473e6" strokeWidth={3} vectorEffect="non-scaling-stroke" />
         {sketch.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r={Math.max(40, (index === 0 ? 7 : 4) * mmPerPx)} fill={index === 0 ? "#1473e6" : "white"} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" aria-label={index === 0 ? "Outline start" : undefined} />)}
       </g> : null}
+      {originalVisible && project.freehandSketch?.strokes.length ? <g aria-label="Original freehand strokes" pointerEvents="none" opacity={originalOpacity / 100}>
+        {project.freehandSketch.strokes.map(stroke =>
+          <polyline key={stroke.id} points={stroke.points.map(point => `${point.x * project.freehandSketch!.mmPerUnit},${point.y * project.freehandSketch!.mmPerUnit}`).join(" ")}
+            fill="none" stroke="#64748b" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke" />)}
+      </g> : null}
       <ModelPlanGeometry project={project} levelId={levelId} />
       {ghost && current && !selectMode ? <g aria-label="Placing" pointerEvents="none" opacity={0.65} className="text-brand">{ghost(current)}</g> : null}
       {objects.filter((object) => selectedIds.has(object.selection.id)).map((object) => {
@@ -730,6 +738,10 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       </MmPerPx.Provider>
     </svg>
     {actionBar && selectMode && selections.length && !endDrag && !hold && !wallDrag && !itemDrag && !openingDrag && canvasSize ? <FloatingBar bounds={objects.filter((object) => selectedIds.has(object.selection.id)).map((object) => object.bounds)} view={effective} size={canvasSize}>{actionBar}</FloatingBar> : null}
+    {project.freehandSketch?.strokes.length && project.walls.length ? <div className="absolute left-2 top-12 z-20 flex items-center gap-2 rounded-lg border bg-background/95 p-2 text-[11px] shadow-sm">
+      <label className="flex items-center gap-1"><input type="checkbox" checked={originalVisible} onChange={e => setOriginalVisible(e.target.checked)} /> Original sketch</label>
+      {originalVisible ? <label className="flex items-center gap-1">Opacity <input type="range" aria-label="Original sketch opacity" min={5} max={100} step={5} value={originalOpacity} onChange={e => setOriginalOpacity(Number(e.target.value))} className="w-16" /></label> : null}
+    </div> : null}
     {current ? <span aria-label="Pointer coordinates" className="pointer-events-none absolute right-2 top-3 z-10 rounded-md border bg-background/90 px-2 py-0.5 font-mono text-[11px] tabular-nums">X {Number(displayLength(current.x, unit).toFixed(unit === "m" ? 2 : unit === "cm" ? 1 : 0))} · Y {Number(displayLength(current.y, unit).toFixed(unit === "m" ? 2 : unit === "cm" ? 1 : 0))} {unit}</span> : null}
     {draftStart && activeTool && (activeTool === "room" || lineTools.has(activeTool)) ? <TypedDraft
       key={`${draftStart.x},${draftStart.y}`}
