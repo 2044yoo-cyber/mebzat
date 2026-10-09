@@ -520,7 +520,7 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
           onBusy={(busy) => { busyRef.current = busy; }}
         />
       )}
-      {saveOpen && project ? <HouseSaveDialog defaultTitle={project.metadata.title} preferredProjectId={projectId} busy={savingChoice} onSave={(choice) => void saveInto(choice)} onClose={() => setSaveOpen(false)} /> : null}
+      {saveOpen && project ? <HouseSaveDialog defaultTitle={project.metadata.title} preferredProjectId={projectId} busy={savingChoice} onSave={(choice) => void saveInto(choice)} onClose={() => setSaveOpen(false)} onDownload={download} /> : null}
     </main>
   );
 }
