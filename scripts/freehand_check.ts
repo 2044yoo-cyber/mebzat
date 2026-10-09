@@ -197,6 +197,20 @@ const noBridge = suggestFreehandRepairs([
   stroke([[240, 0], [340, 0]], "far-b"),
 ]);
 assert.equal(noBridge.length, 0, "far apart strokes are not joined by a repair suggestion");
+const tailFixture = inspectFreehand([
+  stroke([[-100, 0], [100, 0]], "long-base"),
+  stroke([[0, -100], [0, 0]], "vertical-arm"),
+  stroke([[0, 0], [0, 15]], "short-tail"),
+]);
+assert.ok(tailFixture.issues.some(issue => issue.kind === "dangling-extension"),
+  "short dangling extension connected to a junction is flagged for review");
+const intentionalProjection = inspectFreehand([
+  stroke([[-100, 0], [100, 0]], "base-long"),
+  stroke([[0, -100], [0, 0]], "arm-long"),
+  stroke([[0, 0], [0, 85]], "long-projection"),
+]);
+assert.equal(intentionalProjection.issues.filter(issue => issue.kind === "dangling-extension").length, 0,
+  "long projecting walls are not marked as short dangling tails");
 const diagonal = convertStrokes(
   [
     stroke([
