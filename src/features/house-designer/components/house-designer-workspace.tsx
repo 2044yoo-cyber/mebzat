@@ -1337,7 +1337,7 @@ function PlanEditor({
   return (
     <HouseUnitsContext.Provider value={project.displayUnits ?? "mm"}>
       <section className="min-w-0 space-y-2">
-        <EditorHeader onBack={onBack} levels={project.levels} activeLevelId={activeLevelId} onLevel={chooseLevel} onAddFloor={addFloor} status={status} onRetry={onRetry} menu={menu} />
+        <EditorHeader onBack={onBack} onUndo={tab === "plan" ? undo : undefined} canUndo={past.length > 0} levels={project.levels} activeLevelId={activeLevelId} onLevel={chooseLevel} onAddFloor={addFloor} status={status} onRetry={onRetry} menu={menu} />
         <WorkspaceTabs tab={tab} onTab={onTab} />
         {project.freehandSketch ? <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
           <span>{project.freehandSketch.calibrated ? "Sketch scale set; verify remaining measurements." : "Approximate freehand dimensions and areas — calibrate before estimating costs."}</span>
@@ -1412,7 +1412,7 @@ function PlanEditor({
                   </div>
                 ) : null}
               </div>
-              <PlanSecondaryBar canUndo={past.length > 0} canRedo={future.length > 0} onUndo={undo} onRedo={redo} snap={snapEnabled} onSnap={() => setSnapEnabled((value) => !value)} grid={gridVisible} onGrid={() => setGridVisible((value) => !value)} more={moreTools} />
+              <PlanSecondaryBar canRedo={future.length > 0} onRedo={redo} snap={snapEnabled} onSnap={() => setSnapEnabled((value) => !value)} grid={gridVisible} onGrid={() => setGridVisible((value) => !value)} more={moreTools} />
               <HouseMeasurementsDrawer project={project} levelId={activeLevelId} onSelect={(selection) => { setActiveTool("select"); setSelections([selection]); }} onSendToAgenda={link ? (text) => void sendMeasurements(text) : undefined} />
               {bottomActions}
             </div>
