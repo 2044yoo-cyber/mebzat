@@ -89,15 +89,14 @@ export function PlanToolbar({ activeTool, onTool }: { activeTool: HouseCommandId
 
 export type MoreItem = { id: string; label: string; onSelect: () => void; disabled?: boolean };
 
-export function PlanSecondaryBar({ canUndo, canRedo, onUndo, onRedo, snap, onSnap, grid, onGrid, more }: {
-  canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void;
+export function PlanSecondaryBar({ canRedo, onRedo, snap, onSnap, grid, onGrid, more }: {
+  canRedo: boolean; onRedo: () => void;
   snap: boolean; onSnap: () => void; grid: boolean; onGrid: () => void; more: MoreItem[];
 }) {
   const [open, setOpen] = useState(false);
   const button = "flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs disabled:opacity-30";
   return (
     <div className="relative flex min-w-0 items-center gap-1 rounded-xl border bg-card p-1">
-      <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" className={cn(button, "hover:bg-muted")}><Undo2 className="size-4" /><span className="hidden sm:inline">Undo</span></button>
       <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" className={cn(button, "hover:bg-muted")}><Redo2 className="size-4" /><span className="hidden sm:inline">Redo</span></button>
       <button type="button" onClick={onSnap} aria-pressed={snap} aria-label="Snap" className={cn(button, snap ? "bg-brand/10 text-brand" : "text-muted-foreground hover:bg-muted")}><Magnet className="size-4" /><span>Snap</span></button>
       <button type="button" onClick={onGrid} aria-pressed={grid} aria-label="Grid" className={cn(button, grid ? "bg-brand/10 text-brand" : "text-muted-foreground hover:bg-muted")}><Grid3X3 className="size-4" /><span>Grid</span></button>
@@ -145,8 +144,10 @@ export function SaveIndicator({ status, onRetry }: { status: SaveStatus; onRetry
   );
 }
 
-export function EditorHeader({ onBack, levels, activeLevelId, onLevel, onAddFloor, status, onRetry, menu }: {
+export function EditorHeader({ onBack, onUndo, canUndo, levels, activeLevelId, onLevel, onAddFloor, status, onRetry, menu }: {
   onBack: () => void;
+  onUndo?: () => void;
+  canUndo?: boolean;
   levels: { id: string; name: string }[];
   activeLevelId: string;
   onLevel: (id: string) => void;
@@ -161,6 +162,7 @@ export function EditorHeader({ onBack, levels, activeLevelId, onLevel, onAddFloo
   return (
     <div className="relative z-30 flex min-w-0 items-center gap-1 rounded-xl border bg-card p-1">
       <button type="button" onClick={onBack} aria-label="Back" className="flex size-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"><ArrowLeft className="size-4" /></button>
+      {onUndo ? <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className="flex size-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30"><Undo2 className="size-4" /></button> : null}
       <div className="relative min-w-0">
         <button type="button" onClick={() => setFloorOpen((value) => !value)} aria-expanded={floorOpen} aria-label={`Floor: ${activeLevel?.name ?? "none"}`} className="flex min-h-10 min-w-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold hover:bg-muted">
           <span className="truncate">{activeLevel?.name ?? "Floor"}</span>
