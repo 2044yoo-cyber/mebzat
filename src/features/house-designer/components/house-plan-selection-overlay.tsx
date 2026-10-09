@@ -342,6 +342,11 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       // A second finger landing mid-drag means "I want to pan", not "place
       // the next wall point" — the marquee it interrupted was never finished.
       setDragStart(null);
+      // A two-finger pinch must cancel an unfinished wall/group translation.
+      // Otherwise lifting the first finger could commit an unintended move.
+      setWallGroupDrag(null);
+      setWallDrag(null);
+      setItemDrag(null);
       cancelLongPress();
       pinch.current = pinchState();
       return;
