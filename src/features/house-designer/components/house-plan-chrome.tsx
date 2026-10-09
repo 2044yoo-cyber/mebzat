@@ -478,6 +478,7 @@ const ACTION_ICONS: Record<string, typeof Copy> = {
   vertical: Columns2,
   horizontal: Rows2,
   cancel: X,
+  clear: X,
   flip: FlipHorizontal2,
   "door-hinge": FlipHorizontal2,
   "door-swing": FlipVertical2,
@@ -513,6 +514,7 @@ export function QuickActionBar({ label, actions, more }: { label: string; action
   const [open, setOpen] = useState(false);
   return (
     <div role="toolbar" aria-label={label} className="relative flex items-center gap-0.5 rounded-full border bg-card/95 p-0.5 shadow-lg backdrop-blur">
+      {label.endsWith(" walls selected") ? <span className="shrink-0 pl-2 pr-1 text-[10px] font-semibold text-brand">{label.replace(" selected", "")}</span> : null}
       {actions.map((action) => (
         <button key={action.id} type="button" aria-label={action.label} title={action.label} onClick={() => { setOpen(false); action.onSelect(); }} aria-pressed={action.pressed} className={cn("flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted", action.pressed && "bg-brand/15 text-brand")}><ActionIcon action={action} /></button>
       ))}
