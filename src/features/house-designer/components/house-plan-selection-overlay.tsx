@@ -438,6 +438,14 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       setDragStart(raw);
       return;
     }
+    // Walls use independent touch-and-drag gestures, not a chained
+    // two-tap direction/length workflow. Each finger-down is a fresh start.
+    if (activeTool === "wall") {
+      const start = snapped(raw);
+      onDraftStart(start);
+      svg.current?.setPointerCapture(event.pointerId);
+      return;
+    }
     if (activeTool && lineTools.has(activeTool)) {
       if (!draftStart) {
         onDraftStart(point);
@@ -589,6 +597,21 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       return;
     }
     if (pointers.current.size >= 1) return;
+    if (activeTool === "wall" && draftStart) {
+      const raw = modelPoint(event);
+      if (raw) {
+        const end = snapped(raw, draftStart);
+        if (Math.hypot(end.x - draftStart.x, end.y - draftStart.y) > 50) {
+          // Strictly horizontal/vertical, matching the freehand sketch tool.
+          const aligned = Math.abs(end.x - draftStart.x) >= Math.abs(end.y - draftStart.y)
+            ? { x: end.x, y: draftStart.y }
+            : { x: draftStart.x, y: end.y };
+          onDraft(draftStart, aligned);
+        }
+      }
+      onDraftStart(null);
+      return;
+    }
     const press = roomPress.current;
     roomPress.current = null;
     if (press && press.pointerId === event.pointerId && activeTool === "room") {
