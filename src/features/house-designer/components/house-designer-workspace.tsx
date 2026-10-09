@@ -755,7 +755,6 @@ function PlanEditor({
   const [propertiesFor, setPropertiesFor] = useState<string | null>(null);
   const [roomSplit, setRoomSplit] = useState<string | null>(null);
   const [splitDraft, setSplitDraft] = useState<{ roomId: string; axis: "vertical" | "horizontal"; first: number } | null>(null);
-  const [placement, setPlacement] = useState<{ x: number; y: number; width: number; depth: number; name: string } | null>(null);
   const clipboard = useRef<HouseClipboard | null>(null);
   const keyboardRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
   const escapeRef = useRef(0);
@@ -963,8 +962,7 @@ function PlanEditor({
       setPlacing(null);
       setDrawingSpace(false);
       setSplitDraft(null);
-      setPlacement(null);
-      setDraftStart(null);
+        setDraftStart(null);
       setOutlineSketch([]);
       setActiveTool("select");
       onOpenFreehand();
@@ -977,7 +975,6 @@ function PlanEditor({
     setPlacing(null);
     setDrawingSpace(false);
     setSplitDraft(null);
-    setPlacement(null);
     if (id === "select") { setActiveTool("select"); setDraftStart(null); setOutlineSketch([]); return; }
     activateDrawingTool(id);
   }
@@ -1150,17 +1147,6 @@ function PlanEditor({
     applyMutation(edit());
   }
 
-  function placeCopy() {
-    if (!placement) return;
-    const result = createRoomFromGesture(project, activeLevelId, { x: placement.x, y: placement.y }, { x: placement.x + placement.width, y: placement.y + placement.depth }, "rectangle", { wallThickness: 120 });
-    if (result.blocked.length) { toast.info(result.blocked.join(". ")); return; }
-    const created = result.project.rooms.find((room) => room.levelId === activeLevelId && !project.rooms.some((item) => item.id === room.id) && Math.abs(Math.min(...room.boundary.map((point) => point.x)) - placement.x) < 1 && Math.abs(Math.min(...room.boundary.map((point) => point.y)) - placement.y) < 1);
-    const named = created ? patchHouseObject(result.project, { kind: "room", id: created.id }, { name: placement.name }) : result.project;
-    commit(named);
-    setSelections(created ? [{ kind: "room", id: created.id }] : result.selections);
-    setPlacement(null);
-  }
-
   // Doors stay attached to their wall. Change their hinge and swing rather than
   // rotating the opening (which would detach it from the wall).
   function flipDoor(selection: HouseSelection, direction: "hinge" | "swing") {
@@ -1261,11 +1247,6 @@ function PlanEditor({
       case "select": chooseTool("select"); return;
       case "cancel": {
         const now = Date.now();
-        if (placement) {
-          setPlacement(null);
-          escapeRef.current = now;
-          return;
-        }
         if (draftStart || outlineSketch.length) {
           setDraftStart(null);
           setOutlineSketch([]);
@@ -1348,7 +1329,7 @@ function PlanEditor({
     { id: "fit", label: "Zoom to fit", onSelect: () => setViewRevision((value) => value + 1) },
   ];
 
-  const sheetFor = tab === "plan" && selectMode && selected && selected.kind !== "level" && !proposals && !mergeFrom && !activePinId && !placement && selections.length === 1 ? selected : null;
+  const sheetFor = tab === "plan" && selectMode && selected && selected.kind !== "level" && !proposals && !mergeFrom && !activePinId && selections.length === 1 ? selected : null;
   const quick = sheetFor ? quickActions(sheetFor) : null;
   const splitRoomTarget = splitDraft ? project.rooms.find((room) => room.id === splitDraft.roomId) : null;
   const splitGuide = (() => {
@@ -1408,9 +1389,7 @@ function PlanEditor({
                   onWallDistance={(selection, neighbourId, distance) => wallEdit(selection, () => setWallDistance(project, selection.id, neighbourId, distance))}
                   actionBar={quick && propertiesFor !== sheetFor?.id ? <QuickActionBar key={`${sheetFor!.id}:${roomSplit ?? ""}`} label={quick.label} actions={quick.actions} more={quick.more} /> : null}
                   guide={splitGuide ? { ...splitGuide.line, label: `${shortMm(splitDraft!.first, project.displayUnits ?? "mm")} | ${shortMm(splitGuide.span - splitDraft!.first, project.displayUnits ?? "mm")}` } : null}
-                  placement={placement}
                   ghost={placing && (activeTool === "furniture" || activeTool === "stair" || activeTool === "column") ? placingGhost : null}
-                  onPlacementMove={(x, y) => setPlacement((current) => current && { ...current, x, y })}
                 /> : null}
                 <span className="pointer-events-none absolute left-2 top-2 rounded-full border bg-background/90 px-2.5 py-1 text-[11px] font-medium">{activeLevel?.name} · {project.displayUnits ?? "mm"}</span>
                 {activeTool === "room" && !draftStart ? <div role="radiogroup" aria-label="Room shape" className="absolute left-1/2 top-10 z-10 flex -translate-x-1/2 gap-1 rounded-xl border bg-card/95 p-1 text-xs shadow-sm backdrop-blur">
@@ -1431,19 +1410,13 @@ function PlanEditor({
                     <button type="button" onClick={() => setSplitDraft(null)} aria-label="Cancel split" className="min-h-10 rounded-lg px-2 text-muted-foreground">✕</button>
                   </form>
                 ) : null}
-                {placement ? (
-                  <div role="region" aria-label="Place room copy" className="absolute inset-x-1.5 top-10 z-20 flex items-center gap-1 rounded-xl border bg-card/95 p-1.5 text-xs shadow-lg backdrop-blur">
-                    <span className="min-w-0 flex-1 truncate px-1">Drag the copy into place</span>
-                    <button type="button" onClick={() => setPlacement({ ...placement, width: placement.depth, depth: placement.width })} className="min-h-10 rounded-lg border px-2.5">↻ 90°</button>
-                    <button type="button" onClick={placeCopy} className="min-h-10 rounded-lg bg-brand px-3 font-semibold text-brand-foreground">Place</button>
-                    <button type="button" onClick={() => setPlacement(null)} aria-label="Cancel copy" className="min-h-10 rounded-lg px-2 text-muted-foreground">✕</button>
-                  </div>
-                ) : null}
               </div>
-              {placement ? <div role="region" aria-label="Room copy pending" className="flex items-center justify-between gap-2 rounded-xl border border-amber-400/50 bg-card p-2 text-sm">
-                <span className="text-muted-foreground">Room copy not placed</span>
-                <button type="button" onClick={() => setPlacement(null)} className="min-h-11 rounded-lg border px-4 font-semibold">Cancel copy</button>
-              </div> : null}
+              {(activeTool && activeTool !== "select" || placing || draftStart || splitDraft) ? (
+                <div role="region" aria-label="Active drawing controls" className="flex items-center justify-between gap-2 rounded-xl border bg-card p-2 text-sm">
+                  <span className="min-w-0 truncate text-muted-foreground">Drawing mode active</span>
+                  <button type="button" onClick={() => { setDraftStart(null); setOutlineSketch([]); setPlacing(null); setLibraryFor(null); setSplitDraft(null); setRoomSplit(null); setActiveTool("select"); }} className="min-h-11 rounded-lg border px-4 font-semibold">Cancel</button>
+                </div>
+              ) : null}
               <PlanSecondaryBar canRedo={future.length > 0} onRedo={redo} snap={snapEnabled} onSnap={() => setSnapEnabled((value) => !value)} grid={gridVisible} onGrid={() => setGridVisible((value) => !value)} more={moreTools} />
               <HouseMeasurementsDrawer project={project} levelId={activeLevelId} onSelect={(selection) => { setActiveTool("select"); setSelections([selection]); }} onSendToAgenda={link ? (text) => void sendMeasurements(text) : undefined} />
               {bottomActions}
