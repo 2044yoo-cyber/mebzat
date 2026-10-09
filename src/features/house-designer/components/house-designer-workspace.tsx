@@ -500,7 +500,7 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
         <div className="flex min-h-[50dvh] items-center justify-center text-sm text-muted-foreground"><Loader2 className="mr-2 size-4 animate-spin" /> Opening the plan…</div>
       ) : (
         <PlanEditor
-          key={project.id}
+          key={`${project.id}:${project.freehandSketch && project.walls.length ? "converted" : "draft"}`}
           project={project}
           onProjectChange={updateProject}
           tab={tab}
