@@ -10,7 +10,8 @@
     "check:i18n": "node --experimental-strip-types scripts/i18n_check.ts",
     "seed": "tsx --env-file=.env.local scripts/seed.ts",
     "import:businesses": "tsx --env-file=.env.local scripts/import-businesses.ts",
-    "check:wall-joints": "tsx scripts/wall_joint_check.ts"
+    "check:wall-joints": "tsx scripts/wall_joint_check.ts",
+    "check:wall-groups": "tsx scripts/wall_group_check.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
