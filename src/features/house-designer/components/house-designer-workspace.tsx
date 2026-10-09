@@ -951,6 +951,22 @@ function PlanEditor({
   }
 
   function chooseTool(id: HouseCommandId) {
+    // For an empty plan, drawing a wall begins with the existing touch-first
+    // freehand canvas instead of the direction/typed-length workflow.
+    // Existing BIM walls remain editable with the regular wall tools until
+    // incremental freehand conversion can safely preserve their geometry.
+    if (id === "wall" && project.walls.length === 0) {
+      setLibraryFor(null);
+      setPlacing(null);
+      setDrawingSpace(false);
+      setSplitDraft(null);
+      setPlacement(null);
+      setDraftStart(null);
+      setOutlineSketch([]);
+      setActiveTool("select");
+      setFreehandOpen(true);
+      return;
+    }
     const library = (["furniture", "stair", "door", "window", "column"] as const).find((item) => item === id) ?? null;
     // A room selected when Stair is tapped is the space Auto fit starts from.
     if (id === "stair") { const room = selections[0]?.kind === "room" ? roomRectangle(project, selections[0].id) : null; setStairSpace(room ? { width: room.width, length: room.depth } : null); }
