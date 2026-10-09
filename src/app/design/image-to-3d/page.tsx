@@ -9,10 +9,10 @@ export const metadata: Metadata = {
 };
 
 /**
- * This is a discoverable entry point, not a fake automatic image converter.
- * Image recognition and DXF vector import need a separate verified pipeline.
- * Until then, the real House Design editor supports importing reference plans
- * and tracing geometry, then opening that geometry in 3D.
+ * No paid vision AI is required. The first stage uses deterministic browser
+ * line detection on images or selected PDF pages. Users must calibrate and
+ * review candidates before opening editable wall geometry in House Design.
+ * Direct DXF geometry import and complex opening recognition remain separate work.
  */
 export default function ImageTo3DPage() {
   return (
@@ -33,15 +33,15 @@ export default function ImageTo3DPage() {
       <section className="space-y-4 rounded-2xl border bg-card p-4 sm:p-6">
         <h2 className="text-lg font-semibold">Start with an existing floor plan</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Use a CAD screenshot, a floor-plan photo or a PDF as a reference.
-          For manual tracing, open House Design, choose <strong>Upload floor plan</strong>, then
-          calibrate a known dimension and trace or correct walls before creating the 3D model.
+          Upload a CAD screenshot, floor-plan image or PDF above. Select a PDF page, calibrate a known measurement,
+          correct the detected walls with touch controls, then continue to the editable House Design plan and 3D view.
+          If the drawing is too complex for line detection, the existing <strong>Upload floor plan</strong> reference workflow remains available.
         </p>
         <Link href="/house-design" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand px-4 font-semibold text-brand-foreground hover:opacity-90">
           <Upload className="size-5" /> Open floor-plan importer <ArrowRight className="size-4" />
         </Link>
         <p className="text-xs text-muted-foreground">
-          Basic straight-wall candidate detection is now available above. Automatic recognition of doors, windows, angled walls and complex scanned drawings is not yet available.
+          Straight wall candidates are detected without AI; missing or diagonal lines can be added manually. Door and window recognition, direct DXF vectors and complex scanned drawings are not yet automatic.
         </p>
       </section>
 
