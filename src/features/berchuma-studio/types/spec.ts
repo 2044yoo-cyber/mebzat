@@ -706,6 +706,19 @@ export const designSpecSchema = z.object({
   cabinets: z.array(cabinetSchema).min(1).max(160),
 
   /**
+   * Independent cabinet designs in the same manufacturing project.
+   *
+   * Each keeps its own kind, layout, boards, fittings and cost rules. The
+   * primary design remains this spec, so old saved designs work unchanged.
+   * Children are decoded with parseSpec at the server boundary; nested
+   * collections are forbidden to prevent recursive or oversized payloads.
+   */
+  projectItems: z.array(z.object({
+    id: z.string().min(1).max(80),
+    spec: z.unknown(),
+  })).max(12).optional(),
+
+  /**
    * The overall bounding box.
    *
    * Derived, not authored — `validateSpec` recomputes it from the cabinets on
@@ -2336,5 +2349,21 @@ export function parseSpec(
   }
 
   const { spec, issues } = validateSpec(parsed.data);
+  if (spec.projectItems?.length) {
+    const used = new Set<string>();
+    const decodedItems: NonNullable<DesignSpec["projectItems"]> = [];
+    for (const item of spec.projectItems) {
+      if (used.has(item.id)) return { ok: false, error: "Duplicate project cabinet identifier." };
+      used.add(item.id);
+      const raw = item.spec;
+      if (!raw || typeof raw !== "object" || Array.isArray(raw) || "projectItems" in raw) {
+        return { ok: false, error: "Invalid nested cabinet design." };
+      }
+      const decoded = parseSpec(raw);
+      if (!decoded.ok) return { ok: false, error: `Cabinet ${item.id}: ${decoded.error}` };
+      decodedItems.push({ id: item.id, spec: decoded.spec });
+    }
+    spec.projectItems = decodedItems;
+  }
   return { ok: true, spec, issues };
 }
