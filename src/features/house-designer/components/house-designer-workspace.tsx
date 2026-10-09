@@ -1423,6 +1423,7 @@ function PlanEditor({
                     : null;
                   const to = item ? snapToFurniture(project, activeLevelId, { ...item, x: item.x + dx, y: item.y + dy }, { ignore: item.id }) : null;
                   applyMutation(moveHouseSelections(project, targets, to && item ? to.x - item.x : dx, to && item ? to.y - item.y : dy, { footprintEditable: true }));
+                  if (activeTool === "move") setActiveTool("select");
                 }} onDraftStart={(point) => { if (chainEnded.current) { chainEnded.current = false; setDraftStart(null); return; } setDraftStart(point); }} onDraft={draftObject} onSelect={chooseMany} onSelectionMenu={() => undefined} onDimensionChange={(selection, patch) => { const conflict = lockConflict(project, selection); if (conflict) { toast.info(conflict); return; } commit(patchHouseObject(project, selection, patch)); }} onGuidance={() => undefined} pins={pins.filter((pin) => pin.source.kind === "plan" && pin.source.level === activeLevelId)} onPinTap={(id) => setActivePinId(id)} focus={planFocus}
                   onWallExtend={(selection, end, delta) => wallEdit(selection, () => extendWall(project, selection.id, end, delta))}
                   onWallEnd={(selection, end, to) => wallEdit(selection, () => moveWallEnd(project, selection.id, end, to))}
