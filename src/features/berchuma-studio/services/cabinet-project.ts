@@ -156,24 +156,26 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
   const layout: Cell[][] = [["Board", "Sheet", "Part / source design", "X (mm)", "Y (mm)", "Cut width (mm)", "Cut height (mm)", "Rotated"]];
   const sheets = [...boards.entries()].map(([id, item]) => {
     const group = sharedInputs.get(id);
+    if (!group) throw new Error(`Missing manufacturing rows for board: ${id}`);
+    // Custom/legacy boards may not exist in the stock catalogue. Their own
+    // original nesting is still valid; retain that rather than reject export.
     const board = findBoard(id);
-    if (!group || !board) throw new Error(`Unknown manufacturing board: ${id}`);
-    const shared = nestBoard(board, group.rows);
+    const shared = board ? nestBoard(board, group.rows) : null;
     // Shelf packing is a heuristic: with more pieces, it can occasionally
     // choose a worse arrangement. Keep the separate verified plans whenever
     // shared nesting does not improve the sheet count.
-    const useShared = shared.unplaced.length === 0 && shared.sheets.length <= item.sheets;
+    const useShared = !!shared && shared.unplaced.length === 0 && shared.sheets.length <= item.sheets;
     if (useShared) {
-      for (const sheet of shared.sheets) for (const place of sheet.placements) {
+      for (const sheet of shared!.sheets) for (const place of sheet.placements) {
         const source = group.rows.find(row => row.index === place.index);
-        layout.push([board.label, sheet.number, source?.label ?? place.label,
+        layout.push([item.board, sheet.number, source?.label ?? place.label,
           place.x, place.y, place.width, place.height, place.rotated ? "Yes" : "No"]);
       }
     } else {
       let sheetOffset = 0;
       for (const source of group.separate) {
         for (const sheet of source.nesting.sheets) for (const place of sheet.placements) {
-          layout.push([board.label, sheet.number + sheetOffset,
+          layout.push([item.board, sheet.number + sheetOffset,
             `${source.design} — ${place.label}`,
             place.x, place.y, place.width, place.height,
             place.rotated ? "Yes" : "No"]);
@@ -183,7 +185,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     }
     return {
       board: item.board,
-      sheets: useShared ? shared.sheets.length : item.sheets,
+      sheets: useShared ? shared!.sheets.length : item.sheets,
       separateSheets: item.sheets,
       pieces: item.pieces,
       area: Math.round(item.area * 1000) / 1000,
