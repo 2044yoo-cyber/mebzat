@@ -301,6 +301,44 @@ export function cleanFreehandStrokes(strokes: readonly Stroke[]): {
   return { strokes: cleaned, removed: strokes.length - cleaned.length };
 }
 
+/** Trim only an independent two-point source stroke whose ENTIRE converted
+ * geometry matches a flagged short dangling edge. Complex strokes need manual
+ * splitting; never delete a parent stroke merely because its tail is short.
+ */
+export function suggestFreehandTrims(
+  strokes: readonly Stroke[],
+  snapPixels = 12,
+  unitsPerPixel = 1,
+): { id: string; strokeId: string; point: Point; label: string }[] {
+  const { issues, segments } = inspectFreehand(strokes, snapPixels, unitsPerPixel);
+  const tails = issues.filter(issue => issue.kind === "dangling-extension");
+  const used = new Set<string>();
+  const result: { id: string; strokeId: string; point: Point; label: string }[] = [];
+  for (const tail of tails) {
+    const candidates = strokes.filter(stroke => {
+      if (stroke.points.length !== 2 || used.has(stroke.id)) return false;
+      const a = stroke.points[0]!, b = stroke.points[1]!;
+      // The source line must already match a complete isolated graph edge,
+      // not a section of a longer wall.
+      return segments.some(edge => {
+        const same = distance(a, edge.start) < 2 * unitsPerPixel &&
+          distance(b, edge.end) < 2 * unitsPerPixel;
+        const reversed = distance(a, edge.end) < 2 * unitsPerPixel &&
+          distance(b, edge.start) < 2 * unitsPerPixel;
+        return (same || reversed) &&
+          (distance(edge.start, tail.point) < 2 * unitsPerPixel ||
+           distance(edge.end, tail.point) < 2 * unitsPerPixel);
+      });
+    });
+    if (candidates.length !== 1) continue;
+    const stroke = candidates[0]!;
+    used.add(stroke.id);
+    result.push({ id: `trim-${stroke.id}`, strokeId: stroke.id,
+      point: tail.point, label: "Trim this independent short wall tail" });
+  }
+  return result;
+}
+
 /** Proposed gap closures never change the sketch until approved. */
 export type FreehandRepair = {
   id: string;
