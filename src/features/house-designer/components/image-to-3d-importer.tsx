@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, FileText, ImageUp, PenLine, RotateCcw, Ruler, ScanLine, Trash2, Undo2 } from "lucide-react";
-import { detectOrthogonalWalls, IMAGE_IMPORT_KEY, type CandidateLine } from "../services/image-line-detection";
+import { ArrowRight, Check, Crop, FileText, ImageUp, PenLine, RotateCcw, Ruler, ScanLine, Trash2, Undo2 } from "lucide-react";
+import { detectOrthogonalWalls, imageBackgroundPolarity, IMAGE_IMPORT_KEY, type CandidateLine, type DrawingPolarity } from "../services/image-line-detection";
 import { loadImage, pdfPageCount, renderPdfPage } from "../services/source-render";
 import { dxfWallPreview, parseDxfWallDrawing, MAX_REVIEWED_WALLS, type DxfWallDrawing } from "../services/dxf-wall-import";
 
@@ -14,6 +14,7 @@ export function ImageTo3DImporter() {
   const router = useRouter();
   const canvas = useRef<HTMLCanvasElement>(null);
   const image = useRef<HTMLCanvasElement | null>(null);
+  const uncropped = useRef<HTMLCanvasElement | null>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [fileName, setFileName] = useState("");
   const dxfDrawing = useRef<DxfWallDrawing | null>(null);
@@ -25,12 +26,15 @@ export function ImageTo3DImporter() {
   const [cadTotal, setCadTotal] = useState(0);
   const [lines, setLines] = useState<CandidateLine[]>([]);
   const [minLength, setMinLength] = useState(42);
+  const [polarity, setPolarity] = useState<DrawingPolarity>("auto");
+  const [cropStart, setCropStart] = useState<Point | null>(null);
+  const [cropEnd, setCropEnd] = useState<Point | null>(null);
   const [scalePoints, setScalePoints] = useState<Point[]>([]);
   const [knownMetres, setKnownMetres] = useState("3.00");
   const [showLines, setShowLines] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<"calibrate" | "review" | "add">("calibrate");
+  const [mode, setMode] = useState<"calibrate" | "review" | "add" | "crop">("calibrate");
   const pdfUrl = useRef<string | null>(null);
   const [pdfPages, setPdfPages] = useState(0);
   const [pdfPage, setPdfPage] = useState(1);
@@ -97,16 +101,28 @@ export function ImageTo3DImporter() {
         ctx.stroke();
       }
     }
+    if (cropStart && cropEnd) {
+      const left = Math.min(cropStart.x, cropEnd.x);
+      const top = Math.min(cropStart.y, cropEnd.y);
+      ctx.save();
+      ctx.strokeStyle = "#f97316";
+      ctx.setLineDash([8, 5]);
+      ctx.lineWidth = 3;
+      ctx.fillStyle = "#f9731630";
+      ctx.fillRect(left, top, Math.abs(cropEnd.x - cropStart.x), Math.abs(cropEnd.y - cropStart.y));
+      ctx.strokeRect(left, top, Math.abs(cropEnd.x - cropStart.x), Math.abs(cropEnd.y - cropStart.y));
+      ctx.restore();
+    }
   }
-  useEffect(draw, [lines, scalePoints, showLines, size, selected, newStart]);
+  useEffect(draw, [lines, scalePoints, showLines, size, selected, newStart, cropStart, cropEnd]);
 
-  function detect(min: number) {
+  function detect(min: number, background: DrawingPolarity = polarity) {
     const original = image.current;
     if (!original) return;
     const ctx = original.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
     try {
-      const result = detectOrthogonalWalls(ctx.getImageData(0, 0, original.width, original.height), min);
+      const result = detectOrthogonalWalls(ctx.getImageData(0, 0, original.width, original.height), min, background);
       setLines(result);
       setHistory([]);
       setSelected(null);
@@ -132,11 +148,13 @@ export function ImageTo3DImporter() {
     ctx.drawImage(source, 0, 0, width, height);
     if ("close" in source && typeof source.close === "function") source.close();
     image.current = original;
+    uncropped.current = original;
+    setCropStart(null); setCropEnd(null);
     setSize({ width, height });
     setScalePoints([]);
     setMode("calibrate");
     setFileName(label);
-    const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength);
+    const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity);
     setLines(detected);
     setSelected(null); setNewStart(null); setHistory([]); setReviewed(false);
     setError(detected.length ? "" : "No straight walls detected. Use a clearer image, add the walls by hand, or lower minimum line length.");
@@ -171,6 +189,8 @@ export function ImageTo3DImporter() {
     }
     ctx.stroke();
     image.current = background;
+    uncropped.current = null;
+    setCropStart(null); setCropEnd(null);
     setSize({ width: preview.width, height: preview.height });
     setCadMmPerPixel(preview.mmPerPixel);
     setCadTotal(preview.total);
@@ -249,6 +269,12 @@ export function ImageTo3DImporter() {
     return Math.hypot(point.x - line.x1 - t * dx, point.y - line.y1 - t * dy);
   }
   function pointerDown(event: PointerEvent<HTMLCanvasElement>) {
+    if (mode === "crop" && sourceKind === "raster") {
+      const p = at(event);
+      setCropStart(p); setCropEnd(p);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
     if (mode !== "review" || selected === null || !lines[selected]) return;
     const p = at(event);
     const line = lines[selected]!;
@@ -262,6 +288,7 @@ export function ImageTo3DImporter() {
     event.currentTarget.setPointerCapture(event.pointerId);
   }
   function pointerMove(event: PointerEvent<HTMLCanvasElement>) {
+    if (mode === "crop" && cropStart) { setCropEnd(at(event)); return; }
     const drag = endpointDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const p = at(event);
@@ -277,6 +304,36 @@ export function ImageTo3DImporter() {
   }
   function pickPoint(event: PointerEvent<HTMLCanvasElement>) {
     const p = at(event);
+    if (mode === "crop") {
+      const start = cropStart, original = image.current;
+      setCropStart(null); setCropEnd(null);
+      if (!start || !original) return;
+      const left = Math.max(0, Math.floor(Math.min(start.x, p.x)));
+      const top = Math.max(0, Math.floor(Math.min(start.y, p.y)));
+      const width = Math.min(original.width - left, Math.ceil(Math.abs(start.x - p.x)));
+      const height = Math.min(original.height - top, Math.ceil(Math.abs(start.y - p.y)));
+      if (width < 80 || height < 80) {
+        setError("Select a crop at least 80 × 80 pixels. Include the complete floor plan and exclude app toolbars.");
+        return;
+      }
+      const trimmed = document.createElement("canvas");
+      trimmed.width = width; trimmed.height = height;
+      const ctx = trimmed.getContext("2d", { willReadFrequently: true });
+      if (!ctx) { setError("Could not crop the image on this phone."); return; }
+      ctx.drawImage(original, left, top, width, height, 0, 0, width, height);
+      image.current = trimmed;
+      setSize({ width, height });
+      setScalePoints([]);
+      setSelected(null);
+      setNewStart(null);
+      setHistory([]);
+      setReviewed(false);
+      setMode("calibrate");
+      const cropped = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity);
+      setLines(cropped);
+      setError(cropped.length ? "" : "No straight walls found in this crop. Try Black CAD background mode or a higher-resolution screenshot.");
+      return;
+    }
     const drag = endpointDrag.current;
     if (drag && drag.pointerId === event.pointerId) {
       if (drag.moved) {
@@ -422,6 +479,8 @@ export function ImageTo3DImporter() {
               <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showLines} onChange={e => setShowLines(e.target.checked)} /> Show detected lines</label>
             </div>
             <div className="flex flex-wrap gap-2" role="group" aria-label="Import editing tool">
+              {sourceKind === "raster" ? <button type="button" aria-pressed={mode === "crop"} onClick={() => { setMode("crop"); setSelected(null); setNewStart(null); setCropStart(null); setCropEnd(null); }}
+                className={`min-h-11 rounded-lg border px-3 text-xs font-medium ${mode === "crop" ? "border-brand bg-brand/10 text-brand" : ""}`}><Crop className="mr-1 inline size-3.5" />Crop plan</button> : null}
               <button type="button" onClick={() => { setMode("calibrate"); setSelected(null); setNewStart(null); }}
                 aria-pressed={mode === "calibrate"}
                 className={`min-h-11 rounded-lg border px-3 text-xs font-medium ${mode === "calibrate" ? "border-brand bg-brand/10 text-brand" : ""}`}><Ruler className="mr-1 inline size-3.5" />Scale</button>
@@ -436,12 +495,13 @@ export function ImageTo3DImporter() {
             </div>
             <canvas ref={canvas} width={size.width} height={size.height}
               onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pickPoint}
-              onPointerCancel={() => { if (endpointDrag.current) setLines(endpointDrag.current.before); endpointDrag.current = null; }}
+              onPointerCancel={() => { if (endpointDrag.current) setLines(endpointDrag.current.before); endpointDrag.current = null; setCropStart(null); setCropEnd(null); }}
               style={{ touchAction: mode === "calibrate" ? "manipulation" : "none" }}
               className="w-full rounded-lg border bg-white"
               aria-label="Floor plan image: calibrate distance, select lines, drag endpoints, or tap two points to add a wall" />
             <p className="text-xs text-muted-foreground">
               {mode === "calibrate" ? "Orange dots: tap two ends of one known dimension." :
+                mode === "crop" ? "Drag from the top-left to bottom-right of the PLAN ONLY. Exclude phone bars, palettes, dimensions outside the building and unrelated drawings." :
                 mode === "review" ? "Green: detected walls. Tap a line to select it; drag its blue endpoints to adjust. Remove unwanted dimension or text lines." :
                 newStart ? "Tap the second end of the missing wall, or switch to Review to cancel." : "Tap the start and end of a missing wall. Angled walls are allowed."}
             </p>
@@ -450,6 +510,32 @@ export function ImageTo3DImporter() {
               <button type="button" onClick={removeSelected} className="flex min-h-10 items-center gap-1 rounded-md border border-destructive/50 px-3 text-destructive"><Trash2 className="size-4" />Remove</button>
             </div> : null}
           </div>
+          {sourceKind === "raster" ? <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+            <label className="flex flex-wrap items-center gap-2 text-sm font-medium">
+              Drawing background
+              <select value={polarity} onChange={event => {
+                  const next = event.target.value as DrawingPolarity;
+                  setPolarity(next);
+                  detect(minLength, next);
+                }}
+                className="min-h-11 min-w-40 flex-1 rounded-lg border bg-background px-3">
+                <option value="auto">Detect automatically</option>
+                <option value="dark">Black CAD background</option>
+                <option value="light">White paper background</option>
+              </select>
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Current scan: {image.current ? imageBackgroundPolarity(image.current.getContext("2d")!.getImageData(0, 0, image.current.width, image.current.height)) === "dark" ? "dark CAD style" : "light paper style" : "not loaded"}.
+              For black CAD drawings, only pale neutral lines are scanned; bright annotation colors are ignored.
+            </p>
+            {uncropped.current && image.current !== uncropped.current ? <button type="button" onClick={() => {
+              image.current = uncropped.current;
+              const original = uncropped.current;
+              setSize({ width: original.width, height: original.height });
+              setScalePoints([]); setReviewed(false); setMode("calibrate");
+              detect(minLength);
+            }} className="min-h-10 rounded-lg border px-3 text-xs font-medium">Restore full image</button> : null}
+          </div> : null}
           <div className="space-y-2 text-sm">
             <span>Minimum detected line length: {minLength} px</span>
             <input type="range" min="25" max="150" step="5" value={minLength}
