@@ -528,6 +528,14 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       const length = Math.max(holdStep, Math.round(run / holdStep) * holdStep);
       point = { x: anchor.x + (point.x - anchor.x) * length / run, y: anchor.y + (point.y - anchor.y) * length / run, label: point.label };
     }
+    // Match the freehand editor's orthogonal constraint in the live preview:
+    // releasing the finger must not suddenly turn the ghost into a diagonal.
+    if (project.levels.find((level) => level.id === selectedWall.levelId)?.plan?.freehand) {
+      const horizontal = Math.abs(selectedWall.end.x - selectedWall.start.x) >= Math.abs(selectedWall.end.y - selectedWall.start.y);
+      point = horizontal
+        ? { ...point, y: anchor.y, label: "Horizontal" }
+        : { ...point, x: anchor.x, label: "Vertical" };
+    }
     setEndDrag({ ...endDrag, point });
     return true;
   }
