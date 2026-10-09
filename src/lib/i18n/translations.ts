@@ -27,7 +27,7 @@ export const translations: Record<Language, Dictionary> = {
     },
     language: { label: "Language", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
-      design: "Design Home",
+      design: "Design", "design-home": "All Design Tools", "house-design": "House Design", "cabinet-design": "Cabinet Design", "furniture-design": "Furniture Design", "sketch-design": "Sketch & Draw", "interior-design": "Interior Design", "exterior-design": "Exterior Design", "design-projects": "Saved Cabinet Designs", "design-gallery": "Design Gallery",
       agenda: "Agenda", "agenda-home": "Agenda", "agenda-projects": "Construction Projects",
       "agenda-tasks": "My Tasks", "agenda-calendar": "Calendar",
       home: "Home", ai: "AI", "ai-home": "Medosha AI", market: "Market", marketplace: "Marketplace",
@@ -195,7 +195,7 @@ export const translations: Record<Language, Dictionary> = {
     },
     language: { label: "ቋንቋ", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
-      design: "የቤት ዲዛይን",
+      design: "ዲዛይን", "design-home": "ሁሉም የዲዛይን መሣሪያዎች", "house-design": "የቤት ዲዛይን", "cabinet-design": "የካቢኔት ዲዛይን", "furniture-design": "የፈርኒቸር ዲዛይን", "sketch-design": "ስኬች እና ስዕል", "interior-design": "የውስጥ ዲዛይን", "exterior-design": "የውጪ ዲዛይን", "design-projects": "የተቀመጡ የካቢኔት ዲዛይኖች", "design-gallery": "የዲዛይን ጋለሪ",
       agenda: "አጀንዳ", "agenda-home": "አጀንዳ", "agenda-projects": "የግንባታ ፕሮጀክቶች",
       "agenda-tasks": "የእኔ ተግባራት", "agenda-calendar": "የቀን መቁጠሪያ",
       home: "መነሻ", ai: "AI", "ai-home": "Medosha AI", market: "ገበያ", marketplace: "ገበያ", property: "ንብረት",
@@ -333,7 +333,7 @@ export const translations: Record<Language, Dictionary> = {
     },
     language: { label: "Afaan", english: "English", amharic: "አማርኛ", oromo: "Afaan Oromo" },
     navigation: {
-      design: "Dizaayinii Manaa",
+      design: "Dizaayinii", "design-home": "Meeshaalee Dizaayinii Hunda", "house-design": "Dizaayinii Manaa", "cabinet-design": "Dizaayinii Kaabineetii", "furniture-design": "Dizaayinii Meeshaa Manaa", "sketch-design": "Fakkii fi Kaasaa", "interior-design": "Dizaayinii Keessaa", "exterior-design": "Dizaayinii Alaa", "design-projects": "Dizaayinoota Kaabineetii Kuufaman", "design-gallery": "Kuusaa Dizaayinii",
       agenda: "Ajandaa", "agenda-home": "Ajandaa", "agenda-projects": "Pirojektoota Ijaarsaa",
       "agenda-tasks": "Hojiiwwan Koo", "agenda-calendar": "Kaalaandarii",
       home: "Mana", ai: "AI", "ai-home": "Medosha AI", market: "Gabaa", marketplace: "Gabaa", property: "Qabeenya",
