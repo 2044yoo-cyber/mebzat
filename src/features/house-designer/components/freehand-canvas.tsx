@@ -61,7 +61,7 @@ export function FreehandCanvas({
   const [snap, setSnap] = useState(true),
     [thickness, setThickness] = useState(200);
   const [message, setMessage] = useState(
-    "Draw walls with one finger. Lift to straighten. Use Hand to pan.",
+    "Drag to draw straight 90° walls. Ends snap to nearby corners. Use Hand to pan.",
   );
   const [review, setReview] = useState(false);
   const [focusedIssue, setFocusedIssue] = useState<string | null>(null);
@@ -265,6 +265,33 @@ export function FreehandCanvas({
       x: (e.clientX - r.left - v.x) / v.zoom,
       y: (e.clientY - r.top - v.y) / v.zoom,
     };
+  }
+  // Orthogonal pencil: every gesture creates one horizontal or vertical wall.
+  // Nearby wall endpoints become exact shared junctions.
+  function alignWall(start: Point, end: Point): [Point, Point] {
+    const radius = 18 / view.current.zoom;
+    const endpoints = sketch.strokes.flatMap(stroke => stroke.points.length < 2
+      ? [] : [stroke.points[0]!, stroke.points[stroke.points.length - 1]!]);
+    const nearest = (p: Point) => {
+      let best = p, distance = radius;
+      for (const candidate of endpoints) {
+        const d = Math.hypot(candidate.x - p.x, candidate.y - p.y);
+        if (d < distance) { best = candidate; distance = d; }
+      }
+      return { ...best };
+    };
+    const a = snap ? nearest(start) : start;
+    const dx = end.x - a.x, dy = end.y - a.y;
+    const horizontal = Math.abs(dx) >= Math.abs(dy);
+    const projected = horizontal ? { x: end.x, y: a.y } : { x: a.x, y: end.y };
+    if (snap) {
+      const target = nearest(projected);
+      if (Math.hypot(target.x - projected.x, target.y - projected.y) < radius) {
+        projected.x = horizontal ? target.x : a.x;
+        projected.y = horizontal ? a.y : target.y;
+      }
+    }
+    return [a, projected];
   }
   function nearestEndpoint(p: Point) {
     let best: { strokeId: string; end: "start" | "end"; distance: number } | null = null;
@@ -544,14 +571,8 @@ export function FreehandCanvas({
             view.current.y += e.clientY - g.last.y;
             g.last = { x: e.clientX, y: e.clientY };
           } else if (tool === "erase") erase(point(e));
-          else {
-            const events = e.nativeEvent.getCoalescedEvents?.() ?? [];
-            for (const sample of events.length ? events : [e]) {
-              const p = point(sample), last = live.current.at(-1);
-              if (live.current.length < 10000 &&
-                (!last || Math.hypot(p.x - last.x, p.y - last.y) > 0.4 / view.current.zoom))
-                live.current.push(p);
-            }
+          else if (tool === "draw" && live.current.length) {
+            live.current = alignWall(live.current[0]!, point(e));
           }
           schedule();
         }}
@@ -576,7 +597,7 @@ export function FreehandCanvas({
                 }
               }
             } else if (tool === "draw" && live.current.length > 1 && sketch.strokes.length < 500) {
-              const stroke = { id: crypto.randomUUID(), points: [...live.current, point(e)], thickness };
+              const stroke = { id: crypto.randomUUID(), points: alignWall(live.current[0]!, point(e)), thickness };
               if (strokeSegments(stroke).length)
                 commit({ ...sketch, strokes: [...sketch.strokes, stroke] });
             } else if (tool === "erase" && g.erase.size)
