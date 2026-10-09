@@ -76,6 +76,8 @@ export type ProjectProductionSummary = {
   pieces: number;
   sheets: { board: string; sheets: number; pieces: number; area: number }[];
   workbook: Uint8Array;
+  rows: { design: string; partId: string; cabinet: string; label: string; board: string;
+    length: number; width: number; thickness: number; quantity: number; banding: string }[];
 };
 
 export function buildProjectCutList(primary: DesignSpec): ProjectProductionSummary {
@@ -89,6 +91,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
       throw new Error(`"${item.title}" contains panels that do not fit the stock sheet. Fix that design first.`);
   }
 
+  const printable: ProjectProductionSummary["rows"] = [];
   const cutting: Cell[][] = [[
     "Project #", "Design", "Part ID", "Cabinet", "Part", "Board",
     "Length (mm)", "Width (mm)", "Thickness (mm)", "Quantity",
@@ -98,11 +101,19 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
   const hardware: Cell[][] = [["Design", "Hardware", "Qty", "Unit", "Note"]];
   const summary: Cell[][] = [["Design", "Category", "Pieces", "Area (m²)", "Sheets"]];
   cuts.forEach(({ title, cut }, index) => {
-    cut.rows.forEach(row => cutting.push([
+    cut.rows.forEach(row => {
+      printable.push({
+        design: title, partId: `${index + 1}-${row.partId}`,
+        cabinet: row.cabinet, label: row.label, board: row.boardLabel,
+        length: row.length, width: row.width, thickness: row.thickness,
+        quantity: row.quantity, banding: row.banding,
+      });
+      cutting.push([
       index + 1, title, `${index + 1}-${row.partId}`, row.cabinet, row.label,
       row.boardLabel, row.length, row.width, row.thickness, row.quantity,
       row.banding, row.bandLabel, row.grainLocked ? "Yes" : "No", row.area,
-    ]));
+      ]);
+    });
     cut.byBoard.forEach(board => {
       const entry = boards.get(board.boardId) ?? {
         board: board.boardLabel, sheets: 0, pieces: 0, area: 0,
@@ -141,5 +152,6 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     pieces: cuts.reduce((sum, item) => sum + item.cut.totals.pieces, 0),
     sheets,
     workbook: buildXlsx(workbookSheets),
+    rows: printable,
   };
 }
