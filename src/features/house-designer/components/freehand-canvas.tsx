@@ -563,11 +563,12 @@ export function FreehandCanvas({
           const open = result.issues.filter(issue => issue.kind === "open-end");
           const short = result.issues.filter(issue => issue.kind === "short-wall");
           const tails = result.issues.filter(issue => issue.kind === "dangling-extension");
+          const ambiguous = result.issues.filter(issue => issue.kind === "ambiguous-junction");
           const repairs = suggestFreehandRepairs(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom).filter(p => !rejectedRepairs.includes(p.id));
           const trims = suggestFreehandTrims(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom).filter(p => !rejectedRepairs.includes(p.id));
           return <div className="max-h-[30dvh] space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
             <strong className="block text-sm">Review Plan · {result.segments.length} walls</strong>
-            <p>{open.length} open endpoints · {short.length} short pieces · {tails.length} possible wall tails</p>
+            <p>{open.length} open endpoints · {short.length} short pieces · {tails.length} possible wall tails · {ambiguous.length} ambiguous junctions</p>
             <button type="button" className="w-full rounded-lg border border-slate-300 bg-white p-2 text-left font-medium" onClick={() => {
               const cleaned = cleanFreehandStrokes(sketch.strokes);
               if (!cleaned.removed) {
@@ -647,7 +648,7 @@ export function FreehandCanvas({
                 {index + 1}. {issue.detail} <span className="text-blue-700">Show on drawing</span>
               </button>)}
             {result.issues.length > 30 ? <p>Showing the first 30 warnings.</p> : null}
-            <p className="text-slate-500">Red markers need review. No walls are added or removed automatically; use Draw / Erase or Undo to repair them.</p>
+            <p className="text-slate-500">Red: open endpoints. Orange: ambiguous junctions. Yellow: short extensions. Only approve connections or trims that match your sketch.</p>
           </div>;
         })() : null}
         <button
