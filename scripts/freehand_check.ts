@@ -238,6 +238,12 @@ const ambiguousProposals = suggestFreehandRepairs(forkChoice);
 assert.equal(ambiguousProposals.filter(repair => Math.hypot(repair.start.x - 100, repair.start.y) < 1 ||
   Math.hypot(repair.end.x - 100, repair.end.y) < 1).length, 0,
   "ambiguous endpoint does not receive an automatic bridge suggestion");
+const shortExistingWall = [stroke([[0, 0], [20, 0]], "already-connected")];
+assert.equal(suggestFreehandRepairs(shortExistingWall).length, 0,
+  "two ends of a short existing wall must not be connected again");
+assert.equal(inspectFreehand(shortExistingWall).issues.filter(issue =>
+  issue.kind === "ambiguous-junction").length, 0,
+  "the ends of one existing short wall are not ambiguous junctions");
 const diagonal = convertStrokes(
   [
     stroke([
