@@ -234,7 +234,7 @@ export function convertStrokes(
  */
 export type FreehandIssue = {
   id: string;
-  kind: "open-end" | "short-wall" | "dangling-extension";
+  kind: "open-end" | "short-wall" | "dangling-extension" | "ambiguous-junction";
   point: Point;
   detail: string;
 };
@@ -256,6 +256,22 @@ export function inspectFreehand(
     if (node.degree === 1)
       issues.push({ id: `open-${key}`, kind: "open-end", point: node.point,
         detail: "Open wall endpoint. Join it to another wall if this room should be enclosed." });
+  // Two similarly plausible destinations must be reviewed instead of guessed.
+  // Diagnose at graph endpoints (not raw finger sample points), with a
+  // zoom-scaled search radius. Exclude self and coincident endpoints.
+  const openNodes = [...nodes.entries()].filter(([, node]) => node.degree === 1);
+  const searchRadius = Math.max(16 * unitsPerPixel, snapPixels * unitsPerPixel * 2.5);
+  for (const [key, node] of openNodes) {
+    const nearby = openNodes
+      .filter(([otherKey]) => otherKey !== key)
+      .map(([, other]) => distance(node.point, other.point))
+      .filter(d => d > unitsPerPixel && d < searchRadius)
+      .sort((a, b) => a - b);
+    if (nearby.length >= 2 && nearby[1]! < nearby[0]! * 1.5)
+      issues.push({ id: `ambiguous-${key}`, kind: "ambiguous-junction",
+        point: node.point,
+        detail: "More than one possible connection is nearby. Choose the intended wall manually." });
+  }
   // Ignore very short subdivisions adjacent to junctions; flag genuinely tiny
   // standalone pieces, but never delete any geometry on the user's behalf.
   const small = Math.max(2 * unitsPerPixel, 0.01);
@@ -354,12 +370,13 @@ export function suggestFreehandRepairs(
 ): FreehandRepair[] {
   const { issues, segments } = inspectFreehand(strokes, snapPixels, unitsPerPixel);
   const open = issues.filter(issue => issue.kind === "open-end");
+  const ambiguous = new Set(issues.filter(issue => issue.kind === "ambiguous-junction").map(issue => issue.id.slice("ambiguous-".length)));
   const maxGap = Math.max(16 * unitsPerPixel, snapPixels * unitsPerPixel * 2.5);
   const used = new Set<string>(), proposals: FreehandRepair[] = [];
   for (const item of open) {
-    if (used.has(item.id)) continue;
+    if (used.has(item.id) || ambiguous.has(item.id.slice("open-".length))) continue;
     const candidates = open.filter(other => other.id !== item.id &&
-      !used.has(other.id) && distance(item.point, other.point) <= maxGap &&
+      !used.has(other.id) && !ambiguous.has(other.id.slice("open-".length)) && distance(item.point, other.point) <= maxGap &&
       distance(item.point, other.point) > Math.max(1e-4, unitsPerPixel));
     const ordered = candidates.sort((a,b) => distance(item.point, a.point) - distance(item.point, b.point));
     const chosen = ordered[0];
