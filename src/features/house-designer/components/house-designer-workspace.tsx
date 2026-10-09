@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   Building2,
@@ -710,10 +711,16 @@ function StartScreen({
           </div>
         )}
 
+        {source === "upload" ? (
+          <Link href="/design/image-to-3d"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-center text-sm font-semibold text-brand-foreground hover:opacity-90">
+            <FileUp className="size-4" /> Convert DXF, PDF or Image without AI
+          </Link>
+        ) : null}
         <div className="flex flex-col gap-2 sm:flex-row">
           {source === "upload" || source === "sketch" ? <>
             <button type="button" onClick={() => onContinue(true)} disabled={analysingPlan || floorPlans.length === 0 || floorPlans[0]?.mediaType !== "image"} className="flex-1 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground disabled:opacity-40">
-              {analysingPlan ? <span className="flex items-center justify-center gap-2"><Loader2 className="size-4 animate-spin" /> Reading your {source === "sketch" ? "sketch" : "plan"}…</span> : source === "sketch" ? "Convert sketch with AI" : "Convert with AI"}
+              {analysingPlan ? <span className="flex items-center justify-center gap-2"><Loader2 className="size-4 animate-spin" /> Reading your {source === "sketch" ? "sketch" : "plan"}…</span> : source === "sketch" ? "Convert sketch with AI" : "Convert with AI (paid)"}
             </button>
             <button type="button" onClick={() => onContinue(false)} disabled={analysingPlan || floorPlans.length === 0} className="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold hover:bg-muted disabled:opacity-40">Trace it myself</button>
           </> : source === "describe" ? (
@@ -726,7 +733,8 @@ function StartScreen({
             </button>
           )}
         </div>
-        {(source === "upload" || source === "sketch") && floorPlans[0]?.mediaType === "pdf" ? <p className="text-xs text-muted-foreground">AI conversion reads images; a PDF can be traced by hand.</p> : null}
+        {(source === "upload" || source === "sketch") && floorPlans[0]?.mediaType === "pdf" ?
+          <p className="text-xs text-muted-foreground">The no-AI importer supports PDF pages. The paid AI option only reads images.</p> : null}
       </section>
 
     </div>
