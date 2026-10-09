@@ -10,12 +10,12 @@
 import assert from "node:assert/strict";
 import { rectangularRoom, roomSchema } from "../src/features/berchuma-studio/types/room";
 import { moveHouseSelections } from "../src/features/house-designer/services/model-commands";
-import { patchHouseObject, rebuildLevel } from "../src/features/house-designer/services/project-edit";
+import { rebuildLevel } from "../src/features/house-designer/services/project-edit";
 import { moveWallEnd, toggleWallJoints, wallJointLinked, wallJointsLinked } from "../src/features/house-designer/services/quick-edit";
 import { createHouseProject, houseProjectSchema, type HouseProject } from "../src/features/house-designer/types/project";
 
 type Point = { x: number; y: number };
-type WallId = "a" | "b" | "c";
+type WallId = "a" | "b" | "c" | "d";
 const P = (x: number, y: number): Point => ({ x, y });
 function fixture(): HouseProject {
   const plan = roomSchema.parse({
@@ -24,6 +24,7 @@ function fixture(): HouseProject {
       { id: "a", start: P(1000, 1200), end: P(3000, 1200), thickness: 120, height: 2700 },
       { id: "b", start: P(1000, 1200), end: P(1000, 3200), thickness: 120, height: 2700 },
       { id: "c", start: P(3000, 1200), end: P(3000, 3200), thickness: 120, height: 2700 },
+      { id: "d", start: P(2000, 1200), end: P(2000, 3200), thickness: 120, height: 2700 },
     ],
     zones: [],
   });
@@ -69,6 +70,7 @@ assert.equal(wallJointLinked(original, initially.a.id, "end"), false);
   assert.deepEqual(next.a.end, P(3000, 1700));
   assert.deepEqual(next.b, initially.b, "left neighbour stayed exactly where it was");
   assert.deepEqual(next.c, initially.c, "right neighbour stayed exactly where it was");
+  assert.deepEqual(wall(result.project, "d"), wall(original, "d"), "midpoint T must not follow an independent move");
   assert.deepEqual(result.project.rooms[0]!.boundary, original.rooms[0]!.boundary, "existing exterior room is not dragged");
   checkSaved(result.project);
 }
@@ -82,6 +84,7 @@ assert.equal(wallJointLinked(original, initially.a.id, "end"), false);
   assert.deepEqual(result.blocked, []);
   assert.deepEqual(wall(result.project, "b").start, P(1000, 1700));
   assert.deepEqual(wall(result.project, "c").start, P(3000, 1200), "unlinked END must not follow");
+  assert.deepEqual(wall(result.project, "d").start, P(2000, 1200), "linking just the START does not move a midpoint T");
   assert.deepEqual(wall(result.project, "b").end, initially.b.end, "the neighbour's far endpoint stays anchored");
   checkSaved(result.project);
 }
@@ -110,6 +113,7 @@ assert.equal(wallJointLinked(original, initially.a.id, "end"), false);
   assert.deepEqual(moved.blocked, []);
   assert.deepEqual(wall(moved.project, "b").start, P(1000, 1650));
   assert.deepEqual(wall(moved.project, "c").start, P(3000, 1650));
+  assert.deepEqual(wall(moved.project, "d").start, P(2000, 1650), "linking BOTH ends intentionally includes a true midpoint T");
   const released = toggleWallJoints(linked, initially.a.id);
   assert.equal(wallJointsLinked(released, initially.a.id), false);
   checkSaved(released);
