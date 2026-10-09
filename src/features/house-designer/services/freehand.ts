@@ -227,6 +227,45 @@ export function convertStrokes(
     };
   });
 }
+/** Non-destructive review of the exact geometry that conversion will consume.
+ * Degree-one endpoints are warnings, not automatically guessed connections.
+ * Short pieces can be intentional; flag them without deleting them.
+ */
+export type FreehandIssue = {
+  id: string;
+  kind: "open-end" | "short-wall";
+  point: Point;
+  detail: string;
+};
+export function inspectFreehand(
+  strokes: readonly Stroke[],
+  snapPixels = 12,
+  unitsPerPixel = 1,
+): { segments: Segment[]; issues: FreehandIssue[] } {
+  const segments = convertStrokes(strokes, 1, snapPixels, unitsPerPixel);
+  const nodes = new Map<string, { point: Point; degree: number }>();
+  const keyOf = (p: Point) => `${p.x.toFixed(3)}:${p.y.toFixed(3)}`;
+  for (const segment of segments)
+    for (const point of [segment.start, segment.end]) {
+      const key = keyOf(point), old = nodes.get(key);
+      nodes.set(key, { point, degree: (old?.degree ?? 0) + 1 });
+    }
+  const issues: FreehandIssue[] = [];
+  for (const [key, node] of nodes)
+    if (node.degree === 1)
+      issues.push({ id: `open-${key}`, kind: "open-end", point: node.point,
+        detail: "Open wall endpoint. Join it to another wall if this room should be enclosed." });
+  // Ignore very short subdivisions adjacent to junctions; flag genuinely tiny
+  // standalone pieces, but never delete any geometry on the user's behalf.
+  const small = Math.max(2 * unitsPerPixel, 0.01);
+  for (const [i, segment] of segments.entries())
+    if (distance(segment.start, segment.end) < small)
+      issues.push({ id: `short-${i}`, kind: "short-wall",
+        point: { x: (segment.start.x + segment.end.x) / 2, y: (segment.start.y + segment.end.y) / 2 },
+        detail: "Very short wall piece. Inspect before conversion." });
+  return { segments, issues };
+}
+
 /** Convert to native level walls; existing editor, save and takeoff consume them. */
 export function applyFreehand(
   project: HouseProject,
