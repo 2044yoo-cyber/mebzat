@@ -1,4 +1,4 @@
-import { rebuildLevel, deleteRoom, moveRoom, patchHouseObject, reconcileRooms, removeFootprintCorner } from "./project-edit";
+import { rebuildLevel, deleteRoom, moveRoom, patchHouseObject, reconcileRooms, removeFootprintCorner, wallJointLinked, wallJointsLinked } from "./project-edit";
 import { objectDefinition } from "./object-library";
 import { stairFields, stairPreset, type StairParams } from "./stair-geometry";
 import { allHouseSelections, sameSelection } from "./model-state";
@@ -135,14 +135,20 @@ export function lockConflict(project: HouseProject, selection: HouseSelection): 
   if (selection.kind !== "wall") return null;
   const wall = project.walls.find((item) => item.id === selection.id);
   if (!wall) return null;
-  // Without an explicit connection the neighbouring walls are not edited,
-  // so even a pinned neighbour cannot block an independent wall move.
-  if (project.objectInstances[wall.id]?.properties.linkedJoints !== true) return null;
-  // A linked joint is a real centreline junction, NOT a wall merely within
-  // half the thickness of this wall (which could be an unrelated wall).
-  const attached = project.walls.filter((item) => item.levelId === wall.levelId && item.id !== wall.id
-    && [item.start, item.end].some((point) => pointSegmentDistance(point, wall.start, wall.end) <= 1));
-  return attached.some((item) => project.objectInstances[item.id]?.pinned) ? "A locked wall meets this linked wall — unlock it or release the wall connection first" : null;
+  const atStart = wallJointLinked(project, wall.id, "start");
+  const atEnd = wallJointLinked(project, wall.id, "end");
+  if (!atStart && !atEnd) return null;
+  // A neighbouring wall is affected only when its endpoint is at a
+  // specifically linked endpoint of the selected wall, not at any point
+  // along the line or within the wall thickness.
+  const attached = project.walls.filter((item) => item.levelId === wall.levelId && item.id !== wall.id &&
+    [item.start, item.end].some((point) =>
+      (atStart && Math.hypot(point.x - wall.start.x, point.y - wall.start.y) <= 1) ||
+      (atEnd && Math.hypot(point.x - wall.end.x, point.y - wall.end.y) <= 1),
+    ));
+  return attached.some((item) => project.objectInstances[item.id]?.pinned)
+    ? "A locked wall shares a linked endpoint — release the joint or unlock that wall"
+    : null;
 }
 
 export function moveHouseSelections(project: HouseProject, selections: readonly HouseSelection[], dx: number, dy: number, options?: { footprintEditable?: boolean }): HouseCommandMutation {
@@ -156,8 +162,8 @@ export function moveHouseSelections(project: HouseProject, selections: readonly 
       const level = wall ? next.levels.find((item) => item.id === wall.levelId) : null;
       if (!wall) continue;
       const footprint = !!(wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId));
-      if (footprint && next.objectInstances[wall.id]?.properties.linkedJoints !== true) {
-        blocked.push("This is a footprint wall: use the Link joints button to allow moving its connected corners");
+      if (footprint && !wallJointsLinked(next, wall.id)) {
+        blocked.push("This wall is part of a closed footprint: link BOTH endpoint joints to move the whole side");
         continue;
       }
       if (!options?.footprintEditable && next.originalPlanStrict && wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId)) {
