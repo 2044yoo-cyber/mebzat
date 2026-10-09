@@ -16,6 +16,8 @@ import {
   Footprints,
   Grid3X3,
   LayoutGrid,
+  Link2,
+  Unlink2,
   Loader2,
   Lock,
   LockOpen,
@@ -459,6 +461,7 @@ const ACTION_ICONS: Record<string, typeof Copy> = {
   split: Scissors,
   divide: SplitSquareHorizontal,
   move: Move,
+  junction: Link2,
   lock: Lock,
   delete: Trash2,
   agenda: CalendarPlus,
@@ -477,7 +480,11 @@ const ACTION_ICONS: Record<string, typeof Copy> = {
 };
 
 function ActionIcon({ action }: { action: QuickAction }) {
-  const Icon = (action.id === "lock" && action.label === "Unlock" ? LockOpen : ACTION_ICONS[action.id]) ?? MoreHorizontal;
+  const Icon = (action.id === "lock" && action.label === "Unlock"
+    ? LockOpen
+    : action.id === "junction" && !action.pressed
+      ? Unlink2
+      : ACTION_ICONS[action.id]) ?? MoreHorizontal;
   return <Icon className="size-4" aria-hidden />;
 }
 
