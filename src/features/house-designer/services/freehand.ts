@@ -116,6 +116,43 @@ export function strokeSegments(
   }
   return result;
 }
+/**
+ * Optional orthogonal correction for rough, mostly rectangular sketches.
+ * Works on each simplified wall run and retains intentional diagonals.
+ * No change is applied unless the user explicitly accepts the suggestion.
+ */
+export function suggestOrthogonalCorrection(strokes: readonly Stroke[]): { strokes: Stroke[]; corrected: number } {
+  let corrected = 0;
+  const next = strokes.map(stroke => {
+    const segments = strokeSegments(stroke, 3, false);
+    if (!segments.length) return stroke;
+    const correctedSegments = segments.map(segment => {
+      const dx = segment.end.x - segment.start.x;
+      const dy = segment.end.y - segment.start.y;
+      const length = Math.hypot(dx, dy);
+      if (length < 10) return segment;
+      const horizontal = Math.abs(dy) <= Math.abs(dx) * Math.tan(Math.PI / 9);
+      const vertical = Math.abs(dx) <= Math.abs(dy) * Math.tan(Math.PI / 9);
+      if (!horizontal && !vertical) return segment;
+      if (horizontal && Math.abs(dy) > 0.5) {
+        corrected++;
+        const y = (segment.start.y + segment.end.y) / 2;
+        return { ...segment, start: { ...segment.start, y }, end: { ...segment.end, y } };
+      }
+      if (vertical && Math.abs(dx) > 0.5) {
+        corrected++;
+        const x = (segment.start.x + segment.end.x) / 2;
+        return { ...segment, start: { ...segment.start, x }, end: { ...segment.end, x } };
+      }
+      return segment;
+    });
+    if (correctedSegments.every((seg, i) => seg === segments[i])) return stroke;
+    // Store corrected wall runs as straight point pairs; the conversion
+    // engine will reconnect nearby endpoints using its existing snap graph.
+    return { ...stroke, points: correctedSegments.flatMap(seg => [seg.start, seg.end]) };
+  });
+  return { strokes: next, corrected };
+}
 /** Pixel-space snapping then the existing planar graph, including T/X splits. */
 export function convertStrokes(
   strokes: readonly Stroke[],
