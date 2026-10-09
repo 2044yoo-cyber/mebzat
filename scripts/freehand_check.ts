@@ -154,6 +154,26 @@ const teeReview = inspectFreehand([
 ]);
 assert.equal(teeReview.issues.filter(issue => issue.kind === "open-end").length, 3,
   "T junction is connected while three outer ends remain open");
+// A wavering finger movement remains ONE wall, not a chain of false corners.
+const fingerJitter = stroke(Array.from({ length: 61 }, (_, i) => [
+  i * 4, i === 21 ? 8 : i === 39 ? -7 : Math.sin(i * 1.4) * 2.5,
+]), "shaky-finger");
+assert.equal(strokeSegments(fingerJitter).length, 1,
+  "finger tremor and isolated spikes cannot manufacture wall junctions");
+const fingerL = stroke([
+  ...Array.from({ length: 26 }, (_, i) => [i * 4, Math.sin(i) * 2]),
+  ...Array.from({ length: 25 }, (_, i) => [100 + Math.sin(i) * 2, (i + 1) * 4]),
+], "finger-L");
+assert.equal(strokeSegments(fingerL).length, 2,
+  "sustained right-angle change still makes exactly two walls");
+const fingerRectangle = stroke([
+  ...Array.from({ length: 26 }, (_, i) => [i * 4, Math.sin(i) * 1.5]),
+  ...Array.from({ length: 25 }, (_, i) => [100 + Math.sin(i) * 1.5, (i + 1) * 4]),
+  ...Array.from({ length: 25 }, (_, i) => [100 - (i + 1) * 4, 100 + Math.sin(i) * 1.5]),
+  ...Array.from({ length: 25 }, (_, i) => [Math.sin(i) * 1.5, 100 - (i + 1) * 4]),
+], "finger-rectangle");
+assert.equal(strokeSegments(fingerRectangle).length, 4,
+  "one shaky continuous rectangle retains four architectural sides");
 const diagonal = convertStrokes(
   [
     stroke([
