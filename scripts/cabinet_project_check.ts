@@ -8,7 +8,7 @@ import { parseSpec } from "../src/features/berchuma-studio/types/spec";
 import { buildParts } from "../src/features/berchuma-studio/services/geometry";
 import { buildCutList } from "../src/features/berchuma-studio/services/cutlist";
 import {
-  addProjectDesign, buildProjectCutList, projectDesigns,
+  addProjectDesign, duplicateProjectDesign, buildProjectCutList, projectDesigns,
   removeProjectDesign, updateProjectDesign,
 } from "../src/features/berchuma-studio/services/cabinet-project";
 import { nudgeTo, nudgeBlocked } from "../src/features/berchuma-studio/services/nudge";
@@ -36,6 +36,20 @@ const removed = removeProjectDesign(edited, "wardrobe-3");
 assert.equal(projectDesigns(removed).length, 2);
 assert.equal(projectDesigns(three).length, 3, "removal leaves previous state immutable");
 assert.throws(() => addProjectDesign(three, "vanity-2", "vanity"), /already exists/);
+const duplicated = duplicateProjectDesign(three, "primary", "wardrobe-copy");
+const copy = projectDesigns(duplicated).at(-1)!.spec;
+assert.equal(projectDesigns(duplicated).length, 4, "a whole cabinet design may be copied");
+assert.equal(copy.kind, "wardrobe", "copied cabinet keeps its furniture type");
+assert.equal(copy.title, `${first.title} (copy)`,
+  "copied design title distinguishes it from the source");
+assert.equal(copy.carcass.board.id, first.carcass.board.id,
+  "copied cabinet retains the source material specification");
+assert.equal(copy.projectItems, undefined,
+  "copied cabinet may not recursively contain all project siblings");
+assert.equal(projectDesigns(three).length, 3,
+  "duplicating never mutates the original collection");
+assert.throws(() => duplicateProjectDesign(three, "not-found", "missing-copy"), /could not be found/);
+
 const invalid = structuredClone(three);
 invalid.projectItems![0]!.spec = { ...first, projectItems: [{ id: "cycle", spec: first }] };
 assert.equal(parseSpec(invalid).ok, false, "nested project bundles are not allowed");
