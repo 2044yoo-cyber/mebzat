@@ -45,10 +45,17 @@ const expected = reopened.reduce((total, item) => total +
   buildCutList(item.spec, buildParts(item.spec)).totals.pieces, 0);
 assert.equal(workbook.pieces, expected, "every cabinet contributes all its cut pieces");
 assert.equal(workbook.designs, 3);
+assert.ok(workbook.sheets.every(board => board.sheets <= board.separateSheets),
+  "combined cutting layout must never use more sheets than separate layouts");
+assert.ok(workbook.sheets.every(board => board.pieces > 0 && board.sheets >= 1),
+  "all nonempty board groups have physical parts and a valid cutting plan");
 assert.equal(workbook.rows.reduce((total, row) => total + row.quantity, 0), expected);
 assert.ok(workbook.rows.some(row => row.design.includes("Vanity")) ||
   workbook.rows.some(row => row.design === reopened[1]!.spec.title),
   "vanity parts are present in the same cut list as wardrobes");
+const totalBoards = workbook.sheets.reduce((n, board) => n + board.sheets, 0);
+const separateBoards = workbook.sheets.reduce((n, board) => n + board.separateSheets, 0);
+assert.ok(totalBoards <= separateBoards, "joint job optimizes without overestimating cutting sheets");
 assert.deepEqual([...workbook.workbook.slice(0, 2)], [0x50, 0x4b],
   "combined workbook is a ZIP-based XLSX file");
 
