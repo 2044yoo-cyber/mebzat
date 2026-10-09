@@ -487,6 +487,14 @@ function ActionIcon({ action }: { action: QuickAction }) {
     : action.id.startsWith("junction") && !action.pressed
       ? Unlink2
       : ACTION_ICONS[action.id]) ?? MoreHorizontal;
+  if (action.id === "junction-start" || action.id === "junction-end") {
+    return <span className="relative inline-flex size-5 items-center justify-center">
+      <Icon className="size-4" aria-hidden />
+      <span aria-hidden className="absolute -bottom-1 -right-1 rounded-full bg-card px-0.5 text-[9px] font-bold leading-3">
+        {action.id === "junction-start" ? "S" : "E"}
+      </span>
+    </span>;
+  }
   return <Icon className="size-4" aria-hidden />;
 }
 
