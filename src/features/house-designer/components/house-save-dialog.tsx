@@ -16,12 +16,13 @@ export type SaveChoice = { project: ProjectOption | { newName: string }; title: 
  * Agenda projects, the same ones the Agenda shows, so there is one kind of
  * project rather than a House Designer project and an Agenda project.
  */
-export function HouseSaveDialog({ defaultTitle, preferredProjectId, busy, onSave, onClose }: {
+export function HouseSaveDialog({ defaultTitle, preferredProjectId, busy, onSave, onClose, onDownload }: {
   defaultTitle: string;
   preferredProjectId?: string | null;
   busy: boolean;
   onSave: (choice: SaveChoice) => void;
   onClose: () => void;
+  onDownload: () => void;
 }) {
   const [projects, setProjects] = useState<ProjectOption[] | null>(null);
   const [chosen, setChosen] = useState<string>("new");
@@ -70,6 +71,7 @@ export function HouseSaveDialog({ defaultTitle, preferredProjectId, busy, onSave
             ))}
           </div>
         </fieldset>
+        <button type="button" onClick={onDownload} className="min-h-11 w-full rounded-xl border border-blue-500/50 text-sm font-medium text-blue-500">Download backup (.json) — works without cloud saving</button>
         <div className="flex gap-2">
           <button type="button" onClick={onClose} disabled={busy} className="min-h-11 flex-1 rounded-xl border text-sm font-medium hover:bg-muted">Cancel</button>
           <button type="submit" disabled={!ready || busy} className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-brand text-sm font-semibold text-brand-foreground disabled:opacity-40">{busy ? <Loader2 className="size-4 animate-spin" /> : null}Save</button>
