@@ -71,43 +71,69 @@ function fitted(points: readonly Point[]): [Point, Point] {
   };
   return [project(points[0]!), project(points.at(-1)!)];
 }
+/** Suppress finger tremor without moving the true start/end of a stroke.
+ * Coordinate-wise median rejects brief spikes without rounding off 90° bends.
+ */
+function stableFingerPath(points: readonly Point[]): Point[] {
+  if (points.length < 5) return points.map(p => ({ ...p }));
+  return points.map((p, i) => {
+    if (i === 0 || i === points.length - 1) return { ...p };
+    const neighbours = points.slice(Math.max(0, i - 2), Math.min(points.length, i + 3));
+    const xs = neighbours.map(p => p.x).sort((a, b) => a - b);
+    const ys = neighbours.map(p => p.y).sort((a, b) => a - b);
+    return { x: xs[Math.floor(xs.length / 2)]!, y: ys[Math.floor(ys.length / 2)]! };
+  });
+}
+
+/** Only sustained turns create an architectural corner. A one-finger wobble
+ * must not produce another wall or a pair of extra endpoint handles.
+ */
 export function strokeSegments(
   stroke: Stroke,
   tolerance = 3,
   snap = true,
 ): Segment[] {
-  const raw = stroke.points.filter(
-    (p) => Number.isFinite(p.x) && Number.isFinite(p.y),
-  );
+  const raw = stroke.points.filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
   if (raw.length < 2) return [];
-  const sampled = raw.filter(
-    (p, i) =>
-      i === 0 || i === raw.length - 1 || distance(p, raw[i - 1]!) > 0.25,
-  );
-  const corners = simplify(sampled, tolerance),
-    result: Segment[] = [];
-  let from = 0;
+  const sampled = raw.filter((p, i) =>
+    i === 0 || i === raw.length - 1 || distance(p, raw[i - 1]!) > 0.25);
+  if (sampled.length < 2) return [];
+  const stable = stableFingerPath(sampled);
+  const travelled = stable.slice(1).reduce((sum, p, i) => sum + distance(p, stable[i]!), 0);
+  const epsilon = Math.max(tolerance, Math.min(tolerance * 3, travelled * 0.018));
+  let corners = simplify(stable, epsilon);
+  // RDP may retain a corner caused by a single hand tremor. Only keep it
+  // when both adjacent runs are long enough and there is a real change in angle.
+  const minimumRun = Math.max(tolerance * 2, Math.min(tolerance * 5, travelled * 0.035));
+  let changed = true;
+  while (changed && corners.length > 2) {
+    changed = false;
+    for (let i = 1; i < corners.length - 1; i++) {
+      const prev = corners[i - 1]!, at = corners[i]!, next = corners[i + 1]!;
+      const first = distance(prev, at), second = distance(at, next);
+      const dot = (at.x - prev.x) * (next.x - at.x) + (at.y - prev.y) * (next.y - at.y);
+      const turn = Math.acos(Math.max(-1, Math.min(1, dot / (first * second || 1))));
+      if (first < minimumRun || second < minimumRun || turn < Math.PI / 9) {
+        corners = [...corners.slice(0, i), ...corners.slice(i + 1)];
+        changed = true;
+        break;
+      }
+    }
+  }
+  const result: Segment[] = [];
   for (let i = 1; i < corners.length; i++) {
-    let to = sampled.findIndex(
-      (p, index) =>
-        index > from && p.x === corners[i]!.x && p.y === corners[i]!.y,
-    );
-    if (to < 0) to = sampled.length - 1;
-    let [start, end] = fitted(sampled.slice(from, to + 1));
-    from = to;
+    let start = { ...corners[i - 1]! }, end = { ...corners[i]! };
     if (distance(start, end) < tolerance * 2) continue;
     if (snap) {
-      const angle = Math.atan2(end.y - start.y, end.x - start.x),
-        axis = (Math.round(angle / (Math.PI / 2)) * Math.PI) / 2;
-      if (Math.abs(angle - axis) <= (5 * Math.PI) / 180) {
+      const angle = Math.atan2(end.y - start.y, end.x - start.x);
+      const axis = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2);
+      if (Math.abs(angle - axis) <= (7 * Math.PI) / 180) {
         if (Math.abs(Math.cos(axis)) > 0.5) {
           const y = (start.y + end.y) / 2;
-          start = { ...start, y };
-          end = { ...end, y };
+          start = { ...start, y }; end = { ...end, y };
         } else {
           const x = (start.x + end.x) / 2;
-          start = { ...start, x };
-          end = { ...end, x };
+          start = { ...start, x }; end = { ...end, x };
         }
       }
     }
