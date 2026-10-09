@@ -17,6 +17,26 @@ export type WallEnd = "start" | "end";
 
 const TOLERANCE = 1;
 
+/** Connection mode persists with the wall. Off (independent) is the safe default. */
+export function wallJointsLinked(project: HouseProject, wallId: string): boolean {
+  return project.objectInstances[wallId]?.properties.linkedJoints === true;
+}
+
+export function toggleWallJoints(project: HouseProject, wallId: string): HouseProject {
+  if (!project.walls.some((wall) => wall.id === wallId)) return project;
+  const previous = project.objectInstances[wallId];
+  return {
+    ...project,
+    objectInstances: {
+      ...project.objectInstances,
+      [wallId]: {
+        ...(previous ?? { typeId: null, mark: "", pinned: false, groupId: null, flipped: false, properties: {} }),
+        properties: { ...previous?.properties, linkedJoints: !wallJointsLinked(project, wallId) },
+      },
+    },
+  };
+}
+
 function plain(project: HouseProject, wall: Wall) {
   const plan = project.levels.find((level) => level.id === wall.levelId)?.plan;
   const source = wall.sourceWallId ?? wall.id.split(":wall:")[1];
@@ -48,19 +68,11 @@ export function extendWall(project: HouseProject, wallId: string, end: WallEnd, 
   const move = { x: direction.x * delta * sign, y: direction.y * delta * sign };
   const selection: HouseSelection = { kind: "wall", id: wall.id };
   const { outline } = plain(project, wall);
-  if (outline) {
-    const corner = end === "end" ? wall.end : wall.start;
-    const neighbour = project.walls.find((item) => item.levelId === wall.levelId && item.id !== wall.id
-      && Math.hypot((end === "end" ? item.start : item.end).x - corner.x, (end === "end" ? item.start : item.end).y - corner.y) < TOLERANCE);
-    if (neighbour) {
-      const along = unit(neighbour);
-      const parallel = Math.abs(along.x * direction.y - along.y * direction.x) < 1e-6;
-      if (!parallel) {
-        const moved = moveHouseSelections(project, [{ kind: "wall", id: neighbour.id }], move.x, move.y, { footprintEditable: true });
-        return { project: moved.project, selections: [selection], blocked: moved.blocked };
-      }
-    }
-  }
+  if (outline && !wallJointsLinked(project, wallId))
+    return blocked(project, "This exterior wall belongs to the closed footprint. Turn on Link joints before moving its corner.");
+  // Moving the selected endpoint changes just this wall in independent
+  // mode. When joints are linked, patchWall moves actual attached endpoints
+  // together and the footprint corners remain closed.
   const point = end === "end" ? wall.end : wall.start;
   const patch: HousePatch = end === "end" ? { endX: point.x + move.x, endY: point.y + move.y } : { startX: point.x + move.x, startY: point.y + move.y };
   return { project: patchHouseObject(project, selection, patch), selections: [selection], blocked: [] };
@@ -74,35 +86,43 @@ export function setWallLength(project: HouseProject, wallId: string, end: WallEn
 }
 
 /**
- * Move an endpoint together with other wall endpoints at the same junction.
- * Only exact/near-exact shared endpoints are changed; unrelated crossing
- * walls and mid-wall T intersections are left untouched.
+ * Moving a handle edits ONLY the selected wall by default. A link toggle
+ * explicitly allows shared junctions to follow. The selected wall is edited
+ * once: patchWall handles linked endpoints together in one rebuild/undo step.
  */
 export function moveWallEnd(project: HouseProject, wallId: string, end: WallEnd, to: Point): HouseCommandMutation {
   const wall = project.walls.find((item) => item.id === wallId);
   if (!wall) return blocked(project, "Wall not found");
-  const from = wall[end];
-  const selection: HouseSelection = { kind: "wall", id: wall.id };
-  const connected = project.walls.flatMap((item) =>
-    item.levelId !== wall.levelId ? [] : (["start", "end"] as const)
-      .filter((side) => Math.hypot(item[side].x - from.x, item[side].y - from.y) <= TOLERANCE)
-      .map((side) => ({ wall: item, side })),
-  );
-  if (!connected.length) return blocked(project, "Wall endpoint not found");
-  for (const joint of connected) {
-    const fixed = joint.wall[joint.side === "start" ? "end" : "start"];
-    if (Math.hypot(to.x - fixed.x, to.y - fixed.y) < 200) {
-      return blocked(project, "Moving this junction would make a connected wall shorter than 200 mm");
+  const selection: HouseSelection = { kind: "wall", id: wallId };
+  if (project.objectInstances[wallId]?.pinned) return blocked(project, "This wall is locked — unlock it to change it");
+  const linked = wallJointsLinked(project, wallId);
+  if (plain(project, wall).outline && !linked)
+    return blocked(project, "This exterior wall belongs to the closed footprint. Turn on Link joints before moving its corner.");
+  const moving = wall[end];
+  const fixed = wall[end === "start" ? "end" : "start"];
+  if (!Number.isFinite(to.x) || !Number.isFinite(to.y) || Math.hypot(to.x - fixed.x, to.y - fixed.y) < 200)
+    return blocked(project, "A wall must be at least 200 mm long");
+  if (Math.hypot(to.x - moving.x, to.y - moving.y) < 0.01)
+    return { project, selections: [selection], blocked: [] };
+  if (linked) {
+    const connected = project.walls.filter((item) =>
+      item.id !== wallId && item.levelId === wall.levelId &&
+      (["start", "end"] as const).some((side) => Math.hypot(item[side].x - moving.x, item[side].y - moving.y) <= TOLERANCE),
+    );
+    for (const joint of connected) {
+      if (project.objectInstances[joint.id]?.pinned)
+        return blocked(project, "A locked wall shares this joint — release the connection or unlock that wall");
+      const side = (["start", "end"] as const).find((key) =>
+        Math.hypot(joint[key].x - moving.x, joint[key].y - moving.y) <= TOLERANCE)!;
+      const far = joint[side === "start" ? "end" : "start"];
+      if (Math.hypot(to.x - far.x, to.y - far.y) < 200)
+        return blocked(project, "Moving the joined endpoint would make a neighbouring wall shorter than 200 mm");
     }
   }
-  let next = project;
-  for (const joint of connected) {
-    const patch: HousePatch = joint.side === "end"
-      ? { endX: to.x, endY: to.y }
-      : { startX: to.x, startY: to.y };
-    next = patchHouseObject(next, { kind: "wall", id: joint.wall.id }, patch);
-  }
-  return { project: next, selections: [selection], blocked: [] };
+  const patch: HousePatch = end === "end"
+    ? { endX: to.x, endY: to.y }
+    : { startX: to.x, startY: to.y };
+  return { project: patchHouseObject(project, selection, patch), selections: [selection], blocked: [] };
 }
 
 /** An inside wall turned a quarter about its middle. The outline is the house's shape, and is not turned. */
