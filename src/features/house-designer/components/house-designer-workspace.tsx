@@ -1353,6 +1353,14 @@ function PlanEditor({
             <div className="min-w-0 space-y-2">
               {analysis && showAnalysis ? <p className="flex items-start gap-2 rounded-xl border border-brand/25 bg-brand/5 p-2.5 text-xs">{analysis}<button type="button" onClick={() => setShowAnalysis(false)} aria-label="Dismiss" className="ml-auto shrink-0 text-muted-foreground">✕</button></p> : null}
               <PlanToolbar activeTool={activeTool} onTool={chooseTool} />
+              {tab === "plan" && selected?.kind === "wall" && selections.length === 1 && !proposals && !placement ? (
+                <div role="region" aria-label="Selected wall editing tools" className="flex min-w-0 items-center gap-2 rounded-xl border border-brand/40 bg-card px-2 py-1.5">
+                  <span className="shrink-0 text-xs font-semibold text-brand">Wall</span>
+                  <div className="min-w-0 flex-1 overflow-x-auto">
+                    <QuickActionBar key={`wall-tools:${selected.id}`} label="Selected wall actions" actions={quickActions(selected).actions} more={quickActions(selected).more} />
+                  </div>
+                </div>
+              ) : null}
               <div className="relative h-[75dvh] min-h-[520px] min-w-0 overflow-hidden rounded-xl border bg-slate-200 sm:h-[78dvh] lg:h-[min(760px,75dvh)] dark:bg-background">
                 {activeLevel ? <HousePlanSelectionOverlay project={project} levelId={activeLevelId} activeTool={activeTool} selections={selections} draftStart={draftStart} snapEnabled={snapEnabled} showGrid={gridVisible} chain={toolSettings.chain} viewRevision={viewRevision} roomShape={roomShape} sketch={outlineSketch} onCancelDraft={() => { setDraftStart(null); setOutlineSketch([]); }} proposals={proposals?.levelId === activeLevelId ? proposals.items : null} chosenProposal={proposals?.chosen ?? null} onProposalChoose={(id) => setProposals((current) => current && { ...current, chosen: id })} onProposalMove={(id, x, y) => setProposals((current) => current && { ...current, items: current.items.map((item) => item.id === id ? { ...item, x, y } : item) })} onMoveSelection={(selection, dx, dy) => {
                   // Furniture dragged near furniture lands edge to edge with it.
@@ -1370,7 +1378,7 @@ function PlanEditor({
                     } catch(error) {return {project,selections:[selection],blocked:[error instanceof Error ? error.message : "Check dimension"]};}
                   })}
                   onWallDistance={(selection, neighbourId, distance) => wallEdit(selection, () => setWallDistance(project, selection.id, neighbourId, distance))}
-                  actionBar={quick && propertiesFor !== sheetFor?.id ? <QuickActionBar key={`${sheetFor!.id}:${roomSplit ?? ""}`} label={quick.label} actions={quick.actions} more={quick.more} /> : null}
+                  actionBar={quick && sheetFor?.kind !== "wall" && propertiesFor !== sheetFor?.id ? <QuickActionBar key={`${sheetFor!.id}:${roomSplit ?? ""}`} label={quick.label} actions={quick.actions} more={quick.more} /> : null}
                   guide={splitGuide ? { ...splitGuide.line, label: `${shortMm(splitDraft!.first, project.displayUnits ?? "mm")} | ${shortMm(splitGuide.span - splitDraft!.first, project.displayUnits ?? "mm")}` } : null}
                   placement={placement}
                   ghost={placing && (activeTool === "furniture" || activeTool === "stair" || activeTool === "column") ? placingGhost : null}
