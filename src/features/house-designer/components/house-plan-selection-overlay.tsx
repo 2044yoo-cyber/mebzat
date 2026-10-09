@@ -771,7 +771,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       <label className="flex items-center gap-1"><input type="checkbox" checked={originalVisible} onChange={e => setOriginalVisible(e.target.checked)} /> Original sketch</label>
       {originalVisible ? <label className="flex items-center gap-1">Opacity <input type="range" aria-label="Original sketch opacity" min={5} max={100} step={5} value={originalOpacity} onChange={e => setOriginalOpacity(Number(e.target.value))} className="w-16" /></label> : null}
     </div> : null}
-    {current ? <span aria-label="Pointer coordinates" className="pointer-events-none absolute right-2 top-3 z-10 rounded-md border bg-background/90 px-2 py-0.5 font-mono text-[11px] tabular-nums">X {Number(displayLength(current.x, unit).toFixed(unit === "m" ? 2 : unit === "cm" ? 1 : 0))} · Y {Number(displayLength(current.y, unit).toFixed(unit === "m" ? 2 : unit === "cm" ? 1 : 0))} {unit}</span> : null}
+    {current ? <span aria-label="Pointer coordinates" className="pointer-events-none absolute right-2 top-3 z-10 rounded-md border bg-background/90 px-2 py-0.5 font-mono text-[11px] tabular-nums">X {displayLength(current.x, unit).toFixed(unit === "m" ? 2 : unit === "cm" ? 1 : 0)} · Y {displayLength(current.y, unit).toFixed(unit === "m" ? 2 : unit === "cm" ? 1 : 0)} {unit}</span> : null}
     {draftStart && activeTool && (activeTool === "room" || (activeTool !== "wall" && lineTools.has(activeTool))) ? <TypedDraft
       key={`${draftStart.x},${draftStart.y}`}
       room={activeTool === "room"}
