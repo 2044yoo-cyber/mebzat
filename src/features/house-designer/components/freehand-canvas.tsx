@@ -17,6 +17,7 @@ import {
 import type { HouseProject } from "../types/project";
 import {
   convertStrokes,
+  cleanFreehandStrokes,
   inspectFreehand,
   suggestFreehandRepairs,
   foot,
@@ -534,6 +535,16 @@ export function FreehandCanvas({
           return <div className="max-h-[30dvh] space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
             <strong className="block text-sm">Review Plan · {result.segments.length} walls</strong>
             <p>{open.length} open endpoints · {short.length} short pieces</p>
+            <button type="button" className="w-full rounded-lg border border-slate-300 bg-white p-2 text-left font-medium" onClick={() => {
+              const cleaned = cleanFreehandStrokes(sketch.strokes);
+              if (!cleaned.removed) {
+                setMessage("No exact duplicate or empty strokes found. No changes made.");
+                return;
+              }
+              commit({ ...sketch, strokes: cleaned.strokes });
+              setReview(true);
+              setMessage(`Removed ${cleaned.removed} duplicate/empty strokes. Undo stroke reverses this cleanup.`);
+            }}>Auto Fix Safe Issues (exact duplicate / empty strokes)</button>
             {repairs.length ? <div className="space-y-2 rounded-lg border border-green-200 bg-green-50 p-2">
               <strong className="block text-green-900">{repairs.length} suggested endpoint connections</strong>
               {repairs.slice(0, 15).map(proposal => <div key={proposal.id} className="rounded border bg-white p-2">
