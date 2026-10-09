@@ -13,6 +13,8 @@ import {
   ZoomIn,
   ZoomOut,
   Check,
+  MousePointer2,
+  Trash2,
 } from "lucide-react";
 import type { HouseProject } from "../types/project";
 import {
@@ -48,9 +50,11 @@ export function FreehandCanvas({
   onConvert: (sketch: Sketch, snap: number, unitsPerPixel: number) => void;
 }) {
   const [sketch, setSketch] = useState<Sketch>(initial ?? empty);
-  const [tool, setTool] = useState<"draw" | "erase" | "pan">(
+  const [tool, setTool] = useState<"draw" | "erase" | "pan" | "point">(
     readOnly ? "pan" : "draw",
   );
+  const [selectedPoint, setSelectedPoint] = useState<{ strokeId: string; end: "start" | "end" } | null>(null);
+  const pointStart = useRef<Point | null>(null);
   const [past, setPast] = useState<Sketch[]>([]),
     [future, setFuture] = useState<Sketch[]>([]);
   const [snap, setSnap] = useState(true),
@@ -160,6 +164,14 @@ export function FreehandCanvas({
       const highlighted = proposals.find(p => p.id === focusedIssue);
       if (highlighted) draw([highlighted.start, highlighted.end], "#16a34a", 5);
     }
+    for (const stroke of state.current.sketch.strokes) {
+      if (tool !== "point" || stroke.points.length < 2) continue;
+      for (const [end, p] of [["start", stroke.points[0]!], ["end", stroke.points[stroke.points.length - 1]!]] as const) {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 7 / v.zoom, 0, Math.PI * 2);
+        ctx.fillStyle = selectedPoint?.strokeId === stroke.id && selectedPoint.end === end ? "#2563eb" : "#fff";
+        ctx.fill(); ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 2 / v.zoom; ctx.stroke();
+      }
+    }
     for (const p of points.values()) {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 3 / v.zoom, 0, Math.PI * 2);
@@ -252,6 +264,25 @@ export function FreehandCanvas({
       x: (e.clientX - r.left - v.x) / v.zoom,
       y: (e.clientY - r.top - v.y) / v.zoom,
     };
+  }
+  function nearestEndpoint(p: Point) {
+    let best: { strokeId: string; end: "start" | "end"; distance: number } | null = null;
+    for (const stroke of sketch.strokes) {
+      if (stroke.points.length < 2) continue;
+      for (const [end, q] of [["start", stroke.points[0]!], ["end", stroke.points[stroke.points.length - 1]!]] as const) {
+        const distance = Math.hypot(p.x - q.x, p.y - q.y);
+        if (distance < 18 / view.current.zoom && (!best || distance < best.distance)) best = { strokeId: stroke.id, end, distance };
+      }
+    }
+    return best && { strokeId: best.strokeId, end: best.end };
+  }
+  function deleteSelectedPoint() {
+    if (!selectedPoint || readOnly) return;
+    const next = sketch.strokes.filter(stroke => stroke.id !== selectedPoint.strokeId);
+    // Removing an endpoint removes its stroke rather than leaving a disconnected fragment.
+    commit({ ...sketch, strokes: next });
+    setSelectedPoint(null);
+    setMessage("Wall segment removed. Undo to restore it.");
   }
   function erase(p: Point) {
     for (const s of sketch.strokes)
@@ -403,6 +434,8 @@ export function FreehandCanvas({
           tool === "draw",
           readOnly,
         )}
+        {button("Edit endpoints", MousePointer2, () => { setTool("point"); setSelectedPoint(null); }, tool === "point", readOnly)}
+        {tool === "point" ? button("Delete selected wall endpoint and its stroke", Trash2, deleteSelectedPoint, false, !selectedPoint || readOnly) : null}
         {button(
           "Erase stroke",
           Eraser,
@@ -469,6 +502,10 @@ export function FreehandCanvas({
           } else if (!gesture.current) {
             suppressStroke.current = false;
             gesture.current = { id: e.pointerId, last: { x: e.clientX, y: e.clientY }, erase: new Set() };
+            if (tool === "point") {
+              setSelectedPoint(nearestEndpoint(point(e)));
+              pointStart.current = point(e);
+            }
             if (tool === "draw") live.current = [point(e)];
             if (tool === "erase") erase(point(e));
           }
@@ -499,7 +536,9 @@ export function FreehandCanvas({
           }
           const g = gesture.current;
           if (!g || g.id !== e.pointerId || suppressStroke.current) return;
-          if (tool === "pan") {
+          if (tool === "point") {
+            // Drag preview is intentionally deferred until release to keep undo atomic.
+          } else if (tool === "pan") {
             view.current.x += e.clientX - g.last.x;
             view.current.y += e.clientY - g.last.y;
             g.last = { x: e.clientX, y: e.clientY };
@@ -521,13 +560,30 @@ export function FreehandCanvas({
           contacts.current.delete(e.pointerId);
           if (contacts.current.size < 2) pinch.current = null;
           if (g && g.id === e.pointerId && canCommit) {
-            if (tool === "draw" && live.current.length > 1 && sketch.strokes.length < 500) {
+            if (tool === "point" && selectedPoint && pointStart.current) {
+              const to = point(e), from = pointStart.current;
+              if (Math.hypot(to.x - from.x, to.y - from.y) > 5 / view.current.zoom) {
+                const target = sketch.strokes.find(stroke => stroke.id === selectedPoint.strokeId);
+                if (target) {
+                  const anchor = selectedPoint.end === "start" ? target.points[0]! : target.points[target.points.length - 1]!;
+                  const dx = to.x - anchor.x, dy = to.y - anchor.y;
+                  const next = sketch.strokes.map(stroke => {
+                    if (stroke.id !== target.id) return stroke;
+                    const pts = stroke.points.map(p => ({...p}));
+                    if (selectedPoint.end === "start") pts[0] = to; else pts[pts.length - 1] = to;
+                    return { ...stroke, points: pts };
+                  });
+                  commit({ ...sketch, strokes: next });
+                }
+              }
+            } else if (tool === "draw" && live.current.length > 1 && sketch.strokes.length < 500) {
               const stroke = { id: crypto.randomUUID(), points: [...live.current, point(e)], thickness };
               if (strokeSegments(stroke).length)
                 commit({ ...sketch, strokes: [...sketch.strokes, stroke] });
             } else if (tool === "erase" && g.erase.size)
               commit({ ...sketch, strokes: sketch.strokes.filter(s => !g.erase.has(s.id)) });
           }
+          pointStart.current = null;
           if (g?.id === e.pointerId || suppressStroke.current) {
             live.current = [];
             gesture.current = null;
