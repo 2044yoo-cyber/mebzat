@@ -1496,7 +1496,7 @@ function PlanEditor({
         )}
         {activePin && link ? (
           <div className="fixed inset-x-2 bottom-2 z-[60] max-h-[70dvh] overflow-y-auto sm:left-auto sm:w-[420px]">
-            <HousePinSheet key={activePin.id} pin={activePin} userId={userId} projectId={link.projectId} taskStatus={activePin.taskId ? statuses[activePin.taskId] : undefined} where={whereOf(activePin)} onClose={() => setActivePinId(null)} onChange={async (patch) => { const result = await updatePin(createClient(), activePin.id, patch); if (result.error) toast.error(result.error); await reloadPins(); }} onAddToAgenda={() => addPinToAgenda(activePin)} onShow={tab === "agenda" || tab === "files" ? () => openPin(activePin) : undefined} />
+            <HousePinSheet key={activePin.id} pin={activePin} userId={userId} projectId={link.projectId} planId={link.planId} taskStatus={activePin.taskId ? statuses[activePin.taskId] : undefined} where={whereOf(activePin)} onClose={() => setActivePinId(null)} onChange={async (patch) => { const result = await updatePin(createClient(), activePin.id, patch); if (result.error) toast.error(result.error); await reloadPins(); }} onAddToAgenda={() => addPinToAgenda(activePin)} onShow={tab === "agenda" || tab === "files" ? () => openPin(activePin) : undefined} />
           </div>
         ) : null}
         {pinDialog ? <HousePinDialog initial={pinDialog.initial} onCancel={() => setPinDialog(null)} onSave={(details) => void placePlanPin(pinDialog.at, details)} /> : null}
