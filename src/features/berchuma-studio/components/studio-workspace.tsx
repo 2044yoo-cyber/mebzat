@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { DesignChat, type ChatMessage } from "./chat/design-chat";
 import { CostPanel } from "./pricing/cost-panel";
 import { DesignEditor } from "./editor/design-editor";
+import { TemplateThumb } from "./template-thumb";
 import { PublishBar } from "./publish-bar";
 import { SendToCalculator } from "./send-to-calculator";
 import { StartPanel } from "./start-panel";
@@ -634,6 +635,39 @@ export function StudioWorkspace({
                     </button>
                   ))}
                 </div>
+                {projectItems.length > 1 ? (
+                  <details className="rounded-lg border bg-muted/10 p-2">
+                    <summary className="cursor-pointer select-none py-1 text-xs font-medium">
+                      View all cabinets together ({projectItems.length} designs)
+                    </summary>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {projectItems.map((item, index) => (
+                        <div key={item.id} className="min-w-0 rounded-lg border bg-background p-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-semibold">{index + 1}. {item.spec.title}</p>
+                              <p className="text-[11px] capitalize text-muted-foreground">
+                                {item.spec.kind.replace(/_/g, " ")} · {Math.round(item.spec.envelope.width)} ×
+                                {Math.round(item.spec.envelope.height)} × {Math.round(item.spec.envelope.depth)} mm
+                              </p>
+                            </div>
+                            <button type="button" onClick={() => {
+                              setActiveItemId(item.id);
+                              setProjectMessage(null);
+                            }} className="shrink-0 rounded-md border px-2 py-1 text-xs font-medium">
+                              Edit
+                            </button>
+                          </div>
+                          <TemplateThumb spec={item.spec}
+                            className="mt-2 h-28 w-full rounded-md bg-muted/30 p-2 text-foreground" />
+                          <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                            Material: {item.spec.carcass.board.label}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="flex items-center gap-2 text-xs">
                     Add
