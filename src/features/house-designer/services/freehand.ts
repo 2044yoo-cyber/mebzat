@@ -123,9 +123,9 @@ export function strokeSegments(
  */
 export function suggestOrthogonalCorrection(strokes: readonly Stroke[]): { strokes: Stroke[]; corrected: number } {
   let corrected = 0;
-  const next = strokes.map(stroke => {
+  const next = strokes.flatMap(stroke => {
     const segments = strokeSegments(stroke, 3, false);
-    if (!segments.length) return stroke;
+    if (!segments.length) return [stroke];
     const correctedSegments = segments.map(segment => {
       const dx = segment.end.x - segment.start.x;
       const dy = segment.end.y - segment.start.y;
@@ -146,10 +146,10 @@ export function suggestOrthogonalCorrection(strokes: readonly Stroke[]): { strok
       }
       return segment;
     });
-    if (correctedSegments.every((seg, i) => seg === segments[i])) return stroke;
+    if (correctedSegments.every((seg, i) => seg === segments[i])) return [stroke];
     // Store corrected wall runs as straight point pairs; the conversion
     // engine will reconnect nearby endpoints using its existing snap graph.
-    return { ...stroke, points: correctedSegments.flatMap(seg => [seg.start, seg.end]) };
+    return correctedSegments.map((seg, i) => ({ ...stroke, id: i === 0 ? stroke.id : `${stroke.id}:orth:${i}`, points: [seg.start, seg.end] }));
   });
   return { strokes: next, corrected };
 }
