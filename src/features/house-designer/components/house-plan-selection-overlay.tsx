@@ -784,7 +784,12 @@ function TypedDraft({ room, unit, live, direction, onDirection, onCancel, onLeng
     <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="absolute inset-x-2 top-12 z-10 flex flex-wrap items-center justify-center gap-1 rounded-xl border bg-card/95 p-1 shadow-sm backdrop-blur">
       {room ? <>{field("Width", first, setFirst, live?.[0])}<span className="text-xs text-muted-foreground">×</span>{field("Depth", second, setSecond, live?.[1])}</> : <>
         {field("Length", first, setFirst, live?.[2])}
-        <span className="flex">{DIRECTIONS.map((item) => <button key={item.label} type="button" aria-label={`Run ${item.label}`} aria-pressed={direction?.x === item.x && direction?.y === item.y} onClick={() => onDirection(direction?.x === item.x && direction?.y === item.y ? null : { x: item.x, y: item.y })} className="size-7 rounded-md text-sm text-muted-foreground aria-pressed:bg-brand/15 aria-pressed:text-brand">{item.label}</button>)}</span>
+        <details className="group relative">
+          <summary className="cursor-pointer list-none rounded-md border px-2 py-1.5 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden" aria-label="Advanced wall direction">Direction ▾</summary>
+          <div className="absolute left-0 top-full z-20 mt-1 flex gap-1 rounded-lg border bg-card p-1 shadow-lg">
+            {DIRECTIONS.map((item) => <button key={item.label} type="button" aria-label={`Run ${item.label}`} aria-pressed={direction?.x === item.x && direction?.y === item.y} onClick={() => onDirection(direction?.x === item.x && direction?.y === item.y ? null : { x: item.x, y: item.y })} className="size-9 rounded-md text-base text-muted-foreground aria-pressed:bg-brand/15 aria-pressed:text-brand">{item.label}</button>)}
+          </div>
+        </details>
       </>}
       <button type="submit" disabled={!ready} className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-medium text-brand-foreground disabled:opacity-40">{room ? "Create" : "Add"}</button>
       <button type="button" onClick={onCancel} aria-label="Cancel drafting" className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted">✕</button>
