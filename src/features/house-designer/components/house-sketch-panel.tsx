@@ -173,25 +173,45 @@ export function HouseSketchPanel({ project, levelId, link, userId, pins, onPinsC
     if (!current || savingRef.current) return current?.sketch.id ? { id: current.sketch.id, previewPath: current.sketch.previewPath } : null;
     savingRef.current = true;
     setSaving(true);
-    const client = createClient();
-    const target = { projectId: link.projectId, planId: link.planId };
-    const saved = await saveSketch(client, userId, target, current.sketch);
-    if ("error" in saved) { savingRef.current = false; setSaving(false); toast.error(saved.error); return null; }
-    let previewPath = current.sketch.previewPath;
-    const blob = await renderMarkup(current.background, current.sketch.markup, pinsOf(pins, current.sketch.markup));
-    if (blob) {
-      const uploaded = await uploadProjectFile(client, link.projectId, "sketches", blob, "sketch.png");
-      if (!("error" in uploaded)) {
-        previewPath = uploaded.path;
-        await saveSketch(client, userId, target, { ...current.sketch, id: saved.id, previewPath });
+    try {
+      const client = createClient();
+      const target = { projectId: link.projectId, planId: link.planId };
+      const saved = await saveSketch(client, userId, target, current.sketch);
+      if ("error" in saved) { toast.error(saved.error); return null; }
+
+      let previewPath = current.sketch.previewPath;
+      try {
+        const blob = await renderMarkup(current.background, current.sketch.markup, pinsOf(pins, current.sketch.markup));
+        if (blob) {
+          const uploaded = await uploadProjectFile(client, link.projectId, "sketches", blob, `${saved.id}-${crypto.randomUUID()}.png`);
+          if ("error" in uploaded) {
+            toast.warning("Sketch saved, but its preview image could not be uploaded.");
+          } else {
+            const previewSaved = await saveSketch(client, userId, target, { ...current.sketch, id: saved.id, previewPath: uploaded.path });
+            if ("error" in previewSaved) {
+              toast.warning("Sketch saved, but its preview could not be refreshed.");
+            } else {
+              previewPath = uploaded.path;
+            }
+          }
+        }
+      } catch (previewError) {
+        console.error("Sketch preview update failed", previewError);
+        toast.warning("Sketch saved, but its preview could not be refreshed.");
       }
+
+      setOpen((value) => value && { ...value, sketch: { ...value.sketch, id: saved.id, previewPath } });
+      if (openRef.current?.sketch.markup === current.sketch.markup) setDirty(false);
+      void reload().catch((error) => console.error("Sketch list refresh failed", error));
+      return { id: saved.id, previewPath };
+    } catch (error) {
+      console.error("Sketch save failed unexpectedly", error);
+      toast.error(error instanceof Error ? `Sketch save failed: ${error.message}` : "Sketch save failed. Check your connection and try again.");
+      return null;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-    savingRef.current = false;
-    setSaving(false);
-    setOpen((value) => value && value.sketch === current.sketch ? { ...value, sketch: { ...value.sketch, id: saved.id, previewPath } } : value && { ...value, sketch: { ...value.sketch, id: saved.id, previewPath } });
-    if (openRef.current?.sketch.markup === current.sketch.markup) setDirty(false);
-    void reload();
-    return { id: saved.id, previewPath };
   }
 
   async function placePin(at: { x: number; y: number }, details: { title: string; note: string; measurement: string; agenda: boolean }) {
