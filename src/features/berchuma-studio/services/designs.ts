@@ -6,7 +6,7 @@ import { calculateCost } from "./costing";
 import { buildCutList, sheetCountsOf } from "./cutlist";
 import { buildParts } from "./geometry";
 import { marketRates } from "./rates";
-import type { DesignVisibility } from "@/types/database.types";
+import type { DesignVisibility, Json } from "@/types/database.types";
 import { parseSpec, type DesignSpec, type ProjectStatus } from "../types/spec";
 import { frontDrawing, type FrontDrawingData } from "./front-drawing";
 
@@ -62,7 +62,7 @@ export async function saveDesign(
         title: spec.title,
         kind: spec.kind,
         prompt: spec.meta.prompt || null,
-        spec,
+        spec: spec as unknown as Json,
         estimated_cost: estimatedCost,
         price_confidence: confidence,
       })
@@ -96,7 +96,7 @@ export async function saveDesign(
       kind: spec.kind,
       title: spec.title,
       prompt: spec.meta.prompt || null,
-      spec,
+      spec: spec as unknown as Json,
       estimated_cost: estimatedCost,
       price_confidence: confidence,
       visibility: "private",
@@ -157,7 +157,7 @@ export async function publishDesign(
       kind: decoded.spec.kind,
       title: decoded.spec.title,
       prompt: decoded.spec.meta.prompt || null,
-      spec: decoded.spec,
+      spec: decoded.spec as unknown as Json,
       estimated_cost: estimatedCost,
       price_confidence: confidence,
     })
@@ -306,7 +306,7 @@ export async function remixDesign(
       kind: decoded.spec.kind,
       title: decoded.spec.title,
       prompt: decoded.spec.meta.prompt || null,
-      spec: decoded.spec,
+      spec: decoded.spec as unknown as Json,
       estimated_cost: estimatedCost,
       price_confidence: confidence,
     })
@@ -673,7 +673,7 @@ async function appendVersion(
   const { error } = await supabase.from("design_versions").insert({
     design_id: designId,
     version: (latest?.version ?? 0) + 1,
-    spec,
+    spec: spec as unknown as Json,
     note: note ?? null,
     author_id: authorId,
     estimated_cost: estimatedCost,

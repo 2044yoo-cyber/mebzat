@@ -21,7 +21,6 @@ assert.equal(first.projectItems, undefined, "the original design remains untouch
 assert.equal(three.projectItems?.length, 2, "additional cabinet designs persist in primary spec");
 const parsed = parseSpec(JSON.parse(JSON.stringify(three)));
 assert.ok(parsed.ok, "existing saved design parser accepts mixed-cabinet project");
-if (!parsed.ok) throw new Error(parsed.error);
 const reopened = projectDesigns(parsed.spec);
 assert.equal(reopened.length, 3, "all three cabinets reopen after JSON save and parse");
 assert.equal(reopened[0]!.spec.carcass.board.id, first.carcass.board.id,
