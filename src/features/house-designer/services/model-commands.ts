@@ -1,4 +1,5 @@
 import { rebuildLevel, deleteRoom, moveRoom, patchHouseObject, reconcileRooms, removeFootprintCorner, wallJointLinked, wallJointsLinked } from "./project-edit";
+import { withDerivedZones } from "./room-topology";
 import { objectDefinition } from "./object-library";
 import { stairFields, stairPreset, type StairParams } from "./stair-geometry";
 import { allHouseSelections, sameSelection } from "./model-state";
@@ -152,7 +153,95 @@ export function lockConflict(project: HouseProject, selection: HouseSelection): 
     : null;
 }
 
+/**
+ * Explicitly selected walls move together in a SINGLE plan mutation.
+ *
+ * Rebuilding after each individual wall is incorrect: between the first and
+ * third moves a temporarily open room can be re-labelled, its topology can
+ * change, and the next selected wall may be reconciled onto the wrong face.
+ * Here all selected source walls are translated once from the ORIGINAL plan.
+ * Other interior walls (including T joints) remain unchanged unless also
+ * selected. The vertices of a closed exterior polygon necessarily belong to
+ * two outline sides; only those shared corners change to keep it closed.
+ */
+function moveSelectedWallsAsGroup(
+  project: HouseProject,
+  selections: readonly HouseSelection[],
+  dx: number,
+  dy: number,
+  options?: { footprintEditable?: boolean },
+): HouseCommandMutation {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy))
+    return { project, selections: [...selections], blocked: ["Move distance must be a finite number"] };
+  if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001)
+    return { project, selections: [...selections], blocked: [] };
+  const chosen = selections.map((selection) => project.walls.find((wall) => wall.id === selection.id)).filter((wall): wall is HouseProject["walls"][number] => !!wall);
+  if (chosen.length !== selections.length)
+    return { project, selections: [...selections], blocked: ["One or more selected walls no longer exist"] };
+  const conflicts = chosen.map((wall) => lockConflict(project, { kind: "wall", id: wall.id })).filter((value): value is string => !!value);
+  if (conflicts.length)
+    return { project, selections: [...selections], blocked: conflicts };
+  const chosenIds = new Set(chosen.map((wall) => wall.id));
+  const grouped = new Map<string, typeof chosen>();
+  for (const wall of chosen) grouped.set(wall.levelId, [...(grouped.get(wall.levelId) ?? []), wall]);
+  let result = project;
+  for (const [levelId, levelWalls] of grouped) {
+    const plan = project.levels.find((item) => item.id === levelId)?.plan;
+    if (!plan) return { project, selections: [...selections], blocked: ["The floor plan is missing"] };
+    const exteriorCorners = new Set<number>();
+    const selectedInterior = new Set<string>();
+    for (const wall of levelWalls) {
+      const sourceId = wall.sourceWallId ?? wall.id.split(":wall:")[1];
+      const index = plan.corners.findIndex((corner) => corner.id === sourceId);
+      if (index >= 0) {
+        if (!options?.footprintEditable && project.originalPlanStrict)
+          return { project, selections: [...selections], blocked: ["Original Floor Plan Strict protects exterior walls"] };
+        exteriorCorners.add(index);
+        exteriorCorners.add((index + 1) % plan.corners.length);
+      } else if (plan.interiorWalls?.some((item) => item.id === sourceId)) {
+        selectedInterior.add(sourceId);
+      } else {
+        return { project, selections: [...selections], blocked: ["A selected wall has no editable plan segment"] };
+      }
+    }
+    // A pinned unselected outline wall must not have either of its endpoint
+    // vertices moved as a side effect of moving the selected outline walls.
+    if (exteriorCorners.size > 0) {
+      const pinnedNeighbour = project.walls.find((wall) => {
+        if (wall.levelId !== levelId || chosenIds.has(wall.id) || !project.objectInstances[wall.id]?.pinned) return false;
+        const sourceId = wall.sourceWallId ?? wall.id.split(":wall:")[1];
+        const index = plan.corners.findIndex((corner) => corner.id === sourceId);
+        return index >= 0 && (exteriorCorners.has(index) || exteriorCorners.has((index + 1) % plan.corners.length));
+      });
+      if (pinnedNeighbour)
+        return { project, selections: [...selections], blocked: ["A locked exterior wall shares a moved corner. Unlock it before moving these walls."] };
+    }
+    const newCorners = plan.corners.map((corner, index) =>
+      exteriorCorners.has(index) ? { ...corner, x: corner.x + dx, y: corner.y + dy } : corner);
+    const newInteriors = (plan.interiorWalls ?? []).map((wall) =>
+      selectedInterior.has(wall.id) ? {
+        ...wall,
+        start: { x: wall.start.x + dx, y: wall.start.y + dy },
+        end: { x: wall.end.x + dx, y: wall.end.y + dy },
+      } : wall);
+    // A move cannot collapse a perimeter side to a point; keep the original
+    // document unchanged instead of saving malformed architectural geometry.
+    if (newCorners.some((corner, index) => newCorners.length > 0 &&
+      Math.hypot(corner.x - newCorners[(index + 1) % newCorners.length]!.x,
+        corner.y - newCorners[(index + 1) % newCorners.length]!.y) < 200)) {
+      return { project, selections: [...selections], blocked: ["That move would make a footprint wall shorter than 20 cm"] };
+    }
+    const updated = withDerivedZones(plan, { ...plan, corners: newCorners, interiorWalls: newInteriors });
+    result = rebuildLevel(result, levelId, updated);
+  }
+  return { project: result, selections: [...selections], blocked: [] };
+}
+
 export function moveHouseSelections(project: HouseProject, selections: readonly HouseSelection[], dx: number, dy: number, options?: { footprintEditable?: boolean }): HouseCommandMutation {
+  // A direct wall drag (one or many walls) is always an intentional movement.
+  // It does not require the separately controlled endpoint link toggle.
+  if (selections.length && selections.every((selection) => selection.kind === "wall"))
+    return moveSelectedWallsAsGroup(project, selections, dx, dy, options);
   let next = project;
   const blocked: string[] = [];
   for (const selection of selections) {
