@@ -453,8 +453,18 @@ function ShapeView({ shape, arrowId, selected, pin }: { shape: MarkupShape; arro
         return <polyline points={shape.points.map(([x, y]) => `${x},${y}`).join(" ")} {...stroke} />;
       case "line":
         return <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} {...stroke} />;
-      case "arrow":
-        return <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} {...stroke} markerEnd={`url(#${arrowId})`} />;
+      case "arrow": {
+        // SVG context-stroke markers do not render reliably in iOS Safari.
+        // Draw an actual filled arrow head, matching the PNG/export renderer.
+        const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
+        const head = shape.size * 4;
+        const left: [number, number] = [b[0] - head * Math.cos(angle - 0.45), b[1] - head * Math.sin(angle - 0.45)];
+        const right: [number, number] = [b[0] - head * Math.cos(angle + 0.45), b[1] - head * Math.sin(angle + 0.45)];
+        return <g>
+          <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} {...stroke} />
+          <polygon points={`${b[0]},${b[1]} ${left[0]},${left[1]} ${right[0]},${right[1]}`} fill={shape.color} stroke={shape.color} strokeWidth={shape.size * 0.2} />
+        </g>;
+      }
       case "rect":
         return <rect x={Math.min(a[0], b[0])} y={Math.min(a[1], b[1])} width={Math.abs(b[0] - a[0])} height={Math.abs(b[1] - a[1])} {...stroke} />;
       case "circle":
@@ -528,6 +538,13 @@ export function shapeDistance(shape: MarkupShape, [px, py]: [number, number]): n
   if (shape.type === "pin") return Math.hypot(px - a[0], py - (a[1] - shape.size));
   if (shape.type === "rect" || shape.type === "cloud" || shape.type === "circle") {
     const corners: [number, number][] = [[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]]];
+    const left = Math.min(a[0], b[0]), right = Math.max(a[0], b[0]);
+    const top = Math.min(a[1], b[1]), bottom = Math.max(a[1], b[1]);
+    if (shape.type !== "circle" && px >= left && px <= right && py >= top && py <= bottom) return 0;
+    if (shape.type === "circle" && right > left && bottom > top) {
+      const cx = (left + right) / 2, cy = (top + bottom) / 2;
+      if (((px - cx) / ((right - left) / 2)) ** 2 + ((py - cy) / ((bottom - top) / 2)) ** 2 <= 1) return 0;
+    }
     return Math.min(...corners.map((corner, index) => segment(corner, corners[(index + 1) % 4]!)));
   }
   let best = Infinity;
