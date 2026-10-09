@@ -21,6 +21,7 @@ import { PrintButton } from "@/features/berchuma-studio/components/public/print-
 import { QuoteRequest } from "@/features/berchuma-studio/components/public/quote-request";
 import { getDesign } from "@/features/berchuma-studio/services/designs";
 import { buildCutList } from "@/features/berchuma-studio/services/cutlist";
+import { buildProjectCutList } from "@/features/berchuma-studio/services/cabinet-project";
 import { buildExport } from "@/features/berchuma-studio/services/exports";
 import { buildParts } from "@/features/berchuma-studio/services/geometry";
 import { marketRates } from "@/features/berchuma-studio/services/rates";
@@ -65,6 +66,88 @@ export default async function CutListPage({
   const { slug } = await params;
   const design = await getDesign(slug);
   if (!design) notFound();
+
+  // A manufacturing project consists of independent cabinetry designs. The
+  // old single-design preview would silently exclude every added wardrobe and
+  // vanity, even though the XLSX route now includes them. Show the same full
+  // production list on screen and on paper.
+  if (design.spec.projectItems?.length) {
+    let combined: ReturnType<typeof buildProjectCutList> | null = null;
+    let problem: string | null = null;
+    try {
+      combined = buildProjectCutList(design.spec);
+    } catch (error) {
+      problem = error instanceof Error ? error.message : "The project cannot be cut yet.";
+    }
+    return (
+      <main className="mx-auto max-w-5xl space-y-5 p-3 @lg/ws:p-6 print:max-w-none print:p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <Link href={`/studio?design=${encodeURIComponent(design.slug)}`}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+            <ArrowLeft className="size-4" aria-hidden /> Edit project
+          </Link>
+          {combined ? <a href={`/api/studio/designs/${design.slug}/cut-list`}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground">
+            <FileSpreadsheet className="size-4" aria-hidden /> Download combined Excel
+          </a> : null}
+          <PrintButton />
+        </div>
+        <header className="border-b pb-3">
+          <h1 className="text-xl font-semibold">Combined cabinet cut list — {design.title}</h1>
+          <p className="text-sm text-muted-foreground">
+            {design.spec.projectItems.length + 1} independent cabinet designs ·
+            materials and specifications retained per design
+          </p>
+        </header>
+        {problem ? <div role="alert" className="rounded-lg border border-destructive p-4 text-sm">
+          {problem}. Fix the affected cabinet in the project editor, then export again.
+        </div> : combined ? (
+          <>
+            <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Stat label="Cabinet designs" value={String(combined.designs)} />
+              <Stat label="Cut pieces" value={String(combined.pieces)} />
+              <Stat label="Board materials" value={String(combined.sheets.length)} />
+            </section>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[880px] border-collapse text-xs">
+                <thead><tr className="border-b text-left">
+                  <th className="p-2">Design</th><th className="p-2">Part ID</th>
+                  <th className="p-2">Cabinet</th><th className="p-2">Part</th>
+                  <th className="p-2">Board</th><th className="p-2">L × W × T (mm)</th>
+                  <th className="p-2">Qty</th><th className="p-2">Banding</th>
+                </tr></thead>
+                <tbody>{combined.rows.map((row, index) => <tr key={index} className="border-b">
+                  <td className="p-2">{row.design}</td><td className="p-2">{row.partId}</td>
+                  <td className="p-2">{row.cabinet}</td><td className="p-2">{row.label}</td>
+                  <td className="p-2">{row.board}</td>
+                  <td className="p-2">{row.length} × {row.width} × {row.thickness}</td>
+                  <td className="p-2">{row.quantity}</td><td className="p-2">{row.banding}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+            <section className="space-y-2">
+              <h2 className="font-semibold">Board totals</h2>
+              <div className="overflow-x-auto"><table className="w-full border-collapse text-sm">
+                <thead><tr className="border-b text-left">
+                  <th className="p-2">Board</th><th className="p-2">Pieces</th>
+                  <th className="p-2">Area</th><th className="p-2">Sheets</th>
+                </tr></thead>
+                <tbody>{combined.sheets.map(board => <tr key={board.board} className="border-b">
+                  <td className="p-2">{board.board}</td><td className="p-2">{board.pieces}</td>
+                  <td className="p-2">{board.area} m²</td><td className="p-2">{board.sheets}</td>
+                </tr>)}</tbody>
+              </table></div>
+              <p className="text-xs text-muted-foreground">
+                Sheet counts sum the separately nested designs conservatively;
+                shared offcuts are not assumed. The Excel file also includes hardware
+                schedules and per-design summaries.
+              </p>
+            </section>
+          </>
+        ) : null}
+      </main>
+    );
+  }
 
   // Whether it can be cut at all, before anything is priced.
   //
