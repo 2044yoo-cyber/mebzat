@@ -159,7 +159,7 @@ export const roomSchema = z.object({
   runWalls: z.array(z.string()).max(8).default([]),
 
   /** Optional house-plan detail. Furniture plans can ignore these fields. */
-  interiorWalls: z.array(interiorWallSchema).max(80).optional(),
+  interiorWalls: z.array(interiorWallSchema).max(400).optional(),
   zones: z.array(planZoneSchema).max(40).optional(),
   planColumns: z.array(planColumnSchema).max(80).optional(),
   planStairs: z.array(planStairSchema).max(20).optional(),
