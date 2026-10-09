@@ -46,31 +46,6 @@ export function simplify(points: readonly Point[], tolerance: number): Point[] {
   }
   return [...keep].sort((a, b) => a - b).map((i) => ({ ...points[i]! }));
 }
-/** Orthogonal least squares: stable for vertical and horizontal lines alike. */
-function fitted(points: readonly Point[]): [Point, Point] {
-  const mean = points.reduce(
-    (m, p) => ({ x: m.x + p.x / points.length, y: m.y + p.y / points.length }),
-    { x: 0, y: 0 },
-  );
-  let xx = 0,
-    xy = 0,
-    yy = 0;
-  for (const p of points) {
-    const x = p.x - mean.x,
-      y = p.y - mean.y;
-    xx += x * x;
-    xy += x * y;
-    yy += y * y;
-  }
-  const angle = 0.5 * Math.atan2(2 * xy, xx - yy),
-    ux = Math.cos(angle),
-    uy = Math.sin(angle);
-  const project = (p: Point) => {
-    const t = (p.x - mean.x) * ux + (p.y - mean.y) * uy;
-    return { x: mean.x + t * ux, y: mean.y + t * uy };
-  };
-  return [project(points[0]!), project(points.at(-1)!)];
-}
 /** Suppress finger tremor without moving the true start/end of a stroke.
  * Coordinate-wise median rejects brief spikes without rounding off 90° bends.
  */
