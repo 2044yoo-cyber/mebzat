@@ -55,7 +55,7 @@ export function FreehandCanvas({
     "Draw walls with one finger. Lift to straighten. Use Hand to pan.",
   );
   const dialog = useRef<HTMLDivElement>(null);
-  const cache = useRef(new Map<Stroke, ReturnType<typeof strokeSegments>>());
+  const preview = useRef<{ strokes: Sketch["strokes"]; snap: boolean; zoom: number; segments: ReturnType<typeof strokeSegments> } | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null),
     live = useRef<Point[]>([]);
   const gesture = useRef<{
@@ -112,25 +112,35 @@ export function FreehandCanvas({
       ctx.stroke();
     };
     for (const stroke of state.current.sketch.strokes) {
-      if (gesture.current?.erase.has(stroke.id)) continue;
-      draw(stroke.points, "#bdc5cf", 1);
-      let segments = cache.current.get(stroke);
-      if (!segments) {
-        segments = strokeSegments(stroke, 3, state.current.snap);
-        cache.current.set(stroke, segments);
+      if (!gesture.current?.erase.has(stroke.id)) draw(stroke.points, "#bdc5cf", 1);
+    }
+    // Preview exactly the same joined, split wall graph used by Convert to Plan.
+    // Cache while moving the pointer so drawing stays responsive on phones.
+    const visibleStrokes = state.current.sketch.strokes;
+    let geometry = preview.current;
+    if (!geometry || geometry.strokes !== visibleStrokes || geometry.snap !== state.current.snap || geometry.zoom !== v.zoom) {
+      try {
+        geometry = { strokes: visibleStrokes, snap: state.current.snap, zoom: v.zoom,
+          segments: convertStrokes(visibleStrokes, 1, state.current.snap ? 12 : 0, 1 / v.zoom) };
+      } catch {
+        geometry = { strokes: visibleStrokes, snap: state.current.snap, zoom: v.zoom, segments: [] };
       }
-      for (const s of segments) {
-        draw([s.start, s.end], "#233c59", 2);
-        for (const p of [s.start, s.end]) {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, 3 / v.zoom, 0, Math.PI * 2);
-          ctx.fillStyle = "#fff";
-          ctx.fill();
-          ctx.strokeStyle = "#4c769a";
-          ctx.lineWidth = 1 / v.zoom;
-          ctx.stroke();
-        }
-      }
+      preview.current = geometry;
+    }
+    const points = new Map<string, Point>();
+    for (const segment of geometry.segments) {
+      draw([segment.start, segment.end], "#233c59", 2);
+      for (const p of [segment.start, segment.end])
+        points.set(`${p.x.toFixed(3)}:${p.y.toFixed(3)}`, p);
+    }
+    for (const p of points.values()) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3 / v.zoom, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.strokeStyle = "#4c769a";
+      ctx.lineWidth = 1 / v.zoom;
+      ctx.stroke();
     }
     draw(live.current, "#63a5f6", 2);
     if (live.current.length > 1) {
@@ -178,7 +188,7 @@ export function FreehandCanvas({
     };
   }, []);
   useEffect(() => {
-    cache.current.clear();
+    preview.current = null;
     schedule();
   }, [sketch, snap]);
   useEffect(() => {
