@@ -32,11 +32,11 @@ const TOOLS = [
   },
   {
     title: "Image to 3D Floor Plan",
-    description: "Upload a CAD screenshot, plan image or PDF. Calibrate measurements and prepare for editable 3D and future quantity estimates.",
+    description: "Import DXF CAD wall vectors, PDF pages or screenshots without AI. Verify lines and open editable 3D.",
     href: "/design/image-to-3d",
     icon: ImageUp,
     accent: "text-cyan-500",
-    tag: "Image · CAD · Area takeoff",
+    tag: "DXF · PDF · Image · 3D",
   },
   {
     title: "Cabinet Design",
