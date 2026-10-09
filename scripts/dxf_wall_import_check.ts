@@ -67,5 +67,5 @@ assert.ok(crowdedPreview.total > MAX_REVIEWED_WALLS, "must narrow CAD layers bef
 
 // Wiring: the handoff validates max size before building the saved 3D model.
 const house = readFileSync("src/features/house-designer/components/house-designer-workspace.tsx", "utf8");
-assert.match(house, /payload\\.lines\\.length > MAX_REVIEWED_WALLS/, "hard limit enforced at 3D handoff");
+assert.match(house, /payload\.lines\.length > MAX_REVIEWED_WALLS/, "hard limit enforced at 3D handoff");
 console.log("DXF import: layer filters, 1:1 units, polyline extraction, skipped arcs and import limits passed.");
