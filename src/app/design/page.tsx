@@ -9,6 +9,7 @@ import {
   Layers,
   Paintbrush,
   PencilRuler,
+  ImageUp,
   Ruler,
   Sparkles,
 } from "lucide-react";
@@ -28,6 +29,14 @@ const TOOLS = [
     icon: Building2,
     accent: "text-sky-500",
     tag: "Floor plan · 3D",
+  },
+  {
+    title: "Image to 3D Floor Plan",
+    description: "Upload a CAD screenshot, plan image or PDF. Calibrate measurements and prepare for editable 3D and future quantity estimates.",
+    href: "/design/image-to-3d",
+    icon: ImageUp,
+    accent: "text-cyan-500",
+    tag: "Image · CAD · Area takeoff",
   },
   {
     title: "Cabinet Design",
