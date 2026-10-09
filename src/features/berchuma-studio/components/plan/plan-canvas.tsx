@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
+import { joinedWallFootprints } from "../../services/wall-joins";
 import { allRoomWalls, openingsOn, roomWalls } from "../../services/room-geometry";
 import type { Room, RoomOpening } from "../../types/room";
 
@@ -57,6 +58,7 @@ export function PlanCanvas({
   const walls = useMemo(() => roomWalls(room), [room]);
   const allWalls = useMemo(() => allRoomWalls(room), [room]);
   const interiorWalls = useMemo(() => room.interiorWalls ?? [], [room.interiorWalls]);
+  const joins = useMemo(() => room.freehand ? joinedWallFootprints(interiorWalls) : null, [room.freehand, interiorWalls]);
   const zones = useMemo(() => room.zones ?? [], [room.zones]);
   const columns = useMemo(() => room.planColumns ?? [], [room.planColumns]);
   const stairs = useMemo(() => room.planStairs ?? [], [room.planStairs]);
@@ -272,12 +274,13 @@ export function PlanCanvas({
         );
       })}
 
+      {joins ? <path data-wall-join-fill d={[...joins.footprints.values(),...joins.junctions.map(j=>j.boundary)].map(points=>`M ${points.map(p=>`${p.x},${p.y}`).join(" L ")} Z`).join(" ")} className="pointer-events-none fill-foreground/65" /> : null}
       {interiorWalls.map((wall) => {
         const selected = wall.id === selectedWallId;
         const renderedWall = allWalls.find((item) => item.id === wall.id);
         return (
           <g key={wall.id}>
-            <line x1={wall.start.x} y1={wall.start.y} x2={wall.end.x} y2={wall.end.y} strokeWidth={wall.thickness} className={cn("cursor-pointer", selected ? "stroke-brand" : "stroke-foreground/65")} onPointerDown={() => onSelectWall?.(selected ? null : wall.id)} />
+            {joins?.footprints.has(wall.id) ? <polygon data-joined-wall={wall.id} points={joins.footprints.get(wall.id)!.map(p=>`${p.x},${p.y}`).join(" ")} className={cn("cursor-pointer", selected ? "fill-brand" : "fill-transparent")} onPointerDown={() => onSelectWall?.(selected ? null : wall.id)} /> : <line x1={wall.start.x} y1={wall.start.y} x2={wall.end.x} y2={wall.end.y} strokeWidth={wall.thickness} className={cn("cursor-pointer", selected ? "stroke-brand" : "stroke-foreground/65")} onPointerDown={() => onSelectWall?.(selected ? null : wall.id)} />}
             {renderedWall ? openingsOn(room, wall.id).map((opening) => <OpeningMark key={opening.id} opening={opening} wall={renderedWall} thickness={wall.thickness} symbol={openingSymbols} onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); setDragging(`opening:${opening.id}`); }} />) : null}
             {(["start", "end"] as const).map((end) => (
               <circle key={end} cx={wall[end].x} cy={wall[end].y} r={HANDLE / 2.5} strokeWidth={stroke} className="cursor-grab fill-background stroke-foreground/60" onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); setDragging(`iw-${end}:${wall.id}`); }} />

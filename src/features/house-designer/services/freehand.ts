@@ -215,11 +215,19 @@ export function convertStrokes(
         const limit = Math.min(tolerance, distance(la.start, la.end) / 4, distance(lb.start, lb.end) / 4);
         if (distance(ends[a]!.point, ends[b]!.point) <= limit) join(a, b);
       }
+    // Keep squared axes when endpoints meet: averaging both coordinates
+    // would tilt a horizontal and vertical wall again at their shared corner.
+    const axes = lines.map(line => Math.abs(line.end.y-line.start.y)<1e-8 ? "horizontal" : Math.abs(line.end.x-line.start.x)<1e-8 ? "vertical" : "diagonal");
     const clusters = new Map<number, Point[]>();
     ends.forEach((end, i) => { const id = root(i); clusters.set(id, [...(clusters.get(id) ?? []), end.point]); });
     ends.forEach((end, i) => {
       const group = clusters.get(root(i))!;
       const mean = { x: group.reduce((sum, p) => sum + p.x, 0) / group.length, y: group.reduce((sum, p) => sum + p.y, 0) / group.length };
+      const members = ends.filter((_, j) => root(j) === root(i));
+      const vertical = members.filter(member => axes[member.lineIndex] === "vertical");
+      const horizontal = members.filter(member => axes[member.lineIndex] === "horizontal");
+      if (vertical.length) mean.x = vertical.reduce((sum,member)=>sum+member.point.x,0)/vertical.length;
+      if (horizontal.length) mean.y = horizontal.reduce((sum,member)=>sum+member.point.y,0)/horizontal.length;
       lines[end.lineIndex]![end.key] = mean;
     });
 
