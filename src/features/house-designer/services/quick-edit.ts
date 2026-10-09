@@ -70,9 +70,34 @@ export function extendWall(project: HouseProject, wallId: string, end: WallEnd, 
   const { outline } = plain(project, wall);
   if (outline && !wallJointsLinked(project, wallId))
     return blocked(project, "This exterior wall belongs to the closed footprint. Turn on Link joints before moving its corner.");
-  // Moving the selected endpoint changes just this wall in independent
-  // mode. When joints are linked, patchWall moves actual attached endpoints
-  // together and the footprint corners remain closed.
+  // A connected OUTER wall is a side of a polygon, not a free line.
+  // Lengthening it at a square corner translates its perpendicular next side
+  // (both of that neighbour's endpoints) to keep the footprint orthogonal.
+  // This ONLY happens after the user explicitly turns on Link joints.
+  if (outline) {
+    const corner = end === "end" ? wall.end : wall.start;
+    const neighbour = project.walls.find((item) =>
+      item.levelId === wall.levelId && item.id !== wall.id &&
+      Math.hypot(
+        (end === "end" ? item.start : item.end).x - corner.x,
+        (end === "end" ? item.start : item.end).y - corner.y,
+      ) < TOLERANCE,
+    );
+    if (neighbour) {
+      const along = unit(neighbour);
+      const perpendicular = Math.abs(along.x * direction.y - along.y * direction.x) > 1e-6;
+      if (perpendicular) {
+        // Temporarily allow THIS expressly connected corner operation through
+        // the adjacent footprint wall's geometry guard. Do not persist a link
+        // choice on the neighbour behind the user's back.
+        const editable = wallJointsLinked(project, neighbour.id) ? project : toggleWallJoints(project, neighbour.id);
+        const moved = moveHouseSelections(editable, [{ kind: "wall", id: neighbour.id }], move.x, move.y, { footprintEditable: true });
+        if (moved.blocked.length) return blocked(project, moved.blocked.join(". "));
+        return { project: { ...moved.project, objectInstances: project.objectInstances }, selections: [selection], blocked: [] };
+      }
+    }
+  }
+  // Inside walls stay independent unless their connection was linked.
   const point = end === "end" ? wall.end : wall.start;
   const patch: HousePatch = end === "end" ? { endX: point.x + move.x, endY: point.y + move.y } : { startX: point.x + move.x, startY: point.y + move.y };
   return { project: patchHouseObject(project, selection, patch), selections: [selection], blocked: [] };
