@@ -170,7 +170,7 @@ export function createHouseTakeoffPackage(project: HouseProject): HouseTakeoffPa
     elements,
     quantities,
     levels: project.levels.map((item) => item.name),
-    warnings: ["Preliminary quantities only. Verify the structural design and final measurements before construction or procurement."],
+    warnings: [...(project.freehandSketch && !project.freehandSketch.calibrated ? ["UNSCALED FREEHAND SKETCH: dimensions, areas and costs are approximate. Set known dimensions before using this estimate."] : []), "Preliminary quantities only. Verify the structural design and final measurements before construction or procurement."],
   };
 }
 

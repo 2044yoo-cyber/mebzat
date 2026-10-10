@@ -1,3 +1,4 @@
+import { joinedWallFootprints } from "@/features/berchuma-studio/services/wall-joins";
 import { formatLength, polygonArea } from "./measurements";
 import type { HouseProject } from "../types/project";
 
@@ -40,13 +41,16 @@ export function planSnapshot(project: HouseProject, levelId: string): PlanSnapsh
   const parts: string[] = [];
 
   parts.push(`<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="#ffffff"/>`);
+  if (project.freehandSketch && !project.freehandSketch.calibrated) parts.push(`<text x="${x + 100}" y="${y + text}" font-size="${text}" fill="#92400e">APPROXIMATE SKETCH — SCALE NOT VERIFIED</text>`);
   for (const room of rooms) {
     const centre = room.boundary.reduce((sum, point) => ({ x: sum.x + point.x / room.boundary.length, y: sum.y + point.y / room.boundary.length }), { x: 0, y: 0 });
     parts.push(`<polygon points="${room.boundary.map((point) => `${point.x},${point.y}`).join(" ")}" fill="#e0f2fe"/>`);
     parts.push(`<text x="${centre.x}" y="${centre.y}" font-size="${text}" text-anchor="middle" fill="#0f172a" font-family="sans-serif">${escape(room.name)}</text>`);
     parts.push(`<text x="${centre.x}" y="${centre.y + text * 1.2}" font-size="${text * 0.8}" text-anchor="middle" fill="#475569" font-family="sans-serif">${polygonArea(room.boundary).toFixed(2)} m²</text>`);
   }
-  for (const wall of walls) {
+  const joins = project.levels.find(l=>l.id===levelId)?.plan?.freehand ? joinedWallFootprints(walls) : null;
+  if (joins) parts.push(`<path d="${[...joins.footprints.values(),...joins.junctions.map(j=>j.boundary)].map(boundary=>`M ${boundary.map(p=>`${p.x},${p.y}`).join(" L ")} Z`).join(" ")}" fill="#1f2937"/>`);
+  else for (const wall of walls) {
     parts.push(`<line x1="${wall.start.x}" y1="${wall.start.y}" x2="${wall.end.x}" y2="${wall.end.y}" stroke="#1f2937" stroke-width="${wall.thickness}" stroke-linecap="square"/>`);
   }
   for (const opening of [...on(project.doors), ...on(project.windows)]) {

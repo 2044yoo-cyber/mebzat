@@ -1113,13 +1113,20 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
     "three dimmed pairs of buttons with nothing selected is three controls that do nothing",
   );
   check(
+    "phone move distance is adjustable up to one metre",
+    /aria-label="Cabinet move distance"/.test(editor) &&
+      /\[1, 10, 50, 200, 500, 1000\]/.test(editor) &&
+      /nudge\(axis, direction, moveDistance\)/.test(editor),
+    "ten-millimetre-only phone movements required too many taps",
+  );
+  check(
     "it draws a pair for every axis",
     /\{AXES\.map\(\(\{ axis, label, towards \}\) => \(/.test(editor),
     "a hardcoded X and Y would be one edit away from disagreeing with the keyboard",
   );
   check(
     "a refused button carries its reason",
-    /const blocked = nudgeBlocked\(selected, axis, direction\);/.test(editor) &&
+    /const blocked = nudgeBlocked\(selected, axis, direction, moveDistance\);/.test(editor) &&
       /label=\{\s*\n?\s*blocked \?\? /.test(editor) &&
       /disabled=\{blocked !== null\}/.test(editor),
     "a control that refuses and will not say why is what this whole change is about",
@@ -1612,7 +1619,7 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   // its frosted card — a file-wide search for the blur matched that instead
   // and failed on correct code.
   const padStart = editor.indexOf('{view === "solid" && selected && movePad ? (');
-  const padEnd = editor.indexOf("{NUDGE_STEP} mm", padStart);
+  const padEnd = editor.indexOf('<div className="pointer-events-none absolute inset-x-0 bottom-0', padStart);
   const padRegion =
     padStart === -1 || padEnd === -1 ? "" : editor.slice(padStart, padEnd);
 

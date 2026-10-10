@@ -1,6 +1,7 @@
 import { roomSchema, type Room } from "@/features/berchuma-studio/types/room";
 
 import { applyModelingOptions } from "./workspace-options";
+import { withDerivedZones } from "./room-topology";
 import { applyStairEdit, stairFields, stairParams } from "./stair-geometry";
 
 import {
@@ -17,6 +18,41 @@ import {
 } from "../types/project";
 
 export type HousePatch = Record<string, string | number>;
+
+/** Wall connections are selected per endpoint and stored on its model instance.
+ * Older plans with linkedJoints=true keep both endpoints connected until edited.
+ */
+export type WallJointEnd = "start" | "end";
+
+export function wallJointLinked(project: HouseProject, wallId: string, end: WallJointEnd): boolean {
+  const properties = project.objectInstances[wallId]?.properties;
+  const override = end === "start" ? properties?.linkStart : properties?.linkEnd;
+  return typeof override === "boolean" ? override : properties?.linkedJoints === true;
+}
+
+export function wallJointsLinked(project: HouseProject, wallId: string): boolean {
+  return wallJointLinked(project, wallId, "start") && wallJointLinked(project, wallId, "end");
+}
+
+export function toggleWallJoints(project: HouseProject, wallId: string, end?: WallJointEnd): HouseProject {
+  if (!project.walls.some((wall) => wall.id === wallId)) return project;
+  const previous = project.objectInstances[wallId];
+  const currentlyStart = wallJointLinked(project, wallId, "start");
+  const currentlyEnd = wallJointLinked(project, wallId, "end");
+  const both = currentlyStart && currentlyEnd;
+  const start = end === "start" ? !currentlyStart : end === "end" ? currentlyStart : !both;
+  const finish = end === "end" ? !currentlyEnd : end === "start" ? currentlyEnd : !both;
+  return {
+    ...project,
+    objectInstances: {
+      ...project.objectInstances,
+      [wallId]: {
+        ...(previous ?? { typeId: null, mark: "", pinned: false, groupId: null, flipped: false, properties: {} }),
+        properties: { ...previous?.properties, linkStart: start, linkEnd: finish, linkedJoints: start && finish },
+      },
+    },
+  };
+}
 
 /**
  * Deleting an exterior wall means deleting the corner it starts from — there
@@ -258,19 +294,41 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
   if (!level || !plan || !sourceWallId) return next;
 
   const startIndex = plan.corners.findIndex((corner) => corner.id === sourceWallId);
+  // A wall shares its coordinates with other walls geometrically, but that
+  // alone must never give it permission to drag their endpoints. Linking is
+  // opt-in and saved with this particular wall.
+  const linkedStart = wallJointLinked(project, id, "start");
+  const linkedEnd = wallJointLinked(project, id, "end");
+  const movingStart = numberOr(effectivePatch.startX, wall.start.x) !== wall.start.x ||
+    numberOr(effectivePatch.startY, wall.start.y) !== wall.start.y;
+  const movingEnd = numberOr(effectivePatch.endX, wall.end.x) !== wall.end.x ||
+    numberOr(effectivePatch.endY, wall.end.y) !== wall.end.y;
+  // The footprint is a CLOSED polygon, so moving a corner necessarily
+  // changes the adjoining footprint segment. Permission is specific to the
+  // corner being moved, never inferred from proximity to another wall.
+  if (startIndex >= 0 && ((movingStart && !linkedStart) || (movingEnd && !linkedEnd))) return project;
   if (startIndex < 0) {
     const interior = plan.interiorWalls?.find((item) => item.id === sourceWallId);
     if (!interior) return next;
     const start = { x: numberOr(effectivePatch.startX, interior.start.x), y: numberOr(effectivePatch.startY, interior.start.y) };
     const end = { x: numberOr(effectivePatch.endX, interior.end.x), y: numberOr(effectivePatch.endY, interior.end.y) };
-    // What was attached to the wall stays attached: the ends of the walls
-    // that meet it (at a corner or a T) and the corners of the rooms it
-    // bounds keep their place along its line, wherever the line goes. The
-    // house's outside corners are never moved by an inside wall.
-    const follow = attachedTo(interior.start, interior.end, start, end, interior.thickness / 2 + 5);
+    // Preserve all neighbouring geometry in independent mode. In linked
+    // mode ONLY endpoints intentionally attached at this wall's linked
+    // start/end follow. A T intersection midway along the wall remains
+    // separate unless explicitly edited: it is not a hidden group selection.
+    const follow = (point: { x: number; y: number }) => {
+      if (linkedStart && Math.hypot(point.x - interior.start.x, point.y - interior.start.y) <= 1)
+        return { x: start.x, y: start.y };
+      if (linkedEnd && Math.hypot(point.x - interior.end.x, point.y - interior.end.y) <= 1)
+        return { x: end.x, y: end.y };
+      // Linking BOTH ends explicitly chooses connected-wall editing. A real
+      // T junction on the moved wall's centreline may then follow as well.
+      // With either end independently released, no midpoint attachment moves.
+      return linkedStart && linkedEnd ? attachedTo(interior.start, interior.end, start, end, 1)(point) : point;
+    };
     const outside = new Set(plan.corners.map((corner) => `${corner.x},${corner.y}`));
     const keepOutside = (point: { x: number; y: number }) => outside.has(`${point.x},${point.y}`) ? point : follow(point);
-    return rebuildLevel(next, level.id, {
+    return rebuildLevel(next, level.id, withDerivedZones(plan, {
       ...plan,
       interiorWalls: (plan.interiorWalls ?? []).map((item) => item.id === sourceWallId ? {
         ...item,
@@ -279,8 +337,7 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
         thickness: positiveOr(effectivePatch.thickness, item.thickness),
         height: positiveOr(effectivePatch.height, item.height),
       } : { ...item, start: keepOutside(item.start), end: keepOutside(item.end) }),
-      zones: (plan.zones ?? []).map((zone) => ({ ...zone, boundary: zone.boundary.map(keepOutside) })),
-    });
+    }));
   }
   const endIndex = (startIndex + 1) % plan.corners.length;
   const corners = plan.corners.map((corner, index) => {
@@ -300,16 +357,26 @@ function patchWall(project: HouseProject, id: string, patch: HousePatch): HouseP
     }
     return corner;
   });
-  // Inside walls ending on this wall, and room corners on it, go with it.
-  const follow = attachedTo(plan.corners[startIndex]!, plan.corners[endIndex]!, corners[startIndex]!, corners[endIndex]!, plan.wallThickness / 2 + 5);
-  const changedPlan: Room = {
+  // Each footprint corner has its own link permission. Only an interior
+  // endpoint actually coincident with a moved, linked corner follows.
+  const follow = (point: { x: number; y: number }) => {
+    const oldStart = plan.corners[startIndex]!;
+    const oldEnd = plan.corners[endIndex]!;
+    if (linkedStart && Math.hypot(point.x - oldStart.x, point.y - oldStart.y) <= 1)
+      return { x: corners[startIndex]!.x, y: corners[startIndex]!.y };
+    if (linkedEnd && Math.hypot(point.x - oldEnd.x, point.y - oldEnd.y) <= 1)
+      return { x: corners[endIndex]!.x, y: corners[endIndex]!.y };
+    return linkedStart && linkedEnd
+      ? attachedTo(oldStart, oldEnd, corners[startIndex]!, corners[endIndex]!, 1)(point)
+      : point;
+  };
+  const changedPlan: Room = withDerivedZones(plan, {
     ...plan,
     corners,
     interiorWalls: (plan.interiorWalls ?? []).map((item) => ({ ...item, start: follow(item.start), end: follow(item.end) })),
-    zones: plan.zones?.map((zone) => ({ ...zone, boundary: zone.boundary.map(follow) })),
     wallThickness: positiveOr(effectivePatch.thickness, plan.wallThickness),
     ceilingHeight: positiveOr(effectivePatch.height, plan.ceilingHeight),
-  };
+  });
   return rebuildLevel(next, level.id, changedPlan);
 }
 
@@ -532,7 +599,7 @@ function ordinalFloor(index: number) {
 
 // Structure — columns, beams, grid, footings — is never generated here: a
 // plan edit rebuilds the plan and leaves whatever structure exists alone.
-function rebuildLevel(project: HouseProject, levelId: string, plan: Room): HouseProject {
+export function rebuildLevel(project: HouseProject, levelId: string, plan: Room): HouseProject {
   const roomId = project.rooms.find((room) => room.levelId === levelId)?.id ?? `${levelId}:room-1`;
   const oldWalls = new Map(
     project.walls
@@ -617,6 +684,25 @@ function rebuildLevel(project: HouseProject, levelId: string, plan: Room): House
   };
 }
 
+/**
+ * The rooms of every floor whose walls changed between `before` and `after`,
+ * traced again from `after`'s walls and matched to `before`'s rooms. For an
+ * edit made in several steps — a wall split in two, walls moved together —
+ * so the rooms come from where the walls ended up, not from each step.
+ */
+export function reconcileRooms(before: HouseProject, after: HouseProject): HouseProject {
+  let next = after;
+  for (const level of after.levels) {
+    const old = before.levels.find((item) => item.id === level.id)?.plan;
+    if (!old || !level.plan || (!old.freehand && !old.zones?.length)) continue;
+    const sameWalls = JSON.stringify([old.corners, old.interiorWalls ?? []]) === JSON.stringify([level.plan.corners, level.plan.interiorWalls ?? []]);
+    if (sameWalls) continue;
+    const plan = withDerivedZones(old, level.plan);
+    if (JSON.stringify(plan.zones) !== JSON.stringify(level.plan.zones)) next = rebuildLevel(next, level.id, plan);
+  }
+  return next;
+}
+
 function patchList<T extends { id: string }>(items: T[], id: string, patch: HousePatch): T[] {
   return items.map((item) => item.id === id ? { ...item, ...patch } as T : item);
 }
@@ -663,7 +749,10 @@ export function splitRoomAlong(project: HouseProject, levelId: string, a: Point,
   const nextZones = zones.flatMap((zone) => zone.id === target.id
     ? [{ ...zone, boundary: larger! }, { ...zone, id: `zone-${crypto.randomUUID()}`, name: `Room ${number}`, boundary: smaller! }]
     : [zone]);
-  return rebuildLevel(project, levelId, { ...plan, zones: nextZones });
+  // Then checked against the walls: where another wall crosses the new one,
+  // the rooms are the faces the walls close, not the halves of a polygon.
+  const divided = { ...plan, zones: nextZones };
+  return rebuildLevel(project, levelId, withDerivedZones(divided, divided));
 }
 
 /**
@@ -744,16 +833,18 @@ export function deleteRoom(project: HouseProject, roomId: string): { project: Ho
   const target = zones.find((zone) => `${level!.id}:${zone.id}` === roomId) ?? (zones.length === 1 ? zones[0] : undefined);
   if (!target) return { project, blocked: "That room is not on the plan" };
   const others = zones.filter((zone) => zone !== target);
-  const own = ownEdges(target.boundary, others.map((zone) => zone.boundary));
+  // Rooms not enclosed have no walls of their own to keep.
+  const standing = others.filter((zone) => zone.enclosed !== false);
+  const own = ownEdges(target.boundary, standing.map((zone) => zone.boundary));
   const outline = plan.corners.map(({ x, y }) => ({ x, y }));
   const inHouse = (zone: (typeof zones)[number]) => zone.boundary.every((point) => onOrInside(point, outline));
-  const takesOutline = overlapsAny(own, edgesOf(outline)) && !others.some(inHouse);
+  const takesOutline = overlapsAny(own, edgesOf(outline)) && !standing.some(inHouse);
   const { interiorWalls, openings } = cutInteriorWalls(plan, own);
   if (!takesOutline) return { project: rebuildLevel(project, level!.id, { ...plan, zones: others, interiorWalls, openings }), blocked: null };
 
   const cornerIds = new Set(plan.corners.map((corner) => corner.id));
   const kept = openings.filter((opening) => !cornerIds.has(opening.wallId));
-  const promoted = [...others].sort((a, b) => Math.abs(signedArea(b.boundary)) - Math.abs(signedArea(a.boundary)))[0];
+  const promoted = [...standing].sort((a, b) => Math.abs(signedArea(b.boundary)) - Math.abs(signedArea(a.boundary)))[0];
   if (!promoted) {
     // Nothing left on the floor: it is open space again.
     const levelId = level!.id;
@@ -797,7 +888,7 @@ export function moveRoom(project: HouseProject, roomId: string, dx: number, dy: 
   const target = zones.find((zone) => `${level!.id}:${zone.id}` === roomId) ?? (zones.length === 1 ? zones[0] : undefined);
   if (!target) return { project, blocked: "That room is not on the plan" };
   const others = zones.filter((zone) => zone !== target);
-  if (others.some((zone) => sharedSegments(target.boundary, zone.boundary).length)) return { project, blocked: `${target.name} shares a wall with another room — drag that wall to change it` };
+  if (others.some((zone) => zone.enclosed !== false && sharedSegments(target.boundary, zone.boundary).length)) return { project, blocked: `${target.name} shares a wall with another room — drag that wall to change it` };
   const shift = <T extends Point>(point: T): T => ({ ...point, x: micron(point.x + dx), y: micron(point.y + dy) });
   const outline = plan.corners.map(({ x, y }) => ({ x, y }));
   const edges = edgesOf(target.boundary);
@@ -805,7 +896,7 @@ export function moveRoom(project: HouseProject, roomId: string, dx: number, dy: 
   const lies = (wall: NonNullable<Room["interiorWalls"]>[number]) => isHouse
     ? onOrInside(wall.start, outline) && onOrInside(wall.end, outline)
     : subtractSegments(wall.start, wall.end, edges, wall.thickness / 2 + 5).length === 0;
-  if (isHouse && others.some((zone) => zone.boundary.every((point) => onOrInside(point, outline)))) return { project, blocked: `${target.name} shares the house with another room — drag a wall to change it` };
+  if (isHouse && others.some((zone) => zone.enclosed !== false && zone.boundary.every((point) => onOrInside(point, outline)))) return { project, blocked: `${target.name} shares the house with another room — drag a wall to change it` };
   const interiorWalls = (plan.interiorWalls ?? []).map((wall) => lies(wall) ? { ...wall, start: shift(wall.start), end: shift(wall.end) } : wall);
   // The furniture in it goes with it.
   const inside = (item: { levelId: string; x: number; y: number }) => item.levelId === level!.id && pointInPolygon(item, target.boundary);
@@ -970,6 +1061,12 @@ function attachedTo(oldStart: { x: number; y: number }, oldEnd: { x: number; y: 
   const lengthSquared = dx * dx + dy * dy;
   return (point: { x: number; y: number }) => {
     if (!lengthSquared) return point;
+    // An endpoint actually pinned to the moving wall's endpoint follows
+    // that same endpoint, including when the selected wall changes length.
+    if (Math.hypot(point.x - oldStart.x, point.y - oldStart.y) <= tolerance)
+      return { x: micron(newStart.x), y: micron(newStart.y) };
+    if (Math.hypot(point.x - oldEnd.x, point.y - oldEnd.y) <= tolerance)
+      return { x: micron(newEnd.x), y: micron(newEnd.y) };
     const t = ((point.x - oldStart.x) * dx + (point.y - oldStart.y) * dy) / lengthSquared;
     if (t < -0.001 || t > 1.001) return point;
     const off = Math.abs((point.x - oldStart.x) * dy - (point.y - oldStart.y) * dx) / Math.sqrt(lengthSquared);
@@ -1024,7 +1121,8 @@ function rectangleBoundary(x: number, y: number, width: number, depth: number) {
 
 function roomsForPlan(levelId: string, plan: Room, previous: HouseProject["rooms"]): HouseProject["rooms"] {
   if (plan.zones?.length) {
-    return plan.zones.map((zone) => {
+    // A room whose walls no longer close has no floor, ceiling or area.
+    return plan.zones.filter((zone) => zone.enclosed !== false).map((zone) => {
       const id = `${levelId}:${zone.id}`;
       const old = previous.find((room) => room.id === id);
       return {
@@ -1039,6 +1137,7 @@ function roomsForPlan(levelId: string, plan: Room, previous: HouseProject["rooms
       };
     });
   }
+  if (plan.freehand) return [];
   const old = previous[0];
   return [{
     id: old?.id ?? `${levelId}:room-1`,

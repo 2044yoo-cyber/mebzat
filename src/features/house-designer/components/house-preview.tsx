@@ -8,6 +8,7 @@ import { pitchedRise } from "../services/roof-geometry";
 import { ColumnMesh, FurnitureMesh, StairMesh } from "./house-object-meshes";
 
 import { RoomShell } from "@/features/berchuma-studio/components/viewer/room-shell";
+import { joinedWallFootprints, wallSectionFootprint, type JoinPoint } from "@/features/berchuma-studio/services/wall-joins";
 import { roomWalls } from "@/features/berchuma-studio/services/room-geometry";
 import type { Room } from "@/features/berchuma-studio/types/room";
 import { cn } from "@/lib/utils";
@@ -253,7 +254,22 @@ function InteriorWallMeshes({ project, levelId, bounds, selectedIds, hiddenIds, 
   const level = project.levels.find((item) => item.id === levelId);
   const exteriorIds = new Set(level?.plan?.corners.map((corner) => corner.id) ?? []);
   const walls = project.walls.filter((wall) => wall.levelId === levelId && !hiddenIds.has(wall.id) && (!wall.sourceWallId || !exteriorIds.has(wall.sourceWallId)));
-  return walls.flatMap((wall) => wallSegments(wall, [...project.doors, ...project.windows].filter((opening) => opening.wallId === wall.id)).map((segment) => {
+  const joins = level?.plan?.freehand ? joinedWallFootprints(walls) : null;
+  const openings = [...project.doors,...project.windows];
+  const junctionMeshes = joins?.junctions.flatMap((join,index) => {
+    const incident = walls.filter(w=>join.wallIds.includes(w.id));
+    const maximum = Math.min(...incident.map(w=>w.height));
+    const holes = openings.filter(o=>incident.some(w=>w.id===o.wallId && (Math.hypot(w.start.x-join.point.x,w.start.y-join.point.y)<.01 ? o.offset<.01 : o.offset+o.width>=Math.hypot(w.end.x-w.start.x,w.end.y-w.start.y)-.01)));
+    const cuts = [...new Set([0,maximum,...holes.flatMap(o=>[Math.min(maximum,o.sillHeight),Math.min(maximum,o.sillHeight+o.height)])])].sort((a,b)=>a-b);
+    return cuts.slice(1).flatMap((top,i)=>{
+      const bottom=cuts[i]!,middle=(bottom+top)/2;
+      if(top-bottom<.01||holes.some(o=>middle>o.sillHeight&&middle<o.sillHeight+o.height))return [];
+      return <JoinedWallSolid key={`junction-${index}-${i}`} boundary={join.boundary} bottom={bottom+(level?.elevation??0)} height={top-bottom} bounds={bounds} selected={false} onSelect={()=>onSelect({kind:"wall",id:incident[0]!.id})} />;
+    });
+  });
+  return <>{junctionMeshes}{walls.flatMap((wall) => wallSegments(wall, [...project.doors, ...project.windows].filter((opening) => opening.wallId === wall.id)).map((segment) => {
+    const footprint = joins?.footprints.get(wall.id);
+    if (footprint) return <JoinedWallSolid key={`${wall.id}:${segment.id}`} boundary={wallSectionFootprint(wall,footprint,segment.from,segment.to)} bottom={segment.bottom+(level?.elevation??0)} height={segment.top-segment.bottom} bounds={bounds} selected={selectedIds.has(wall.id)} onSelect={()=>onSelect({kind:"wall",id:wall.id})} />;
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
     const length = Math.max(1, Math.hypot(dx, dy));
@@ -271,7 +287,16 @@ function InteriorWallMeshes({ project, levelId, bounds, selectedIds, hiddenIds, 
         <meshStandardMaterial color={selectedIds.has(wall.id) ? "#1473e6" : "#ddd8cf"} roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
     );
-  }));
+  }))}</>;
+}
+
+function JoinedWallSolid({boundary,bottom,height,bounds,selected,onSelect}:{boundary:JoinPoint[];bottom:number;height:number;bounds:Bounds;selected:boolean;onSelect:()=>void}) {
+  const shape=useMemo(()=>polygonShape(boundary,bounds),[boundary,bounds]);
+  if(boundary.length<3)return null;
+  return <mesh rotation={[-Math.PI/2,0,0]} position={[0,bottom*MM,0]} onClick={event=>{event.stopPropagation();onSelect();}}>
+    <extrudeGeometry args={[shape,{depth:height*MM,bevelEnabled:false}]} />
+    <meshStandardMaterial color={selected?"#1473e6":"#ddd8cf"} roughness={.95} side={THREE.DoubleSide} />
+  </mesh>;
 }
 
 function wallSegments(wall: HouseWall, openings: HouseProject["doors"]) {

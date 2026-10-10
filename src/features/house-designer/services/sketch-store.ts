@@ -4,6 +4,7 @@ import { AGENDA_FILES_BUCKET, agendaFilePath } from "@/lib/agenda/files";
 import type { Database, Json } from "@/types/database.types";
 
 import type { MarkupShape } from "../components/markup-canvas";
+import { sketchSaveError } from "./sketch-save-errors";
 
 /**
  * Sketches, pins and the Agenda items about them — all on the plan's project.
@@ -111,8 +112,18 @@ export async function saveSketch(client: Client, userId: string, target: { proje
     ...(sketch.previewPath !== undefined ? { preview_path: sketch.previewPath } : {}),
   };
   if (sketch.id) {
-    const { error } = await client.from("agenda_sketches").update(row).eq("id", sketch.id);
-    return error ? { error: "The sketch could not be saved." } : { id: sketch.id };
+    const { data, error } = await client
+      .from("agenda_sketches")
+      .update(row)
+      .eq("id", sketch.id)
+      .select("id")
+      .maybeSingle();
+    if (error) {
+      console.error("Sketch update failed", { code: error.code, message: error.message, hint: error.hint });
+      return { error: sketchSaveError(error) };
+    }
+    if (!data) return { error: "This sketch was not updated. It may have been removed, or your project access may have changed. Reopen it and try again." };
+    return { id: data.id };
   }
   const { data, error } = await client
     .from("agenda_sketches")
@@ -129,7 +140,11 @@ export async function saveSketch(client: Client, userId: string, target: { proje
     })
     .select("id")
     .single();
-  return error || !data ? { error: "The sketch could not be saved." } : { id: data.id };
+  if (error) {
+    console.error("Sketch insert failed", { code: error.code, message: error.message, hint: error.hint });
+    return { error: sketchSaveError(error) };
+  }
+  return data ? { id: data.id } : { error: "Sketch save failed: the database returned no saved sketch id." };
 }
 
 /** Puts a file in the project's store — the bucket Agenda already uses — and says where. */

@@ -1,4 +1,5 @@
-import { deleteRoom, moveRoom, patchHouseObject, removeFootprintCorner } from "./project-edit";
+import { rebuildLevel, deleteRoom, moveRoom, patchHouseObject, reconcileRooms, removeFootprintCorner, wallJointLinked, wallJointsLinked } from "./project-edit";
+import { withDerivedZones } from "./room-topology";
 import { objectDefinition } from "./object-library";
 import { stairFields, stairPreset, type StairParams } from "./stair-geometry";
 import { allHouseSelections, sameSelection } from "./model-state";
@@ -135,14 +136,120 @@ export function lockConflict(project: HouseProject, selection: HouseSelection): 
   if (selection.kind !== "wall") return null;
   const wall = project.walls.find((item) => item.id === selection.id);
   if (!wall) return null;
-  // Any wall with an end on this one changes with it: the neighbours that
-  // share its corners, and walls meeting it in a T.
-  const attached = project.walls.filter((item) => item.levelId === wall.levelId && item.id !== wall.id
-    && [item.start, item.end].some((point) => pointSegmentDistance(point, wall.start, wall.end) <= wall.thickness / 2 + 5));
-  return attached.some((item) => project.objectInstances[item.id]?.pinned) ? "A locked wall joined to it would have to change — unlock it first" : null;
+  const atStart = wallJointLinked(project, wall.id, "start");
+  const atEnd = wallJointLinked(project, wall.id, "end");
+  if (!atStart && !atEnd) return null;
+  // A neighbouring wall is affected only when its endpoint is at a
+  // specifically linked endpoint of the selected wall, not at any point
+  // along the line or within the wall thickness.
+  const attached = project.walls.filter((item) => item.levelId === wall.levelId && item.id !== wall.id &&
+    [item.start, item.end].some((point) =>
+      (atStart && Math.hypot(point.x - wall.start.x, point.y - wall.start.y) <= 1) ||
+      (atEnd && Math.hypot(point.x - wall.end.x, point.y - wall.end.y) <= 1) ||
+      (atStart && atEnd && pointSegmentDistance(point, wall.start, wall.end) <= 1),
+    ));
+  return attached.some((item) => project.objectInstances[item.id]?.pinned)
+    ? "A locked wall shares a linked endpoint — release the joint or unlock that wall"
+    : null;
+}
+
+/**
+ * Explicitly selected walls move together in a SINGLE plan mutation.
+ *
+ * Rebuilding after each individual wall is incorrect: between the first and
+ * third moves a temporarily open room can be re-labelled, its topology can
+ * change, and the next selected wall may be reconciled onto the wrong face.
+ * Here all selected source walls are translated once from the ORIGINAL plan.
+ * Other interior walls (including T joints) remain unchanged unless also
+ * selected. The vertices of a closed exterior polygon necessarily belong to
+ * two outline sides; only those shared corners change to keep it closed.
+ */
+function moveSelectedWallsAsGroup(
+  project: HouseProject,
+  selections: readonly HouseSelection[],
+  dx: number,
+  dy: number,
+  options?: { footprintEditable?: boolean },
+): HouseCommandMutation {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy))
+    return { project, selections: [...selections], blocked: ["Move distance must be a finite number"] };
+  if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001)
+    return { project, selections: [...selections], blocked: [] };
+  const chosen = selections.map((selection) => project.walls.find((wall) => wall.id === selection.id)).filter((wall): wall is HouseProject["walls"][number] => !!wall);
+  if (chosen.length !== selections.length)
+    return { project, selections: [...selections], blocked: ["One or more selected walls no longer exist"] };
+  const conflicts = chosen.map((wall) => lockConflict(project, { kind: "wall", id: wall.id })).filter((value): value is string => !!value);
+  if (conflicts.length)
+    return { project, selections: [...selections], blocked: conflicts };
+  const chosenIds = new Set(chosen.map((wall) => wall.id));
+  const grouped = new Map<string, typeof chosen>();
+  for (const wall of chosen) grouped.set(wall.levelId, [...(grouped.get(wall.levelId) ?? []), wall]);
+  let result = project;
+  for (const [levelId, levelWalls] of grouped) {
+    const plan = project.levels.find((item) => item.id === levelId)?.plan;
+    if (!plan) return { project, selections: [...selections], blocked: ["The floor plan is missing"] };
+    const exteriorCorners = new Set<number>();
+    const selectedInterior = new Set<string>();
+    for (const wall of levelWalls) {
+      const sourceId = wall.sourceWallId ?? wall.id.split(":wall:")[1];
+      const index = plan.corners.findIndex((corner) => corner.id === sourceId);
+      if (index >= 0) {
+        if (!options?.footprintEditable && project.originalPlanStrict)
+          return { project, selections: [...selections], blocked: ["Original Floor Plan Strict protects exterior walls"] };
+        exteriorCorners.add(index);
+        exteriorCorners.add((index + 1) % plan.corners.length);
+      } else if (plan.interiorWalls?.some((item) => item.id === sourceId)) {
+        selectedInterior.add(sourceId);
+      } else {
+        return { project, selections: [...selections], blocked: ["A selected wall has no editable plan segment"] };
+      }
+    }
+    // A pinned unselected outline wall must not have either of its endpoint
+    // vertices moved as a side effect of moving the selected outline walls.
+    if (exteriorCorners.size > 0) {
+      const pinnedNeighbour = project.walls.find((wall) => {
+        if (wall.levelId !== levelId || chosenIds.has(wall.id) || !project.objectInstances[wall.id]?.pinned) return false;
+        const sourceId = wall.sourceWallId ?? wall.id.split(":wall:")[1];
+        const index = plan.corners.findIndex((corner) => corner.id === sourceId);
+        return index >= 0 && (exteriorCorners.has(index) || exteriorCorners.has((index + 1) % plan.corners.length));
+      });
+      if (pinnedNeighbour)
+        return { project, selections: [...selections], blocked: ["A locked exterior wall shares a moved corner. Unlock it before moving these walls."] };
+    }
+    const newCorners = plan.corners.map((corner, index) =>
+      exteriorCorners.has(index) ? { ...corner, x: corner.x + dx, y: corner.y + dy } : corner);
+    const newInteriors = (plan.interiorWalls ?? []).map((wall) =>
+      selectedInterior.has(wall.id) ? {
+        ...wall,
+        start: { x: wall.start.x + dx, y: wall.start.y + dy },
+        end: { x: wall.end.x + dx, y: wall.end.y + dy },
+      } : wall);
+    // A move cannot collapse a perimeter side to a point; keep the original
+    // document unchanged instead of saving malformed architectural geometry.
+    if (newCorners.some((corner, index) => newCorners.length > 0 &&
+      Math.hypot(corner.x - newCorners[(index + 1) % newCorners.length]!.x,
+        corner.y - newCorners[(index + 1) % newCorners.length]!.y) < 200)) {
+      return { project, selections: [...selections], blocked: ["That move would make a footprint wall shorter than 20 cm"] };
+    }
+    const updated = withDerivedZones(plan, { ...plan, corners: newCorners, interiorWalls: newInteriors });
+    result = rebuildLevel(result, levelId, updated);
+  }
+  return { project: result, selections: [...selections], blocked: [] };
 }
 
 export function moveHouseSelections(project: HouseProject, selections: readonly HouseSelection[], dx: number, dy: number, options?: { footprintEditable?: boolean }): HouseCommandMutation {
+  // Dragging several selected walls must be ONE atomic geometry operation.
+  // For one interior wall with explicit endpoint links, preserve the separate
+  // per-end behaviour used by the handle/link controls. Unlinked wall body
+  // moves and exterior wall body moves are intentional and can move directly.
+  if (selections.length && selections.every((selection) => selection.kind === "wall")) {
+    const one = selections.length === 1 ? project.walls.find((item) => item.id === selections[0]!.id) : null;
+    const plan = one ? project.levels.find((level) => level.id === one.levelId)?.plan : null;
+    const isExterior = !!(one?.sourceWallId && plan?.corners.some((corner) => corner.id === one.sourceWallId));
+    const linked = !!one && (wallJointLinked(project, one.id, "start") || wallJointLinked(project, one.id, "end"));
+    if (!one || !linked || isExterior || selections.length > 1)
+      return moveSelectedWallsAsGroup(project, selections, dx, dy, options);
+  }
   let next = project;
   const blocked: string[] = [];
   for (const selection of selections) {
@@ -152,6 +259,11 @@ export function moveHouseSelections(project: HouseProject, selections: readonly 
       const wall = next.walls.find((item) => item.id === selection.id);
       const level = wall ? next.levels.find((item) => item.id === wall.levelId) : null;
       if (!wall) continue;
+      const footprint = !!(wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId));
+      if (footprint && !wallJointsLinked(next, wall.id)) {
+        blocked.push("This wall is part of a closed footprint: link BOTH endpoint joints to move the whole side");
+        continue;
+      }
       if (!options?.footprintEditable && next.originalPlanStrict && wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId)) {
         blocked.push("Original Floor Plan Strict protects exterior walls");
         continue;
@@ -172,6 +284,9 @@ export function moveHouseSelections(project: HouseProject, selections: readonly 
     }
     next = moveSimpleObject(next, selection, dx, dy);
   }
+  // Walls moved together: the rooms are traced from where they all ended up,
+  // not from each wall's step on the way.
+  if (selections.filter((selection) => selection.kind === "wall").length > 1 && !selections.some((selection) => selection.kind === "room")) next = reconcileRooms(project, next);
   return { project: next, selections: [...selections], blocked };
 }
 
@@ -258,13 +373,26 @@ export function alignHouseSelections(project: HouseProject, selections: readonly
   return { project: next, selections: [...selections], blocked };
 }
 
-export function splitHouseSelection(project: HouseProject, selection: HouseSelection | null): HouseCommandMutation {
+export function splitHouseSelection(project: HouseProject, selection: HouseSelection | null, fraction = 0.5): HouseCommandMutation {
   if (!selection) return { project, selections: [], blocked: ["Select a wall, beam, railing or reference plane"] };
   if (selection.kind === "wall") {
     const wall = project.walls.find((item) => item.id === selection.id);
     const level = wall ? project.levels.find((item) => item.id === wall.levelId) : null;
     if (!wall) return { project, selections: [selection], blocked: ["Wall not found"] };
     if (wall.sourceWallId && level?.plan?.corners.some((corner) => corner.id === wall.sourceWallId)) return { project, selections: [selection], blocked: ["An outside wall is the house's outline — to divide a room, select the room and Split it"] };
+    if (level?.plan?.freehand) {
+      const length = Math.hypot(wall.end.x-wall.start.x,wall.end.y-wall.start.y);
+      if (!Number.isFinite(fraction) || fraction*length < 1 || (1-fraction)*length < 1) return { project, selections:[selection], blocked:["Choose a split point inside the wall"] };
+      const offset=length*fraction;
+      if (level.plan.openings.some(o=>o.wallId===wall.sourceWallId && o.offset<offset && o.offset+o.width>offset)) return {project,selections:[selection],blocked:["The split crosses an opening. Choose another point."]};
+      const middle={x:wall.start.x+(wall.end.x-wall.start.x)*fraction,y:wall.start.y+(wall.end.y-wall.start.y)*fraction};
+      const sourceWallId=`interior-${crypto.randomUUID()}`, id=wallObjectId(wall.levelId,sourceWallId);
+      const original=level.plan.interiorWalls!.find(w=>w.id===wall.sourceWallId)!;
+      const plan={...level.plan,interiorWalls:[...level.plan.interiorWalls!.map(w=>w.id===wall.sourceWallId?{...w,end:middle}:w),{...original,id:sourceWallId,start:middle,end:{...wall.end}}],openings:level.plan.openings.map(o=>o.wallId===wall.sourceWallId && o.offset>=offset?{...o,wallId:sourceWallId,offset:o.offset-offset}:o)};
+      let next=rebuildLevel(project,wall.levelId,plan);
+      next={...next,measuredWalls:project.measuredWalls?.flatMap(c=>c.id===wall.id?[{id:wall.id,length:offset},{id,length:length-offset}]:[c])};
+      return {project:reconcileRooms(project,next),selections:[selection,{kind:"wall",id}],blocked:[]};
+    }
     const middle = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
     const oldEnd = { ...wall.end };
     let next = patchHouseObject(project, selection, { endX: middle.x, endY: middle.y });
@@ -277,7 +405,9 @@ export function splitHouseSelection(project: HouseProject, selection: HouseSelec
       levels: next.levels.map((item) => item.id === wall.levelId && item.plan ? { ...item, plan: { ...item.plan, interiorWalls: [...(item.plan.interiorWalls ?? []), { id: sourceWallId, start: middle, end: oldEnd, thickness: wall.thickness, height: wall.height, label: "Split wall" }] } } : item),
       objectInstances: { ...next.objectInstances, [id]: { ...(project.objectInstances[wall.id] ?? emptyInstance()), mark: `${project.objectInstances[wall.id]?.mark ?? "Wall"} B` } },
     };
-    return { project: next, selections: [selection, { kind: "wall", id }], blocked: [] };
+    // Shortened, the wall was open for a moment; split, it is whole again,
+    // and the rooms either side of it are the rooms they were.
+    return { project: reconcileRooms(project, next), selections: [selection, { kind: "wall", id }], blocked: [] };
   }
   const key = selection.kind === "beam" ? "structuralBeams" : selection.kind === "railing" ? "railings" : selection.kind === "reference-plane" ? "referencePlanes" : null;
   if (!key) return { project, selections: [selection], blocked: [`Split is not available for ${selection.kind}`] };

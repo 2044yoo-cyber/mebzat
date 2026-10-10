@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import { Cabinet } from "@/components/icons/cabinet";
 
 import { cn } from "@/lib/utils";
 import { I18nText } from "@/components/i18n/i18n-text";
@@ -119,27 +118,6 @@ export function MenuBar({ signedIn }: { signedIn: boolean }) {
           landmarks with the same name is a screen reader announcing the same
           thing twice with no way to tell them apart. */}
       <nav aria-label={t("navigation.allMedosha")} className="flex items-center gap-0.5">
-        {/* Cabinet Design (Berchuma) has its own place on the bar rather than only a row inside
-            the Medosha AI menu. It is the thing on this platform that exists
-            nowhere else, and two hovers deep is where features go to be never
-            found. */}
-        <Link
-          href="/studio"
-          aria-current={isActive(pathname, "/studio") ? "page" : undefined}
-          className={cn(
-            "mr-1 flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium whitespace-nowrap",
-            isActive(pathname, "/studio")
-              ? "bg-brand text-brand-foreground"
-              : "text-brand hover:bg-brand/10",
-          )}
-          onMouseEnter={() => setOpen(null)}
-        >
-          <Cabinet className="size-3.5" aria-hidden />
-          <I18nText textKey="navigation.berchuma" secondary />
-        </Link>
-
-        <span className="mr-1 h-4 w-px shrink-0 bg-border" aria-hidden />
-
         {NAV_SECTIONS.map((section) => (
           <Section
             key={section.id}

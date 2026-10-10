@@ -1,0 +1,92 @@
+[
+ {
+  "name": "dashed faint swing again",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "d={`M${shut.x},${shut.y} A${length},${length} 0 0 ${sweep} ${open.x},${open.y}`} {...LINE} strokeWidth={0.9} />",
+  "to": "d={`M${shut.x},${shut.y} A${length},${length} 0 0 ${sweep} ${open.x},${open.y}`} {...FAINT} strokeDasharray=\"40 30\" />"
+ },
+ {
+  "name": "hinge on the wall centre",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    const hinge = at(from, hingeAlong, half);",
+  "to": "    const hinge = at(from, hingeAlong, 0);"
+ },
+ {
+  "name": "hinge on the wrong face",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    const hinge = at(from, hingeAlong, half);",
+  "to": "    const hinge = at(from, hingeAlong, -half);"
+ },
+ {
+  "name": "one frame only",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "  const jambs = <>{jamb(0, \"j0\")}{jamb(1, \"j1\")}</>;",
+  "to": "  const jambs = <>{jamb(0, \"j0\")}</>;"
+ },
+ {
+  "name": "frame only halfway across the wall",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "{polygon(box(0, frame, -half, half), \"jamb\", `${key}j`, 1.3)}",
+  "to": "{polygon(box(0, frame, 0, half), \"jamb\", `${key}j`, 1.3)}"
+ },
+ {
+  "name": "no trims",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "        {polygon(box(-trim.lap, frame, -half - trim.depth, -half), \"trim\", `${key}b`)}\n",
+  "to": ""
+ },
+ {
+  "name": "trims not lapping the wall",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "  const trim = { lap: 40, depth: 15 };",
+  "to": "  const trim = { lap: 0, depth: 15 };"
+ },
+ {
+  "name": "no threshold",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    default: return <g data-door={type}>{jambs}{threshold}{leaf(",
+  "to": "    default: return <g data-door={type}>{jambs}{leaf("
+ },
+ {
+  "name": "leaf hung on the jamb, not the frame",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "{leaf(hingeAtFrom ? frame : width - frame, clear, direction, \"a\")}",
+  "to": "{leaf(hingeAtFrom ? 0 : width, width, direction, \"a\")}"
+ },
+ {
+  "name": "leaf hung on the wrong side",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "{leaf(hingeAtFrom ? frame : width - frame, clear, direction, \"a\")}",
+  "to": "{leaf(frame, clear, direction, \"a\")}"
+ },
+ {
+  "name": "leaf a hairline",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    const leafThickness = Math.min(40, length / 10);",
+  "to": "    const leafThickness = 0;"
+ },
+ {
+  "name": "leaf leaning, not square to the wall",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    const open = at(hinge, 0, length);",
+  "to": "    const open = at(hinge, length * 0.3 * direction, length * 0.95);"
+ },
+ {
+  "name": "double door one leaf",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "{leaf(frame, clear / 2, 1, \"a\")}{leaf(width - frame, clear / 2, -1, \"b\")}",
+  "to": "{leaf(frame, clear, 1, \"a\")}"
+ },
+ {
+  "name": "double leaves not meeting",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "{leaf(frame, clear / 2, 1, \"a\")}{leaf(width - frame, clear / 2, -1, \"b\")}",
+  "to": "{leaf(frame, clear / 2 - 100, 1, \"a\")}{leaf(width - frame, clear / 2 - 100, -1, \"b\")}"
+ },
+ {
+  "name": "swing curling back towards the hinge",
+  "file": "src/features/house-designer/components/plan-symbols.tsx",
+  "from": "    const sweep = (side.x * u.y - side.y * u.x) * direction > 0 ? 0 : 1;",
+  "to": "    const sweep = (side.x * u.y - side.y * u.x) * direction > 0 ? 1 : 0;"
+ }
+]

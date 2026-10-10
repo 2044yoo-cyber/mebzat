@@ -3,24 +3,42 @@
 import { useState } from "react";
 import {
   ArrowLeft,
+  ArrowUpDown,
+  CalendarPlus,
   Check,
   ChevronDown,
+  Columns2,
   Columns3,
+  Copy,
   DoorOpen,
+  FlipHorizontal2,
+  FlipVertical2,
   Footprints,
   Grid3X3,
   LayoutGrid,
+  Link2,
+  Unlink2,
   Loader2,
+  Lock,
+  LockOpen,
   Magnet,
+  Merge,
   Minus,
   MoreHorizontal,
   MoreVertical,
   MousePointer2,
+  Move,
+  Pencil,
   RectangleHorizontal,
   Redo2,
+  RotateCw,
+  Rows2,
   Ruler,
+  Scissors,
+  SlidersHorizontal,
   Sofa,
   SplitSquareHorizontal,
+  Trash2,
   Undo2,
   X,
 } from "lucide-react";
@@ -56,16 +74,24 @@ export const PLAN_TOOLS: { id: HouseCommandId; label: string; icon: React.Compon
   { id: "split", label: "Split", icon: SplitSquareHorizontal },
 ];
 
-export function PlanToolbar({ activeTool, onTool }: { activeTool: HouseCommandId | null; onTool: (id: HouseCommandId) => void }) {
+export function PlanToolbar({ activeTool, onTool, onUndo, canUndo }: { activeTool: HouseCommandId | null; onTool: (id: HouseCommandId) => void; onUndo: () => void; canUndo: boolean }) {
   return (
     <nav aria-label="Modeling tools" className="flex min-w-0 gap-1 overflow-x-auto rounded-xl border bg-card p-1">
       {PLAN_TOOLS.map(({ id, label, icon: Icon }) => {
         const on = (activeTool ?? "select") === id;
         return (
-          <button key={id} type="button" aria-label={label} aria-pressed={on} onClick={() => onTool(id)} className={cn("flex min-h-12 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 text-[10px] text-muted-foreground active:bg-brand/20", on && "bg-brand/15 text-brand")}>
-            <Icon className="size-[18px]" />
-            <span className="leading-none">{label}</span>
-          </button>
+          <div key={id} className="contents">
+            <button type="button" aria-label={label} aria-pressed={on} onClick={() => onTool(id)} className={cn("flex min-h-12 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 text-[10px] text-muted-foreground active:bg-brand/20", on && "bg-brand/15 text-brand")}>
+              <Icon className="size-[18px]" />
+              <span className="leading-none">{label}</span>
+            </button>
+            {id === "select" ? (
+              <button type="button" aria-label="Undo" title="Undo last change" onClick={onUndo} disabled={!canUndo} className="flex min-h-12 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 text-[10px] text-muted-foreground hover:bg-muted active:bg-brand/20 disabled:opacity-30">
+                <Undo2 className="size-[18px]" />
+                <span className="leading-none">Undo</span>
+              </button>
+            ) : null}
+          </div>
         );
       })}
     </nav>
@@ -74,15 +100,14 @@ export function PlanToolbar({ activeTool, onTool }: { activeTool: HouseCommandId
 
 export type MoreItem = { id: string; label: string; onSelect: () => void; disabled?: boolean };
 
-export function PlanSecondaryBar({ canUndo, canRedo, onUndo, onRedo, snap, onSnap, grid, onGrid, more }: {
-  canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void;
+export function PlanSecondaryBar({ canRedo, onRedo, snap, onSnap, grid, onGrid, more }: {
+  canRedo: boolean; onRedo: () => void;
   snap: boolean; onSnap: () => void; grid: boolean; onGrid: () => void; more: MoreItem[];
 }) {
   const [open, setOpen] = useState(false);
   const button = "flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs disabled:opacity-30";
   return (
     <div className="relative flex min-w-0 items-center gap-1 rounded-xl border bg-card p-1">
-      <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" className={cn(button, "hover:bg-muted")}><Undo2 className="size-4" /><span className="hidden sm:inline">Undo</span></button>
       <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" className={cn(button, "hover:bg-muted")}><Redo2 className="size-4" /><span className="hidden sm:inline">Redo</span></button>
       <button type="button" onClick={onSnap} aria-pressed={snap} aria-label="Snap" className={cn(button, snap ? "bg-brand/10 text-brand" : "text-muted-foreground hover:bg-muted")}><Magnet className="size-4" /><span>Snap</span></button>
       <button type="button" onClick={onGrid} aria-pressed={grid} aria-label="Grid" className={cn(button, grid ? "bg-brand/10 text-brand" : "text-muted-foreground hover:bg-muted")}><Grid3X3 className="size-4" /><span>Grid</span></button>
@@ -434,21 +459,69 @@ function SheetNumber({ label, value, unit, text, plain = false, signed = false, 
 
 export type QuickAction = { id: string; label: string; onSelect: () => void; pressed?: boolean };
 
+/** Each action's icon: the bar shows icons only, as Revit does; the name is the button's label and tooltip. */
+const ACTION_ICONS: Record<string, typeof Copy> = {
+  duplicate: Copy,
+  rotate: RotateCw,
+  split: Scissors,
+  divide: SplitSquareHorizontal,
+  move: Move,
+  junction: Link2,
+  "junction-start": Link2,
+  "junction-end": Link2,
+  lock: Lock,
+  delete: Trash2,
+  agenda: CalendarPlus,
+  properties: SlidersHorizontal,
+  merge: Merge,
+  rename: Pencil,
+  vertical: Columns2,
+  horizontal: Rows2,
+  cancel: X,
+  clear: X,
+  flip: FlipHorizontal2,
+  "door-hinge": FlipHorizontal2,
+  "door-swing": FlipVertical2,
+  "door-type": DoorOpen,
+  mirror: FlipHorizontal2,
+  reverse: ArrowUpDown,
+};
+
+function ActionIcon({ action }: { action: QuickAction }) {
+  const Icon = (action.id === "lock" && action.label === "Unlock"
+    ? LockOpen
+    : action.id.startsWith("junction") && !action.pressed
+      ? Unlink2
+      : ACTION_ICONS[action.id]) ?? MoreHorizontal;
+  if (action.id === "junction-start" || action.id === "junction-end") {
+    return <span className="relative inline-flex size-5 items-center justify-center">
+      <Icon className="size-4" aria-hidden />
+      <span aria-hidden className="absolute -bottom-1 -right-1 rounded-full bg-card px-0.5 text-[9px] font-bold leading-3">
+        {action.id === "junction-start" ? "S" : "E"}
+      </span>
+    </span>;
+  }
+  return <Icon className="size-4" aria-hidden />;
+}
+
 /**
  * The selection's own actions, small and beside it — not a bar across the
- * screen. The common few are buttons; the rest are under ⋮.
+ * screen, and not over what is being edited: icons only, 36 px, each named
+ * by its label for touch, screen readers and the tooltip. The common few are
+ * on the bar; the rest open under ⋮ as a second row of icons.
  */
 export function QuickActionBar({ label, actions, more }: { label: string; actions: QuickAction[]; more: QuickAction[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div role="toolbar" aria-label={label} className="relative flex items-center gap-0.5 rounded-full border bg-card/95 p-0.5 shadow-lg backdrop-blur">
+      {label.endsWith(" walls selected") ? <span className="shrink-0 pl-2 pr-1 text-[10px] font-semibold text-brand">{label.replace(" selected", "")}</span> : null}
       {actions.map((action) => (
-        <button key={action.id} type="button" onClick={() => { setOpen(false); action.onSelect(); }} aria-pressed={action.pressed} className={cn("min-h-11 min-w-11 shrink-0 rounded-full px-3 text-xs font-medium hover:bg-muted", action.pressed && "bg-brand/15 text-brand")}>{action.label}</button>
+        <button key={action.id} type="button" aria-label={action.label} title={action.label} onClick={() => { setOpen(false); action.onSelect(); }} aria-pressed={action.pressed} className={cn("flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted", action.pressed && "bg-brand/15 text-brand")}><ActionIcon action={action} /></button>
       ))}
-      {more.length ? <button type="button" aria-label="More actions" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="flex min-h-11 min-w-11 items-center justify-center rounded-full hover:bg-muted"><MoreVertical className="size-4" /></button> : null}
+      {more.length ? <button type="button" aria-label="More actions" title="More actions" aria-expanded={open} onClick={() => setOpen((value) => !value)} className={cn("flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted", open && "bg-muted")}><MoreVertical className="size-4" aria-hidden /></button> : null}
       {open ? (
-        <div role="menu" aria-label={`${label}: more`} className="absolute right-0 top-full z-30 mt-1 w-48 rounded-xl border bg-card p-1 shadow-xl">
-          {more.map((action) => <button key={action.id} type="button" role="menuitem" onClick={() => { setOpen(false); action.onSelect(); }} className={cn("block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-muted", action.id === "delete" && "text-destructive")}>{action.label}</button>)}
+        <div role="menu" aria-label={`${label}: more`} className="absolute right-0 top-full z-30 mt-1 flex gap-0.5 rounded-full border bg-card p-0.5 shadow-xl">
+          {more.map((action) => <button key={action.id} type="button" role="menuitem" aria-label={action.label} title={action.label} onClick={() => { setOpen(false); action.onSelect(); }} className={cn("flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted", action.id === "delete" && "text-destructive")}><ActionIcon action={action} /></button>)}
         </div>
       ) : null}
     </div>

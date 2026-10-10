@@ -237,36 +237,79 @@ type Point = { x: number; y: number };
  * A door in its wall: `from`→`to` along the wall, `side` the normal it opens
  * towards, `hinge` which jamb it hangs on.
  */
+/**
+ * A door as a CAD door block draws it: at each jamb the frame across the
+ * wall with its trim on both faces; a threshold across the opening between
+ * the frames; the leaf a panel standing open at 90°, hung on the frame's
+ * inner edge on the face of the wall it swings out of; and the quarter
+ * circle its edge sweeps, from the far frame to the open leaf, as a line.
+ * A double door is two such leaves meeting in the middle. Sliding, pocket,
+ * folding and pivot doors keep their own marks, in the same frames.
+ */
 export function DoorSymbol({ from, to, side, hingeAtFrom, style, thickness }: { from: Point; to: Point; side: Point; hingeAtFrom: boolean; style: string | undefined; thickness: number }) {
   const type = doorType(style);
   const width = Math.hypot(to.x - from.x, to.y - from.y);
   const u = { x: (to.x - from.x) / width, y: (to.y - from.y) / width };
+  const half = thickness / 2;
   const at = (base: Point, along: number, out: number) => ({ x: base.x + u.x * along + side.x * out, y: base.y + u.y * along + side.y * out });
-  const leaf = (hinge: Point, length: number, direction: 1 | -1, key: string) => {
-    const open = { x: hinge.x + side.x * length, y: hinge.y + side.y * length };
-    const shut = { x: hinge.x + u.x * length * direction, y: hinge.y + u.y * length * direction };
-    const sweep = (side.x * u.y - side.y * u.x) * direction > 0 ? 1 : 0;
-    return <g key={key}><line x1={hinge.x} y1={hinge.y} x2={open.x} y2={open.y} {...LINE} strokeWidth={1.6} /><path d={`M${shut.x},${shut.y} A${length},${length} 0 0 ${sweep} ${open.x},${open.y}`} {...FAINT} strokeDasharray="40 30" /></g>;
+  const polygon = (corners: Point[], part: string, key: string, strokeWidth = 1) => <polygon key={key} data-door-part={part} points={corners.map((point) => `${point.x},${point.y}`).join(" ")} {...SOLID} strokeWidth={strokeWidth} />;
+  // The frame: a 50 mm jamb filling the wall's thickness at each end, with
+  // a 15 mm trim on each face lapping 40 mm onto the wall.
+  const frame = Math.min(50, width / 10);
+  const trim = { lap: 40, depth: 15 };
+  const jamb = (end: 0 | 1, key: string) => {
+    const dir = end === 0 ? 1 : -1;
+    const base = end === 0 ? 0 : width;
+    const box = (a: number, b: number, c: number, d: number) => [at(from, base + a * dir, c), at(from, base + b * dir, c), at(from, base + b * dir, d), at(from, base + a * dir, d)];
+    return (
+      <g key={key} data-door-part="frame">
+        {polygon(box(0, frame, -half, half), "jamb", `${key}j`, 1.3)}
+        {polygon(box(-trim.lap, frame, half, half + trim.depth), "trim", `${key}a`)}
+        {polygon(box(-trim.lap, frame, -half - trim.depth, -half), "trim", `${key}b`)}
+      </g>
+    );
+  };
+  const jambs = <>{jamb(0, "j0")}{jamb(1, "j1")}</>;
+  // The threshold, across the opening between the frames.
+  const threshold = polygon([at(from, frame, -10), at(from, width - frame, -10), at(from, width - frame, 10), at(from, frame, 10)], "threshold", "t", 0.7);
+  const clear = width - 2 * frame;
+  // A hinged leaf: a panel 40 mm thick, open square to the wall, hung on the
+  // frame's inner edge on the wall face it opens to; its swing a solid
+  // quarter circle.
+  const leaf = (hingeAlong: number, length: number, direction: 1 | -1, key: string) => {
+    const leafThickness = Math.min(40, length / 10);
+    const hinge = at(from, hingeAlong, half);
+    const open = at(hinge, 0, length);
+    const shut = at(hinge, length * direction, 0);
+    const panel = [hinge, open, at(open, leafThickness * direction, 0), at(hinge, leafThickness * direction, 0)];
+    // Drawn round the hinge, from the closed position to the open leaf.
+    const sweep = (side.x * u.y - side.y * u.x) * direction > 0 ? 0 : 1;
+    return (
+      <g key={key}>
+        <polygon data-door-part="leaf" points={panel.map((point) => `${point.x},${point.y}`).join(" ")} {...SOLID} strokeWidth={1.4} />
+        <path data-door-part="swing" d={`M${shut.x},${shut.y} A${length},${length} 0 0 ${sweep} ${open.x},${open.y}`} {...LINE} strokeWidth={0.9} />
+      </g>
+    );
   };
   const panel = (a: number, b: number, offset: number, key: string) => { const p = at(from, a, offset); const q = at(from, b, offset); return <line key={key} x1={p.x} y1={p.y} x2={q.x} y2={q.y} {...LINE} strokeWidth={2.2} />; };
   const hinge = hingeAtFrom ? from : to;
   const direction: 1 | -1 = hingeAtFrom ? 1 : -1;
   switch (type) {
-    case "double": return <g>{leaf(from, width / 2, 1, "a")}{leaf(to, width / 2, -1, "b")}</g>;
-    case "sliding": return <g>{panel(0, width * 0.55, -thickness * 0.15, "a")}{panel(width * 0.45, width, thickness * 0.15, "b")}</g>;
-    case "double-sliding": return <g>{panel(0, width * 0.3, thickness * 0.15, "a")}{panel(width * 0.25, width * 0.5, -thickness * 0.15, "b")}{panel(width * 0.5, width * 0.75, -thickness * 0.15, "c")}{panel(width * 0.7, width, thickness * 0.15, "d")}</g>;
-    case "pocket": { const p = at(from, -width * 0.6, 0); const q = at(from, width * 0.4, 0); return <g><line x1={p.x} y1={p.y} x2={q.x} y2={q.y} {...LINE} strokeWidth={2.2} strokeDasharray="60 30" /></g>; }
+    case "double": return <g data-door={type}>{jambs}{threshold}{leaf(frame, clear / 2, 1, "a")}{leaf(width - frame, clear / 2, -1, "b")}</g>;
+    case "sliding": return <g data-door={type}>{jambs}{panel(0, width * 0.55, -thickness * 0.15, "a")}{panel(width * 0.45, width, thickness * 0.15, "b")}</g>;
+    case "double-sliding": return <g data-door={type}>{jambs}{panel(0, width * 0.3, thickness * 0.15, "a")}{panel(width * 0.25, width * 0.5, -thickness * 0.15, "b")}{panel(width * 0.5, width * 0.75, -thickness * 0.15, "c")}{panel(width * 0.7, width, thickness * 0.15, "d")}</g>;
+    case "pocket": { const p = at(from, -width * 0.6, 0); const q = at(from, width * 0.4, 0); return <g data-door={type}>{jambs}<line x1={p.x} y1={p.y} x2={q.x} y2={q.y} {...LINE} strokeWidth={2.2} strokeDasharray="60 30" /></g>; }
     case "folding": {
       const fold = (base: Point, dir: 1 | -1, key: string) => { const leafW = width / 4; const a = base; const b = { x: a.x + u.x * leafW * 0.6 * dir + side.x * leafW * 0.8, y: a.y + u.y * leafW * 0.6 * dir + side.y * leafW * 0.8 }; const c = { x: a.x + u.x * leafW * 1.2 * dir, y: a.y + u.y * leafW * 1.2 * dir }; return <path key={key} d={`M${a.x},${a.y} L${b.x},${b.y} L${c.x},${c.y}`} {...LINE} strokeWidth={1.6} />; };
-      return <g>{fold(from, 1, "a")}{fold(to, -1, "b")}</g>;
+      return <g data-door={type}>{jambs}{fold(from, 1, "a")}{fold(to, -1, "b")}</g>;
     }
     case "pivot": {
       const pivot = at(hinge, (width / 3) * direction, 0);
       const outer = at(pivot, 0, (width * 2) / 3);
       const inner = at(pivot, 0, -width / 3);
-      return <g><line x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} {...LINE} strokeWidth={1.6} /><circle cx={pivot.x} cy={pivot.y} r={30} {...LINE} /><path d={`M${at(pivot, ((width * 2) / 3) * -direction, 0).x},${at(pivot, ((width * 2) / 3) * -direction, 0).y} A${(width * 2) / 3},${(width * 2) / 3} 0 0 ${(side.x * u.y - side.y * u.x) * -direction > 0 ? 1 : 0} ${outer.x},${outer.y}`} {...FAINT} strokeDasharray="40 30" /></g>;
+      return <g data-door={type}>{jambs}<line x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} {...LINE} strokeWidth={1.6} /><circle cx={pivot.x} cy={pivot.y} r={30} {...LINE} /><path d={`M${at(pivot, ((width * 2) / 3) * -direction, 0).x},${at(pivot, ((width * 2) / 3) * -direction, 0).y} A${(width * 2) / 3},${(width * 2) / 3} 0 0 ${(side.x * u.y - side.y * u.x) * -direction > 0 ? 1 : 0} ${outer.x},${outer.y}`} {...FAINT} strokeDasharray="40 30" /></g>;
     }
-    default: return leaf(hinge, width, direction, "a");
+    default: return <g data-door={type}>{jambs}{threshold}{leaf(hingeAtFrom ? frame : width - frame, clear, direction, "a")}</g>;
   }
 }
 

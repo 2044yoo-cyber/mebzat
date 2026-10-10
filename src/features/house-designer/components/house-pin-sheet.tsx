@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, CircleDot, ExternalLink, Loader2, Send, X } from "lucide-react";
+import { CheckCircle2, CircleDot, ExternalLink, Loader2, RefreshCw, Send, Share2, Users, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
-import { addComment, listComments, type Comment, type Pin } from "../services/sketch-store";
+import { addComment, listComments, pinHref, type Comment, type Pin } from "../services/sketch-store";
 
 /**
  * A pin, and the conversation about it.
@@ -16,10 +16,11 @@ import { addComment, listComments, type Comment, type Pin } from "../services/sk
  * opening the task in Agenda reads and writes. Nothing here is a second
  * messaging system.
  */
-export function HousePinSheet({ pin, userId, projectId, taskStatus, where, onClose, onChange, onAddToAgenda, onShow }: {
+export function HousePinSheet({ pin, userId, projectId, planId, taskStatus, where, onClose, onChange, onAddToAgenda, onShow }: {
   pin: Pin;
   userId: string;
   projectId: string;
+  planId: string;
   taskStatus?: string;
   /** "Ground Floor", "kitchen.jpg · page 2" — what the pin is on. */
   where: string;
@@ -40,6 +41,21 @@ export function HousePinSheet({ pin, userId, projectId, taskStatus, where, onClo
     void listComments(createClient(), userId, taskId).then((items) => { if (live) setComments(items); });
     return () => { live = false; };
   }, [taskId, userId]);
+
+  async function share() {
+    const url = new URL(pinHref(planId, pin), window.location.origin).toString();
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Discussion link copied. Only project members can view it.");
+    } catch {
+      window.prompt("Copy this member-only discussion link", url);
+    }
+  }
+
+  async function refreshComments() {
+    if (!taskId) return;
+    setComments(await listComments(createClient(), userId, taskId));
+  }
 
   async function send() {
     if (!taskId || !message.trim()) return;
@@ -68,6 +84,8 @@ export function HousePinSheet({ pin, userId, projectId, taskStatus, where, onClo
       </div>
       <div className="flex flex-wrap gap-1.5">
         {onShow ? <button type="button" onClick={onShow} className="min-h-10 rounded-lg border px-3 text-xs font-medium hover:bg-muted">Show on drawing</button> : null}
+        <button type="button" onClick={() => void share()} className="flex min-h-10 items-center gap-1 rounded-lg border border-brand/40 px-2 text-xs font-medium text-brand"><Share2 className="size-3.5" />Share link</button>
+        <a href={`/agenda/projects/${projectId}/directory`} className="flex min-h-10 items-center gap-1 rounded-lg border px-2 text-xs font-medium"><Users className="size-3.5" />Team</a>
         {taskId ? (
           <a href={`/agenda/projects/${projectId}/tasks`} className="flex min-h-10 items-center gap-1 rounded-lg border px-3 text-xs font-medium hover:bg-muted"><ExternalLink className="size-3.5" />On the Agenda{taskStatus ? ` · ${taskStatus.replace("_", " ")}` : ""}</a>
         ) : (
@@ -76,7 +94,10 @@ export function HousePinSheet({ pin, userId, projectId, taskStatus, where, onClo
       </div>
       {taskId ? (
         <div aria-label="Discussion" role="region" className="space-y-1.5 border-t pt-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Discussion</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Discussion · Project team</p>
+            <button type="button" onClick={() => void refreshComments()} aria-label="Refresh discussion" className="flex min-h-9 items-center gap-1 rounded-lg border px-2 text-[11px]"><RefreshCw className="size-3.5" />Refresh</button>
+          </div>
           {comments === null ? <p className="text-xs text-muted-foreground">Loading…</p> : comments.length === 0 ? <p className="text-xs text-muted-foreground">No messages yet.</p> : null}
           <ul className="max-h-48 space-y-1.5 overflow-y-auto">
             {comments?.map((comment) => (
@@ -97,21 +118,22 @@ export function HousePinSheet({ pin, userId, projectId, taskStatus, where, onClo
 }
 
 /** Asking for a new pin's title, note and measurement, before it is placed. */
-export function HousePinDialog({ initial, onSave, onCancel }: { initial?: { title?: string; measurement?: string; note?: string }; onSave: (pin: { title: string; note: string; measurement: string; agenda: boolean }) => void; onCancel: () => void }) {
+export function HousePinDialog({ initial, discussionOnly = false, onSave, onCancel }: { initial?: { title?: string; measurement?: string; note?: string }; discussionOnly?: boolean; onSave: (pin: { title: string; note: string; measurement: string; agenda: boolean }) => void; onCancel: () => void }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [note, setNote] = useState(initial?.note ?? "");
   const [measurement, setMeasurement] = useState(initial?.measurement ?? "");
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/45 p-3 sm:items-center" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
       <form role="dialog" aria-modal="true" aria-label="New pin" onSubmit={(event) => event.preventDefault()} className="w-full max-w-md space-y-2 rounded-2xl border bg-card p-4 shadow-2xl">
-        <h2 className="text-base font-semibold">New pin</h2>
+        <h2 className="text-base font-semibold">{discussionOnly ? "Start a drawing discussion" : "New pin"}</h2>
+        {discussionOnly ? <p className="text-xs text-muted-foreground">This annotation will become a pin and an Agenda task. Project members can comment on the same discussion.</p> : null}
         <input autoFocus aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Kitchen wall" maxLength={200} className="min-h-11 w-full rounded-lg border bg-background px-3 text-sm" />
         <textarea aria-label="Note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="e.g. Please verify on site" rows={2} maxLength={4000} className="w-full rounded-lg border bg-background p-3 text-sm" />
         <input aria-label="Measurement" value={measurement} onChange={(event) => setMeasurement(event.target.value)} placeholder="e.g. 3.62 m" maxLength={200} className="min-h-11 w-full rounded-lg border bg-background px-3 text-sm" />
-        <div className="grid grid-cols-3 gap-2">
+        <div className={discussionOnly ? "grid grid-cols-2 gap-2" : "grid grid-cols-3 gap-2"}>
           <button type="button" onClick={onCancel} className="min-h-11 rounded-xl border text-sm font-medium">Cancel</button>
-          <button type="button" disabled={!title.trim()} onClick={() => onSave({ title, note, measurement, agenda: false })} className="min-h-11 rounded-xl border text-sm font-semibold disabled:opacity-40">Place pin</button>
-          <button type="button" disabled={!title.trim()} onClick={() => onSave({ title, note, measurement, agenda: true })} className="min-h-11 rounded-xl bg-brand text-sm font-semibold text-brand-foreground disabled:opacity-40">+ Agenda</button>
+          {!discussionOnly ? <button type="button" disabled={!title.trim()} onClick={() => onSave({ title, note, measurement, agenda: false })} className="min-h-11 rounded-xl border text-sm font-semibold disabled:opacity-40">Place pin</button> : null}
+          <button type="button" disabled={!title.trim()} onClick={() => onSave({ title, note, measurement, agenda: true })} className="min-h-11 rounded-xl bg-brand text-sm font-semibold text-brand-foreground disabled:opacity-40">{discussionOnly ? "Create discussion" : "+ Agenda"}</button>
         </div>
       </form>
     </div>

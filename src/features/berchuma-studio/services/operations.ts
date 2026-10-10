@@ -1115,6 +1115,52 @@ export function setBayFitting(
   });
 }
 
+/**
+ * Switch one wardrobe section between shelves, drawers, internal drawers and
+ * hanging in a single edit. This deliberately clears Open Display first:
+ * composing setBayDisplay() and setBayFitting() caused two validation passes
+ * and mobile taps could appear to do nothing when the intermediate repaired
+ * spec won. Open Display itself continues to use setBayDisplay().
+ */
+export function setWardrobeBayFitting(
+  spec: DesignSpec,
+  cabinetId: string,
+  bayId: string,
+  fitting: Bay["fitting"],
+  internalDrawers = false,
+): DesignSpec {
+  return change(spec, (draft) => {
+    const bay = find(draft, cabinetId)?.bays.find((entry) => entry.id === bayId);
+    if (!bay) return;
+
+    delete bay.display;
+    delete bay.doorOverrides;
+    bay.fitting = fitting;
+
+    if (fitting.kind === "drawers") {
+      // Narrow the local fitting value first. TypeScript cannot preserve the
+      // discriminated-union narrowing through the mutable bay.fitting property.
+      const drawers = fitting;
+      if (internalDrawers) {
+        drawers.internal = true;
+        if (bay.door === "none") bay.door = "hinged";
+        leavesFor(bay);
+      } else {
+        delete drawers.internal;
+        delete drawers.boxDepth;
+        delete drawers.frontBoardId;
+        // External drawers are the visible front, not a door behind them.
+        bay.doorLeaves = 1;
+      }
+      return;
+    }
+
+    // Shelves and hanging are closed wardrobe interiors by default.
+    if (bay.door === "none") bay.door = "hinged";
+    leavesFor(bay);
+  });
+}
+
 export function setBayDoor(
   spec: DesignSpec,
   cabinetId: string,

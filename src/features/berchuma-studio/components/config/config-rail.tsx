@@ -297,6 +297,7 @@ export function ConfigRail({
             <BayRow
               key={bay.id}
               bay={bay}
+              kitchen={spec.furnitureType === "kitchen"}
               index={bayIndex}
               cabinetIndex={index}
               removable={cabinet.bays.length > 1}
@@ -312,6 +313,7 @@ export function ConfigRail({
 
 function BayRow({
   bay,
+  kitchen,
   index,
   cabinetIndex,
   removable,
@@ -319,6 +321,7 @@ function BayRow({
   redistribute,
 }: {
   bay: Bay;
+  kitchen: boolean;
   index: number;
   cabinetIndex: number;
   removable: boolean;
@@ -463,7 +466,11 @@ function BayRow({
       ) : null}
 
       {bay.door === "hinged" ? (
-        <label className="mt-2 flex items-center gap-2 text-xs">
+        kitchen ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Kitchen doors prefer 25–45 cm (250–450 mm) and split automatically.
+          </p>
+        ) : <label className="mt-2 flex items-center gap-2 text-xs">
           <input
             type="checkbox"
             checked={bay.doorLeaves === 2}

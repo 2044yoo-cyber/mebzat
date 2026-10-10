@@ -1,0 +1,128 @@
+[
+ {
+  "name": "inside wall drags room corners again",
+  "file": "src/features/house-designer/services/project-edit.ts",
+  "from": "    return rebuildLevel(next, level.id, withDerivedZones(plan, {\n      ...plan,\n      interiorWalls:",
+  "to": "    return rebuildLevel(next, level.id, ((_: Room, after: Room) => ({ ...after, zones: (plan.zones ?? []).map((zone) => ({ ...zone, boundary: zone.boundary.map(keepOutside) })) }))(plan, {\n      ...plan,\n      interiorWalls:"
+ },
+ {
+  "name": "outside wall drags room corners again",
+  "file": "src/features/house-designer/services/project-edit.ts",
+  "from": "  const changedPlan: Room = withDerivedZones(plan, {",
+  "to": "  const changedPlan: Room = ((_: Room, after: Room) => ({ ...after, zones: plan.zones?.map((zone) => ({ ...zone, boundary: zone.boundary.map(follow) })) }))(plan, {"
+ },
+ {
+  "name": "outside wall leaves rooms where they were",
+  "file": "src/features/house-designer/services/project-edit.ts",
+  "from": "  const changedPlan: Room = withDerivedZones(plan, {",
+  "to": "  const changedPlan: Room = ((_: Room, after: Room) => after)(plan, {"
+ },
+ {
+  "name": "room not enclosed still gets a floor",
+  "file": "src/features/house-designer/services/project-edit.ts",
+  "from": "plan.zones.filter((zone) => zone.enclosed !== false).map((zone) => {",
+  "to": "plan.zones.map((zone) => {"
+ },
+ {
+  "name": "split not checked against the walls",
+  "file": "src/features/house-designer/services/project-edit.ts",
+  "from": "  return rebuildLevel(project, levelId, withDerivedZones(divided, divided));",
+  "to": "  return rebuildLevel(project, levelId, divided);"
+ },
+ {
+  "name": "room losing its walls keeps a stale outline as enclosed",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "    if (face === undefined) return { ...rest, enclosed: false };",
+  "to": "    if (face === undefined) return zone;"
+ },
+ {
+  "name": "room coming back stays marked not enclosed",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "    return { ...rest, boundary: newFaces[face]!.map(micronPoint) };",
+  "to": "    return { ...zone, boundary: newFaces[face]!.map(micronPoint) };"
+ },
+ {
+  "name": "no T joint",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "        if (distance <= reachOf(line) && (!best || distance < best.distance)) best = { point: foot.point, distance };",
+  "to": "        if (distance <= 0 && (!best || distance < best.distance)) best = { point: foot.point, distance };"
+ },
+ {
+  "name": "no end to end joint",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "          if (distance > reach) continue;",
+  "to": "          if (distance > 0) continue;"
+ },
+ {
+  "name": "crossing walls not cut",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "      if (crossing && crossing.t > 0 && crossing.t < 1) cuts.push(crossing);",
+  "to": "      if (crossing && crossing.t > 2) cuts.push(crossing);"
+ },
+ {
+  "name": "T ends not cut into the wall they meet",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "        if (foot && foot.t > 0 && foot.t < 1 && Math.hypot(foot.point.x - end.x, foot.point.y - end.y) <= MERGE) cuts.push({ t: foot.t, point: end });",
+  "to": "        if (foot && foot.t > 2) cuts.push({ t: foot.t, point: end });"
+ },
+ {
+  "name": "loose ends and free walls kept",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "    edges = edges.filter((_, index) => !bridges.has(index));",
+  "to": "    edges = edges.filter(() => true);"
+ },
+ {
+  "name": "straight-through corners kept",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "(point.y - before.y) * (after.x - before.x)) / length < 0.5) {",
+  "to": "(point.y - before.y) * (after.x - before.x)) / length < -1) {"
+ },
+ {
+  "name": "outside face taken as a room",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": ".filter((face) => face.length >= 3 && signedArea(face) > 0 && (2 * signedArea(face))",
+  "to": ".map((face) => (signedArea(face) < 0 ? [...face].reverse() : face)).filter((face) => face.length >= 3 && signedArea(face) > 0 && (2 * signedArea(face))"
+ },
+ {
+  "name": "worst match first",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "  pairs.sort((a, b) => b.score - a.score || Number(a.zone.enclosed === false) - Number(b.zone.enclosed === false));",
+  "to": "  pairs.sort((a, b) => a.score - b.score || Number(a.zone.enclosed === false) - Number(b.zone.enclosed === false));"
+ },
+ {
+  "name": "no new room for new ground",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "    if (!wasRoom && wasEnclosed) return;",
+  "to": "    return;"
+ },
+ {
+  "name": "no matching by centre",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "    if (best) { faceOf.set(zone,",
+  "to": "    if (best && false) { faceOf.set(zone,"
+ },
+ {
+  "name": "rooms dividing a room not followed",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "    if (inside.length && inside.reduce((sum, face) => sum + signedArea(face), 0) >= 0.9 * area) tracked.add(zone);",
+  "to": "    void inside;"
+ },
+ {
+  "name": "split wall rooms not reconciled",
+  "file": "src/features/house-designer/services/model-commands.ts",
+  "from": "    return { project: reconcileRooms(project, next), selections: [selection, { kind: \"wall\", id }], blocked: [] };",
+  "to": "    return { project: next, selections: [selection, { kind: \"wall\", id }], blocked: [] };"
+ },
+ {
+  "name": "walls moved together not reconciled",
+  "file": "src/features/house-designer/services/model-commands.ts",
+  "from": "!selections.some((selection) => selection.kind === \"room\")) next = reconcileRooms(project, next);",
+  "to": "!selections.some((selection) => selection.kind === \"room\")) next = next;"
+ },
+ {
+  "name": "plan draws a floor for a room not enclosed",
+  "file": "src/features/berchuma-studio/components/plan/plan-canvas.tsx",
+  "from": "        if (zone.enclosed === false) {",
+  "to": "        if (zone.enclosed === false && false) {"
+ }
+]

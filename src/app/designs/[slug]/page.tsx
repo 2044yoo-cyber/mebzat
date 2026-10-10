@@ -14,6 +14,7 @@ import {
 } from "@/features/berchuma-studio/services/designs";
 import { buildParts } from "@/features/berchuma-studio/services/geometry";
 import { buildCutList } from "@/features/berchuma-studio/services/cutlist";
+import { projectDesigns } from "@/features/berchuma-studio/services/cabinet-project";
 import { allBays } from "@/features/berchuma-studio/types/spec";
 
 /**
@@ -136,6 +137,36 @@ export default async function DesignPage({
           </p>
         ) : null}
       </header>
+
+      {design.spec.projectItems?.length ? (
+        <section aria-label="Cabinets in this manufacturing project" className="space-y-3 rounded-xl border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Manufacturing project · {design.spec.projectItems.length + 1} designs</h2>
+            <Link href={`/designs/${design.slug}/cut-list`}
+              className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground">
+              Combined cut list
+            </Link>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            The 3D preview below shows the first design. The saved project also
+            contains these independently editable cabinets; their materials,
+            cuts and hardware are included in the combined production workbook.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {projectDesigns(design.spec).map((item, index) => (
+              <div key={item.id} className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs font-medium">{index + 1}. {item.spec.title}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {item.spec.kind.replace(/_/g, " ")} · {item.spec.envelope.width} ×
+                  {item.spec.envelope.height} × {item.spec.envelope.depth} mm
+                </p>
+              </div>
+            ))}
+          </div>
+          {design.isOwner ? <Link href={`/studio?design=${encodeURIComponent(design.slug)}`}
+            className="inline-flex rounded-lg border px-3 py-2 text-xs font-medium">Edit all project cabinets</Link> : null}
+        </section>
+      ) : null}
 
       <DesignCanvas spec={design.spec} />
 

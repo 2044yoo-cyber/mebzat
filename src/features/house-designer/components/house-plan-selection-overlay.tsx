@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { PlanCanvas } from "@/features/berchuma-studio/components/plan/plan-canvas";
-import { levelChains, wallChain, type WallEnd } from "../services/quick-edit";
+import { levelChains, wallChain, wallJointLinked, type WallEnd } from "../services/quick-edit";
 
 import { useHouseUnits } from "./house-units";
 import { displayLength, modelLength } from "../services/workspace-options";
@@ -61,8 +61,8 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   chosenProposal?: string | null;
   onProposalChoose?: (id: string) => void;
   onProposalMove?: (id: string, x: number, y: number) => void;
-  /** Dragging a selected wall square to itself. */
-  onMoveSelection?: (selection: HouseSelection, dx: number, dy: number) => void;
+  /** Drag a wall, or an entire multi-selection, without discarding the selected set. */
+  onMoveSelection?: (selection: HouseSelection | readonly HouseSelection[], dx: number, dy: number) => void;
   onDraftStart: (point: HousePlanPoint | null) => void;
   onDraft: (start: HousePlanPoint, end: HousePlanPoint) => void;
   onSelect: (items: HouseSelection[], mode: "replace" | "add" | "remove") => void;
@@ -99,6 +99,8 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   const unit = useHouseUnits();
   const [dragStart, setDragStart] = useState<HousePlanPoint | null>(null);
   const [current, setCurrent] = useState<SnapPoint | null>(null);
+  const [originalVisible, setOriginalVisible] = useState(false);
+  const [originalOpacity, setOriginalOpacity] = useState(35);
   // A room can be dragged out in one press as well as tapped corner-to-corner.
   const roomPress = useRef<{ pointerId: number; start: HousePlanPoint } | null>(null);
   // Which way a typed length runs. On a phone there is no hovering pointer to
@@ -107,6 +109,9 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
   // A door or window being slid along its wall: the offset it would land at.
   const [proposalDrag, setProposalDrag] = useState<{ pointerId: number; id: string; grab: HousePlanPoint; x: number; y: number; moved: boolean } | null>(null);
   const [wallDrag, setWallDrag] = useState<{ pointerId: number; selection: HouseSelection; origin: HousePlanPoint; normal: HousePlanPoint; distance: number } | null>(null);
+  // Drag all explicitly selected walls in one two-axis gesture.
+  // They are applied as one geometry operation and one undo step.
+  const [wallGroupDrag, setWallGroupDrag] = useState<{ pointerId: number; origin: HousePlanPoint; dx: number; dy: number } | null>(null);
   const [openingDrag, setOpeningDrag] = useState<{ pointerId: number; selection: HouseSelection; grab: number; offset: number; from: number } | null>(null);
   // A selected wall's end: dragged, or lengthened with + / − (held, it keeps going).
   const [endDrag, setEndDrag] = useState<{ pointerId: number; end: WallEnd; point: SnapPoint } | null>(null);
@@ -337,6 +342,11 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       // A second finger landing mid-drag means "I want to pan", not "place
       // the next wall point" — the marquee it interrupted was never finished.
       setDragStart(null);
+      // A two-finger pinch must cancel an unfinished wall/group translation.
+      // Otherwise lifting the first finger could commit an unintended move.
+      setWallGroupDrag(null);
+      setWallDrag(null);
+      setItemDrag(null);
       cancelLongPress();
       pinch.current = pinchState();
       return;
@@ -352,7 +362,8 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
         entry.fired = true;
         const hit = pickHouseObject(objects, raw);
         if (!hit) return;
-        onSelect([hit], "replace");
+        const alreadySelected = selections.some((item) => item.id === hit.id && item.kind === hit.kind);
+        onSelect([hit], alreadySelected && selections.length > 1 ? "remove" : "add");
         onSelectionMenu({ x: clientX, y: clientY });
       }, 500);
       longPress.current = entry;
@@ -412,6 +423,23 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
         return;
       }
     }
+    // Multi-selected walls are a single movable set. Hit any of the selected
+    // walls to drag the WHOLE set, without downgrading it to a one-wall pick.
+    if ((selectMode || activeTool === "move") && onMoveSelection &&
+      selections.filter((item) => item.kind === "wall").length >= (activeTool === "move" ? 1 : 2)) {
+      const selectedWalls = project.walls.filter((wall) => selections.some((item) => item.kind === "wall" && item.id === wall.id));
+      const tolerance = Math.max(16 * mmPerPx, 60);
+      const hit = selectedWalls.some((wall) => {
+        const nearest = closestPointOnSegment(raw, wall.start, wall.end);
+        return Math.hypot(raw.x - nearest.x, raw.y - nearest.y) <= wall.thickness / 2 + tolerance;
+      });
+      if (hit) {
+        cancelLongPress();
+        svg.current?.setPointerCapture(event.pointerId);
+        setWallGroupDrag({ pointerId: event.pointerId, origin: raw, dx: 0, dy: 0 });
+        return;
+      }
+    }
     if (selectMode && selectedItemBounds && selections[0] && onMoveSelection) {
       const reach = Math.max(16 * mmPerPx, 60);
       if (raw.x >= selectedItemBounds.minX - reach && raw.x <= selectedItemBounds.maxX + reach && raw.y >= selectedItemBounds.minY - reach && raw.y <= selectedItemBounds.maxY + reach) {
@@ -434,6 +462,14 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     if (selectMode) {
       svg.current?.setPointerCapture(event.pointerId);
       setDragStart(raw);
+      return;
+    }
+    // Walls use independent touch-and-drag gestures, not a chained
+    // two-tap direction/length workflow. Each finger-down is a fresh start.
+    if (activeTool === "wall") {
+      const start = snapped(raw);
+      onDraftStart(start);
+      svg.current?.setPointerCapture(event.pointerId);
       return;
     }
     if (activeTool && lineTools.has(activeTool)) {
@@ -518,7 +554,27 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       const length = Math.max(holdStep, Math.round(run / holdStep) * holdStep);
       point = { x: anchor.x + (point.x - anchor.x) * length / run, y: anchor.y + (point.y - anchor.y) * length / run, label: point.label };
     }
+    // Match the freehand editor's orthogonal constraint in the live preview:
+    // releasing the finger must not suddenly turn the ghost into a diagonal.
+    if (project.levels.find((level) => level.id === selectedWall.levelId)?.plan?.freehand) {
+      const horizontal = Math.abs(selectedWall.end.x - selectedWall.start.x) >= Math.abs(selectedWall.end.y - selectedWall.start.y);
+      point = horizontal
+        ? { ...point, y: anchor.y, label: "Horizontal" }
+        : { ...point, x: anchor.x, label: "Vertical" };
+    }
     setEndDrag({ ...endDrag, point });
+    return true;
+  }
+
+  function moveWallGroup(event: React.PointerEvent<SVGSVGElement>) {
+    if (!wallGroupDrag || wallGroupDrag.pointerId !== event.pointerId) return false;
+    const raw = modelPoint(event);
+    if (!raw) return true;
+    const step = snapEnabled ? 50 : 10;
+    const dx = Math.round((raw.x - wallGroupDrag.origin.x) / step) * step;
+    const dy = Math.round((raw.y - wallGroupDrag.origin.y) / step) * step;
+    if (dx !== wallGroupDrag.dx || dy !== wallGroupDrag.dy)
+      setWallGroupDrag({ ...wallGroupDrag, dx, dy });
     return true;
   }
 
@@ -568,6 +624,13 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       setEndDrag(null);
       return;
     }
+    if (wallGroupDrag && wallGroupDrag.pointerId === event.pointerId) {
+      if (wallGroupDrag.dx !== 0 || wallGroupDrag.dy !== 0)
+        onMoveSelection?.(selections.filter((item) => item.kind === "wall"), wallGroupDrag.dx, wallGroupDrag.dy);
+      else tapped();
+      setWallGroupDrag(null);
+      return;
+    }
     if (itemDrag && itemDrag.pointerId === event.pointerId) {
       if (itemDrag.dx !== 0 || itemDrag.dy !== 0) onMoveSelection?.(itemDrag.selection, itemDrag.dx, itemDrag.dy);
       else tapped();
@@ -587,6 +650,21 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       return;
     }
     if (pointers.current.size >= 1) return;
+    if (activeTool === "wall" && draftStart) {
+      const raw = modelPoint(event);
+      if (raw) {
+        const end = snapped(raw, draftStart);
+        if (Math.hypot(end.x - draftStart.x, end.y - draftStart.y) > 50) {
+          // Strictly horizontal/vertical, matching the freehand sketch tool.
+          const aligned = Math.abs(end.x - draftStart.x) >= Math.abs(end.y - draftStart.y)
+            ? { x: end.x, y: draftStart.y }
+            : { x: draftStart.x, y: end.y };
+          onDraft(draftStart, aligned);
+        }
+      }
+      onDraftStart(null);
+      return;
+    }
     const press = roomPress.current;
     roomPress.current = null;
     if (press && press.pointerId === event.pointerId && activeTool === "room") {
@@ -655,7 +733,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
     {/* The verified plan underneath, in the same frame, so it pans and zooms
         with the model rather than staying put behind it. */}
     {plan ? <div className="pointer-events-none absolute inset-0"><PlanCanvas room={plan} onChange={noop} formatLength={(value) => displayLength(value, project.displayUnits ?? "mm")} openingSymbols={false} viewBox={{ x: effective.minX, y: effective.minY, width: effective.maxX - effective.minX, height: effective.maxY - effective.minY }} /></div> : null}
-    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (placementDrag && placementDrag.pointerId === event.pointerId) { const raw = modelPoint(event); if (raw && onPlacementMove) onPlacementMove(...placementSnap(raw, placementDrag.grab)); return; } if (hold && hold.pointerId === event.pointerId) { holdSlide(event); return; } if (moveEnd(event) || moveProposal(event) || moveItem(event) || moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(toolPoint(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => {
+    <svg ref={svg} tabIndex={0} aria-label="House plan modeling canvas" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none outline-none" style={{ cursor: selectMode ? "default" : "crosshair" }} onPointerDown={pointerDown} onPointerMove={(event) => { if (placementDrag && placementDrag.pointerId === event.pointerId) { const raw = modelPoint(event); if (raw && onPlacementMove) onPlacementMove(...placementSnap(raw, placementDrag.grab)); return; } if (hold && hold.pointerId === event.pointerId) { holdSlide(event); return; } if (moveEnd(event) || moveProposal(event) || moveWallGroup(event) || moveItem(event) || moveWall(event) || moveOpening(event)) return; if (longPress.current && Math.hypot(event.clientX - longPress.current.x, event.clientY - longPress.current.y) > 10) cancelLongPress(); if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.current.size >= 2) { applyPinch(); return; } const raw = modelPoint(event); if (raw) setCurrent(toolPoint(raw)); }} onPointerUp={pointerUp} onTouchEnd={(event) => {
         if (swallowRelease.current) { swallowRelease.current = false; event.preventDefault(); return; }
         // The canvas has had the tap. The click a browser makes of it after
         // the finger lifts would land on whatever the tap just opened there —
@@ -681,6 +759,12 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
         <polyline points={sketch.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke="#1473e6" strokeWidth={3} vectorEffect="non-scaling-stroke" />
         {sketch.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r={Math.max(40, (index === 0 ? 7 : 4) * mmPerPx)} fill={index === 0 ? "#1473e6" : "white"} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" aria-label={index === 0 ? "Outline start" : undefined} />)}
       </g> : null}
+      {originalVisible && project.freehandSketch?.strokes.length ? <g aria-label="Original freehand strokes" pointerEvents="none" opacity={originalOpacity / 100}>
+        {project.freehandSketch.strokes.map(stroke =>
+          <polyline key={stroke.id} points={stroke.points.map(point => `${point.x * project.freehandSketch!.mmPerUnit},${point.y * project.freehandSketch!.mmPerUnit}`).join(" ")}
+            fill="none" stroke="#64748b" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke" />)}
+      </g> : null}
       <ModelPlanGeometry project={project} levelId={levelId} />
       {ghost && current && !selectMode ? <g aria-label="Placing" pointerEvents="none" opacity={0.65} className="text-brand">{ghost(current)}</g> : null}
       {objects.filter((object) => selectedIds.has(object.selection.id)).map((object) => {
@@ -697,8 +781,26 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
         }
         return <rect key={object.selection.id} x={object.bounds.minX} y={object.bounds.minY} width={Math.max(1, object.bounds.maxX - object.bounds.minX)} height={Math.max(1, object.bounds.maxY - object.bounds.minY)} fill="rgba(20,115,230,.10)" stroke="#1473e6" strokeWidth={10} vectorEffect="non-scaling-stroke" />;
       })}
+      {wallGroupDrag && (wallGroupDrag.dx !== 0 || wallGroupDrag.dy !== 0) ? (
+        <g aria-label="Move selected walls preview" pointerEvents="none">
+          {project.walls.filter((wall) => selections.some((selected) => selected.kind === "wall" && selected.id === wall.id)).map((wall) => (
+            <line key={wall.id} x1={wall.start.x + wallGroupDrag.dx} y1={wall.start.y + wallGroupDrag.dy} x2={wall.end.x + wallGroupDrag.dx} y2={wall.end.y + wallGroupDrag.dy}
+              stroke="#1473e6" strokeWidth={Math.max(wall.thickness, 20)} strokeOpacity={0.65} strokeDasharray="16 9" />
+          ))}
+          <text x={wallGroupDrag.origin.x + wallGroupDrag.dx} y={wallGroupDrag.origin.y + wallGroupDrag.dy - 30 * mmPerPx}
+            textAnchor="middle" fontSize={13 * mmPerPx} fontWeight={700} stroke="white" strokeWidth={4 * mmPerPx} paintOrder="stroke" fill="#1473e6">
+            {displayLength(wallGroupDrag.dx, unit).toFixed(unit === "m" ? 2 : 0)} × {displayLength(wallGroupDrag.dy, unit).toFixed(unit === "m" ? 2 : 0)} {unit}
+          </text>
+        </g>
+      ) : null}
       {project.annotations.filter((item) => item.levelId === levelId).map((item) => item.end ? <g key={item.id}><line x1={item.start.x} y1={item.start.y} x2={item.end.x} y2={item.end.y} stroke={selectedIds.has(item.id) ? "#1473e6" : "#7c3aed"} strokeWidth={2} strokeDasharray={item.kind === "dimension" ? undefined : "80 45"} vectorEffect="non-scaling-stroke" /><text x={(item.start.x + item.end.x) / 2} y={(item.start.y + item.end.y) / 2 - 80} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#334155">{item.kind === "dimension" && item.value !== null ? `${displayLength(item.value, project.displayUnits ?? "mm")} ${project.displayUnits ?? "mm"}` : item.text}</text></g> : <text key={item.id} x={item.start.x} y={item.start.y} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill={selectedIds.has(item.id) ? "#1473e6" : "#7c3aed"}>{item.text}</text>)}
       {selectionBox ? <rect x={selectionBox.minX} y={selectionBox.minY} width={selectionBox.maxX - selectionBox.minX} height={selectionBox.maxY - selectionBox.minY} fill={crossing ? "rgba(20,115,230,.10)" : "rgba(20,115,230,.06)"} stroke="#1473e6" strokeWidth={2} strokeDasharray={crossing ? `${margin * 0.08} ${margin * 0.05}` : undefined} vectorEffect="non-scaling-stroke" /> : null}
+      {draftStart && current && activeTool === "wall" ? <line
+        x1={draftStart.x} y1={draftStart.y}
+        x2={Math.abs(current.x - draftStart.x) >= Math.abs(current.y - draftStart.y) ? current.x : draftStart.x}
+        y2={Math.abs(current.x - draftStart.x) >= Math.abs(current.y - draftStart.y) ? draftStart.y : current.y}
+        stroke="#1473e6" strokeWidth={Math.max(70, margin * 0.006)} strokeLinecap="round"
+        opacity={0.8} pointerEvents="none" /> : null}
       {draftStart && current && activeTool === "room" ? <g pointerEvents="none"><polygon points={roomOutline(roomShape, draftStart, current).map((point) => `${point.x},${point.y}`).join(" ")} fill="rgba(20,115,230,.08)" stroke="#1473e6" strokeWidth={2} strokeDasharray="80 40" vectorEffect="non-scaling-stroke" /><text x={(draftStart.x + current.x) / 2} y={Math.min(draftStart.y, current.y) - 100} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#1473e6">{displayLength(Math.abs(current.x - draftStart.x), unit)} × {displayLength(Math.abs(current.y - draftStart.y), unit)} {unit}</text></g> : null}
       {draftStart && current && activeTool && activeTool !== "room" && lineTools.has(activeTool) ? <g><line x1={draftStart.x} y1={draftStart.y} x2={current.x} y2={current.y} stroke="#1473e6" strokeWidth={2} strokeDasharray="80 40" vectorEffect="non-scaling-stroke" /><text x={(draftStart.x + current.x) / 2} y={(draftStart.y + current.y) / 2 - 100} textAnchor="middle" fontSize={Math.max(120, margin * 0.15)} fill="#1473e6">{displayLength(Math.hypot(current.x - draftStart.x, current.y - draftStart.y), project.displayUnits ?? "mm")} {project.displayUnits ?? "mm"}</text></g> : null}
       {!selectMode && current ? <g pointerEvents="none"><circle cx={current.x} cy={current.y} r={Math.max(45, margin * 0.035)} fill="white" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><path d={`M ${current.x - 65} ${current.y} H ${current.x + 65} M ${current.x} ${current.y - 65} V ${current.y + 65}`} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={current.x + 100} y={current.y - 80} fontSize={Math.max(100, margin * 0.12)} fill="#1473e6">{current.label}</text></g> : null}
@@ -719,7 +821,7 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       {/* Editing fields belong to Select. While drawing, they sat where the
           next room or wall was being started and took the touch. */}
       {selectMode && selectedWall && !endDrag && !hold && !wallDrag ? <WallTemporaryDimension wall={selectedWall} margin={margin} selection={selections[0]!} onChange={(selection, length) => onWallLength ? onWallLength(selection, activeEnd, length) : onDimensionChange(selection, { length })} /> : null}
-      {selectMode && selectedWall && onWallExtend ? <WallEndControls wall={selectedWall} controls={wallControls(selectedWall)} preview={endDrag ? { end: endDrag.end, point: endDrag.point } : hold ? { end: hold.end, delta: hold.sign * hold.steps * holdStep } : null} unit={unit} /> : null}
+      {selectMode && selectedWall && onWallExtend ? <WallEndControls wall={selectedWall} controls={wallControls(selectedWall)} links={{ start: wallJointLinked(project, selectedWall.id, "start"), end: wallJointLinked(project, selectedWall.id, "end") }} preview={endDrag ? { end: endDrag.end, point: endDrag.point } : hold ? { end: hold.end, delta: hold.sign * hold.steps * holdStep } : null} unit={unit} /> : null}
       {selectMode && selectedWall && onWallDistance ? <WallChainView project={project} wall={selectedWall} shift={wallDrag ? (Math.abs(wallDrag.normal.x) > Math.abs(wallDrag.normal.y) ? wallDrag.normal.x : wallDrag.normal.y) * wallDrag.distance : 0} editable={!wallDrag && !endDrag && !hold} unit={unit} onDistance={(neighbourId, distance) => onWallDistance(selections[0]!, neighbourId, distance)} /> : null}
       {selectMode && selections.length === 1 && (selectedWall || selections[0]?.kind === "room") || placement ? <LevelChainsView chains={chains} bounds={levelBounds(project, levelId)} unit={unit} /> : null}
       {endDrag ? <g pointerEvents="none"><circle cx={endDrag.point.x} cy={endDrag.point.y} r={9 * mmPerPx} fill="white" stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={endDrag.point.x + 14 * mmPerPx} y={endDrag.point.y - 12 * mmPerPx} fontSize={12 * mmPerPx} fill="#1473e6" aria-label="Snap">{endDrag.point.label}</text></g> : null}
@@ -730,8 +832,12 @@ export function HousePlanSelectionOverlay({ project, levelId, activeTool, select
       </MmPerPx.Provider>
     </svg>
     {actionBar && selectMode && selections.length && !endDrag && !hold && !wallDrag && !itemDrag && !openingDrag && canvasSize ? <FloatingBar bounds={objects.filter((object) => selectedIds.has(object.selection.id)).map((object) => object.bounds)} view={effective} size={canvasSize}>{actionBar}</FloatingBar> : null}
-    {current ? <span aria-label="Pointer coordinates" className="pointer-events-none absolute right-2 top-3 z-10 rounded-md border bg-background/90 px-2 py-0.5 font-mono text-[11px] tabular-nums">X {displayLength(current.x, unit)} · Y {displayLength(current.y, unit)} {unit}</span> : null}
-    {draftStart && activeTool && (activeTool === "room" || lineTools.has(activeTool)) ? <TypedDraft
+    {project.freehandSketch?.strokes.length && project.walls.length ? <div className="absolute left-2 top-12 z-20 flex items-center gap-2 rounded-lg border bg-background/95 p-2 text-[11px] shadow-sm">
+      <label className="flex items-center gap-1"><input type="checkbox" checked={originalVisible} onChange={e => setOriginalVisible(e.target.checked)} /> Original sketch</label>
+      {originalVisible ? <label className="flex items-center gap-1">Opacity <input type="range" aria-label="Original sketch opacity" min={5} max={100} step={5} value={originalOpacity} onChange={e => setOriginalOpacity(Number(e.target.value))} className="w-16" /></label> : null}
+    </div> : null}
+    {current ? <span aria-label="Pointer coordinates" className="pointer-events-none absolute right-2 top-3 z-10 rounded-md border bg-background/90 px-2 py-0.5 font-mono text-[11px] tabular-nums">X {displayLength(current.x, unit).toFixed(unit === "m" ? 2 : unit === "cm" ? 1 : 0)} · Y {displayLength(current.y, unit).toFixed(unit === "m" ? 2 : unit === "cm" ? 1 : 0)} {unit}</span> : null}
+    {draftStart && activeTool && (activeTool === "room" || (activeTool !== "wall" && lineTools.has(activeTool))) ? <TypedDraft
       key={`${draftStart.x},${draftStart.y}`}
       room={activeTool === "room"}
       unit={unit}
@@ -784,7 +890,12 @@ function TypedDraft({ room, unit, live, direction, onDirection, onCancel, onLeng
     <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="absolute inset-x-2 top-12 z-10 flex flex-wrap items-center justify-center gap-1 rounded-xl border bg-card/95 p-1 shadow-sm backdrop-blur">
       {room ? <>{field("Width", first, setFirst, live?.[0])}<span className="text-xs text-muted-foreground">×</span>{field("Depth", second, setSecond, live?.[1])}</> : <>
         {field("Length", first, setFirst, live?.[2])}
-        <span className="flex">{DIRECTIONS.map((item) => <button key={item.label} type="button" aria-label={`Run ${item.label}`} aria-pressed={direction?.x === item.x && direction?.y === item.y} onClick={() => onDirection(direction?.x === item.x && direction?.y === item.y ? null : { x: item.x, y: item.y })} className="size-7 rounded-md text-sm text-muted-foreground aria-pressed:bg-brand/15 aria-pressed:text-brand">{item.label}</button>)}</span>
+        <details className="group relative">
+          <summary className="cursor-pointer list-none rounded-md border px-2 py-1.5 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden" aria-label="Advanced wall direction">Direction ▾</summary>
+          <div className="absolute left-0 top-full z-20 mt-1 flex gap-1 rounded-lg border bg-card p-1 shadow-lg">
+            {DIRECTIONS.map((item) => <button key={item.label} type="button" aria-label={`Run ${item.label}`} aria-pressed={direction?.x === item.x && direction?.y === item.y} onClick={() => onDirection(direction?.x === item.x && direction?.y === item.y ? null : { x: item.x, y: item.y })} className="size-9 rounded-md text-base text-muted-foreground aria-pressed:bg-brand/15 aria-pressed:text-brand">{item.label}</button>)}
+          </div>
+        </details>
       </>}
       <button type="submit" disabled={!ready} className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-medium text-brand-foreground disabled:opacity-40">{room ? "Create" : "Add"}</button>
       <button type="button" onClick={onCancel} aria-label="Cancel drafting" className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted">✕</button>
@@ -1089,7 +1200,7 @@ function shortLength(mm: number, unit: ReturnType<typeof useHouseUnits>) {
 }
 
 /** A selected wall's end handles and its small + / −, with the live length while changing. */
-function WallEndControls({ wall, controls, preview, unit }: { wall: HouseProject["walls"][number]; controls: { end: WallEnd; kind: "handle" | "plus" | "minus"; at: HousePlanPoint }[]; preview: { end: WallEnd; point: HousePlanPoint } | { end: WallEnd; delta: number } | null; unit: ReturnType<typeof useHouseUnits> }) {
+function WallEndControls({ wall, controls, links, preview, unit }: { wall: HouseProject["walls"][number]; controls: { end: WallEnd; kind: "handle" | "plus" | "minus"; at: HousePlanPoint }[]; links: Record<WallEnd, boolean>; preview: { end: WallEnd; point: HousePlanPoint } | { end: WallEnd; delta: number } | null; unit: ReturnType<typeof useHouseUnits> }) {
   const px = useContext(MmPerPx);
   const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
   let start: HousePlanPoint = wall.start;
@@ -1107,7 +1218,10 @@ function WallEndControls({ wall, controls, preview, unit }: { wall: HouseProject
     <g aria-label="Wall ends">
       {preview ? <g pointerEvents="none"><line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke="#f59e0b" strokeWidth={4} vectorEffect="non-scaling-stroke" /><text aria-label="Live length" x={(start.x + end.x) / 2} y={(start.y + end.y) / 2 - 14 * px} textAnchor="middle" fontSize={15 * px} fontWeight={700} fill="#b45309" paintOrder="stroke" stroke="white" strokeWidth={4 * px}>{shortLength(live, unit)} {unit}</text></g> : null}
       {controls.map((control) => control.kind === "handle"
-        ? <circle key={`${control.end}-handle`} aria-label={`Wall ${control.end} handle`} cx={control.at.x} cy={control.at.y} r={8 * px} fill="white" stroke="#1473e6" strokeWidth={3} vectorEffect="non-scaling-stroke" />
+        ? <g key={`${control.end}-handle`} aria-label={`Wall ${control.end} handle: ${links[control.end] ? "linked" : "independent"}`}>
+            <circle cx={control.at.x} cy={control.at.y} r={10 * px} fill={links[control.end] ? "#dcfce7" : "white"} stroke={links[control.end] ? "#16a34a" : "#1473e6"} strokeWidth={3} vectorEffect="non-scaling-stroke" />
+            <text x={control.at.x} y={control.at.y + 3.5 * px} textAnchor="middle" fontSize={10 * px} fontWeight={700} fill={links[control.end] ? "#166534" : "#1d4ed8"} pointerEvents="none">{control.end === "start" ? "S" : "E"}</text>
+          </g>
         : <g key={`${control.end}-${control.kind}`} aria-label={`${control.kind === "plus" ? "Lengthen" : "Shorten"} from ${control.end}`}><circle cx={control.at.x} cy={control.at.y} r={11 * px} fill={control.kind === "plus" ? "#1473e6" : "white"} stroke="#1473e6" strokeWidth={2} vectorEffect="non-scaling-stroke" /><text x={control.at.x} y={control.at.y + 5 * px} textAnchor="middle" fontSize={16 * px} fontWeight={700} fill={control.kind === "plus" ? "white" : "#1473e6"}>{control.kind === "plus" ? "+" : "−"}</text></g>)}
     </g>
   );

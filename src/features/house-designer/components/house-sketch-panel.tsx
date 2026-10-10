@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, FileImage, FolderOpen, Layers, Loader2, Maximize2, Redo2, RotateCw, Undo2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileImage, FolderOpen, Layers, Loader2, Maximize2, Redo2, RotateCw, Share2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
@@ -57,6 +57,7 @@ export function HouseSketchPanel({ project, levelId, link, userId, pins, onPinsC
   const [fitKey, setFitKey] = useState(0);
   const [thumbs, setThumbs] = useState<Record<number, string>>({});
   const [pinAt, setPinAt] = useState<{ x: number; y: number } | null>(null);
+  const [discussionShape, setDiscussionShape] = useState<MarkupShape | null>(null);
   const [focus, setFocus] = useState<{ x: number; y: number } | null>(null);
   const handled = useRef<number | null>(null);
   const savingRef = useRef(false);
@@ -139,6 +140,8 @@ export function HouseSketchPanel({ project, levelId, link, userId, pins, onPinsC
       setDirty(false);
       setRotation(0);
       setFocus(focusAt);
+      setPinAt(null);
+      setDiscussionShape(null);
       if (source.kind === "pdf" && rendered.url && rendered.pages) void loadThumbs(rendered.url, rendered.pages);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "That could not be opened.");
@@ -170,29 +173,50 @@ export function HouseSketchPanel({ project, levelId, link, userId, pins, onPinsC
     if (!current || savingRef.current) return current?.sketch.id ? { id: current.sketch.id, previewPath: current.sketch.previewPath } : null;
     savingRef.current = true;
     setSaving(true);
-    const client = createClient();
-    const target = { projectId: link.projectId, planId: link.planId };
-    const saved = await saveSketch(client, userId, target, current.sketch);
-    if ("error" in saved) { savingRef.current = false; setSaving(false); toast.error(saved.error); return null; }
-    let previewPath = current.sketch.previewPath;
-    const blob = await renderMarkup(current.background, current.sketch.markup, pinsOf(pins, current.sketch.markup));
-    if (blob) {
-      const uploaded = await uploadProjectFile(client, link.projectId, "sketches", blob, "sketch.png");
-      if (!("error" in uploaded)) {
-        previewPath = uploaded.path;
-        await saveSketch(client, userId, target, { ...current.sketch, id: saved.id, previewPath });
+    try {
+      const client = createClient();
+      const target = { projectId: link.projectId, planId: link.planId };
+      const saved = await saveSketch(client, userId, target, current.sketch);
+      if ("error" in saved) { toast.error(saved.error); return null; }
+
+      let previewPath = current.sketch.previewPath;
+      try {
+        const blob = await renderMarkup(current.background, current.sketch.markup, pinsOf(pins, current.sketch.markup));
+        if (blob) {
+          const uploaded = await uploadProjectFile(client, link.projectId, "sketches", blob, `${saved.id}-${crypto.randomUUID()}.png`);
+          if ("error" in uploaded) {
+            toast.warning("Sketch saved, but its preview image could not be uploaded.");
+          } else {
+            const previewSaved = await saveSketch(client, userId, target, { ...current.sketch, id: saved.id, previewPath: uploaded.path });
+            if ("error" in previewSaved) {
+              toast.warning("Sketch saved, but its preview could not be refreshed.");
+            } else {
+              previewPath = uploaded.path;
+            }
+          }
+        }
+      } catch (previewError) {
+        console.error("Sketch preview update failed", previewError);
+        toast.warning("Sketch saved, but its preview could not be refreshed.");
       }
+
+      setOpen((value) => value && { ...value, sketch: { ...value.sketch, id: saved.id, previewPath } });
+      if (openRef.current?.sketch.markup === current.sketch.markup) setDirty(false);
+      void reload().catch((error) => console.error("Sketch list refresh failed", error));
+      return { id: saved.id, previewPath };
+    } catch (error) {
+      console.error("Sketch save failed unexpectedly", error);
+      toast.error(error instanceof Error ? `Sketch save failed: ${error.message}` : "Sketch save failed. Check your connection and try again.");
+      return null;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-    savingRef.current = false;
-    setSaving(false);
-    setOpen((value) => value && value.sketch === current.sketch ? { ...value, sketch: { ...value.sketch, id: saved.id, previewPath } } : value && { ...value, sketch: { ...value.sketch, id: saved.id, previewPath } });
-    if (openRef.current?.sketch.markup === current.sketch.markup) setDirty(false);
-    void reload();
-    return { id: saved.id, previewPath };
   }
 
   async function placePin(at: { x: number; y: number }, details: { title: string; note: string; measurement: string; agenda: boolean }) {
     setPinAt(null);
+    setDiscussionShape(null);
     if (!open) return;
     const saved = await save();
     if (!saved) return;
@@ -205,6 +229,30 @@ export function HouseSketchPanel({ project, levelId, link, userId, pins, onPinsC
     const after = await save();
     if (details.agenda) await onAddToAgenda(pin, after?.previewPath ?? null);
     toast.success(`${pin.number} placed`);
+  }
+
+  async function shareSketch() {
+    // A stable application link, NOT a signed storage URL. The recipient must
+    // belong to this Agenda project; database RLS checks that membership.
+    const saved = await save();
+    if (!saved) { toast.error("Save the sketch before sharing it."); return; }
+    const address = new URL("/house-design", window.location.origin);
+    address.searchParams.set("plan", link.planId);
+    address.searchParams.set("sketch", saved.id);
+    try {
+      await navigator.clipboard.writeText(address.toString());
+      toast.success("Sketch link copied. Only members of this Agenda project can open it.");
+    } catch {
+      window.prompt("Copy this project-member link", address.toString());
+    }
+  }
+
+  function discussShape(shape: MarkupShape) {
+    const a = shape.points[0];
+    if (!a) return;
+    const b = shape.points.at(-1) ?? a;
+    setDiscussionShape(shape);
+    setPinAt({ x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2 });
   }
 
   async function addImage(file: File) {
@@ -238,7 +286,8 @@ export function HouseSketchPanel({ project, levelId, link, userId, pins, onPinsC
           mmPerUnit={sketch.mmPerUnit}
           onCalibrate={sketch.source.kind === "plan" ? undefined : (mmPerUnit) => { setOpen({ ...open, sketch: { ...sketch, mmPerUnit } }); setDirty(true); toast.success("Scale set — Measure now reads real lengths"); }}
           unit={project.displayUnits ?? "mm"}
-          onPinRequest={(point) => setPinAt(point)}
+          onPinRequest={(point) => { setDiscussionShape(null); setPinAt(point); }}
+          onDiscussShape={discussShape}
           onPinOpen={(id) => { const pin = pins.find((item) => item.id === id); if (pin) onPin(pin); }}
           focus={focus}
           rotation={rotation}
@@ -246,6 +295,8 @@ export function HouseSketchPanel({ project, levelId, link, userId, pins, onPinsC
         />
         <div className="flex flex-wrap gap-1.5">
           <button type="button" onClick={() => setFitKey((value) => value + 1)} className="flex min-h-10 items-center gap-1 rounded-lg border px-3 text-xs"><Maximize2 className="size-3.5" />Fit</button>
+          <button type="button" disabled={saving} onClick={() => void shareSketch()} className="flex min-h-10 items-center gap-1 rounded-lg border border-brand/40 px-3 text-xs font-semibold text-brand disabled:opacity-40"><Share2 className="size-3.5" />Share with members</button>
+          <a href={`/agenda/projects/${link.projectId}/directory`} className="flex min-h-10 items-center gap-1 rounded-lg border px-3 text-xs"><ExternalLink className="size-3.5" />Invite team</a>
           {sketch.source.kind !== "plan" ? <button type="button" onClick={() => setRotation((value) => (value + 90) % 360)} className="flex min-h-10 items-center gap-1 rounded-lg border px-3 text-xs"><RotateCw className="size-3.5" />Rotate view</button> : null}
         </div>
         {open.pages && open.pages > 1 ? (
@@ -268,7 +319,13 @@ export function HouseSketchPanel({ project, levelId, link, userId, pins, onPinsC
             </div>
           </details>
         ) : null}
-        {pinAt ? <HousePinDialog initial={{ measurement: "" }} onCancel={() => setPinAt(null)} onSave={(details) => void placePin(pinAt, details)} /> : null}
+        {pinAt ? <HousePinDialog
+          key={discussionShape?.id ?? "pin"}
+          discussionOnly={!!discussionShape}
+          initial={{ title: discussionShape ? (discussionShape.type === "text" ? discussionShape.text ?? "Text note" : `${discussionShape.type} — review`) : "", note: "", measurement: "" }}
+          onCancel={() => { setPinAt(null); setDiscussionShape(null); }}
+          onSave={(details) => void placePin(pinAt, { ...details, agenda: details.agenda || !!discussionShape })}
+        /> : null}
       </section>
     );
   }

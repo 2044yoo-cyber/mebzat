@@ -7,18 +7,26 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { ChevronUp, FilePlus2, MessageSquare, Ruler, Wallet } from "lucide-react";
+import Link from "next/link";
+import { ChevronUp, Copy, FilePlus2, FileSpreadsheet, MessageSquare, Plus, Ruler, Trash2, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 import { DesignChat, type ChatMessage } from "./chat/design-chat";
 import { CostPanel } from "./pricing/cost-panel";
 import { DesignEditor } from "./editor/design-editor";
+import { TemplateThumb } from "./template-thumb";
 import { PublishBar } from "./publish-bar";
 import { SendToCalculator } from "./send-to-calculator";
 import { StartPanel } from "./start-panel";
 import { useDesign } from "../hooks/use-design";
 import { startingDesign } from "../services/starting-designs";
+import { addProjectDesign, duplicateProjectDesign, projectDesigns, removeProjectDesign, updateProjectDesign } from "../services/cabinet-project";
+import { buildProjectCutList } from "../services/cabinet-project";
+import { buildParts } from "../services/geometry";
+import { buildCutList, sheetCountsOf } from "../services/cutlist";
+import { calculateCost } from "../services/costing";
+import type { DesignCard } from "../services/designs";
 import {
   differsFrom,
   draftKey,
@@ -78,8 +86,7 @@ function safeRead(key: string): string | null {
 }
 
 const TABS: { id: Tab; label: string; icon: typeof MessageSquare }[] = [
-  { id: "chat", label: "Berchuma", icon: MessageSquare },
-  { id: "design", label: "Design", icon: Ruler },
+  { id: "design", label: "Cabinet Design", icon: Ruler },
   { id: "cost", label: "Price", icon: Wallet },
 ];
 
@@ -88,6 +95,7 @@ export function StudioWorkspace({
   opening,
   editing,
   userId,
+  recentProjects = [],
 }: {
   rates: MarketRate[];
   /**
@@ -110,6 +118,8 @@ export function StudioWorkspace({
   editing?: { spec: DesignSpec; designId: string; slug: string } | null;
   /** Who is looking, for the draft key. Null keeps the draft turned off. */
   userId?: string | null;
+  /** Most recently edited Cabinet Design projects for the landing page. */
+  recentProjects?: DesignCard[];
 }) {
   // `rates` arrives from a server component and never changes for the life of
   // the page, but it is an array literal in props — memoised so the cost
@@ -131,13 +141,76 @@ export function StudioWorkspace({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>(
-    editing || opening?.kind === "kitchen" || opening?.template ? "design" : "chat",
-  );
-  // `tab` defaults to "chat" so a phone opens on the conversational entry
-  // point — that default says nothing about whether a desktop reader asked
-  // for the rail. This does: it starts false and only `onOpenChat` sets it.
-  const [chatRequested, setChatRequested] = useState(false);
+  const [tab, setTab] = useState<Tab>("design");
+  // Every entry in a project remains its own validated DesignSpec, not an
+  // incorrectly mixed kitchen/wardrobe geometry. The primary design is always
+  // the saved record's root spec; extras live in its projectItems.
+  const [activeItemId, setActiveItemId] = useState("primary");
+  const [freshProject, setFreshProject] = useState(false);
+  const [newCabinetKind, setNewCabinetKind] = useState<DesignKind>("wardrobe");
+  const [projectMessage, setProjectMessage] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const projectItems = useMemo(() => design.spec ? projectDesigns(design.spec) : [], [design.spec]);
+  const activeItem = projectItems.find(item => item.id === activeItemId) ?? projectItems[0];
+  const activeSpec = activeItem?.spec ?? null;
+  const activePartCount = useMemo(() => activeSpec ? buildParts(activeSpec).totals.partCount : 0, [activeSpec]);
+  const activeCostState = useMemo(() => {
+    if (!activeSpec) return null;
+    if (activeItemId === "primary")
+      return { cost: design.cost, issues: design.issues };
+    const parts = buildParts(activeSpec);
+    const cut = buildCutList(activeSpec, parts);
+    return {
+      cost: calculateCost(activeSpec, parts, {
+        rates: stableRates, sheetCounts: sheetCountsOf(cut),
+        manufacturable: cut.buildable,
+      }),
+      issues: [],
+    };
+  }, [activeSpec, activeItemId, design.cost, design.issues, stableRates]);
+  const updateActive = useCallback((next: DesignSpec) => {
+    if (!design.spec) return;
+    design.set(updateProjectDesign(design.spec, activeItemId, next));
+  }, [design.spec, design.set, activeItemId]);
+  const addAnotherCabinet = () => {
+    if (!design.spec) return;
+    try {
+      const id = crypto.randomUUID();
+      design.set(addProjectDesign(design.spec, id, newCabinetKind));
+      setActiveItemId(id);
+      setProjectMessage("New cabinet added. Edit it here, then Save to keep the whole project.");
+    } catch (error) {
+      setProjectMessage(error instanceof Error ? error.message : "Could not add cabinet.");
+    }
+  };
+  const downloadCombined = async () => {
+    if (!design.spec) return;
+    setExporting(true);
+    setProjectMessage(null);
+    try {
+      // Build and trigger the download synchronously from the tap. Deferring
+      // this behind a dynamic import can lose the browser user-activation on
+      // iOS Safari, where the XLSX button appeared to do nothing.
+      const result = buildProjectCutList(design.spec);
+      const blob = new Blob([result.workbook.slice().buffer as ArrayBuffer],
+        { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = "medosha-combined-cabinet-cut-list.xlsx";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      // Mobile browsers may take longer to hand a generated file to Downloads.
+      window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
+      const saved = result.sheets.reduce((total, board) => total + board.separateSheets - board.sheets, 0);
+      setProjectMessage(`Exported ${result.designs} designs and ${result.pieces} cut pieces. Shared sheet nesting saved ${saved} MDF/board sheets versus separate cutting plans.`);
+    } catch (error) {
+      setProjectMessage(error instanceof Error ? error.message : "Could not generate the combined cut list.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // ---- the draft ---------------------------------------------------------
   //
@@ -145,7 +218,7 @@ export function StudioWorkspace({
   // studio held it in React state and nothing else had a copy until Save was
   // pressed. This keeps one in localStorage as the design changes, and offers
   // it back on the next visit.
-  const key = userId ? draftKey(userId, editing?.designId ?? null) : null;
+  const key = userId ? draftKey(userId, freshProject ? null : editing?.designId ?? null) : null;
   const [dismissed, setDismissed] = useState(false);
 
   // Open to begin with: somebody arriving needs to see what they are looking
@@ -234,7 +307,7 @@ export function StudioWorkspace({
         const body: DesignRequestBody = {
           brief,
           history,
-          current: design.spec,
+          current: activeSpec,
         };
 
         const response = await fetch("/api/studio/design", {
@@ -265,7 +338,8 @@ export function StudioWorkspace({
         ]);
 
         if (payload.spec) {
-          replace(payload.spec, payload.issues);
+          if (design.spec) updateActive(payload.spec);
+          else replace(payload.spec, payload.issues);
           // A phone shows one column at a time, and the thing worth seeing
           // after a design lands is the design.
           setTab("design");
@@ -278,7 +352,7 @@ export function StudioWorkspace({
         setBusy(false);
       }
     },
-    [design.spec, messages, replace],
+    [design.spec, activeSpec, messages, replace, updateActive],
   );
 
   const chat = (
@@ -314,7 +388,7 @@ export function StudioWorkspace({
   // to do, so it stays off the desktop grid and the picker gets its width —
   // until "Or describe it in your own words" asks for it by name, same as it
   // already does on a phone via the same tab switch.
-  const chatVisible = design.spec !== null || chatRequested;
+  const chatVisible = false;
 
   return (
     <div
@@ -328,7 +402,7 @@ export function StudioWorkspace({
         <div
           role="tablist"
           aria-label="Studio view"
-          className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1"
+          className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
         >
           {TABS.map((entry) => (
             <button
@@ -477,11 +551,11 @@ export function StudioWorkspace({
                     </button>
                     <div className="min-w-0">
                       <h1 className="truncate text-sm font-semibold">
-                        {design.spec.title}
+                        {activeSpec?.title ?? design.spec.title}
                       </h1>
                       <p className="text-[11px] text-muted-foreground">
-                        {design.parts?.totals.partCount ?? 0} parts ·{" "}
-                        {design.spec.carcass.board.label}
+                        {activePartCount} parts ·{" "}
+                        {activeSpec?.carcass.board.label ?? design.spec.carcass.board.label}
                       </p>
                     </div>
                   </div>
@@ -514,7 +588,10 @@ export function StudioWorkspace({
                         }
                         if (key) clearDraft(window.localStorage, key);
                         setDismissed(true);
+                        setFreshProject(true);
                         design.clear();
+                        setActiveItemId("primary");
+                        setProjectMessage(null);
                         setMessages([]);
                       }}
                       className="flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium"
@@ -524,27 +601,138 @@ export function StudioWorkspace({
                     </button>
 
                     <SendToCalculator
-                      kind={design.spec.kind}
-                      width={design.spec.envelope.width}
+                      kind={activeSpec?.kind ?? design.spec.kind}
+                      width={activeSpec?.envelope.width ?? design.spec.envelope.width}
                     />
                     <PublishBar
+                      key={freshProject ? "new-project" : editing?.designId ?? "unsaved-project"}
                       spec={design.spec}
                       lastBrief={lastBrief}
                       initialSaved={
-                        editing ? { id: editing.designId, slug: editing.slug } : null
+                        !freshProject && editing ? { id: editing.designId, slug: editing.slug } : null
                       }
                     />
                   </div>
                 </div>
               ) : null}
 
+              {/* A single saved project can contain independently editable
+                  wardrobes, vanities, kitchens, etc. Each has its own materials
+                  and joinery rules; the XLSX combines their production output. */}
+              <section aria-label="Cabinets in this project" className="space-y-2 border-b bg-background px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold">Cabinets in project ({projectItems.length})</span>
+                  <button type="button" onClick={() => void downloadCombined()} disabled={exporting}
+                    className="inline-flex min-h-9 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium disabled:opacity-50">
+                    <FileSpreadsheet className="size-4" aria-hidden />
+                    {exporting ? "Preparing…" : "Combined cut list (.xlsx)"}
+                  </button>
+                </div>
+                <div role="tablist" aria-label="Cabinet designs" className="flex gap-2 overflow-x-auto pb-1">
+                  {projectItems.map((item, index) => (
+                    <button key={item.id} type="button" role="tab" aria-selected={activeItemId === item.id}
+                      onClick={() => { setActiveItemId(item.id); setProjectMessage(null); }}
+                      className={cn("max-w-[180px] shrink-0 truncate rounded-lg border px-3 py-2 text-xs",
+                        activeItemId === item.id ? "border-primary bg-primary/10 font-semibold text-primary" : "bg-muted/30")}>
+                      {index + 1}. {item.spec.title}
+                    </button>
+                  ))}
+                </div>
+                {projectItems.length > 1 ? (
+                  <details className="rounded-lg border bg-muted/10 p-2">
+                    <summary className="cursor-pointer select-none py-1 text-xs font-medium">
+                      View all cabinets together ({projectItems.length} designs)
+                    </summary>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {projectItems.map((item, index) => (
+                        <div key={item.id} className="min-w-0 rounded-lg border bg-background p-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-semibold">{index + 1}. {item.spec.title}</p>
+                              <p className="text-[11px] capitalize text-muted-foreground">
+                                {item.spec.kind.replace(/_/g, " ")} · {Math.round(item.spec.envelope.width)} ×
+                                {Math.round(item.spec.envelope.height)} × {Math.round(item.spec.envelope.depth)} mm
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 gap-1">
+                              <button type="button" onClick={() => {
+                                setActiveItemId(item.id);
+                                setProjectMessage(null);
+                              }} className="rounded-md border px-2 py-1 text-xs font-medium">
+                                Edit
+                              </button>
+                              <button type="button" aria-label={`Duplicate design ${item.spec.title}`}
+                                onClick={() => {
+                                  if (!design.spec) return;
+                                  try {
+                                    const nextId = crypto.randomUUID();
+                                    design.set(duplicateProjectDesign(design.spec, item.id, nextId));
+                                    setActiveItemId(nextId);
+                                    setProjectMessage("A complete copy was added. Save the project to keep it.");
+                                  } catch (error) {
+                                    setProjectMessage(error instanceof Error ? error.message : "Could not duplicate this design.");
+                                  }
+                                }} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium">
+                                <Copy className="size-3" aria-hidden /> Copy
+                              </button>
+                            </div>
+                          </div>
+                          <TemplateThumb spec={item.spec}
+                            className="mt-2 h-28 w-full rounded-md bg-muted/30 p-2 text-foreground" />
+                          <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                            Material: {item.spec.carcass.board.label}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 text-xs">
+                    Add
+                    <select aria-label="Cabinet design type to add" value={newCabinetKind}
+                      onChange={(event) => setNewCabinetKind(event.target.value as DesignKind)}
+                      className="min-h-10 rounded-lg border bg-background px-2">
+                      <option value="wardrobe">Wardrobe</option>
+                      <option value="vanity">Vanity / bathroom</option>
+                      <option value="kitchen">Kitchen</option>
+                      <option value="tv_unit">TV unit</option>
+                      <option value="office_storage">Office cabinet</option>
+                      <option value="shelving">Shelves</option>
+                      <option value="custom">Custom cabinet</option>
+                    </select>
+                  </label>
+                  <button type="button" onClick={addAnotherCabinet}
+                    className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">
+                    <Plus className="size-4" aria-hidden /> Add cabinet
+                  </button>
+                  {activeItemId !== "primary" ? (
+                    <button type="button" onClick={() => {
+                      if (!design.spec || !window.confirm("Remove this cabinet design from the project? Undo can restore it.")) return;
+                      design.set(removeProjectDesign(design.spec, activeItemId));
+                      setActiveItemId("primary");
+                      setProjectMessage("Cabinet removed from this project. Use Undo to restore it.");
+                    }} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-destructive/50 px-2 text-xs text-destructive">
+                      <Trash2 className="size-3.5" aria-hidden /> Remove design
+                    </button>
+                  ) : null}
+                </div>
+                {projectMessage ? <p role={projectMessage.startsWith("Exported ") ? "status" : "alert"} aria-live="polite" className={cn("break-words rounded-lg border px-3 py-2 text-xs", projectMessage.startsWith("Exported ") ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "border-amber-500/40 text-foreground")}>{projectMessage}</p> : null}
+                {projectItems.length > 1 ? <p className="text-[11px] text-muted-foreground">
+                  Save stores all cabinets together. Excel combines cuts and hardware,
+                  and its cutting layout reuses sheets across matching materials
+                  when a shared arrangement reduces waste.
+                </p> : null}
+              </section>
+
               {/* The editor takes the rest of the column. On a phone that is
                   as much as it wants — the drawing sticks to the top of the
                   page and the controls run past it. */}
               <div className="w-full min-w-0 max-w-full flex-1 overflow-x-hidden @4xl/ws:min-h-0">
                 <DesignEditor
-                  spec={design.spec}
-                  onChange={design.set}
+                  key={activeItemId}
+                  spec={activeSpec ?? design.spec}
+                  onChange={updateActive}
                   onUndo={design.undo}
                   onRedo={design.redo}
                   canUndo={design.canUndo}
@@ -555,21 +743,62 @@ export function StudioWorkspace({
               </div>
             </>
           ) : (
-            <StartPanel
-              initialKind={opening?.kind}
-              initialWidth={opening?.width}
-              initialTemplate={opening?.template}
-              onStart={(spec) => {
-                // A starting design has already been validated, so it arrives
-                // with no outstanding issues — which is the point of it.
-                replace(spec, []);
-                setTab("design");
-              }}
-              onOpenChat={() => {
-                setTab("chat");
-                setChatRequested(true);
-              }}
-            />
+            <div className="w-full">
+              <div className="mx-auto w-full max-w-2xl px-4 pt-5">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <h1 className="text-2xl font-semibold">Cabinet Design</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Start a cabinet or continue one of your recent projects.
+                    </p>
+                  </div>
+                  <Link
+                    href="/designs?mine=1"
+                    className="shrink-0 text-xs font-medium text-primary"
+                  >
+                    View all
+                  </Link>
+                </div>
+                {recentProjects.length > 0 ? (
+                  <section className="mt-5">
+                    <h2 className="mb-2 text-sm font-medium">Recently created projects</h2>
+                    <div className="grid grid-cols-2 gap-2">
+                      {recentProjects.slice(0, 4).map((project) => (
+                        // Resume a saved editor with a real navigation on mobile.
+                        // Client-side query-only transitions can preserve the
+                        // current useDesign controller and leave Start visible.
+                        <a
+                          key={project.id}
+                          href={`/studio?design=${encodeURIComponent(project.slug)}`}
+                          aria-label={`Continue design: ${project.title}`}
+                          className="block min-w-0 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        >
+                          <p className="truncate text-sm font-medium">{project.title}</p>
+                          <p className="mt-1 text-xs capitalize text-muted-foreground">
+                            {project.kind.replace(/_/g, " ")}
+                          </p>
+                          {project.project?.width ? (
+                            <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                              {Math.round(project.project.width)} × {Math.round(project.project.height)} × {Math.round(project.project.depth)} mm
+                            </p>
+                          ) : null}
+                          <p className="mt-2 text-xs font-medium text-primary">Continue design →</p>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+              </div>
+              <StartPanel
+                initialKind={opening?.kind}
+                initialWidth={opening?.width}
+                initialTemplate={opening?.template}
+                onStart={(spec) => {
+                  replace(spec, []);
+                  setTab("design");
+                }}
+              />
+            </div>
           )}
         </div>
 
@@ -580,11 +809,11 @@ export function StudioWorkspace({
             tab === "cost" ? "block" : "hidden",
           )}
         >
-          {design.cost && design.spec ? (
+          {activeCostState?.cost && activeSpec ? (
             <CostPanel
-              cost={design.cost}
-              issues={design.issues}
-              assumptions={design.spec.meta.assumptions}
+              cost={activeCostState.cost}
+              issues={activeCostState.issues}
+              assumptions={activeSpec.meta.assumptions}
             />
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground">

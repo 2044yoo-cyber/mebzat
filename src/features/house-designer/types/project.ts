@@ -429,6 +429,13 @@ export const houseProjectSchema = z.object({
       mediaType: z.enum(["image", "pdf"]),
     }),
   ),
+  measuredWalls: z.array(z.object({ id: z.string(), length: z.number().positive() })).optional(),
+  freehandSketch: z.object({
+    version: z.literal(1),
+    strokes: z.array(z.object({ id: z.string(), points: z.array(z.object({ x: z.number().finite(), y: z.number().finite() })).max(10000), thickness: z.number().positive().max(600) })).max(500),
+    mmPerUnit: z.number().positive(),
+    calibrated: z.boolean(),
+  }).optional(),
   revisions: z.array(
     z.object({ id: z.string(), createdAt: z.string(), note: z.string() }),
   ),
@@ -544,7 +551,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
       else doors.push(item);
     }
 
-    slabs.push({
+    if (plan.corners.length >= 3) slabs.push({
       id: `${levelId}:slab`,
       levelId,
       boundary: plan.corners.map(copyPoint),
@@ -578,7 +585,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
 
   const top = levels[levels.length - 1];
   const topPlan = top.plan ?? input.room;
-  const roofs: HouseProject["roofs"] = [
+  const roofs: HouseProject["roofs"] = topPlan.corners.length >= 3 ? [
     {
       id: "main-roof",
       levelId: top.id,
@@ -591,7 +598,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
       thickness: 180,
       material: "Reinforced concrete",
     },
-  ];
+  ] : [];
   const facade = facadeSettingsForStyle(input.style, input.referenceImages?.some((image) => image.kind === "facade") ?? false);
   const facadeElements = buildFacadeElements(walls, levels, facade);
   const structuralColumns = buildStructuralColumns(levels);
@@ -611,6 +618,7 @@ export function createHouseProject(input: HouseProjectInput): HouseProject {
       updatedAt: now,
     },
     units: "mm",
+    displayUnits: "m",
     designStyle: input.style,
     originalPlanStrict: input.strict,
     facade,

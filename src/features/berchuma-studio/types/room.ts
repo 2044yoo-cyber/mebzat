@@ -78,10 +78,16 @@ export const interiorWallSchema = z.object({
 export const planZoneSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(80),
-  boundary: z.array(planPointSchema).min(3).max(16),
+  boundary: z.array(planPointSchema).min(3).max(64),
   floorMaterial: z.string().max(100).default("Unspecified"),
   wallMaterial: z.string().max(100).default("Paint"),
   ceilingMaterial: z.string().max(100).default("Gypsum board"),
+  /**
+   * False while the walls around the room no longer close: it has no floor
+   * or ceiling then, and `boundary` is the outline it last had, by which it
+   * is found again when they close. Absent means enclosed.
+   */
+  enclosed: z.boolean().optional(),
 });
 
 export const planColumnSchema = z.object({
@@ -131,7 +137,11 @@ export const roomSchema = z.object({
    * such thing as half a room, and letting one exist means every consumer has
    * to decide what to do about it.
    */
-  corners: z.array(cornerSchema).min(3).max(32),
+  corners: z.array(cornerSchema).max(32),
+  /** Freehand wall graphs may be open and have no perimeter polygon. */
+  freehand: z.boolean().optional(),
+  /** Imported raster plans do not become measurable rooms until walls are reviewed. */
+  autoZones: z.boolean().optional(),
 
   /** Structural thickness, drawn on the plan. Does not enter the BOQ. */
   wallThickness: z.number().positive().max(600).default(150),
@@ -151,7 +161,7 @@ export const roomSchema = z.object({
   runWalls: z.array(z.string()).max(8).default([]),
 
   /** Optional house-plan detail. Furniture plans can ignore these fields. */
-  interiorWalls: z.array(interiorWallSchema).max(80).optional(),
+  interiorWalls: z.array(interiorWallSchema).max(400).optional(),
   zones: z.array(planZoneSchema).max(40).optional(),
   planColumns: z.array(planColumnSchema).max(80).optional(),
   planStairs: z.array(planStairSchema).max(20).optional(),
@@ -169,7 +179,7 @@ export const roomSchema = z.object({
       scale: z.number().positive().optional(),
     })
     .optional(),
-});
+}).refine((room) => room.corners.length >= 3 || (room.freehand === true && room.corners.length === 0), { message: "A closed plan needs at least three corners" });
 
 export type Room = z.infer<typeof roomSchema>;
 

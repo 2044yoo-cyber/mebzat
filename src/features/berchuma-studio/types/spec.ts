@@ -355,7 +355,7 @@ export const baySchema = z.object({
     .array(
       z.object({
         run: z.number().int().min(0).default(0),
-        leaf: z.number().int().min(0).max(1),
+        leaf: z.number().int().min(0).max(11),
         x: z.number(),
         y: z.number(),
         width: z.number().positive(),
@@ -704,6 +704,19 @@ export const designSpecSchema = z.object({
    * One entry for a wardrobe; a dozen or more for a kitchen.
    */
   cabinets: z.array(cabinetSchema).min(1).max(160),
+
+  /**
+   * Independent cabinet designs in the same manufacturing project.
+   *
+   * Each keeps its own kind, layout, boards, fittings and cost rules. The
+   * primary design remains this spec, so old saved designs work unchanged.
+   * Children are decoded with parseSpec at the server boundary; nested
+   * collections are forbidden to prevent recursive or oversized payloads.
+   */
+  projectItems: z.array(z.object({
+    id: z.string().min(1).max(80),
+    spec: z.unknown(),
+  })).max(12).optional(),
 
   /**
    * The overall bounding box.
@@ -1644,11 +1657,11 @@ function validateCabinet(
     const standing = cabinet.kind !== "wall" && cabinet.position.y === 0;
     cabinet.plinthHeight = cabinet.zekolo.on && standing ? Math.round(cabinet.zekolo.height ?? (spec.carcass.plinthHeight || 100)) : 0;
   } else if (furnitureType === "wardrobe" && cabinet.stackedOn) {
+    // An upper module stands on the module below it, never on a plinth. Its
+    // bays are its own: shelves, drawers or open, as the owner sets them.
+    // (This used to reset every one of them to "open" on each edit, so a
+    // Shelves button on an upper module changed nothing.)
     cabinet.plinthHeight = 0;
-    cabinet.bays = cabinet.bays.map((bay) => ({
-      ...bay,
-      fitting: { kind: "open" },
-    }));
   } else if (furnitureType === "wardrobe") {
     const standardPlinth = Math.max(50, Math.round(spec.carcass.plinthHeight || 100));
     if (cabinet.plinthHeight !== standardPlinth) {
@@ -2336,5 +2349,21 @@ export function parseSpec(
   }
 
   const { spec, issues } = validateSpec(parsed.data);
+  if (spec.projectItems?.length) {
+    const used = new Set<string>();
+    const decodedItems: NonNullable<DesignSpec["projectItems"]> = [];
+    for (const item of spec.projectItems) {
+      if (used.has(item.id)) return { ok: false, error: "Duplicate project cabinet identifier." };
+      used.add(item.id);
+      const raw = item.spec;
+      if (!raw || typeof raw !== "object" || Array.isArray(raw) || "projectItems" in raw) {
+        return { ok: false, error: "Invalid nested cabinet design." };
+      }
+      const decoded = parseSpec(raw);
+      if (!decoded.ok) return { ok: false, error: `Cabinet ${item.id}: ${decoded.error}` };
+      decodedItems.push({ id: item.id, spec: decoded.spec });
+    }
+    spec.projectItems = decodedItems;
+  }
   return { ok: true, spec, issues };
 }

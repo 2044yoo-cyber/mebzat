@@ -1581,6 +1581,45 @@ export type CabinetFronts = {
   warnings: string[];
 };
 
+/** Preferred visible width of one kitchen cabinet door leaf, in mm. */
+export const KITCHEN_DOOR_LEAF_WIDTH = { min: 250, max: 450 } as const;
+
+/**
+ * Choose as few leaves as possible while keeping a kitchen front in its
+ * preferred width range. When the opening is too narrow or too wide for that
+ * range, choose the count whose leaf width is nearest the range; this keeps
+ * small appliance-adjacent fronts usable without pretending every opening can
+ * satisfy the preference.
+ *
+ * `outerGaps` is 1 for a bay front (a gap at both ends) and 0 for detailed
+ * kitchen doors aligned across the cabinet's complete front.
+ */
+export function preferredKitchenDoorLeaves(
+  frontWidth: number,
+  gap: number,
+  outerGaps: 0 | 1 = 1,
+): number {
+  const maxLeaves = 12;
+  const widthFor = (count: number) =>
+    (frontWidth - gap * (count + outerGaps)) / count;
+  let nearestCount = 1;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (let count = 1; count <= maxLeaves; count += 1) {
+    const width = widthFor(count);
+    const distance = width < KITCHEN_DOOR_LEAF_WIDTH.min
+      ? KITCHEN_DOOR_LEAF_WIDTH.min - width
+      : width > KITCHEN_DOOR_LEAF_WIDTH.max
+        ? width - KITCHEN_DOOR_LEAF_WIDTH.max
+        : 0;
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestCount = count;
+    }
+    if (distance === 0) return count;
+  }
+  return nearestCount;
+}
+
 /** Whether a kitchen unit's doors span its whole front rather than its bay. */
 function alignedKitchenDoors(spec: DesignSpec, cabinet: Cabinet): boolean {
   const bay = cabinet.bays.length === 1 ? cabinet.bays[0] : null;
@@ -1617,7 +1656,9 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
       for (const face of construction.faces) drawers.push({ bayId: bay.id, x: span.x + gap, y: face.floor, width: span.width - 2 * gap, height: face.height });
     };
     const doorRun = (run: number, bandFloor: number, bandHeight: number) => {
-      const count = bay.doorLeaves;
+      const count = spec.furnitureType === "kitchen" && bay.door === "hinged"
+        ? preferredKitchenDoorLeaves(span.width, gap)
+        : bay.doorLeaves;
       const leafWidth = Math.floor((span.width - gap * (count + 1)) / count);
       const leafHeight = bandHeight - 2 * gap;
       if (leafHeight <= 0 || leafWidth <= 0) return;
@@ -1663,8 +1704,8 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
   // front, insets and all, rather than inside its one bay.
   if (alignedKitchenDoors(spec, cabinet)) {
     const bay = cabinet.bays[0]!;
-    const count = bay.doorLeaves;
     const frontWidth = cabinet.size.width - (cabinet.frontInsets?.start ?? 0) - (cabinet.frontInsets?.end ?? 0);
+    const count = preferredKitchenDoorLeaves(frontWidth, gap, 0);
     const leafWidth = (frontWidth - count * gap) / count;
     leaves.length = 0;
     for (let leaf = 0; leaf < count && leafWidth > 0; leaf += 1) {

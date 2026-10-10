@@ -154,6 +154,9 @@ export function DesignEditor({
   const [surface, setSurface] = useState<SurfaceView>("model");
   // The move pad, shown with a selection; the Move action hides and shows it.
   const [movePad, setMovePad] = useState(true);
+  // The old fixed 10 mm step needed fifty taps to move a cabinet half a metre.
+  // Keep precision available while making 200/500/1000 mm moves one tap.
+  const [moveDistance, setMoveDistance] = useState(200);
   // A cabinet copied, to paste after another — in this design or the next.
   const [clip, setClip] = useState<CabinetClip | null>(null);
   const [showCountertop, setShowCountertop] = useState(false);
@@ -641,7 +644,7 @@ export function DesignEditor({
               {AXES.map(({ axis, label, towards }) => (
                 <div key={axis} className="flex items-center gap-0.5">
                   {([-1, 1] as Direction[]).map((direction) => {
-                    const blocked = nudgeBlocked(selected, axis, direction);
+                    const blocked = nudgeBlocked(selected, axis, direction, moveDistance);
                     const towardsLabel =
                       towards[direction === -1 ? 0 : 1];
                     return (
@@ -665,7 +668,7 @@ export function DesignEditor({
                             blocked ?? `Move ${selected.label} ${towardsLabel}`
                           }
                           disabled={blocked !== null}
-                          onClick={() => nudge(axis, direction)}
+                          onClick={() => nudge(axis, direction, moveDistance)}
                         >
                           {direction === -1 ? (
                             <Minus className="size-3" aria-hidden />
@@ -678,9 +681,18 @@ export function DesignEditor({
                   })}
                 </div>
               ))}
-              <span className="mx-auto rounded bg-background/45 px-1 text-center text-[9px] tabular-nums text-foreground/70 backdrop-blur-[2px]">
-                {NUDGE_STEP} mm
-              </span>
+              <label className="mx-auto flex items-center gap-1 rounded-md bg-background/80 px-1.5 py-1 text-[10px] text-foreground shadow-sm">
+                Step
+                <select
+                  aria-label="Cabinet move distance"
+                  value={moveDistance}
+                  onChange={(event) => setMoveDistance(Number(event.target.value))}
+                  className="max-w-[72px] rounded border border-foreground/15 bg-background px-1 py-1 tabular-nums"
+                >
+                  {[1, 10, 50, 200, 500, 1000].map((mm) =>
+                    <option key={mm} value={mm}>{mm} mm</option>)}
+                </select>
+              </label>
             </div>
           </div>
         ) : null}

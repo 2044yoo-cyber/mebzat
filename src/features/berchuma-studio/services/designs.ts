@@ -6,7 +6,7 @@ import { calculateCost } from "./costing";
 import { buildCutList, sheetCountsOf } from "./cutlist";
 import { buildParts } from "./geometry";
 import { marketRates } from "./rates";
-import type { DesignVisibility } from "@/types/database.types";
+import type { DesignVisibility, Json } from "@/types/database.types";
 import { parseSpec, type DesignSpec, type ProjectStatus } from "../types/spec";
 import { frontDrawing, type FrontDrawingData } from "./front-drawing";
 
@@ -62,7 +62,7 @@ export async function saveDesign(
         title: spec.title,
         kind: spec.kind,
         prompt: spec.meta.prompt || null,
-        spec,
+        spec: spec as unknown as Json,
         estimated_cost: estimatedCost,
         price_confidence: confidence,
       })
@@ -96,7 +96,7 @@ export async function saveDesign(
       kind: spec.kind,
       title: spec.title,
       prompt: spec.meta.prompt || null,
-      spec,
+      spec: spec as unknown as Json,
       estimated_cost: estimatedCost,
       price_confidence: confidence,
       visibility: "private",
@@ -157,7 +157,7 @@ export async function publishDesign(
       kind: decoded.spec.kind,
       title: decoded.spec.title,
       prompt: decoded.spec.meta.prompt || null,
-      spec: decoded.spec,
+      spec: decoded.spec as unknown as Json,
       estimated_cost: estimatedCost,
       price_confidence: confidence,
     })
@@ -306,7 +306,7 @@ export async function remixDesign(
       kind: decoded.spec.kind,
       title: decoded.spec.title,
       prompt: decoded.spec.meta.prompt || null,
-      spec: decoded.spec,
+      spec: decoded.spec as unknown as Json,
       estimated_cost: estimatedCost,
       price_confidence: confidence,
     })
@@ -634,16 +634,21 @@ export async function recordDesignView(designId: string): Promise<void> {
 /** The price as the server computes it, from live rates. */
 async function priceOf(spec: DesignSpec) {
   const rates = await marketRates();
-  const parts = buildParts(spec);
-  const cutList = buildCutList(spec, parts);
-  const cost = calculateCost(spec, parts, {
-    rates,
-    sheetCounts: sheetCountsOf(cutList),
-    manufacturable: cutList.buildable,
+  // A saved manufacturing project is more than its first cabinet. Price each
+  // independent design with its own materials and nesting, then total them.
+  const designs = [spec, ...(spec.projectItems ?? []).map(item => item.spec as DesignSpec)];
+  const costs = designs.map((item) => {
+    const parts = buildParts(item);
+    const cutList = buildCutList(item, parts);
+    return calculateCost(item, parts, {
+      rates,
+      sheetCounts: sheetCountsOf(cutList),
+      manufacturable: cutList.buildable,
+    });
   });
   return {
-    estimatedCost: Math.round(cost.price),
-    confidence: Math.round(cost.confidence * 100) / 100,
+    estimatedCost: Math.round(costs.reduce((total, cost) => total + cost.price, 0)),
+    confidence: Math.round(Math.min(...costs.map(cost => cost.confidence)) * 100) / 100,
   };
 }
 
@@ -668,7 +673,7 @@ async function appendVersion(
   const { error } = await supabase.from("design_versions").insert({
     design_id: designId,
     version: (latest?.version ?? 0) + 1,
-    spec,
+    spec: spec as unknown as Json,
     note: note ?? null,
     author_id: authorId,
     estimated_cost: estimatedCost,

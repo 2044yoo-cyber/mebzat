@@ -142,8 +142,21 @@ export async function listPlans(client: Client, projectId: string): Promise<Plan
 }
 
 function refusal(message?: string) {
-  if (message && (message.includes("row-level security") || message.includes("permission denied"))) {
-    return "You are not on that project.";
+  const detail = (message ?? "").toLowerCase();
+  if (detail.includes("row-level security") || detail.includes("permission denied")) {
+    return "You do not have permission to save this plan to the selected project.";
   }
-  return "The plan could not be saved. Check your connection and try again.";
+  if (detail.includes("schema cache") || detail.includes("does not exist") || detail.includes("could not find the table")) {
+    return "The project-saving database tables are missing or unavailable. Contact the site administrator to check the Agenda migrations.";
+  }
+  if (detail.includes("foreign key")) {
+    return "The selected project or account could not be found in the database. Try choosing an existing project.";
+  }
+  if (detail.includes("jwt") || detail.includes("token") || detail.includes("not authenticated")) {
+    return "Your sign-in session may have expired. Sign in again, then retry saving.";
+  }
+  if (detail.includes("fetch") || detail.includes("network") || detail.includes("timeout")) {
+    return "The database could not be reached. Check your connection and try again.";
+  }
+  return message ? `Saving failed: ${message.slice(0, 220)}` : "The plan could not be saved. Please try again.";
 }

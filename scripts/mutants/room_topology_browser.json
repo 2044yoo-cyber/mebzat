@@ -1,0 +1,32 @@
+[
+ {
+  "name": "inside wall drags room corners again",
+  "file": "src/features/house-designer/services/project-edit.ts",
+  "from": "    return rebuildLevel(next, level.id, withDerivedZones(plan, {\n      ...plan,\n      interiorWalls:",
+  "to": "    return rebuildLevel(next, level.id, ((_: Room, after: Room) => ({ ...after, zones: (plan.zones ?? []).map((zone) => ({ ...zone, boundary: zone.boundary.map(keepOutside) })) }))(plan, {\n      ...plan,\n      interiorWalls:"
+ },
+ {
+  "name": "outside wall drags room corners again",
+  "file": "src/features/house-designer/services/project-edit.ts",
+  "from": "  const changedPlan: Room = withDerivedZones(plan, {",
+  "to": "  const changedPlan: Room = ((_: Room, after: Room) => ({ ...after, zones: plan.zones?.map((zone) => ({ ...zone, boundary: zone.boundary.map(follow) })) }))(plan, {"
+ },
+ {
+  "name": "room not enclosed still gets a floor",
+  "file": "src/features/house-designer/services/project-edit.ts",
+  "from": "plan.zones.filter((zone) => zone.enclosed !== false).map((zone) => {",
+  "to": "plan.zones.map((zone) => {"
+ },
+ {
+  "name": "room coming back stays marked not enclosed",
+  "file": "src/features/house-designer/services/room-topology.ts",
+  "from": "    return { ...rest, boundary: newFaces[face]!.map(micronPoint) };",
+  "to": "    return { ...zone, boundary: newFaces[face]!.map(micronPoint) };"
+ },
+ {
+  "name": "plan draws a floor for a room not enclosed",
+  "file": "src/features/berchuma-studio/components/plan/plan-canvas.tsx",
+  "from": "        if (zone.enclosed === false) {",
+  "to": "        if (zone.enclosed === false && false) {"
+ }
+]

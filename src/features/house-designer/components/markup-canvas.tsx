@@ -86,6 +86,7 @@ export function MarkupCanvas({
   unit,
   onPinRequest,
   onPinOpen,
+  onDiscussShape,
   focus,
   rotation = 0,
   label = "Sketch canvas",
@@ -100,6 +101,8 @@ export function MarkupCanvas({
   unit: DisplayUnits;
   onPinRequest?: (point: { x: number; y: number }) => void;
   onPinOpen?: (pinId: string) => void;
+  /** Start an Agenda-linked discussion pinned to this exact annotation. */
+  onDiscussShape?: (shape: MarkupShape) => void;
   focus?: { x: number; y: number } | null;
   /** Turns the view, not the picture: markup stays in the picture's own frame. */
   rotation?: number;
@@ -124,7 +127,10 @@ export function MarkupCanvas({
   const [draft, setDraft] = useState<MarkupShape | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ id: string; from: [number, number]; dx: number; dy: number } | null>(null);
-  const [typing, setTyping] = useState<{ x: number; y: number; value: string } | null>(null);
+  const [endDrag, setEndDrag] = useState<{ id: string; end: 0 | 1; point: [number, number] } | null>(null);
+  // Arrow can be made by dragging, OR tapping its start and end on a phone.
+  const [arrowStart, setArrowStart] = useState<[number, number] | null>(null);
+  const [typing, setTyping] = useState<{ id?: string; x: number; y: number; value: string } | null>(null);
   const [calibration, setCalibration] = useState<{ points: [number, number][]; value: string } | null>(null);
   const [size, setSize] = useState({ width: 1, height: 1 });
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -202,6 +208,7 @@ export function MarkupCanvas({
     if (pointers.current.size >= 2) {
       setDraft(null);
       setDrag(null);
+      setEndDrag(null);
       pan.current = null;
       pinch.current = pinchState();
       return;
@@ -216,6 +223,16 @@ export function MarkupCanvas({
       return;
     }
     if (tool === "text") { setTyping({ x: point[0], y: point[1], value: "" }); return; }
+    if (tool === "arrow" && arrowStart) {
+      if (Math.hypot(point[0] - arrowStart[0], point[1] - arrowStart[1]) > 6 * perPx) {
+        const shape: MarkupShape = { id: crypto.randomUUID(), type: "arrow", points: [arrowStart, point], color, size: 3 * perPx };
+        onShapes([...shapes, shape]);
+        setSelected(shape.id);
+        setTool("select");
+      }
+      setArrowStart(null);
+      return;
+    }
     if (tool === "pin") { onPinRequest?.({ x: point[0], y: point[1] }); return; }
     if (tool === "eraser") {
       const target = hit(point);
@@ -225,6 +242,15 @@ export function MarkupCanvas({
     if (tool === "select") {
       const target = hit(point);
       if (target?.pinId && onPinOpen) { onPinOpen(target.pinId); return; }
+      if (target && target.id === selected && (target.type === "arrow" || target.type === "line" || target.type === "measure" || target.type === "dimension")) {
+        const ends = [target.points[0]!, target.points.at(-1)!] as const;
+        const end = Math.hypot(point[0] - ends[0][0], point[1] - ends[0][1]) <= 18 * perPx ? 0
+          : Math.hypot(point[0] - ends[1][0], point[1] - ends[1][1]) <= 18 * perPx ? 1 : null;
+        if (end !== null) {
+          setEndDrag({ id: target.id, end, point });
+          return;
+        }
+      }
       setSelected(target?.id ?? null);
       if (target) setDrag({ id: target.id, from: point, dx: 0, dy: 0 });
       else pan.current = { x: event.clientX, y: event.clientY };
@@ -259,6 +285,7 @@ export function MarkupCanvas({
       return;
     }
     const point = at(event);
+    if (endDrag) { setEndDrag({ ...endDrag, point }); return; }
     if (drag) { setDrag({ ...drag, dx: point[0] - drag.from[0], dy: point[1] - drag.from[1] }); return; }
     if (!draft) return;
     if (draft.type === "pen" || draft.type === "highlighter") {
@@ -274,6 +301,16 @@ export function MarkupCanvas({
     if (pointers.current.size >= 1) return;
     pinch.current = null;
     pan.current = null;
+    if (endDrag) {
+      onShapes(shapes.map((shape) => shape.id === endDrag.id ? {
+        ...shape,
+        points: shape.points.map((point, index) => index === (endDrag.end === 0 ? 0 : shape.points.length - 1) ? endDrag.point : point),
+        text: (shape.type === "measure" || shape.type === "dimension")
+          ? measureLabel(shape.points.map((point, index) => index === (endDrag.end === 0 ? 0 : shape.points.length - 1) ? endDrag.point : point)) : shape.text,
+      } : shape));
+      setEndDrag(null);
+      return;
+    }
     if (drag) {
       if (drag.dx || drag.dy) onShapes(shapes.map((shape) => shape.id === drag.id ? { ...shape, points: shape.points.map(([x, y]) => [x + drag.dx, y + drag.dy] as [number, number]) } : shape));
       setDrag(null);
@@ -285,6 +322,13 @@ export function MarkupCanvas({
     if (long) {
       const finished = draft.type === "measure" || draft.type === "dimension" ? { ...draft, text: measureLabel(draft.points), size: 13 * perPx } : draft;
       onShapes([...shapes, finished]);
+      if (draft.type === "arrow" || draft.type === "line" || draft.type === "rect" || draft.type === "circle" || draft.type === "cloud" || draft.type === "measure" || draft.type === "dimension") {
+        setSelected(draft.id);
+        setTool("select");
+      }
+      setArrowStart(null);
+    } else if (draft.type === "arrow") {
+      setArrowStart(draft.points[0]!);
     }
     setDraft(null);
   }
@@ -298,12 +342,19 @@ export function MarkupCanvas({
   function chooseTool(next: MarkupTool, group: "shape" | "pen" | null = null) {
     setTool(next);
     setSelected(null);
+    setArrowStart(null);
     setCalibration(next === "calibrate" ? { points: [], value: "" } : null);
     // Pen and Shape offer their kinds each time they are pressed; drawing puts the choice away.
     setVariants(group);
   }
 
-  const display = drag ? shapes.map((shape) => shape.id === drag.id ? { ...shape, points: shape.points.map(([x, y]) => [x + drag.dx, y + drag.dy] as [number, number]) } : shape) : shapes;
+  const display = shapes.map((shape) =>
+    drag && shape.id === drag.id
+      ? { ...shape, points: shape.points.map(([x, y]) => [x + drag.dx, y + drag.dy] as [number, number]) }
+      : endDrag && shape.id === endDrag.id
+        ? { ...shape, points: shape.points.map((point, index) => index === (endDrag.end === 0 ? 0 : shape.points.length - 1) ? endDrag.point : point) }
+        : shape);
+  const selectedShape = shapes.find((shape) => shape.id === selected) ?? null;
   const calibrated = calibration?.points.length === 2 ? Math.hypot(calibration.points[1]![0] - calibration.points[0]![0], calibration.points[1]![1] - calibration.points[0]![1]) : null;
   const toolGroup = (id: MarkupTool) => (["line", "rect", "circle", "cloud"].includes(id) ? "rect" : id === "highlighter" ? "pen" : id);
 
@@ -318,7 +369,7 @@ export function MarkupCanvas({
         ))}
       </nav>
       <div className="relative h-[calc(100dvh-22rem)] min-h-[300px] overflow-hidden rounded-xl border bg-slate-100 dark:bg-slate-900 lg:h-[min(640px,62dvh)]">
-        <svg ref={svg} role="img" aria-label={label} viewBox={`${shown.x} ${shown.y} ${shown.w} ${shown.h}`} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none select-none" style={{ cursor: tool === "select" ? "default" : "crosshair" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); setDraft(null); setDrag(null); pan.current = null; }} onWheel={wheel}
+        <svg ref={svg} role="img" aria-label={label} viewBox={`${shown.x} ${shown.y} ${shown.w} ${shown.h}`} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full touch-none select-none" style={{ cursor: tool === "select" ? "default" : "crosshair" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={(event) => { pointers.current.delete(event.pointerId); setDraft(null); setDrag(null); setEndDrag(null); pan.current = null; }} onWheel={wheel}
           // A tap here is all pointer events. Without this the browser follows
           // it with a pretend mouse press — on whatever the tap just opened,
           // the pin dialog's backdrop, which closed it again.
@@ -331,10 +382,16 @@ export function MarkupCanvas({
           <g aria-label="Markup">
             {display.map((shape) => <ShapeView key={shape.id} shape={shape} arrowId={`${arrowId}-head`} selected={selected === shape.id} pin={pins.find((pin) => pin.id === shape.pinId)} />)}
             {draft ? <ShapeView shape={draft.type === "measure" || draft.type === "dimension" ? { ...draft, text: measureLabel(draft.points), size: 13 * perPx } : draft} arrowId={`${arrowId}-head`} selected={false} /> : null}
+            {arrowStart && tool === "arrow" ? <circle cx={arrowStart[0]} cy={arrowStart[1]} r={7 * perPx} fill="#2563eb" stroke="white" strokeWidth={2} vectorEffect="non-scaling-stroke" /> : null}
+            {selectedShape && tool === "select" && ["arrow", "line", "measure", "dimension"].includes(selectedShape.type)
+              ? [selectedShape.points[0]!, selectedShape.points.at(-1)!].map(([x, y], index) => <circle key={index} cx={endDrag && endDrag.end === index ? endDrag.point[0] : x} cy={endDrag && endDrag.end === index ? endDrag.point[1] : y}
+                r={8 * perPx} fill="white" stroke="#2563eb" strokeWidth={2} vectorEffect="non-scaling-stroke" />)
+              : null}
             {calibration?.points.map(([x, y], index) => <circle key={index} cx={x} cy={y} r={6 * perPx} fill="#f59e0b" stroke="white" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
           </g>
           </g>
         </svg>
+        {arrowStart && tool === "arrow" ? <div role="status" className="absolute left-2 bottom-12 z-10 flex items-center gap-2 rounded-lg border bg-card/95 p-2 text-xs shadow-sm">Tap arrow end, or <button type="button" onClick={() => setArrowStart(null)} className="underline">Cancel</button></div> : null}
         {variants ? (
           <div role="radiogroup" aria-label={variants === "shape" ? "Shape" : "Pen"} className="absolute left-1/2 top-12 z-10 flex -translate-x-1/2 gap-1 rounded-xl border bg-card/95 p-1 text-xs shadow-sm">
             {(variants === "shape" ? SHAPE_VARIANTS : PEN_VARIANTS).map(({ id, label: name, icon: Icon }) => <button key={id} type="button" role="radio" aria-checked={tool === id} onClick={() => { setTool(id); setVariants(null); }} className={cn("flex min-h-9 items-center gap-1 rounded-lg px-2.5", tool === id ? "bg-brand/15 text-brand" : "text-muted-foreground")}><Icon className="size-3.5" />{name}</button>)}
@@ -344,9 +401,17 @@ export function MarkupCanvas({
           {COLORS.map((value) => <button key={value} type="button" aria-label={`Colour ${value}`} aria-pressed={color === value} onClick={() => setColor(value)} className={cn("size-7 rounded-full border-2", color === value ? "border-foreground" : "border-transparent")} style={{ background: value }} />)}
         </div>
         {typing ? (
-          <form onSubmit={(event) => { event.preventDefault(); if (typing.value.trim()) onShapes([...shapes, { id: crypto.randomUUID(), type: "text", points: [[typing.x, typing.y]], color, text: typing.value.trim().slice(0, 300), size: 16 * perPx }]); setTyping(null); }} className="absolute inset-x-2 top-12 z-20 flex gap-1 rounded-xl border bg-card p-1.5 shadow-lg">
+          <form onSubmit={(event) => { event.preventDefault(); if (typing.value.trim()) {
+            const content = typing.value.trim().slice(0, 300);
+            if (typing.id) onShapes(shapes.map((shape) => shape.id === typing.id ? { ...shape, text: content } : shape));
+            else {
+              const shape: MarkupShape = { id: crypto.randomUUID(), type: "text", points: [[typing.x, typing.y]], color, text: content, size: 16 * perPx };
+              onShapes([...shapes, shape]); setSelected(shape.id);
+            }
+            setTool("select");
+          } setTyping(null); }} className="absolute inset-x-2 top-12 z-20 flex gap-1 rounded-xl border bg-card p-1.5 shadow-lg">
             <input autoFocus aria-label="Sketch text" value={typing.value} onChange={(event) => setTyping({ ...typing, value: event.target.value })} placeholder="Type a note" className="min-h-10 min-w-0 flex-1 rounded-lg border bg-background px-2 text-sm" />
-            <button type="submit" className="rounded-lg bg-brand px-3 text-sm font-medium text-brand-foreground">Add</button>
+            <button type="submit" className="rounded-lg bg-brand px-3 text-sm font-medium text-brand-foreground">{typing.id ? "Save" : "Add"}</button>
             <button type="button" onClick={() => setTyping(null)} aria-label="Cancel text" className="rounded-lg px-2 text-sm text-muted-foreground">✕</button>
           </form>
         ) : null}
@@ -356,10 +421,12 @@ export function MarkupCanvas({
             {calibration?.points.length === 2 ? <div className="flex gap-1.5"><input autoFocus aria-label="Known length" inputMode="decimal" value={calibration.value} onChange={(event) => setCalibration({ ...calibration, value: event.target.value })} placeholder={`e.g. 5000`} className="min-h-10 min-w-0 flex-1 rounded-lg border bg-background px-2 text-sm" /><span className="self-center text-muted-foreground">{unit}</span><button type="submit" className="rounded-lg bg-brand px-3 font-medium text-brand-foreground">Set scale</button></div> : null}
           </form>
         ) : null}
-        {selected && tool === "select" ? (
-          <div className="absolute inset-x-2 bottom-2 z-20 flex items-center gap-1.5 rounded-xl border bg-card/95 p-1.5 text-xs shadow-lg">
-            <span className="min-w-0 flex-1 truncate px-1">{describe(shapes.find((shape) => shape.id === selected))}</span>
-            <button type="button" onClick={() => { onShapes(shapes.filter((shape) => shape.id !== selected)); setSelected(null); }} className="flex min-h-10 items-center gap-1 rounded-lg border border-destructive/30 px-3 text-destructive"><Trash2 className="size-3.5" />Delete</button>
+        {selectedShape && tool === "select" ? (
+          <div className="absolute inset-x-2 bottom-2 z-20 flex flex-wrap items-center gap-1 rounded-xl border bg-card/95 p-1.5 text-xs shadow-lg">
+            <span className="min-w-0 flex-1 truncate px-1">{describe(selectedShape)} · Drag to move</span>
+            {selectedShape.type === "text" ? <button type="button" onClick={() => setTyping({ id: selectedShape.id, x: selectedShape.points[0]![0], y: selectedShape.points[0]![1], value: selectedShape.text ?? "" })} className="min-h-10 rounded-lg border px-2">Edit</button> : null}
+            {onDiscussShape && !selectedShape.pinId ? <button type="button" onClick={() => onDiscussShape(selectedShape)} className="min-h-10 rounded-lg border border-brand/40 px-2 text-brand">Discuss</button> : null}
+            <button type="button" onClick={() => { onShapes(shapes.filter((shape) => shape.id !== selected)); setSelected(null); }} className="flex min-h-10 items-center gap-1 rounded-lg border border-destructive/30 px-2 text-destructive"><Trash2 className="size-3.5" />Delete</button>
           </div>
         ) : null}
         <p className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-background/85 px-2.5 py-1 text-[11px] text-muted-foreground" aria-label="Scale">{mmPerUnit ? "Scale set" : "Not calibrated"}</p>
@@ -386,8 +453,18 @@ function ShapeView({ shape, arrowId, selected, pin }: { shape: MarkupShape; arro
         return <polyline points={shape.points.map(([x, y]) => `${x},${y}`).join(" ")} {...stroke} />;
       case "line":
         return <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} {...stroke} />;
-      case "arrow":
-        return <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} {...stroke} markerEnd={`url(#${arrowId})`} />;
+      case "arrow": {
+        // SVG context-stroke markers do not render reliably in iOS Safari.
+        // Draw an actual filled arrow head, matching the PNG/export renderer.
+        const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
+        const head = shape.size * 4;
+        const left: [number, number] = [b[0] - head * Math.cos(angle - 0.45), b[1] - head * Math.sin(angle - 0.45)];
+        const right: [number, number] = [b[0] - head * Math.cos(angle + 0.45), b[1] - head * Math.sin(angle + 0.45)];
+        return <g>
+          <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} {...stroke} />
+          <polygon points={`${b[0]},${b[1]} ${left[0]},${left[1]} ${right[0]},${right[1]}`} fill={shape.color} stroke={shape.color} strokeWidth={shape.size * 0.2} />
+        </g>;
+      }
       case "rect":
         return <rect x={Math.min(a[0], b[0])} y={Math.min(a[1], b[1])} width={Math.abs(b[0] - a[0])} height={Math.abs(b[1] - a[1])} {...stroke} />;
       case "circle":
@@ -461,6 +538,13 @@ export function shapeDistance(shape: MarkupShape, [px, py]: [number, number]): n
   if (shape.type === "pin") return Math.hypot(px - a[0], py - (a[1] - shape.size));
   if (shape.type === "rect" || shape.type === "cloud" || shape.type === "circle") {
     const corners: [number, number][] = [[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]]];
+    const left = Math.min(a[0], b[0]), right = Math.max(a[0], b[0]);
+    const top = Math.min(a[1], b[1]), bottom = Math.max(a[1], b[1]);
+    if (shape.type !== "circle" && px >= left && px <= right && py >= top && py <= bottom) return 0;
+    if (shape.type === "circle" && right > left && bottom > top) {
+      const cx = (left + right) / 2, cy = (top + bottom) / 2;
+      if (((px - cx) / ((right - left) / 2)) ** 2 + ((py - cy) / ((bottom - top) / 2)) ** 2 <= 1) return 0;
+    }
     return Math.min(...corners.map((corner, index) => segment(corner, corners[(index + 1) % 4]!)));
   }
   let best = Infinity;

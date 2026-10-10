@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type PointerEvent } from "react";
 import { createKitchenDesign } from "../services/kitchen-setup";
 import { DEFAULT_KITCHEN_SETUP, REFERENCE_KITCHEN_DETAILS, kitchenRunChoices, kitchenSetupError, type KitchenSetup as Settings } from "../types/kitchen";
 import type { DesignSpec } from "../types/spec";
@@ -20,6 +20,17 @@ export function KitchenSetup({ initial, onStart, submitLabel = "Create my kitche
   const error = kitchenSetupError(settings);
   const runs = kitchenRunChoices(settings);
   const detail = settings.details!;
+  function moveAppliance(role: "fridge" | "sink" | "stove", runId: string, offset: number) {
+    const run = runs.find((item) => item.id === runId);
+    if (!run || (role === "fridge" && /island|peninsula/.test(runId))) return;
+    const appliance = detail[role];
+    const bounded = Math.max(0, Math.min(Math.max(0, run.length - appliance.width), Math.round(offset / 5) * 5));
+    setSettings((current) => ({
+      ...current,
+      fridgePlacement: role === "fridge" ? "custom" : current.fridgePlacement,
+      details: { ...current.details!, [role]: { ...current.details![role], runId, offset: bounded } },
+    }));
+  }
   function fridgeAt(runId: string, placement = settings.fridgePlacement) {
     const length = runs.find((run) => run.id === runId)?.length ?? detail.fridge.width;
     return {
@@ -70,7 +81,7 @@ export function KitchenSetup({ initial, onStart, submitLabel = "Create my kitche
         {shape.label}
       </button>)}
     </div>
-    {settings.placementMode === "plan" ? <KitchenPlanPreview settings={settings} /> : null}
+    {settings.placementMode === "plan" ? <KitchenPlanPreview settings={settings} onMove={moveAppliance} /> : null}
     {settings.placementMode === "plan" ? <fieldset className="space-y-3 border-t pt-3">
       <legend className="text-sm font-medium">Appliance positions</legend>
       <p className="text-[11px] text-muted-foreground">Choose the wall or island first. Position is measured from the start of its usable cabinet run, after the corner. Back wall: right to left; left wall: back to front; right wall: front to back; island/peninsula: left to right.</p>
@@ -147,30 +158,135 @@ export function KitchenSetup({ initial, onStart, submitLabel = "Create my kitche
   </form>;
 }
 
-function KitchenPlanPreview({ settings }: { settings: Settings }) {
+type ApplianceRole = "fridge" | "sink" | "stove";
+
+/**
+ * Mobile-friendly plan placement: tap an appliance to select it, then drag it
+ * onto any valid wall (or island for sink/stove). All coordinates are derived
+ * from kitchenRunChoices, so the form's exact numeric offsets remain the
+ * source of truth for generated 3D cabinet positions.
+ */
+function KitchenPlanPreview({ settings, onMove }: {
+  settings: Settings;
+  onMove: (role: ApplianceRole, runId: string, offset: number) => void;
+}) {
   const runs = kitchenRunChoices(settings);
   const details = settings.details!;
-  const point = (runId: string, offset: number) => {
-    const run = runs.find((item) => item.id === runId);
-    const ratio = run ? Math.max(0, Math.min(1, offset / run.length)) : 0;
-    if (runId.endsWith("left")) return { x: 20, y: 30 + ratio * 140 };
-    if (runId.endsWith("right")) return { x: 280, y: 170 - ratio * 140 };
-    if (runId.includes("island")) return { x: 95 + ratio * 120, y: 120 };
-    if (runId.includes("peninsula")) return { x: 20 + ratio * 130, y: 170 };
-    return { x: 280 - ratio * 260, y: 30 };
+  const svg = useRef<SVGSVGElement>(null);
+  const dragging = useRef<{ role: ApplianceRole; pointerId: number; x: number; y: number } | null>(null);
+  const [selected, setSelected] = useState<ApplianceRole | null>(null);
+  const [preview, setPreview] = useState<{ role: ApplianceRole; x: number; y: number } | null>(null);
+  const [hint, setHint] = useState("Drag F, S or H to a wall to position it.");
+
+  const lines = (runId: string) => {
+    if (runId.endsWith("left")) return { a: [20, 30] as const, b: [20, 170] as const };
+    if (runId.endsWith("right")) return { a: [280, 170] as const, b: [280, 30] as const };
+    if (runId.includes("island")) return { a: [95, 120] as const, b: [215, 120] as const };
+    if (runId.includes("peninsula")) return { a: [20, 170] as const, b: [150, 170] as const };
+    return { a: [280, 30] as const, b: [20, 30] as const };
   };
+  function point(runId: string, offset: number) {
+    const run = runs.find((item) => item.id === runId);
+    const { a, b } = lines(runId);
+    const t = run?.length ? Math.max(0, Math.min(1, offset / run.length)) : 0;
+    return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t };
+  }
+  function localPoint(event: PointerEvent<SVGSVGElement>) {
+    const node = svg.current;
+    if (!node) return null;
+    const matrix = node.getScreenCTM();
+    if (!matrix) return null;
+    const p = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+    return { x: p.x, y: p.y };
+  }
+  function nearestRun(role: ApplianceRole, x: number, y: number) {
+    let nearest: { id: string; offset: number; distance: number } | null = null;
+    for (const run of runs) {
+      if (role === "fridge" && /island|peninsula/.test(run.id)) continue;
+      const { a, b } = lines(run.id);
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy)));
+      const px = a[0] + dx * t, py = a[1] + dy * t;
+      const distance = Math.hypot(x - px, y - py);
+      if (!nearest || distance < nearest.distance) nearest = {
+        id: run.id,
+        offset: Math.max(0, Math.min(run.length - details[role].width, t * run.length - details[role].width / 2)),
+        distance,
+      };
+    }
+    return nearest;
+  }
+  function startDrag(role: ApplianceRole, event: PointerEvent<SVGGElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const p = localPoint(event as unknown as PointerEvent<SVGSVGElement>);
+    if (!p) return;
+    dragging.current = { role, pointerId: event.pointerId, x: p.x, y: p.y };
+    setSelected(role);
+    svg.current?.setPointerCapture(event.pointerId);
+  }
+  function move(event: PointerEvent<SVGSVGElement>) {
+    if (!dragging.current || dragging.current.pointerId !== event.pointerId) return;
+    const p = localPoint(event);
+    if (p) setPreview({ role: dragging.current.role, x: p.x, y: p.y });
+  }
+  function finish(event: PointerEvent<SVGSVGElement>) {
+    const active = dragging.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    dragging.current = null;
+    const p = localPoint(event);
+    setPreview(null);
+    if (!p) return;
+    const nearest = nearestRun(active.role, p.x, p.y);
+    if (!nearest || nearest.distance > 40) {
+      setHint("Drop on a highlighted wall or island.");
+      return;
+    }
+    onMove(active.role, nearest.id, nearest.offset);
+    setHint(`${active.role === "fridge" ? "Fridge" : active.role === "sink" ? "Sink" : "Stove"} moved to ${runs.find((run) => run.id === nearest.id)?.label ?? nearest.id}. Adjust exact position below.`);
+  }
   const hasLeft = ["u_shaped", "g_shaped"].includes(settings.shape);
   const hasRight = ["l_shaped", "u_shaped", "g_shaped"].includes(settings.shape);
-  return <div className="rounded-lg border bg-muted/20 p-2">
-    <svg viewBox="0 0 300 190" className="h-44 w-full" aria-label="Kitchen top plan with appliance anchors">
-      <path d={`M20 30H280${hasRight ? "V170" : ""}${settings.shape === "g_shaped" ? "M20 170H150" : ""}`} fill="none" stroke="currentColor" strokeWidth="12" opacity=".22" />
-      {hasLeft ? <path d="M20 30V170" fill="none" stroke="currentColor" strokeWidth="12" opacity=".22" /> : null}
-      {settings.shape === "island" ? <path d="M95 120H215" fill="none" stroke="currentColor" strokeWidth="18" opacity=".22" /> : null}
+  return <div className="space-y-2 rounded-lg border bg-muted/20 p-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="text-xs font-semibold">Place appliances · top view</span>
+      <span className="text-[11px] text-muted-foreground">Touch and drag</span>
+    </div>
+    <svg ref={svg} viewBox="0 0 300 190" className="h-52 w-full select-none rounded-lg bg-background/70" style={{ touchAction: "none" }}
+      aria-label="Draggable kitchen top plan with fridge, sink and stove"
+      onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { dragging.current = null; setPreview(null); }}>
+      <path d={`M20 30H280${hasRight ? "V170" : ""}${settings.shape === "g_shaped" ? "M20 170H150" : ""}`}
+        fill="none" stroke="currentColor" strokeWidth="15" opacity=".18" />
+      {hasLeft ? <path d="M20 30V170" fill="none" stroke="currentColor" strokeWidth="15" opacity=".18" /> : null}
+      {settings.shape === "island" ? <path d="M95 120H215" fill="none" stroke="currentColor" strokeWidth="19" opacity=".18" /> : null}
+      {runs.map((run) => {
+        const { a, b } = lines(run.id);
+        return <line key={run.id} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke="#3b82f6" strokeWidth="4" strokeDasharray="5 5" opacity=".55" />;
+      })}
       {(["fridge", "sink", "stove"] as const).map((role) => {
-        const at = point(details[role].runId, details[role].offset + details[role].width / 2);
-        return <g key={role}><circle cx={at.x} cy={at.y} r="12" fill="var(--color-primary)" /><text x={at.x} y={at.y + 4} textAnchor="middle" fontSize="10" fill="white">{role === "fridge" ? "F" : role === "sink" ? "S" : "H"}</text></g>;
+        const position = preview?.role === role ? preview : point(details[role].runId, details[role].offset + details[role].width / 2);
+        const active = selected === role;
+        return <g key={role} role="button" tabIndex={0} aria-label={`Drag ${role} position`}
+          onPointerDown={(event) => startDrag(role, event)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(role); }
+          }}
+          style={{ cursor: "grab" }}>
+          <circle cx={position.x} cy={position.y} r={active ? 17 : 15} fill={role === "fridge" ? "#2563eb" : role === "sink" ? "#0891b2" : "#ea580c"}
+            stroke={active ? "#facc15" : "white"} strokeWidth={active ? 3 : 2} />
+          <text x={position.x} y={position.y + 4.5} textAnchor="middle" fontSize="12" fontWeight="bold" fill="white" pointerEvents="none">
+            {role === "fridge" ? "F" : role === "sink" ? "S" : "H"}
+          </text>
+        </g>;
       })}
     </svg>
-    <p className="text-center text-[11px] text-muted-foreground">Top plan · F fridge · S sink · H stove</p>
+    <div className="grid grid-cols-3 gap-1.5 text-center text-[11px]">
+      {(["fridge", "sink", "stove"] as const).map((role) => <button key={role} type="button"
+        onClick={() => setSelected(role)}
+        className={`min-h-10 rounded-lg border px-1 font-medium ${selected === role ? "border-brand bg-brand/10 text-brand" : "bg-background"}`}>
+        {role === "fridge" ? "F · Fridge" : role === "sink" ? "S · Sink" : "H · Stove"}
+      </button>)}
+    </div>
+    <p role="status" className="min-h-4 text-center text-[11px] text-muted-foreground">{hint}</p>
   </div>;
 }

@@ -168,7 +168,17 @@ const vanityUneven = setDoorSize(vanity, vanityLeft, { width: 400 }).spec;
 const vanityEqual = makeDoorsEqual(vanityUneven, vanityLeft);
 equal(vanityEqual.problem, null, "two single doors on two bays can be made equal");
 equal(cabinetFronts(vanityEqual.spec, vanityEqual.spec.cabinets.find((item) => item.id === wall.id)!).leaves.map((leaf) => [leaf.x, leaf.width]), [[20, 579], [601, 579]], "1160 across them, a gap between, 579 each");
-ok(/no other door/.test(makeDoorsEqual(startingDesign("kitchen"), { cabinetId: "base-11", bayId: "bay-6", run: 0, leaf: 0 }).problem ?? ""), "a lone door has nothing to share with");
+const loneDoorDesign = structuredClone(startingDesign("wardrobe"));
+const loneDoorCabinet = loneDoorDesign.cabinets[0]!;
+loneDoorCabinet.bays = [loneDoorCabinet.bays[0]!];
+loneDoorCabinet.bays[0]!.doorLeaves = 1;
+loneDoorDesign.cabinets = [loneDoorCabinet];
+ok(/no other door/.test(makeDoorsEqual(loneDoorDesign, {
+  cabinetId: loneDoorCabinet.id,
+  bayId: loneDoorCabinet.bays[0]!.id,
+  run: 0,
+  leaf: 0,
+}).problem ?? ""), "a lone door has nothing to share with");
 
 // Changing the kind of front or the fitting starts the doors over.
 equal(setBayDoor(narrower.spec, cabinet.id, bay1!.id, "sliding").cabinets[0]!.bays[0]!.doorOverrides, undefined, "a new door style starts automatic");
@@ -197,7 +207,7 @@ const kitchen = startingDesign("kitchen");
 const base: DoorRef = { cabinetId: "base-11", bayId: "bay-6", run: 0, leaf: 0 };
 const baseSized = setDoorSize(kitchen, base, { height: 600 });
 equal(baseSized.problem, null, "a kitchen base door can be sized");
-equal(doors(baseSized.spec, "base-11").map((part) => [part.width, part.length, part.quantity]), [[560, 600, 1]], "560 × 600 on the cut list");
+equal(doors(baseSized.spec, "base-11").map((part) => [part.width, part.length, part.quantity]), [[279, 600, 1], [279, 766, 1]], "two preferred-width base doors stay on the cut list");
 const wallRef: DoorRef = { cabinetId: "wall-14", bayId: "bay-13", run: 0, leaf: 0 };
 const wallSized = setDoorSize(kitchen, wallRef, { width: 300 });
 equal(doors(wallSized.spec, "wall-14").map((part) => [part.width, part.length]), [[300, 716], [379, 716]], "a wall unit's left leaf at 300");
