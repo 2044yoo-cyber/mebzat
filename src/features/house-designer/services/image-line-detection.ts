@@ -59,6 +59,7 @@ export function detectOrthogonalWalls(
   data: ImageData,
   minimumLength = 38,
   polarity: DrawingPolarity = "auto",
+  structuralOnly = true,
 ): CandidateLine[] {
   const { width: w, height: h } = data;
   if (w < 80 || h < 80) throw new Error("Use an image at least 80 × 80 pixels.");
@@ -104,7 +105,12 @@ export function detectOrthogonalWalls(
   const lines = groups
     // CAD geometry is sometimes only a SINGLE pixel. For long, uninterrupted
     // runs it is safe to offer even that thin line for review.
-    .filter(g => (g.runs.length >= 2 || g.hi - g.lo >= minimumLength * 2.4) && g.hi - g.lo >= minimumLength)
+    .filter(g => (g.runs.length >= 2 || g.hi - g.lo >= minimumLength * 2.4) &&
+      g.hi - g.lo >= minimumLength &&
+      // Light architectural scans usually depict walls with noticeably
+      // heavier strokes than furniture outlines, lettering and stairs.
+      // Single-pixel CAD vectors remain available with the filter off.
+      (!structuralOnly || background === "dark" || g.runs.length >= 4))
     .map(g => {
       const centre = Math.round(g.runs.reduce((sum, run) => sum + run.at, 0) / g.runs.length);
       return g.orientation === "h"
