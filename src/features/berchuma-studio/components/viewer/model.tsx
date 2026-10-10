@@ -514,6 +514,30 @@ function PartMesh({
         emissive={part.role === "led" ? LED_GLOW : doorSelected ? DOOR_GLOW : selected && !accentColour(part, spec) ? SELECTION_GLOW : BLACK}
         emissiveIntensity={part.role === "led" ? 1.4 : doorSelected ? 0.35 : selected && !accentColour(part, spec) ? 0.22 : 0}
       />
+      {part.frontGrip === "handle" && part.doorStyle !== "fixed" && !part.internal ? (
+        <mesh position={part.role === "drawer_front"
+          ? [0, size[1] / 2 - 0.025, size[2] / 2 + 0.007]
+          : [size[0] / 2 - 0.035, 0, size[2] / 2 + 0.007]}
+          castShadow raycast={() => null}>
+          <boxGeometry args={part.role === "drawer_front" ? [0.16, 0.008, 0.012] : [0.008, Math.min(0.16, Math.max(0.08, size[1] * 0.65)), 0.012]} />
+          <meshStandardMaterial color="#b7bec7" metalness={0.82} roughness={0.25} />
+        </mesh>
+      ) : null}
+      {part.frontGrip === "recessed-pull" && !part.internal ? (
+        <mesh position={part.role === "drawer_front"
+          ? [0, size[1] / 2 - 0.012, size[2] / 2 + 0.002]
+          : [size[0] / 2 - 0.018, 0, size[2] / 2 + 0.002]}
+          raycast={() => null}>
+          <boxGeometry args={part.role === "drawer_front" ? [Math.min(0.18, size[0] * 0.65), 0.008, 0.004] : [0.008, Math.min(0.18, size[1] * 0.65), 0.004]} />
+          <meshStandardMaterial color="#26303b" roughness={0.7} />
+        </mesh>
+      ) : null}
+      {part.frontGrip === "finger-gap" && part.role === "door" && part.doorStyle !== "fixed" ? (
+        <mesh position={[0, -size[1] / 2 + 0.012, size[2] / 2 + 0.002]} raycast={() => null}>
+          <boxGeometry args={[Math.min(0.12, size[0] * 0.45), 0.006, 0.004]} />
+          <meshStandardMaterial color="#26303b" roughness={0.75} />
+        </mesh>
+      ) : null}
     </mesh>
   );
 }
