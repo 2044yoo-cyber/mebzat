@@ -125,6 +125,33 @@ export default async function CutListPage({
                 </tr>)}</tbody>
               </table>
             </div>
+            <section className="space-y-2 print:break-before-page">
+              <h2 className="font-semibold">Workshop part labels</h2>
+              <p className="text-xs text-muted-foreground print:hidden">
+                Print these labels and attach them to cut panels. Each label identifies its cabinet,
+                part, finished dimensions, board and edge-banding instructions.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 print:grid-cols-3">
+                {combined.rows.flatMap((row, rowIndex) =>
+                  Array.from({ length: row.quantity }, (_, copy) => (
+                    <article key={`${row.partId}-${copy}`}
+                      className="break-inside-avoid rounded-lg border-2 border-dashed p-3 print:border-black print:p-2">
+                      <div className="flex items-start justify-between gap-2 border-b pb-1">
+                        <p className="text-sm font-bold">{row.partId}{row.quantity > 1 ? ` · ${copy + 1}/${row.quantity}` : ""}</p>
+                        <p className="text-[10px] font-semibold uppercase">{row.board}</p>
+                      </div>
+                      <p className="mt-2 text-xs font-semibold">{row.design}</p>
+                      <p className="text-xs">{row.cabinet}</p>
+                      <p className="mt-2 text-base font-bold tabular-nums">
+                        {row.length} × {row.width} × {row.thickness} mm
+                      </p>
+                      <p className="mt-1 text-xs">Part: {row.label}</p>
+                      <p className="mt-1 text-xs font-semibold">Edge banding: {row.banding || "None specified"}</p>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
             <section className="space-y-2">
               <h2 className="font-semibold">Board totals</h2>
               <div className="overflow-x-auto"><table className="w-full border-collapse text-sm">
