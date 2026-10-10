@@ -21,9 +21,10 @@ import { PrintButton } from "@/features/berchuma-studio/components/public/print-
 import { QuoteRequest } from "@/features/berchuma-studio/components/public/quote-request";
 import { getDesign } from "@/features/berchuma-studio/services/designs";
 import { buildCutList } from "@/features/berchuma-studio/services/cutlist";
-import { buildProjectCutList } from "@/features/berchuma-studio/services/cabinet-project";
+import { buildProjectCutList, projectDesigns } from "@/features/berchuma-studio/services/cabinet-project";
 import { buildExport } from "@/features/berchuma-studio/services/exports";
 import { buildParts } from "@/features/berchuma-studio/services/geometry";
+import { calculateCost } from "@/features/berchuma-studio/services/costing";
 import { marketRates } from "@/features/berchuma-studio/services/rates";
 import { allBays } from "@/features/berchuma-studio/types/spec";
 import type { CutList } from "@/features/berchuma-studio/services/cutlist";
@@ -74,8 +75,35 @@ export default async function CutListPage({
   if (design.spec.projectItems?.length) {
     let combined: ReturnType<typeof buildProjectCutList> | null = null;
     let problem: string | null = null;
+    let projectCosts: {
+      designs: { title: string; price: number; confidence: number }[];
+      totals: Record<string, number>;
+      price: number;
+      currency: string;
+      confidence: number;
+    } | null = null;
     try {
       combined = buildProjectCutList(design.spec);
+      const rates = await marketRates();
+      const costs = projectDesigns(design.spec).map(({ spec }) => {
+        const parts = buildParts(spec);
+        const draft = buildCutList(spec, parts);
+        const sheetCounts = Object.fromEntries(draft.byBoard.map(board => [board.boardId, board.sheets]));
+        const cost = calculateCost(spec, parts, { rates, sheetCounts, manufacturable: draft.buildable });
+        return { title: spec.title, cost };
+      });
+      const groups = ["material", "edge_band", "hardware", "labour", "finishing", "installation", "transport"];
+      const totals: Record<string, number> = {};
+      for (const group of groups) {
+        totals[group] = costs.reduce((sum, item) => sum + item.cost.subtotals[group as keyof typeof item.cost.subtotals], 0);
+      }
+      projectCosts = {
+        designs: costs.map(item => ({ title: item.title, price: item.cost.price, confidence: item.cost.confidence })),
+        totals,
+        price: costs.reduce((sum, item) => sum + item.cost.price, 0),
+        currency: costs[0]?.cost.currency ?? "ETB",
+        confidence: costs.length ? Math.min(...costs.map(item => item.cost.confidence)) : 0,
+      };
     } catch (error) {
       problem = error instanceof Error ? error.message : "The project cannot be cut yet.";
     }
@@ -108,6 +136,45 @@ export default async function CutListPage({
               <Stat label="Cut pieces" value={String(combined.pieces)} />
               <Stat label="Board materials" value={String(combined.sheets.length)} />
             </section>
+            {projectCosts ? (
+              <section className="space-y-3 rounded-lg border p-3 print:break-inside-avoid">
+                <h2 className="font-semibold">Combined project cost estimate</h2>
+                <p className="text-2xl font-bold tabular-nums">
+                  {projectCosts.currency} {Math.round(projectCosts.price).toLocaleString("en-US")}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Estimate for all {projectCosts.designs.length} cabinets, including boards, edge banding, hardware,
+                  workshop labour, finishing, installation and transport. Lowest cabinet rate confidence: {Math.round(projectCosts.confidence)}%.
+                  Confirm supplier prices and assumptions before treating this as a final quote.
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                  {[
+                    ["Boards & materials", projectCosts.totals.material],
+                    ["Edge banding", projectCosts.totals.edge_band],
+                    ["Hardware", projectCosts.totals.hardware],
+                    ["Workshop labour", projectCosts.totals.labour],
+                    ["Finishing", projectCosts.totals.finishing],
+                    ["Installation", projectCosts.totals.installation],
+                    ["Transport", projectCosts.totals.transport],
+                  ].map(([label, amount]) => (
+                    <div key={String(label)} className="rounded-md bg-muted/40 p-2">
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className="font-semibold tabular-nums">{projectCosts!.currency} {Math.round(Number(amount)).toLocaleString("en-US")}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[480px] border-collapse text-xs">
+                    <thead><tr className="border-b text-left"><th className="p-2">Cabinet design</th><th className="p-2">Estimated price</th><th className="p-2">Rate confidence</th></tr></thead>
+                    <tbody>{projectCosts.designs.map(item => <tr key={item.title} className="border-b">
+                      <td className="p-2">{item.title}</td>
+                      <td className="p-2">{projectCosts!.currency} {Math.round(item.price).toLocaleString("en-US")}</td>
+                      <td className="p-2">{Math.round(item.confidence)}%</td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>
+              </section>
+            ) : null}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[880px] border-collapse text-xs">
                 <thead><tr className="border-b text-left">
