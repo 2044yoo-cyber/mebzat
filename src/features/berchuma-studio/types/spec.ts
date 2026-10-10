@@ -260,9 +260,9 @@ export const bayFittingSchema = z.discriminatedUnion("kind", [
      * How the user grips the drawer front. The finger-gap option reserves a
      * 25 mm hand-access recess; existing designs default safely to that style.
      */
-    grip: z.enum(["finger-gap", "push-to-open", "recessed-pull", "handle"]).default("finger-gap"),
+    grip: z.enum(["finger-gap", "push-to-open", "recessed-pull", "handle"]).optional(),
     /** Clear finger access in mm for the finger-gap style. */
-    gripClearance: z.number().min(15).max(40).default(25),
+    gripClearance: z.number().min(15).max(40).optional(),
     /**
      * Front heights in mm, top to bottom. Omitted means equal division, which
      * is what most people mean and nobody says.
