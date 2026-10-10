@@ -198,14 +198,31 @@ export function StudioWorkspace({
       setCuttingLayouts(result.layouts);
       const blob = new Blob([result.workbook.slice().buffer as ArrayBuffer],
         { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const filename = "medosha-combined-cabinet-cut-list.xlsx";
+      // iOS Safari often prefers the native share sheet for generated files;
+      // fall back to a normal download where file sharing is unavailable.
+      if (typeof File !== "undefined" && typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        const file = new File([blob], filename, { type: blob.type });
+        if (typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: "Combined cabinet cut list", text: "Medosha combined manufacturing cut list and purchasing workbook." });
+            setProjectMessage("Combined cut list shared successfully.");
+            return;
+          } catch (shareError) {
+            if (shareError instanceof Error && shareError.name === "AbortError") {
+              setProjectMessage("Share cancelled. Tap Combined cut list again to download or share it.");
+              return;
+            }
+          }
+        }
+      }
       const href = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = href;
-      anchor.download = "medosha-combined-cabinet-cut-list.xlsx";
+      anchor.download = filename;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      // Mobile browsers may take longer to hand a generated file to Downloads.
       window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
       const saved = result.sheets.reduce((total, board) => total + board.separateSheets - board.sheets, 0);
       setProjectMessage(`Exported ${result.designs} designs and ${result.pieces} cut pieces. Shared sheet nesting saved ${saved} MDF/board sheets versus separate cutting plans.`);
