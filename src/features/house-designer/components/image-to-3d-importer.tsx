@@ -375,8 +375,10 @@ export function ImageTo3DImporter() {
   }
   function pointerMove(event: PointerEvent<HTMLCanvasElement>) {
     if (symbolDrag.current?.pointerId === event.pointerId) {
-      setSymbolEnd(at(event));
-      if (!symbolStart) setSymbolStart(symbolDrag.current.point);
+      const moving = at(event);
+      setSymbolEnd(moving);
+      if (!symbolStart && Math.hypot(moving.x - symbolDrag.current.point.x, moving.y - symbolDrag.current.point.y) >= 6)
+        setSymbolStart(symbolDrag.current.point);
       return;
     }
     if (mode === "crop" && cropStart) { setCropEnd(at(event)); return; }
@@ -398,13 +400,12 @@ export function ImageTo3DImporter() {
     if (["door", "window", "stair", "furniture"].includes(mode)) {
       const drag = symbolDrag.current?.pointerId === event.pointerId ? symbolDrag.current : null;
       symbolDrag.current = null;
-      const moved = drag && Math.hypot(p.x - drag.point.x, p.y - drag.point.y) >= 12;
-      // Support both a single drag and two taps. Do not mistake the first
-      // tap for an object; a symbol needs two distinct endpoints.
-      if (moved) addSymbol(mode as ImportedSymbolKind, drag.point, p);
-      else if (symbolStart && !(drag && Math.hypot(drag.point.x - symbolStart.x, drag.point.y - symbolStart.y) > 10))
+      const moved = !!drag && Math.hypot(p.x - drag.point.x, p.y - drag.point.y) >= 12;
+      // Support both drag-and-drop and two taps. Minor pointer jitter should
+      // not complete an opening accidentally on the very first tap.
+      if (moved) addSymbol(mode as ImportedSymbolKind, drag!.point, p);
+      else if (symbolStart && !(drag && Math.hypot(drag.point.x - symbolStart.x, drag.point.y - symbolStart.y) < 0.5 && symbolEnd))
         finishSymbolAt(p, null);
-      else if (symbolStart) finishSymbolAt(p, null);
       else setSymbolStart(p);
       setSymbolEnd(null);
       return;
@@ -601,6 +602,55 @@ export function ImageTo3DImporter() {
               <button type="button" onClick={undoEdit} disabled={!history.length}
                 className="min-h-11 rounded-lg border px-3 text-xs disabled:opacity-30"><Undo2 className="mr-1 inline size-3.5" />Undo</button>
             </div>
+            <div className="space-y-2 rounded-xl border border-violet-400/40 bg-violet-500/5 p-3" aria-label="Trace doors stairs and furniture">
+              <div className="flex items-center justify-between gap-2">
+                <strong className="text-sm">2 · Trace architectural objects</strong>
+                <span className="text-xs text-muted-foreground">{symbols.length} placed</span>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Walls alone cannot reconstruct this plan. Trace door/window spans along their host walls, or drag a box around stairs, beds, sofas and other furniture. These are independent 3D objects, not wall segments.
+              </p>
+              <div role="group" aria-label="Trace object category" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {([
+                  { type: "door", label: "Door", Icon: DoorOpen },
+                  { type: "window", label: "Window", Icon: AppWindow },
+                  { type: "stair", label: "Stairs", Icon: Footprints },
+                  { type: "furniture", label: "Furniture", Icon: BedDouble },
+                ] as const).map(({ type, label, Icon }) => (
+                  <button key={type} type="button" aria-pressed={mode === type} onClick={() => chooseTraceTool(type)}
+                    className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-semibold ${mode === type ? "border-violet-500 bg-violet-500/15 text-violet-600" : "bg-background"}`}>
+                    <Icon className="size-4" />{label}
+                  </button>
+                ))}
+              </div>
+              {mode === "furniture" ? <label className="flex min-h-11 items-center gap-2 text-xs font-medium">
+                Furniture type
+                <select aria-label="Furniture type to trace" value={furnitureId} onChange={event => setFurnitureId(event.target.value)}
+                  className="min-h-11 min-w-0 flex-1 rounded-lg border bg-background px-2">
+                  {OBJECT_LIBRARY.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label> : null}
+              {mode === "stair" ? <label className="flex min-h-11 items-center gap-2 text-xs font-medium">
+                Stair type
+                <select aria-label="Stair type to trace" value={stairType} onChange={event => setStairType(event.target.value)}
+                  className="min-h-11 min-w-0 flex-1 rounded-lg border bg-background px-2">
+                  <option value="straight">Straight</option><option value="l-shaped">L-shaped</option><option value="u-shaped">U-shaped</option>
+                </select>
+              </label> : null}
+              {["door", "window", "stair", "furniture"].includes(mode)
+                ? <div role="status" className="flex items-center justify-between gap-2 text-xs text-violet-600">
+                    <span>{symbolStart ? "Tap the other end to finish, or draw in one drag." : "Drag a line/box on the image, or tap two endpoints."}</span>
+                    {symbolStart ? <button type="button" className="min-h-9 shrink-0 rounded-lg border px-2" onClick={() => { setSymbolStart(null); setSymbolEnd(null); }}>Cancel</button> : null}
+                  </div>
+                : null}
+              {symbols.length ? <div className="max-h-36 space-y-1 overflow-y-auto">
+                {symbols.map((symbol, index) => <div key={symbol.id} className="flex min-h-9 items-center justify-between gap-2 rounded-lg bg-background px-2 text-xs">
+                  <span className="min-w-0 truncate">{index + 1}. {symbol.kind === "furniture" ? OBJECT_LIBRARY.find(item => item.id === symbol.furnitureId)?.name ?? "Furniture" : symbol.kind}</span>
+                  <button type="button" aria-label={`Remove traced ${symbol.kind} ${index + 1}`} onClick={() => { setSymbols(current => current.filter(item => item.id !== symbol.id)); setReviewed(false); }}
+                    className="flex min-h-9 items-center gap-1 text-destructive"><Trash2 className="size-3.5" />Remove</button>
+                </div>)}
+              </div> : null}
+            </div>
             <canvas ref={canvas} width={size.width} height={size.height}
               onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pickPoint}
               onPointerCancel={() => { if (endpointDrag.current) setLines(endpointDrag.current.before); endpointDrag.current = null; symbolDrag.current = null; setSymbolStart(null); setSymbolEnd(null); setCropStart(null); setCropEnd(null); }}
@@ -608,7 +658,9 @@ export function ImageTo3DImporter() {
               className="w-full rounded-lg border bg-white"
               aria-label="Floor plan image: calibrate distance, select lines, drag endpoints, or tap two points to add a wall" />
             <p className="text-xs text-muted-foreground">
-              {mode === "calibrate" ? "Orange dots: tap two ends of one known dimension." :
+              {["door", "window", "stair", "furniture"].includes(mode)
+                ? "Purple/red/blue/orange: traced architectural objects. They remain separate from the green wall candidates."
+                : mode === "calibrate" ? "Orange dots: tap two ends of one known dimension." :
                 mode === "crop" ? "Drag from the top-left to bottom-right of the PLAN ONLY. Exclude phone bars, palettes, dimensions outside the building and unrelated drawings." :
                 mode === "review" ? "Green: detected walls. Tap a line to select it; drag its blue endpoints to adjust. Remove unwanted dimension or text lines." :
                 newStart ? "Tap the second end of the missing wall, or switch to Review to cancel." : "Tap the start and end of a missing wall. Angled walls are allowed."}
@@ -685,7 +737,7 @@ export function ImageTo3DImporter() {
           </div>
           <label className="flex items-start gap-3 rounded-xl border bg-muted/30 p-3 text-xs">
             <input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} className="mt-0.5 size-4" />
-            <span><strong>I've reviewed these walls.</strong> Missing or wrongly detected segments will need correction in House Design. I will verify all dimensions, rooms, doors and windows before relying on 3D measurements or BOQ.</span>
+            <span><strong>I've reviewed walls and architectural objects.</strong> I checked false wall detections, stair boxes, door/window locations and furniture types. Missing or unclear objects can be added in House Design; measurements must be verified before BOQ.</span>
           </label>
           {error ? <p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{error}</p> : null}
           <button type="button" disabled={!calibrated || !lines.length || !reviewed || busy || (sourceKind === "raster" && lines.length >= MAX_REVIEWED_WALLS) || (sourceKind === "cad" && cadTotal > MAX_REVIEWED_WALLS)} onClick={openPlan}
@@ -693,8 +745,7 @@ export function ImageTo3DImporter() {
             Continue to editable Floor Plan & 3D <ArrowRight className="size-4" />
           </button>
           <p className="text-xs text-muted-foreground">
-            This is a candidate geometry import, not a guaranteed accurate 3D conversion. Confirm wall positions,
-            wall thickness, doors, windows and enclosed rooms before measuring m² or estimating materials.
+            Wall lines are proposed automatically. Furniture, doors, windows and stairs in this version are user-traced, not automatically recognized. Only successfully snapped openings are placed in their host walls. Confirm every object and room before 3D measurements, tile quantities or painting estimates.
           </p>
         </>
       ) : error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
