@@ -59,6 +59,14 @@ const expected = reopened.reduce((total, item) => total +
   buildCutList(item.spec, buildParts(item.spec)).totals.pieces, 0);
 assert.equal(workbook.pieces, expected, "every cabinet contributes all its cut pieces");
 assert.equal(workbook.designs, 3);
+assert.ok(workbook.layouts.length > 0, "combined export exposes visual cutting-plan sheets");
+assert.ok(workbook.layouts.every(sheet => sheet.parts.length > 0),
+  "every visual sheet contains labeled parts");
+assert.ok(workbook.layouts.every(sheet => sheet.parts.every(part =>
+  part.x >= 0 && part.y >= 0 && part.x + part.width <= sheet.length &&
+  part.y + part.height <= sheet.width)),
+  "visual cut preview parts remain inside sheet bounds");
+
 assert.ok(workbook.sheets.every(board => board.sheets <= board.separateSheets),
   "combined cutting layout must never use more sheets than separate layouts");
 assert.ok(workbook.sheets.every(board => board.pieces > 0 && board.sheets >= 1),
