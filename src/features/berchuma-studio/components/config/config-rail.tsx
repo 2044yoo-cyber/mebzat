@@ -423,7 +423,7 @@ function BayRow({
       {bay.fitting.kind === "shelves" || bay.fitting.kind === "drawers" ? (
         <div className="mt-2">
           <LengthField
-            label={bay.fitting.kind === "shelves" ? "Shelves" : "Drawers"}
+            label={bay.fitting.kind === "shelves" ? "Shelves" : "Drawer sections"}
             value={bay.fitting.count}
             min={bay.fitting.kind === "drawers" ? 1 : 0}
             max={bay.fitting.kind === "drawers" ? 8 : 12}
@@ -442,6 +442,54 @@ function BayRow({
               })
             }
           />
+        </div>
+      ) : null}
+
+      {bay.fitting.kind === "drawers" ? (
+        <div className="mt-2 space-y-2 rounded-lg border p-2">
+          <Label className="text-xs">Drawer opening style</Label>
+          <Select
+            value={bay.fitting.grip ?? "finger-gap"}
+            onValueChange={picked((grip) =>
+              onEdit((draft) => {
+                const target = at(draft);
+                if (target?.fitting.kind === "drawers") {
+                  target.fitting.grip = grip as typeof target.fitting.grip;
+                }
+              }),
+            )}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="finger-gap">Handle-free finger gap</SelectItem>
+              <SelectItem value="push-to-open">Push-to-open hardware</SelectItem>
+              <SelectItem value="recessed-pull">Recessed finger pull</SelectItem>
+              <SelectItem value="handle">External handle</SelectItem>
+            </SelectContent>
+          </Select>
+          {(bay.fitting.grip ?? "finger-gap") === "finger-gap" ? (
+            <LengthField
+              label="Finger access clearance"
+              value={bay.fitting.gripClearance ?? 25}
+              min={15}
+              max={40}
+              step={5}
+              unit="mm"
+              onChange={(clearance) =>
+                onEdit((draft) => {
+                  const target = at(draft);
+                  if (target?.fitting.kind === "drawers") {
+                    target.fitting.gripClearance = clearance;
+                  }
+                })
+              }
+            />
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            Finger access is configurable from 15–40 mm. Push-to-open requires compatible latches.
+          </p>
         </div>
       ) : null}
 
