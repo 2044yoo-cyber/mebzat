@@ -1566,6 +1566,7 @@ export type DoorLeaf = FrontRect & {
   /** How many leaves its run has. */
   leaves: number;
   style: Bay["door"];
+  frontGrip: NonNullable<Bay["frontGrip"]>;
   /** Sized by hand — and the size passed the checks; otherwise the automatic size. */
   manual: boolean;
   /** What the automatic sizing gives, for Reset and for the panel. */
@@ -1690,7 +1691,7 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
       if (leafHeight <= 0 || leafWidth <= 0) return;
       for (let leaf = 0; leaf < count; leaf += 1) {
         const auto = { x: span.x + gap + leaf * (leafWidth + gap), y: bandFloor + gap, width: leafWidth, height: leafHeight };
-        leaves.push({ ...auto, bayId: bay.id, run, leaf, leaves: count, style: bay.door, manual: false, auto, aligned: false });
+        leaves.push({ ...auto, bayId: bay.id, run, leaf, leaves: count, style: bay.door, frontGrip: bay.frontGrip ?? "handle", manual: false, auto, aligned: false });
       }
     };
 
@@ -1812,7 +1813,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
           edges: { front: true, back: false, top: true, bottom: false },
           size: { x: leaf.width, y: leaf.height, z: frontThickness },
           placements: [{ x: leaf.x, y: leaf.y, z: -frontThickness }], axis: "z",
-          doorStyle: "hinged", bayId: bay.id, doorLeaf: { run: leaf.run, first: leaf.leaf },
+          doorStyle: "hinged", frontGrip: bay.frontGrip ?? "handle", bayId: bay.id, doorLeaf: { run: leaf.run, first: leaf.leaf },
         });
       }
       return;
@@ -1822,7 +1823,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       id, role: "door", label, bayId: bay.id, board,
       length: leaf.height, width: leaf.width, quantity,
       edges: { front: true, back: true, top: true, bottom: true },
-      edgeBand: frontBand, doorStyle, placements,
+      edgeBand: frontBand, doorStyle, frontGrip: bay.frontGrip ?? "handle", placements,
       size: { x: leaf.width, y: leaf.height, z: frontThickness }, axis: "z",
       doorLeaf: { run: leaf.run, first: leaf.leaf },
     });
@@ -1860,31 +1861,37 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         explicit,
       );
 
-      for (const face of construction.faces) {
+      const grip = bay.fitting.kind === "drawers" ? bay.fitting.grip ?? "finger-gap" : "finger-gap";
+      const clearance = grip === "finger-gap" && count > 1
+        ? Math.min(bay.fitting.kind === "drawers" ? bay.fitting.gripClearance ?? 25 : 25, 40)
+        : 0;
+      const totalClearance = clearance * Math.max(0, construction.faces.length - 1);
+      const originalHeight = construction.faces.reduce((sum, face) => sum + face.height, 0);
+      const heightBudget = Math.max(0, bandHeight - totalClearance);
+      let frontY = bandFloor;
+      for (const [index, face] of construction.faces.entries()) {
+        const frontHeight = originalHeight > 0 ? face.height * heightBudget / originalHeight : face.height;
         parts.push({
           id: `${idPrefix}-front-${face.index}`,
           role: "drawer_front",
           label: `Drawer front ${face.index + 1}${bayLabelSuffix(cabinet, bay.id)}`,
           bayId: bay.id,
           board,
-          length: face.height,
+          length: frontHeight,
           width: span.width - 2 * gap,
           quantity: 1,
-          // A front shows on all four edges.
           edges: { front: true, back: true, top: true, bottom: true },
           edgeBand: frontBand,
-          // Stacked on the same floors as the boxes behind them, and standing
-          // proud of the carcass — hence the negative z.
-          placements: [
-            { x: span.x + gap, y: face.floor, z: -frontThickness },
-          ],
+          frontGrip: grip,
+          placements: [{ x: span.x + gap, y: frontY, z: -frontThickness }],
           size: {
             x: span.width - 2 * gap,
-            y: face.height,
+            y: frontHeight,
             z: frontThickness,
           },
           axis: "z",
         });
+        frontY += frontHeight + (index < construction.faces.length - 1 ? clearance : 0);
       }
     };
 
@@ -1965,6 +1972,7 @@ function hardwareFor(
     hanging_rail: "hanging-rail",
     sliding_gear: "sliding-gear",
     leg: "leg-adjustable",
+    push_latch: "push-to-open-latch",
   };
   const pick = (kind: Hardware["kind"]) =>
     spec.hardware.find((item) => item.kind === kind) ??
@@ -1993,23 +2001,34 @@ function hardwareFor(
     }
   }
 
+  const bayForPart = (part: Part) =>
+    spec.cabinets.find((cabinet) => cabinet.id === part.cabinetId)?.bays.find((bay) => bay.id === part.bayId);
+  const gripForDoor = (part: Part) => bayForPart(part)?.frontGrip ?? "handle";
+  const gripForDrawer = (part: Part) => {
+    const bay = bayForPart(part);
+    return bay?.fitting.kind === "drawers" ? bay.fitting.grip ?? "finger-gap" : "finger-gap";
+  };
+  const countDoorGrip = (grip: "handle" | "push-to-open" | "recessed-pull" | "finger-gap") =>
+    doors.filter((door) => door.doorStyle !== "fixed" && gripForDoor(door) === grip)
+      .reduce((total, door) => total + (door.doorStyle === "bifold" ? Math.ceil(door.quantity / 2) : door.quantity), 0);
+  const countDrawerGrip = (grip: "handle" | "push-to-open" | "recessed-pull" | "finger-gap") =>
+    drawerFronts.filter((front) => gripForDrawer(front) === grip)
+      .reduce((total, front) => total + front.quantity, 0);
+
   const handle = pick("handle");
-  if (handle) {
-    const count =
-      doors
-        .filter((door) => door.doorStyle !== "fixed")
-        .reduce(
-          (total, door) =>
-            total +
-            (door.doorStyle === "bifold"
-              ? Math.ceil(door.quantity / 2)
-              : door.quantity),
-          0,
-        ) +
-      drawerFronts.reduce((total, front) => total + front.quantity, 0);
-    if (count > 0) {
-      lines.push({ hardware: handle, quantity: count, note: "One per front" });
-    }
+  const handleCount = countDoorGrip("handle") + countDrawerGrip("handle");
+  if (handle && handleCount > 0) {
+    lines.push({ hardware: handle, quantity: handleCount, note: "External handle, one per operable front" });
+  }
+  const profileHandle = spec.hardware.find((item) => item.id === "handle-profile") ?? findHardware("handle-profile");
+  const profileCount = countDoorGrip("recessed-pull") + countDrawerGrip("recessed-pull");
+  if (profileHandle && profileCount > 0) {
+    lines.push({ hardware: profileHandle, quantity: profileCount, note: "Integrated/recessed pull, one per front" });
+  }
+  const pushLatch = pick("push_latch");
+  const pushCount = countDoorGrip("push-to-open") + countDrawerGrip("push-to-open");
+  if (pushLatch && pushCount > 0) {
+    lines.push({ hardware: pushLatch, quantity: pushCount, note: "Push-to-open latch, one per operable front" });
   }
 
   const drawerBoxes = parts.filter((part) => part.role === "drawer_base");
