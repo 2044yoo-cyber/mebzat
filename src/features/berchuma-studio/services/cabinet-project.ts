@@ -143,7 +143,7 @@ export type ProjectProductionSummary = {
   sheets: { boardId: string; board: string; sheets: number; separateSheets: number; pieces: number; area: number }[];
   workbook: Uint8Array;
   layouts: { board: string; sheet: number; length: number; width: number; utilisation: number; parts: { label: string; design: string; x: number; y: number; width: number; height: number; rotated: boolean }[] }[];
-  offcuts: { boardId: string; board: string; sheet: number; x: number; y: number; length: number; width: number; areaM2: number; reusable: boolean }[];
+  offcuts: { boardId: string; board: string; thicknessMm: number | null; sheet: number; x: number; y: number; length: number; width: number; areaM2: number; reusable: boolean }[];
   rows: { design: string; partId: string; cabinet: string; label: string; board: string;
     length: number; width: number; thickness: number; quantity: number; banding: string }[];
   purchasing: { boards: { boardId: string; board: string; sheets: number; separateSheets: number; saved: number; unitPrice: number | null; estimatedCost: number | null }[];
@@ -302,7 +302,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     if (useShared) {
       for (const sheet of shared!.sheets) {
         for (const offcut of sheet.offcuts) offcuts.push({
-          boardId: id, board: item.board, sheet: sheet.number,
+          boardId: id, board: item.board, thicknessMm: findBoard(id)?.thickness ?? null, sheet: sheet.number,
           x: offcut.x, y: offcut.y, length: offcut.length, width: offcut.width,
           areaM2: offcut.areaM2, reusable: offcut.reusable,
         });
@@ -312,7 +312,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
       for (const source of group.separate) {
         for (const sheet of source.nesting.sheets) {
           for (const offcut of sheet.offcuts) offcuts.push({
-            boardId: id, board: item.board, sheet: sheet.number + sheetOffset,
+            boardId: id, board: item.board, thicknessMm: findBoard(id)?.thickness ?? null, sheet: sheet.number + sheetOffset,
             x: offcut.x, y: offcut.y, length: offcut.length, width: offcut.width,
             areaM2: offcut.areaM2, reusable: offcut.reusable,
           });
