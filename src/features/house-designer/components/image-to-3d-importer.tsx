@@ -633,7 +633,7 @@ export function ImageTo3DImporter() {
               </label> : null}
               {mode === "stair" ? <label className="flex min-h-11 items-center gap-2 text-xs font-medium">
                 Stair type
-                <select aria-label="Stair type to trace" value={stairType} onChange={event => setStairType(event.target.value)}
+                <select aria-label="Stair type to trace" value={stairType} onChange={event => { const value = event.target.value; if (value === "straight" || value === "l-shaped" || value === "u-shaped") setStairType(value); }}
                   className="min-h-11 min-w-0 flex-1 rounded-lg border bg-background px-2">
                   <option value="straight">Straight</option><option value="l-shaped">L-shaped</option><option value="u-shaped">U-shaped</option>
                 </select>
