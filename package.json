@@ -15,7 +15,8 @@
     "check:sketch-save-errors": "node --experimental-strip-types scripts/sketch_save_error_check.ts",
     "check:image-import": "tsx scripts/image_import_check.ts",
     "check:dxf-import": "tsx scripts/dxf_wall_import_check.ts",
-    "check:image-objects": "tsx scripts/image_object_import_check.ts"
+    "check:image-objects": "tsx scripts/image_object_import_check.ts",
+    "check:berchuma-manufacturing": "tsx scripts/berchuma_manufacturing_check.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
