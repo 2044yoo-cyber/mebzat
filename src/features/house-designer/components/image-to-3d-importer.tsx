@@ -530,8 +530,9 @@ export function ImageTo3DImporter() {
               For black CAD drawings, only pale neutral lines are scanned; bright annotation colors are ignored.
             </p>
             {uncropped.current && image.current !== uncropped.current ? <button type="button" onClick={() => {
-              image.current = uncropped.current;
               const original = uncropped.current;
+              if (!original) return;
+              image.current = original;
               setSize({ width: original.width, height: original.height });
               setScalePoints([]); setReviewed(false); setMode("calibrate");
               detect(minLength);
