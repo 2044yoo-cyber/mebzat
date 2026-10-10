@@ -1656,7 +1656,29 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
 
     const drawerFaces = (count: number, explicit: number[] | undefined, bandFloor: number, bandHeight: number) => {
       const construction = drawerConstructionFor(spec, bay.width, bandHeight, bandFloor, interiorDepth, count, explicit);
-      for (const face of construction.faces) drawers.push({ bayId: bay.id, x: span.x + gap, y: face.floor, width: span.width - 2 * gap, height: face.height });
+      const grip = bay.fitting.kind === "drawers" ? bay.fitting.grip ?? "finger-gap" : "finger-gap";
+      const clearance = grip === "finger-gap" && count > 1
+        ? Math.min(bay.fitting.kind === "drawers" ? bay.fitting.gripClearance ?? 25 : 25, 40)
+        : 0;
+      // Finger-gap fronts get a deliberate access gap between adjacent drawers.
+      // Reduce the visible front heights rather than moving the drawer boxes:
+      // the carcass and runner geometry remains unchanged and the front schedule
+      // (including the cut list) uses these exact visible sizes.
+      const totalGap = clearance * Math.max(0, construction.faces.length - 1);
+      const heightBudget = Math.max(0, bandHeight - totalGap);
+      const originalTotal = construction.faces.reduce((sum, face) => sum + face.height, 0);
+      let y = bandFloor;
+      construction.faces.forEach((face, index) => {
+        const height = originalTotal > 0 ? face.height * heightBudget / originalTotal : face.height;
+        drawers.push({
+          bayId: bay.id,
+          x: span.x + gap,
+          y,
+          width: span.width - 2 * gap,
+          height,
+        });
+        y += height + (index < construction.faces.length - 1 ? clearance : 0);
+      });
     };
     const doorRun = (run: number, bandFloor: number, bandHeight: number) => {
       const preferredWidth = cabinet.kind === "wall" ? 300 : 400;
