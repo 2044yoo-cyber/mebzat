@@ -1557,15 +1557,16 @@ function PlanEditor({
                   </div>
                   <button type="button" className="min-h-11 rounded-lg border border-brand/40 px-3 font-semibold text-brand"
                     onClick={() => {
-                      const plan = activeLevel.plan;
-                      if (!plan) return;
+                      const level = project.levels.find(item => item.id === activeLevelId);
+                      if (!level?.plan) return;
+                      const plan = level.plan;
                       const checked = { ...plan, autoZones: true };
                       const derived = withDerivedZones(checked, checked);
                       if (!derived.zones?.length) {
                         toast.info("No enclosed rooms found. Check wall junctions and close the wall boundaries.");
                         return;
                       }
-                      commit(rebuildLevel(project, activeLevel.id, derived));
+                      commit(rebuildLevel(project, level.id, derived));
                       toast.success(`Detected ${derived.zones.length} candidate rooms. Confirm each boundary before using areas or BOQ.`);
                     }}>
                     Generate rooms after review
