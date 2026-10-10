@@ -4769,6 +4769,8 @@ export interface Database {
           owner_id: string;
           source_design_id: string | null;
           source_sheet_number: number | null;
+          source_x_mm: number | null;
+          source_y_mm: number | null;
           board_id: string | null;
           board_label: string;
           thickness_mm: number;
@@ -4786,6 +4788,8 @@ export interface Database {
           owner_id: string;
           source_design_id?: string | null;
           source_sheet_number?: number | null;
+          source_x_mm?: number | null;
+          source_y_mm?: number | null;
           board_id?: string | null;
           board_label: string;
           thickness_mm: number;
@@ -4803,6 +4807,8 @@ export interface Database {
           owner_id?: string;
           source_design_id?: string | null;
           source_sheet_number?: number | null;
+          source_x_mm?: number | null;
+          source_y_mm?: number | null;
           board_id?: string | null;
           board_label?: string;
           thickness_mm?: number;
