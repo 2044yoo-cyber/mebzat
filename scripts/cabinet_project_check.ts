@@ -59,6 +59,13 @@ const expected = reopened.reduce((total, item) => total +
   buildCutList(item.spec, buildParts(item.spec)).totals.pieces, 0);
 assert.equal(workbook.pieces, expected, "every cabinet contributes all its cut pieces");
 assert.equal(workbook.designs, 3);
+assert.ok(workbook.purchasing.boards.length > 0, "purchasing summary includes board materials");
+assert.equal(workbook.purchasing.estimatedBoardCost,
+  workbook.purchasing.boards.reduce((sum, board) => sum + board.estimatedCost, 0),
+  "board estimate equals sum of per-material estimates");
+assert.ok(workbook.purchasing.hardware.every(item => item.quantity > 0 && item.designs.length > 0),
+  "aggregated hardware has quantities and source cabinet names");
+
 assert.ok(workbook.layouts.length > 0, "combined export exposes visual cutting-plan sheets");
 assert.ok(workbook.layouts.every(sheet => sheet.parts.length > 0),
   "every visual sheet contains labeled parts");
