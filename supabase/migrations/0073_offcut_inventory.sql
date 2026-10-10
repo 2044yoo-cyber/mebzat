@@ -9,6 +9,8 @@ create table if not exists public.offcut_inventory (
   owner_id uuid not null references auth.users(id) on delete cascade,
   source_design_id uuid references public.designs(id) on delete set null,
   source_sheet_number integer,
+  source_x_mm numeric(10, 2),
+  source_y_mm numeric(10, 2),
   board_id text,
   board_label text not null,
   thickness_mm numeric(10, 2) not null check (thickness_mm > 0),
