@@ -8,6 +8,8 @@ const page = read("src/app/studio/offcuts/page.tsx");
 const component = read("src/features/berchuma-studio/components/offcut-inventory.tsx");
 const types = read("src/types/database.types.ts");
 const workspace = read("src/features/berchuma-studio/components/studio-workspace.tsx");
+const project = read("src/features/berchuma-studio/services/cabinet-project.ts");
+const actions = read("src/app/studio/offcuts/actions.ts");
 
 let passed = 0;
 function check(name, condition) {
@@ -27,6 +29,9 @@ check("inventory form accepts precise decimal measurements", /step="any"/.test(c
 check("inventory page requires an authenticated account", /redirect\("\/login\?redirect=%2Fstudio%2Foffcuts"\)/.test(page));
 check("inventory page clearly discloses stock-matching is a later step", /not yet automatically deducted/.test(page));
 check("the Berchuma dashboard links to offcut inventory", /href="\/studio\/offcuts"/.test(workspace));
+check("generated cutting layouts expose board thickness for each offcut", /thicknessMm: findBoard\(id\)\?\.thickness \?\? null/.test(project));
+check("the studio can save generated offcut candidates into the persistent inventory", /saveLayoutOffcutsAction\(candidates\)/.test(workspace) && /addOffcutsFromLayout/.test(actions));
+check("imported offcuts retain their source sheet and measured coordinates", /source_sheet_number: item\.sheet/.test(read("src/features/berchuma-studio/services/offcuts.ts")) && /source_x_mm: item\.x/.test(read("src/features/berchuma-studio/services/offcuts.ts")) && /source_y_mm: item\.y/.test(read("src/features/berchuma-studio/services/offcuts.ts")));
 check("database types include the persistent inventory table", /offcut_inventory: \{[\s\S]*?thickness_mm: number;[\s\S]*?length_mm: number;[\s\S]*?width_mm: number;/.test(types));
 
 console.log(`${passed} offcut inventory checks passed.`);
