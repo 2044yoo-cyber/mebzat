@@ -56,6 +56,14 @@ const cabinet = wardrobe.cabinets[0]!;
 const [bay1, bay2, bay3] = cabinet.bays;
 const left: DoorRef = { cabinetId: cabinet.id, bayId: bay1!.id, run: 0, leaf: 0 };
 const right: DoorRef = { ...left, leaf: 1 };
+// Grip style must agree between the generated manufacturing parts and the
+// hardware order, rather than changing only the appearance of the model.
+const pushGripDraft = structuredClone(wardrobe);
+pushGripDraft.cabinets[0]!.bays[0]!.frontGrip = "push-to-open";
+const pushGrip = validateSpec(pushGripDraft).spec;
+ok(doors(pushGrip).filter((part) => part.bayId === bay1!.id).every((part) => part.frontGrip === "push-to-open"), "push-to-open selection is carried by every generated door leaf");
+const pushLatch = buildParts(pushGrip).hardware.filter((line) => line.hardware.kind === "push_latch");
+ok(pushLatch.length > 0 && pushLatch.every((line) => line.quantity > 0), "push-to-open doors create a positive-quantity latch hardware order");
 const autoDoors = doors(wardrobe);
 const pair = autoDoors.find((part) => part.id === `${cabinet.id}/${bay1!.id}-door`)!;
 ok(pair, "an automatic pair is still the one part it always was");
