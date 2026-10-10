@@ -50,6 +50,18 @@ export type Placement = {
   rotated: boolean;
 };
 
+export type SheetOffcut = {
+  /** Millimetres from the usable sheet origin (bottom-left). */
+  x: number;
+  y: number;
+  /** Rectangular remnant dimensions in mm. */
+  length: number;
+  width: number;
+  areaM2: number;
+  /** Only sufficiently large, rectangular remnants are suggested for reuse. */
+  reusable: boolean;
+};
+
 export type NestedSheet = {
   /** 1-based, per board. "Sheet 3 of 9" is how a shop refers to it. */
   number: number;
@@ -57,6 +69,8 @@ export type NestedSheet = {
   length: number;
   width: number;
   placements: Placement[];
+  /** Rectangular offcuts that can be identified safely from this saw layout. */
+  offcuts: SheetOffcut[];
   /** Share of the sheet covered by parts, 0–1. */
   utilisation: number;
 };
@@ -170,11 +184,43 @@ export function nestBoard(
         length: usableLength,
         width: usableWidth,
         placements: [],
+        offcuts: [],
         utilisation: 0,
       });
       shelvesBySheet.push([]);
       place(piece, options, sheets, shelvesBySheet, kerf, usableLength, usableWidth);
     }
+  }
+
+  // Record only rectangular remnants whose location follows the same
+  // guillotine strips the panel-saw layout actually uses. This is deliberately
+  // conservative: it does not claim every square millimetre of unused area is
+  // a reusable offcut.
+  for (const [sheetIndex, sheet] of sheets.entries()) {
+    const shelves = shelvesBySheet[sheetIndex] ?? [];
+    const offcuts: SheetOffcut[] = [];
+    for (const shelf of shelves) {
+      const x = shelf.used + kerf;
+      const length = usableLength - x;
+      if (length > 0 && shelf.height > 0) {
+        offcuts.push({
+          x, y: shelf.y, length, width: shelf.height,
+          areaM2: round((length * shelf.height) / 1_000_000, 4),
+          reusable: length >= 150 && shelf.height >= 100,
+        });
+      }
+    }
+    const top = shelves.reduce((highest, shelf) => Math.max(highest, shelf.y + shelf.height), 0);
+    const y = top === 0 ? 0 : top + kerf;
+    const width = usableWidth - y;
+    if (width > 0 && usableLength > 0) {
+      offcuts.push({
+        x: 0, y, length: usableLength, width,
+        areaM2: round((usableLength * width) / 1_000_000, 4),
+        reusable: usableLength >= 150 && width >= 100,
+      });
+    }
+    sheet.offcuts = offcuts;
   }
 
   const sheetArea = (usableLength * usableWidth) / 1_000_000;
