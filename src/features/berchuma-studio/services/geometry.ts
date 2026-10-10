@@ -1666,7 +1666,7 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
       // the carcass and runner geometry remains unchanged and the front schedule
       // (including the cut list) uses these exact visible sizes.
       const totalGap = clearance * Math.max(0, construction.faces.length - 1);
-      const heightBudget = Math.max(0, bandHeight - totalGap);
+      const heightBudget = Math.max(0, originalTotal - totalGap);
       const originalTotal = construction.faces.reduce((sum, face) => sum + face.height, 0);
       let y = bandFloor;
       construction.faces.forEach((face, index) => {
@@ -1737,7 +1737,7 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
     leaves.length = 0;
     for (let leaf = 0; leaf < count && leafWidth > 0; leaf += 1) {
       const auto = { x: (cabinet.frontInsets?.start ?? 0) + gap / 2 + leaf * (leafWidth + gap), y: plinth + gap / 2, width: leafWidth, height: height - plinth - gap };
-      leaves.push({ ...auto, bayId: bay.id, run: 0, leaf, leaves: count, style: "hinged", manual: false, auto, aligned: true });
+      leaves.push({ ...auto, bayId: bay.id, run: 0, leaf, leaves: count, style: "hinged", frontGrip: bay.frontGrip ?? "handle", manual: false, auto, aligned: true });
     }
   }
 
@@ -1867,7 +1867,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         : 0;
       const totalClearance = clearance * Math.max(0, construction.faces.length - 1);
       const originalHeight = construction.faces.reduce((sum, face) => sum + face.height, 0);
-      const heightBudget = Math.max(0, bandHeight - totalClearance);
+      const heightBudget = Math.max(0, originalHeight - totalClearance);
       let frontY = bandFloor;
       for (const [index, face] of construction.faces.entries()) {
         const frontHeight = originalHeight > 0 ? face.height * heightBudget / originalHeight : face.height;
