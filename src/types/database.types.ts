@@ -4763,6 +4763,60 @@ export interface Database {
         };
         Relationships: [];
       };
+      offcut_inventory: {
+        Row: {
+          id: string;
+          owner_id: string;
+          source_design_id: string | null;
+          source_sheet_number: number | null;
+          board_id: string | null;
+          board_label: string;
+          thickness_mm: number;
+          length_mm: number;
+          width_mm: number;
+          quantity: number;
+          status: string;
+          location: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          source_design_id?: string | null;
+          source_sheet_number?: number | null;
+          board_id?: string | null;
+          board_label: string;
+          thickness_mm: number;
+          length_mm: number;
+          width_mm: number;
+          quantity?: number;
+          status?: string;
+          location?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          source_design_id?: string | null;
+          source_sheet_number?: number | null;
+          board_id?: string | null;
+          board_label?: string;
+          thickness_mm?: number;
+          length_mm?: number;
+          width_mm?: number;
+          quantity?: number;
+          status?: string;
+          location?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       designs: {
         Row: {
           id: string;
