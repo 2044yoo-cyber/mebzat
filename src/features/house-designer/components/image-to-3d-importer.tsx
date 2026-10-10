@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Crop, FileText, ImageUp, PenLine, RotateCcw, Ruler, ScanLine, Trash2, Undo2 } from "lucide-react";
+import { ArrowRight, BedDouble, Check, Crop, DoorOpen, FileText, ImageUp, PenLine, RotateCcw, Ruler, ScanLine, Trash2, Undo2, Footprints, AppWindow } from "lucide-react";
 import { detectOrthogonalWalls, imageBackgroundPolarity, IMAGE_IMPORT_KEY, type CandidateLine, type DrawingPolarity } from "../services/image-line-detection";
 import { loadImage, pdfPageCount, renderPdfPage } from "../services/source-render";
 import { dxfWallPreview, parseDxfWallDrawing, MAX_REVIEWED_WALLS, type DxfWallDrawing } from "../services/dxf-wall-import";
+import { MAX_TRACED_SYMBOLS, type ImportedSymbol, type ImportedSymbolKind } from "../services/image-object-import";
+import { OBJECT_LIBRARY } from "../services/object-library";
 
 type Point = { x: number; y: number };
 const MAX_BYTES = 12 * 1024 * 1024;
@@ -34,7 +36,13 @@ export function ImageTo3DImporter() {
   const [showLines, setShowLines] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<"calibrate" | "review" | "add" | "crop">("calibrate");
+  const [mode, setMode] = useState<"calibrate" | "review" | "add" | "crop" | "door" | "window" | "stair" | "furniture">("calibrate");
+  const [symbols, setSymbols] = useState<ImportedSymbol[]>([]);
+  const [symbolStart, setSymbolStart] = useState<Point | null>(null);
+  const [symbolEnd, setSymbolEnd] = useState<Point | null>(null);
+  const symbolDrag = useRef<{ pointerId: number; point: Point } | null>(null);
+  const [furnitureId, setFurnitureId] = useState("sofa-3");
+  const [stairType, setStairType] = useState<"straight" | "l-shaped" | "u-shaped">("straight");
   const pdfUrl = useRef<string | null>(null);
   const [pdfPages, setPdfPages] = useState(0);
   const [pdfPage, setPdfPage] = useState(1);
@@ -101,6 +109,45 @@ export function ImageTo3DImporter() {
         ctx.stroke();
       }
     }
+
+    // Traced architectural objects are a SEPARATE layer; their strokes do
+    // not become walls or create phantom rooms.
+    for (const symbol of symbols) {
+      ctx.save();
+      const a = symbol.start, b = symbol.end;
+      const color = symbol.kind === "door" ? "#e11d48" :
+        symbol.kind === "window" ? "#0284c7" :
+        symbol.kind === "stair" ? "#ea580c" : "#7c3aed";
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 3;
+      const left = Math.min(a.x, b.x), top = Math.min(a.y, b.y);
+      const width = Math.abs(a.x - b.x), height = Math.abs(a.y - b.y);
+      if (symbol.kind === "door" || symbol.kind === "window") {
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.beginPath(); ctx.arc(a.x, a.y, 4, 0, 2 * Math.PI); ctx.arc(b.x, b.y, 4, 0, 2 * Math.PI); ctx.fill();
+      } else {
+        ctx.strokeRect(left, top, width, height);
+        if (symbol.kind === "stair" && height > 5) {
+          for (let j = 1; j < 5; j++) { ctx.beginPath(); ctx.moveTo(left, top + height * j / 5); ctx.lineTo(left + width, top + height * j / 5); ctx.stroke(); }
+        }
+      }
+      ctx.font = "bold 15px sans-serif";
+      ctx.fillText(symbol.kind === "furniture" ? (OBJECT_LIBRARY.find(item => item.id === symbol.furnitureId)?.name ?? "Furniture") : symbol.kind.toUpperCase(), left + 3, top - 7);
+      ctx.restore();
+    }
+    if (symbolStart && ["door", "window", "stair", "furniture"].includes(mode)) {
+      ctx.save();
+      ctx.fillStyle = "#7c3aed";
+      ctx.beginPath(); ctx.arc(symbolStart.x, symbolStart.y, 6, 0, 2 * Math.PI); ctx.fill();
+      if (symbolEnd) {
+        ctx.strokeStyle = "#7c3aed"; ctx.lineWidth = 3; ctx.setLineDash([7, 5]);
+        if (mode === "door" || mode === "window") {
+          ctx.beginPath(); ctx.moveTo(symbolStart.x, symbolStart.y); ctx.lineTo(symbolEnd.x, symbolEnd.y); ctx.stroke();
+        } else ctx.strokeRect(Math.min(symbolStart.x, symbolEnd.x), Math.min(symbolStart.y, symbolEnd.y), Math.abs(symbolStart.x - symbolEnd.x), Math.abs(symbolStart.y - symbolEnd.y));
+      }
+      ctx.restore();
+    }
     if (cropStart && cropEnd) {
       const left = Math.min(cropStart.x, cropEnd.x);
       const top = Math.min(cropStart.y, cropEnd.y);
@@ -114,7 +161,7 @@ export function ImageTo3DImporter() {
       ctx.restore();
     }
   }
-  useEffect(draw, [lines, scalePoints, showLines, size, selected, newStart, cropStart, cropEnd]);
+  useEffect(draw, [lines, scalePoints, showLines, size, selected, newStart, cropStart, cropEnd, symbols, symbolStart, symbolEnd, mode]);
 
   function detect(min: number, background: DrawingPolarity = polarity) {
     const original = image.current;
@@ -134,6 +181,7 @@ export function ImageTo3DImporter() {
 
   async function loadRaster(source: HTMLImageElement | ImageBitmap, label: string) {
     dxfDrawing.current = null;
+    setSymbols([]); setSymbolStart(null); setSymbolEnd(null);
     setSourceKind("raster");
     setCadLayers([]); setSelectedLayers([]); setCadMmPerPixel(null); setCadTotal(0);
     const scale = Math.min(1, 1100 / Math.max(source.width, source.height));
@@ -175,6 +223,7 @@ export function ImageTo3DImporter() {
 
   function refreshDxf(drawing: DxfWallDrawing, layers: readonly string[]) {
     const selected = new Set(layers);
+    setSymbols([]); setSymbolStart(null); setSymbolEnd(null);
     const preview = dxfWallPreview(drawing, selected);
     const background = document.createElement("canvas");
     background.width = preview.width; background.height = preview.height;
@@ -268,7 +317,44 @@ export function ImageTo3DImporter() {
     const t = Math.max(0, Math.min(1, ((point.x - line.x1) * dx + (point.y - line.y1) * dy) / (dx * dx + dy * dy || 1)));
     return Math.hypot(point.x - line.x1 - t * dx, point.y - line.y1 - t * dy);
   }
+
+  function addSymbol(kind: ImportedSymbolKind, start: Point, end: Point) {
+    const pixelSize = Math.hypot(end.x - start.x, end.y - start.y);
+    const min = kind === "door" || kind === "window" ? 8 : 12;
+    if (pixelSize < min) { setError(`Trace a longer ${kind} segment.`); return; }
+    if (symbols.length >= MAX_TRACED_SYMBOLS) { setError(`Maximum of ${MAX_TRACED_SYMBOLS} traced doors, windows, stairs and furniture per import.`); return; }
+    setSymbols(current => [...current, {
+      id: `traced-${Date.now()}-${current.length}`,
+      kind, start, end,
+      ...(kind === "furniture" ? { furnitureId } : {}),
+      ...(kind === "stair" ? { stairType } : {}),
+    }]);
+    setSymbolStart(null); setSymbolEnd(null);
+    setReviewed(false);
+    setError("");
+  }
+  function chooseTraceTool(tool: ImportedSymbolKind) {
+    setMode(tool); setNewStart(null); setSelected(null);
+    setSymbolStart(null); setSymbolEnd(null);
+  }
+  function finishSymbolAt(point: Point, dragStart: Point | null) {
+    if (!["door", "window", "stair", "furniture"].includes(mode)) return;
+    const kind = mode as ImportedSymbolKind;
+    if (dragStart && Math.hypot(point.x - dragStart.x, point.y - dragStart.y) >= 12) {
+      addSymbol(kind, dragStart, point);
+      return;
+    }
+    if (symbolStart) addSymbol(kind, symbolStart, point);
+    else setSymbolStart(point);
+    setSymbolEnd(null);
+  }
+
   function pointerDown(event: PointerEvent<HTMLCanvasElement>) {
+    if (["door", "window", "stair", "furniture"].includes(mode)) {
+      symbolDrag.current = { pointerId: event.pointerId, point: at(event) };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
     if (mode === "crop" && sourceKind === "raster") {
       const p = at(event);
       setCropStart(p); setCropEnd(p);
@@ -288,6 +374,11 @@ export function ImageTo3DImporter() {
     event.currentTarget.setPointerCapture(event.pointerId);
   }
   function pointerMove(event: PointerEvent<HTMLCanvasElement>) {
+    if (symbolDrag.current?.pointerId === event.pointerId) {
+      setSymbolEnd(at(event));
+      if (!symbolStart) setSymbolStart(symbolDrag.current.point);
+      return;
+    }
     if (mode === "crop" && cropStart) { setCropEnd(at(event)); return; }
     const drag = endpointDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
@@ -304,6 +395,20 @@ export function ImageTo3DImporter() {
   }
   function pickPoint(event: PointerEvent<HTMLCanvasElement>) {
     const p = at(event);
+    if (["door", "window", "stair", "furniture"].includes(mode)) {
+      const drag = symbolDrag.current?.pointerId === event.pointerId ? symbolDrag.current : null;
+      symbolDrag.current = null;
+      const moved = drag && Math.hypot(p.x - drag.point.x, p.y - drag.point.y) >= 12;
+      // Support both a single drag and two taps. Do not mistake the first
+      // tap for an object; a symbol needs two distinct endpoints.
+      if (moved) addSymbol(mode as ImportedSymbolKind, drag.point, p);
+      else if (symbolStart && !(drag && Math.hypot(drag.point.x - symbolStart.x, drag.point.y - symbolStart.y) > 10))
+        finishSymbolAt(p, null);
+      else if (symbolStart) finishSymbolAt(p, null);
+      else setSymbolStart(p);
+      setSymbolEnd(null);
+      return;
+    }
     if (mode === "crop") {
       const start = cropStart, original = image.current;
       setCropStart(null); setCropEnd(null);
@@ -324,6 +429,7 @@ export function ImageTo3DImporter() {
       image.current = trimmed;
       setSize({ width, height });
       setScalePoints([]);
+      setSymbols([]); setSymbolStart(null); setSymbolEnd(null);
       setSelected(null);
       setNewStart(null);
       setHistory([]);
@@ -412,6 +518,7 @@ export function ImageTo3DImporter() {
       source: fileName,
       mmPerUnit: automaticCadScale ?? metres * 1000 / pixelLength,
       lines: lines.map(l => ({ start: { x: l.x1, y: l.y1 }, end: { x: l.x2, y: l.y2 } })),
+      symbols,
     };
     try {
       sessionStorage.setItem(IMAGE_IMPORT_KEY, JSON.stringify(payload));
@@ -496,7 +603,7 @@ export function ImageTo3DImporter() {
             </div>
             <canvas ref={canvas} width={size.width} height={size.height}
               onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pickPoint}
-              onPointerCancel={() => { if (endpointDrag.current) setLines(endpointDrag.current.before); endpointDrag.current = null; setCropStart(null); setCropEnd(null); }}
+              onPointerCancel={() => { if (endpointDrag.current) setLines(endpointDrag.current.before); endpointDrag.current = null; symbolDrag.current = null; setSymbolStart(null); setSymbolEnd(null); setCropStart(null); setCropEnd(null); }}
               style={{ touchAction: mode === "calibrate" ? "manipulation" : "none" }}
               className="w-full rounded-lg border bg-white"
               aria-label="Floor plan image: calibrate distance, select lines, drag endpoints, or tap two points to add a wall" />
