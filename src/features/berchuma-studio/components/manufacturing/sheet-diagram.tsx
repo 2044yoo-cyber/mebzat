@@ -41,6 +41,32 @@ export function SheetDiagram({
           strokeWidth={4}
         />
 
+        {sheet.offcuts.map((offcut, index) => (
+          <g key={"offcut-" + index}>
+            <rect
+              x={offcut.x}
+              y={width - offcut.y - offcut.width}
+              width={offcut.length}
+              height={offcut.width}
+              className="fill-muted/10 stroke-muted-foreground/70"
+              strokeWidth={2}
+              strokeDasharray="18 12"
+            />
+            {offcut.reusable && offcut.length > 300 && offcut.width > 180 ? (
+              <text
+                x={offcut.x + offcut.length / 2}
+                y={width - offcut.y - offcut.width / 2}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="fill-muted-foreground"
+                fontSize={Math.max(24, Math.min(42, Math.min(offcut.length, offcut.width) * 0.18))}
+              >
+                {"OFFCUT " + Math.round(offcut.length) + " × " + Math.round(offcut.width)}
+              </text>
+            ) : null}
+          </g>
+        ))}
+
         {sheet.placements.map((piece, index) => (
           <g key={`${piece.index}-${index}`}>
             <rect
@@ -170,9 +196,7 @@ export function BoardSheets({ nesting }: { nesting: BoardNesting }) {
       </div>
 
       <p className="text-[11px] text-muted-foreground">
-        Numbers match the cut list. Cuts run edge to edge in strips, which is
-        how a panel saw works — take the horizontal cuts first, then the
-        vertical ones within each strip. Allow {nesting.kerf} mm for the blade.
+        Numbers match the cut list. Dashed rectangles mark conservative rectangular offcut candidates; measure and label each remnant before reuse. Cuts run edge to edge in strips, which is how a panel saw works — take the horizontal cuts first, then the vertical ones within each strip. Allow {nesting.kerf} mm for the blade.
       </p>
     </section>
   );
