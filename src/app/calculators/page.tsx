@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 import { CalculatorHub } from "@/components/calculators/calculator-hub";
 import { CALCULATORS } from "@/lib/calculators/registry";
@@ -25,6 +27,13 @@ export default function CalculatorsPage() {
         <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground sm:text-base">
           Fast, practical calculators for construction, architecture, materials, and furniture.
         </p>
+        <Link
+          href="/build-intelligence"
+          className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+        >
+          Build Intelligence: costs, materials and house planning
+          <ArrowRight className="h-4 w-4" />
+        </Link>
         <p className="mt-2 text-xs text-muted-foreground">
           {CALCULATORS.length} calculators. All free, no sign-in needed, and the arithmetic runs on your
           device.

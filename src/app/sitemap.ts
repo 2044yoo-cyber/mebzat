@@ -39,6 +39,8 @@ const STATIC_ROUTES: {
   { path: "/directory/supplier", priority: 0.7, changeFrequency: "weekly" },
   { path: "/ai", priority: 0.6, changeFrequency: "monthly" },
   { path: "/calculators", priority: 0.8, changeFrequency: "monthly" },
+  { path: "/build-intelligence", priority: 0.9, changeFrequency: "weekly" },
+  { path: "/material-price-radar", priority: 0.9, changeFrequency: "daily" },
   { path: "/about", priority: 0.4, changeFrequency: "monthly" },
   { path: "/contact", priority: 0.4, changeFrequency: "monthly" },
   { path: "/privacy", priority: 0.2, changeFrequency: "yearly" },
