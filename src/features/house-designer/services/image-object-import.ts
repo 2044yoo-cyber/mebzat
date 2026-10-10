@@ -4,7 +4,7 @@
  * from the pixel pattern: it requires user confirmation before creating BIM.
  * The endpoints are in ORIGINAL image pixels, not millimetres.
  */
-import type { HouseProject, HouseWall } from "../types/project";
+import type { HouseProject } from "../types/project";
 import { rebuildLevel } from "./project-edit";
 import { OBJECT_LIBRARY } from "./object-library";
 import { applyStairEdit, stairFields, stairPreset } from "./stair-geometry";
@@ -49,7 +49,7 @@ export function applyTracedImageSymbols(
   const wallById = new Map(project.walls.map(wall => [wall.id, wall]));
 
   for (const [index, mark] of raw.entries()) {
-    const prefix = `${mark.kind} ${index + 1}`;
+    const prefix = `${mark?.kind ?? "Object"} ${index + 1}`;
     if (!mark || !["door", "window", "stair", "furniture"].includes(mark.kind) ||
       !mark.start || !mark.end || ![mark.start.x, mark.start.y, mark.end.x, mark.end.y].every(Number.isFinite)) {
       warnings.push(`Item ${index + 1} has invalid coordinates and was skipped.`);
