@@ -1598,26 +1598,29 @@ export function preferredKitchenDoorLeaves(
   frontWidth: number,
   gap: number,
   outerGaps: 0 | 1 = 1,
+  preferredWidth = 400,
 ): number {
   const maxLeaves = 12;
   const widthFor = (count: number) =>
     (frontWidth - gap * (count + outerGaps)) / count;
-  let nearestCount = 1;
-  let nearestDistance = Number.POSITIVE_INFINITY;
+  let bestCount = 1;
+  let bestScore = Number.POSITIVE_INFINITY;
   for (let count = 1; count <= maxLeaves; count += 1) {
     const width = widthFor(count);
-    const distance = width < KITCHEN_DOOR_LEAF_WIDTH.min
+    // Keep doors in the practical 250–450 mm range whenever the opening
+    // permits it; among valid splits, choose the width closest to the target.
+    const outside = width < KITCHEN_DOOR_LEAF_WIDTH.min
       ? KITCHEN_DOOR_LEAF_WIDTH.min - width
       : width > KITCHEN_DOOR_LEAF_WIDTH.max
         ? width - KITCHEN_DOOR_LEAF_WIDTH.max
         : 0;
-    if (distance < nearestDistance) {
-      nearestDistance = distance;
-      nearestCount = count;
+    const score = outside > 0 ? 10000 + outside : Math.abs(width - preferredWidth);
+    if (score < bestScore) {
+      bestScore = score;
+      bestCount = count;
     }
-    if (distance === 0) return count;
   }
-  return nearestCount;
+  return bestCount;
 }
 
 /** Whether a kitchen unit's doors span its whole front rather than its bay. */
@@ -1656,8 +1659,9 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
       for (const face of construction.faces) drawers.push({ bayId: bay.id, x: span.x + gap, y: face.floor, width: span.width - 2 * gap, height: face.height });
     };
     const doorRun = (run: number, bandFloor: number, bandHeight: number) => {
+      const preferredWidth = cabinet.kind === "wall" ? 300 : 400;
       const count = spec.furnitureType === "kitchen" && bay.door === "hinged"
-        ? preferredKitchenDoorLeaves(span.width, gap)
+        ? preferredKitchenDoorLeaves(span.width, gap, 1, preferredWidth)
         : bay.doorLeaves;
       const leafWidth = Math.floor((span.width - gap * (count + 1)) / count);
       const leafHeight = bandHeight - 2 * gap;
