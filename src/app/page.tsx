@@ -89,6 +89,7 @@ export default async function Home() {
               ["/contact", "Contact"],
               ["/privacy", "Privacy"],
               ["/terms", "Terms"],
+              ["/legal", "Legal & Policies"],
             ].map(([href, label]) => (
               <li key={href}>
                 <Link href={href} className="hover:text-foreground">
