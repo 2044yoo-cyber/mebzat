@@ -149,7 +149,7 @@ export function StudioWorkspace({
   // the saved record's root spec; extras live in its projectItems.
   const [activeItemId, setActiveItemId] = useState("primary");
   const [freshProject, setFreshProject] = useState(false);
-  const [newCabinetKind, setNewCabinetKind] = useState<DesignKind>("wardrobe");
+  const [newCabinetKind, setNewCabinetKind] = useState<DesignKind>("custom");
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [cuttingLayouts, setCuttingLayouts] = useState<ProjectProductionSummary["layouts"]>([]);
@@ -181,7 +181,7 @@ export function StudioWorkspace({
       const id = crypto.randomUUID();
       design.set(addProjectDesign(design.spec, id, newCabinetKind));
       setActiveItemId(id);
-      setProjectMessage("New cabinet added. Edit it here, then Save to keep the whole project.");
+      setProjectMessage(newCabinetKind === "custom" ? "New custom cabinet created. Model and configure it in the editor, then Save the project." : "New cabinet starter added. Customize it in the editor, then Save the project.");
     } catch (error) {
       setProjectMessage(error instanceof Error ? error.message : "Could not add cabinet.");
     }
@@ -714,18 +714,19 @@ export function StudioWorkspace({
                     <select aria-label="Cabinet design type to add" value={newCabinetKind}
                       onChange={(event) => setNewCabinetKind(event.target.value as DesignKind)}
                       className="min-h-10 rounded-lg border bg-background px-2">
-                      <option value="wardrobe">Wardrobe</option>
-                      <option value="vanity">Vanity / bathroom</option>
-                      <option value="kitchen">Kitchen</option>
-                      <option value="tv_unit">TV unit</option>
-                      <option value="office_storage">Office cabinet</option>
-                      <option value="shelving">Shelves</option>
+                      <option value="custom">Build from scratch</option>
+                      <option value="wardrobe">Wardrobe starter</option>
+                      <option value="vanity">Vanity / bathroom starter</option>
+                      <option value="kitchen">Kitchen starter</option>
+                      <option value="tv_unit">TV unit starter</option>
+                      <option value="office_storage">Office cabinet starter</option>
+                      <option value="shelving">Shelving starter</option>
                       <option value="custom">Custom cabinet</option>
                     </select>
                   </label>
                   <button type="button" onClick={addAnotherCabinet}
                     className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">
-                    <Plus className="size-4" aria-hidden /> Add cabinet
+                    <Plus className="size-4" aria-hidden /> Create &amp; model
                   </button>
                   {activeItemId !== "primary" ? (
                     <button type="button" onClick={() => {
