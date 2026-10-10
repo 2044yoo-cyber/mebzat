@@ -141,6 +141,7 @@ export type ProjectProductionSummary = {
   pieces: number;
   sheets: { board: string; sheets: number; separateSheets: number; pieces: number; area: number }[];
   workbook: Uint8Array;
+  layouts: { board: string; sheet: number; length: number; width: number; utilisation: number; parts: { label: string; design: string; x: number; y: number; width: number; height: number; rotated: boolean }[] }[];
   rows: { design: string; partId: string; cabinet: string; label: string; board: string;
     length: number; width: number; thickness: number; quantity: number; banding: string }[];
 };
@@ -217,6 +218,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     "Board", "Shared sheets to buy", "Separate-sheet baseline", "Sheets saved", "Pieces", "Area (m²)"
   ]];
   const layout: Cell[][] = [["Board", "Sheet", "Part / source design", "X (mm)", "Y (mm)", "Cut width (mm)", "Cut height (mm)", "Rotated"]];
+  const layouts: ProjectProductionSummary["layouts"] = [];
   const sheets = [...boards.entries()].map(([id, item]) => {
     const group = sharedInputs.get(id);
     if (!group) throw new Error(`Missing manufacturing rows for board: ${id}`);
@@ -247,6 +249,36 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
         sheetOffset += source.nesting.sheets.length;
       }
     }
+    const selectedLayouts = useShared ? shared!.sheets : [];
+    if (useShared) {
+      for (const sheet of selectedLayouts) {
+        layouts.push({
+          board: item.board, sheet: sheet.number,
+          length: shared!.sheet.length, width: shared!.sheet.width,
+          utilisation: sheet.utilisation,
+          parts: sheet.placements.map(place => ({
+            label: group.rows.find(row => row.index === place.index)?.label ?? place.label,
+            design: group.rows.find(row => row.index === place.index)?.cabinet ?? "",
+            x: place.x, y: place.y, width: place.width, height: place.height,
+            rotated: place.rotated,
+          })),
+        });
+      }
+    } else {
+      for (const source of group.separate) {
+        for (const sheet of source.nesting.sheets) {
+          layouts.push({
+            board: item.board, sheet: sheet.number,
+            length: source.nesting.sheet.length, width: source.nesting.sheet.width,
+            utilisation: sheet.utilisation,
+            parts: sheet.placements.map(place => ({
+              label: place.label, design: source.design, x: place.x, y: place.y,
+              width: place.width, height: place.height, rotated: place.rotated,
+            })),
+          });
+        }
+      }
+    }
     return {
       board: item.board,
       sheets: useShared ? shared!.sheets.length : item.sheets,
@@ -275,6 +307,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     pieces: cuts.reduce((sum, item) => sum + item.cut.totals.pieces, 0),
     sheets,
     workbook: buildXlsx(workbookSheets),
+    layouts,
     rows: printable,
   };
 }
