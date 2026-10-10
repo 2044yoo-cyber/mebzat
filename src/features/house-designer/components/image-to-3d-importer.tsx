@@ -29,6 +29,7 @@ export function ImageTo3DImporter() {
   const [lines, setLines] = useState<CandidateLine[]>([]);
   const [minLength, setMinLength] = useState(42);
   const [polarity, setPolarity] = useState<DrawingPolarity>("auto");
+  const [structuralOnly, setStructuralOnly] = useState(true);
   const [cropStart, setCropStart] = useState<Point | null>(null);
   const [cropEnd, setCropEnd] = useState<Point | null>(null);
   const [scalePoints, setScalePoints] = useState<Point[]>([]);
@@ -163,13 +164,13 @@ export function ImageTo3DImporter() {
   }
   useEffect(draw, [lines, scalePoints, showLines, size, selected, newStart, cropStart, cropEnd, symbols, symbolStart, symbolEnd, mode]);
 
-  function detect(min: number, background: DrawingPolarity = polarity) {
+  function detect(min: number, background: DrawingPolarity = polarity, heavyOnly = structuralOnly) {
     const original = image.current;
     if (!original) return;
     const ctx = original.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
     try {
-      const result = detectOrthogonalWalls(ctx.getImageData(0, 0, original.width, original.height), min, background);
+      const result = detectOrthogonalWalls(ctx.getImageData(0, 0, original.width, original.height), min, background, heavyOnly);
       setLines(result);
       setHistory([]);
       setSelected(null);
@@ -202,7 +203,7 @@ export function ImageTo3DImporter() {
     setScalePoints([]);
     setMode("calibrate");
     setFileName(label);
-    const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity);
+    const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity, structuralOnly);
     setLines(detected);
     setSelected(null); setNewStart(null); setHistory([]); setReviewed(false);
     setError(detected.length >= MAX_REVIEWED_WALLS ? `Found at least ${MAX_REVIEWED_WALLS} candidate lines. Crop to the drawing, excluding toolbars and labels, then rescan.` : detected.length ? "" : "No straight walls detected. For a dark screenshot select Black CAD background, or use a higher resolution image.");
@@ -436,7 +437,7 @@ export function ImageTo3DImporter() {
       setHistory([]);
       setReviewed(false);
       setMode("calibrate");
-      const cropped = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity);
+      const cropped = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity, structuralOnly);
       setLines(cropped);
       setError(cropped.length >= MAX_REVIEWED_WALLS ? "Still too many lines. Crop more tightly or increase minimum line length." : cropped.length ? "" : "No straight walls found in this crop. Try Black CAD background mode or a higher-resolution screenshot.");
       return;
@@ -683,6 +684,10 @@ export function ImageTo3DImporter() {
                 <option value="dark">Black CAD background</option>
                 <option value="light">White paper background</option>
               </select>
+            </label>
+            <label className="flex min-h-11 items-start gap-2 text-xs">
+              <input type="checkbox" checked={structuralOnly} onChange={event => { setStructuralOnly(event.target.checked); detect(minLength, polarity, event.target.checked); }} className="mt-0.5 size-4 shrink-0" />
+              <span><strong>Walls only (recommended)</strong><span className="block text-muted-foreground">On white plans, ignore thin furniture outlines, stair treads, arrows and room text. Turn off only to recover thin structural lines, then remove non-walls before importing.</span></span>
             </label>
             <p className="text-xs text-muted-foreground">
               Current scan: {image.current ? imageBackgroundPolarity(image.current.getContext("2d")!.getImageData(0, 0, image.current.width, image.current.height)) === "dark" ? "dark CAD style" : "light paper style" : "not loaded"}.
