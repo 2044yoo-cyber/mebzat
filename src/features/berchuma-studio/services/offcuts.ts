@@ -43,8 +43,8 @@ export async function listOffcuts(): Promise<OffcutRecord[]> {
     .from("offcut_inventory")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error || !data) return [];
-  return data as OffcutRecord[];
+  if (error) throw new Error("Offcut inventory could not be loaded.");
+  return (data ?? []) as OffcutRecord[];
 }
 
 export async function addOffcut(input: NewOffcut):
