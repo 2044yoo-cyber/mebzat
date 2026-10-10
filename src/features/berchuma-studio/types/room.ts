@@ -140,6 +140,8 @@ export const roomSchema = z.object({
   corners: z.array(cornerSchema).max(32),
   /** Freehand wall graphs may be open and have no perimeter polygon. */
   freehand: z.boolean().optional(),
+  /** Imported raster plans do not become measurable rooms until walls are reviewed. */
+  autoZones: z.boolean().optional(),
 
   /** Structural thickness, drawn on the plan. Does not enter the BOQ. */
   wallThickness: z.number().positive().max(600).default(150),
