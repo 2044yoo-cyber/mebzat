@@ -125,6 +125,43 @@ export default async function CutListPage({
                 </tr>)}</tbody>
               </table>
             </div>
+            <section className="space-y-3 print:break-before-page">
+              <h2 className="font-semibold">Combined purchasing list</h2>
+              <p className="text-xs text-muted-foreground">
+                One shopping summary for all cabinet designs. Board prices are indicative catalogue estimates in ETB, not live supplier quotes.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse text-xs">
+                  <thead><tr className="border-b text-left">
+                    <th className="p-2">Board material</th><th className="p-2">Sheets to buy</th>
+                    <th className="p-2">Separate plan</th><th className="p-2">Saved</th><th className="p-2">Est. total</th>
+                  </tr></thead>
+                  <tbody>{combined.purchasing.boards.map(board => <tr key={board.board} className="border-b">
+                    <td className="p-2">{board.board}</td><td className="p-2">{board.sheets}</td>
+                    <td className="p-2">{board.separateSheets}</td><td className="p-2">{board.saved}</td>
+                    <td className="p-2">{board.estimatedCost.toLocaleString()} ETB</td>
+                  </tr>)}</tbody>
+                </table>
+              </div>
+              <p className="text-sm font-semibold">
+                Estimated board material total: {combined.purchasing.estimatedBoardCost.toLocaleString()} ETB
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse text-xs">
+                  <thead><tr className="border-b text-left">
+                    <th className="p-2">Hardware / fitting</th><th className="p-2">Total quantity</th>
+                    <th className="p-2">Unit</th><th className="p-2">Cabinets using it</th>
+                  </tr></thead>
+                  <tbody>{combined.purchasing.hardware.map(item => <tr key={item.item + item.unit} className="border-b">
+                    <td className="p-2">{item.item}</td><td className="p-2">{item.quantity}</td>
+                    <td className="p-2">{item.unit}</td><td className="p-2">{item.designs.join(", ")}</td>
+                  </tr>)}</tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Confirm current supplier prices, pack sizes, stock, and actual cut waste before buying. Hardware quantities follow the specifications saved in each design.
+              </p>
+            </section>
             <section className="space-y-2 print:break-before-page">
               <h2 className="font-semibold">Workshop part labels</h2>
               <p className="text-xs text-muted-foreground print:hidden">
