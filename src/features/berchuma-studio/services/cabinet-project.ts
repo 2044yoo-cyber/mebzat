@@ -4,7 +4,7 @@ import { startingDesign } from "./starting-designs";
 import { buildParts } from "./geometry";
 import { buildCutList, type CutListRow } from "./cutlist";
 import { nestBoard, type BoardNesting } from "./nesting";
-import { BOARDS, findBoard } from "../types/catalogue";
+import { findBoard } from "../types/catalogue";
 import { buildXlsx, type Cell, type Sheet } from "./xlsx";
 
 /**
