@@ -463,6 +463,7 @@ export function applyFreehand(
   sketch: NonNullable<HouseProject["freehandSketch"]>,
   snapPixels = 12,
   unitsPerPixel = 1,
+  inferRooms = true,
 ): HouseProject {
   const level = project.levels[0];
   if (!level) throw new Error("A drawing needs a floor.");
@@ -486,6 +487,7 @@ export function applyFreehand(
   let plan = roomSchema.parse({
     version: 1,
     freehand: true,
+    autoZones: inferRooms,
     corners: [],
     wallThickness: 200,
     ceilingHeight: Math.min(6000, level.floorToFloorHeight),
