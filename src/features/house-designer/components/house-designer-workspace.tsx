@@ -132,6 +132,7 @@ import { createHouseTakeoffPackage, HOUSE_TAKEOFF_SESSION_KEY } from "../service
 import { FreehandCanvas } from "./freehand-canvas";
 import { applyFreehand, dimensionRectangle, dimensionConflicts, calibrateFromWall, rememberWallLength } from "../services/freehand";
 import { IMAGE_IMPORT_KEY } from "../services/image-line-detection";
+import { applyTracedImageSymbols, MAX_TRACED_SYMBOLS, type ImportedSymbol } from "../services/image-object-import";
 import { MAX_REVIEWED_WALLS } from "../services/dxf-wall-import";
 
 type Stage = "start" | "editor" | "loading";
@@ -235,6 +236,7 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
         source?: string;
         mmPerUnit?: number;
         lines?: { start: { x: number; y: number }; end: { x: number; y: number } }[];
+        symbols?: ImportedSymbol[];
       };
       if (payload.version !== 1 || !payload.createdAt || Date.now() - payload.createdAt > 10 * 60_000 ||
           !Number.isFinite(payload.mmPerUnit) || (payload.mmPerUnit ?? 0) <= 0 ||
@@ -266,16 +268,24 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
         floorCount: 1,
         floorToFloorHeight: 3000,
       }));
-      const imported = ensureHouseBimState(applyFreehand(blank, sketch, 8));
+      const importedWalls = ensureHouseBimState(applyFreehand(blank, sketch, 8));
+      const objects = Array.isArray(payload.symbols) ? payload.symbols : [];
+      if (objects.length > MAX_TRACED_SYMBOLS)
+        throw new Error("Too many traced architectural objects. Return to the importer and remove duplicates.");
+      const traced = applyTracedImageSymbols(importedWalls, objects, payload.mmPerUnit!);
+      const imported = ensureHouseBimState(traced.project);
       setProject({ ...imported, displayUnits: "m" });
       setSource("upload");
       setLink(null);
       setStatus("device");
       setTab("plan");
       setStartTool("select");
-      setPlanAnalysis("Editable walls imported without AI from the reviewed image, PDF or DXF. Verify wall locations, closed rooms, door/window openings and dimensions before using 3D or quantity estimates.");
+      const count = traced.placed;
+      const description = `Imported wall geometry and ${count.door} doors, ${count.window} windows, ${count.stair} stairs and ${count.furniture} furniture objects from your confirmed tracing. No AI. Verify scale, enclosed rooms, opening locations and material quantities.`;
+      setPlanAnalysis(traced.warnings.length ? `${description} Attention: ${traced.warnings.slice(0, 5).join(" ")}` : description);
+      if (traced.warnings.length) toast.warning(`${traced.warnings.length} traced objects could not be placed. See import notes and correct them on the plan.`);
       setStage("editor");
-      toast.success("Floor-plan wall geometry imported. Review and save the plan.");
+      toast.success("Reviewed floor plan and architectural objects imported. Inspect the 3D view and save the project.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Floor-plan import failed.");
     } finally {
