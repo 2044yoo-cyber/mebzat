@@ -132,7 +132,7 @@ export default async function CutListPage({
                 part, finished dimensions, board and edge-banding instructions.
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 print:grid-cols-3">
-                {combined.rows.flatMap((row, rowIndex) =>
+                {combined.rows.flatMap(row =>
                   Array.from({ length: row.quantity }, (_, copy) => (
                     <article key={`${row.partId}-${copy}`}
                       className="break-inside-avoid rounded-lg border-2 border-dashed p-3 print:border-black print:p-2">
