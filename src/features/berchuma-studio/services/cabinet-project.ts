@@ -99,8 +99,8 @@ function assertSafeNesting(nesting: BoardNesting, rows: CutListRow[], boardLabel
   for (const sheet of nesting.sheets) {
     for (const place of sheet.placements) {
       if (place.x < 0 || place.y < 0 ||
-          place.x + place.width > nesting.sheet.length - nesting.trim + 0.001 ||
-          place.y + place.height > nesting.sheet.width - nesting.trim + 0.001) {
+          place.x + place.width > nesting.sheet.length - nesting.trim * 2 + 0.001 ||
+          place.y + place.height > nesting.sheet.width - nesting.trim * 2 + 0.001) {
         throw new Error(`Cut ${place.label} exceeds the usable ${boardLabel} sheet boundary.`);
       }
       actual.set(place.index, (actual.get(place.index) ?? 0) + 1);
