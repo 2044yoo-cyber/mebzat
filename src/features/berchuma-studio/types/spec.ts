@@ -350,7 +350,7 @@ export const baySchema = z.object({
   fitting: bayFittingSchema,
   door: z.enum(doorStyles).default("hinged"),
   /** Visible front treatment, separate from how the door opens. */
-  frontGrip: z.enum(["handle", "push-to-open", "recessed-pull", "finger-gap"]).default("handle"),
+  frontGrip: z.enum(["handle", "push-to-open", "recessed-pull", "finger-gap"]).optional(),
   /** A pair of doors on one bay, for bays too wide for a single leaf. */
   doorLeaves: z.number().int().min(1).max(2).default(1),
   /**
