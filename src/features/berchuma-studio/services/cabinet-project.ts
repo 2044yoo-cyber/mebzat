@@ -143,6 +143,7 @@ export type ProjectProductionSummary = {
   sheets: { boardId: string; board: string; sheets: number; separateSheets: number; pieces: number; area: number }[];
   workbook: Uint8Array;
   layouts: { board: string; sheet: number; length: number; width: number; utilisation: number; parts: { label: string; design: string; x: number; y: number; width: number; height: number; rotated: boolean }[] }[];
+  offcuts: { boardId: string; board: string; sheet: number; x: number; y: number; length: number; width: number; areaM2: number; reusable: boolean }[];
   rows: { design: string; partId: string; cabinet: string; label: string; board: string;
     length: number; width: number; thickness: number; quantity: number; banding: string }[];
   purchasing: { boards: { boardId: string; board: string; sheets: number; separateSheets: number; saved: number; unitPrice: number | null; estimatedCost: number | null }[];
@@ -237,6 +238,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
   ]];
   const layout: Cell[][] = [["Board", "Sheet", "Part / source design", "X (mm)", "Y (mm)", "Cut width (mm)", "Cut height (mm)", "Rotated"]];
   const layouts: ProjectProductionSummary["layouts"] = [];
+  const offcuts: ProjectProductionSummary["offcuts"] = [];
   const sheets = [...boards.entries()].map(([id, item]) => {
     const group = sharedInputs.get(id);
     if (!group) throw new Error(`Missing manufacturing rows for board: ${id}`);
@@ -297,6 +299,27 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
         }
       }
     }
+    if (useShared) {
+      for (const sheet of shared!.sheets) {
+        for (const offcut of sheet.offcuts) offcuts.push({
+          boardId: id, board: item.board, sheet: sheet.number,
+          x: offcut.x, y: offcut.y, length: offcut.length, width: offcut.width,
+          areaM2: offcut.areaM2, reusable: offcut.reusable,
+        });
+      }
+    } else {
+      let sheetOffset = 0;
+      for (const source of group.separate) {
+        for (const sheet of source.nesting.sheets) {
+          for (const offcut of sheet.offcuts) offcuts.push({
+            boardId: id, board: item.board, sheet: sheet.number + sheetOffset,
+            x: offcut.x, y: offcut.y, length: offcut.length, width: offcut.width,
+            areaM2: offcut.areaM2, reusable: offcut.reusable,
+          });
+        }
+        sheetOffset += source.nesting.sheets.length;
+      }
+    }
     return {
       boardId: id,
       board: item.board,
@@ -332,10 +355,17 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     "Final check: dimensions, door gaps, drawer operation, finish and installation readiness.",
   ];
   cuts.forEach(({ title }) => assemblySteps.forEach((step, index) => assemblyRows.push([title, index + 1, step, "☐"])));
+  const offcutRows: Cell[][] = [[ "Board", "Sheet", "X (mm)", "Y (mm)", "Length (mm)", "Width (mm)", "Area (m²)", "Reusable candidate" ]];
+  offcuts.forEach(item => offcutRows.push([
+    item.board, item.sheet, item.x, item.y, item.length, item.width,
+    item.areaM2, item.reusable ? "Yes — inspect and label" : "No — small remnant",
+  ]));
+  if (offcuts.length === 0) offcutRows.push(["No rectangular offcuts identified from these layouts."]);
   const workbookSheets: Sheet[] = [
     { name: "Combined cut list", rows: cutting, widths: [11, 32, 22, 32, 25, 23, 16, 16, 17, 12, 24, 20, 14, 14] },
     { name: "Board totals", rows: sheetSummary, widths: [36, 21, 25, 16, 14, 19] },
     { name: "Cutting layout", rows: layout, widths: [32, 10, 55, 12, 12, 18, 19, 12] },
+    { name: "Offcut inventory", rows: offcutRows, widths: [34, 10, 12, 12, 17, 17, 14, 28] },
     { name: "Hardware", rows: hardware, widths: [34, 32, 12, 12, 50] },
     { name: "Design summary", rows: summary, widths: [35, 17, 15, 19, 13] },
     { name: "Validation report", rows: validationRows, widths: [13, 30, 27, 30, 64, 68] },
@@ -395,6 +425,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     sheets,
     workbook: buildXlsx(workbookSheetsWithPurchasing),
     layouts,
+    offcuts,
     rows: printable,
     purchasing: {
       boards: purchasingBoards,
