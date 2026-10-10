@@ -22,6 +22,7 @@ import { StartPanel } from "./start-panel";
 import { useDesign } from "../hooks/use-design";
 import { startingDesign } from "../services/starting-designs";
 import { addProjectDesign, duplicateProjectDesign, projectDesigns, removeProjectDesign, updateProjectDesign } from "../services/cabinet-project";
+import { buildProjectCutList } from "../services/cabinet-project";
 import { buildParts } from "../services/geometry";
 import { buildCutList, sheetCountsOf } from "../services/cutlist";
 import { calculateCost } from "../services/costing";
@@ -187,8 +188,9 @@ export function StudioWorkspace({
     setExporting(true);
     setProjectMessage(null);
     try {
-      // Load the XLSX writer only on demand, not with the 3D editor.
-      const { buildProjectCutList } = await import("../services/cabinet-project");
+      // Build and trigger the download synchronously from the tap. Deferring
+      // this behind a dynamic import can lose the browser user-activation on
+      // iOS Safari, where the XLSX button appeared to do nothing.
       const result = buildProjectCutList(design.spec);
       const blob = new Blob([result.workbook.slice().buffer as ArrayBuffer],
         { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -199,7 +201,8 @@ export function StudioWorkspace({
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(href), 1000);
+      // Mobile browsers may take longer to hand a generated file to Downloads.
+      window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
       const saved = result.sheets.reduce((total, board) => total + board.separateSheets - board.sheets, 0);
       setProjectMessage(`Exported ${result.designs} designs and ${result.pieces} cut pieces. Shared sheet nesting saved ${saved} MDF/board sheets versus separate cutting plans.`);
     } catch (error) {
@@ -714,7 +717,7 @@ export function StudioWorkspace({
                     </button>
                   ) : null}
                 </div>
-                {projectMessage ? <p role="status" className="text-xs text-muted-foreground">{projectMessage}</p> : null}
+                {projectMessage ? <p role={projectMessage.startsWith("Exported ") ? "status" : "alert"} aria-live="polite" className={cn("break-words rounded-lg border px-3 py-2 text-xs", projectMessage.startsWith("Exported ") ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "border-amber-500/40 text-foreground")}>{projectMessage}</p> : null}
                 {projectItems.length > 1 ? <p className="text-[11px] text-muted-foreground">
                   Save stores all cabinets together. Excel combines cuts and hardware,
                   and its cutting layout reuses sheets across matching materials
