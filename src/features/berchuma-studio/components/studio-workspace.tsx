@@ -20,6 +20,7 @@ import { PublishBar } from "./publish-bar";
 import { SendToCalculator } from "./send-to-calculator";
 import { StartPanel } from "./start-panel";
 import { CuttingPlanPreview } from "./cutting-plan-preview";
+import { saveLayoutOffcutsAction } from "@/app/studio/offcuts/actions";
 import type { ProjectProductionSummary } from "../services/cabinet-project";
 import { useDesign } from "../hooks/use-design";
 import { startingDesign } from "../services/starting-designs";
@@ -153,6 +154,9 @@ export function StudioWorkspace({
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [cuttingLayouts, setCuttingLayouts] = useState<ProjectProductionSummary["layouts"]>([]);
+  const [offcutCandidates, setOffcutCandidates] = useState<ProjectProductionSummary["offcuts"]>([]);
+  const [offcutsSaved, setOffcutsSaved] = useState(false);
+  const [savingOffcuts, setSavingOffcuts] = useState(false);
   const projectItems = useMemo(() => design.spec ? projectDesigns(design.spec) : [], [design.spec]);
   const activeItem = projectItems.find(item => item.id === activeItemId) ?? projectItems[0];
   const activeSpec = activeItem?.spec ?? null;
@@ -186,6 +190,38 @@ export function StudioWorkspace({
       setProjectMessage(error instanceof Error ? error.message : "Could not add cabinet.");
     }
   };
+  const saveOffcutsToInventory = async () => {
+    const candidates = offcutCandidates
+      .filter(item => item.reusable && item.thicknessMm !== null)
+      .map(item => ({
+        boardId: item.boardId,
+        boardLabel: item.board,
+        thicknessMm: item.thicknessMm!,
+        sheet: item.sheet,
+        x: item.x,
+        y: item.y,
+        length: item.length,
+        width: item.width,
+        reusable: item.reusable,
+      }));
+    if (!candidates.length || offcutsSaved) return;
+    setSavingOffcuts(true);
+    setProjectMessage(null);
+    try {
+      const result = await saveLayoutOffcutsAction(candidates);
+      if (!result.ok) {
+        setProjectMessage(result.error);
+        return;
+      }
+      setOffcutsSaved(true);
+      setProjectMessage("Saved " + result.count + " reusable offcut candidate(s) to your workshop inventory. Measure each physical remnant before reuse.");
+    } catch {
+      setProjectMessage("Could not save offcuts to the inventory. Check your connection and try again.");
+    } finally {
+      setSavingOffcuts(false);
+    }
+  };
+
   const downloadCombined = async () => {
     if (!design.spec) return;
     setExporting(true);
@@ -196,6 +232,8 @@ export function StudioWorkspace({
       // iOS Safari, where the XLSX button appeared to do nothing.
       const result = buildProjectCutList(design.spec);
       setCuttingLayouts(result.layouts);
+      setOffcutCandidates(result.offcuts.filter(item => item.reusable && item.thicknessMm !== null));
+      setOffcutsSaved(false);
       const blob = new Blob([result.workbook.slice().buffer as ArrayBuffer],
         { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const filename = "medosha-combined-cabinet-cut-list.xlsx";
@@ -747,6 +785,27 @@ export function StudioWorkspace({
                 </p> : null}
               </section>
               {cuttingLayouts.length ? <div className="px-3 pb-3"><CuttingPlanPreview layouts={cuttingLayouts} /></div> : null}
+              {offcutCandidates.length ? (
+                <section className="mx-3 mb-3 rounded-xl border bg-muted/20 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold">Reusable offcuts from this layout</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {offcutCandidates.length} candidate(s) with known board thickness. Save them to carry the measured stock into future projects.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Link href="/studio/offcuts" className="text-xs font-medium text-primary">Inventory</Link>
+                      <button type="button" onClick={saveOffcutsToInventory} disabled={savingOffcuts || offcutsSaved} className="min-h-10 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50">
+                        {offcutsSaved ? "Saved" : savingOffcuts ? "Saving…" : "Save offcuts"}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Layout remnants are candidates only. Inspect, measure and label the physical board before using it in a cut plan.
+                  </p>
+                </section>
+              ) : null}
 
               {/* The editor takes the rest of the column. On a phone that is
                   as much as it wants — the drawing sticks to the top of the
