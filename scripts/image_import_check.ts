@@ -25,6 +25,16 @@ const lines = detectOrthogonalWalls(drawing, 40);
 assert.ok(lines.some(line => line.orientation === "h" && line.x2 - line.x1 > 220 && line.support >= 2), "detect horizontal wall");
 assert.ok(lines.some(line => line.orientation === "v" && line.y2 - line.y1 > 140 && line.support >= 2), "detect vertical wall");
 assert.ok(lines.length <= MAX_RASTER_WALL_CANDIDATES, "the hand-off never exceeds its plan size limit");
+// Furniture, stairs and thin text outlines must not invent phantom walls on
+// white paper plans in the default Walls Only scan mode.
+const printed = image(420, 320);
+ink(printed, 25, 50, 370, 57);   // heavy 8 px wall
+ink(printed, 25, 130, 370, 131); // thin furniture line
+const heavy = detectOrthogonalWalls(printed, 40, "light", true);
+assert.ok(heavy.some(line => line.orientation === "h" && line.y1 >= 48 && line.y1 <= 60), "heavy structural wall detected");
+assert.ok(!heavy.some(line => line.orientation === "h" && line.y1 >= 125 && line.y1 <= 138), "thin furniture line omitted");
+const all = detectOrthogonalWalls(printed, 40, "light", false);
+assert.ok(all.some(line => line.orientation === "h" && line.y1 >= 125 && line.y1 <= 138), "optional relaxed scan restores thin lines");
 // Screenshot of a dark AutoCAD canvas: nearly the entire bitmap is black,
 // white neutral strokes are WALL candidates, orange annotation is NOT one.
 const blackCad = image(420, 360);
@@ -61,6 +71,9 @@ assert.equal(IMAGE_IMPORT_KEY, "medosha:house-image-detection:v1");
 const importer = readFileSync("src/features/house-designer/components/image-to-3d-importer.tsx", "utf8");
 assert.match(importer, /pdfPageCount\(/, "PDF page selection");
 assert.match(importer, /mode === "crop"/, "mobile crop removes toolbars before scan");
+assert.match(importer, /"door", "window", "stair", "furniture"/, "arch objects traced separately");
+assert.match(importer, /symbols,/, "annotated geometry sent through native import hand-off");
+assert.match(importer, /Walls only \(recommended\)/, "structural-only raster scan is enabled by default");
 assert.match(importer, /Black CAD background/, "can force dark CAD scanning");
 assert.match(importer, /detectOrthogonalWalls\(ctx\.getImageData\(0, 0, width, height\), minLength, polarity\)/, "initial scan uses selected polarity");
 
