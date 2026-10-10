@@ -24,6 +24,8 @@ check("successful validation emits a readable pass record",
   validation.some((entry) => entry.code === "manufacturing-check-passed"));
 check("cut list reports physical board nesting",
   cut.byBoard.length > 0 && cut.byBoard.every((board) => board.nesting.sheets.length === board.sheets));
+check("every nested sheet exposes a conservative rectangular offcut inventory",
+  cut.byBoard.every((board) => board.nesting.sheets.every((sheet) => Array.isArray(sheet.offcuts))));
 
 // Deliberately corrupt only the test copy: the production geometry stays untouched.
 const first = parts.parts[0];
@@ -50,6 +52,8 @@ const pack = buildProjectCutList(spec);
 const workbookText = new TextDecoder().decode(pack.workbook);
 check("the combined workbook includes the validation report tab",
   workbookText.includes("Validation report"));
+check("the combined workbook includes offcut dimensions and reuse flags",
+  workbookText.includes("Offcut inventory") && workbookText.includes("Reusable candidate"));
 check("the combined workbook includes workshop assembly steps",
   workbookText.includes("Assembly steps"));
 check("the pack keeps a machine-readable validation result",
