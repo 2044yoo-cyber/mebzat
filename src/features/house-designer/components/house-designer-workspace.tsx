@@ -80,7 +80,8 @@ import {
   splitHouseSelection,
   type HouseClipboard,
 } from "../services/model-commands";
-import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong } from "../services/project-edit";
+import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, rebuildLevel, splitRoomAlong } from "../services/project-edit";
+import { withDerivedZones } from "../services/room-topology";
 import { PLAN_TEMPLATES, ROOM_SAMPLES } from "../services/plan-templates";
 import { HouseTemplateLibrary } from "./house-template-library";
 import { ObjectLibrarySheet, type LibraryChoice, type LibraryKind, type StairSpace } from "./house-object-library";
@@ -268,7 +269,7 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
         floorCount: 1,
         floorToFloorHeight: 3000,
       }));
-      const importedWalls = ensureHouseBimState(applyFreehand(blank, sketch, 8));
+      const importedWalls = ensureHouseBimState(applyFreehand(blank, sketch, 8, 1, false));
       const objects = Array.isArray(payload.symbols) ? payload.symbols : [];
       if (objects.length > MAX_TRACED_SYMBOLS)
         throw new Error("Too many traced architectural objects. Return to the importer and remove duplicates.");
@@ -1546,6 +1547,29 @@ function PlanEditor({
                 <div role="region" aria-label="Active drawing controls" className="flex items-center justify-between gap-2 rounded-xl border bg-card p-2 text-sm">
                   <span className="min-w-0 truncate text-muted-foreground">Drawing mode active</span>
                   <button type="button" onClick={() => { setDraftStart(null); setOutlineSketch([]); setPlacing(null); setLibraryFor(null); setSplitDraft(null); setRoomSplit(null); setActiveTool("select"); }} className="min-h-11 rounded-lg border px-4 font-semibold">Cancel</button>
+                </div>
+              ) : null}
+              {activeLevel?.plan?.freehand && activeLevel.plan.autoZones === false ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400/50 bg-card p-3 text-xs">
+                  <div className="min-w-0 flex-1">
+                    <strong>Rooms not verified</strong>
+                    <p className="mt-1 text-muted-foreground">The image scanner imported candidate walls only. Fix missing walls and remove furniture lines first. Do not estimate floor or painting areas until rooms are enclosed.</p>
+                  </div>
+                  <button type="button" className="min-h-11 rounded-lg border border-brand/40 px-3 font-semibold text-brand"
+                    onClick={() => {
+                      const plan = activeLevel.plan;
+                      if (!plan) return;
+                      const checked = { ...plan, autoZones: true };
+                      const derived = withDerivedZones(checked, checked);
+                      if (!derived.zones?.length) {
+                        toast.info("No enclosed rooms found. Check wall junctions and close the wall boundaries.");
+                        return;
+                      }
+                      commit(rebuildLevel(project, activeLevel.id, derived));
+                      toast.success(`Detected ${derived.zones.length} candidate rooms. Confirm each boundary before using areas or BOQ.`);
+                    }}>
+                    Generate rooms after review
+                  </button>
                 </div>
               ) : null}
               <PlanSecondaryBar canRedo={future.length > 0} onRedo={redo} snap={snapEnabled} onSnap={() => setSnapEnabled((value) => !value)} grid={gridVisible} onGrid={() => setGridVisible((value) => !value)} more={moreTools} />
