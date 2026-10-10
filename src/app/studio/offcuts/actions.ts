@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   addOffcut,
+  addOffcutsFromLayout,
   changeOffcutStatus,
   deleteOffcut,
   type OffcutStatus,
@@ -21,6 +22,12 @@ export async function addOffcutAction(formData: FormData) {
     location: String(formData.get("location") ?? ""),
     notes: String(formData.get("notes") ?? ""),
   });
+  if (result.ok) revalidatePath(inventoryPath);
+  return result;
+}
+
+export async function saveLayoutOffcutsAction(candidates: unknown) {
+  const result = await addOffcutsFromLayout(candidates);
   if (result.ok) revalidatePath(inventoryPath);
   return result;
 }
