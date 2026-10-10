@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Check, CircleAlert, Trash2 } from "lucide-react";
 
@@ -32,6 +32,8 @@ export function OffcutInventory({ initialItems }: { initialItems: OffcutRecord[]
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => setItems(initialItems), [initialItems]);
 
   const available = useMemo(() => items.filter((item) => item.status === "available"), [items]);
   const availableArea = available.reduce((sum, item) => sum + areaM2(item), 0);
