@@ -307,6 +307,11 @@ export function deriveZones(before: Room, after: Room): Room["zones"] {
 
 /** A plan whose rooms are rebuilt from its walls, given the plan before the walls changed. */
 export function withDerivedZones(before: Room, after: Room): Room {
+  // Raster line detection can produce closed loops around furniture, stair
+  // symbols and labels. Do not claim those are real, measurable rooms until
+  // the user has inspected the wall topology and chosen Generate Rooms.
+  if (after.freehand && after.autoZones === false)
+    return { ...after, zones: [] };
   const zones = deriveZones(before, after);
   return zones === after.zones ? after : { ...after, zones };
 }
