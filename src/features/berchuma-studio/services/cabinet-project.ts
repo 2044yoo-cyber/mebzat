@@ -6,6 +6,7 @@ import { buildCutList, type CutListRow } from "./cutlist";
 import { nestBoard, type BoardNesting } from "./nesting";
 import { findBoard } from "../types/catalogue";
 import { buildXlsx, type Cell, type Sheet } from "./xlsx";
+import { validateManufacturingDesign, type ManufacturingIssue } from "./manufacturing-validation";
 
 /**
  * A collection is saved in the existing design's spec JSON. Every additional
@@ -147,18 +148,31 @@ export type ProjectProductionSummary = {
   purchasing: { boards: { boardId: string; board: string; sheets: number; separateSheets: number; saved: number; unitPrice: number | null; estimatedCost: number | null }[];
     hardware: { item: string; quantity: number; unit: string; designs: string[]; notes: string[] }[];
     estimatedBoardCost: number; unpricedBoardCount: number; currency: string; };
-
+  validation: ManufacturingIssue[];
 };
 
 export function buildProjectCutList(primary: DesignSpec): ProjectProductionSummary {
   const designs = validProjectDesigns(primary);
-  const cuts = designs.map(item => ({
-    title: item.spec.title,
-    cut: buildCutList(item.spec, buildParts(item.spec)),
-  }));
+  const cuts = designs.map(item => {
+    const parts = buildParts(item.spec);
+    const cut = buildCutList(item.spec, parts);
+    return {
+      title: item.spec.title,
+      spec: item.spec,
+      parts,
+      cut,
+      validation: validateManufacturingDesign(item.spec, parts, cut),
+    };
+  });
   for (const item of cuts) {
     if (!item.cut.buildable)
       throw new Error(`"${item.title}" contains panels that do not fit the stock sheet. Fix that design first.`);
+  }
+  const validation = cuts.flatMap(item => item.validation);
+  const blockingIssues = validation.filter(item => item.severity === "error");
+  if (blockingIssues.length) {
+    const first = blockingIssues.slice(0, 3).map(item => `${item.design}: ${item.message}`).join(" ");
+    throw new Error(`Manufacturing validation found ${blockingIssues.length} blocking issue(s). ${first}`);
   }
 
   const printable: ProjectProductionSummary["rows"] = [];
@@ -300,12 +314,32 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
   sheetSummary.push(["Sheet layouts are calculated across matching board materials where doing so saves sheets."]);
   sheetSummary.push(["Cut part IDs and source cabinet names remain distinct for assembly."]);
   sheetSummary.push(["Offcuts shared between unrelated board types or grain directions are never assumed."]);
+  const validationRows: Cell[][] = [[ "Severity", "Design", "Check", "Item", "Finding", "Recommended action" ]];
+  validation.forEach(item => validationRows.push([
+    item.severity.toUpperCase(), item.design, item.code, item.item, item.message, item.action,
+  ]));
+  const assemblyRows: Cell[][] = [[ "Design", "Step", "Workshop check", "Complete" ]];
+  const assemblySteps = [
+    "Confirm the design name, dimensions and latest revision before cutting.",
+    "Match each part ID and quantity to the combined cut list.",
+    "Check board thickness, finish and grain direction against the material label.",
+    "Cut and label parts; keep parts grouped by cabinet and transport module.",
+    "Dry-fit the carcass and confirm it is square before fixing the back.",
+    "Install dividers, fixed shelves and adjustable shelf supports as specified.",
+    "Assemble drawers and verify runner clearance and smooth travel.",
+    "Fit doors, hinges, handles, profile pulls or push-to-open hardware as specified.",
+    "Apply the listed edge banding and inspect visible edges and corners.",
+    "Final check: dimensions, door gaps, drawer operation, finish and installation readiness.",
+  ];
+  cuts.forEach(({ title }) => assemblySteps.forEach((step, index) => assemblyRows.push([title, index + 1, step, "☐"])));
   const workbookSheets: Sheet[] = [
     { name: "Combined cut list", rows: cutting, widths: [11, 32, 22, 32, 25, 23, 16, 16, 17, 12, 24, 20, 14, 14] },
     { name: "Board totals", rows: sheetSummary, widths: [36, 21, 25, 16, 14, 19] },
     { name: "Cutting layout", rows: layout, widths: [32, 10, 55, 12, 12, 18, 19, 12] },
     { name: "Hardware", rows: hardware, widths: [34, 32, 12, 12, 50] },
     { name: "Design summary", rows: summary, widths: [35, 17, 15, 19, 13] },
+    { name: "Validation report", rows: validationRows, widths: [13, 30, 27, 30, 64, 68] },
+    { name: "Assembly steps", rows: assemblyRows, widths: [32, 10, 90, 12] },
   ];
   const purchasingHardware = new Map<string, {
     item: string; quantity: number; unit: string; designs: string[]; notes: string[];
@@ -369,5 +403,6 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
       unpricedBoardCount: purchasingBoards.filter(item => item.estimatedCost === null).length,
       currency: "ETB",
     },
+    validation,
   };
 }
