@@ -139,13 +139,19 @@ export default async function CutListPage({
                   <tbody>{combined.purchasing.boards.map(board => <tr key={board.board} className="border-b">
                     <td className="p-2">{board.board}</td><td className="p-2">{board.sheets}</td>
                     <td className="p-2">{board.separateSheets}</td><td className="p-2">{board.saved}</td>
-                    <td className="p-2">{board.estimatedCost.toLocaleString()} ETB</td>
+                    <td className="p-2">{board.estimatedCost === null ? "Price needed" : `${board.estimatedCost.toLocaleString()} ETB`}</td>
                   </tr>)}</tbody>
                 </table>
               </div>
               <p className="text-sm font-semibold">
-                Estimated board material total: {combined.purchasing.estimatedBoardCost.toLocaleString()} ETB
+                Estimated priced-board subtotal: {combined.purchasing.estimatedBoardCost.toLocaleString()} ETB
               </p>
+              {combined.purchasing.unpricedBoardCount > 0 ? (
+                <p role="status" className="rounded-md border border-amber-500/50 p-3 text-sm">
+                  {combined.purchasing.unpricedBoardCount} board material type(s) have no catalogue price.
+                  Their cost is excluded from this subtotal; get supplier prices before approving the budget.
+                </p>
+              ) : null}
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] border-collapse text-xs">
                   <thead><tr className="border-b text-left">
@@ -161,6 +167,36 @@ export default async function CutListPage({
               <p className="text-[11px] text-muted-foreground">
                 Confirm current supplier prices, pack sizes, stock, and actual cut waste before buying. Hardware quantities follow the specifications saved in each design.
               </p>
+            </section>
+            <section className="space-y-3 print:break-before-page">
+              <h2 className="font-semibold">Production release checklist</h2>
+              <p className="text-xs text-muted-foreground">
+                Paper checklist for the workshop lead. Complete every check before cutting; this printout is not a saved approval record.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {[
+                  "Confirm project name and latest approved dimensions",
+                  "Check every cabinet opening, door swing and drawer clearance",
+                  "Verify board type, thickness, finish and grain direction",
+                  "Confirm edge-banding sides and thickness against the drawing",
+                  "Check hinges, runners, handles and other hardware quantities",
+                  "Confirm supplier stock and replace estimated prices with current quotes",
+                  "Review every cutting sheet, trim allowance and part label",
+                  "Verify saw kerf, blade calibration and sheet dimensions",
+                  "Confirm transport modules, assembly access and installation site",
+                  "Workshop lead authorises cutting",
+                ].map((item, index) => (
+                  <div key={item} className="flex min-h-9 items-start gap-2 border-b py-2 text-sm">
+                    <span aria-hidden className="mt-0.5 inline-block size-4 shrink-0 border border-current" />
+                    <span>{index + 1}. {item}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 gap-4 pt-3 text-sm sm:grid-cols-3">
+                <div className="border-b border-current pb-1">Prepared by: __________________</div>
+                <div className="border-b border-current pb-1">Checked by: __________________</div>
+                <div className="border-b border-current pb-1">Release date: ________________</div>
+              </div>
             </section>
             <section className="space-y-2 print:break-before-page">
               <h2 className="font-semibold">Workshop part labels</h2>
