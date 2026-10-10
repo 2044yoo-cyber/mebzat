@@ -225,7 +225,7 @@ export function StudioWorkspace({
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
       const saved = result.sheets.reduce((total, board) => total + board.separateSheets - board.sheets, 0);
-      setProjectMessage(`Exported ${result.designs} designs and ${result.pieces} cut pieces. Shared sheet nesting saved ${saved} MDF/board sheets versus separate cutting plans.`);
+      setProjectMessage(`Production pack exported: ${result.designs} designs, ${result.pieces} cut pieces, ${result.validation.filter(item => item.severity === "info").length} validation pass record(s), assembly checklist, hardware schedule and cutting layouts. Shared sheet nesting saved ${saved} MDF/board sheets versus separate cutting plans.`);
     } catch (error) {
       setProjectMessage(error instanceof Error ? error.message : "Could not generate the combined cut list.");
     } finally {
