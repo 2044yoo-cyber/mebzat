@@ -139,14 +139,14 @@ function validProjectDesigns(primary: DesignSpec): ProjectItem[] {
 export type ProjectProductionSummary = {
   designs: number;
   pieces: number;
-  sheets: { board: string; sheets: number; separateSheets: number; pieces: number; area: number }[];
+  sheets: { boardId: string; board: string; sheets: number; separateSheets: number; pieces: number; area: number }[];
   workbook: Uint8Array;
   layouts: { board: string; sheet: number; length: number; width: number; utilisation: number; parts: { label: string; design: string; x: number; y: number; width: number; height: number; rotated: boolean }[] }[];
   rows: { design: string; partId: string; cabinet: string; label: string; board: string;
     length: number; width: number; thickness: number; quantity: number; banding: string }[];
-  purchasing: { boards: { board: string; sheets: number; separateSheets: number; saved: number; estimatedCost: number }[];
+  purchasing: { boards: { boardId: string; board: string; sheets: number; separateSheets: number; saved: number; unitPrice: number | null; estimatedCost: number | null }[];
     hardware: { item: string; quantity: number; unit: string; designs: string[]; notes: string[] }[];
-    estimatedBoardCost: number; currency: string; };
+    estimatedBoardCost: number; unpricedBoardCount: number; currency: string; };
 
 };
 
@@ -284,6 +284,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
       }
     }
     return {
+      boardId: id,
       board: item.board,
       sheets: useShared ? shared!.sheets.length : item.sheets,
       separateSheets: item.sheets,
@@ -322,12 +323,16 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     }
   });
   const purchasingBoards = sheets.map(board => {
-    const match = [...BOARDS].find(candidate => candidate.label === board.board);
-    const unitPrice = match?.fallbackRate ?? 0;
+    // Match by catalogue ID, not display label: labels are not a safe price key.
+    const match = findBoard(board.boardId);
+    const unitPrice = match?.fallbackRate ?? null;
     return {
-      board: board.board, sheets: board.sheets, separateSheets: board.separateSheets,
+      boardId: board.boardId, board: board.board, sheets: board.sheets,
+      separateSheets: board.separateSheets,
       saved: board.separateSheets - board.sheets,
-      estimatedCost: board.sheets * unitPrice,
+      unitPrice,
+      // A missing catalogue price must never masquerade as a free material.
+      estimatedCost: unitPrice === null ? null : board.sheets * unitPrice,
     };
   });
   const workbookSheetsWithPurchasing: Sheet[] = [
@@ -337,7 +342,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
       ["Material", "Sheets to buy", "Separate baseline", "Sheets saved", "Est. unit price (ETB)", "Est. total (ETB)"],
       ...purchasingBoards.map(item => [
         item.board, item.sheets, item.separateSheets, item.saved,
-        item.sheets ? Math.round(item.estimatedCost / item.sheets) : 0, item.estimatedCost,
+        item.unitPrice ?? "PRICE NEEDED", item.estimatedCost ?? "PRICE NEEDED",
       ]),
       [],
       ["HARDWARE — AGGREGATED ACROSS DESIGNS"],
@@ -360,7 +365,8 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     purchasing: {
       boards: purchasingBoards,
       hardware: [...purchasingHardware.values()],
-      estimatedBoardCost: purchasingBoards.reduce((sum, item) => sum + item.estimatedCost, 0),
+      estimatedBoardCost: purchasingBoards.reduce((sum, item) => sum + (item.estimatedCost ?? 0), 0),
+      unpricedBoardCount: purchasingBoards.filter(item => item.estimatedCost === null).length,
       currency: "ETB",
     },
   };
