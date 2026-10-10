@@ -61,7 +61,7 @@ assert.equal(workbook.pieces, expected, "every cabinet contributes all its cut p
 assert.equal(workbook.designs, 3);
 assert.ok(workbook.purchasing.boards.length > 0, "purchasing summary includes board materials");
 assert.equal(workbook.purchasing.estimatedBoardCost,
-  workbook.purchasing.boards.reduce((sum, board) => sum + board.estimatedCost, 0),
+  workbook.purchasing.boards.reduce((sum, board) => sum + (board.estimatedCost ?? 0), 0),
   "board estimate equals sum of per-material estimates");
 assert.ok(workbook.purchasing.hardware.every(item => item.quantity > 0 && item.designs.length > 0),
   "aggregated hardware has quantities and source cabinet names");
