@@ -78,6 +78,8 @@ export type Part = {
    * to produce it. A sliding leaf must never receive concealed hinges.
    */
   doorStyle?: "hinged" | "sliding" | "bifold" | "corner" | "fixed";
+  /** Physical grip treatment rendered on the front and counted in the hardware schedule. */
+  frontGrip?: "handle" | "push-to-open" | "recessed-pull" | "finger-gap";
   /**
    * Only shelves carried on adjustable pins consume shelf-pin hardware.
    * Fixed stack dividers and rail support shelves are real boards, but they
