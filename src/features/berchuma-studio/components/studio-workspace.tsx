@@ -775,12 +775,20 @@ export function StudioWorkspace({
                       Start a cabinet or continue one of your recent projects.
                     </p>
                   </div>
-                  <Link
-                    href="/designs?mine=1"
-                    className="shrink-0 text-xs font-medium text-primary"
-                  >
-                    View all
-                  </Link>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <Link
+                      href="/designs?mine=1"
+                      className="text-xs font-medium text-primary"
+                    >
+                      View all
+                    </Link>
+                    <Link
+                      href="/studio/offcuts"
+                      className="text-xs font-medium text-primary"
+                    >
+                      Offcut inventory ↗
+                    </Link>
+                  </div>
                 </div>
                 {recentProjects.length > 0 ? (
                   <section className="mt-5">
