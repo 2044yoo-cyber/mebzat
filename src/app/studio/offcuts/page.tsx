@@ -57,7 +57,7 @@ export default async function OffcutInventoryPage() {
         </p>
       </header>
       {inventoryError ? <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{inventoryError}</p> : null}
-      <OffcutInventory initialItems={offcuts} />
+      <OffcutInventory key={offcuts.map((item) => `${item.id}:${item.status}:${item.updated_at}`).join("|")} initialItems={offcuts} />
       <p className="text-xs text-muted-foreground">
         Inventory records are not yet automatically deducted from a new project's board purchase estimate. That requires a separate stock-matching and reservation step so one remnant cannot be promised to two projects.
       </p>
