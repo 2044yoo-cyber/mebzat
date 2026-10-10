@@ -418,6 +418,30 @@ function BayRow({
         </Select>
       </div>
 
+      {bay.door !== "none" ? (
+        <div className="mt-2 space-y-1">
+          <Label className="text-xs">Door front / opening grip</Label>
+          <Select
+            value={bay.frontGrip ?? "handle"}
+            onValueChange={picked((grip) =>
+              onEdit((draft) => {
+                const target = at(draft);
+                if (target) target.frontGrip = grip as NonNullable<Bay["frontGrip"]>;
+              }),
+            )}
+          >
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="handle">External handle</SelectItem>
+              <SelectItem value="push-to-open">Handle-free · push-to-open</SelectItem>
+              <SelectItem value="recessed-pull">Recessed / profile pull</SelectItem>
+              <SelectItem value="finger-gap">Finger-grip lip / reveal</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Push-to-open and profile pulls are included in hardware and costing.</p>
+        </div>
+      ) : null}
+
       {/* A count only exists for the fittings that have one, so the control
           appears with the fitting rather than sitting there disabled. */}
       {bay.fitting.kind === "shelves" || bay.fitting.kind === "drawers" ? (
