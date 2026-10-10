@@ -4,7 +4,7 @@ import { startingDesign } from "./starting-designs";
 import { buildParts } from "./geometry";
 import { buildCutList, type CutListRow } from "./cutlist";
 import { nestBoard, type BoardNesting } from "./nesting";
-import { findBoard } from "../types/catalogue";
+import { BOARDS, findBoard } from "../types/catalogue";
 import { buildXlsx, type Cell, type Sheet } from "./xlsx";
 
 /**
@@ -144,6 +144,10 @@ export type ProjectProductionSummary = {
   layouts: { board: string; sheet: number; length: number; width: number; utilisation: number; parts: { label: string; design: string; x: number; y: number; width: number; height: number; rotated: boolean }[] }[];
   rows: { design: string; partId: string; cabinet: string; label: string; board: string;
     length: number; width: number; thickness: number; quantity: number; banding: string }[];
+  purchasing: { boards: { board: string; sheets: number; separateSheets: number; saved: number; estimatedCost: number }[];
+    hardware: { item: string; quantity: number; unit: string; designs: string[]; notes: string[] }[];
+    estimatedBoardCost: number; currency: string; };
+
 };
 
 export function buildProjectCutList(primary: DesignSpec): ProjectProductionSummary {
@@ -302,12 +306,62 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     { name: "Hardware", rows: hardware, widths: [34, 32, 12, 12, 50] },
     { name: "Design summary", rows: summary, widths: [35, 17, 15, 19, 13] },
   ];
+  const purchasingHardware = new Map<string, {
+    item: string; quantity: number; unit: string; designs: string[]; notes: string[];
+  }>();
+  cuts.forEach(({ title, cut }) => {
+    for (const item of cut.hardware) {
+      const key = `${item.label.toLocaleLowerCase()}|${item.unit.toLocaleLowerCase()}`;
+      const entry = purchasingHardware.get(key) ?? {
+        item: item.label, quantity: 0, unit: item.unit, designs: [], notes: [],
+      };
+      entry.quantity += item.quantity;
+      if (!entry.designs.includes(title)) entry.designs.push(title);
+      if (item.note && !entry.notes.includes(item.note)) entry.notes.push(item.note);
+      purchasingHardware.set(key, entry);
+    }
+  });
+  const purchasingBoards = sheets.map(board => {
+    const match = [...BOARDS].find(candidate => candidate.label === board.board);
+    const unitPrice = match?.fallbackRate ?? 0;
+    return {
+      board: board.board, sheets: board.sheets, separateSheets: board.separateSheets,
+      saved: board.separateSheets - board.sheets,
+      estimatedCost: board.sheets * unitPrice,
+    };
+  });
+  const workbookSheetsWithPurchasing: Sheet[] = [
+    ...workbookSheets,
+    { name: "Purchasing list", rows: [
+      ["BOARD MATERIALS — ESTIMATED PURCHASE"],
+      ["Material", "Sheets to buy", "Separate baseline", "Sheets saved", "Est. unit price (ETB)", "Est. total (ETB)"],
+      ...purchasingBoards.map(item => [
+        item.board, item.sheets, item.separateSheets, item.saved,
+        item.sheets ? Math.round(item.estimatedCost / item.sheets) : 0, item.estimatedCost,
+      ]),
+      [],
+      ["HARDWARE — AGGREGATED ACROSS DESIGNS"],
+      ["Item", "Total quantity", "Unit", "Used by designs", "Notes"],
+      ...[...purchasingHardware.values()].map(item => [
+        item.item, item.quantity, item.unit, item.designs.join(", "), item.notes.join("; "),
+      ]),
+      [],
+      ["Pricing note: ETB board estimates use the catalogue fallback rate and may be outdated."],
+      ["Confirm supplier prices, hardware pack sizes, stock and waste before purchasing."],
+    ], widths: [38, 16, 19, 16, 23, 22] },
+  ];
   return {
     designs: designs.length,
     pieces: cuts.reduce((sum, item) => sum + item.cut.totals.pieces, 0),
     sheets,
-    workbook: buildXlsx(workbookSheets),
+    workbook: buildXlsx(workbookSheetsWithPurchasing),
     layouts,
     rows: printable,
+    purchasing: {
+      boards: purchasingBoards,
+      hardware: [...purchasingHardware.values()],
+      estimatedBoardCost: purchasingBoards.reduce((sum, item) => sum + item.estimatedCost, 0),
+      currency: "ETB",
+    },
   };
 }
