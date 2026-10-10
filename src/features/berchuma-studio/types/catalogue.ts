@@ -337,6 +337,14 @@ export const HARDWARE: Hardware[] = [
     fallbackRate: 320,
   },
   {
+    id: "push-to-open-latch",
+    label: "Push-to-open cabinet latch",
+    kind: "push_latch",
+    unit: "each",
+    priceKey: "Push to open latch",
+    fallbackRate: 180,
+  },
+  {
     id: "runner-soft-close",
     label: "Soft-close full-extension runner",
     kind: "drawer_runner",
