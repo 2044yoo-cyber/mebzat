@@ -19,6 +19,8 @@ import { TemplateThumb } from "./template-thumb";
 import { PublishBar } from "./publish-bar";
 import { SendToCalculator } from "./send-to-calculator";
 import { StartPanel } from "./start-panel";
+import { CuttingPlanPreview } from "./cutting-plan-preview";
+import type { ProjectProductionSummary } from "../services/cabinet-project";
 import { useDesign } from "../hooks/use-design";
 import { startingDesign } from "../services/starting-designs";
 import { addProjectDesign, duplicateProjectDesign, projectDesigns, removeProjectDesign, updateProjectDesign } from "../services/cabinet-project";
@@ -150,6 +152,7 @@ export function StudioWorkspace({
   const [newCabinetKind, setNewCabinetKind] = useState<DesignKind>("wardrobe");
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [cuttingLayouts, setCuttingLayouts] = useState<ProjectProductionSummary["layouts"]>([]);
   const projectItems = useMemo(() => design.spec ? projectDesigns(design.spec) : [], [design.spec]);
   const activeItem = projectItems.find(item => item.id === activeItemId) ?? projectItems[0];
   const activeSpec = activeItem?.spec ?? null;
@@ -192,6 +195,7 @@ export function StudioWorkspace({
       // this behind a dynamic import can lose the browser user-activation on
       // iOS Safari, where the XLSX button appeared to do nothing.
       const result = buildProjectCutList(design.spec);
+      setCuttingLayouts(result.layouts);
       const blob = new Blob([result.workbook.slice().buffer as ArrayBuffer],
         { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const href = URL.createObjectURL(blob);
@@ -724,6 +728,7 @@ export function StudioWorkspace({
                   when a shared arrangement reduces waste.
                 </p> : null}
               </section>
+              {cuttingLayouts.length ? <div className="px-3 pb-3"><CuttingPlanPreview layouts={cuttingLayouts} /></div> : null}
 
               {/* The editor takes the rest of the column. On a phone that is
                   as much as it wants — the drawing sticks to the top of the
