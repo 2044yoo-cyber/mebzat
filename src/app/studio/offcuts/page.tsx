@@ -13,11 +13,11 @@ export const metadata: Metadata = {
 };
 
 export default async function OffcutInventoryPage() {
-  let user = null;
+  let authenticated = false;
   try {
     const supabase = await createClient();
     const result = await supabase.auth.getUser();
-    user = result.data.user;
+    authenticated = Boolean(result.data.user);
   } catch {
     return (
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-8">
@@ -28,9 +28,15 @@ export default async function OffcutInventoryPage() {
     );
   }
 
-  if (!user) redirect("/login?redirect=%2Fstudio%2Foffcuts");
+  if (!authenticated) redirect("/login?redirect=%2Fstudio%2Foffcuts");
 
-  const offcuts = await listOffcuts();
+  let offcuts: Awaited<ReturnType<typeof listOffcuts>> = [];
+  let inventoryError: string | null = null;
+  try {
+    offcuts = await listOffcuts();
+  } catch {
+    inventoryError = "The inventory table is not available yet. Apply supabase/migrations/0073_offcut_inventory.sql to the Medosha Supabase project, then reload this page.";
+  }
   const readyCount = offcuts.filter((item) => item.status === "available").length;
 
   return (
@@ -50,6 +56,7 @@ export default async function OffcutInventoryPage() {
           Record the actual dimensions of leftover MDF, plywood and other sheet materials. Your inventory is saved to your account, so it follows you between projects and devices. Check every remnant in the workshop before reuse.
         </p>
       </header>
+      {inventoryError ? <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{inventoryError}</p> : null}
       <OffcutInventory initialItems={offcuts} />
       <p className="text-xs text-muted-foreground">
         Inventory records are not yet automatically deducted from a new project's board purchase estimate. That requires a separate stock-matching and reservation step so one remnant cannot be promised to two projects.
