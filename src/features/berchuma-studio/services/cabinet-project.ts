@@ -86,6 +86,46 @@ export function removeProjectDesign(primary: DesignSpec, id: string): DesignSpec
   };
 }
 
+/** Fail closed rather than export a cutting diagram with missing, overlapping,
+ * or off-sheet parts. Coordinates are in millimetres on the usable sheet.
+ */
+function assertSafeNesting(nesting: BoardNesting, rows: CutListRow[], boardLabel: string): void {
+  if (nesting.unplaced.length) {
+    throw new Error(`Some parts do not fit ${boardLabel}: ${nesting.unplaced.map(p => p.label).join(", ")}`);
+  }
+  const expected = new Map<number, number>();
+  rows.forEach(row => expected.set(row.index, (expected.get(row.index) ?? 0) + row.quantity));
+  const actual = new Map<number, number>();
+  for (const sheet of nesting.sheets) {
+    for (const place of sheet.placements) {
+      if (place.x < 0 || place.y < 0 ||
+          place.x + place.width > nesting.sheet.length - nesting.trim + 0.001 ||
+          place.y + place.height > nesting.sheet.width - nesting.trim + 0.001) {
+        throw new Error(`Cut ${place.label} exceeds the usable ${boardLabel} sheet boundary.`);
+      }
+      actual.set(place.index, (actual.get(place.index) ?? 0) + 1);
+    }
+    for (let i = 0; i < sheet.placements.length; i++) {
+      const a = sheet.placements[i]!;
+      for (let j = i + 1; j < sheet.placements.length; j++) {
+        const b = sheet.placements[j]!;
+        const separated = a.x + a.width <= b.x || b.x + b.width <= a.x ||
+          a.y + a.height <= b.y || b.y + b.height <= a.y;
+        if (!separated) throw new Error(`Cutting layout overlaps: ${a.label} and ${b.label} on sheet ${sheet.number}.`);
+      }
+    }
+  }
+  for (const [index, quantity] of expected) {
+    if ((actual.get(index) ?? 0) !== quantity) {
+      const row = rows.find(item => item.index === index);
+      throw new Error(`Cutting layout quantity mismatch for ${row?.label ?? index} on ${boardLabel}.`);
+    }
+  }
+  for (const index of actual.keys()) {
+    if (!expected.has(index)) throw new Error(`Unexpected part in cutting layout for ${boardLabel}.`);
+  }
+}
+
 /** Parse every independent design at the export boundary, never trust raw JSON. */
 function validProjectDesigns(primary: DesignSpec): ProjectItem[] {
   return projectDesigns(primary).map((item) => {
@@ -184,6 +224,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     // original nesting is still valid; retain that rather than reject export.
     const board = findBoard(id);
     const shared = board ? nestBoard(board, group.rows) : null;
+    if (shared) assertSafeNesting(shared, group.rows, item.board);
     // Shelf packing is a heuristic: with more pieces, it can occasionally
     // choose a worse arrangement. Keep the separate verified plans whenever
     // shared nesting does not improve the sheet count.
