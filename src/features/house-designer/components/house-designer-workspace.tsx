@@ -1484,8 +1484,8 @@ function PlanEditor({
         {project.freehandSketch ? <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
           <span>{project.freehandSketch.calibrated ? "Sketch scale set; verify remaining measurements." : "Approximate freehand dimensions and areas — calibrate before estimating costs."}</span>
           {project.walls.length === 4 && project.rooms.length === 1 ? <button type="button" className="rounded border px-2 py-1 font-semibold" onClick={() => {
-            const width = window.prompt("Rectangle width in metres (wall centrelines)", "4.00"); if (width === null) return;
-            const depth = window.prompt("Rectangle length in metres (wall centrelines)", "5.00"); if (depth === null) return;
+            const width = window.prompt("Clear inside room width in metres (finished wall face to finished wall face)", "4.00"); if (width === null) return;
+            const depth = window.prompt("Clear inside room length in metres (finished wall face to finished wall face)", "5.00"); if (depth === null) return;
             try { commit(dimensionRectangle(project, Number(width)*1000, Number(depth)*1000)); } catch (error) { toast.error(error instanceof Error ? error.message : "Check dimensions"); }
           }}>Set rectangle dimensions</button> : null}
         </div> : null}
