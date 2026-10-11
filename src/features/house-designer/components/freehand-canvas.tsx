@@ -739,9 +739,9 @@ export function FreehandCanvas({
         <p className="text-xs text-slate-500" role="status">
           {message} <span ref={status} />
         </p>
-        {dimensionSegments.length ? <details className="rounded-lg border border-slate-200 bg-slate-50 text-xs" open={dimensionSegments.length <= 8}>
+        {dimensionSegments.length ? <details className="rounded-lg border border-slate-200 bg-slate-50 text-xs" open>
           <summary className="cursor-pointer p-2 font-semibold text-slate-700">Inside wall dimensions · {dimensionSegments.length} wall(s) · {sketch.calibrated ? "calibrated" : "approximate"}</summary>
-          <div className="max-h-32 space-y-1 overflow-y-auto px-2 pb-2">
+          <div className="max-h-[30dvh] space-y-1 overflow-y-auto px-2 pb-2">
             {dimensionSegments.map((wall, index) => {
               const metres = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y) / 1000;
               return <div key={`${index}-${wall.start.x}-${wall.start.y}-${wall.end.x}-${wall.end.y}`} className="flex items-center justify-between gap-2 rounded border bg-white px-2 py-1.5">
