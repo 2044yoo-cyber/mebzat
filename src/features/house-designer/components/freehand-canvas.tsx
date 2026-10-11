@@ -61,7 +61,7 @@ export function FreehandCanvas({
   const [snap, setSnap] = useState(true),
     [thickness, setThickness] = useState(200);
   const [message, setMessage] = useState(
-    "Drag to draw straight 90° walls. Ends snap to nearby corners. Use Hand to pan.",
+    "Draw clear inside wall-face lengths. Labels are approximate until you set a known wall length. Use Hand to pan.",
   );
   const [review, setReview] = useState(false);
   const [focusedIssue, setFocusedIssue] = useState<string | null>(null);
@@ -147,6 +147,33 @@ export function FreehandCanvas({
       draw([segment.start, segment.end], "#233c59", 2);
       for (const p of [segment.start, segment.end])
         points.set(`${p.x.toFixed(3)}:${p.y.toFixed(3)}`, p);
+    }
+    // Labels show clear inside wall-face measurements, not centreline or outside dimensions.
+    // Until a known wall length calibrates the sketch, mark these values approximate.
+    for (const segment of geometry.segments) {
+      const dx = segment.end.x - segment.start.x;
+      const dy = segment.end.y - segment.start.y;
+      const length = Math.hypot(dx, dy);
+      if (length < 24) continue;
+      const metres = length * state.current.sketch.mmPerUnit / 1000;
+      const mx = (segment.start.x + segment.end.x) / 2;
+      const my = (segment.start.y + segment.end.y) / 2;
+      const nx = length ? -dy / length : 0;
+      const ny = length ? dx / length : -1;
+      const tx = mx + nx * 15 / v.zoom;
+      const ty = my + ny * 15 / v.zoom;
+      const label = (state.current.sketch.calibrated ? "" : "≈ ") + metres.toFixed(2) + " m";
+      ctx.save();
+      ctx.font = "600 " + (12 / v.zoom) + "px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const metrics = ctx.measureText(label);
+      const pad = 4 / v.zoom;
+      ctx.fillStyle = "#fafbfc";
+      ctx.fillRect(tx - metrics.width / 2 - pad, ty - 8 / v.zoom, metrics.width + pad * 2, 16 / v.zoom);
+      ctx.fillStyle = state.current.sketch.calibrated ? "#334155" : "#64748b";
+      ctx.fillText(label, tx, ty);
+      ctx.restore();
     }
     if (review) {
       const diagnostics = inspectFreehand(visibleStrokes, state.current.snap ? 12 : 0, 1 / v.zoom);
