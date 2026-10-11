@@ -86,7 +86,12 @@ const convert = (strokes: Stroke[]) =>
 const plan = convert(rectangle);
 assert.equal(plan.walls.length, 4, "rough rectangle has four native walls");
 assert.equal(plan.rooms.length, 1, "almost closed rectangle forms room");
-assert.ok(Math.abs(signedArea(plan.rooms[0]!.boundary) / 1e6 - 20) < 0.3);
+const insideBoundary = plan.rooms[0]!.boundary;
+const insideWidth = Math.max(...insideBoundary.map((point) => point.x)) - Math.min(...insideBoundary.map((point) => point.x));
+const insideDepth = Math.max(...insideBoundary.map((point) => point.y)) - Math.min(...insideBoundary.map((point) => point.y));
+assert.ok(Math.abs(insideWidth - 4000) < 1, `converted room preserves 4000 mm clear inside width (${insideWidth})`);
+assert.ok(Math.abs(insideDepth - 5000) < 1, `converted room preserves 5000 mm clear inside depth (${insideDepth})`);
+assert.ok(Math.abs(signedArea(insideBoundary) / 1e6 - 20) < 0.3);
 assert.equal(
   convertStrokes(
     [
