@@ -510,7 +510,12 @@ export function applyFreehand(
   return sketch.calibrated ? rememberWallLength(next, next.walls[0]!.id) : next;
 }
 
-/** Calibrate an axis-aligned single-room rectangle, with centreline dimensions. */
+/**
+ * Calibrate a four-wall rectangle from the clear inside room dimensions.
+ * Native wall geometry uses centre-lines, so add one wall thickness to each
+ * overall centre-line span. This preserves the requested inside clear width
+ * and depth after the wall solids are generated.
+ */
 export function dimensionRectangle(
   project: HouseProject,
   width: number,
@@ -553,9 +558,12 @@ export function dimensionRectangle(
     maxX = Math.max(...xs),
     minY = Math.min(...ys),
     maxY = Math.max(...ys);
+  const wallThickness = plan.wallThickness;
+  const centrelineWidth = width + wallThickness;
+  const centrelineDepth = depth + wallThickness;
   const map = (p: Point) => ({
-    x: minX + (p.x < (minX + maxX) / 2 ? 0 : width),
-    y: minY + (p.y < (minY + maxY) / 2 ? 0 : depth),
+    x: minX + (p.x < (minX + maxX) / 2 ? 0 : centrelineWidth),
+    y: minY + (p.y < (minY + maxY) / 2 ? 0 : centrelineDepth),
   });
   const nextPlan = {
     ...plan,
