@@ -502,12 +502,38 @@ export function applyFreehand(
     zones: [],
   });
   plan = roomSchema.parse(withDerivedZones(plan, plan));
-  const next = rebuildLevel(
+  let next = rebuildLevel(
     { ...project, freehandSketch: sketch },
     level.id,
     plan,
   );
-  return sketch.calibrated ? rememberWallLength(next, next.walls[0]!.id) : next;
+
+  // The sketch is drawn along the clear inside faces, not wall centrelines.
+  // Once calibrated, a simple closed four-wall rectangle can be converted
+  // directly: expand the centreline spans by one wall thickness so the room's
+  // finished inside dimensions stay equal to the lengths drawn by the user.
+  // Complex plans remain untouched and can use individual dimensions in Plan.
+  if (
+    sketch.calibrated &&
+    next.walls.length === 4 &&
+    next.rooms.length === 1 &&
+    !next.doors.length &&
+    !next.windows.length
+  ) {
+    const xs = segments.flatMap((segment) => [segment.start.x, segment.end.x]);
+    const ys = segments.flatMap((segment) => [segment.start.y, segment.end.y]);
+    const width = Math.max(...xs) - Math.min(...xs);
+    const depth = Math.max(...ys) - Math.min(...ys);
+    try {
+      next = dimensionRectangle(next, width, depth);
+    } catch {
+      // Four-wall non-rectangular shapes are valid sketches; leave their
+      // geometry alone rather than forcing them into a rectangle.
+    }
+  }
+  return sketch.calibrated && next.walls[0]
+    ? rememberWallLength(next, next.walls[0].id)
+    : next;
 }
 
 /**
