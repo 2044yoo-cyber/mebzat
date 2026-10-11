@@ -385,7 +385,7 @@ export function FreehandCanvas({
         }
       }
   }
-  function calibrate() {
+  function calibrate(wallIndex = 0) {
     const segments = convertStrokes(
       sketch.strokes,
       1,
@@ -396,11 +396,14 @@ export function FreehandCanvas({
       setMessage("Draw a wall first, then set its known length.");
       return;
     }
-    // Choose a single, explicitly identified reference: the first converted wall.
-    const wall = segments[0]!,
-      units = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+    const wall = segments[wallIndex];
+    if (!wall) {
+      setMessage("That wall is no longer in the sketch. Review the drawing and try again.");
+      return;
+    }
+    const units = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
     const answer = window.prompt(
-      "Clear inside length between finished wall faces of the FIRST drawn wall (metres). This calibrates the whole sketch.",
+      `Clear inside length between finished wall faces for Wall ${wallIndex + 1} (metres). Measure inside the home, not centre-to-centre or outside. This calibrates the whole sketch.`,
       sketch.calibrated ? ((units * sketch.mmPerUnit) / 1000).toFixed(3) : "",
     );
     if (answer === null) return;
@@ -419,7 +422,7 @@ export function FreehandCanvas({
       return;
     commit({ ...sketch, mmPerUnit: (metres * 1000) / units, calibrated: true });
     setMessage(
-      "Scale set from the first wall’s clear inside length. Calibrated rectangular rooms will preserve the inside dimensions when converted.",
+      `Scale set from Wall ${wallIndex + 1} using its clear inside length. Calibrated rectangular rooms preserve inside dimensions when converted; complex plans retain the measured scale for review in Plan mode.`,
     );
   }
   function zoom(factor: number) {
@@ -444,6 +447,12 @@ export function FreehandCanvas({
     >
       <Icon className="size-5" />
     </button>
+  );
+  const dimensionSegments = convertStrokes(
+    sketch.strokes,
+    sketch.mmPerUnit,
+    snap ? 12 : 0,
+    1 / view.current.zoom,
   );
   return (
     <div
@@ -697,6 +706,18 @@ export function FreehandCanvas({
         <p className="text-xs text-slate-500" role="status">
           {message} <span ref={status} />
         </p>
+        {dimensionSegments.length ? <details className="rounded-lg border border-slate-200 bg-slate-50 text-xs" open={dimensionSegments.length <= 8}>
+          <summary className="cursor-pointer p-2 font-semibold text-slate-700">Inside wall dimensions · {dimensionSegments.length} wall(s) · {sketch.calibrated ? "calibrated" : "approximate"}</summary>
+          <div className="max-h-32 space-y-1 overflow-y-auto px-2 pb-2">
+            {dimensionSegments.map((wall, index) => {
+              const metres = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y) / 1000;
+              return <div key={`${index}-${wall.start.x}-${wall.start.y}-${wall.end.x}-${wall.end.y}`} className="flex items-center justify-between gap-2 rounded border bg-white px-2 py-1.5">
+                <span>Wall {index + 1}: <strong>{sketch.calibrated ? "" : "≈ "}{metres.toFixed(2)} m</strong></span>
+                {!readOnly ? <button type="button" className="shrink-0 rounded border border-blue-200 px-2 py-1 text-blue-700" onClick={() => calibrate(index)}>Set known inside length</button> : null}
+              </div>;
+            })}
+          </div>
+        </details> : null}
         {review && !readOnly ? (() => {
           const result = inspectFreehand(sketch.strokes, snap ? 12 : 0, 1 / view.current.zoom);
           const open = result.issues.filter(issue => issue.kind === "open-end");
