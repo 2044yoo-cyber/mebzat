@@ -61,7 +61,7 @@ export function FreehandCanvas({
   const [snap, setSnap] = useState(true),
     [thickness, setThickness] = useState(200);
   const [message, setMessage] = useState(
-    "Draw clear inside wall-face lengths. Labels are approximate until you set a known wall length. Use Hand to pan.",
+    "Draw along the finished inside wall faces. Dimensions are clear inside measurements, not centreline or outside lengths. Calibrate with a known inside length; calibrated rectangles keep these dimensions after wall thickness is applied.",
   );
   const [review, setReview] = useState(false);
   const [focusedIssue, setFocusedIssue] = useState<string | null>(null);
@@ -400,7 +400,7 @@ export function FreehandCanvas({
     const wall = segments[0]!,
       units = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
     const answer = window.prompt(
-      "Known length of the FIRST drawn wall (metres). This uniformly scales the whole sketch.",
+      "Clear inside length between finished wall faces of the FIRST drawn wall (metres). This calibrates the whole sketch.",
       sketch.calibrated ? ((units * sketch.mmPerUnit) / 1000).toFixed(3) : "",
     );
     if (answer === null) return;
@@ -419,7 +419,7 @@ export function FreehandCanvas({
       return;
     commit({ ...sketch, mmPerUnit: (metres * 1000) / units, calibrated: true });
     setMessage(
-      "Scale set from the first wall. Check every other dimension in Plan mode.",
+      "Scale set from the first wall’s clear inside length. Calibrated rectangular rooms will preserve the inside dimensions when converted.",
     );
   }
   function zoom(factor: number) {
@@ -783,7 +783,8 @@ export function FreehandCanvas({
               </div>)}
             </div> : null}
 
-            {!sketch.calibrated ? <p className="font-medium text-amber-800">Dimensions are approximate. Set a known wall length before estimating costs.</p> : null}
+            <p className="text-slate-600">Dimensions measure the clear space from inside wall face to inside wall face. Wall thickness is added outside this clear space during calibrated rectangular conversion.</p>
+            {!sketch.calibrated ? <p className="font-medium text-amber-800">Dimensions are approximate. Set a known inside wall length before estimating costs.</p> : null}
             {result.issues.length === 0 ? <p className="text-green-700">No open endpoints or tiny pieces detected. Verify the rooms after conversion.</p> : result.issues.slice(0, 30).map((issue, index) =>
               <button key={issue.id} type="button" onClick={() => {
                 const rect = canvas.current?.getBoundingClientRect();
