@@ -1666,8 +1666,8 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
       // the carcass and runner geometry remains unchanged and the front schedule
       // (including the cut list) uses these exact visible sizes.
       const totalGap = clearance * Math.max(0, construction.faces.length - 1);
-      const heightBudget = Math.max(0, originalTotal - totalGap);
       const originalTotal = construction.faces.reduce((sum, face) => sum + face.height, 0);
+      const heightBudget = Math.max(0, originalTotal - totalGap);
       let y = bandFloor;
       construction.faces.forEach((face, index) => {
         const height = originalTotal > 0 ? face.height * heightBudget / originalTotal : face.height;
