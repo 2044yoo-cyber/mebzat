@@ -148,33 +148,41 @@ export function FreehandCanvas({
       for (const p of [segment.start, segment.end])
         points.set(`${p.x.toFixed(3)}:${p.y.toFixed(3)}`, p);
     }
-    // Labels show clear inside wall-face measurements, not centreline or outside dimensions.
-    // Until a known wall length calibrates the sketch, mark these values approximate.
+    // Render dimension labels in screen-space after wall geometry. This keeps
+    // text crisp and readable at every zoom level and prevents the canvas zoom
+    // transform from shrinking labels into invisibility on mobile.
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     for (const segment of geometry.segments) {
       const dx = segment.end.x - segment.start.x;
       const dy = segment.end.y - segment.start.y;
       const length = Math.hypot(dx, dy);
-      if (length < 24) continue;
-      const metres = length * state.current.sketch.mmPerUnit / 1000;
+      if (length < 24 / v.zoom) continue;
+      const metres = (length * state.current.sketch.mmPerUnit) / 1000;
       const mx = (segment.start.x + segment.end.x) / 2;
       const my = (segment.start.y + segment.end.y) / 2;
       const nx = length ? -dy / length : 0;
       const ny = length ? dx / length : -1;
-      const tx = mx + nx * 15 / v.zoom;
-      const ty = my + ny * 15 / v.zoom;
+      // Convert the wall midpoint and its normal offset to screen coordinates.
+      const tx = (mx + nx * 18 / v.zoom) * v.zoom + v.x;
+      const ty = (my + ny * 18 / v.zoom) * v.zoom + v.y;
       const label = (state.current.sketch.calibrated ? "" : "≈ ") + metres.toFixed(2) + " m";
-      ctx.save();
-      ctx.font = "600 " + (12 / v.zoom) + "px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
       const metrics = ctx.measureText(label);
-      const pad = 4 / v.zoom;
-      ctx.fillStyle = "#fafbfc";
-      ctx.fillRect(tx - metrics.width / 2 - pad, ty - 8 / v.zoom, metrics.width + pad * 2, 16 / v.zoom);
-      ctx.fillStyle = state.current.sketch.calibrated ? "#334155" : "#64748b";
+      const padX = 6, padY = 4, boxW = metrics.width + padX * 2, boxH = 22;
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(tx - boxW / 2, ty - boxH / 2, boxW, boxH, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = state.current.sketch.calibrated ? "#1e293b" : "#475569";
       ctx.fillText(label, tx, ty);
-      ctx.restore();
     }
+    ctx.restore();
     if (review) {
       const diagnostics = inspectFreehand(visibleStrokes, state.current.snap ? 12 : 0, 1 / v.zoom);
       for (const issue of diagnostics.issues) {
