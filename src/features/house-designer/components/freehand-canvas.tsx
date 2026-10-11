@@ -156,31 +156,56 @@ export function FreehandCanvas({
     ctx.font = "600 13px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    const placedLabels: Array<{ left: number; top: number; right: number; bottom: number }> = [];
     for (const segment of geometry.segments) {
       const dx = segment.end.x - segment.start.x;
       const dy = segment.end.y - segment.start.y;
       const length = Math.hypot(dx, dy);
-      if (length < 24 / v.zoom) continue;
+      if (!length) continue;
       const metres = (length * state.current.sketch.mmPerUnit) / 1000;
       const mx = (segment.start.x + segment.end.x) / 2;
       const my = (segment.start.y + segment.end.y) / 2;
-      const nx = length ? -dy / length : 0;
-      const ny = length ? dx / length : -1;
-      // Convert the wall midpoint and its normal offset to screen coordinates.
-      const tx = (mx + nx * 18 / v.zoom) * v.zoom + v.x;
-      const ty = (my + ny * 18 / v.zoom) * v.zoom + v.y;
+      const nx = -dy / length;
+      const ny = dx / length;
+      const sx = mx * v.zoom + v.x;
+      const sy = my * v.zoom + v.y;
+      const tx = dx / length;
+      const ty = dy / length;
       const label = (state.current.sketch.calibrated ? "" : "≈ ") + metres.toFixed(2) + " m";
       const metrics = ctx.measureText(label);
-      const padX = 6, padY = 4, boxW = metrics.width + padX * 2, boxH = 22;
+      const padX = 6, boxW = metrics.width + padX * 2, boxH = 22;
+      // Try progressively wider offsets on either side of the wall, then along
+      // it. Collision checks happen in screen pixels so mobile zoom is stable.
+      const candidates = [
+        [nx * 18, ny * 18], [-nx * 18, -ny * 18],
+        [nx * 34, ny * 34], [-nx * 34, -ny * 34],
+        [nx * 50, ny * 50], [-nx * 50, -ny * 50],
+        [tx * 28 + nx * 18, ty * 28 + ny * 18],
+        [-tx * 28 + nx * 18, -ty * 28 + ny * 18],
+        [tx * 28 - nx * 18, ty * 28 - ny * 18],
+        [-tx * 28 - nx * 18, -ty * 28 - ny * 18],
+        [nx * 68, ny * 68], [-nx * 68, -ny * 68],
+      ];
+      let chosen = { x: sx, y: sy - 18 };
+      let chosenBox = { left: chosen.x - boxW / 2, top: chosen.y - boxH / 2, right: chosen.x + boxW / 2, bottom: chosen.y + boxH / 2 };
+      let bestOverlap = Infinity;
+      for (const [ox, oy] of candidates) {
+        const x = sx + ox, y = sy + oy;
+        const box = { left: x - boxW / 2, top: y - boxH / 2, right: x + boxW / 2, bottom: y + boxH / 2 };
+        const overlaps = placedLabels.filter(p => box.left < p.right + 3 && box.right + 3 > p.left && box.top < p.bottom + 3 && box.bottom + 3 > p.top).length;
+        if (overlaps === 0) { chosen = { x, y }; chosenBox = box; bestOverlap = 0; break; }
+        if (overlaps < bestOverlap) { bestOverlap = overlaps; chosen = { x, y }; chosenBox = box; }
+      }
+      placedLabels.push(chosenBox);
       ctx.fillStyle = "#ffffff";
       ctx.strokeStyle = "#64748b";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.roundRect(tx - boxW / 2, ty - boxH / 2, boxW, boxH, 6);
+      ctx.roundRect(chosen.x - boxW / 2, chosen.y - boxH / 2, boxW, boxH, 6);
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = state.current.sketch.calibrated ? "#1e293b" : "#475569";
-      ctx.fillText(label, tx, ty);
+      ctx.fillText(label, chosen.x, chosen.y);
     }
     ctx.restore();
     if (review) {
