@@ -7,7 +7,9 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const sections = [
+type PolicySection = { title: string; body: string[]; bullets?: string[] };
+
+const sections: PolicySection[] = [
   {
     "title": "1. AI outputs are suggestions",
     "body": [
