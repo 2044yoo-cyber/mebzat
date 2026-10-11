@@ -1,6 +1,6 @@
-import type { FrontDrawingData } from \"../services/front-drawing\";
+import type { FrontDrawingData } from "../services/front-drawing";
 
-export { frontDrawing, type FrontDrawingData } from \"../services/front-drawing\";
+export { frontDrawing, type FrontDrawingData } from "../services/front-drawing";
 
 /** The front view drawn: see `frontDrawing`. No hooks, so a server page can use it. */
 export function FrontDrawing({ drawing, className }: { drawing: FrontDrawingData | null; className?: string }) {
@@ -9,9 +9,9 @@ export function FrontDrawing({ drawing, className }: { drawing: FrontDrawingData
   return (
     <svg
       viewBox={`${drawing.minX - pad} ${-pad} ${drawing.width + 2 * pad} ${drawing.height + 2 * pad}`}
-      preserveAspectRatio=\"xMidYMid meet\"
+      preserveAspectRatio="xMidYMid meet"
       className={className}
-      role=\"img\"
+      role="img"
       aria-label={`Front view, ${Math.round(drawing.width)} × ${Math.round(drawing.height)} mm`}
     >
       {/* Flipped so y runs up from the floor, as the spec measures it. */}
@@ -23,10 +23,10 @@ export function FrontDrawing({ drawing, className }: { drawing: FrontDrawingData
             y={box.y}
             width={Math.max(box.width, 1)}
             height={Math.max(box.height, 1)}
-            fill={box.front ? \"var(--thumb-front, #f5f5f4)\" : \"none\"}
-            stroke=\"#334155\"
+            fill={box.front ? "var(--thumb-front, #f5f5f4)" : "none"}
+            stroke="#334155"
             strokeWidth={1.5}
-            vectorEffect=\"non-scaling-stroke\"
+            vectorEffect="non-scaling-stroke"
           />
         ))}
       </g>
