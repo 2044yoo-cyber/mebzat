@@ -12,7 +12,7 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 
-import { NAV_ITEMS, NAV_SECTIONS } from "../src/lib/workspace/navigation.ts";
+import { NAV_ITEMS, NAV_SECTIONS, NAV_SPEC } from "../src/lib/workspace/navigation.ts";
 import { QUICK_CREATE } from "../src/components/shell/quick-actions.tsx";
 
 const GREEN = "\x1b[32m";
@@ -123,6 +123,23 @@ function routeExists(href: string): boolean {
       "two menu rows that go to the same page is worse than one in the wrong place",
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// No unbuilt rows on show
+//
+// A menu with nine greyed-out "Soon" rows under Business reads as an
+// unfinished product. Unbuilt modules stay in NAV_SPEC; the menus get
+// NAV_SECTIONS, which leaves them out.
+// ---------------------------------------------------------------------------
+
+{
+  const unbuilt = NAV_ITEMS.filter((item) => !item.href).map((item) => item.label);
+  check("no menu row is a disabled placeholder", unbuilt.length === 0, unbuilt.join(", "));
+  check(
+    "but the unbuilt modules are still written down",
+    NAV_SPEC.some((section) => section.items.some((item) => !item.href)),
+  );
 }
 
 // ---------------------------------------------------------------------------

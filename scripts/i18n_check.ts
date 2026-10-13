@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { NAV_SECTIONS } from "../src/lib/workspace/navigation.ts";
+import { NAV_SPEC } from "../src/lib/workspace/navigation.ts";
 import { STITCH_ERRORS } from "../src/lib/panorama/stitch.ts";
 import {
   LANGUAGES,
@@ -39,7 +39,7 @@ function validateCatalog() {
     }
   }
 
-  for (const section of NAV_SECTIONS) {
+  for (const section of NAV_SPEC) {
     for (const id of [section.id, ...section.items.map((item) => item.id)]) {
       for (const language of LANGUAGES) {
         assert.notEqual(translate(language, navigationKey(id)), navigationKey(id));

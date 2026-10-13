@@ -604,3 +604,10 @@ export function connectionInfo(platform: SocialPlatform) {
     redirectUri: redirectUri(platform),
   };
 }
+
+/**
+ * The OAuth nonce's cookie. Short-lived, HttpOnly, never read by the browser.
+ * Kept here rather than in the connect route because a route file may export
+ * only handlers and route config; any other export fails the build.
+ */
+export const STATE_COOKIE = "medosha_oauth_nonce";
