@@ -29,6 +29,7 @@ import {
   type Point,
   type Stroke,
 } from "../services/freehand";
+import { DIMENSION_STYLE, layoutDimensions } from "../services/freehand-dimensions";
 
 type Sketch = NonNullable<HouseProject["freehandSketch"]>;
 const empty: Sketch = {
@@ -148,64 +149,38 @@ export function FreehandCanvas({
       for (const p of [segment.start, segment.end])
         points.set(`${p.x.toFixed(3)}:${p.y.toFixed(3)}`, p);
     }
-    // Render dimension labels in screen-space after wall geometry. This keeps
-    // text crisp and readable at every zoom level and prevents the canvas zoom
-    // transform from shrinking labels into invisibility on mobile.
+    // Architectural dimensions, drawn in screen pixels after the walls so
+    // they stay small and crisp at every zoom: a thin line off each wall
+    // with extension lines and 45° ticks, the length in mm along it.
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.font = "600 13px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const placedLabels: Array<{ left: number; top: number; right: number; bottom: number }> = [];
-    for (const segment of geometry.segments) {
-      const dx = segment.end.x - segment.start.x;
-      const dy = segment.end.y - segment.start.y;
-      const length = Math.hypot(dx, dy);
-      if (!length) continue;
-      const metres = (length * state.current.sketch.mmPerUnit) / 1000;
-      const mx = (segment.start.x + segment.end.x) / 2;
-      const my = (segment.start.y + segment.end.y) / 2;
-      const nx = -dy / length;
-      const ny = dx / length;
-      const sx = mx * v.zoom + v.x;
-      const sy = my * v.zoom + v.y;
-      const tx = dx / length;
-      const ty = dy / length;
-      const label = (state.current.sketch.calibrated ? "" : "≈ ") + metres.toFixed(2) + " m";
-      const metrics = ctx.measureText(label);
-      const padX = 6, boxW = metrics.width + padX * 2, boxH = 22;
-      // Try progressively wider offsets on either side of the wall, then along
-      // it. Collision checks happen in screen pixels so mobile zoom is stable.
-      const candidates = [
-        [nx * 18, ny * 18], [-nx * 18, -ny * 18],
-        [nx * 34, ny * 34], [-nx * 34, -ny * 34],
-        [nx * 50, ny * 50], [-nx * 50, -ny * 50],
-        [tx * 28 + nx * 18, ty * 28 + ny * 18],
-        [-tx * 28 + nx * 18, -ty * 28 + ny * 18],
-        [tx * 28 - nx * 18, ty * 28 - ny * 18],
-        [-tx * 28 - nx * 18, -ty * 28 - ny * 18],
-        [nx * 68, ny * 68], [-nx * 68, -ny * 68],
-      ];
-      let chosen = { x: sx, y: sy - 18 };
-      let chosenBox = { left: chosen.x - boxW / 2, top: chosen.y - boxH / 2, right: chosen.x + boxW / 2, bottom: chosen.y + boxH / 2 };
-      let bestOverlap = Infinity;
-      for (const [ox, oy] of candidates) {
-        const x = sx + ox, y = sy + oy;
-        const box = { left: x - boxW / 2, top: y - boxH / 2, right: x + boxW / 2, bottom: y + boxH / 2 };
-        const overlaps = placedLabels.filter(p => box.left < p.right + 3 && box.right + 3 > p.left && box.top < p.bottom + 3 && box.bottom + 3 > p.top).length;
-        if (overlaps === 0) { chosen = { x, y }; chosenBox = box; bestOverlap = 0; break; }
-        if (overlaps < bestOverlap) { bestOverlap = overlaps; chosen = { x, y }; chosenBox = box; }
-      }
-      placedLabels.push(chosenBox);
-      ctx.fillStyle = "#ffffff";
-      ctx.strokeStyle = "#64748b";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(chosen.x - boxW / 2, chosen.y - boxH / 2, boxW, boxH, 6);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = state.current.sketch.calibrated ? "#1e293b" : "#475569";
-      ctx.fillText(label, chosen.x, chosen.y);
+    ctx.font = `500 ${DIMENSION_STYLE.font}px system-ui, sans-serif`;
+    const screenSegments = geometry.segments.map((segment) => ({
+      start: { x: segment.start.x * v.zoom + v.x, y: segment.start.y * v.zoom + v.y },
+      end: { x: segment.end.x * v.zoom + v.x, y: segment.end.y * v.zoom + v.y },
+    }));
+    const lengthsMm = geometry.segments.map((segment) => Math.hypot(segment.end.x - segment.start.x, segment.end.y - segment.start.y) * state.current.sketch.mmPerUnit);
+    const dimensions = layoutDimensions(screenSegments, lengthsMm, state.current.sketch.calibrated, (text) => ctx.measureText(text).width);
+    const ink = state.current.sketch.calibrated ? "#1e293b" : "#64748b";
+    ctx.strokeStyle = ink;
+    ctx.lineCap = "butt";
+    for (const dimension of dimensions) {
+      const segment = (a: Point, b: Point, lineWidth: number) => { ctx.lineWidth = lineWidth; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
+      for (const [a, b] of dimension.extensions) segment(a, b, 0.6);
+      segment(dimension.line[0], dimension.line[1], 0.7);
+      for (const [a, b] of dimension.ticks) segment(a, b, 1.3);
+      // The text on the line, the line broken under it.
+      const { x, y, angle, text, width, height } = dimension.text;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.fillStyle = "#fafbfc";
+      ctx.fillRect(-width / 2 - DIMENSION_STYLE.pad, -height / 2 - 1, width + DIMENSION_STYLE.pad * 2, height + 2);
+      ctx.fillStyle = ink;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 0, 0);
+      ctx.restore();
     }
     ctx.restore();
     if (review) {

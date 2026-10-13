@@ -1,0 +1,80 @@
+[
+ {
+  "name": "bubble back round the text",
+  "file": "src/features/house-designer/components/freehand-canvas.tsx",
+  "from": "      ctx.fillRect(-width / 2 - DIMENSION_STYLE.pad, -height / 2 - 1, width + DIMENSION_STYLE.pad * 2, height + 2);",
+  "to": "      ctx.beginPath(); ctx.roundRect(-width / 2 - 6, -11, width + 12, 22, 6); ctx.fill(); ctx.stroke();"
+ },
+ {
+  "name": "big text",
+  "file": "src/features/house-designer/services/freehand-dimensions.ts",
+  "from": "  font: 10,",
+  "to": "  font: 13,"
+ },
+ {
+  "name": "metres again",
+  "file": "src/features/house-designer/services/freehand-dimensions.ts",
+  "from": "  return `${calibrated ? \"\" : \"\u2248\"}${Math.round(millimetres)}`;",
+  "to": "  return `${calibrated ? \"\" : \"\u2248 \"}${(millimetres / 1000).toFixed(2)} m`;"
+ },
+ {
+  "name": "\u2248 when calibrated",
+  "file": "src/features/house-designer/services/freehand-dimensions.ts",
+  "from": "${calibrated ? \"\" : \"\u2248\"}",
+  "to": "${\"\u2248\"}"
+ },
+ {
+  "name": "text not turned along the wall",
+  "file": "src/features/house-designer/services/freehand-dimensions.ts",
+  "from": "    let angle = Math.atan2(dy, dx);",
+  "to": "    let angle = 0 * Math.atan2(dy, dx);"
+ },
+ {
+  "name": "text upside down on some walls",
+  "file": "src/features/house-designer/services/freehand-dimensions.ts",
+  "from": "    if (angle >= Math.PI / 2 - 1e-6) angle -= Math.PI;\n",
+  "to": ""
+ },
+ {
+  "name": "ticks square, not 45\u00b0",
+  "file": "src/features/house-designer/services/freehand-dimensions.ts",
+  "from": "    const d = { x: (t.x + n.x) * Math.SQRT1_2 * DIMENSION_STYLE.tick, y: (t.y + n.y) * Math.SQRT1_2 * DIMENSION_STYLE.tick };",
+  "to": "    const d = { x: n.x * DIMENSION_STYLE.tick, y: n.y * DIMENSION_STYLE.tick };"
+ },
+ {
+  "name": "no extension overshoot",
+  "file": "src/features/house-designer/services/freehand-dimensions.ts",
+  "from": "at(end, 0, offset + side * DIMENSION_STYLE.overshoot)",
+  "to": "at(end, 0, offset)"
+ },
+ {
+  "name": "extension lines touching the wall",
+  "file": "src/features/house-designer/services/freehand-dimensions.ts",
+  "from": "[at(end, 0, side * DIMENSION_STYLE.gap),",
+  "to": "[at(end, 0, 0),"
+ },
+ {
+  "name": "dimension line on the wall",
+  "file": "src/features/house-designer/services/freehand-dimensions.ts",
+  "from": "    const a = at(segment.start, 0, offset);\n    const b = at(segment.end, 0, offset);",
+  "to": "    const a = at(segment.start, 0, 0);\n    const b = at(segment.end, 0, 0);"
+ },
+ {
+  "name": "no stepping out on collisions",
+  "file": "src/features/house-designer/services/freehand-dimensions.ts",
+  "from": "    for (const tier of [1, 2, 3, 4]) {\n      for (const sign of [1, -1]) {",
+  "to": "    for (const tier of [1]) {\n      for (const sign of [1]) {"
+ },
+ {
+  "name": "canvas skips the ticks",
+  "file": "src/features/house-designer/components/freehand-canvas.tsx",
+  "from": "      for (const [a, b] of dimension.ticks) segment(a, b, 1.3);",
+  "to": ""
+ },
+ {
+  "name": "canvas skips the extension lines",
+  "file": "src/features/house-designer/components/freehand-canvas.tsx",
+  "from": "      for (const [a, b] of dimension.extensions) segment(a, b, 0.6);",
+  "to": ""
+ }
+]

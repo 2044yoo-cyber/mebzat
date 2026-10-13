@@ -62,6 +62,9 @@ export const signQuarantinePreview = async () => ({});
     absWorkingDir: root, entryPoints: [join(out, "entry.tsx")], bundle: true, outfile: join(out, "app.js"),
     format: "esm", jsx: "automatic", platform: "browser", logLevel: "error", nodePaths: [join(root, "node_modules")],
     define: { "process.env.NODE_ENV": '"development"' }, splitting: false,
+    // Next's client modules (next/link, next/navigation) read process.env at
+    // load; inside the Next runtime it is defined, here it is an empty one.
+    banner: { js: "globalThis.process ??= { env: {}, versions: {}, emit() {} };" },
     loader: { ".mjs": "js" },
     plugins: [{ name: "alias", setup(builder) {
       builder.onResolve({ filter: /^@\/lib\/supabase\/client$/ }, () => ({ path: join(root, "scripts/house_fake_supabase.ts") }));
