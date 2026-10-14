@@ -156,7 +156,24 @@ begin
       -- comment on `company_size` can: 0086 adds that column and does not
       -- comment on it.
       (100, '0100_profile_form_columns', 'comment',
-           'profiles.company_size|Re-asserted by 0100')
+           'profiles.company_size|Re-asserted by 0100'),
+      (101, '0101_mixed_personalized_feed', 'table', 'feed_interactions'),
+      (102, '0102_agenda_plans',       'table',   'agenda_plans'),
+      -- 0103 rewrites 0102's guard in place; only the new body tells them apart.
+      (103, '0103_fix_sketch_update_guard', 'body',
+           'agenda_plan_guard|if tg_table_name = ''agenda_plans'' then'),
+      -- 0104 changes data only. What it leaves is demo posts with no broken
+      -- punctuation; "missing" here can also mean there are no demo posts.
+      (104, '0104_feed_demo_cleanup',  'row',
+           'feed_posts|is_demo and not exists (select 1 from public.feed_posts d where d.is_demo and (strpos(concat_ws('' '', d.title, d.body, d.author_name), ''â€'') > 0 or strpos(concat_ws('' '', d.title, d.body, d.author_name), ''Â'') > 0))'),
+      (105, '0105_collab_studio',      'table',   'collab_boards'),
+      -- 0106 and 0108 are security fixes that replace or add guards; their
+      -- bodies are what has to be there, not just the names.
+      (106, '0106_agenda_member_guard', 'body',
+           'agenda_guard_member_update|A membership stays with its person and its project'),
+      (107, '0107_collab_invite_links', 'table',  'collab_invites'),
+      (108, '0108_agenda_authorship',  'body',
+           'agenda_studio_viewer_guard|to_regclass(''public.collab_access'')')
     ) as t (ordering, migration, kind, object)
   loop
     present := case row.kind
