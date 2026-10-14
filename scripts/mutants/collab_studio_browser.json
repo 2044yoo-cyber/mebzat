@@ -70,5 +70,11 @@
   "file": "src/lib/collab/item-store.ts",
   "from": "      } else if (result.current && result.current.revision !== (this.confirmed.get(result.id)?.revision ?? 0)) {",
   "to": "      } else if (false) {"
+ },
+ {
+  "name": "a viewer may start a discussion",
+  "file": "src/components/collab/discussion-view.tsx",
+  "from": "{allowed.comment ? <button type=\"button\" onClick={() => { setComposing(true); studio.openThread(null); }}",
+  "to": "{allowed.view ? <button type=\"button\" onClick={() => { setComposing(true); studio.openThread(null); }}"
  }
 ]

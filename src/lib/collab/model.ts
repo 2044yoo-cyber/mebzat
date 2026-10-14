@@ -208,3 +208,46 @@ export function mentionedIn(body: string, members: readonly { id: string; handle
   const handles = new Set([...body.matchAll(/(^|\s)@([a-z0-9_.-]{2,40})/gi)].map((match) => match[2]!.toLowerCase()));
   return members.filter((member) => member.handle && handles.has(member.handle.toLowerCase())).map((member) => member.id);
 }
+
+// ---------------------------------------------------------------------------
+// Invitation links (0107)
+// ---------------------------------------------------------------------------
+
+/**
+ * The Agenda roles a link may give. Not `client` or `administrator`: Agenda
+ * treats both as owners of the project, and a link is something that gets
+ * forwarded. The database refuses them too.
+ */
+export const INVITE_ROLES = [
+  "project_manager", "contractor", "architect", "engineer", "interior_designer",
+  "quantity_surveyor", "supervisor", "supplier", "employee",
+] as const;
+export type InviteRole = (typeof INVITE_ROLES)[number];
+
+export const INVITE_DAYS = [1, 7, 30] as const;
+export const INVITE_USES = [1, 5, 25] as const;
+
+/** What the owner chooses for a new link. Commenting, one person, a week, unless they say otherwise. */
+export const inviteInput = z.object({
+  level: z.enum(["editor", "commenter", "viewer"]).default("commenter"),
+  role: z.enum(INVITE_ROLES).default("employee"),
+  days: z.union([z.literal(1), z.literal(7), z.literal(30)]).default(7),
+  maxUses: z.union([z.literal(1), z.literal(5), z.literal(25)]).default(1),
+  label: z.string().trim().max(80).optional(),
+}).strict();
+export type InviteInput = z.input<typeof inviteInput>;
+
+/** A token as the server makes them: 32 random bytes, base64url — 43 characters. */
+export const inviteToken = z.string().regex(/^[A-Za-z0-9_-]{43}$/, "This invitation link is not valid.");
+
+/**
+ * The address to send. The token goes after `#`, which a browser never sends
+ * to a server: it stays out of access logs, analytics and `Referer` headers.
+ */
+export const inviteUrl = (origin: string, token: string) => `${origin}/agenda/join#${token}`;
+
+/** The token from an address's `#…`, or null. */
+export function tokenFromHash(hash: string): string | null {
+  const token = hash.replace(/^#/, "");
+  return inviteToken.safeParse(token).success ? token : null;
+}

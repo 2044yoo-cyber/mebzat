@@ -208,6 +208,22 @@ check(
 );
 
 /* -------------------------------------------------------------------------- */
+/* Signing in returns people to where they were going                          */
+/* -------------------------------------------------------------------------- */
+
+// The proxy sends `?redirect=`; a dozen pages and buttons send `?next=`, and
+// the form read only the first, so those landed on the dashboard. Scoped to
+// the component, so a helper elsewhere in the file reading `next` does not
+// satisfy it.
+const loginForm = code(readFileSync("src/app/(auth)/login/login-form.tsx", "utf8"));
+const formBody = loginForm.slice(loginForm.indexOf("export function LoginForm"));
+check(
+  "the login form honours ?next= as well as ?redirect=",
+  /const redirectTo = safeRedirect\(\s*searchParams\.get\("redirect"\)\s*\?\?\s*searchParams\.get\("next"\)\s*\)/.test(formBody),
+  "pages that send ?next= land on the dashboard after signing in",
+);
+
+/* -------------------------------------------------------------------------- */
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} failed:\n`);

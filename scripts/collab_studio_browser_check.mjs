@@ -351,7 +351,7 @@ try {
   await viewer.getByRole("list", { name: "Discussions" }).getByText("Change this finish to walnut.").click();
   await viewer.getByRole("region", { name: "Discussion C-001" }).waitFor();
   equal(await viewer.getByLabel("Reply").count(), 0, "6: a viewer reads the discussion but has no reply box");
-  equal(await viewer.getByRole("button", { name: "New discussion" }).count(), 0, "6: nor starts one");
+  equal(await viewer.getByRole("button", { name: "New", exact: true }).count(), 0, "6: nor starts one");
 
   const outsider = await open("outsider");
   ok(await outsider.locator("#not-found").isVisible(), "6: somebody not on the project gets not-found");

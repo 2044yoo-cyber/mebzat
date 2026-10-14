@@ -65,6 +65,8 @@ function visible(db: Db, table: string, row: Row, user: string): boolean {
   if (table === "profiles") return true;
   if (table === "collab_reads") return row.user_id === user;
   if (table === "notifications") return row.user_id === user;
+  // 0107: the links are the owner's alone.
+  if (table === "collab_invites") return levelOf(db, user, String(row.project_id)) === "owner";
   const project = projectOf(db, table, row);
   if (!project) return true;
   return levelOf(db, user, project) !== null;
@@ -76,6 +78,7 @@ function refuseInsert(db: Db, table: string, row: Row, user: string): string | n
   if (table === "collab_threads" || table === "collab_annotations") return canComment(level) ? null : "new row violates row-level security policy";
   if (table === "collab_comments") return canComment(level) && row.author_id === user ? null : "new row violates row-level security policy";
   if (table === "collab_access") return level === "owner" ? null : "new row violates row-level security policy";
+  if (table === "collab_invites") return level === "owner" ? null : "new row violates row-level security policy";
   if (table === "collab_reads") return row.user_id === user && level !== null ? null : "new row violates row-level security policy";
   if (table.startsWith("agenda_")) return level !== null ? null : "new row violates row-level security policy";
   return null;
@@ -88,6 +91,7 @@ function mayUpdate(db: Db, table: string, row: Row, user: string): boolean {
   if (table === "collab_comments") return canComment(level) && row.author_id === user;
   if (table === "collab_annotations") return canComment(level) && (row.created_by === user || canEdit(level));
   if (table === "collab_access") return level === "owner";
+  if (table === "collab_invites") return level === "owner";
   if (table === "collab_reads") return row.user_id === user;
   if (table.startsWith("agenda_")) return level !== null;
   return true;
@@ -127,6 +131,24 @@ function beforeWrite(db: Db, table: string, row: Row, old: Row | null, user: str
       if (row.status !== old.status || row.assigned_to !== old.assigned_to) row.last_activity_at = now();
     }
   }
+  if (table === "collab_invites") {
+    // 0107's checks and guard.
+    if (!["editor", "commenter", "viewer"].includes(String(row.level))) return "new row violates check constraint";
+    if (["client", "administrator"].includes(String(row.role))) return "new row violates check constraint";
+    if (!/^[0-9a-f]{64}$/.test(String(row.token_hash))) return "new row violates check constraint";
+    if (!(Number(row.max_uses) >= 1 && Number(row.max_uses) <= 100)) return "new row violates check constraint";
+    if (!old) {
+      row.created_by = user; row.created_at = now(); row.uses = 0; row.revoked_at = null; row.revoked_by = null;
+      const lifetime = Date.parse(String(row.expires_at)) - Date.now();
+      if (!(lifetime > 0 && lifetime <= 30 * 86_400_000 + 60_000)) return "new row violates check constraint \"collab_invites_window\"";
+    } else {
+      const fixed = (value: Row) => { const { revoked_at: _a, revoked_by: _b, uses: _c, ...rest } = value; void _a; void _b; void _c; return JSON.stringify(rest); };
+      if (fixed(row) !== fixed(old)) return "An invitation link is not edited. Withdraw it and make another.";
+      if (old.revoked_at && row.revoked_at !== old.revoked_at) return "A withdrawn link stays withdrawn.";
+      if (row.revoked_at && !old.revoked_at) { row.revoked_at = now(); row.revoked_by = user; } else row.revoked_by = old.revoked_by;
+      if (Number(row.uses) < Number(old.uses) || Number(row.uses) > Number(old.uses) + 1) return "A link is used by one person at a time.";
+    }
+  }
   if (table === "collab_access") {
     const member = (db.agenda_members ?? []).find((entry) => entry.project_id === row.project_id && entry.user_id === row.user_id && ["invited", "active"].includes(String(entry.status)));
     if (!member) return "That person is not on this project.";
@@ -162,6 +184,7 @@ const DEFAULTS: Record<string, () => Row> = {
   agenda_drawing_revisions: () => ({ id: crypto.randomUUID(), status: "open", created_at: now() }),
   agenda_tasks: () => ({ id: crypto.randomUUID(), status: "todo", priority: "normal", description: null, assigned_to: null, due_at: null, started_at: null, completed_at: null, archived_at: null, created_at: now(), updated_at: now() }),
   agenda_approvals: () => ({ id: crypto.randomUUID(), created_at: now() }),
+  collab_invites: () => ({ id: crypto.randomUUID(), level: "commenter", role: "employee", label: null, max_uses: 1, uses: 0, expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(), created_at: now(), revoked_at: null, revoked_by: null }),
 };
 
 function announce(db: Db, table: string, event: "INSERT" | "UPDATE", row: Row) {
@@ -386,6 +409,7 @@ export function fakeClient() {
         store(db);
         return { data: `${String(args.prefix)}-${String(value).padStart(Number(args.width ?? 3), "0")}`, error: null };
       }
+      if (name === "collab_invite_preview" || name === "collab_accept_invite") return invites(name, String(args.invite_token ?? ""));
       throw new Error(`fake supabase: no rpc ${name}`);
     },
     storage: {
@@ -401,3 +425,53 @@ export function fakeClient() {
 }
 
 export function createClient() { return fakeClient(); }
+
+// ---------------------------------------------------------------------------
+// 0107's two functions: reading a link, and using it
+// ---------------------------------------------------------------------------
+
+async function sha256(text: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function invites(name: string, token: string): Promise<Result> {
+  const user = currentUser();
+  const refuse = (message: string) => ({ data: null, error: { message } });
+  if (name === "collab_accept_invite" && !user) return refuse("Sign in to accept the invitation.");
+  if (!user || token.length < 20 || token.length > 200) return name === "collab_invite_preview" ? { data: [], error: null } : refuse("This invitation link is not valid.");
+  const hash = await sha256(token);
+  const db = load();
+  const invite = (db.collab_invites ?? []).find((row) => row.token_hash === hash);
+  if (!invite) return name === "collab_invite_preview" ? { data: [], error: null } : refuse("This invitation link is not valid.");
+  const project = (db.agenda_projects ?? []).find((row) => row.id === invite.project_id)!;
+  const membership = (db.agenda_members ?? []).find((row) => row.project_id === invite.project_id && row.user_id === user);
+  const member = membership?.status === "active" || project.owner_id === user;
+  const removed = membership && ["removed", "suspended"].includes(String(membership.status));
+  const expired = Date.parse(String(invite.expires_at)) <= Date.now();
+  const usedUp = Number(invite.uses) >= Number(invite.max_uses);
+
+  if (name === "collab_invite_preview") {
+    const inviter = (db.profiles ?? []).find((row) => row.id === invite.created_by);
+    const state = member ? "member" : removed ? "removed" : invite.revoked_at ? "revoked" : expired ? "expired" : usedUp ? "used" : "ok";
+    return { data: [{ project_id: invite.project_id, project_name: project.name, level: invite.level, role: invite.role, invited_by: inviter?.full_name ?? inviter?.username ?? "Someone", expires_at: invite.expires_at, state }], error: null };
+  }
+
+  if (member) return { data: invite.project_id, error: null };
+  if (removed) return refuse("Your access to this project was removed. Ask the project owner to add you again.");
+  if (invite.revoked_at) return refuse("This invitation link was withdrawn.");
+  if (expired) return refuse("This invitation link has expired.");
+  if (usedUp) return refuse("This invitation link has already been used.");
+  const at = now();
+  if (membership) Object.assign(membership, { status: "active", accepted_at: at });
+  else (db.agenda_members ??= []).push({ id: crypto.randomUUID(), project_id: invite.project_id, user_id: user, role: invite.role, status: "active", invited_by: invite.created_by, invited_at: at, accepted_at: at });
+  const access = (db.collab_access ??= []);
+  if (!access.some((row) => row.project_id === invite.project_id && row.user_id === user)) {
+    access.push({ project_id: invite.project_id, user_id: user, level: invite.level, granted_by: invite.created_by, invite_id: invite.id, created_at: at, updated_at: at });
+  }
+  invite.uses = Number(invite.uses) + 1;
+  const who = (db.profiles ?? []).find((row) => row.id === user);
+  (db.agenda_events ??= []).push({ id: crypto.randomUUID(), project_id: invite.project_id, kind: "collab", title: `${String(who?.full_name ?? "Someone")} joined with an invitation link`, detail: null, actor_id: user, occurred_at: at, created_at: at });
+  store(db);
+  return { data: invite.project_id, error: null };
+}

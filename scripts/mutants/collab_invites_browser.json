@@ -1,0 +1,86 @@
+[
+ {
+  "name": "new links default to editing",
+  "file": "src/components/collab/team-view.tsx",
+  "from": "useState<{ level: \"editor\" | \"commenter\" | \"viewer\"; role: InviteRole; days: 1 | 7 | 30; maxUses: 1 | 5 | 25; label: string }>({ level: \"commenter\"",
+  "to": "useState<{ level: \"editor\" | \"commenter\" | \"viewer\"; role: InviteRole; days: 1 | 7 | 30; maxUses: 1 | 5 | 25; label: string }>({ level: \"editor\""
+ },
+ {
+  "name": "links shown to everybody",
+  "file": "src/components/collab/team-view.tsx",
+  "from": "{allowed.manage ? <InviteLinks /> : null}",
+  "to": "<InviteLinks />"
+ },
+ {
+  "name": "links offer the client role",
+  "file": "src/lib/collab/model.ts",
+  "from": "  \"project_manager\", \"contractor\", \"architect\",",
+  "to": "  \"client\", \"project_manager\", \"contractor\", \"architect\","
+ },
+ {
+  "name": "token sent to the server in the query",
+  "file": "src/lib/collab/model.ts",
+  "from": "`${origin}/agenda/join#${token}`",
+  "to": "`${origin}/agenda/join?t=${token}#${token}`"
+ },
+ {
+  "name": "short tokens",
+  "file": "src/app/(dashboard)/agenda/projects/[projectId]/collaborate/actions.ts",
+  "from": "  const bytes = crypto.getRandomValues(new Uint8Array(32));",
+  "to": "  const bytes = crypto.getRandomValues(new Uint8Array(16));"
+ },
+ {
+  "name": "token stored instead of its hash",
+  "file": "src/app/(dashboard)/agenda/projects/[projectId]/collaborate/actions.ts",
+  "from": "    token_hash: await hashToken(token),",
+  "to": "    token_hash: token,"
+ },
+ {
+  "name": "token left in the address",
+  "file": "src/components/collab/join-studio.tsx",
+  "from": "    if (window.location.hash) window.history.replaceState(null, \"\", window.location.pathname + window.location.search);",
+  "to": "    void 0;"
+ },
+ {
+  "name": "token lost through signing in",
+  "file": "src/components/collab/join-studio.tsx",
+  "from": "    try { sessionStorage.setItem(KEY, token); } catch { /* private mode: the address still has it */ }",
+  "to": "    void KEY;"
+ },
+ {
+  "name": "token kept after joining",
+  "file": "src/components/collab/join-studio.tsx",
+  "from": "    try { sessionStorage.removeItem(KEY); } catch { /* nothing to clear */ }\n    router.push(",
+  "to": "    router.push("
+ },
+ {
+  "name": "a broken link becomes the last one",
+  "file": "src/components/collab/join-studio.tsx",
+  "from": "  if (window.location.hash.length > 1) return tokenFromHash(window.location.hash);",
+  "to": "  const fromAddress = tokenFromHash(window.location.hash);\n  if (fromAddress) return fromAddress;"
+ },
+ {
+  "name": "sign-in does not come back",
+  "file": "src/components/collab/join-studio.tsx",
+  "from": "href=\"/login?redirect=/agenda/join\"",
+  "to": "href=\"/login\""
+ },
+ {
+  "name": "members re-join screen missing",
+  "file": "src/components/collab/join-studio.tsx",
+  "from": "      {preview.state === \"member\" ? (",
+  "to": "      {false ? ("
+ },
+ {
+  "name": "closed links offer Join",
+  "file": "src/components/collab/join-studio.tsx",
+  "from": "      ) : preview.state === \"ok\" ? (",
+  "to": "      ) : preview.state !== \"member\" ? ("
+ },
+ {
+  "name": "withdrawal does nothing",
+  "file": "src/app/(dashboard)/agenda/projects/[projectId]/collaborate/actions.ts",
+  "from": "  const { data, error } = await supabase.from(\"collab_invites\").update({ revoked_at: new Date().toISOString() })",
+  "to": "  const { data, error } = await supabase.from(\"collab_invites\").update({})"
+ }
+]
