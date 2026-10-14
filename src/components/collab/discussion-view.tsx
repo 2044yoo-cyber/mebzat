@@ -46,7 +46,7 @@ export function DiscussionView({ onLocate }: { onLocate: (thread: Thread) => voi
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col lg:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
       <div className="flex min-h-0 flex-col border-b lg:w-96 lg:border-b-0 lg:border-r">
         <div className="flex gap-1 border-b p-2" role="tablist" aria-label="Discussion">
           {([["threads", "Discussions", MessagesSquare], ["tasks", "Tasks", ClipboardList], ["activity", "Activity", Activity]] as const).map(([value, label, Icon]) => (

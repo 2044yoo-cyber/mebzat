@@ -118,6 +118,26 @@ export class ItemStore {
     this.emit();
   }
 
+  /**
+   * Takes back the step under way, as if it never began: a drag that turned
+   * out to be the first finger of a pinch. Not undoable, because nothing happened.
+   */
+  cancelStep() {
+    const step = this.transaction;
+    this.transaction = null;
+    if (!step?.before.size) { this.emit(); return; }
+    for (const [id, before] of step.before) {
+      if (before === null) {
+        const queued = this.pending.get(id);
+        if (queued?.op === "create" && !this.inFlight.has(id) && !this.confirmed.has(id)) { this.pending.delete(id); this.local.delete(id); }
+        else { const current = this.local.get(id); if (current) this.local.set(id, { ...current, archived: true }); this.pending.set(id, { op: "archive", base: this.base(id) }); }
+      } else {
+        this.restore(id, before);
+      }
+    }
+    this.changed();
+  }
+
   private record(id: string, before: Item | null, after: Item | null) {
     const step = this.transaction;
     if (step) {
@@ -260,7 +280,7 @@ export class ItemStore {
     try {
       response = await this.save(changes);
     } catch {
-      response = { ok: false, error: "No connection. Your changes are kept here; they will be sent again." };
+      response = { ok: false, error: "No connection. Your changes are kept here and sent again when it is back." };
     }
 
     for (const id of sent.keys()) this.inFlight.delete(id);

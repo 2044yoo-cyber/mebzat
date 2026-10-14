@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Columns3, Copy, Layers, Loader2, Maximize2, MessageSquarePlus, MessagesSquare, Minimize2, MoreHorizontal, Pencil, PenTool, Plus, ScanEye, Shapes, Trash2, Users, X } from "lucide-react";
 import { toast } from "sonner";
@@ -44,6 +44,7 @@ export function StudioWorkspace({ initial }: { initial: { tab: Tab; boardId: str
   const [drawingId, setDrawingId] = useState(initial.drawingId);
   const [discussing, setDiscussing] = useState<Item | null>(null);
   const [full, setFull] = useState(false);
+  const [lowered, setLowered] = useState(false);
 
   const boards = studio.boards.filter((board) => board.kind === "board");
   const canvases = studio.boards.filter((board) => board.kind === "canvas");
@@ -81,6 +82,7 @@ export function StudioWorkspace({ initial }: { initial: { tab: Tab; boardId: str
     }
   }, [studio.boards]);
 
+  const wide = useWide();
   const side = discussing ? <ItemThreads item={discussing} onClose={() => setDiscussing(null)} /> : studio.openThreadId && tab !== "discuss" ? <ThreadPanel key={studio.openThreadId} threadId={studio.openThreadId} onClose={() => studio.openThread(null)} onLocate={(thread) => void locate(thread)} /> : null;
 
   return (
@@ -111,14 +113,33 @@ export function StudioWorkspace({ initial }: { initial: { tab: Tab; boardId: str
           {tab === "team" ? <TeamView /> : null}
         </main>
         {side ? (
-          <>
-            <aside className="hidden min-h-0 w-96 shrink-0 border-l lg:flex lg:flex-col" aria-label="Comments">{side}</aside>
-            {/* On a phone: a sheet over the bottom of the screen, the work still visible above it. */}
-            <div className="fixed inset-x-0 bottom-0 z-[60] flex h-[70dvh] flex-col rounded-t-2xl border-t bg-card shadow-2xl lg:hidden" role="dialog" aria-label="Comments">{side}</div>
-          </>
+          wide ? (
+            <aside className="flex min-h-0 w-96 shrink-0 flex-col border-l" aria-label="Comments">{side}</aside>
+          ) : (
+            // On a phone: a sheet over the lower half, the work still visible
+            // above it, and lowered to a handle to see all of it.
+            <div className={cn("fixed inset-x-0 bottom-0 z-[60] flex flex-col rounded-t-2xl border-t bg-card shadow-2xl", lowered ? "" : "h-[50dvh]")} role="dialog" aria-label="Comments">
+              <button type="button" onClick={() => setLowered(!lowered)} aria-expanded={!lowered} aria-label={lowered ? "Raise comments" : "Lower comments"} className="flex min-h-8 shrink-0 items-center justify-center gap-2 text-xs text-muted-foreground">
+                <span className="h-1 w-10 rounded-full bg-muted-foreground/40" aria-hidden />{lowered ? "Comments" : null}
+              </button>
+              {/* Kept mounted while lowered, so a reply being written survives. */}
+              <div className={cn("min-h-0 flex-1 flex-col", lowered ? "hidden" : "flex")}>{side}</div>
+            </div>
+          )
         ) : null}
       </div>
     </div>
+  );
+}
+
+// Rendered once, in the place the screen has room for: two copies would each
+// load the comments and mark them read, and say everything twice to a reader.
+const WIDE = "(min-width: 1024px)";
+function useWide() {
+  return useSyncExternalStore(
+    (changed) => { const query = window.matchMedia(WIDE); query.addEventListener("change", changed); return () => query.removeEventListener("change", changed); },
+    () => window.matchMedia(WIDE).matches,
+    () => true,
   );
 }
 

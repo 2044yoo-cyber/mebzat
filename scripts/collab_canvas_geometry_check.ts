@@ -67,6 +67,14 @@ for (const view of [{ zoom: 1, x: 0, y: 0 }, { zoom: 2.5, x: -340, y: 120 }, { z
   const lying = { id: "t", x: 400, y: -160, w: 400, h: 20, rotation: 0 };
   ok(visible([lying], view, { width: 1200, height: 800 }, 0).length === 0, "a plank lying just above the view is not drawn");
   ok(visible([{ ...lying, rotation: 90 }], view, { width: 1200, height: 800 }, 0).length === 1, "turned upright into view, it is — culling uses its turned bounds");
+  // Just off screen: drawn ahead of time when within the margin, so a pan shows no gap.
+  const beside = { id: "b", x: 1300, y: 100, w: 50, h: 50, rotation: 0 };
+  ok(visible([beside], view, { width: 1200, height: 800 }, 0).length === 0, "100 px past the right edge, with no margin, it is not drawn");
+  ok(visible([beside], view, { width: 1200, height: 800 }, 200).length === 1, "with a 200 px margin it is");
+  // At half size a 400 px screen shows 800 across; the note is 500 past that, 250 px on screen.
+  const half = { zoom: 0.5, x: 0, y: 0 };
+  ok(visible([beside], half, { width: 400, height: 800 }, 200).length === 0 && visible([beside], half, { width: 400, height: 800 }, 300).length === 1, "the margin is in screen pixels, whatever the zoom");
+  ok(visible([{ ...beside, x: 1200 }], view, { width: 1200, height: 800 }, 0).length === 1, "one whose edge is exactly on the screen's edge is drawn");
 }
 
 // Picking a turned object.

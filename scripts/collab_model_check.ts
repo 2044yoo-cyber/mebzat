@@ -64,6 +64,7 @@ equal(nextRevisionLabel(["Rev 01", "C"]), "D", "labels typed by hand are skipped
 const members = [{ id: "u1", handle: "abebe" }, { id: "u2", handle: "sara.k" }, { id: "u3", handle: null }];
 equal(mentionedIn("@abebe can you check? cc @sara.k", members), ["u1", "u2"], "@handles name members");
 equal(mentionedIn("email me at abebe@example.com", members), [], "an email address is not a mention");
+equal(mentionedIn("write to hanna@abebe", members), [], "even when what follows the @ is somebody's handle");
 equal(mentionedIn("@nobody here", members), [], "and a handle that is not on the project names nobody");
 
 // Levels.

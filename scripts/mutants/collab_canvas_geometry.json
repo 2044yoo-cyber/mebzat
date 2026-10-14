@@ -1,0 +1,68 @@
+[
+ {
+  "name": "zoom moves the point under the finger",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "  return { zoom, x: screenPoint.x - world.x * zoom, y: screenPoint.y - world.y * zoom };",
+  "to": "  return { zoom, x: view.x, y: view.y };"
+ },
+ {
+  "name": "zoom unbounded",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "  const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, view.zoom * factor));",
+  "to": "  const zoom = view.zoom * factor;"
+ },
+ {
+  "name": "fit ignores the margin",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "    (viewport.width - margin * 2) / Math.max(bounds.w, 1),",
+  "to": "    viewport.width / Math.max(bounds.w, 1),"
+ },
+ {
+  "name": "culling ignores the margin",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "  const padded = { x: area.x - margin / view.zoom, y: area.y - margin / view.zoom, w: area.w + (2 * margin) / view.zoom, h: area.h + (2 * margin) / view.zoom };",
+  "to": "  const padded = area;"
+ },
+ {
+  "name": "hit ignores rotation",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "  const cos = Math.cos(rad(-shape.rotation));\n  const sin = Math.sin(rad(-shape.rotation));\n  const dx = point.x - cx;",
+  "to": "  const cos = 1;\n  const sin = 0;\n  const dx = point.x - cx;"
+ },
+ {
+  "name": "overlap misses touching edges",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "export const overlaps = (a: Box, b: Box) => a.x <= b.x + b.w && a.x + a.w >= b.x && a.y <= b.y + b.h && a.y + a.h >= b.y;",
+  "to": "export const overlaps = (a: Box, b: Box) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;"
+ },
+ {
+  "name": "resize moves the opposite corner",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "  const offset = turn((-sx * shape.w) / 2, (-sy * shape.h) / 2);",
+  "to": "  const offset = turn(0, 0);"
+ },
+ {
+  "name": "resize ignores the minimum",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "  let w = sx === 0 ? shape.w : Math.max(min, local.x * sx);",
+  "to": "  let w = sx === 0 ? shape.w : local.x * sx;"
+ },
+ {
+  "name": "resize ignores the ratio",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "  if (options.keepRatio && shape.w > 0 && shape.h > 0) {",
+  "to": "  if (false) {"
+ },
+ {
+  "name": "snap does nothing",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "export const snap = (value: number, grid: number) => (grid > 0 ? Math.round(value / grid) * grid : value);",
+  "to": "export const snap = (value: number, grid: number) => (grid > 0 ? value : value);"
+ },
+ {
+  "name": "screen to world forgets zoom",
+  "file": "src/lib/collab/canvas-geometry.ts",
+  "from": "export const toWorld = (point: Point, view: View): Point => ({ x: (point.x - view.x) / view.zoom, y: (point.y - view.y) / view.zoom });",
+  "to": "export const toWorld = (point: Point, view: View): Point => ({ x: point.x - view.x, y: point.y - view.y });"
+ }
+]

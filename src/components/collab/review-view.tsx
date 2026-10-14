@@ -56,7 +56,7 @@ export function ReviewView({ drawingId, onSelectDrawing }: { drawingId: string |
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col lg:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
       <aside className={cn("flex min-h-0 flex-col border-b lg:w-72 lg:border-b-0 lg:border-r", asset && "hidden lg:flex")} aria-label="Drawings">
         <div className="flex items-center gap-2 p-2">
           <h3 className="flex-1 px-1 text-sm font-semibold">Drawings and files</h3>
@@ -82,8 +82,8 @@ export function ReviewView({ drawingId, onSelectDrawing }: { drawingId: string |
         </ul>
         <input ref={fileInput} type="file" multiple accept={ACCEPT} className="hidden" onChange={(event) => { void upload(event.target.files); event.target.value = ""; }} />
       </aside>
-      <div className={cn("min-h-[32rem] min-w-0 flex-1 lg:min-h-0", !asset && "hidden lg:block")}>
-        {asset ? <Reviewer key={asset.id} asset={asset} onBack={() => onSelectDrawing(null)} onUploadRevision={(files) => void upload(files, asset.id)} uploading={uploading} /> : <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">Choose a drawing to review it.</div>}
+      <div className={cn("flex min-h-[32rem] min-w-0 flex-1 flex-col lg:min-h-0", !asset && "hidden lg:flex")}>
+        {asset ? <Reviewer key={asset.id} asset={asset} onBack={() => onSelectDrawing(null)} onUploadRevision={(files) => void upload(files, asset.id)} uploading={uploading} /> : <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">Choose a drawing to review it.</div>}
       </div>
     </div>
   );
@@ -124,7 +124,7 @@ function Reviewer({ asset, onBack, onUploadRevision, uploading }: { asset: Asset
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex flex-wrap items-center gap-2 border-b px-2 py-1.5">
         <button type="button" onClick={onBack} aria-label="Back to drawings" className="flex size-9 items-center justify-center rounded-lg hover:bg-muted lg:hidden"><ChevronLeft className="size-4" /></button>
         <div className="min-w-0 flex-1">
@@ -155,7 +155,7 @@ function Reviewer({ asset, onBack, onUploadRevision, uploading }: { asset: Asset
       </header>
       {revision.status === "approved" ? <p className="flex items-center gap-1.5 border-b bg-emerald-500/10 px-3 py-1 text-xs text-emerald-800 dark:text-emerald-300"><Check className="size-3.5" />Rev {revision.label} is approved.</p> : revision.status === "revise_resubmit" ? <p className="border-b bg-amber-500/10 px-3 py-1 text-xs text-amber-900 dark:text-amber-300">Changes were requested on Rev {revision.label}.</p> : null}
       {reviewable ? (
-        <div className={cn("grid min-h-0 flex-1", compare && "grid-rows-2 md:grid-cols-2 md:grid-rows-1")}>
+        <div className={cn("grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)]", compare && "grid-rows-2 md:grid-cols-2 md:grid-rows-1")}>
           <Canvas key={revision.id} asset={asset} revision={revision} />
           {compare ? <div className="min-h-0 border-t md:border-l md:border-t-0"><Canvas key={compare.id} asset={asset} revision={compare} compact /></div> : null}
         </div>
@@ -279,7 +279,7 @@ function Canvas({ asset, revision, compact }: { asset: Asset; revision: Revision
   return (
     <div className="relative flex h-full min-h-[18rem] flex-col">
       {!compact ? (
-        <div className="flex flex-wrap items-center gap-0.5 border-b px-2 py-1" role="toolbar" aria-label="Review tools">
+        <div className="flex items-center gap-0.5 overflow-x-auto border-b px-2 py-1 [scrollbar-width:none] *:shrink-0 lg:flex-wrap" role="toolbar" aria-label="Review tools">
           {tools.map((entry) => <ToolButton key={entry.value} label={entry.label} active={tool === entry.value} onClick={() => setTool(entry.value)}>{entry.icon}</ToolButton>)}
           {allowed.comment ? (
             <span className="ml-1 flex gap-1" role="group" aria-label="Markup colour">

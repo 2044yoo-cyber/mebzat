@@ -47,7 +47,8 @@ type Studio = {
   unread: Set<string>;
   markRead: (threadId: string) => void;
   tasks: StudioTask[];
-  refreshTasks: () => Promise<void>;
+  /** `also`: tasks just linked, which the thread list may not show until the next render. */
+  refreshTasks: (also?: readonly string[]) => Promise<void>;
   /** Which thread the side panel shows, anywhere in the Studio. */
   openThreadId: string | null;
   openThread: (id: string | null) => void;
@@ -99,7 +100,8 @@ export function StudioProvider({
   const annotationListeners = useRef(new Set<Listener<Annotation>>());
   const openRef = useRef(openThreadId);
   const threadsRef = useRef(threads);
-  useEffect(() => { openRef.current = openThreadId; threadsRef.current = threads; }, [openThreadId, threads]);
+  const tasksRef = useRef(tasks);
+  useEffect(() => { openRef.current = openThreadId; threadsRef.current = threads; tasksRef.current = tasks; }, [openThreadId, threads, tasks]);
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
   const announced = useRef<Omit<Presence, "userId" | "name" | "at">>({ tab: "board", boardId: null, cursor: null });
 
@@ -136,9 +138,9 @@ export function StudioProvider({
   }, [projectId]);
 
   const refreshAssets = useCallback(async () => { setAssets(await readAssets(createClient(), projectId)); }, [projectId]);
-  const refreshTasks = useCallback(async () => {
-    const ids = threadsRef.current.flatMap((thread) => (thread.taskId ? [thread.taskId] : []));
-    setTasks(await readStudioTasks(createClient(), projectId, ids));
+  const refreshTasks = useCallback(async (also: readonly string[] = []) => {
+    const ids = new Set([...threadsRef.current.flatMap((thread) => (thread.taskId ? [thread.taskId] : [])), ...also]);
+    setTasks(await readStudioTasks(createClient(), projectId, [...ids]));
   }, [projectId]);
 
   const openThread = useCallback((id: string | null) => {
@@ -171,7 +173,10 @@ export function StudioProvider({
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "collab_threads", filter }, (payload) => {
         if (!payload.new || !("id" in payload.new)) return;
-        upsertThread(toThread(payload.new as Parameters<typeof toThread>[0]));
+        const thread = toThread(payload.new as Parameters<typeof toThread>[0]);
+        upsertThread(thread);
+        // Somebody else made it a task: fetch the task so it shows here too.
+        if (thread.taskId && !tasksRef.current.some((task) => task.id === thread.taskId)) void refreshTasks([thread.taskId]);
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "collab_comments", filter }, (payload) => {
         const comment = toComment(payload.new as Parameters<typeof toComment>[0]);
@@ -200,7 +205,7 @@ export function StudioProvider({
       window.removeEventListener("offline", goOffline);
       void supabase.removeChannel(channel);
     };
-  }, [projectId, me.id, me.name, addComment, removeBoard, upsertBoard, upsertThread]);
+  }, [projectId, me.id, me.name, addComment, refreshTasks, removeBoard, upsertBoard, upsertThread]);
 
   // Presence: at most a few updates a second, however fast the cursor moves.
   const lastSent = useRef(0);

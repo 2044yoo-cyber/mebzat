@@ -100,3 +100,56 @@ House Plan and Freehand Sketch are custom SVG and canvas.
   against real PostgreSQL with the real policies; the UI against the
   in-memory fake the House Plan's browser checks use. What was and was not
   run is reported.
+
+## How it is checked
+
+| Check | Command | What it proves |
+| --- | --- | --- |
+| Schema and permissions | `bash supabase/tests/run.sh` | 0104 on real PostgreSQL 16, as a non-superuser `authenticated` role with `request.jwt.claim.sub`: the four levels, row security on every Studio table, cross-project references refused, revisions in order, numbering, notifications, no deletes, nothing for `anon` |
+| Model | `npx tsx scripts/collab_model_check.ts` | Item data validated per kind, `javascript:` links refused, pins stored as fractions, revision labels, mentions, who may do what |
+| Save engine | `npx tsx scripts/collab_store_check.ts` | Optimistic edits, batched saves, "saved" only when the server said so, conflicts, offline and retry, undo, realtime merge, a pinch cancelling a drag |
+| Canvas geometry | `npx tsx scripts/collab_canvas_geometry_check.ts` | Zoom about a point, fit, culling, rotated hit-testing and resizing, snapping, alignment |
+| The Studio in a browser | `node scripts/collab_studio_browser_check.mjs` (after `npm run build`) | The workflow end to end, several people in several tabs: below |
+
+Each has a mutation plan in `scripts/mutants/collab_*.json`, run with
+`node scripts/mutate.mjs "<command>" <plan>`.
+
+The browser check drives the real components and the real server actions
+against `scripts/collab_fake_supabase.ts`, a fake that keeps its rows in the
+browser and imitates 0104's rules (the rules themselves are tested on
+PostgreSQL above). It covers: a board with the architecture sections, a card
+that survives a reload, a drag between columns, free layout, undo; a canvas
+with a sticky note, a rectangle and a connector, whose stored coordinates do
+not move on zoom, fit or reload; a render uploaded and a pin placed at an
+exact fraction; a client replying live with an @mention; a comment made into
+an Agenda task, assigned, linked both ways and seen live in the other tabs; a
+revision B uploaded with A kept; ready-for-review and approval by the client;
+a stale save refused with the newer change kept; offline (said, never called
+saved, resent on reconnect) and a failed save with Retry; a viewer with no
+editing tools whose drags change nothing; an outsider getting not-found; and
+a phone — comments as a sheet that can be lowered, nothing wider than the
+screen, and a pinch that zooms without moving the object under it.
+
+## What was not run here
+
+- **A real Supabase project.** None is reachable from this container, so
+  realtime between two real browsers, Supabase Storage uploads and signed
+  URLs, and the server actions against a real PostgREST have not been run.
+  The fake stands in for them in the browser check; the database rules are
+  run for real in the SQL tests.
+- **Migration 0104 has not been applied anywhere.** Until it is, the Studio
+  page says the Studio is not installed and nothing else is affected.
+
+## Known limits
+
+- Studio levels govern the Studio's own tables. Agenda's own tables
+  (drawings, tasks, approvals) keep Agenda's existing rules, under which any
+  active project member may write them; a Studio viewer is not shown the
+  controls, but Agenda's own pages are unchanged.
+- Invitations reuse Agenda's existing invite-by-email and accept flow; there
+  are no shareable invitation links, and nothing is open to visitors who are
+  not signed in and on the project. A new member is a commenter until the
+  owner gives them another level.
+- On a phone the comment sheet covers the lower half of the screen; the
+  drawing is not re-fitted into the upper half, but the sheet can be lowered
+  to a handle.

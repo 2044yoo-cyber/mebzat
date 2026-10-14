@@ -1,0 +1,92 @@
+[
+ {
+  "name": "saved while still saving",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "    else this.status = { state: pendingCount ? \"saving\" : \"saved\", pending: pendingCount, error: null };",
+  "to": "    else this.status = { state: \"saved\", pending: pendingCount, error: null };"
+ },
+ {
+  "name": "unsaved forgotten on the next change",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "    if (this.status.state === \"unsaved\") this.status = { ...this.status, pending: pendingCount };\n    else this.status",
+  "to": "    if (false) this.status = { ...this.status, pending: pendingCount };\n    else this.status"
+ },
+ {
+  "name": "a drag is many undo steps",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "  beginStep() { if (!this.transaction) this.transaction = { before: new Map(), after: new Map() }; }",
+  "to": "  beginStep() {}"
+ },
+ {
+  "name": "a cancelled step leaves its moves",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "        this.restore(id, before);",
+  "to": "        void before;"
+ },
+ {
+  "name": "a cancelled step becomes undoable",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "    if (!step?.before.size) { this.emit(); return; }",
+  "to": "    if (step?.before.size) this.undoStack.push(step);\n    if (!step?.before.size) { this.emit(); return; }"
+ },
+ {
+  "name": "a failed save drops the changes",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "      for (const [id, queued] of sent) if (!this.pending.has(id)) this.pending.set(id, queued); else this.mergeBack(id, queued);",
+  "to": "      void sent;"
+ },
+ {
+  "name": "a failed save reports nothing",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "      this.status = { state: \"unsaved\", pending: this.pending.size, error: response.error };",
+  "to": "      void response;"
+ },
+ {
+  "name": "an edit during a save keeps the old base",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "        if (next && next.op !== \"create\") next.base = result.item.revision;",
+  "to": "        void next;"
+ },
+ {
+  "name": "a conflict replays the stale edit",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "        this.local.set(result.id, result.current);\n        this.pending.delete(result.id);\n        for (const listener of this.conflictListeners) listener(result.current, result.error);",
+  "to": "        this.local.set(result.id, result.current);\n        for (const listener of this.conflictListeners) listener(result.current, result.error);"
+ },
+ {
+  "name": "a conflict is not reported",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "        for (const listener of this.conflictListeners) listener(result.current, result.error);",
+  "to": "        void result;"
+ },
+ {
+  "name": "a refusal keeps the refused edit",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "        if (confirmed) this.local.set(result.id, confirmed); else this.local.delete(result.id);",
+  "to": "        void confirmed;"
+ },
+ {
+  "name": "unsaved create deleted is still sent",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "    if (queued?.op === \"create\" && !this.inFlight.has(id)) this.pending.delete(id);\n    else this.pending.set(id, { op: \"archive\", base: this.base(id) });",
+  "to": "    this.pending.set(id, { op: \"archive\", base: this.base(id) });"
+ },
+ {
+  "name": "realtime overwrites a local edit",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "    if (!this.pending.has(item.id) && !this.inFlight.has(item.id)) {\n      this.local.set(item.id, item);",
+  "to": "    {\n      this.local.set(item.id, item);"
+ },
+ {
+  "name": "realtime accepts an older revision",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "    if (known && known.revision >= item.revision) return;",
+  "to": "    void known;"
+ },
+ {
+  "name": "realtime takes other boards",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "    if (item.boardId !== this.boardId) return;\n    const known",
+  "to": "    const known"
+ }
+]

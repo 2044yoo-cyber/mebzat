@@ -1,0 +1,74 @@
+[
+ {
+  "name": "a phone gets the side column instead of the sheet",
+  "file": "src/components/collab/studio-workspace.tsx",
+  "from": "          wide ? (",
+  "to": "          true ? ("
+ },
+ {
+  "name": "a task just made is looked for among stale threads",
+  "file": "src/components/collab/thread-panel.tsx",
+  "from": "    await studio.refreshTasks([result.taskId]);",
+  "to": "    await studio.refreshTasks();"
+ },
+ {
+  "name": "a task made elsewhere is not fetched live",
+  "file": "src/components/collab/studio-context.tsx",
+  "from": "        if (thread.taskId && !tasksRef.current.some((task) => task.id === thread.taskId)) void refreshTasks([thread.taskId]);",
+  "to": "        void tasksRef;"
+ },
+ {
+  "name": "back online, nothing is resent",
+  "file": "src/components/collab/use-items.ts",
+  "from": "    const resend = () => { if (store.hasUnsaved()) void store.retry(); };",
+  "to": "    const resend = () => {};"
+ },
+ {
+  "name": "a pinch keeps what the first finger moved",
+  "file": "src/components/collab/canvas-view.tsx",
+  "from": "      if (gesture?.kind === \"move\" || gesture?.kind === \"resize\" || gesture?.kind === \"rotate\") store.cancelStep(); else store.endStep();",
+  "to": "      store.endStep();"
+ },
+ {
+  "name": "the canvas has no height on a phone",
+  "file": "src/components/collab/canvas-view.tsx",
+  "from": "    <div className=\"flex min-h-0 flex-1 flex-col\" onKeyDown={onKeyDown}>",
+  "to": "    <div className=\"flex h-full min-h-0 flex-col\" onKeyDown={onKeyDown}>"
+ },
+ {
+  "name": "the review grid widens the phone page",
+  "file": "src/components/collab/review-view.tsx",
+  "from": "grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)]",
+  "to": "grid min-h-0 flex-1"
+ },
+ {
+  "name": "a failed save is shown as saved",
+  "file": "src/components/collab/chrome.tsx",
+  "from": "  if (status.state === \"unsaved\") {",
+  "to": "  if (false) {"
+ },
+ {
+  "name": "a viewer gets the canvas tools",
+  "file": "src/components/collab/canvas-view.tsx",
+  "from": "  const editable = allowed.edit;",
+  "to": "  const editable = allowed.view;"
+ },
+ {
+  "name": "a viewer gets a reply box",
+  "file": "src/components/collab/thread-panel.tsx",
+  "from": "      {allowed.comment ? <Reply threadId={thread.id} /> :",
+  "to": "      {allowed.view ? <Reply threadId={thread.id} /> :"
+ },
+ {
+  "name": "the phone sheet cannot be lowered",
+  "file": "src/components/collab/studio-workspace.tsx",
+  "from": "lowered ? \"\" : \"h-[50dvh]\"",
+  "to": "\"h-[50dvh]\""
+ },
+ {
+  "name": "a conflict is left as a save error",
+  "file": "src/lib/collab/item-store.ts",
+  "from": "      } else if (result.current && result.current.revision !== (this.confirmed.get(result.id)?.revision ?? 0)) {",
+  "to": "      } else if (false) {"
+ }
+]

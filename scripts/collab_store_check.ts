@@ -139,6 +139,18 @@ async function main() {
     equal(store.get(note.id)?.x, 999, "4: where they put it");
     equal(told, ["theirs: Somebody else changed this a moment ago. It has been reloaded."], "4: and says so");
     equal(store.getStatus().state, "saved", "4: nothing is left pretending to be unsaved");
+    // An edit made while the losing save was on its way builds on the
+    // overtaken version: it is dropped, not replayed onto theirs.
+    db.elsewhere(note.id, { x: 1000 });
+    store.update(note.id, { x: 6 });
+    const losing = store.flush();
+    store.update(note.id, { x: 7 });
+    await losing;
+    const sentSoFar = db.calls.length;
+    await store.flush();
+    equal([db.rows.get(note.id)?.x, store.get(note.id)?.x], [1000, 1000], "4: an edit made on top of the stale one is dropped with it");
+    equal(db.calls.length, sentSoFar, "4: not sent again to be refused again");
+    ok(!store.hasUnsaved() && store.getStatus().state === "saved", "4: and nothing is left waiting, or reported as an error");
     store.dispose();
   }
 
@@ -202,6 +214,7 @@ async function main() {
     store.archive(scratch.id);
     await store.flush();
     equal(db.calls.length, before, "7: made and deleted before it was ever saved: nothing sent");
+    ok(!store.hasUnsaved(), "7: nor left waiting to be sent");
     ok(!db.rows.has(scratch.id), "7: and nothing on the server");
     // Moved, deleted, then undone twice: back, and back where it was.
     store.update(note.id, { x: 70 });
@@ -235,7 +248,7 @@ async function main() {
     equal(store.get(note.id)?.x, 5, "8: while this person is editing it, their edit stays on their screen");
     await store.flush();
     equal(store.get(note.id)?.x, 456, "8: until the server says the other change came first");
-    store.receive({ ...db.rows.get(note.id)!, boardId: "b0000000-0000-4000-8000-000000000999", revision: 99 });
+    store.receive({ ...db.rows.get(note.id)!, boardId: "b0000000-0000-4000-8000-000000000999", revision: 99, x: -7 });
     equal(store.get(note.id)?.x, 456, "8: a change to another board is not this board's");
     store.dispose();
   }
@@ -255,6 +268,28 @@ async function main() {
     ok(store.canUndo(), "8b: (the create is still there to undo)");
     store.redo();
     equal(store.get(note.id)?.x, 30, "8b: and redone in one");
+    store.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 8c. A drag that becomes a pinch is taken back: nothing moved, nothing sent.
+  // ---------------------------------------------------------------------------
+  {
+    const { db, store } = fresh();
+    const note = store.create({ kind: "sticky", x: 5, y: 7, data: { text: "x" } });
+    await store.flush();
+    const sentBefore = db.calls.length;
+    const undoable = store.canUndo();
+    store.beginStep();
+    for (let x = 6; x <= 9; x += 1) store.update(note.id, { x, y: x });
+    store.cancelStep();
+    equal([store.get(note.id)?.x, store.get(note.id)?.y], [5, 7], "8c: cancelled, the note is back where it was");
+    ok(!store.hasUnsaved(), "8c: with nothing waiting to be saved");
+    await store.flush();
+    equal(db.calls.length, sentBefore, "8c: and nothing sent to the server");
+    equal(store.canUndo(), undoable, "8c: nor anything added to undo");
+    store.undo();
+    ok(!store.get(note.id) || store.get(note.id)?.archived, "8c: undo still takes back the step before it (the create)");
     store.dispose();
   }
 

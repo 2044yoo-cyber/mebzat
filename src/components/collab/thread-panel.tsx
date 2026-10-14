@@ -221,7 +221,7 @@ function ConvertToTask({ thread, onDone }: { thread: Thread; onDone: () => void 
     setBusy(false);
     if (!result.ok) { toast.error(result.error); return; }
     studio.upsertThread(result.thread);
-    await studio.refreshTasks();
+    await studio.refreshTasks([result.taskId]);
     toast.success("Task created and linked to this comment.");
     onDone();
   };

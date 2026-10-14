@@ -39,7 +39,7 @@ export function useItems(boardId: string | null) {
       try {
         return await saveItems(projectId, boardId, changes);
       } catch {
-        return { ok: false as const, error: "No connection. Your changes are kept here; they will be sent again." };
+        return { ok: false as const, error: "No connection. Your changes are kept here and sent again when it is back." };
       }
     });
   }, [boardId, loaded, projectId]);
@@ -49,11 +49,15 @@ export function useItems(boardId: string | null) {
     const offItem = onItem((item) => store.receive(item));
     const offConflict = store.onConflict((_, message) => toast.info(message, { id: `conflict:${message}` }));
     const warn = (event: BeforeUnloadEvent) => { if (store.hasUnsaved()) { event.preventDefault(); event.returnValue = ""; } };
+    // Back online: send what is waiting, as the "not saved" message promised.
+    const resend = () => { if (store.hasUnsaved()) void store.retry(); };
     window.addEventListener("beforeunload", warn);
+    window.addEventListener("online", resend);
     return () => {
       offItem();
       offConflict();
       window.removeEventListener("beforeunload", warn);
+      window.removeEventListener("online", resend);
       void store.flush().finally(() => store.dispose());
     };
   }, [store, onItem]);

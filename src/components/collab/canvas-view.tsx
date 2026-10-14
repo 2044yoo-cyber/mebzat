@@ -235,7 +235,13 @@ export function CanvasView({ board, onDiscuss }: { board: Board; onDiscuss: (ite
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("[data-overlay]")) return;
-    if (viewport.pointerDown(event)) { setGesture(null); store.endStep(); return; }
+    if (viewport.pointerDown(event)) {
+      // A second finger: this is a pinch, so whatever the first finger began
+      // moving goes back where it was.
+      if (gesture?.kind === "move" || gesture?.kind === "resize" || gesture?.kind === "rotate") store.cancelStep(); else store.endStep();
+      setGesture(null);
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     const point = viewport.world(event);
     const touch = event.pointerType === "touch";
@@ -389,8 +395,8 @@ export function CanvasView({ board, onDiscuss }: { board: Board; onDiscuss: (ite
   const v = viewport.view;
 
   return (
-    <div className="flex h-full min-h-0 flex-col" onKeyDown={onKeyDown}>
-      <div className="flex flex-wrap items-center gap-0.5 border-b bg-card/80 px-2 py-1.5" role="toolbar" aria-label="Canvas tools">
+    <div className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown}>
+      <div className="flex items-center gap-0.5 overflow-x-auto border-b bg-card/80 px-2 py-1.5 [scrollbar-width:none] *:shrink-0 lg:flex-wrap" role="toolbar" aria-label="Canvas tools">
         <ToolButton label="Select" shortcut="V" active={tool === "select"} onClick={() => setTool("select")}><MousePointer2 className="size-4" /></ToolButton>
         <ToolButton label="Pan" shortcut="H" active={tool === "hand"} onClick={() => setTool("hand")}><Hand className="size-4" /></ToolButton>
         {editable ? (

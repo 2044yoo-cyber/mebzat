@@ -136,7 +136,7 @@ export function BoardView({ board, onDiscuss, onReview }: { board: Board; onDisc
   const cardProps = { store, onEdit: setEditing, onDiscuss, onReview, threadCount, columns, editable: allowed.edit, commentable: allowed.comment };
 
   return (
-    <div className="flex h-full min-h-0 flex-col" onKeyDown={(event) => {
+    <div className="flex min-h-0 flex-1 flex-col" onKeyDown={(event) => {
       if (!allowed.edit || (event.target as HTMLElement).closest("input, textarea, select")) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); if (event.shiftKey) store.redo(); else store.undo(); }
     }}>
