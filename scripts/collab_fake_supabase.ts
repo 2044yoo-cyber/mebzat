@@ -49,6 +49,11 @@ export function levelOf(db: Db, user: string, project: string): Level {
   return ((db.collab_access ?? []).find((row) => row.project_id === project && row.user_id === user)?.level as Level) ?? "commenter";
 }
 const canEdit = (level: Level) => level === "owner" || level === "editor";
+/** 0108's `agenda_can_approve`: the owner, or a member given `can_approve`. */
+function mayApprove(db: Db, user: string, project: string) {
+  if (levelOf(db, user, project) === "owner") return true;
+  return (db.agenda_members ?? []).some((row) => row.project_id === project && row.user_id === user && row.status === "active" && row.can_approve === true);
+}
 const canComment = (level: Level) => canEdit(level) || level === "commenter";
 
 const COLLAB = new Set(["collab_boards", "collab_items", "collab_threads", "collab_comments", "collab_annotations", "collab_access", "collab_reads"]);
@@ -130,6 +135,14 @@ function beforeWrite(db: Db, table: string, row: Row, old: Row | null, user: str
       else if (!["resolved", "approved"].includes(String(row.status))) { row.resolved_by = null; row.resolved_at = null; }
       if (row.status !== old.status || row.assigned_to !== old.assigned_to) row.last_activity_at = now();
     }
+  }
+  if (table === "agenda_approvals" && row.decision !== "pending") {
+    // 0108: decided only by somebody who may approve, in their own name, once.
+    if (old && old.decision !== "pending") return "A decision stands once made. Ask again as a new step.";
+    if (!mayApprove(db, user, String(row.project_id))) return "You are not allowed to approve on this project. Ask the owner.";
+    if (!old && row.approver_id && row.approver_id !== user) return "An approval is recorded in the name of whoever gives it.";
+    if (!old && (db.agenda_approvals ?? []).some((entry) => entry.subject_type === row.subject_type && entry.subject_id === row.subject_id && entry.step === row.step)) return "duplicate key value violates unique constraint";
+    row.approver_id = user; row.decided_at = now();
   }
   if (table === "collab_invites") {
     // 0107's checks and guard.
@@ -399,6 +412,7 @@ export function fakeClient() {
       await new Promise((resolve) => setTimeout(resolve, 10));
       const db = load();
       if (name === "collab_level") return { data: levelOf(db, currentUser(), String(args.target_project)), error: null };
+      if (name === "agenda_can_approve") return { data: mayApprove(db, currentUser(), String(args.target_project)), error: null };
       if (name === "agenda_next_number") {
         if (levelOf(db, currentUser(), String(args.target_project)) === null) return { data: null, error: { message: "You are not on this project." } };
         const counters = (db.agenda_counters ??= []);

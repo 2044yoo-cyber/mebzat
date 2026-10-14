@@ -1,0 +1,134 @@
+[
+ {
+  "name": "every session is maintenance",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "as $$ select coalesce(current_setting('role', true), 'none') in ('authenticated', 'anon'); $$;",
+  "to": "as $$ select false; $$;"
+ },
+ {
+  "name": "can_approve ignored",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "      and m.status = 'active' and m.can_approve\n",
+  "to": "      and m.status = 'active'\n"
+ },
+ {
+  "name": "makers taken from the request",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "    if tg_op = 'INSERT' then\n      patch := patch || jsonb_build_object(col, me);\n    elsif",
+  "to": "    if tg_op = 'INSERT' then\n      null;\n    elsif"
+ },
+ {
+  "name": "makers rewritable",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "    elsif (fresh -> col) is distinct from (before -> col) then\n      raise exception 'Who made a record is not changed afterwards.'",
+  "to": "    elsif false then\n      raise exception 'Who made a record is not changed afterwards.'"
+ },
+ {
+  "name": "deciders may name others",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "      if fresh ->> col is distinct from me::text then\n        raise exception 'A record can only name you",
+  "to": "      if false then\n        raise exception 'A record can only name you"
+ },
+ {
+  "name": "decided-by columns not covered",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "'decided_by', 'approved_by', 'reviewed_by', 'contractor_signed_by')) as decided,",
+  "to": "'none')) as decided,"
+ },
+ {
+  "name": "tasks not stamped",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "      and c.table_name not in ('agenda_members', 'agenda_events', 'agenda_audit', 'agenda_approvals')",
+  "to": "      and c.table_name not in ('agenda_members', 'agenda_events', 'agenda_audit', 'agenda_approvals', 'agenda_tasks', 'agenda_task_comments', 'agenda_drawing_revisions')"
+ },
+ {
+  "name": "approvals move between subjects",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "    if new.project_id is distinct from old.project_id or new.subject_type is distinct from old.subject_type\n       or new.subject_id is distinct from old.subject_id or new.step is distinct from old.step then",
+  "to": "    if false then"
+ },
+ {
+  "name": "decisions changeable",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "    if old.decision <> 'pending' then\n      raise exception 'A decision stands once made.",
+  "to": "    if false then\n      raise exception 'A decision stands once made."
+ },
+ {
+  "name": "anybody re-addresses requests",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "       and not public.agenda_is_owner(new.project_id) and old.approver_id is distinct from me then",
+  "to": "       and false then"
+ },
+ {
+  "name": "pending carries a decision time",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "    new.decided_at := null;\n    return new;",
+  "to": "    return new;"
+ },
+ {
+  "name": "anybody decides",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "  if not public.agenda_can_approve(new.project_id) then\n    raise exception 'You are not allowed to approve",
+  "to": "  if false then\n    raise exception 'You are not allowed to approve"
+ },
+ {
+  "name": "decides what waits on others",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "  if tg_op = 'UPDATE' and old.approver_id is not null and old.approver_id <> me\n     and not public.agenda_is_owner(new.project_id) then",
+  "to": "  if false then"
+ },
+ {
+  "name": "approves in another's name",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "  if tg_op = 'INSERT' and new.approver_id is not null and new.approver_id <> me then",
+  "to": "  if false then"
+ },
+ {
+  "name": "decision time not stamped",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "  new.approver_id := me;\n  new.decided_at := now();",
+  "to": "  new.approver_id := me;"
+ },
+ {
+  "name": "history writable",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "drop policy if exists \"agenda events: insert\" on public.agenda_events;\nrevoke insert, update, delete, truncate on public.agenda_events from authenticated, anon;",
+  "to": "select 1;"
+ },
+ {
+  "name": "comments rewritable",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "  if public.agenda_app_session() and old.author_id is distinct from auth.uid() then\n    raise exception 'Only the person who wrote a comment edits it.'",
+  "to": "  if false then\n    raise exception 'Only the person who wrote a comment edits it.'"
+ },
+ {
+  "name": "files swappable",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "    if (to_jsonb(new) -> col) is distinct from (to_jsonb(old) -> col) then\n      raise exception 'The file of an issued record",
+  "to": "    if false then\n      raise exception 'The file of an issued record"
+ },
+ {
+  "name": "revision files not fixed",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "      ('agenda_drawing_revisions', 'drawing_id,revision,storage_path,file_name,mime_type,size_bytes'),",
+  "to": "      ('agenda_drawing_revisions', 'notes'),"
+ },
+ {
+  "name": "photo files not fixed",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "      ('agenda_photos', 'storage_path'),",
+  "to": "      ('agenda_photos', 'caption'),"
+ },
+ {
+  "name": "viewers change drawings",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "     and exists (\n       select 1 from public.collab_access a",
+  "to": "     and false and exists (\n       select 1 from public.collab_access a"
+ },
+ {
+  "name": "owner treated as viewer",
+  "file": "supabase/migrations/0108_agenda_authorship.sql",
+  "from": "     and not public.agenda_is_owner(new.project_id)\n     and exists (",
+  "to": "     and exists ("
+ }
+]

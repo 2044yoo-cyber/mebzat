@@ -111,6 +111,7 @@ House Plan and Freehand Sketch are custom SVG and canvas.
 | Canvas geometry | `npx tsx scripts/collab_canvas_geometry_check.ts` | Zoom about a point, fit, culling, rotated hit-testing and resizing, snapping, alignment |
 | The Studio in a browser | `node scripts/collab_studio_browser_check.mjs` (after `npm run build`) | The workflow end to end, several people in several tabs: below |
 | Memberships and invitation links | `bash supabase/tests/run.sh collab-invites` | 0106 and 0107 on PostgreSQL: a member may only accept or leave their own membership; links never make an owner, expire, run out, can be withdrawn, keep only a hash, need a sign-in, and do not let a removed member back |
+| Authorship on PostgreSQL | `bash supabase/tests/run.sh agenda-authorship` | 0108: who made, decided and approved a record is always the signed-in person; decisions stand; history is the system's; files stay with their records; Studio viewers change no drawings |
 | Invitation links in a browser | `node scripts/collab_invites_browser_check.mjs` | The owner makes and copies a link; somebody signed out opens it, signs in and joins at exactly its access; the next person finds it used up; withdrawn and mangled links open nothing; the token never stays in the address bar or the database |
 
 Each has a mutation plan in `scripts/mutants/collab_*.json`, run with
@@ -146,10 +147,13 @@ screen, and a pinch that zooms without moving the object under it.
 
 ## Known limits
 
-- Studio levels govern the Studio's own tables. Agenda's own tables
-  (drawings, tasks, approvals) keep Agenda's existing rules, under which any
-  active project member may write them; a Studio viewer is not shown the
-  controls, but Agenda's own pages are unchanged.
+- Studio levels govern the Studio's own tables, and since 0108 also
+  drawings, revisions and approvals: a member the owner made a Studio viewer
+  adds or changes none of them. Other Agenda records (tasks, daily logs, …)
+  keep Agenda's rule that any active member may write them.
+- Approving a revision is Agenda's permission, not a Studio level: the owner,
+  the client, an administrator, or a member given "can approve". Each
+  decision is a new step and stands once made.
 - Invitations are by email (Agenda's existing flow) or by link (0107). A
   link needs a signed-in Medosha account, expires within 30 days, is for a
   set number of people (one by default), is for commenting unless the owner
@@ -168,6 +172,19 @@ and anybody could start a project — becoming its administrator — and move
 that row onto any other project, becoming an administrator of somebody
 else's Agenda with finance, meetings and contracts. 0106 fixes it; it is
 independent of the Studio and worth applying first.
+
+## Authorship audit (0108)
+
+The same review of everything the Studio touches found that Agenda's tables
+let any active member write rows without checking the columns that say who.
+On PostgreSQL 16 (supabase/tests/agenda-authorship.sql, written before the
+fix): an approval recorded in the owner's name, or by somebody not allowed
+to approve; somebody else's pending approval decided, and a decided one
+changed; a line of history written by hand in the owner's name; a task, a
+comment or a revision claiming the owner made it, and the maker rewritten
+later; somebody else's comment rewritten; the file behind an issued revision
+swapped. 0108 closes each, for people using the app; maintenance (SQL editor,
+service role, migrations) can still correct a record.
 - On a phone the comment sheet covers the lower half of the screen; the
   drawing is not re-fitted into the upper half, but the sheet can be lowered
   to a handle.

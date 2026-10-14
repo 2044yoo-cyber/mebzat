@@ -94,10 +94,11 @@ if (location.pathname === "/agenda/join") {
   const [members, boards, assets, threads] = await Promise.all([readMembers(client, projectId), readBoards(client, projectId), readAssets(client, projectId), readThreads(client, projectId)]);
   const unread = await readUnread(client, projectId, PEOPLE[as].id, threads);
   const tasks = await readStudioTasks(client, projectId, threads.flatMap((t) => (t.taskId ? [t.taskId] : [])));
+  const mayApprove = (await fakeClient().rpc("agenda_can_approve", { target_project: projectId })).data === true;
   const tab = query.get("tab") ?? "board";
   createRoot(node).render(
     <>
-      <StudioProvider projectId={projectId} me={{ id: PEOPLE[as].id, name: PEOPLE[as].name }} level={level} members={members} initialBoards={boards} initialAssets={assets} initialThreads={threads} initialUnread={[...unread]} initialTasks={tasks} initialThreadId={query.get("thread")}>
+      <StudioProvider projectId={projectId} me={{ id: PEOPLE[as].id, name: PEOPLE[as].name }} level={level} members={members} initialBoards={boards} initialAssets={assets} initialThreads={threads} initialUnread={[...unread]} initialTasks={tasks} initialThreadId={query.get("thread")} mayApprove={mayApprove}>
         <StudioPrimer urls={{}} />
         <StudioWorkspace initial={{ tab, boardId: query.get("board"), canvasId: query.get("canvas"), drawingId: query.get("drawing") }} />
       </StudioProvider>

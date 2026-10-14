@@ -58,9 +58,12 @@ export default async function CollaboratePage({
     readThreads(supabase, projectId),
     supabase.from("profiles").select("full_name, company_name, username").eq("id", user.id).maybeSingle(),
   ]);
-  const [unread, tasks] = await Promise.all([
+  const [unread, tasks, approve] = await Promise.all([
     readUnread(supabase, projectId, user.id, threads),
     readStudioTasks(supabase, projectId, threads.flatMap((thread) => (thread.taskId ? [thread.taskId] : []))),
+    // Missing before 0108 is applied: then nobody is offered approving, which
+    // the database would refuse anyway once it is.
+    supabase.rpc("agenda_can_approve", { target_project: projectId }),
   ]);
 
   // Signed once here for the first screen; the browser signs again as they run out.
@@ -91,6 +94,7 @@ export default async function CollaboratePage({
       initialUnread={[...unread]}
       initialTasks={tasks}
       initialThreadId={threadId && threads.some((thread) => thread.id === threadId) ? threadId : null}
+      mayApprove={approve.data === true}
     >
       <StudioPrimer urls={signed} />
       <StudioWorkspace
