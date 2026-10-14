@@ -7,7 +7,7 @@
  * signed-in person is per tab (sessionStorage), and changes reach the other
  * tabs through a BroadcastChannel the way Supabase Realtime delivers them.
  *
- * The rules 0104 enforces in PostgreSQL are imitated here so the screens meet
+ * The rules 0105 enforces in PostgreSQL are imitated here so the screens meet
  * the same refusals: Studio levels, revisions that must go up by one, the
  * database stamping who did what, thread numbers, and an update that row
  * security filters out affecting no rows rather than failing. The real rules
@@ -60,7 +60,7 @@ function projectOf(db: Db, table: string, row: Row): string {
   return "";
 }
 
-/** May this person see the row? Row security, as 0104 and Agenda write it. */
+/** May this person see the row? Row security, as 0105 and Agenda write it. */
 function visible(db: Db, table: string, row: Row, user: string): boolean {
   if (table === "profiles") return true;
   if (table === "collab_reads") return row.user_id === user;
@@ -251,7 +251,7 @@ class Query implements PromiseLike<Result> {
           continue;
         }
         const row = { ...(DEFAULTS[this.table]?.() ?? { id: crypto.randomUUID() }), ...payload };
-        // As 0104's trigger: the author is whoever is signed in, whatever was sent.
+        // As 0105's trigger: the author is whoever is signed in, whatever was sent.
         if (this.table === "collab_comments") row.author_id = user;
         const denied = refuseInsert(db, this.table, row, user);
         if (denied) return { data: null, error: { message: denied, code: "42501" } };

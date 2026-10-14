@@ -85,7 +85,7 @@ House Plan and Freehand Sketch are custom SVG and canvas.
 
 ## Stages
 
-1. Migration `0104_collab_studio.sql` + SQL tests (permissions, RLS,
+1. Migration `0105_collab_studio.sql` + SQL tests (permissions, RLS,
    cross-project refusal, concurrency, notifications).
 2. Server actions with validation and server-side authorisation.
 3. Workspace shell, navigation entries, loading/empty/error/denied states.
@@ -105,7 +105,7 @@ House Plan and Freehand Sketch are custom SVG and canvas.
 
 | Check | Command | What it proves |
 | --- | --- | --- |
-| Schema and permissions | `bash supabase/tests/run.sh` | 0104 on real PostgreSQL 16, as a non-superuser `authenticated` role with `request.jwt.claim.sub`: the four levels, row security on every Studio table, cross-project references refused, revisions in order, numbering, notifications, no deletes, nothing for `anon` |
+| Schema and permissions | `bash supabase/tests/run.sh` | 0105 on real PostgreSQL 16, as a non-superuser `authenticated` role with `request.jwt.claim.sub`: the four levels, row security on every Studio table, cross-project references refused, revisions in order, numbering, notifications, no deletes, nothing for `anon` |
 | Model | `npx tsx scripts/collab_model_check.ts` | Item data validated per kind, `javascript:` links refused, pins stored as fractions, revision labels, mentions, who may do what |
 | Save engine | `npx tsx scripts/collab_store_check.ts` | Optimistic edits, batched saves, "saved" only when the server said so, conflicts, offline and retry, undo, realtime merge, a pinch cancelling a drag |
 | Canvas geometry | `npx tsx scripts/collab_canvas_geometry_check.ts` | Zoom about a point, fit, culling, rotated hit-testing and resizing, snapping, alignment |
@@ -116,7 +116,7 @@ Each has a mutation plan in `scripts/mutants/collab_*.json`, run with
 
 The browser check drives the real components and the real server actions
 against `scripts/collab_fake_supabase.ts`, a fake that keeps its rows in the
-browser and imitates 0104's rules (the rules themselves are tested on
+browser and imitates 0105's rules (the rules themselves are tested on
 PostgreSQL above). It covers: a board with the architecture sections, a card
 that survives a reload, a drag between columns, free layout, undo; a canvas
 with a sticky note, a rectangle and a connector, whose stored coordinates do
@@ -137,7 +137,7 @@ screen, and a pinch that zooms without moving the object under it.
   URLs, and the server actions against a real PostgREST have not been run.
   The fake stands in for them in the browser check; the database rules are
   run for real in the SQL tests.
-- **Migration 0104 has not been applied anywhere.** Until it is, the Studio
+- **Migration 0105 has not been applied anywhere.** Until it is, the Studio
   page says the Studio is not installed and nothing else is affected.
 
 ## Known limits

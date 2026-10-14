@@ -14,7 +14,7 @@ import type {
  * what they are about to save with the same schemas the server actions use,
  * so a card the browser accepts is a card the server accepts.
  *
- * Who may do what is decided by the database (0104's `collab_level` and the
+ * Who may do what is decided by the database (0105's `collab_level` and the
  * policies on every table). `can` below says the same thing so the screen
  * offers only what will work — it is never what makes it safe.
  */

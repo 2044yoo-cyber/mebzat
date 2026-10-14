@@ -27,7 +27,7 @@ import type { Database, Json } from "@/types/database.types";
  * Writing to a project's Collaborative Studio.
  *
  * Two checks, deliberately. Every action first asks the database for the
- * caller's Studio level (`collab_level`, 0104) and refuses in words when the
+ * caller's Studio level (`collab_level`, 0105) and refuses in words when the
  * level does not allow it — that is what a person reads. Then it writes, and
  * row-level security on every table refuses it again if the level was wrong
  * or changed in between — that is what makes it safe. Neither trusts the

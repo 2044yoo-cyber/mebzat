@@ -1,4 +1,4 @@
--- The Collaborative Studio (0104): levels, boards, items, threads, comments,
+-- The Collaborative Studio (0105): levels, boards, items, threads, comments,
 -- annotations, reads — who may do what, and what can never happen.
 --
 -- Every access question is asked as `authenticated` with a jwt subject: a

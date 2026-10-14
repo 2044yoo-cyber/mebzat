@@ -4,7 +4,7 @@
  *   node scripts/collab_studio_browser_check.mjs
  *
  * The real screens and the real server actions, against the fake database in
- * collab_fake_supabase.ts (which imitates 0104's rules; the rules themselves
+ * collab_fake_supabase.ts (which imitates 0105's rules; the rules themselves
  * are tested on PostgreSQL in supabase/tests/collab-studio.sql). Each tab is
  * signed in as a different person and sees the others' changes live.
  *

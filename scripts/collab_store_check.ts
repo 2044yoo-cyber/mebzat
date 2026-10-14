@@ -5,7 +5,7 @@
  *
  *   npx tsx scripts/collab_store_check.ts
  *
- * Driven against a fake server that applies revisions the way 0104's trigger
+ * Driven against a fake server that applies revisions the way 0105's trigger
  * does — an update names the revision it was made from, and a stale one is
  * refused with the object as it now is.
  */

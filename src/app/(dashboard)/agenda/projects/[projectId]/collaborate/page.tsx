@@ -45,7 +45,7 @@ export default async function CollaboratePage({
       <div className="mx-auto max-w-lg space-y-3 p-6 text-sm">
         <DatabaseZap className="size-8 text-brand" />
         <h2 className="text-lg font-semibold">{missing ? "The Collaborative Studio is not installed yet" : "The Studio could not be opened"}</h2>
-        <p className="text-muted-foreground">{missing ? "The database is missing migration 0104_collab_studio.sql. Whoever runs Medosha's database needs to apply it; nothing on this project is affected meanwhile." : "The database did not answer. Try again in a moment."}</p>
+        <p className="text-muted-foreground">{missing ? "The database is missing migration 0105_collab_studio.sql. Whoever runs Medosha's database needs to apply it; nothing on this project is affected meanwhile." : "The database did not answer. Try again in a moment."}</p>
       </div>
     );
   }
