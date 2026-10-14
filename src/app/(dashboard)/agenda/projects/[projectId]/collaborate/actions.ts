@@ -7,7 +7,7 @@ import { isInProject } from "@/lib/agenda/files";
 import {
   annotationGeometry,
   can,
-
+  inviteInput,
   itemChange,
   nextRevisionLabel,
   parseItemData,
@@ -15,6 +15,7 @@ import {
   TASK_COLUMNS,
   uuid,
   type AnnotationKind,
+  type InviteInput,
   type ItemChange,
   type Level,
   type ThreadStatus,
@@ -547,3 +548,58 @@ export async function setAccess(projectId: string, input: { userId: string; leve
   return { ok: true };
 }
 
+
+// ---------------------------------------------------------------------------
+// Invitation links
+// ---------------------------------------------------------------------------
+
+/** 32 random bytes, base64url. Web Crypto: the same on the server and in the browser checks. */
+function newToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** SHA-256, hex — what 0107's `collab_token_hash` computes, so the database finds it. */
+async function hashToken(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Makes a link and returns its token — once. Only the hash is stored, so a
+ * lost link cannot be shown again; it is withdrawn and another made.
+ */
+export async function createInviteLink(projectId: string, input: InviteInput): Promise<Result<{ token: string; inviteId: string }>> {
+  const { supabase, user, level, projectId: project } = await context(projectId);
+  const refusal = denied(level, "manage");
+  if (!user || refusal) return fail(refusal ?? "Sign in first.");
+  const parsed = inviteInput.safeParse(input);
+  if (!parsed.success) return fail("Those link settings are not valid.");
+  const token = newToken();
+  const { data, error } = await supabase.from("collab_invites").insert({
+    project_id: project,
+    token_hash: await hashToken(token),
+    level: parsed.data.level,
+    role: parsed.data.role,
+    max_uses: parsed.data.maxUses,
+    expires_at: new Date(Date.now() + parsed.data.days * 86_400_000).toISOString(),
+    label: parsed.data.label || null,
+  }).select("id").single();
+  if (error || !data) return fail(explain(error?.message, "The link was not made."));
+  refresh(project);
+  return { ok: true, token, inviteId: data.id };
+}
+
+/** Withdraws a link. Whoever already joined by it stays; remove them from the team if they should not. */
+export async function revokeInviteLink(projectId: string, inviteId: string): Promise<Result> {
+  const { supabase, user, level, projectId: project } = await context(projectId);
+  const refusal = denied(level, "manage");
+  if (!user || refusal) return fail(refusal ?? "Sign in first.");
+  if (!uuid.safeParse(inviteId).success) return fail("That link is not valid.");
+  const { data, error } = await supabase.from("collab_invites").update({ revoked_at: new Date().toISOString() })
+    .eq("id", inviteId).eq("project_id", project).is("revoked_at", null).select("id").maybeSingle();
+  if (error) return fail(explain(error.message, "The link was not withdrawn."));
+  if (!data) return fail("That link is already withdrawn, or is not on this project.");
+  refresh(project);
+  return { ok: true };
+}

@@ -2711,6 +2711,7 @@ export interface Database {
           user_id: string;
           level: Exclude<CollabAccessLevel, "owner">;
           granted_by: string | null;
+          invite_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -2719,6 +2720,7 @@ export interface Database {
           user_id: string;
           level: Exclude<CollabAccessLevel, "owner">;
           granted_by?: string | null;
+          invite_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -2727,8 +2729,47 @@ export interface Database {
           user_id?: string;
           level?: Exclude<CollabAccessLevel, "owner">;
           granted_by?: string | null;
+          invite_id?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      collab_invites: {
+        Row: {
+          id: string;
+          project_id: string;
+          token_hash: string;
+          level: Exclude<CollabAccessLevel, "owner">;
+          role: Exclude<AgendaRole, "client" | "administrator">;
+          label: string | null;
+          max_uses: number;
+          uses: number;
+          expires_at: string;
+          created_by: string | null;
+          created_at: string;
+          revoked_at: string | null;
+          revoked_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          token_hash: string;
+          level?: Exclude<CollabAccessLevel, "owner">;
+          role?: Exclude<AgendaRole, "client" | "administrator">;
+          label?: string | null;
+          max_uses?: number;
+          uses?: number;
+          expires_at?: string;
+          created_by?: string | null;
+          created_at?: string;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+        };
+        Update: {
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+          uses?: number;
         };
         Relationships: [];
       };
@@ -10078,6 +10119,32 @@ export interface Database {
           target_project: string;
         };
         Returns: CollabAccessLevel | null;
+      };
+      collab_token_hash: {
+        Args: {
+          invite_token: string;
+        };
+        Returns: string;
+      };
+      collab_invite_preview: {
+        Args: {
+          invite_token: string;
+        };
+        Returns: {
+          project_id: string;
+          project_name: string;
+          level: Exclude<CollabAccessLevel, "owner">;
+          role: AgendaRole;
+          invited_by: string;
+          expires_at: string;
+          state: "ok" | "member" | "removed" | "revoked" | "expired" | "used";
+        }[];
+      };
+      collab_accept_invite: {
+        Args: {
+          invite_token: string;
+        };
+        Returns: string;
       };
       collab_can_view: {
         Args: {

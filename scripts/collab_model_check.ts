@@ -9,7 +9,8 @@
  */
 import assert from "node:assert/strict";
 
-import { can, denormalise, itemChange, mentionedIn, nextRevisionLabel, normalise, parseItemData, safeUrl, STARTER_SECTIONS, TASK_COLUMNS } from "../src/lib/collab/model";
+import { can, denormalise, INVITE_ROLES, inviteInput, inviteToken, inviteUrl, itemChange, mentionedIn, nextRevisionLabel, normalise, parseItemData, safeUrl, STARTER_SECTIONS, TASK_COLUMNS, tokenFromHash } from "../src/lib/collab/model";
+import { inviteState } from "../src/lib/collab/queries";
 
 let checks = 0;
 const ok = (value: unknown, message: string) => { assert.ok(value, message); checks += 1; };
@@ -76,4 +77,18 @@ ok(can.view("viewer") && !can.view(null), "everybody on the project views; nobod
 equal(TASK_COLUMNS.map((column) => column.value), ["todo", "in_progress", "review", "done"], "Studio task columns are Agenda's task statuses");
 equal([...STARTER_SECTIONS], ["Concept", "Floor Plans", "Interior Design", "Materials", "3D Renders", "Client Feedback", "Approved Designs"], "the architecture starter sections");
 
-console.log(`Studio model: ${checks} checks — safe links, object data by kind, changes with revisions, normalised pins, revision letters, mentions, levels`);
+// Invitation links.
+const token = "Ab0_-".repeat(8) + "xyz";
+equal(token.length, 43, "(a well-formed token is 43 characters)");
+ok(inviteToken.safeParse(token).success && !inviteToken.safeParse(token.slice(1)).success && !inviteToken.safeParse(`${token.slice(1)}!`).success, "a token is exactly 43 base64url characters");
+equal(inviteUrl("https://medosha.example", token), `https://medosha.example/agenda/join#${token}`, "the token travels after #, which browsers never send to a server");
+equal(tokenFromHash(`#${token}`), token, "and is read back from the address");
+equal([tokenFromHash("#short"), tokenFromHash(""), tokenFromHash(`#${token}x`)], [null, null, null], "a cut-short, missing or padded token is no token");
+ok(!(INVITE_ROLES as readonly string[]).includes("client") && !(INVITE_ROLES as readonly string[]).includes("administrator"), "no link role is one Agenda treats as an owner");
+equal(inviteInput.parse({}), { level: "commenter", role: "employee", days: 7, maxUses: 1 }, "a link is for commenting, by one person, for a week, unless the owner says otherwise");
+ok(!inviteInput.safeParse({ level: "owner" }).success && !inviteInput.safeParse({ role: "client" }).success && !inviteInput.safeParse({ days: 365 }).success && !inviteInput.safeParse({ maxUses: 1000 }).success, "never owner, client, a year, or a thousand people");
+const at = Date.parse("2026-10-14T12:00:00Z");
+const fresh = { revokedAt: null, expiresAt: "2026-10-21T12:00:00Z", uses: 0, maxUses: 1 };
+equal([inviteState(fresh, at), inviteState({ ...fresh, uses: 1 }, at), inviteState({ ...fresh, expiresAt: "2026-10-14T12:00:00Z" }, at), inviteState({ ...fresh, uses: 1, revokedAt: "x" }, at)], ["active", "used", "expired", "revoked"], "a link is active, used up, expired at its moment, or withdrawn — withdrawn first");
+
+console.log(`Studio model: ${checks} checks — safe links, object data by kind, changes with revisions, normalised pins, revision letters, mentions, levels, invitation links`);

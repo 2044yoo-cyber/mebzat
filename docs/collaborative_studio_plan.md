@@ -110,6 +110,8 @@ House Plan and Freehand Sketch are custom SVG and canvas.
 | Save engine | `npx tsx scripts/collab_store_check.ts` | Optimistic edits, batched saves, "saved" only when the server said so, conflicts, offline and retry, undo, realtime merge, a pinch cancelling a drag |
 | Canvas geometry | `npx tsx scripts/collab_canvas_geometry_check.ts` | Zoom about a point, fit, culling, rotated hit-testing and resizing, snapping, alignment |
 | The Studio in a browser | `node scripts/collab_studio_browser_check.mjs` (after `npm run build`) | The workflow end to end, several people in several tabs: below |
+| Memberships and invitation links | `bash supabase/tests/run.sh collab-invites` | 0106 and 0107 on PostgreSQL: a member may only accept or leave their own membership; links never make an owner, expire, run out, can be withdrawn, keep only a hash, need a sign-in, and do not let a removed member back |
+| Invitation links in a browser | `node scripts/collab_invites_browser_check.mjs` | The owner makes and copies a link; somebody signed out opens it, signs in and joins at exactly its access; the next person finds it used up; withdrawn and mangled links open nothing; the token never stays in the address bar or the database |
 
 Each has a mutation plan in `scripts/mutants/collab_*.json`, run with
 `node scripts/mutate.mjs "<command>" <plan>`.
@@ -137,8 +139,10 @@ screen, and a pinch that zooms without moving the object under it.
   URLs, and the server actions against a real PostgREST have not been run.
   The fake stands in for them in the browser check; the database rules are
   run for real in the SQL tests.
-- **Migration 0105 has not been applied anywhere.** Until it is, the Studio
-  page says the Studio is not installed and nothing else is affected.
+- **Migrations 0105, 0106 and 0107 have not been applied anywhere.** Until
+  0105 is, the Studio page says the Studio is not installed and nothing else
+  is affected. Each applies as one transaction, the way the Supabase SQL
+  editor runs a pasted file (checked on PostgreSQL 16).
 
 ## Known limits
 
@@ -146,10 +150,24 @@ screen, and a pinch that zooms without moving the object under it.
   (drawings, tasks, approvals) keep Agenda's existing rules, under which any
   active project member may write them; a Studio viewer is not shown the
   controls, but Agenda's own pages are unchanged.
-- Invitations reuse Agenda's existing invite-by-email and accept flow; there
-  are no shareable invitation links, and nothing is open to visitors who are
-  not signed in and on the project. A new member is a commenter until the
-  owner gives them another level.
+- Invitations are by email (Agenda's existing flow) or by link (0107). A
+  link needs a signed-in Medosha account, expires within 30 days, is for a
+  set number of people (one by default), is for commenting unless the owner
+  chooses otherwise, and never grants an owner's level or an owner's Agenda
+  role. The token is 256 random bits, travels after `#` so it never reaches
+  a server log, and only its SHA-256 is stored. Withdrawing a link does not
+  remove people who already joined by it; they are removed from the team.
+  A new member is a commenter until the owner gives them another level.
+
+## Security fix found on the way (0106)
+
+Reading Agenda's membership rules for the links showed that a member could
+update their own `agenda_members` row beyond accepting it. On PostgreSQL 16,
+as an `authenticated` user: a removed member could reactivate themselves,
+and anybody could start a project — becoming its administrator — and move
+that row onto any other project, becoming an administrator of somebody
+else's Agenda with finance, meetings and contracts. 0106 fixes it; it is
+independent of the Studio and worth applying first.
 - On a phone the comment sheet covers the lower half of the screen; the
   drawing is not re-fitted into the upper half, but the sheet can be lowered
   to a handle.

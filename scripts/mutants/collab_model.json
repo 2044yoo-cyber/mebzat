@@ -70,5 +70,47 @@
   "file": "src/lib/collab/model.ts",
   "from": "  w: finite.min(0).max(1e6),",
   "to": "  w: finite.max(1e6),"
+ },
+ {
+  "name": "token of any length",
+  "file": "src/lib/collab/model.ts",
+  "from": "export const inviteToken = z.string().regex(/^[A-Za-z0-9_-]{43}$/, \"This invitation link is not valid.\");",
+  "to": "export const inviteToken = z.string().regex(/^[A-Za-z0-9_-]{20,}$/, \"This invitation link is not valid.\");"
+ },
+ {
+  "name": "token read with the #",
+  "file": "src/lib/collab/model.ts",
+  "from": "  const token = hash.replace(/^#/, \"\");",
+  "to": "  const token = hash;"
+ },
+ {
+  "name": "links default to editing",
+  "file": "src/lib/collab/model.ts",
+  "from": "  level: z.enum([\"editor\", \"commenter\", \"viewer\"]).default(\"commenter\"),",
+  "to": "  level: z.enum([\"editor\", \"commenter\", \"viewer\"]).default(\"editor\"),"
+ },
+ {
+  "name": "links last a month by default",
+  "file": "src/lib/collab/model.ts",
+  "from": "  days: z.union([z.literal(1), z.literal(7), z.literal(30)]).default(7),",
+  "to": "  days: z.union([z.literal(1), z.literal(7), z.literal(30)]).default(30),"
+ },
+ {
+  "name": "links any length",
+  "file": "src/lib/collab/model.ts",
+  "from": "  days: z.union([z.literal(1), z.literal(7), z.literal(30)]).default(7),",
+  "to": "  days: z.number().default(7),"
+ },
+ {
+  "name": "expiry moment off by one",
+  "file": "src/lib/collab/queries.ts",
+  "from": "  if (Date.parse(invite.expiresAt) <= now) return \"expired\";",
+  "to": "  if (Date.parse(invite.expiresAt) < now) return \"expired\";"
+ },
+ {
+  "name": "withdrawn shown as used",
+  "file": "src/lib/collab/queries.ts",
+  "from": "  if (invite.revokedAt) return \"revoked\";\n",
+  "to": "\n"
  }
 ]

@@ -279,3 +279,35 @@ export async function readStudioTasks(client: Client, projectId: string, taskIds
     dueAt: row.due_at, createdBy: row.created_by, updatedAt: row.updated_at,
   }));
 }
+
+/** An invitation link as its owner sees it. The token itself is never stored, so never here. */
+export type Invite = {
+  id: string;
+  level: Exclude<Level, "owner">;
+  role: string;
+  label: string | null;
+  maxUses: number;
+  uses: number;
+  expiresAt: string;
+  createdAt: string;
+  revokedAt: string | null;
+};
+
+/** What state a link is in, from its own fields. */
+export function inviteState(invite: Pick<Invite, "revokedAt" | "expiresAt" | "uses" | "maxUses">, now = Date.now()): "active" | "revoked" | "expired" | "used" {
+  if (invite.revokedAt) return "revoked";
+  if (Date.parse(invite.expiresAt) <= now) return "expired";
+  if (invite.uses >= invite.maxUses) return "used";
+  return "active";
+}
+
+/** The project's links, newest first. Row security shows them to the owner only. */
+export async function readInvites(client: Client, projectId: string): Promise<Invite[]> {
+  const { data } = await client.from("collab_invites")
+    .select("id, level, role, label, max_uses, uses, expires_at, created_at, revoked_at")
+    .eq("project_id", projectId).order("created_at", { ascending: false }).limit(50);
+  return (data ?? []).map((row) => ({
+    id: row.id, level: row.level, role: row.role, label: row.label, maxUses: row.max_uses, uses: row.uses,
+    expiresAt: row.expires_at, createdAt: row.created_at, revokedAt: row.revoked_at,
+  }));
+}

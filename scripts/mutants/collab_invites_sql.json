@@ -1,0 +1,200 @@
+[
+ {
+  "name": "links may grant owner level",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "    check (level in ('editor', 'commenter', 'viewer')),",
+  "to": "    check (true),"
+ },
+ {
+  "name": "links may make clients or administrators",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "    check (role not in ('client', 'administrator')),",
+  "to": "    check (true),"
+ },
+ {
+  "name": "links unlimited in people",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  max_uses integer not null default 1 check (max_uses between 1 and 100),",
+  "to": "  max_uses integer not null default 1 check (max_uses >= 0),"
+ },
+ {
+  "name": "links last for ever",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  constraint collab_invites_window check (expires_at > created_at and expires_at <= created_at + interval '30 days')",
+  "to": "  constraint collab_invites_window check (true)"
+ },
+ {
+  "name": "plain tokens stored",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  token_hash text not null unique check (token_hash ~ '^[0-9a-f]{64}$'),",
+  "to": "  token_hash text not null unique,"
+ },
+ {
+  "name": "creator taken from the request",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "    new.created_by := auth.uid();\n    new.created_at := now();",
+  "to": "    new.created_at := now();"
+ },
+ {
+  "name": "uses taken from the request",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "    new.uses := 0;\n",
+  "to": "\n"
+ },
+ {
+  "name": "links edited after sending",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  if (to_jsonb(new) - 'revoked_at' - 'revoked_by' - 'uses')\n     is distinct from (to_jsonb(old) - 'revoked_at' - 'revoked_by' - 'uses') then",
+  "to": "  if false then"
+ },
+ {
+  "name": "withdrawn links put back",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  if old.revoked_at is not null and new.revoked_at is distinct from old.revoked_at then",
+  "to": "  if false then"
+ },
+ {
+  "name": "withdrawal not stamped",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "    new.revoked_by := auth.uid();\n  else",
+  "to": "    null;\n  else"
+ },
+ {
+  "name": "use count jumps",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  if new.uses < old.uses or new.uses > old.uses + 1 then",
+  "to": "  if new.uses < old.uses then"
+ },
+ {
+  "name": "level credited to the joiner",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "    select i.created_by into new.granted_by",
+  "to": "    select auth.uid() into new.granted_by"
+ },
+ {
+  "name": "link from another project accepted",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "    where i.id = new.invite_id and i.project_id = new.project_id;",
+  "to": "    where i.id = new.invite_id;"
+ },
+ {
+  "name": "preview without sign-in",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  where auth.uid() is not null\n    and char_length(invite_token) between 20 and 200",
+  "to": "  where char_length(invite_token) between 20 and 200"
+ },
+ {
+  "name": "preview hides removal",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "      when m.status in ('removed', 'suspended') then 'removed'\n",
+  "to": "\n"
+ },
+ {
+  "name": "preview hides expiry",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "      when i.expires_at <= now() then 'expired'\n",
+  "to": "\n"
+ },
+ {
+  "name": "join without sign-in",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  if me is null then\n    raise exception 'Sign in to accept the invitation.'",
+  "to": "  if false then\n    raise exception 'Sign in to accept the invitation.'"
+ },
+ {
+  "name": "removed members rejoin",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  if membership.status in ('removed', 'suspended') then",
+  "to": "  if false then"
+ },
+ {
+  "name": "withdrawn links work",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  if invite.revoked_at is not null then",
+  "to": "  if false then"
+ },
+ {
+  "name": "expired links work",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  if invite.expires_at <= now() then",
+  "to": "  if false then"
+ },
+ {
+  "name": "used-up links work",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  if invite.uses >= invite.max_uses then",
+  "to": "  if false then"
+ },
+ {
+  "name": "members re-join consume and change",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  if membership.status = 'active'\n",
+  "to": "  if false\n"
+ },
+ {
+  "name": "joiner role from the request",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "    values (invite.project_id, me, invite.role, 'active', invite.created_by, now(), now());",
+  "to": "    values (invite.project_id, me, 'administrator', 'active', invite.created_by, now(), now());"
+ },
+ {
+  "name": "emailed invitation overwritten by link role",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "    update public.agenda_members set status = 'active', accepted_at = now()\n    where id = membership.id;",
+  "to": "    update public.agenda_members set status = 'active', accepted_at = now(), role = invite.role\n    where id = membership.id;"
+ },
+ {
+  "name": "level not given",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  values (invite.project_id, me, invite.level, invite.id)",
+  "to": "  values (invite.project_id, me, 'editor', invite.id)"
+ },
+ {
+  "name": "uses not counted",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  update public.collab_invites set uses = uses + 1 where id = invite.id;",
+  "to": "  null;"
+ },
+ {
+  "name": "joining not logged",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  perform public.agenda_log_event(",
+  "to": "  perform 1, ("
+ },
+ {
+  "name": "members read links",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  for select to authenticated using (public.collab_level(project_id) = 'owner');",
+  "to": "  for select to authenticated using (public.collab_can_view(project_id));"
+ },
+ {
+  "name": "members make links",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  for insert to authenticated with check (public.collab_level(project_id) = 'owner');",
+  "to": "  for insert to authenticated with check (public.collab_can_view(project_id));"
+ },
+ {
+  "name": "others withdraw links",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "  using (public.collab_level(project_id) = 'owner')\n  with check (public.collab_level(project_id) = 'owner');",
+  "to": "  using (true)\n  with check (true);"
+ },
+ {
+  "name": "links deletable",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "revoke delete, truncate on public.collab_invites from authenticated;",
+  "to": "grant delete on public.collab_invites to authenticated;"
+ },
+ {
+  "name": "anon reads links",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "revoke all on public.collab_invites from anon, public;",
+  "to": "grant select on public.collab_invites to anon;"
+ },
+ {
+  "name": "anon uses links",
+  "file": "supabase/migrations/0107_collab_invite_links.sql",
+  "from": "revoke all on function public.collab_accept_invite(text) from public, anon;",
+  "to": "grant execute on function public.collab_accept_invite(text) to anon;"
+ }
+]

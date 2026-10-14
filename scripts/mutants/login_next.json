@@ -1,0 +1,14 @@
+[
+ {
+  "name": "login ignores next",
+  "file": "src/app/(auth)/login/login-form.tsx",
+  "from": "  const redirectTo = safeRedirect(searchParams.get(\"redirect\") ?? searchParams.get(\"next\"));",
+  "to": "  const redirectTo = safeRedirect(searchParams.get(\"redirect\"));"
+ },
+ {
+  "name": "login takes next unguarded",
+  "file": "src/app/(auth)/login/login-form.tsx",
+  "from": "  const redirectTo = safeRedirect(searchParams.get(\"redirect\") ?? searchParams.get(\"next\"));",
+  "to": "  const redirectTo = searchParams.get(\"redirect\") ?? searchParams.get(\"next\") ?? \"/dashboard\";"
+ }
+]

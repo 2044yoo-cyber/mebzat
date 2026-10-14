@@ -36,7 +36,7 @@ export default async function CollaboratePage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/agenda/projects/${projectId}/collaborate`);
+  if (!user) redirect(`/login?redirect=${encodeURIComponent(`/agenda/projects/${projectId}/collaborate`)}`);
 
   const level = await supabase.rpc("collab_level", { target_project: projectId });
   if (level.error) {

@@ -25,6 +25,9 @@ export const PEOPLE = {
   client: { id: "c6000000-0000-4000-8000-000000000003", name: "Sara Client", username: "sara" },
   viewer: { id: "c6000000-0000-4000-8000-000000000004", name: "Yonas Viewer", username: "yonas" },
   outsider: { id: "c6000000-0000-4000-8000-000000000005", name: "Out Sider", username: "outsider" },
+  // Not on the project: people an invitation link is sent to.
+  guest: { id: "c6000000-0000-4000-8000-000000000006", name: "Gete Guest", username: "gete" },
+  latecomer: { id: "c6000000-0000-4000-8000-000000000007", name: "Lemma Late", username: "lemma" },
 };
 
 export async function openStudio() {
@@ -45,6 +48,7 @@ import { Toaster } from "sonner";
 import { StudioProvider } from "@/components/collab/studio-context";
 import { StudioWorkspace } from "@/components/collab/studio-workspace";
 import { StudioPrimer } from "@/components/collab/studio-primer";
+import { JoinStudio } from "@/components/collab/join-studio";
 import { readAssets, readBoards, readMembers, readStudioTasks, readThreads, readUnread } from "@/lib/collab/queries";
 import { fakeClient } from "${join(root, "scripts/collab_fake_supabase.ts")}";
 
@@ -52,8 +56,10 @@ const PEOPLE = ${JSON.stringify(PEOPLE)};
 const PROJECT = "${PROJECT}";
 const OTHER = "${OTHER_PROJECT}";
 const query = new URLSearchParams(location.search);
-const as = query.get("as") ?? "owner";
-sessionStorage.setItem("__collab_user", PEOPLE[as].id);
+// \`?as=\` signs this tab in (\`none\` signs it out); later pages in the tab keep whoever it is.
+const remembered = Object.keys(PEOPLE).find((key) => PEOPLE[key].id === sessionStorage.getItem("__collab_user"));
+const as = query.get("as") ?? (sessionStorage.getItem("__collab_user") === "" ? "none" : remembered) ?? "owner";
+sessionStorage.setItem("__collab_user", as === "none" ? "" : PEOPLE[as].id);
 
 if (!localStorage.getItem("__collab_fake_db")) {
   const at = new Date().toISOString();
@@ -74,11 +80,15 @@ if (!localStorage.getItem("__collab_fake_db")) {
   }));
 }
 
-const projectId = query.get("project") ?? PROJECT;
+const parts = location.pathname.split("/");
+const routed = parts[1] === "agenda" && parts[2] === "projects" && parts[4] === "collaborate" ? parts[3] : null;
+const projectId = routed ?? query.get("project") ?? PROJECT;
 const client = fakeClient() as never;
 const level = (await (fakeClient().rpc("collab_level", { target_project: projectId }))).data;
 const node = document.getElementById("root")!;
-if (!level) {
+if (location.pathname === "/agenda/join") {
+  createRoot(node).render(<><JoinStudio signedIn={as !== "none"} /><Toaster /></>);
+} else if (!level) {
   node.innerHTML = '<p id="not-found">This page could not be found.</p>';
 } else {
   const [members, boards, assets, threads] = await Promise.all([readMembers(client, projectId), readBoards(client, projectId), readAssets(client, projectId), readThreads(client, projectId)]);
@@ -119,7 +129,9 @@ if (!level) {
 
   const types = { ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".html": "text/html", ".png": "image/png", ".pdf": "application/pdf" };
   const server = createServer((request, response) => {
-    const path = request.url === "/" || request.url.startsWith("/?") ? "index.html" : decodeURIComponent(request.url.slice(1).split("?")[0]);
+    // The app's own addresses all get the one page, which routes itself.
+    const route = request.url.split("?")[0];
+    const path = route === "/" || route === "/agenda/join" || /^\/agenda\/projects\/[0-9a-f-]{36}\/collaborate$/.test(route) ? "index.html" : decodeURIComponent(route.slice(1));
     try {
       const body = path.startsWith("pdfjs-dist/") ? readFileSync(join(root, "node_modules", path)) : readFileSync(join(out, path));
       const extension = Object.keys(types).find((item) => path.endsWith(item));

@@ -28,7 +28,10 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   // Guarded here too, so the form never renders a link or a hidden input
   // carrying an off-site destination in the first place.
-  const redirectTo = safeRedirect(searchParams.get("redirect"));
+  // `redirect` is what the proxy sends; `next` is what a dozen pages and
+  // buttons were written to send, and was ignored, so signing in from them
+  // landed on the dashboard instead of where the person was going.
+  const redirectTo = safeRedirect(searchParams.get("redirect") ?? searchParams.get("next"));
   const [state, formAction, pending] = useActionState(
     loginWithEmail,
     initialState,
