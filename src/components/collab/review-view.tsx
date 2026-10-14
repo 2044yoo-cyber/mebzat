@@ -144,7 +144,9 @@ function Reviewer({ asset, onBack, onUploadRevision, uploading }: { asset: Asset
             </select>
           ) : null}
           {allowed.edit ? <button type="button" onClick={() => revisionInput.current?.click()} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs hover:border-brand">{uploading ? <Loader2 className="size-3.5 animate-spin" /> : <FilePlus2 className="size-3.5" />}New revision</button> : null}
-          {allowed.comment ? (
+          {/* Approving is Agenda's permission, not a Studio level: the owner, the
+              client, an administrator, or a member given "can approve". */}
+          {studio.mayApprove ? (
             <>
               <button type="button" disabled={deciding} onClick={() => void decide("approved")} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs hover:border-emerald-500 hover:text-emerald-700 disabled:opacity-50"><ThumbsUp className="size-3.5" />Approve Rev {revision.label}</button>
               <button type="button" disabled={deciding} onClick={() => void decide("changes_requested")} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs hover:border-amber-500 hover:text-amber-700 disabled:opacity-50"><Undo2 className="size-3.5" />Request changes</button>

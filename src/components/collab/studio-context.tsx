@@ -57,6 +57,8 @@ type Studio = {
   presence: Presence[];
   announce: (state: Partial<Omit<Presence, "userId" | "name" | "at">>) => void;
   online: boolean;
+  /** Whether this person may approve on the project (0108's `agenda_can_approve`). */
+  mayApprove: boolean;
 };
 
 const StudioContext = createContext<Studio | null>(null);
@@ -73,7 +75,7 @@ export function useCan() {
 }
 
 export function StudioProvider({
-  projectId, me, level, members, initialBoards, initialAssets, initialThreads, initialUnread, initialTasks, initialThreadId, children,
+  projectId, me, level, members, initialBoards, initialAssets, initialThreads, initialUnread, initialTasks, initialThreadId, mayApprove = false, children,
 }: {
   projectId: string;
   me: { id: string; name: string };
@@ -85,6 +87,7 @@ export function StudioProvider({
   initialUnread: string[];
   initialTasks: StudioTask[];
   initialThreadId: string | null;
+  mayApprove?: boolean;
   children: React.ReactNode;
 }) {
   const [boards, setBoards] = useState(initialBoards);
@@ -226,7 +229,7 @@ export function StudioProvider({
     projectId, me, level, members, member, boards, upsertBoard, removeBoard, assets, refreshAssets,
     threads, upsertThread, comments, loadComments, addComment,
     unread, markRead, tasks, refreshTasks, openThreadId, openThread,
-    onItem, onAnnotation, presence, announce, online,
+    onItem, onAnnotation, presence, announce, online, mayApprove,
   };
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
 }

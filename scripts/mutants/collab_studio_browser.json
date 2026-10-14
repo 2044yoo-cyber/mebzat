@@ -76,5 +76,17 @@
   "file": "src/components/collab/discussion-view.tsx",
   "from": "{allowed.comment ? <button type=\"button\" onClick={() => { setComposing(true); studio.openThread(null); }}",
   "to": "{allowed.view ? <button type=\"button\" onClick={() => { setComposing(true); studio.openThread(null); }}"
+ },
+ {
+  "name": "decisions overwrite step 1",
+  "file": "src/app/(dashboard)/agenda/projects/[projectId]/collaborate/actions.ts",
+  "from": "step: (last?.step ?? 0) + 1,",
+  "to": "step: 1,"
+ },
+ {
+  "name": "buttons for every commenter",
+  "file": "src/components/collab/review-view.tsx",
+  "from": "          {studio.mayApprove ? (",
+  "to": "          {allowed.comment ? ("
  }
 ]

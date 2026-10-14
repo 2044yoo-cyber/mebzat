@@ -1,0 +1,32 @@
+[
+ {
+  "name": "page offers approving to all",
+  "file": "src/app/(dashboard)/agenda/projects/[projectId]/collaborate/page.tsx",
+  "from": "      mayApprove={approve.data === true}",
+  "to": "      mayApprove={approve.data !== false}"
+ },
+ {
+  "name": "page never asks",
+  "file": "src/app/(dashboard)/agenda/projects/[projectId]/collaborate/page.tsx",
+  "from": "    supabase.rpc(\"agenda_can_approve\", { target_project: projectId }),",
+  "to": "    Promise.resolve({ data: true }),"
+ },
+ {
+  "name": "action does not check",
+  "file": "src/app/(dashboard)/agenda/projects/[projectId]/collaborate/actions.ts",
+  "from": "  if (mayApprove !== true) return fail(\"Approving needs",
+  "to": "  if (false) return fail(\"Approving needs"
+ },
+ {
+  "name": "decisions overwrite step 1",
+  "file": "src/app/(dashboard)/agenda/projects/[projectId]/collaborate/actions.ts",
+  "from": "step: (last?.step ?? 0) + 1,",
+  "to": "step: 1,"
+ },
+ {
+  "name": "buttons for every commenter",
+  "file": "src/components/collab/review-view.tsx",
+  "from": "          {studio.mayApprove ? (",
+  "to": "          {allowed.comment ? ("
+ }
+]

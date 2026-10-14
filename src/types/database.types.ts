@@ -10170,6 +10170,12 @@ export interface Database {
         };
         Returns: boolean;
       };
+      agenda_can_approve: {
+        Args: {
+          target_project: string;
+        };
+        Returns: boolean;
+      };
       agenda_is_owner: {
         Args: {
           target_project: string;

@@ -267,6 +267,27 @@ try {
   const approved = (await db(client)).collab_threads[0];
   equal([approved.status, approved.resolved_by], ["approved", people.client.id], "3: approved, and the approval says who");
 
+  // Approving a revision is Agenda's permission (0108): the owner has it; a
+  // commenter and an editor without "can approve" are not offered it.
+  const clientReview = await open("client", `&tab=review&drawing=${drawings[0].id}`);
+  // Shown on the current revision, B, where the pin (on A) is not: wait for the drawing's header.
+  await clientReview.getByLabel("Compare with").waitFor({ timeout: 15000 });
+  equal(await clientReview.getByRole("button", { name: /^Approve Rev/ }).count(), 0, "3: a commenter without permission to approve is not offered it");
+  equal(await designer.getByRole("button", { name: /^Approve Rev/ }).count(), 0, "3: nor is an editor without it");
+  await clientReview.close();
+  await owner.reload();
+  const approveRev = owner.getByRole("button", { name: /^Approve Rev/ });
+  await approveRev.waitFor({ timeout: 15000 });
+  const shownRev = (await approveRev.innerText()).replace("Approve Rev ", "").trim();
+  await approveRev.click();
+  await owner.getByText(`Rev ${shownRev} is approved.`).waitFor();
+  owner.once("dialog", (dialog) => void dialog.accept("Darker grain on the doors."));
+  await owner.getByRole("button", { name: "Request changes" }).click();
+  await owner.locator("[data-sonner-toast]").filter({ hasText: `Changes requested on Rev ${shownRev}` }).first().waitFor();
+  const decisions = (await db(owner)).agenda_approvals.filter((row) => row.subject_type === "drawing_revision").sort((x, y) => x.step - y.step);
+  equal(decisions.map((row) => [row.step, row.decision, row.approver_id]), [[1, "approved", people.owner.id], [2, "rejected", people.owner.id]], "3: each decision is its own step — the approval is kept, not overwritten");
+  equal(decisions[1].comment, "Darker grain on the doors.", "3: with what needs to change");
+
   // -------------------------------------------------------------------------
   // 4. A stale save is refused, not written over somebody else's.
   // -------------------------------------------------------------------------

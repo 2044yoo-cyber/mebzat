@@ -322,13 +322,24 @@ export async function decideRevision(projectId: string, input: { revisionId: str
   if (!parsed.success) return fail("That decision is not valid.");
   const { data: revision } = await supabase.from("agenda_drawing_revisions").select("id").eq("id", parsed.data.revisionId).eq("project_id", project).maybeSingle();
   if (!revision) return fail("That revision is not on this project.");
+  const { data: mayApprove } = await supabase.rpc("agenda_can_approve", { target_project: project });
+  if (mayApprove !== true) return fail("Approving needs the owner's permission to approve. Ask the project owner.");
   const approved = parsed.data.decision === "approved";
-  const { error } = await supabase.from("agenda_approvals").upsert({
-    project_id: project, subject_type: "drawing_revision", subject_id: revision.id, step: 1,
-    approver_id: user.id, decision: approved ? "approved" : "rejected", comment: parsed.data.comment || null,
-    decided_at: new Date().toISOString(),
-  }, { onConflict: "subject_type,subject_id,step" });
-  if (error) return fail(explain(error.message, "That decision was not saved."));
+  // A decision stands once made (0108), so each one is a new step: the
+  // revision's history keeps "approved", then "changes requested", in order.
+  let error: { message: string } | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { data: last } = await supabase.from("agenda_approvals").select("step")
+      .eq("subject_type", "drawing_revision").eq("subject_id", revision.id)
+      .order("step", { ascending: false }).limit(1).maybeSingle();
+    ({ error } = await supabase.from("agenda_approvals").insert({
+      project_id: project, subject_type: "drawing_revision", subject_id: revision.id, step: (last?.step ?? 0) + 1,
+      approver_id: user.id, decision: approved ? "approved" : "rejected", comment: parsed.data.comment || null,
+    }));
+    // Somebody else's decision took that step at the same moment: take the next.
+    if (!error || !/duplicate key|unique/i.test(error.message)) break;
+  }
+  if (error) return fail(error.message.includes("not allowed to approve") ? "Approving needs the owner's permission to approve. Ask the project owner." : explain(error.message, "That decision was not saved."));
   const { error: statusError } = await supabase.from("agenda_drawing_revisions").update({ status: approved ? "approved" : "revise_resubmit" }).eq("id", revision.id);
   if (statusError) return fail(explain(statusError.message, "The decision was recorded, but the revision's status was not updated."));
   refresh(project);
