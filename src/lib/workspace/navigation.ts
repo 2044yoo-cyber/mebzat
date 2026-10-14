@@ -47,6 +47,7 @@ import {
   type LucideIcon,
   Users,
   Warehouse,
+  Shapes,
 } from "lucide-react";
 import { Cabinet } from "@/components/icons/cabinet";
 
@@ -272,6 +273,18 @@ export const NAV_SECTIONS: NavSection[] = [
         private: true,
         hint: "Every job you are on",
         keywords: ["construction projects", "sites", "jobs"],
+      },
+      {
+        id: "agenda-collaborate",
+        label: "Collaborate",
+        icon: Shapes,
+        href: "/agenda/collaborate",
+        private: true,
+        hint: "Boards, a shared canvas and drawing review, with your project team",
+        keywords: [
+          "collaborate", "collaborative studio", "whiteboard", "board", "mood board",
+          "canvas", "miro", "milanote", "markup", "review", "redline", "comments", "approval",
+        ],
       },
       {
         id: "agenda-tasks",

@@ -29,7 +29,7 @@ export const translations: Record<Language, Dictionary> = {
     navigation: {
       design: "Design", "design-home": "All Design Tools", "house-design": "House Design", "cabinet-design": "Cabinet Design", "furniture-design": "Furniture Design", "sketch-design": "Sketch & Draw", "interior-design": "Interior Design", "exterior-design": "Exterior Design", "design-projects": "Saved Cabinet Designs", "design-gallery": "Design Gallery",
       agenda: "Agenda", "agenda-home": "Agenda", "agenda-projects": "Construction Projects",
-      "agenda-tasks": "My Tasks", "agenda-calendar": "Calendar",
+      "agenda-tasks": "My Tasks", "agenda-calendar": "Calendar", "agenda-collaborate": "Collaborate",
       home: "Home", ai: "AI", "ai-home": "Medosha AI", market: "Market", marketplace: "Marketplace",
       property: "Property", community: "Community", more: "More", profile: "Profile",
       "price-exchange": "Price Exchange", equipment: "Equipment", events: "Events",
@@ -197,7 +197,7 @@ export const translations: Record<Language, Dictionary> = {
     navigation: {
       design: "ዲዛይን", "design-home": "ሁሉም የዲዛይን መሣሪያዎች", "house-design": "የቤት ዲዛይን", "cabinet-design": "የካቢኔት ዲዛይን", "furniture-design": "የፈርኒቸር ዲዛይን", "sketch-design": "ስኬች እና ስዕል", "interior-design": "የውስጥ ዲዛይን", "exterior-design": "የውጪ ዲዛይን", "design-projects": "የተቀመጡ የካቢኔት ዲዛይኖች", "design-gallery": "የዲዛይን ጋለሪ",
       agenda: "አጀንዳ", "agenda-home": "አጀንዳ", "agenda-projects": "የግንባታ ፕሮጀክቶች",
-      "agenda-tasks": "የእኔ ተግባራት", "agenda-calendar": "የቀን መቁጠሪያ",
+      "agenda-tasks": "የእኔ ተግባራት", "agenda-calendar": "የቀን መቁጠሪያ", "agenda-collaborate": "በጋራ ስራ",
       home: "መነሻ", ai: "AI", "ai-home": "Medosha AI", market: "ገበያ", marketplace: "ገበያ", property: "ንብረት",
       community: "ማህበረሰብ", more: "ተጨማሪ", profile: "መገለጫ", "price-exchange": "የዋጋ ልውውጥ",
       equipment: "መሳሪያ", events: "ዝግጅቶች", berchuma: "ካቢኔት ዲዛይን",
@@ -335,7 +335,7 @@ export const translations: Record<Language, Dictionary> = {
     navigation: {
       design: "Dizaayinii", "design-home": "Meeshaalee Dizaayinii Hunda", "house-design": "Dizaayinii Manaa", "cabinet-design": "Dizaayinii Kaabineetii", "furniture-design": "Dizaayinii Meeshaa Manaa", "sketch-design": "Fakkii fi Kaasaa", "interior-design": "Dizaayinii Keessaa", "exterior-design": "Dizaayinii Alaa", "design-projects": "Dizaayinoota Kaabineetii Kuufaman", "design-gallery": "Kuusaa Dizaayinii",
       agenda: "Ajandaa", "agenda-home": "Ajandaa", "agenda-projects": "Pirojektoota Ijaarsaa",
-      "agenda-tasks": "Hojiiwwan Koo", "agenda-calendar": "Kaalaandarii",
+      "agenda-tasks": "Hojiiwwan Koo", "agenda-calendar": "Kaalaandarii", "agenda-collaborate": "Waliin Hojjechuu",
       home: "Mana", ai: "AI", "ai-home": "Medosha AI", market: "Gabaa", marketplace: "Gabaa", property: "Qabeenya",
       community: "Hawaasa", more: "Dabalata", profile: "Piroofaayilii", "price-exchange": "Jijjiirraa Gatii",
       equipment: "Meeshaa", events: "Taateewwan", berchuma: "Dizaayinii Kaabineetii", "berchuma-studio": "Istuudiyoo Dizaayinii",
