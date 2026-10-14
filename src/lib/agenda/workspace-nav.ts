@@ -4,7 +4,7 @@ import {
   ClipboardList, Coins, Contact, FileSignature, FileSpreadsheet, FileStack,
   FileText, Gavel, HardHat, Image as ImageIcon, LayoutDashboard, ListChecks,
   type LucideIcon, MessageCircleQuestion, Package, PencilRuler, Receipt,
-  Rotate3d, ScrollText, Settings, ShoppingCart, Timer, TriangleAlert, Users,
+  Rotate3d, ScrollText, Settings, Shapes, ShoppingCart, Timer, TriangleAlert, Users,
   Wallet,
 } from "lucide-react";
 
@@ -45,6 +45,7 @@ export const WORKSPACE_GROUPS: WorkspaceGroup[] = [
     sections: [
       { id: "overview", segment: "", label: "Overview", icon: LayoutDashboard, phase: 1 },
       { id: "tasks", segment: "tasks", label: "Tasks", icon: ListChecks, phase: 1 },
+      { id: "collaborate", segment: "collaborate", label: "Collaborate", icon: Shapes, phase: 1 },
       { id: "schedule", segment: "schedule", label: "Schedule", icon: CalendarRange, phase: 2 },
       { id: "daily-logs", segment: "daily-logs", label: "Daily Logs", icon: ScrollText, phase: 2 },
       { id: "activity", segment: "activity", label: "Activity Log", icon: Activity, phase: 1 },

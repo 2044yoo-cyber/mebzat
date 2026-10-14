@@ -1,0 +1,74 @@
+[
+ {
+  "name": "javascript links allowed",
+  "file": "src/lib/collab/model.ts",
+  "from": "      return url.protocol === \"https:\" || url.protocol === \"http:\";",
+  "to": "      return url.protocol.length > 0;"
+ },
+ {
+  "name": "unknown fields accepted on stickies",
+  "file": "src/lib/collab/model.ts",
+  "from": "  sticky: z.object({ text: text(2000), color: color.optional(), ...common }).strict(),",
+  "to": "  sticky: z.object({ text: text(2000), color: color.optional(), ...common }).passthrough(),"
+ },
+ {
+  "name": "commenters edit",
+  "file": "src/lib/collab/model.ts",
+  "from": "  edit: (level: Level | null) => level === \"owner\" || level === \"editor\",",
+  "to": "  edit: (level: Level | null) => level === \"owner\" || level === \"editor\" || level === \"commenter\","
+ },
+ {
+  "name": "viewers comment",
+  "file": "src/lib/collab/model.ts",
+  "from": "  comment: (level: Level | null) => level === \"owner\" || level === \"editor\" || level === \"commenter\",",
+  "to": "  comment: (level: Level | null) => level !== null,"
+ },
+ {
+  "name": "editors manage",
+  "file": "src/lib/collab/model.ts",
+  "from": "  manage: (level: Level | null) => level === \"owner\",",
+  "to": "  manage: (level: Level | null) => level === \"owner\" || level === \"editor\","
+ },
+ {
+  "name": "outsiders view",
+  "file": "src/lib/collab/model.ts",
+  "from": "  view: (level: Level | null) => level !== null,",
+  "to": "  view: (level: Level | null) => level !== undefined,"
+ },
+ {
+  "name": "pins leave the drawing",
+  "file": "src/lib/collab/model.ts",
+  "from": "  const clamp = (value: number) => Math.min(1, Math.max(0, value));",
+  "to": "  const clamp = (value: number) => value;"
+ },
+ {
+  "name": "revision after Z is wrong",
+  "file": "src/lib/collab/model.ts",
+  "from": "  const label = (n: number): string => (n <= 0 ? \"\" : label(Math.floor((n - 1) / 26)) + String.fromCharCode(65 + ((n - 1) % 26)));",
+  "to": "  const label = (n: number): string => String.fromCharCode(64 + n);"
+ },
+ {
+  "name": "hand-typed labels counted",
+  "file": "src/lib/collab/model.ts",
+  "from": "  const letters = existing.filter((label) => /^[A-Z]+$/.test(label));",
+  "to": "  const letters = existing.filter((label) => /^[A-Z]+/.test(label));"
+ },
+ {
+  "name": "emails are mentions",
+  "file": "src/lib/collab/model.ts",
+  "from": "[...body.matchAll(/(^|\\s)@([a-z0-9_.-]{2,40})/gi)]",
+  "to": "[...body.matchAll(/()@([a-z0-9_.-]{2,40})/gi)]"
+ },
+ {
+  "name": "checklist unbounded",
+  "file": "src/lib/collab/model.ts",
+  "from": "      items: z.array(z.object({ id: text(40), text: text(500), done: z.boolean() }).strict()).max(100),",
+  "to": "      items: z.array(z.object({ id: text(40), text: text(500), done: z.boolean() }).strict()),"
+ },
+ {
+  "name": "negative size allowed",
+  "file": "src/lib/collab/model.ts",
+  "from": "  w: finite.min(0).max(1e6),",
+  "to": "  w: finite.max(1e6),"
+ }
+]

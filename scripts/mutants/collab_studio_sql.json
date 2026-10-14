@@ -1,0 +1,260 @@
+[
+ {
+  "name": "member with no level defaults to editor",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "      'commenter'::public.collab_access_level)",
+  "to": "      'editor'::public.collab_access_level)"
+ },
+ {
+  "name": "owner not recognised",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    when public.agenda_is_owner(target_project) then 'owner'::public.collab_access_level",
+  "to": "    when false then 'owner'::public.collab_access_level"
+ },
+ {
+  "name": "non-members get the default level",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    when not public.agenda_is_member(target_project) then null",
+  "to": "    when false then null"
+ },
+ {
+  "name": "levels given to anybody",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  if not exists (\n    select 1 from public.agenda_members m\n    where m.project_id = new.project_id and m.user_id = new.user_id\n      and m.status in ('invited', 'active')\n  ) then",
+  "to": "  if false then"
+ },
+ {
+  "name": "anybody grants levels",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  for insert to authenticated with check (public.collab_level(project_id) = 'owner');",
+  "to": "  for insert to authenticated with check (true);"
+ },
+ {
+  "name": "anybody changes levels",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  using (public.collab_level(project_id) = 'owner')\n  with check (public.collab_level(project_id) = 'owner');",
+  "to": "  using (true)\n  with check (true);"
+ },
+ {
+  "name": "commenters create boards",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "create policy \"collab boards: editors create\" on public.collab_boards\n  for insert to authenticated with check (public.collab_can_edit(project_id));",
+  "to": "create policy \"collab boards: editors create\" on public.collab_boards\n  for insert to authenticated with check (public.collab_can_comment(project_id));"
+ },
+ {
+  "name": "viewers create items",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "create policy \"collab items: editors create\" on public.collab_items\n  for insert to authenticated with check (public.collab_can_edit(project_id));",
+  "to": "create policy \"collab items: editors create\" on public.collab_items\n  for insert to authenticated with check (public.collab_can_view(project_id));"
+ },
+ {
+  "name": "commenters move items",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "create policy \"collab items: editors change\" on public.collab_items\n  for update to authenticated\n  using (public.collab_can_edit(project_id))",
+  "to": "create policy \"collab items: editors change\" on public.collab_items\n  for update to authenticated\n  using (public.collab_can_comment(project_id))"
+ },
+ {
+  "name": "items readable by anyone",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "create policy \"collab items: read\" on public.collab_items\n  for select to authenticated using (public.collab_can_view(project_id));",
+  "to": "create policy \"collab items: read\" on public.collab_items\n  for select to authenticated using (true);"
+ },
+ {
+  "name": "boards readable by anyone",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "create policy \"collab boards: read\" on public.collab_boards\n  for select to authenticated using (public.collab_can_view(project_id));",
+  "to": "create policy \"collab boards: read\" on public.collab_boards\n  for select to authenticated using (true);"
+ },
+ {
+  "name": "board on another project accepted",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    raise exception 'That board is on another project.' using errcode = 'check_violation';",
+  "to": "    null;"
+ },
+ {
+  "name": "drawing on another project accepted",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    raise exception 'That drawing is on another project.' using errcode = 'check_violation';",
+  "to": "    null;"
+ },
+ {
+  "name": "revision of another drawing accepted",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "      and r.drawing_id = (row_json ->> 'drawing_id')::uuid",
+  "to": ""
+ },
+ {
+  "name": "parent on another board accepted",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    raise exception 'That column or group is on another board.' using errcode = 'check_violation';",
+  "to": "    null;"
+ },
+ {
+  "name": "task on another project accepted",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    raise exception 'That task is on another project.' using errcode = 'check_violation';",
+  "to": "    null;"
+ },
+ {
+  "name": "work assigned to outsiders",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    raise exception 'Work can only be assigned to somebody on the project.' using errcode = 'check_violation';",
+  "to": "    null;"
+ },
+ {
+  "name": "stale saves applied",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  if new.revision <> old.revision + 1 then\n    raise exception 'Somebody else changed this a moment ago. It has been reloaded.'",
+  "to": "  if false then\n    raise exception 'Somebody else changed this a moment ago. It has been reloaded.'"
+ },
+ {
+  "name": "every save treated as bookkeeping",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  if (to_jsonb(new) - 'last_activity_at' - 'updated_at')\n     = (to_jsonb(old) - 'last_activity_at' - 'updated_at') then",
+  "to": "  if true then"
+ },
+ {
+  "name": "items move between projects",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  if new.project_id <> old.project_id then\n    raise exception 'It cannot be moved to another project.'",
+  "to": "  if false then\n    raise exception 'It cannot be moved to another project.'"
+ },
+ {
+  "name": "items move between boards",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "     and (to_jsonb(new) ->> 'board_id') is distinct from (to_jsonb(old) ->> 'board_id') then",
+  "to": "     and false then"
+ },
+ {
+  "name": "creator taken from the client",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    if row_json ? 'created_by' then new := jsonb_populate_record(new, jsonb_build_object('created_by', auth.uid())); end if;",
+  "to": ""
+ },
+ {
+  "name": "comment author taken from the client",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    if row_json ? 'author_id' then new := jsonb_populate_record(new, jsonb_build_object('author_id', auth.uid())); end if;",
+  "to": ""
+ },
+ {
+  "name": "thread numbers not given",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    new.number := public.agenda_next_number(new.project_id, 'collab_thread', 'C', 3);",
+  "to": "    new.number := coalesce(new.number, 'C-001');"
+ },
+ {
+  "name": "commenters assign on opening",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    if level not in ('owner', 'editor') then\n      new.assigned_to := null;",
+  "to": "    if false then\n      new.assigned_to := null;"
+ },
+ {
+  "name": "commenters assign later",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "      raise exception 'Only an editor assigns work.' using errcode = 'insufficient_privilege';",
+  "to": "      null;"
+ },
+ {
+  "name": "commenters mark ready for review",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "      raise exception 'Only an editor marks a correction ready for review.' using errcode = 'insufficient_privilege';",
+  "to": "      null;"
+ },
+ {
+  "name": "pins move to another drawing",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    raise exception 'A comment stays where it was placed.' using errcode = 'check_violation';",
+  "to": "    null;"
+ },
+ {
+  "name": "approval not recorded",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    new.resolved_by := auth.uid();\n    new.resolved_at := now();",
+  "to": "    null;"
+ },
+ {
+  "name": "mentions reach outsiders",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  from public.agenda_members m\n  where m.project_id = new.project_id and m.status = 'active'\n    and m.user_id = any (new.mentions) and m.user_id <> new.author_id;",
+  "to": "  from (select unnest(new.mentions) as user_id) m\n  where m.user_id <> new.author_id;"
+ },
+ {
+  "name": "replies notify nobody",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    union select thread.created_by\n",
+  "to": ""
+ },
+ {
+  "name": "ready for review not sent back",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "      values (new.created_by, auth.uid(), 'collab_review',",
+  "to": "      select new.created_by, auth.uid(), 'collab_review'::public.notification_kind, null, null, null where false; insert into public.notifications (user_id, actor_id, kind, title, body, href) select null::uuid, null::uuid, 'collab_review'::public.notification_kind,"
+ },
+ {
+  "name": "self-assignment notifies",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  if new.assigned_to is not null and new.assigned_to is distinct from auth.uid()",
+  "to": "  if new.assigned_to is not null"
+ },
+ {
+  "name": "anybody edits comments",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  using (author_id = auth.uid() and public.collab_can_comment(project_id))",
+  "to": "  using (public.collab_can_comment(project_id))"
+ },
+ {
+  "name": "commenters edit others' markup",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  using (public.collab_can_comment(project_id) and (created_by = auth.uid() or public.collab_can_edit(project_id)))",
+  "to": "  using (public.collab_can_comment(project_id))"
+ },
+ {
+  "name": "viewers comment",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "create policy \"collab threads: commenters open\" on public.collab_threads\n  for insert to authenticated with check (public.collab_can_comment(project_id));",
+  "to": "create policy \"collab threads: commenters open\" on public.collab_threads\n  for insert to authenticated with check (public.collab_can_view(project_id));"
+ },
+ {
+  "name": "read marks for others",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  for insert to authenticated with check (user_id = auth.uid() and public.collab_can_view(project_id));",
+  "to": "  for insert to authenticated with check (public.collab_can_view(project_id));"
+ },
+ {
+  "name": "read marks visible to all",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  for select to authenticated using (user_id = auth.uid());",
+  "to": "  for select to authenticated using (true);"
+ },
+ {
+  "name": "deletes allowed",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    execute format('revoke delete, truncate on public.%I from authenticated', t);",
+  "to": "    null;"
+ },
+ {
+  "name": "signed-out visitors keep grants",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    execute format('revoke all on public.%I from anon', t);",
+  "to": "    null;"
+ },
+ {
+  "name": "not published for realtime",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "        execute format('alter publication supabase_realtime add table public.%I', t);",
+  "to": "        null;"
+ },
+ {
+  "name": "comment does not mark read",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "  insert into public.collab_reads (user_id, thread_id, project_id, read_at)\n  values (new.author_id, new.thread_id, new.project_id, now())\n  on conflict (user_id, thread_id) do update set read_at = excluded.read_at;",
+  "to": ""
+ },
+ {
+  "name": "activity not logged",
+  "file": "supabase/migrations/0105_collab_studio.sql",
+  "from": "    perform public.agenda_log_event(new.project_id, 'collab',\n      'Comment ' || new.number || ' ' || replace(new.status, '_', ' '),\n      new.title, 'collab_threads', new.id);",
+  "to": "    null;"
+ }
+]
