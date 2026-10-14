@@ -241,6 +241,24 @@ async function main() {
   }
 
   // ---------------------------------------------------------------------------
+  // 8b. A drag over many pointer events is one undo step.
+  // ---------------------------------------------------------------------------
+  {
+    const { store } = fresh();
+    const note = store.create({ kind: "sticky", x: 0, data: { text: "x" } });
+    await store.flush();
+    store.beginStep();
+    for (let x = 1; x <= 30; x += 1) store.update(note.id, { x });
+    store.endStep();
+    store.undo();
+    equal(store.get(note.id)?.x, 0, "8b: a 30-event drag is undone in one step");
+    ok(store.canUndo(), "8b: (the create is still there to undo)");
+    store.redo();
+    equal(store.get(note.id)?.x, 30, "8b: and redone in one");
+    store.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
   // 9. Creates reach the server parents first, and the snapshot is stable.
   // ---------------------------------------------------------------------------
   {

@@ -102,17 +102,20 @@ export class ItemStore {
   // Editing
   // -------------------------------------------------------------------------
 
-  /** Several edits as one undo step: a drag, an alignment, a paste. */
+  /** Several edits as one undo step: an alignment, a paste. */
   batch(run: () => void) {
     const outer = this.transaction === null;
-    if (outer) this.transaction = { before: new Map(), after: new Map() };
-    try { run(); } finally {
-      if (outer) {
-        const step = this.transaction!;
-        this.transaction = null;
-        if (step.before.size) { this.undoStack.push(step); if (this.undoStack.length > 200) this.undoStack.shift(); this.redoStack = []; }
-      }
-    }
+    if (outer) this.beginStep();
+    try { run(); } finally { if (outer) this.endStep(); }
+  }
+
+  /** A step that spans many events — a drag from pointerdown to pointerup — undone as one. */
+  beginStep() { if (!this.transaction) this.transaction = { before: new Map(), after: new Map() }; }
+  endStep() {
+    const step = this.transaction;
+    this.transaction = null;
+    if (step?.before.size) { this.undoStack.push(step); if (this.undoStack.length > 200) this.undoStack.shift(); this.redoStack = []; }
+    this.emit();
   }
 
   private record(id: string, before: Item | null, after: Item | null) {
