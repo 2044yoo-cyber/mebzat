@@ -306,6 +306,10 @@ security definer
 set search_path = public
 as $$
 begin
+  -- The Studio's levels live in 0105's table; without it there are no viewers.
+  if to_regclass('public.collab_access') is null then
+    return new;
+  end if;
   if public.agenda_app_session()
      and not public.agenda_is_owner(new.project_id)
      and exists (
