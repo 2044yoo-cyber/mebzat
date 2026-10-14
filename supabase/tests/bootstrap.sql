@@ -86,3 +86,9 @@ alter default privileges in schema public
   grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public
   grant execute on functions to anon, authenticated, service_role;
+
+-- Supabase has this publication; migrations add their realtime tables to it
+-- when it exists. Present here so a test can see which tables are published.
+do $$ begin
+  create publication supabase_realtime;
+exception when duplicate_object then null; end $$;
