@@ -1,0 +1,62 @@
+[
+ {
+  "name": "memberships move between projects",
+  "file": "supabase/migrations/0106_agenda_member_guard.sql",
+  "from": "  if new.project_id is distinct from old.project_id\n     or new.user_id is distinct from old.user_id then",
+  "to": "  if new.user_id is distinct from old.user_id then"
+ },
+ {
+  "name": "memberships move between people",
+  "file": "supabase/migrations/0106_agenda_member_guard.sql",
+  "from": "  if new.project_id is distinct from old.project_id\n     or new.user_id is distinct from old.user_id then",
+  "to": "  if new.project_id is distinct from old.project_id then"
+ },
+ {
+  "name": "every session counts as maintenance",
+  "file": "supabase/migrations/0106_agenda_member_guard.sql",
+  "from": "  if coalesce(current_setting('role', true), 'none') not in ('authenticated', 'anon') then",
+  "to": "  if true then"
+ },
+ {
+  "name": "the owner may not manage the roster",
+  "file": "supabase/migrations/0106_agenda_member_guard.sql",
+  "from": "  if public.agenda_is_owner(old.project_id) then\n    return new;\n  end if;\n\n  if new.role",
+  "to": "  if false then\n    return new;\n  end if;\n\n  if new.role"
+ },
+ {
+  "name": "a member changes their own role",
+  "file": "supabase/migrations/0106_agenda_member_guard.sql",
+  "from": "  if new.role is distinct from old.role\n     or",
+  "to": "  if false\n     or"
+ },
+ {
+  "name": "a member rewrites who invited them",
+  "file": "supabase/migrations/0106_agenda_member_guard.sql",
+  "from": "  if new.invited_by is distinct from old.invited_by\n     or new.invited_at is distinct from old.invited_at then",
+  "to": "  if false then"
+ },
+ {
+  "name": "any status change allowed",
+  "file": "supabase/migrations/0106_agenda_member_guard.sql",
+  "from": "  if new.status is distinct from old.status\n     and not",
+  "to": "  if false\n     and not"
+ },
+ {
+  "name": "a removed member may come back",
+  "file": "supabase/migrations/0106_agenda_member_guard.sql",
+  "from": "     and not (old.status in ('invited', 'active') and new.status = 'removed') then",
+  "to": "     and not (new.status = 'removed') and not (new.status = 'active') then"
+ },
+ {
+  "name": "a member may not leave",
+  "file": "supabase/migrations/0106_agenda_member_guard.sql",
+  "from": "     and not (old.status in ('invited', 'active') and new.status = 'removed') then",
+  "to": "     then"
+ },
+ {
+  "name": "an invitation may not be accepted",
+  "file": "supabase/migrations/0106_agenda_member_guard.sql",
+  "from": "     and not (old.status = 'invited' and new.status = 'active')\n",
+  "to": "\n"
+ }
+]
