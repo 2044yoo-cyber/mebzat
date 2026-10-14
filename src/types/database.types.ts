@@ -114,7 +114,18 @@ export type AgendaEventKind =
   | "attachment"
   | "member"
   | "reminder"
-  | "milestone";
+  | "milestone"
+  | "collab";
+
+export type CollabAccessLevel = "owner" | "editor" | "commenter" | "viewer";
+
+export type CollabItemKind =
+  | "text" | "note" | "image" | "document" | "link" | "checklist" | "column" | "section"
+  | "sticky" | "rect" | "ellipse" | "line" | "arrow" | "freehand" | "connector" | "group";
+
+export type CollabThreadStatus = "open" | "ready_for_review" | "resolved" | "approved" | "changes_requested";
+
+export type CollabAnnotationKind = "freehand" | "arrow" | "line" | "rect" | "ellipse" | "text";
 
 export type AgendaFileKind =
   | "image"
@@ -742,7 +753,11 @@ export type NotificationKind =
   | "template_purchase"
   | "application_update"
   | "job_hired"
-  | "job_deadline";
+  | "job_deadline"
+  | "collab_comment"
+  | "collab_mention"
+  | "collab_assigned"
+  | "collab_review";
 
 export type PanoramaJobStatus =
   | "capturing"
@@ -2687,6 +2702,336 @@ export interface Database {
           archived_at?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      collab_access: {
+        Row: {
+          project_id: string;
+          user_id: string;
+          level: Exclude<CollabAccessLevel, "owner">;
+          granted_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          project_id: string;
+          user_id: string;
+          level: Exclude<CollabAccessLevel, "owner">;
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          project_id?: string;
+          user_id?: string;
+          level?: Exclude<CollabAccessLevel, "owner">;
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      collab_boards: {
+        Row: {
+          id: string;
+          project_id: string;
+          kind: "board" | "canvas";
+          title: string;
+          description: string | null;
+          layout: "free" | "columns";
+          settings: Json;
+          sort_order: number;
+          revision: number;
+          created_by: string | null;
+          updated_by: string | null;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          kind: "board" | "canvas";
+          title: string;
+          description?: string | null;
+          layout?: "free" | "columns";
+          settings?: Json;
+          sort_order?: number;
+          revision?: number;
+          created_by?: string | null;
+          updated_by?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          kind?: "board" | "canvas";
+          title?: string;
+          description?: string | null;
+          layout?: "free" | "columns";
+          settings?: Json;
+          sort_order?: number;
+          revision?: number;
+          created_by?: string | null;
+          updated_by?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      collab_items: {
+        Row: {
+          id: string;
+          board_id: string;
+          project_id: string;
+          kind: CollabItemKind;
+          parent_id: string | null;
+          x: number;
+          y: number;
+          w: number;
+          h: number;
+          rotation: number;
+          z: number;
+          data: Json;
+          drawing_id: string | null;
+          storage_path: string | null;
+          revision: number;
+          created_by: string | null;
+          updated_by: string | null;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          board_id: string;
+          project_id: string;
+          kind: CollabItemKind;
+          parent_id?: string | null;
+          x?: number;
+          y?: number;
+          w?: number;
+          h?: number;
+          rotation?: number;
+          z?: number;
+          data?: Json;
+          drawing_id?: string | null;
+          storage_path?: string | null;
+          revision?: number;
+          created_by?: string | null;
+          updated_by?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          board_id?: string;
+          project_id?: string;
+          kind?: CollabItemKind;
+          parent_id?: string | null;
+          x?: number;
+          y?: number;
+          w?: number;
+          h?: number;
+          rotation?: number;
+          z?: number;
+          data?: Json;
+          drawing_id?: string | null;
+          storage_path?: string | null;
+          revision?: number;
+          created_by?: string | null;
+          updated_by?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      collab_threads: {
+        Row: {
+          id: string;
+          project_id: string;
+          number: string;
+          anchor_kind: "drawing" | "item" | "project";
+          drawing_id: string | null;
+          revision_id: string | null;
+          page: number | null;
+          x: number | null;
+          y: number | null;
+          item_id: string | null;
+          title: string | null;
+          status: CollabThreadStatus;
+          assigned_to: string | null;
+          task_id: string | null;
+          revision: number;
+          created_by: string | null;
+          resolved_by: string | null;
+          resolved_at: string | null;
+          last_activity_at: string;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          number?: string;
+          anchor_kind: "drawing" | "item" | "project";
+          drawing_id?: string | null;
+          revision_id?: string | null;
+          page?: number | null;
+          x?: number | null;
+          y?: number | null;
+          item_id?: string | null;
+          title?: string | null;
+          status?: CollabThreadStatus;
+          assigned_to?: string | null;
+          task_id?: string | null;
+          revision?: number;
+          created_by?: string | null;
+          resolved_by?: string | null;
+          resolved_at?: string | null;
+          last_activity_at?: string;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          number?: string;
+          anchor_kind?: "drawing" | "item" | "project";
+          drawing_id?: string | null;
+          revision_id?: string | null;
+          page?: number | null;
+          x?: number | null;
+          y?: number | null;
+          item_id?: string | null;
+          title?: string | null;
+          status?: CollabThreadStatus;
+          assigned_to?: string | null;
+          task_id?: string | null;
+          revision?: number;
+          created_by?: string | null;
+          resolved_by?: string | null;
+          resolved_at?: string | null;
+          last_activity_at?: string;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      collab_comments: {
+        Row: {
+          id: string;
+          thread_id: string;
+          project_id: string;
+          author_id: string;
+          body: string;
+          mentions: string[];
+          edited_at: string | null;
+          archived_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          thread_id: string;
+          project_id: string;
+          author_id: string;
+          body: string;
+          mentions?: string[];
+          edited_at?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          thread_id?: string;
+          project_id?: string;
+          author_id?: string;
+          body?: string;
+          mentions?: string[];
+          edited_at?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      collab_annotations: {
+        Row: {
+          id: string;
+          project_id: string;
+          drawing_id: string;
+          revision_id: string;
+          page: number | null;
+          thread_id: string | null;
+          kind: CollabAnnotationKind;
+          geometry: Json;
+          style: Json;
+          revision: number;
+          created_by: string | null;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          drawing_id: string;
+          revision_id: string;
+          page?: number | null;
+          thread_id?: string | null;
+          kind: CollabAnnotationKind;
+          geometry: Json;
+          style?: Json;
+          revision?: number;
+          created_by?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          drawing_id?: string;
+          revision_id?: string;
+          page?: number | null;
+          thread_id?: string | null;
+          kind?: CollabAnnotationKind;
+          geometry?: Json;
+          style?: Json;
+          revision?: number;
+          created_by?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      collab_reads: {
+        Row: {
+          user_id: string;
+          thread_id: string;
+          project_id: string;
+          read_at: string;
+        };
+        Insert: {
+          user_id: string;
+          thread_id: string;
+          project_id: string;
+          read_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          thread_id?: string;
+          project_id?: string;
+          read_at?: string;
         };
         Relationships: [];
       };
@@ -9723,6 +10068,30 @@ export interface Database {
         Returns: boolean;
       };
       agenda_can_view_meetings: {
+        Args: {
+          target_project: string;
+        };
+        Returns: boolean;
+      };
+      collab_level: {
+        Args: {
+          target_project: string;
+        };
+        Returns: CollabAccessLevel | null;
+      };
+      collab_can_view: {
+        Args: {
+          target_project: string;
+        };
+        Returns: boolean;
+      };
+      collab_can_comment: {
+        Args: {
+          target_project: string;
+        };
+        Returns: boolean;
+      };
+      collab_can_edit: {
         Args: {
           target_project: string;
         };
