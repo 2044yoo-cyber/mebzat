@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-import { STATE_COOKIE } from "../../connect/[platform]/route";
+import { STATE_COOKIE } from "@/lib/social/oauth";
 import { OAuthError, exchangeCode, verifyState } from "@/lib/social/oauth";
 import { isSocialPlatform, type SocialPlatform } from "@/lib/social/platforms";
 import { createClient } from "@/lib/supabase/server";

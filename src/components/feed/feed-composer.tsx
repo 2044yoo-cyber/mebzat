@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Camera, X, Home, ImagePlus, Sparkles, Store } from "lucide-react";
+import { Camera, X, Home, ImagePlus, Sparkles, Store, UserRound } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -54,7 +54,11 @@ export function FeedComposer({
       <div className="flex items-center gap-2.5">
         <Avatar size="lg" className="shrink-0">
           {viewer?.avatarUrl && <AvatarImage src={viewer.avatarUrl} alt="" />}
-          <AvatarFallback>{initials(viewer?.name ?? "?")}</AvatarFallback>
+          <AvatarFallback>
+            {/* Signed out there is no name to take initials from; a "?" read
+                as a broken image, so show a plain person outline instead. */}
+            {viewer ? initials(viewer.name) : <UserRound className="size-5 text-muted-foreground" aria-hidden />}
+          </AvatarFallback>
         </Avatar>
 
         <button

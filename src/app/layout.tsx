@@ -86,11 +86,15 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     url: "/",
     locale: "en_ET",
+    // JPEG, not WebP: Telegram and WhatsApp link previews are where this is
+    // seen most, and not every client there renders WebP.
+    images: [{ url: "/medosha_share.jpg", width: 1200, height: 630, alt: "Medosha — a building under construction above Addis Ababa" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Medosha — The construction industry, connected",
     description: SITE_DESCRIPTION,
+    images: ["/medosha_share.jpg"],
   },
 };
 
@@ -133,9 +137,12 @@ export default async function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {/* The shell reads the query string, which a statically rendered
-                route may not do outside a boundary. */}
-            <Suspense fallback={<div className="min-h-screen">{children}</div>}>
+            {/* No Suspense boundary around the shell. Every route is dynamic
+                (this layout reads cookies), so the query string is available
+                on the server and nothing here suspends. A boundary whose
+                fallback was {children} made the server send the whole page
+                twice: once as the fallback, once again in a hidden block. */}
+            <>
               <AppShell
                 profile={profile}
                 counts={{ messages, notifications }}
@@ -151,7 +158,7 @@ export default async function RootLayout({
               >
                 {children}
               </AppShell>
-            </Suspense>
+            </>
             <Toaster />
             {/* Not a control and renders nothing. See the component: without a
                 touch listener on the document, Safari never applies `:active`

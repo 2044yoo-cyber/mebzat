@@ -20,11 +20,10 @@ import { createClient } from "@/lib/supabase/server";
  * started the flow.
  */
 
+import { STATE_COOKIE } from "@/lib/social/oauth";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** The nonce's cookie. Short-lived, HttpOnly, and never read by the browser. */
-export const STATE_COOKIE = "medosha_oauth_nonce";
 
 export async function GET(
   request: Request,

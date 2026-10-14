@@ -89,7 +89,12 @@ export type NavSection = {
   items: NavItem[];
 };
 
-export const NAV_SECTIONS: NavSection[] = [
+/**
+ * Everything specified, built or not. Unbuilt modules stay listed here so the
+ * plan is written down in one place, but they are not shown to visitors: a
+ * menu with nine greyed-out "Soon" rows reads as an unfinished product.
+ */
+export const NAV_SPEC: NavSection[] = [
   {
     id: "home",
     label: "Home",
@@ -121,7 +126,15 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/house-design",
         private: true,
         hint: "Floor plans, walls, rooms and residential 3D models",
-        keywords: ["residential", "floor plan", "house", "architecture", "3d building"],
+        // Sketch & Draw, Interior Design and Exterior Design used to be three more
+        // rows here, all opening this same page. Their search terms live on
+        // this row now so the command palette still finds House Design by them.
+        keywords: [
+          "residential", "floor plan", "house", "architecture", "3d building",
+          "sketch", "freehand", "markup", "annotation", "draw",
+          "interior", "room", "layout", "finishes",
+          "exterior", "facade", "roof", "elevation",
+        ],
       },
       {
         id: "image-to-3d",
@@ -149,33 +162,6 @@ export const NAV_SECTIONS: NavSection[] = [
         private: true,
         hint: "Custom furniture, tables, shelving and 3D modeling",
         keywords: ["furniture", "custom", "table", "shelf", "sketch 3d"],
-      },
-      {
-        id: "sketch-design",
-        label: "Sketch & Draw",
-        icon: Ruler,
-        href: "/house-design",
-        private: true,
-        hint: "Freehand plans, drawing markups and measurements",
-        keywords: ["sketch", "freehand", "markup", "annotation", "draw"],
-      },
-      {
-        id: "interior-design",
-        label: "Interior Design",
-        icon: Layers,
-        href: "/house-design",
-        private: true,
-        hint: "Room layouts and interior planning in House Design",
-        keywords: ["interior", "room", "layout", "finishes"],
-      },
-      {
-        id: "exterior-design",
-        label: "Exterior Design",
-        icon: Building2,
-        href: "/house-design",
-        private: true,
-        hint: "Residential exterior and facade planning",
-        keywords: ["exterior", "facade", "roof", "elevation"],
       },
       {
         id: "design-projects",
@@ -586,7 +572,7 @@ export const NAV_SECTIONS: NavSection[] = [
       // knows they want a BOQ should not have to describe their way to one.
       {
         id: "estimations",
-        label: "Cost Estimator",
+        label: "AI Cost Estimator",
         icon: Calculator,
         href: "/ai?agent=cost",
         private: true,
@@ -634,7 +620,7 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         id: "boq",
-        label: "BOQ Generator",
+        label: "AI BOQ Generator",
         icon: ClipboardList,
         href: "/ai?agent=boq",
         private: true,
@@ -815,6 +801,12 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ];
+
+/** What the menus render: only modules that exist. Add an `href` to show one. */
+export const NAV_SECTIONS: NavSection[] = NAV_SPEC.map((section) => ({
+  ...section,
+  items: section.items.filter((item) => item.href),
+})).filter((section) => section.href || section.items.length > 0);
 
 /** Every item that has somewhere to go, flattened, with its section attached. */
 export const NAV_ITEMS: (NavItem & { section: NavSection })[] =
