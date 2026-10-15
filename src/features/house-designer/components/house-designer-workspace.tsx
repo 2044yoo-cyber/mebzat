@@ -1622,7 +1622,7 @@ function ConstructionLearningView({ project, bottomActions }: { project: HousePr
     const hidden = new Set(HIDDEN_IN_3D);
     if (lesson.kind === "foundation") hidden.delete("foundation");
     if (lesson.kind === "beam") hidden.delete("beam");
-    if (lesson.kind === "column") hidden.delete("beam");
+    if (lesson.kind === "column") hidden.delete("column");
     if (lesson.kind === "slab") hidden.delete("slab");
     if (lesson.kind === "wall") hidden.delete("wall");
     if (lesson.kind === "roof") hidden.delete("roof");
