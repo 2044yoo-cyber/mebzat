@@ -456,7 +456,54 @@ for (const [t, insideWidth, boxWidth, endPanel] of [
 }
 
 // ---------------------------------------------------------------------------
-// 6. Nothing downstream does the arithmetic again
+// 6. The finished external depth includes the back, for every fixing method
+// ---------------------------------------------------------------------------
+
+{
+  const depth = 480;
+  for (const fixing of ["overlay", "inset"] as const) {
+    for (const backThickness of [4, 6, 8]) {
+      const spec = cabinet({ depth, backFixing: fixing });
+      spec.carcass.backBoard = {
+        ...spec.carcass.backBoard,
+        thickness: backThickness,
+      };
+      const parts = buildParts(spec).parts;
+      const side = parts.find((part) => part.role === "gable");
+      const back = parts.find((part) => part.role === "back");
+      const maxDepth = parts.reduce(
+        (maximum, part) =>
+          Math.max(
+            maximum,
+            ...part.placements.map((placement) => placement.z + part.size.z),
+          ),
+        0,
+      );
+      const expectedCarcassDepth =
+        fixing === "inset" ? depth : depth - backThickness;
+
+      check(
+        `${fixing}, ${backThickness} mm back: finished depth remains 480 mm`,
+        spec.envelope.depth === depth && maxDepth === depth,
+        `envelope ${spec.envelope.depth}, assembled ${maxDepth}`,
+      );
+      check(
+        `${fixing}, ${backThickness} mm back: carcass blank follows its construction`,
+        side?.width === expectedCarcassDepth,
+        `side cut depth ${side?.width}, wanted ${expectedCarcassDepth}`,
+      );
+      check(
+        `${fixing}, ${backThickness} mm back: back's rear face stays inside the envelope`,
+        Boolean(back) &&
+          back!.placements[0]!.z + back!.size.z === depth,
+        `back rear face ${(back?.placements[0]?.z ?? 0) + (back?.size.z ?? 0)}`,
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 7. Nothing downstream does the arithmetic again
 // ---------------------------------------------------------------------------
 
 {
