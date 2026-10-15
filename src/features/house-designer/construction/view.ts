@@ -202,7 +202,7 @@ export function isolateLayer(view: ViewState, layer: LayerId): ViewState {
 }
 
 export function showAll(view: ViewState): ViewState {
-  return { ...view, storeysOff: [], categoriesOff: [], layersOff: [], hiddenIds: [], isolateId: null, showEmbedded: false };
+  return { ...view, storeysOff: [], categoriesOff: [], layersOff: [], hiddenIds: [], highlightIds: [], isolateId: null, showEmbedded: false };
 }
 
 /** Floor-by-floor visibility: show only the storeys up to and including this one. */

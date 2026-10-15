@@ -195,12 +195,13 @@ export function EditorHeader({ onBack, levels, activeLevelId, onLevel, onAddFloo
   );
 }
 
-export type WorkspaceTab = "plan" | "sketch" | "3d" | "files" | "agenda";
+export type WorkspaceTab = "plan" | "sketch" | "3d" | "learn" | "files" | "agenda";
 
 const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: "plan", label: "Plan" },
   { id: "sketch", label: "Sketch" },
   { id: "3d", label: "3D" },
+  { id: "learn", label: "Learn" },
   { id: "files", label: "Files" },
   { id: "agenda", label: "Agenda" },
 ];

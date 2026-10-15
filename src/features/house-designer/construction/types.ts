@@ -306,6 +306,8 @@ export type ViewState = {
   layersOff: LayerId[];
   hiddenIds: string[];
   isolateId: string | null;
+  /** Components lit up together, such as every item behind a quantity line. */
+  highlightIds: string[];
   /** The selected component and, for a repeated one, the instance. */
   selectedId: string | null;
   selectedInstance: number | null;
@@ -329,6 +331,7 @@ export const DEFAULT_VIEW: ViewState = {
   categoriesOff: [],
   layersOff: [],
   hiddenIds: [],
+  highlightIds: [],
   isolateId: null,
   selectedId: null,
   selectedInstance: null,

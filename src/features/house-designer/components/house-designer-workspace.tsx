@@ -128,6 +128,12 @@ const HousePreview = dynamic(() => import("./house-preview").then((module) => mo
   loading: () => <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl border text-sm text-muted-foreground"><Loader2 className="mr-2 size-4 animate-spin" /> Loading 3D…</div>,
 });
 
+// The construction learning mode carries its own model code and the same 3D engine; it loads only when opened.
+const ConstructionLab = dynamic(() => import("./construction-lab").then((module) => module.ConstructionLab), {
+  ssr: false,
+  loading: () => <div className="flex min-h-[320px] items-center justify-center rounded-xl border text-sm text-muted-foreground"><Loader2 className="mr-2 size-4 animate-spin" /> Opening construction learning…</div>,
+});
+
 import { exportPlanImage, printPlan } from "../services/plan-export";
 import { createHouseTakeoffPackage, HOUSE_TAKEOFF_SESSION_KEY } from "../services/takeoff-adapter";
 import { FreehandCanvas } from "./freehand-canvas";
@@ -1470,7 +1476,7 @@ function PlanEditor({
   const bottomActions = (
     <div className="grid grid-cols-2 gap-2">
       <button type="button" onClick={onSave} className="min-h-12 rounded-xl bg-brand px-4 text-sm font-semibold text-brand-foreground">Save project</button>
-      {tab === "3d"
+      {tab === "3d" || tab === "learn"
         ? <button type="button" onClick={() => onTab("plan")} className="min-h-12 rounded-xl border px-4 text-sm font-semibold hover:bg-muted">Back to plan</button>
         : <button type="button" onClick={() => onTab("3d")} className="min-h-12 rounded-xl border px-4 text-sm font-semibold hover:bg-muted">View 3D</button>}
     </div>
@@ -1593,6 +1599,8 @@ function PlanEditor({
             />
             {bottomActions}
           </div>
+        ) : tab === "learn" ? (
+          <ConstructionLab project={project} />
         ) : !link ? (
           <ProjectSectionPlaceholder tab={tab} linked={false} onSave={onSave} />
         ) : tab === "sketch" ? (
