@@ -145,7 +145,7 @@ export default function Model({
   const allParts = useMemo(() => visibleKitchenParts(breakdown.parts, hideCountertop), [breakdown, hideCountertop]);
   // These are the same Part IDs printed on the cut list, not a second numbering scheme.
   const partTags = useMemo(() => cutListPartTags(spec, breakdown.parts), [spec, breakdown]);
-  const showPartTags = exploded || visualMode === "exploded" || visualMode === "connections";
+  const showPartTags = outlines || exploded || visualMode === "exploded" || visualMode === "connections";
   const parts = useMemo(() => {
     // A closure panel hidden in the list is still made; it is only not drawn.
     const shown = allParts.filter((part) => !part.closure?.hidden);
