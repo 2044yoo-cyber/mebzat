@@ -51,6 +51,23 @@ export function constructionMethods(spec: DesignSpec): ConstructionMethods {
   };
 }
 
+/**
+ * How deep the usable inside of a carcass is, from the front edge.
+ *
+ * The depth entered is the carcass depth, kept exactly: the back panel's
+ * thickness is never taken off it. An overlaid back is fixed behind the
+ * carcass, so the whole depth is usable. An inset back stands in grooves at
+ * the rear of the sides, inside that depth, so the inside stops at its face.
+ */
+export function carcassInteriorDepth(spec: DesignSpec, depth: number): number {
+  return constructionMethods(spec).backFixing === "inset" ? depth - constructionMaterials(spec).back.thickness : depth;
+}
+
+/** Where a back panel starts, from the front edge: behind the carcass when overlaid, in its rear grooves when inset. */
+export function backPanelStart(spec: DesignSpec, depth: number): number {
+  return constructionMethods(spec).backFixing === "inset" ? depth - constructionMaterials(spec).back.thickness : depth;
+}
+
 export type ConstructionMethods = {
   backFixing: "overlay" | "inset";
   backGrooveDepth: number;

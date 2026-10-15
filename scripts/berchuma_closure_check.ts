@@ -341,11 +341,16 @@ for (const spec of [channelOn, on(kitchen)]) {
   const plain = spec === channelOn ? setClosureSettings(channel, { enabled: false }) : kitchen;
   const boardArea = (breakdownOf: ReturnType<typeof buildParts>) => Object.values(breakdownOf.totals.areaByBoard).reduce((total, value) => total + value, 0);
   ok(Math.abs(boardArea(breakdown) - boardArea(buildParts(plain)) - area) < 0.01, `${spec.title}: the board area grows by exactly the panels' area`);
-  const priced = calculateCost(spec, breakdown).subtotals;
-  const unpriced = calculateCost(plain, buildParts(plain)).subtotals;
-  // Priced by the sheet: three narrow rails can ride in a wardrobe's offcut,
-  // a kitchen's worth of end panels and kickboards cannot.
-  ok(spec === channelOn ? priced.material >= unpriced.material : priced.material > unpriced.material, `${spec.title}: and the material cost follows (${Math.round(unpriced.material)} → ${Math.round(priced.material)})`);
+  const pricedCost = calculateCost(spec, breakdown);
+  const unpricedCost = calculateCost(plain, buildParts(plain));
+  const priced = pricedCost.subtotals;
+  const unpriced = unpricedCost.subtotals;
+  // Priced by the sheet, and the panels are nested with everything else. Whether
+  // they need a sheet of their own depends on the offcuts the carcass leaves: they
+  // may ride in them. What cannot happen is that they cost less, or are not nested.
+  const used = (cost: typeof pricedCost) => cost.sheets.reduce((total, sheet) => total + sheet.count * sheet.utilisation, 0);
+  ok(priced.material >= unpriced.material, `${spec.title}: the material cost does not fall (${Math.round(unpriced.material)} → ${Math.round(priced.material)})`);
+  ok(used(pricedCost) > used(unpricedCost) || priced.material > unpriced.material, `${spec.title}: and the panels are nested on the sheets, which are fuller or more (${used(unpricedCost).toFixed(3)} → ${used(pricedCost).toFixed(3)})`);
 }
 ok(buildCutList(channelOn, buildParts(channelOn)).rows.every((row) => row.partId.length > 0), "every row is named");
 

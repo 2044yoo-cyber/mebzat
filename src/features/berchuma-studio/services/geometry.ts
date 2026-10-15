@@ -32,6 +32,8 @@ import {
   constructionMethods,
   edgeBandForConstructionBoard,
   zekoloBoardOf,
+  backPanelStart,
+  carcassInteriorDepth,
 } from "./wardrobe-materials";
 import {
   recessedWardrobePlinthParts,
@@ -602,8 +604,8 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   // from the user's requested depth (for example, 480 mm must remain 480 mm).
   // Back placement is handled independently below.
   const shellDepth = depth;
-  /** Use the full specified depth; back thickness is not deducted here. */
-  const interiorDepth = depth;
+  /** The back thickness is not deducted from the depth; an inset back stands inside it and stops the usable depth. */
+  const interiorDepth = carcassInteriorDepth(spec, depth);
 
   const push = (part: Omit<Part, "edgeBand">, edgeBand = bodyBand) =>
     parts.push({ ...part, edgeBand });
@@ -787,7 +789,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
           quantity: 1,
           edges: { ...NO_EDGES },
           edgeBand: backBand,
-          placements: [{ x: backX, y: pieceY, z: depth - backThickness }],
+          placements: [{ x: backX, y: pieceY, z: backPanelStart(spec, depth) }],
           size: { x: Math.round(width), y: length, z: backThickness },
           axis: "z",
           ...moduleTag(place.module),
@@ -1707,8 +1709,7 @@ function drawerFaceRects(
   band: { floor: number; height: number },
   edges: { low: Edge; high: Edge },
 ): { index: number; y: number; height: number }[] {
-  const materials = constructionMaterials(spec);
-  const interiorDepth = cabinet.size.depth - materials.back.thickness;
+  const interiorDepth = carcassInteriorDepth(spec, cabinet.size.depth);
   const sizing = doorSizingOf(spec);
   const construction = drawerConstructionFor(spec, bay.width, band.height, band.floor, interiorDepth, count, explicit);
   const grip = bay.fitting.kind === "drawers" ? bay.fitting.grip ?? "finger-gap" : "finger-gap";

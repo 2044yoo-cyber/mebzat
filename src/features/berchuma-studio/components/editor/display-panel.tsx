@@ -43,6 +43,7 @@ import {
   type DisplayRef,
   type ZoneKind,
 } from "../../services/operations";
+import { carcassInteriorDepth } from "../../services/wardrobe-materials";
 import { BOARDS } from "../../types/catalogue";
 import { displayLightings, type Bay, type Cabinet, type DesignSpec } from "../../types/spec";
 
@@ -164,7 +165,7 @@ export function DisplayPanel({ spec, display, onChange, onSelectDisplay }: { spe
   const section = display.sectionId && bay.fitting.kind === "stack" ? bay.fitting.sections.find((entry) => entry.id === display.sectionId) : null;
   const look = section?.display ?? bay.display ?? { back: true, lighting: "off" as const };
   const shelves = section ? (section.count ?? 1) : bay.fitting.kind === "shelves" ? bay.fitting.count : 0;
-  const interiorDepth = cabinet.size.depth - spec.carcass.backBoard.thickness;
+  const interiorDepth = carcassInteriorDepth(spec, cabinet.size.depth);
   const side = type === "side" ? sideDisplayOf(spec, cabinet.id) : null;
   const zones = section ? zoneHeightsOf(spec, cabinet.id, bay.id) : [];
   const zoneIndex = zones.findIndex((zone) => zone.id === section?.id);

@@ -1,6 +1,6 @@
 import type { Cabinet, DesignSpec } from "../types/spec";
 import type { Part } from "../types/parts";
-import { constructionMaterials, zekoloBoardOf } from "./wardrobe-materials";
+import { carcassInteriorDepth, constructionMaterials, zekoloBoardOf } from "./wardrobe-materials";
 import { doorFrontOffset, doorSizingOf, frontExtent, leavesAcross } from "./door-sizing";
 
 /** Refine real cutting parts; the viewer, nesting and costing share this list. */
@@ -60,7 +60,7 @@ export function kitchenConstruction(spec: DesignSpec, cabinet: Cabinet, original
   const parts = aligned.filter((p) => p.role !== "top" && p.role !== "leg" && p.role !== "plinth" && !(cabinet.kitchenRole && p.role === "shelf"));
   // Open tops with two vertical stretchers, as in the supplied OBJ. Sink and
   // stove templates remain appliance-specific; no solid board blocks them.
-  for (const [label, z] of [["front", 0], ["rear", depth - materials.back.thickness - t]] as const) {
+  for (const [label, z] of [["front", 0], ["rear", carcassInteriorDepth(spec, depth) - t]] as const) {
     parts.push({ ...panel(`top-stretcher-${label}`, "rail", { x: width - 2 * t, y: 60, z: t }, { x: t, y: height - 60, z }, "z"), manufacture: "cut" });
   }
   const h = cabinet.plinthHeight;

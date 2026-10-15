@@ -20,7 +20,7 @@
  {
   "name": "openings never found",
   "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": ".filter((rect) => rect.width >= MIN_OPENING && rect.height >= MIN_OPENING);",
+  "from": ".filter((rect) => rect.width >= sliver && rect.height >= sliver);",
   "to": ".filter(() => false);"
  },
  {

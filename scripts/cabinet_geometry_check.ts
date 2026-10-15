@@ -37,6 +37,10 @@
 
 import { readFileSync } from "node:fs";
 
+import { createDetailedKitchen } from "../src/features/berchuma-studio/services/kitchen-detail.ts";
+import { DEFAULT_KITCHEN_SETUP, REFERENCE_KITCHEN_DETAILS } from "../src/features/berchuma-studio/types/kitchen.ts";
+import { validateSpec } from "../src/features/berchuma-studio/types/spec.ts";
+
 import { buildParts } from "../src/features/berchuma-studio/services/geometry.ts";
 import { buildCutList } from "../src/features/berchuma-studio/services/cutlist.ts";
 import { tvUnitExample } from "../src/features/berchuma-studio/services/examples.ts";
@@ -456,14 +460,14 @@ for (const [t, insideWidth, boxWidth, endPanel] of [
 }
 
 // ---------------------------------------------------------------------------
-// 6. The finished external depth includes the back, for every fixing method
+// 6. The depth entered is the carcass depth: the back never takes anything off it
 // ---------------------------------------------------------------------------
 
 {
   const depth = 480;
   for (const fixing of ["overlay", "inset"] as const) {
     for (const backThickness of [4, 6, 8]) {
-      const spec = cabinet({ depth, backFixing: fixing });
+      const spec = cabinet({ depth, backFixing: fixing, bays: [{ width: 1400, shelves: 3 }] });
       spec.carcass.backBoard = {
         ...spec.carcass.backBoard,
         thickness: backThickness,
@@ -471,34 +475,69 @@ for (const [t, insideWidth, boxWidth, endPanel] of [
       const parts = buildParts(spec).parts;
       const side = parts.find((part) => part.role === "gable");
       const back = parts.find((part) => part.role === "back");
-      const maxDepth = parts.reduce(
-        (maximum, part) =>
-          Math.max(
-            maximum,
-            ...part.placements.map((placement) => placement.z + part.size.z),
-          ),
-        0,
-      );
-      const expectedCarcassDepth =
-        fixing === "inset" ? depth : depth - backThickness;
+      const deepest = (list: typeof parts) =>
+        list.reduce(
+          (maximum, part) =>
+            Math.max(
+              maximum,
+              ...part.placements.map((placement) => placement.z + part.size.z),
+            ),
+          0,
+        );
+      const carcassDepth = deepest(parts.filter((part) => part.role !== "back"));
+      const label = `${fixing}, ${backThickness} mm back`;
 
       check(
-        `${fixing}, ${backThickness} mm back: finished depth remains 480 mm`,
-        spec.envelope.depth === depth && maxDepth === depth,
-        `envelope ${spec.envelope.depth}, assembled ${maxDepth}`,
+        `${label}: the requested 480 mm is the carcass depth, exactly`,
+        spec.envelope.depth === depth && carcassDepth === depth,
+        `envelope ${spec.envelope.depth}, carcass ${carcassDepth}`,
       );
       check(
-        `${fixing}, ${backThickness} mm back: carcass blank follows its construction`,
-        side?.width === expectedCarcassDepth,
-        `side cut depth ${side?.width}, wanted ${expectedCarcassDepth}`,
+        `${label}: the side is cut the full 480 mm, nothing taken off for the back`,
+        side?.width === depth,
+        `side cut depth ${side?.width}, wanted ${depth}`,
       );
       check(
-        `${fixing}, ${backThickness} mm back: back's rear face stays inside the envelope`,
+        fixing === "overlay"
+          ? `${label}: the overlaid back is fixed behind the carcass, not inside it`
+          : `${label}: the inset back stands in its grooves, inside the 480 mm`,
         Boolean(back) &&
-          back!.placements[0]!.z + back!.size.z === depth,
-        `back rear face ${(back?.placements[0]?.z ?? 0) + (back?.size.z ?? 0)}`,
+          (fixing === "overlay"
+            ? back!.placements[0]!.z === depth && back!.placements[0]!.z + back!.size.z === depth + backThickness
+            : back!.placements[0]!.z + back!.size.z === depth),
+        `back from ${back?.placements[0]?.z} to ${(back?.placements[0]?.z ?? 0) + (back?.size.z ?? 0)}`,
+      );
+      const shelf = parts.find((part) => part.role === "shelf" && !part.label.startsWith("Fixed shelf"));
+      const shelfDepthExpected = (fixing === "inset" ? depth - backThickness : depth) - spec.carcass.shelfSetback;
+      check(
+        `${label}: a shelf is as deep as the usable inside less its setback`,
+        Boolean(shelf) && Math.abs(shelf!.width - shelfDepthExpected) <= 1,
+        `shelf ${shelf?.width}, wanted ${shelfDepthExpected}`,
       );
     }
+  }
+}
+
+// A kitchen base unit's rear stretcher stands at the rear of the carcass: the
+// carcass depth less the board for an overlaid back, which is behind it, and
+// less the back as well for an inset one, which is inside it.
+{
+  for (const fixing of ["overlay", "inset"] as const) {
+    const spec = validateSpec(createDetailedKitchen({ ...DEFAULT_KITCHEN_SETUP, details: REFERENCE_KITCHEN_DETAILS })).spec;
+    spec.carcass.backFixing = fixing;
+    const unit = spec.cabinets.find((entry) => entry.kind === "base" && entry.bays.length > 0)!;
+    const made = buildParts(spec).parts.filter((part) => part.cabinetId === unit.id);
+    const rear = made.find((part) => part.id.endsWith("top-stretcher-rear"));
+    const front = made.find((part) => part.id.endsWith("top-stretcher-front"));
+    const t = spec.carcass.board.thickness;
+    const expected = unit.size.depth - (fixing === "inset" ? spec.carcass.backBoard.thickness : 0) - t;
+    // The run may be turned, so the distance between the two, not either one's z.
+    const apart = rear && front ? Math.hypot(rear.placements[0]!.x - front.placements[0]!.x, rear.placements[0]!.z - front.placements[0]!.z) : NaN;
+    check(
+      `${fixing} back: a kitchen unit's rear stretcher stands ${expected} mm behind the front one, the depth entered less only what is inside it`,
+      Math.abs(apart - expected) < 0.01,
+      `${apart} mm apart, wanted ${expected}`,
+    );
   }
 }
 

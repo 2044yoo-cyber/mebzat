@@ -54,6 +54,10 @@ check("the combined workbook includes the validation report tab",
   workbookText.includes("Validation report"));
 check("the combined workbook includes offcut dimensions and reuse flags",
   workbookText.includes("Offcut inventory") && workbookText.includes("Reusable candidate"));
+check("the combined workbook includes the design summary",
+  workbookText.includes("Design summary"));
+check("the combined workbook states the finished external dimensions",
+  workbookText.includes("Finished dimensions"));
 check("the combined workbook includes workshop assembly steps",
   workbookText.includes("Assembly steps"));
 check("the pack keeps a machine-readable validation result",
