@@ -31,6 +31,7 @@ import {
 import { buildParts } from "../../services/geometry";
 import { visibleKitchenParts } from "../../services/kitchen-construction";
 import { partCentre, partRotationRadians } from "../../services/part-transform";
+import { cabinetCentres, closureJoins, explodedOffset } from "../../services/exploded";
 import {
   designWorldBounds,
   resolveDesign,
@@ -83,6 +84,10 @@ export default function Model({
   selectedDisplay = null,
   onSelectDisplay,
   onDisplayResize,
+  exploded = false,
+  outlines = false,
+  selectedClosureId = null,
+  onSelectClosure,
 }: {
   spec: DesignSpec;
   /** Takes the doors and drawer fronts off, to show what is inside. */
@@ -119,17 +124,28 @@ export default function Model({
   onSelectDisplay?: (display: DisplayRef | null) => void;
   /** An edge of the selected display pulled to here, in its cabinet's frame. */
   onDisplayResize?: (display: DisplayRef, edge: DoorEdge, rect: FrontRect) => void;
+  /** Every board pulled apart along the way it is fitted, with a line back to where it goes. */
+  exploded?: boolean;
+  /** The connection view: each board's outline, and where each closure panel is joined. */
+  outlines?: boolean;
+  /** A closure panel, lit; tapped once its cabinet is selected. */
+  selectedClosureId?: string | null;
+  onSelectClosure?: (id: string | null) => void;
 }) {
   // Every part, fronts included: the dimensions measure the drawer fronts
   // even while they are taken off to show what is inside.
   const allParts = useMemo(() => visibleKitchenParts(buildParts(spec).parts, hideCountertop), [spec, hideCountertop]);
   const parts = useMemo(() => {
-    if (!hideFronts) return allParts;
+    // A closure panel hidden in the list is still made; it is only not drawn.
+    const shown = allParts.filter((part) => !part.closure?.hidden);
+    if (!hideFronts) return shown;
     // Internal drawers' inner fronts are inside: they stay.
-    return allParts.filter(
+    return shown.filter(
       (part) => part.role !== "door" && !(part.role === "drawer_front" && !part.internal),
     );
   }, [allParts, hideFronts]);
+  const centres = useMemo(() => cabinetCentres(allParts), [allParts]);
+  const joins = useMemo(() => closureJoins(parts), [parts]);
 
   const resolved = useMemo(() => resolveDesign(spec), [spec]);
   const bounds = useMemo(() => boundsWithSketch(spec), [spec]);
@@ -239,6 +255,9 @@ export default function Model({
               key={`${part.id}-${index}`}
               part={part}
               placement={placement}
+              offset={exploded ? explodedOffset(part, placement, centres.get(part.cabinetId ?? "") ?? placement, 1) : null}
+              outline={outlines || exploded}
+              closureSelected={Boolean(part.closure && part.closure.id === selectedClosureId)}
               spec={spec}
               surface={surface}
               selected={
@@ -258,6 +277,11 @@ export default function Model({
                     ? () => {
                         // A door of the cabinet already selected selects that
                         // door, to size; the first tap selects the cabinet.
+                        // A closure panel of the selected cabinet selects that panel.
+                        if (onSelectClosure && part.closure && part.cabinetId === selectedCabinetId) {
+                          onSelectClosure(part.closure.id);
+                          return;
+                        }
                         if (onSelectDoor && part.role === "door" && part.doorLeaf && part.bayId && part.cabinetId === selectedCabinetId) {
                           onSelectDoor({ cabinetId: part.cabinetId!, bayId: part.bayId, run: part.doorLeaf.run, leaf: part.doorLeaf.first + index });
                           return;
@@ -303,6 +327,32 @@ export default function Model({
             />
           )),
         )}
+
+        {/* Where each closure panel is fixed: a dot at the joint, and in the
+            exploded view a line from the panel to it. */}
+        {outlines || exploded ? joins.map((join) => {
+          const part = parts.find((entry) => entry.id === join.partId)!;
+          const placement = part.placements[0]!;
+          const centre = partCentre(part, placement);
+          const offset = exploded ? explodedOffset(part, placement, centres.get(part.cabinetId ?? "") ?? placement, 1) : { x: 0, y: 0, z: 0 };
+          const from = new THREE.Vector3((centre.x + offset.x) * MM, (centre.y + offset.y) * MM, -(centre.z + offset.z) * MM);
+          const to = new THREE.Vector3(join.at.x * MM, join.at.y * MM, -join.at.z * MM);
+          return (
+            <group key={`join-${join.partId}`} name="closure-join">
+              <mesh position={to} raycast={() => null}>
+                <sphereGeometry args={[0.012, 12, 12]} />
+                <meshBasicMaterial color="#f4a63a" />
+              </mesh>
+              {exploded ? (
+                <line>
+                  <bufferGeometry attach="geometry" onUpdate={(geometry) => geometry.setFromPoints([from, to])} />
+                  <lineBasicMaterial attach="material" color="#f4a63a" />
+                </line>
+              ) : null}
+              {exploded ? <DimensionLabel text={part.label.split(" — ")[0]!} position={[from.x, from.y + 0.05, from.z]} scale={Math.max(1, reach * 0.4)} /> : null}
+            </group>
+          );
+        }) : null}
 
         {spec.sketchObjects.map((object) => (
           <SketchMesh
@@ -434,6 +484,9 @@ function ModuleLabels({ parts, scale }: { parts: Part[]; scale: number }) {
 function PartMesh({
   part,
   placement,
+  offset = null,
+  outline = false,
+  closureSelected = false,
   spec,
   surface = "model",
   selected,
@@ -443,6 +496,11 @@ function PartMesh({
 }: {
   part: Part;
   placement: { x: number; y: number; z: number };
+  /** Where the exploded view moves it, mm in the design's frame. */
+  offset?: { x: number; y: number; z: number } | null;
+  /** Draws the board's outline, as the connection view shows each one. */
+  outline?: boolean;
+  closureSelected?: boolean;
   spec: DesignSpec;
   surface?: SurfaceView;
   selected: boolean;
@@ -474,10 +532,13 @@ function PartMesh({
   // rather than behind the back panel.
   const centre = partCentre(part, placement);
   const position: [number, number, number] = [
-    centre.x * MM,
-    centre.y * MM,
-    -centre.z * MM,
+    (centre.x + (offset?.x ?? 0)) * MM,
+    (centre.y + (offset?.y ?? 0)) * MM,
+    -(centre.z + (offset?.z ?? 0)) * MM,
   ];
+  const [sx, sy, sz] = size;
+  const edges = useMemo(() => (outline ? new THREE.EdgesGeometry(new THREE.BoxGeometry(sx, sy, sz)) : null), [outline, sx, sy, sz]);
+  useEffect(() => () => { edges?.dispose(); }, [edges]);
 
   return (
     <mesh
@@ -511,9 +572,28 @@ function PartMesh({
         // finish must be able to trust.
         // An accent board keeps its true colour when its cabinet is selected:
         // tinted blue, oak reads as mauve.
-        emissive={part.role === "led" ? LED_GLOW : doorSelected ? DOOR_GLOW : selected && !accentColour(part, spec) ? SELECTION_GLOW : BLACK}
-        emissiveIntensity={part.role === "led" ? 1.4 : doorSelected ? 0.35 : selected && !accentColour(part, spec) ? 0.22 : 0}
+        emissive={part.role === "led" ? LED_GLOW : doorSelected || closureSelected ? DOOR_GLOW : selected && !accentColour(part, spec) ? SELECTION_GLOW : BLACK}
+        emissiveIntensity={part.role === "led" ? 1.4 : doorSelected || closureSelected ? 0.35 : selected && !accentColour(part, spec) ? 0.22 : 0}
       />
+      {edges ? (
+        <lineSegments geometry={edges} raycast={() => null}>
+          <lineBasicMaterial color={part.closure ? "#f4a63a" : "#1f2933"} />
+        </lineSegments>
+      ) : null}
+      {/* A groove routed into the back of the grip edge shows as a shadow line along it. */}
+      {part.frontGrip === "groove" && part.grip ? (
+        <mesh position={[0, (part.grip.edge === "top" ? 1 : -1) * (size[1] / 2 - 0.003), size[2] / 2 + 0.001]} raycast={() => null}>
+          <boxGeometry args={[size[0] * 0.98, 0.004, 0.002]} />
+          <meshStandardMaterial color="#26303b" roughness={0.8} />
+        </mesh>
+      ) : null}
+      {/* A G or J profile stands on the grip edge, where the board was cut back for it. */}
+      {(part.frontGrip === "g-profile" || part.frontGrip === "j-profile") && part.grip ? (
+        <mesh position={[0, (part.grip.edge === "top" ? 1 : -1) * (size[1] / 2 + (part.grip.height * MM) / 2), 0]} raycast={() => null}>
+          <boxGeometry args={[size[0], part.grip.height * MM, size[2]]} />
+          <meshStandardMaterial color="#c9ced4" metalness={0.75} roughness={0.3} />
+        </mesh>
+      ) : null}
       {part.frontGrip === "handle" && part.doorStyle !== "fixed" && !part.internal ? (
         <mesh position={part.role === "drawer_front"
           ? [0, size[1] / 2 - 0.025, size[2] / 2 + 0.007]

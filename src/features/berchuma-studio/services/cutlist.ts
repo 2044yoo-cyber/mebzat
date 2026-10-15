@@ -45,6 +45,8 @@ export type CutListRow = {
   grainLocked: boolean;
   /** Square metres for this row, all pieces. */
   area: number;
+  /** Machining beyond the cut: a finger-pull groove, a profile to fit. */
+  operations?: string[];
 };
 
 export type CutList = {
@@ -106,6 +108,10 @@ export function buildCutList(
       part.edgeBand.id,
       edgeKey(part),
       part.role,
+      // A rail and a masking panel of the same size are different pieces, and
+      // a grooved door is not a plain one: it goes to the router.
+      part.closure?.kind ?? "",
+      (part.operations ?? []).join(";"),
       // Parts of different transport modules are made and stacked apart, and
       // within a module each is listed by name — left side, right side, top.
       ...(part.module ? [part.module.name, part.label] : []),
@@ -145,6 +151,7 @@ export function buildCutList(
         (entry.part.length * entry.part.width * entry.quantity) / 1_000_000,
         3,
       ),
+      ...(entry.part.operations?.length ? { operations: entry.part.operations } : {}),
     }));
 
   // One block per board, because collecting material is one trip to the rack
@@ -331,6 +338,15 @@ export function partCode(part: Pick<Part, "role" | "label">): string {
       return "LG";
     case "led":
       return "LED";
+    case "closure":
+      return /finger-pull/i.test(label) ? "FPR"
+        : /masking/i.test(label) ? "MK"
+        : /filler/i.test(label) ? "FL"
+        : /decorative/i.test(label) ? "EP"
+        : /side cover/i.test(label) ? "SC"
+        : /top closure/i.test(label) ? "TC"
+        : /kickboard/i.test(label) ? "KB"
+        : /rear closure/i.test(label) ? "RC" : "CP";
     default:
       return "PT";
   }

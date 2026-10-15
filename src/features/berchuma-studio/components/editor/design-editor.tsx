@@ -151,6 +151,10 @@ export function DesignEditor({
   const [sketchEnabled, setSketchEnabled] = useState(spec.sketchMode);
   const [sketchTool, setSketchTool] = useState<SketchTool>("select");
   const [hideFronts, setHideFronts] = useState(false);
+  // The assembly views: boards pulled apart, and each board's outline with its joints.
+  const [exploded, setExploded] = useState(false);
+  const [outlines, setOutlines] = useState(false);
+  const [selectedClosure, setSelectedClosure] = useState<string | null>(null);
   const [surface, setSurface] = useState<SurfaceView>("model");
   // The move pad, shown with a selection; the Move action hides and shows it.
   const [movePad, setMovePad] = useState(true);
@@ -378,6 +382,10 @@ export function DesignEditor({
             <Model
               spec={spec}
               hideFronts={hideFronts}
+              exploded={exploded}
+              outlines={outlines}
+              selectedClosureId={selectedClosure}
+              onSelectClosure={setSelectedClosure}
               surface={surface}
               hideCountertop={spec.furnitureType === "kitchen" && !showCountertop}
               selectedCabinetId={selectedId}
@@ -591,6 +599,14 @@ export function DesignEditor({
               />
               Show inside
             </label>
+            <button type="button" aria-pressed={exploded} onClick={() => setExploded((value) => !value)}
+              className={cn("rounded-lg border border-white/10 bg-background/70 px-2 py-1.5 text-[11px] backdrop-blur-xl", exploded && "border-primary text-primary")}>
+              Exploded
+            </button>
+            <button type="button" aria-pressed={outlines} onClick={() => setOutlines((value) => !value)}
+              className={cn("rounded-lg border border-white/10 bg-background/70 px-2 py-1.5 text-[11px] backdrop-blur-xl", outlines && "border-primary text-primary")}>
+              Joints
+            </button>
             </div>
           ) : null}
           {view === "solid" && spec.furnitureType === "kitchen" ? <label className="pointer-events-auto flex items-center gap-1.5 rounded-lg border bg-background/80 px-2 py-1.5 text-[11px]">
@@ -809,6 +825,8 @@ export function DesignEditor({
           onSelectJoint={selectJoint}
           partition={partition}
           onSelectPartition={selectPartition}
+          closure={selectedClosure}
+          onSelectClosure={setSelectedClosure}
         />
       </div>
     </div>

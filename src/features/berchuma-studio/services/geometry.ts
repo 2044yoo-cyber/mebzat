@@ -23,6 +23,8 @@ import { splitSpanAtSupports } from "./panel-segmentation";
 import { transformPlanPoint } from "./part-transform";
 import { resolveDesign } from "./resolve";
 import { kitchenConstruction } from "./kitchen-construction";
+import { fingerPullOf, frontShortening, gripEdgeOf, gripOf } from "./door-grip";
+import { closurePanelsFor, closurePartsOf, type ClosurePanel } from "./closure-panels";
 import { ledHardwareLine } from "./lighting";
 import {
   constructionMaterials,
@@ -40,6 +42,7 @@ import type {
   Cabinet,
   DesignSpec,
   DisplayOptions,
+  FrontGrip,
   Hardware,
   StackSection,
 } from "../types/spec";
@@ -133,7 +136,11 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
         return { cornerId: corner.id, bayId: cabinet.bays[distance(start) <= distance(finish) ? 0 : cabinet.bays.length - 1]?.id };
       });
 
-    for (const part of kitchenConstruction(spec, cabinet, cabinetParts(spec, cabinet))) {
+    // The cabinet as built, and — with Smart Closure Panels on — the panels
+    // that close what it leaves open, worked out from those same parts.
+    const built = kitchenConstruction(spec, cabinet, cabinetParts(spec, cabinet));
+    const closures = spec.closurePanels?.enabled ? closurePartsOf(spec, closureOf(spec, resolved, placed, built).panels) : [];
+    for (const part of [...built, ...closures]) {
       // Open the adjoining end panel into the dedicated shelf corner. A full
       // gable here seals the corner behind two ordinary cabinet boxes.
       const endX = part.id === "gable-left" ? 0 : part.id === "gable-right" ? cabinet.size.width : null;
@@ -158,6 +165,9 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
         id: `${cabinet.id}/${part.id}`,
         cabinetId: cornerBaySelections.find((entry) => entry.bayId && (part.bayId === entry.bayId || part.bayId?.startsWith(`${entry.bayId}-`)))?.cornerId ?? cabinet.id,
         rotationY: rotation === 0 ? undefined : rotation,
+        // A closure panel's joint moves with it, and is named by the part it is
+        // fixed to as that part is now named.
+        ...(part.closure ? { closure: { ...part.closure, fixedTo: `${cabinet.id}/${part.closure.fixedTo}`, join: rotateThenPlace(part.closure.join, rotation, placed.x, placed.y, placed.z) } } : {}),
         placements: part.placements.map((placement) =>
           // The local offset is turned with the run before it is moved onto
           // it. Translating first and rotating after would swing the whole
@@ -178,6 +188,29 @@ export function buildParts(spec: DesignSpec): PartsBreakdown {
       ? [...hardwareFor(spec, parts, resolved), lighting]
       : hardwareFor(spec, parts, resolved),
   );
+}
+
+/** One placed cabinet's closure panels, from its own built parts. */
+function closureOf(spec: DesignSpec, resolved: ReturnType<typeof resolveDesign>, placed: ReturnType<typeof resolveDesign>["cabinets"][number], built: Part[]) {
+  const fronts = cabinetFronts(spec, placed.cabinet);
+  return closurePanelsFor({ spec, resolved, placed, parts: built, leaves: fronts.leaves, drawers: fronts.drawers, regions: doorRunRegions(spec, placed.cabinet) });
+}
+
+/**
+ * Every closure panel the design needs, on or off, with what stops any of
+ * them — for the panel list and its warnings. Worked out whether or not Smart
+ * Closure Panels is on, so the list can say what turning it on would add.
+ */
+export function closureReport(spec: DesignSpec): { panels: ClosurePanel[]; warnings: string[] } {
+  const resolved = resolveDesign(spec);
+  const panels: ClosurePanel[] = [];
+  const warnings: string[] = [];
+  for (const placed of resolved.cabinets) {
+    const result = closureOf(spec, resolved, placed, kitchenConstruction(spec, placed.cabinet, cabinetParts(spec, placed.cabinet)));
+    panels.push(...result.panels);
+    warnings.push(...result.warnings);
+  }
+  return { panels, warnings };
 }
 
 /**
@@ -1566,7 +1599,7 @@ export type DoorLeaf = FrontRect & {
   /** How many leaves its run has. */
   leaves: number;
   style: Bay["door"];
-  frontGrip: NonNullable<Bay["frontGrip"]>;
+  frontGrip: FrontGrip;
   /** Sized by hand — and the size passed the checks; otherwise the automatic size. */
   manual: boolean;
   /** What the automatic sizing gives, for Reset and for the panel. */
@@ -1648,6 +1681,17 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
   const interiorDepth = cabinet.size.depth - materials.back.thickness;
   const leaves: DoorLeaf[] = [];
   const drawers: CabinetFronts["drawers"] = [];
+  // A profile or a channel takes its height off the door's grip edge: the
+  // profile stands there, or the gap is the channel. A sliding leaf has no
+  // such grip, and keeps its size.
+  const gripEdge = gripEdgeOf(cabinet);
+  const shortenForGrip = (rect: FrontRect, grip: FrontGrip): FrontRect => {
+    const cut = frontShortening(spec, grip, materials.fronts.thickness);
+    if (cut <= 0 || cut >= rect.height / 2) return rect;
+    return gripEdge === "top"
+      ? { ...rect, height: rect.height - cut }
+      : { ...rect, y: rect.y + cut, height: rect.height - cut };
+  };
 
   for (const place of bayLayout(cabinet, t)) {
     const bay = place.bay;
@@ -1689,9 +1733,10 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
       const leafWidth = Math.floor((span.width - gap * (count + 1)) / count);
       const leafHeight = bandHeight - 2 * gap;
       if (leafHeight <= 0 || leafWidth <= 0) return;
+      const grip = gripOf(spec, bay);
       for (let leaf = 0; leaf < count; leaf += 1) {
-        const auto = { x: span.x + gap + leaf * (leafWidth + gap), y: bandFloor + gap, width: leafWidth, height: leafHeight };
-        leaves.push({ ...auto, bayId: bay.id, run, leaf, leaves: count, style: bay.door, frontGrip: bay.frontGrip ?? "handle", manual: false, auto, aligned: false });
+        const auto = shortenForGrip({ x: span.x + gap + leaf * (leafWidth + gap), y: bandFloor + gap, width: leafWidth, height: leafHeight }, grip);
+        leaves.push({ ...auto, bayId: bay.id, run, leaf, leaves: count, style: bay.door, frontGrip: grip, manual: false, auto, aligned: false });
       }
     };
 
@@ -1735,9 +1780,10 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
     const count = preferredKitchenDoorLeaves(frontWidth, gap, 0);
     const leafWidth = (frontWidth - count * gap) / count;
     leaves.length = 0;
+    const grip = gripOf(spec, bay);
     for (let leaf = 0; leaf < count && leafWidth > 0; leaf += 1) {
-      const auto = { x: (cabinet.frontInsets?.start ?? 0) + gap / 2 + leaf * (leafWidth + gap), y: plinth + gap / 2, width: leafWidth, height: height - plinth - gap };
-      leaves.push({ ...auto, bayId: bay.id, run: 0, leaf, leaves: count, style: "hinged", frontGrip: bay.frontGrip ?? "handle", manual: false, auto, aligned: true });
+      const auto = shortenForGrip({ x: (cabinet.frontInsets?.start ?? 0) + gap / 2 + leaf * (leafWidth + gap), y: plinth + gap / 2, width: leafWidth, height: height - plinth - gap }, grip);
+      leaves.push({ ...auto, bayId: bay.id, run: 0, leaf, leaves: count, style: "hinged", frontGrip: grip, manual: false, auto, aligned: true });
     }
   }
 
@@ -1760,6 +1806,48 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
     if (!changed) break;
   }
   return { leaves, drawers, warnings };
+}
+
+/**
+ * The openings a cabinet's doors close: per bay, per run of doors, the clear
+ * opening between its boards — what would show of the inside if the doors
+ * did not cover it. Walks the bays exactly as `cabinetFronts` does, so a run
+ * here is the run its leaves belong to. Drawer bands are not included: their
+ * fronts and the finger gaps between them are meant to be there.
+ */
+export type DoorRunRegion = { bayId: string; run: number; x: number; width: number; floor: number; top: number };
+
+export function doorRunRegions(spec: DesignSpec, cabinet: Cabinet): DoorRunRegion[] {
+  const t = constructionMaterials(spec).body.thickness;
+  const plinth = cabinet.plinthHeight;
+  const height = cabinet.size.height;
+  const regions: DoorRunRegion[] = [];
+  for (const place of bayLayout(cabinet, t)) {
+    const bay = place.bay;
+    if (bay.display || bay.door === "none") continue;
+    const openingFloor = plinth + t;
+    const opening = height - plinth - 2 * t;
+    if (bay.fitting.kind === "drawers" && !bay.fitting.internal) continue;
+    if (bay.fitting.kind === "stack") {
+      let run: { floor: number; top: number } | null = null;
+      let index = 0;
+      for (const band of sectionBands(bay.fitting.sections, openingFloor, opening, t)) {
+        if (!doorSection(band.section)) {
+          if (run) regions.push({ bayId: bay.id, run: index, x: place.x, width: place.width, ...run });
+          if (run) index += 1;
+          run = null;
+          continue;
+        }
+        // Bands come top first, so a run grows downwards — as cabinetFronts grows it.
+        const top = band.floor + band.height;
+        run = run ? { floor: band.floor, top: run.top } : { floor: band.floor, top };
+      }
+      if (run) regions.push({ bayId: bay.id, run: index, x: place.x, width: place.width, ...run });
+      continue;
+    }
+    regions.push({ bayId: bay.id, run: 0, x: place.x, width: place.width, floor: openingFloor, top: openingFloor + opening });
+  }
+  return regions;
 }
 
 /**
@@ -1797,6 +1885,21 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   // its own size on the cut list. Emitted where the bay always put its doors,
   // so the cut list reads in the order it always has.
   const fronts = cabinetFronts(spec, cabinet);
+  // What a handleless grip asks of the door it is on: where it runs, and the
+  // machining or fitting the shop has to do.
+  const gripEdge = gripEdgeOf(cabinet);
+  const gripDetail = (leaf: DoorLeaf): Pick<Part, "frontGrip" | "grip" | "operations"> => {
+    const grip = leaf.frontGrip;
+    if (!["groove", "g-profile", "j-profile", "channel"].includes(grip)) return { frontGrip: grip };
+    const { height: gripHeight, depth } = fingerPullOf(spec, grip, frontThickness);
+    const along = `along the ${gripEdge} edge`;
+    const operations = grip === "groove"
+      ? [`Route finger-pull groove ${gripHeight} × ${depth} mm ${along}, on the back`]
+      : grip === "channel"
+        ? [`Handle channel ${gripHeight} mm ${along} — no handle`]
+        : [`Fit aluminium ${grip === "g-profile" ? "G" : "J"}-profile ${along}, ${Math.round(leaf.width)} mm`];
+    return { frontGrip: grip, grip: { edge: gripEdge, height: gripHeight, depth }, operations };
+  };
   const doorRun = (bay: Bay, run: number) => {
     const leavesOfRun = fronts.leaves.filter((leaf) => leaf.bayId === bay.id && leaf.run === run);
     const first = leavesOfRun[0];
@@ -1813,7 +1916,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
           edges: { front: true, back: false, top: true, bottom: false },
           size: { x: leaf.width, y: leaf.height, z: frontThickness },
           placements: [{ x: leaf.x, y: leaf.y, z: -frontThickness }], axis: "z",
-          doorStyle: "hinged", frontGrip: bay.frontGrip ?? "handle", bayId: bay.id, doorLeaf: { run: leaf.run, first: leaf.leaf },
+          doorStyle: "hinged", ...gripDetail(leaf), bayId: bay.id, doorLeaf: { run: leaf.run, first: leaf.leaf },
         });
       }
       return;
@@ -1823,7 +1926,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       id, role: "door", label, bayId: bay.id, board,
       length: leaf.height, width: leaf.width, quantity,
       edges: { front: true, back: true, top: true, bottom: true },
-      edgeBand: frontBand, doorStyle, frontGrip: bay.frontGrip ?? "handle", placements,
+      edgeBand: frontBand, doorStyle, ...gripDetail(leaf), placements,
       size: { x: leaf.width, y: leaf.height, z: frontThickness }, axis: "z",
       doorLeaf: { run: leaf.run, first: leaf.leaf },
     });
@@ -2003,15 +2106,16 @@ function hardwareFor(
 
   const bayForPart = (part: Part) =>
     spec.cabinets.find((cabinet) => cabinet.id === part.cabinetId)?.bays.find((bay) => bay.id === part.bayId);
-  const gripForDoor = (part: Part) => bayForPart(part)?.frontGrip ?? "handle";
+  // The leaf says its own grip — the bay's, else the design's — as it was cut.
+  const gripForDoor = (part: Part): FrontGrip => part.frontGrip ?? gripOf(spec, bayForPart(part) ?? {});
   const gripForDrawer = (part: Part) => {
     const bay = bayForPart(part);
     return bay?.fitting.kind === "drawers" ? bay.fitting.grip ?? "finger-gap" : "finger-gap";
   };
-  const countDoorGrip = (grip: "handle" | "push-to-open" | "recessed-pull" | "finger-gap") =>
+  const countDoorGrip = (grip: FrontGrip) =>
     doors.filter((door) => door.doorStyle !== "fixed" && gripForDoor(door) === grip)
       .reduce((total, door) => total + (door.doorStyle === "bifold" ? Math.ceil(door.quantity / 2) : door.quantity), 0);
-  const countDrawerGrip = (grip: "handle" | "push-to-open" | "recessed-pull" | "finger-gap") =>
+  const countDrawerGrip = (grip: FrontGrip) =>
     drawerFronts.filter((front) => gripForDrawer(front) === grip)
       .reduce((total, front) => total + front.quantity, 0);
 
@@ -2024,6 +2128,15 @@ function hardwareFor(
   const profileCount = countDoorGrip("recessed-pull") + countDrawerGrip("recessed-pull");
   if (profileHandle && profileCount > 0) {
     lines.push({ hardware: profileHandle, quantity: profileCount, note: "Integrated/recessed pull, one per front" });
+  }
+  // Aluminium G and J profiles, one per door, cut to the door's width: the
+  // per-door profile handle, with the metres the shop cuts it from.
+  for (const grip of ["g-profile", "j-profile"] as const) {
+    const leaves = doors.filter((door) => door.doorStyle !== "fixed" && gripForDoor(door) === grip);
+    const count = leaves.reduce((total, door) => total + door.quantity, 0);
+    if (!profileHandle || count === 0) continue;
+    const metres = round(leaves.reduce((total, door) => total + (door.width / 1000) * door.quantity, 0), 2);
+    lines.push({ hardware: profileHandle, quantity: count, note: `Aluminium ${grip === "g-profile" ? "G" : "J"}-profile along the door edge, ${metres} m in all` });
   }
   const pushLatch = pick("push_latch");
   const pushCount = countDoorGrip("push-to-open") + countDrawerGrip("push-to-open");

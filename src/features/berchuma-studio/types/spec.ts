@@ -340,6 +340,90 @@ export type BayFitting = z.infer<typeof bayFittingSchema>;
  */
 export type StackSection = Extract<BayFitting, { kind: "stack" }>["sections"][number];
 
+/**
+ * How a door is gripped. `handle` is a handle bought and screwed on. The rest
+ * are handleless:
+ *
+ *  - `push-to-open`: a latch behind the door, nothing on its face.
+ *  - `groove`: a finger-pull groove routed into the back of the door's grip
+ *    edge. The door keeps its size; the groove is a machining operation.
+ *  - `g-profile`, `j-profile`: an aluminium profile along the grip edge. The
+ *    board is cut shorter by the profile's height, so leaf and profile
+ *    together fill the leaf's place.
+ *  - `channel`: a recessed handle channel. The door is cut shorter by the
+ *    channel's height and the gap behind it is closed by an MDF finger-pull
+ *    rail (see services/closure-panels), set back so a finger reaches the
+ *    door's edge.
+ *
+ * `recessed-pull` and `finger-gap` are the two styles designs were saved with
+ * before these existed, and keep exactly the construction they had.
+ */
+export const frontGrips = ["handle", "push-to-open", "recessed-pull", "finger-gap", "groove", "g-profile", "j-profile", "channel"] as const;
+export type FrontGrip = (typeof frontGrips)[number];
+export const FRONT_GRIP_LABELS: Record<FrontGrip, string> = {
+  handle: "Standard handle",
+  "push-to-open": "Handleless · push-to-open",
+  groove: "Integrated finger-pull groove",
+  "g-profile": "Aluminium G-profile",
+  "j-profile": "Aluminium J-profile",
+  channel: "Recessed handle channel",
+  "recessed-pull": "Recessed / profile pull",
+  "finger-gap": "Finger-grip lip / reveal",
+};
+
+/**
+ * The finger-pull profile: how tall the grip is along the door's grip edge,
+ * and how deep. Groove: depth routed into the door. Channel: how far the rail
+ * behind the gap stands back from the carcass front. Profiles: depth unused.
+ * Absent fields take the defaults in services/closure-panels.
+ */
+export const fingerPullSchema = z.object({
+  height: z.number().min(10).max(60).optional(),
+  depth: z.number().min(0).max(40).optional(),
+});
+export type FingerPull = z.infer<typeof fingerPullSchema>;
+
+/** The design's door hardware: the grip every door has unless its bay says otherwise. */
+export const doorHardwareSchema = z.object({
+  grip: z.enum(frontGrips).default("handle"),
+  profile: fingerPullSchema.default({}),
+});
+export type DoorHardware = z.infer<typeof doorHardwareSchema>;
+
+export const closurePanelKinds = ["rail", "masking", "filler", "end", "decorative_end", "top", "bottom", "rear"] as const;
+export type ClosurePanelKind = (typeof closurePanelKinds)[number];
+
+/**
+ * Smart Closure Panels: MDF parts that close what the cabinets leave open —
+ * the gap behind a channel grip, an opening a door does not cover, the space
+ * to a wall or the ceiling, an exposed end, an island's back. Which are
+ * needed is worked out from the geometry (services/closure-panels); what is
+ * stored is only the switch, the board, and what the user changed about a
+ * panel, keyed by the panel's id: off, hidden from view, or sized by hand.
+ */
+export const closurePanelsSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** The board they are cut from, a catalogue id. Absent: the fronts' board. */
+  boardId: z.string().min(1).optional(),
+  /** `manual` applies the sizes typed below; `auto` keeps every panel at its worked-out size. */
+  sizing: z.enum(["auto", "manual"]).default("auto"),
+  panels: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(200),
+        /** False takes it off the cut list and the model. */
+        enabled: z.boolean().optional(),
+        /** True hides it in the 3D view only; it is still made. */
+        hidden: z.boolean().optional(),
+        width: z.number().positive().max(6000).optional(),
+        height: z.number().positive().max(6000).optional(),
+      }),
+    )
+    .max(400)
+    .default([]),
+});
+export type ClosurePanelSettings = z.infer<typeof closurePanelsSchema>;
+
 export const doorStyles = ["none", "hinged", "sliding", "bifold"] as const;
 export type DoorStyle = (typeof doorStyles)[number];
 
@@ -349,8 +433,8 @@ export const baySchema = z.object({
   width: z.number().positive(),
   fitting: bayFittingSchema,
   door: z.enum(doorStyles).default("hinged"),
-  /** Visible front treatment, separate from how the door opens. */
-  frontGrip: z.enum(["handle", "push-to-open", "recessed-pull", "finger-gap"]).optional(),
+  /** Visible front treatment, separate from how the door opens. Absent: the design's door hardware. */
+  frontGrip: z.enum(frontGrips).optional(),
   /** A pair of doors on one bay, for bays too wide for a single leaf. */
   doorLeaves: z.number().int().min(1).max(2).default(1),
   /**
@@ -813,6 +897,10 @@ export const designSpecSchema = z.object({
     .optional(),
   worktop: worktopSchema.optional(),
   kitchenSetup: kitchenSetupSchema.optional(),
+  /** The grip doors get by default, and its finger-pull profile. Absent: a handle, as before. */
+  doorHardware: doorHardwareSchema.optional(),
+  /** Smart Closure Panels. Absent or off: no closure panels, as before. */
+  closurePanels: closurePanelsSchema.optional(),
 
   /** Manual geometry drawn in Sketch 3D; optional for every existing design. */
   sketchObjects: z.array(sketchObjectSchema).max(500).default([]),

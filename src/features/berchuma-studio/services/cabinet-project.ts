@@ -196,12 +196,12 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     cut.rows.forEach(row => {
       printable.push({
         design: title, partId: `${index + 1}-${row.partId}`,
-        cabinet: row.cabinet, label: row.label, board: row.boardLabel,
+        cabinet: row.cabinet, label: row.operations?.length ? `${row.label} — ${row.operations.join("; ")}` : row.label, board: row.boardLabel,
         length: row.length, width: row.width, thickness: row.thickness,
         quantity: row.quantity, banding: row.banding,
       });
       cutting.push([
-      index + 1, title, `${index + 1}-${row.partId}`, row.cabinet, row.label,
+      index + 1, title, `${index + 1}-${row.partId}`, row.cabinet, row.operations?.length ? `${row.label} — ${row.operations.join("; ")}` : row.label,
       row.boardLabel, row.length, row.width, row.thickness, row.quantity,
       row.banding, row.bandLabel, row.grainLocked ? "Yes" : "No", row.area,
       ]);

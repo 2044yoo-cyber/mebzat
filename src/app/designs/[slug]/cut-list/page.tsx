@@ -424,7 +424,7 @@ export default async function CutListPage({
                       {row.index}
                     </td>
                     <td className="py-1.5 pr-2 font-mono text-xs whitespace-nowrap">{row.partId}</td>
-                    <td className="py-1.5 pr-2">{row.label}</td>
+                    <td className="py-1.5 pr-2">{row.label}{row.operations?.length ? <span className="block text-xs text-muted-foreground">{row.operations.join("; ")}</span> : null}</td>
                     <td className="py-1.5 pr-2 text-xs text-muted-foreground">{[row.cabinet, row.module].filter(Boolean).join(" · ")}</td>
                     <td className="py-1.5 pr-2 text-right tabular-nums">
                       {row.length}

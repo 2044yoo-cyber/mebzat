@@ -23,6 +23,7 @@ import { LengthField, LengthInput } from "../ui/length-field";
 import { DisplayPanel, WardrobeDisplayTools, ZoneEditor } from "./display-panel";
 import { HeightModulesPanel } from "./height-modules-panel";
 import { ZekoloDesignPanel, ZekoloPanel } from "./zekolo-panel";
+import { ClosurePanelSection } from "./closure-panel";
 import { JointPanel, TransportPanel, type JointRef } from "./transport-panel";
 import { isSideDisplay } from "../../services/geometry";
 
@@ -124,6 +125,9 @@ export type ControlPanelProps = {
   /** A wardrobe's height boundary tapped in the elevation: its lower cabinet. */
   partition?: string | null;
   onSelectPartition?: (lowerId: string | null) => void;
+  /** A Smart Closure Panel, tapped in the 3D view or chosen in the list. */
+  closure?: string | null;
+  onSelectClosure?: (id: string | null) => void;
 };
 
 export function ControlPanel({
@@ -143,6 +147,8 @@ export function ControlPanel({
   onSelectJoint = () => undefined,
   partition = null,
   onSelectPartition = () => undefined,
+  closure = null,
+  onSelectClosure = () => undefined,
 }: ControlPanelProps) {
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
@@ -215,6 +221,16 @@ export function ControlPanel({
 
         {/* Zekolo for the whole design: all on, all off, or cabinet by cabinet. */}
         <ZekoloDesignPanel spec={spec} onChange={onChange} />
+
+        {/* Door hardware and Smart Closure Panels: the design's, and the selected cabinet's. */}
+        <ClosurePanelSection
+          key={closure ?? "closure"}
+          spec={spec}
+          selectedCabinetId={selectedId}
+          selectedClosureId={closure}
+          onSelectClosure={onSelectClosure}
+          onChange={onChange}
+        />
 
 
         {selected ? (
