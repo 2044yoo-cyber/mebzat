@@ -160,6 +160,8 @@ export type ComponentRecord = {
   shapes: Shape[];
   /** What the repeated shapes are, when there are many (blocks, treads, bars). */
   repeated?: { noun: string; perInstanceMassKg?: number };
+  /** A name for each shape, parallel to `shapes`, when each is a named part (a cabinet panel, a chair). */
+  instanceNames?: string[];
   dims: Partial<Record<DimensionKey, Dimension>>;
   geometrySource: GeometrySource;
   /** The project object this was read from, when it was. */

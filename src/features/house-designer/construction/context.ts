@@ -151,6 +151,7 @@ export type AddInput = {
   materialId: string;
   shapes: ComponentRecord["shapes"];
   repeated?: ComponentRecord["repeated"];
+  instanceNames?: string[];
   dims?: ComponentRecord["dims"];
   source?: GeometrySource;
   sourceRef?: string | null;
@@ -303,7 +304,7 @@ export class Ctx {
       stage: input.stage, ...(input.removedAfter ? { removedAfter: input.removedAfter } : {}),
       storeyId: level?.levelId ?? null, storeyName: level?.name ?? null, storeyIndex: level?.index ?? input.storeyIndex ?? -1,
       room: input.room ?? null, grid: input.grid ?? null, layer: input.layer, materialId: input.materialId, shapes: input.shapes,
-      ...(input.repeated ? { repeated: input.repeated } : {}),
+      ...(input.repeated ? { repeated: input.repeated } : {}), ...(input.instanceNames ? { instanceNames: input.instanceNames } : {}),
       dims: input.dims ?? {}, geometrySource: input.source ?? "schematic", sourceRef: input.sourceRef ?? null,
       parentId: input.parentId ?? null, connectedIds: input.connectedIds ?? [], sequence: this.next(input.stage),
       explode: { layerIndex: input.explode?.layerIndex ?? 0, dir: input.explode?.dir ?? UP },

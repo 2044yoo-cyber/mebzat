@@ -14,6 +14,9 @@ import { generateElectrical } from "./generators/electrical";
 import { generatePlumbing } from "./generators/plumbing";
 import { generateFinishes } from "./generators/finishes";
 import { generateOpenings } from "./generators/openings";
+import { generateJoinery } from "./generators/joinery";
+import { generateExternal } from "./generators/external";
+import { generateFurniture } from "./generators/furniture";
 import type { Shape, V3 } from "./geometry";
 
 export type BuildExtras = {
@@ -55,7 +58,7 @@ export function buildConstructionModel(
   };
 }
 
-const GENERATORS: ((ctx: Ctx) => void)[] = [generateSite, generateEarthworks, generateFoundation, generateGroundFloor, generateFrame, generateStairs, generateMasonry, generateRoof, generateElectrical, generatePlumbing, generateFinishes, generateOpenings];
+const GENERATORS: ((ctx: Ctx) => void)[] = [generateSite, generateEarthworks, generateFoundation, generateGroundFloor, generateFrame, generateStairs, generateMasonry, generateRoof, generateElectrical, generatePlumbing, generateFinishes, generateOpenings, generateJoinery, generateFurniture, generateExternal];
 
 export function boundsOf(shapes: Shape[]): { min: V3; max: V3 } {
   const min = { x: Infinity, y: Infinity, z: Infinity };
@@ -66,10 +69,20 @@ export function boundsOf(shapes: Shape[]): { min: V3; max: V3 } {
   };
   for (const s of shapes) {
     if (s.t === "box") {
-      const r = Math.hypot(s.s.x, s.s.y, s.s.z) / 2;
-      const rotated = (s.rx ?? 0) !== 0 || (s.ry ?? 0) !== 0 || (s.rz ?? 0) !== 0;
-      const rx = rotated ? r : s.s.x / 2; const ry = rotated ? r : s.s.y / 2; const rz = rotated ? r : s.s.z / 2;
-      grow(s.c.x - rx, s.c.y - ry, s.c.z - rz); grow(s.c.x + rx, s.c.y + ry, s.c.z + rz);
+      const rx = s.rx ?? 0;
+      const ry = s.ry ?? 0;
+      const rz = s.rz ?? 0;
+      const [cx1, sx1, cy1, sy1, cz1, sz1] = [Math.cos(rx), Math.sin(rx), Math.cos(ry), Math.sin(ry), Math.cos(rz), Math.sin(rz)];
+      for (const ax of [-1, 1]) for (const ay of [-1, 1]) for (const az of [-1, 1]) {
+        // Turn about X, then Y, then Z (extrinsic).
+        let x = (ax * s.s.x) / 2;
+        let y = (ay * s.s.y) / 2;
+        let z = (az * s.s.z) / 2;
+        [y, z] = [y * cx1 - z * sx1, y * sx1 + z * cx1];
+        [x, z] = [x * cy1 + z * sy1, -x * sy1 + z * cy1];
+        [x, y] = [x * cz1 - y * sz1, x * sz1 + y * cz1];
+        grow(s.c.x + x, s.c.y + y, s.c.z + z);
+      }
     } else if (s.t === "cyl") {
       const h = s.len / 2;
       const ex = s.axis === "x" ? h : s.r; const ey = s.axis === "y" ? h : s.r; const ez = s.axis === "z" ? h : s.r;
