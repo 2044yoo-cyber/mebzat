@@ -248,7 +248,7 @@ export default function Model({
               surface={surface}
               visualMode={visualMode}
               explodeDistance={explodeDistance}
-              modelBounds={{ x: width, y: height, z: depth }}
+              modelBounds={{ x: originX + width / 2, y: height / 2, z: originZ + depth / 2 }}
               selected={
                 selectedCabinetId !== null && part.cabinetId === selectedCabinetId
               }
