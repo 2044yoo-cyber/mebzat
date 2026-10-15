@@ -107,9 +107,9 @@ export function PortfolioCardView({ card, section, onOpen }: { card: PortfolioCa
   // them would be most of the card.
   if (!card.image && (card.source === "post" || card.source === "job")) {
     return (
-      <Link href={card.href} onClick={onOpen} className={cn(base, "p-3")} aria-label={card.title}>
+      <div className={cn(base, "p-3")}>
         {card.badge ? <span className="mb-1 inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">{card.badge}</span> : null}
-        <p className="line-clamp-2 text-sm font-semibold">{card.title}</p>
+        <Link href={card.href} onClick={onOpen} className="line-clamp-2 text-sm font-semibold hover:underline">{card.title}</Link>
         {card.excerpt ? <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{card.excerpt}</p> : null}
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="truncate text-xs text-muted-foreground">{card.subtitle}</span>
@@ -126,7 +126,7 @@ export function PortfolioCardView({ card, section, onOpen }: { card: PortfolioCa
             {message ? <span role="status" className="w-full text-xs text-muted-foreground">{message}</span> : null}
           </div>
         ) : null}
-      </Link>
+      </div>
     );
   }
 
