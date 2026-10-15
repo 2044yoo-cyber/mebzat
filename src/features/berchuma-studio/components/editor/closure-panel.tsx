@@ -84,7 +84,7 @@ function GripSelect({ value, onChange, label, inherit }: { value: FrontGrip | nu
  * the cut list; a door sized by hand keeps its size, and Reset to Auto — on a
  * door, or for all of them here — gives it the size this hinge makes.
  */
-function DoorFitting({ spec, onChange }: { spec: DesignSpec; onChange: (spec: DesignSpec) => void }) {
+export function DoorFitting({ spec, onChange }: { spec: DesignSpec; onChange: (spec: DesignSpec) => void }) {
   const sizing = doorSizingOf(spec);
   const t = spec.carcass.board.thickness;
   const manual = manualDoorCount(spec);
@@ -170,7 +170,6 @@ export function ClosurePanelSection({
       </button>
       {open ? (
         <div className="space-y-3 px-3 pb-3 text-[11px]">
-          <DoorFitting spec={spec} onChange={onChange} />
           <GripSelect label="Handle type" value={grip} onChange={(next) => onChange(setDesignGrip(spec, next ?? "handle"))} />
           {selected ? (
             <GripSelect
