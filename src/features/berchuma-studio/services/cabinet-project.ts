@@ -80,10 +80,26 @@ export function updateProjectDesign(
 }
 
 export function removeProjectDesign(primary: DesignSpec, id: string): DesignSpec {
-  if (id === "primary") throw new Error("The project's first design cannot be removed.");
+  if (id !== "primary") {
+    if (!primary.projectItems?.some(item => item.id === id))
+      throw new Error("This cabinet is not in the project.");
+    return {
+      ...primary,
+      projectItems: primary.projectItems?.filter(item => item.id !== id),
+    };
+  }
+
+  // The root design owns the saved project record. If it is deleted while
+  // siblings remain, promote the first sibling to the root and keep the rest
+  // attached to it. This lets every cabinet be removable without losing the
+  // project's saved identity or accidentally deleting the other cabinets.
+  const [promoted, ...remaining] = primary.projectItems ?? [];
+  if (!promoted)
+    throw new Error("You cannot delete the last cabinet. Create another cabinet first or start a new project.");
+  const { projectItems: _discard, ...promotedSpec } = promoted.spec as DesignSpec;
   return {
-    ...primary,
-    projectItems: primary.projectItems?.filter(item => item.id !== id),
+    ...promotedSpec,
+    projectItems: remaining,
   };
 }
 
