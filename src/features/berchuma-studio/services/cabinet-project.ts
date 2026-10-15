@@ -361,15 +361,16 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     item.areaM2, item.reusable ? "Yes — inspect and label" : "No — small remnant",
   ]));
   if (offcuts.length === 0) offcutRows.push(["No rectangular offcuts identified from these layouts."]);
+  // Keep the workbook focused on the pages most workshops need. Manufacturing
+  // validation still runs before export; its report remains available, while
+  // secondary offcut, design-summary and assembly-checklist tabs are omitted
+  // from this compact workbook to avoid overwhelming users with many sheets.
   const workbookSheets: Sheet[] = [
     { name: "Combined cut list", rows: cutting, widths: [11, 32, 22, 32, 25, 23, 16, 16, 17, 12, 24, 20, 14, 14] },
     { name: "Board totals", rows: sheetSummary, widths: [36, 21, 25, 16, 14, 19] },
     { name: "Cutting layout", rows: layout, widths: [32, 10, 55, 12, 12, 18, 19, 12] },
-    { name: "Offcut inventory", rows: offcutRows, widths: [34, 10, 12, 12, 17, 17, 14, 28] },
     { name: "Hardware", rows: hardware, widths: [34, 32, 12, 12, 50] },
-    { name: "Design summary", rows: summary, widths: [35, 17, 15, 19, 13] },
     { name: "Validation report", rows: validationRows, widths: [13, 30, 27, 30, 64, 68] },
-    { name: "Assembly steps", rows: assemblyRows, widths: [32, 10, 90, 12] },
   ];
   const purchasingHardware = new Map<string, {
     item: string; quantity: number; unit: string; designs: string[]; notes: string[];
