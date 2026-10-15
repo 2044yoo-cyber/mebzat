@@ -1,0 +1,208 @@
+/**
+ * Plain geometry for the construction model.
+ *
+ * Millimetres throughout, in the house's own frame: X east, Y north (the plan
+ * the House Designer draws), Z up. Nothing here knows about three.js; the
+ * viewer converts at the last moment.
+ */
+
+export type P2 = { x: number; y: number };
+export type V3 = { x: number; y: number; z: number };
+
+/**
+ * A piece of the model. Boxes may be turned about X, then Y, then Z (radians,
+ * extrinsic); cylinders stand along an axis; prisms are a plan outline
+ * extruded from z0 to z1.
+ */
+export type Shape =
+  | { t: "box"; c: V3; s: V3; rx?: number; ry?: number; rz?: number }
+  | { t: "cyl"; c: V3; r: number; len: number; axis: "x" | "y" | "z" }
+  | { t: "prism"; poly: P2[]; z0: number; z1: number };
+
+export const v3 = (x: number, y: number, z: number): V3 => ({ x, y, z });
+
+export function box(cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, rz = 0): Shape {
+  return rz === 0 ? { t: "box", c: { x: cx, y: cy, z: cz }, s: { x: sx, y: sy, z: sz } } : { t: "box", c: { x: cx, y: cy, z: cz }, s: { x: sx, y: sy, z: sz }, rz };
+}
+
+/** A box from its low corner and size: easier to write than centres. */
+export function boxAt(x: number, y: number, z: number, sx: number, sy: number, sz: number, rz = 0): Shape {
+  return box(x + sx / 2, y + sy / 2, z + sz / 2, sx, sy, sz, rz);
+}
+
+export function cyl(cx: number, cy: number, cz: number, r: number, len: number, axis: "x" | "y" | "z"): Shape {
+  return { t: "cyl", c: { x: cx, y: cy, z: cz }, r, len, axis };
+}
+
+export function prism(poly: P2[], z0: number, z1: number): Shape {
+  return { t: "prism", poly: poly.map((p) => ({ x: p.x, y: p.y })), z0, z1 };
+}
+
+/** A beam, wall or pipe run: a box along a plan line between two points. */
+export function alongLine(a: P2, b: P2, width: number, z0: number, z1: number, extendStart = 0, extendEnd = 0): Shape {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  const ux = length === 0 ? 1 : dx / length;
+  const uy = length === 0 ? 0 : dy / length;
+  const total = length + extendStart + extendEnd;
+  const mid = (total / 2) - extendStart;
+  return box(a.x + ux * mid, a.y + uy * mid, (z0 + z1) / 2, total, width, z1 - z0, Math.atan2(dy, dx));
+}
+
+export function dist(a: P2, b: P2): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+export function polygonArea(points: readonly P2[]): number {
+  let sum = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i]!;
+    const b = points[(i + 1) % points.length]!;
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(sum) / 2;
+}
+
+export function polygonBounds(points: readonly P2[]) {
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+}
+
+export function pointInPolygon(p: P2, poly: readonly P2[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+    const a = poly[i]!;
+    const b = poly[j]!;
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+export function centroid(points: readonly P2[]): P2 {
+  const n = points.length || 1;
+  return { x: points.reduce((s, p) => s + p.x, 0) / n, y: points.reduce((s, p) => s + p.y, 0) / n };
+}
+
+/** The four plan corners of a box shape, counter-clockwise. */
+export function boxFootprint(shape: Extract<Shape, { t: "box" }>): P2[] {
+  const rz = shape.rz ?? 0;
+  const cos = Math.cos(rz);
+  const sin = Math.sin(rz);
+  const hx = shape.s.x / 2;
+  const hy = shape.s.y / 2;
+  return [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]].map(([lx, ly]) => ({ x: shape.c.x + lx! * cos - ly! * sin, y: shape.c.y + lx! * sin + ly! * cos }));
+}
+
+/** Round to a tenth of a millimetre, so ids and totals do not carry float dust. */
+export const round1 = (value: number) => Math.round(value * 10) / 10;
+export const round3 = (value: number) => Math.round(value * 1000) / 1000;
+
+// ---------------------------------------------------------------------------
+// Net volumes: concrete counted once
+// ---------------------------------------------------------------------------
+
+/** A convex vertical prism: a counter-clockwise convex plan outline between two heights. */
+export type Prism = { poly: P2[]; z0: number; z1: number };
+
+export function prismOfShape(shape: Shape): Prism | null {
+  if (shape.t === "box") {
+    if ((shape.rx ?? 0) !== 0 || (shape.ry ?? 0) !== 0) return null;
+    return { poly: boxFootprint(shape), z0: shape.c.z - shape.s.z / 2, z1: shape.c.z + shape.s.z / 2 };
+  }
+  if (shape.t === "prism") return { poly: ensureCcw(shape.poly), z0: shape.z0, z1: shape.z1 };
+  return null;
+}
+
+function ensureCcw(poly: P2[]): P2[] {
+  let sum = 0;
+  for (let i = 0; i < poly.length; i += 1) {
+    const a = poly[i]!;
+    const b = poly[(i + 1) % poly.length]!;
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return sum < 0 ? [...poly].reverse() : poly;
+}
+
+/** Sutherland–Hodgman: `subject` clipped to the convex, counter-clockwise `clip`. */
+export function clipConvex(subject: P2[], clip: P2[]): P2[] {
+  let output = subject;
+  for (let i = 0; i < clip.length && output.length > 0; i += 1) {
+    const a = clip[i]!;
+    const b = clip[(i + 1) % clip.length]!;
+    const input = output;
+    output = [];
+    const inside = (p: P2) => (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) >= -1e-9;
+    // Where the segment p→q meets the infinite line through a→b.
+    const cross = (p: P2, q: P2): P2 => {
+      const ex = b.x - a.x;
+      const ey = b.y - a.y;
+      const d1 = ex * (p.y - a.y) - ey * (p.x - a.x);
+      const d2 = ex * (q.y - a.y) - ey * (q.x - a.x);
+      const t = d1 === d2 ? 0 : d1 / (d1 - d2);
+      return { x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t };
+    };
+    for (let j = 0; j < input.length; j += 1) {
+      const current = input[j]!;
+      const previous = input[(j + input.length - 1) % input.length]!;
+      const currentIn = inside(current);
+      const previousIn = inside(previous);
+      if (currentIn) {
+        if (!previousIn) output.push(cross(previous, current));
+        output.push(current);
+      } else if (previousIn) output.push(cross(previous, current));
+    }
+  }
+  return output;
+}
+
+/** Area of the union of convex polygons, by inclusion–exclusion (the sets are small: a member's neighbours). */
+export function unionArea(polys: P2[][]): number {
+  const n = polys.length;
+  if (n === 0) return 0;
+  if (n > 14) throw new Error("Too many overlapping members to count exactly; split the model.");
+  let total = 0;
+  const walk = (index: number, current: P2[] | null, size: number) => {
+    if (index === n) {
+      if (size === 0 || !current) return;
+      total += (size % 2 === 1 ? 1 : -1) * polygonArea(current);
+      return;
+    }
+    walk(index + 1, current, size);
+    const next = current === null ? polys[index]! : clipConvex(current, polys[index]!);
+    if (next.length >= 3 && polygonArea(next) > 1e-6) walk(index + 1, next, size + 1);
+  };
+  walk(0, null, 0);
+  return total;
+}
+
+/**
+ * The volume each prism adds, in order: itself less whatever the earlier ones
+ * already occupy. Column, then beam, then slab — so a beam does not count the
+ * part inside its column, and a slab does not count the part a beam fills.
+ * The sum is the volume of the union; nothing is counted twice.
+ */
+export function netVolumes(prisms: readonly Prism[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < prisms.length; i += 1) {
+    const me = prisms[i]!;
+    const gross = polygonArea(me.poly) * (me.z1 - me.z0);
+    const earlier = prisms.slice(0, i).filter((p) => p.z0 < me.z1 - 1e-9 && p.z1 > me.z0 + 1e-9);
+    if (earlier.length === 0) { out.push(gross); continue; }
+    const cuts = [me.z0, me.z1, ...earlier.flatMap((p) => [p.z0, p.z1])].filter((z) => z >= me.z0 - 1e-9 && z <= me.z1 + 1e-9).sort((a, b) => a - b);
+    let overlap = 0;
+    for (let k = 0; k + 1 < cuts.length; k += 1) {
+      const lo = cuts[k]!;
+      const hi = cuts[k + 1]!;
+      if (hi - lo < 1e-9) continue;
+      const mid = (lo + hi) / 2;
+      const active = earlier.filter((p) => p.z0 <= mid && p.z1 >= mid);
+      if (active.length === 0) continue;
+      const clipped = active.map((p) => clipConvex(me.poly, p.poly)).filter((poly) => poly.length >= 3);
+      overlap += unionArea(clipped) * (hi - lo);
+    }
+    out.push(Math.max(0, gross - overlap));
+  }
+  return out;
+}
