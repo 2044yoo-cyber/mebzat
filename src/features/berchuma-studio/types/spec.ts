@@ -390,6 +390,21 @@ export const doorHardwareSchema = z.object({
 });
 export type DoorHardware = z.infer<typeof doorHardwareSchema>;
 
+/**
+ * How a door hangs on its cabinet, which decides what automatic sizing makes
+ * of the opening (see services/door-sizing): `full` covers the carcass board,
+ * `half` covers half of it, `inset` sits inside the opening.
+ */
+export const hingeTypeSchema = z.enum(["full", "half", "inset"]);
+export type HingeType = z.infer<typeof hingeTypeSchema>;
+
+export const doorSizingSchema = z.object({
+  hinge: hingeTypeSchema.default("full"),
+  /** The gap between adjacent doors, mm; half of it is the reveal at a cabinet's edge. */
+  clearance: z.number().min(0).max(20).default(5),
+});
+export type DoorSizingSettings = z.infer<typeof doorSizingSchema>;
+
 export const closurePanelKinds = ["rail", "masking", "filler", "end", "decorative_end", "top", "bottom", "rear"] as const;
 export type ClosurePanelKind = (typeof closurePanelKinds)[number];
 
@@ -899,6 +914,12 @@ export const designSpecSchema = z.object({
   kitchenSetup: kitchenSetupSchema.optional(),
   /** The grip doors get by default, and its finger-pull profile. Absent: a handle, as before. */
   doorHardware: doorHardwareSchema.optional(),
+  /**
+   * The hinge type and the gap between doors. Absent is a design saved before
+   * these were stored: its doors are sized as they always were, from
+   * `carcass.doorGap`, until a hinge type is chosen.
+   */
+  doorSizing: doorSizingSchema.optional(),
   /** Smart Closure Panels. Absent or off: no closure panels, as before. */
   closurePanels: closurePanelsSchema.optional(),
 

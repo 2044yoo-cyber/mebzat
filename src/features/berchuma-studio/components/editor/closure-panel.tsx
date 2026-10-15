@@ -17,10 +17,12 @@ import {
   setFingerPull,
 } from "../../services/closure-operations";
 import { fingerPullOf } from "../../services/door-grip";
+import { CLEARANCE_LIMITS, HINGE_LABELS, doorSizingOf, hingeTypes, reachAt } from "../../services/door-sizing";
+import { manualDoorCount, resetAllDoorSizes, setDoorClearance, setHingeType } from "../../services/door-sizing-operations";
 import { closureReport } from "../../services/geometry";
 import { constructionMaterials } from "../../services/wardrobe-materials";
 import { BOARDS } from "../../types/catalogue";
-import { FRONT_GRIP_LABELS, frontGrips, type DesignSpec, type FrontGrip } from "../../types/spec";
+import { FRONT_GRIP_LABELS, frontGrips, type DesignSpec, type FrontGrip, type HingeType } from "../../types/spec";
 
 /**
  * Door hardware and Smart Closure Panels, for the whole design and for the
@@ -76,6 +78,63 @@ function GripSelect({ value, onChange, label, inherit }: { value: FrontGrip | nu
   );
 }
 
+/**
+ * How the doors hang: the hinge type, and the gap between doors. Choosing one
+ * resizes every door that is sized automatically, at once, in the drawing and
+ * the cut list; a door sized by hand keeps its size, and Reset to Auto — on a
+ * door, or for all of them here — gives it the size this hinge makes.
+ */
+function DoorFitting({ spec, onChange }: { spec: DesignSpec; onChange: (spec: DesignSpec) => void }) {
+  const sizing = doorSizingOf(spec);
+  const t = spec.carcass.board.thickness;
+  const manual = manualDoorCount(spec);
+  const edge = reachAt(sizing, { kind: "outer", board: t });
+  const shared = reachAt(sizing, { kind: "shared", board: t });
+  const mm = (value: number) => `${Math.round(Math.abs(value) * 10) / 10} mm`;
+  const summary = sizing.legacy
+    ? `Sized as this design was saved: ${mm(sizing.clearance)} gap. Choose a hinge type to size doors from the opening.`
+    : sizing.hinge === "inset"
+      ? `Doors sit ${mm(sizing.clearance)} inside the opening, flush with the carcass front, ${mm(sizing.clearance)} apart.`
+      : sizing.hinge === "half"
+        ? `Each door reaches ${mm(edge)} over a side panel, shared or not; ${mm(sizing.clearance)} between doors.`
+        : `Doors cover ${mm(edge)} of the side panel at a cabinet's edge and ${mm(shared)} of a shared divider; ${mm(sizing.clearance)} between doors.`;
+  return (
+    <fieldset className="space-y-2" data-door-fitting>
+      <legend className="font-medium">Door fitting</legend>
+      <label className="block space-y-1">
+        <span className="text-muted-foreground">Hinge type</span>
+        <select
+          aria-label="Hinge type"
+          className="w-full rounded-md border bg-background px-2 py-2 text-xs"
+          value={sizing.legacy ? "original" : sizing.hinge}
+          onChange={(event) => onChange(setHingeType(spec, event.target.value as HingeType))}
+        >
+          {sizing.legacy ? <option value="original" disabled>As originally sized</option> : null}
+          {hingeTypes.map((hinge) => <option key={hinge} value={hinge}>{HINGE_LABELS[hinge]}</option>)}
+        </select>
+      </label>
+      <label className="block space-y-1">
+        <span className="text-muted-foreground">Gap between doors</span>
+        <LengthInput
+          label="Door clearance"
+          value={sizing.clearance}
+          min={CLEARANCE_LIMITS.min}
+          max={CLEARANCE_LIMITS.max}
+          step={0.5}
+          disabled={sizing.legacy}
+          onChange={(clearance) => onChange(setDoorClearance(spec, clearance))}
+        />
+      </label>
+      <p className="text-muted-foreground" data-door-fitting-summary>{summary}</p>
+      {manual > 0 ? (
+        <button type="button" onClick={() => onChange(resetAllDoorSizes(spec))} className="rounded-md border px-2.5 py-1.5 text-[11px] font-medium">
+          Reset {manual === 1 ? "the door sized by hand" : `all ${manual} doors sized by hand`} to Auto
+        </button>
+      ) : null}
+    </fieldset>
+  );
+}
+
 export function ClosurePanelSection({
   spec,
   selectedCabinetId,
@@ -111,6 +170,7 @@ export function ClosurePanelSection({
       </button>
       {open ? (
         <div className="space-y-3 px-3 pb-3 text-[11px]">
+          <DoorFitting spec={spec} onChange={onChange} />
           <GripSelect label="Handle type" value={grip} onChange={(next) => onChange(setDesignGrip(spec, next ?? "handle"))} />
           {selected ? (
             <GripSelect

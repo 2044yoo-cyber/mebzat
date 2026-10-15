@@ -25,6 +25,7 @@ import { resolveDesign } from "./resolve";
 import { kitchenConstruction } from "./kitchen-construction";
 import { fingerPullOf, frontShortening, gripEdgeOf, gripOf } from "./door-grip";
 import { closurePanelsFor, closurePartsOf, type ClosurePanel } from "./closure-panels";
+import { HINGE_LABELS, doorFrontOffset, doorSizingOf, doorsAreInset, frontExtent, leavesAcross, shelfSetbackOf, type DoorSizing, type Edge } from "./door-sizing";
 import { ledHardwareLine } from "./lighting";
 import {
   constructionMaterials,
@@ -817,7 +818,9 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     // plinth therefore uses the full 20 mm recess from the carcass plane;
     // enclosed and mixed wardrobes measure the same reveal from their outer
     // front boards.
-    const visibleFrontThickness = cabinetHasVisibleFronts(cabinet)
+    // Inset fronts stand in the opening, flush with the carcass: nothing
+    // stands proud for the plinth's recess to be measured from.
+    const visibleFrontThickness = cabinetHasVisibleFronts(cabinet) && !doorsAreInset(spec)
       ? materials.fronts.thickness
       : 0;
     for (const part of standParts(
@@ -972,7 +975,7 @@ function bayParts(input: {
     materials.back,
     spec.carcass.edgeBand,
   );
-  const setback = spec.carcass.shelfSetback;
+  const setback = shelfSetbackOf(spec);
   const parts: Part[] = [];
 
   /**
@@ -1333,7 +1336,8 @@ function bayParts(input: {
             edges: { ...NO_EDGES, front: true },
             edgeBand: interiorBand,
             adjustable: false,
-            placements: [{ x, y: bottom - board.thickness, z: 0 }],
+            // An inset door stands in the opening: the shelf's front is behind it.
+            placements: [{ x, y: bottom - board.thickness, z: doorsAreInset(spec) ? setback : 0 }],
             size: {
               x: Math.round(bay.width),
               y: board.thickness,
@@ -1384,7 +1388,7 @@ function displayParts(input: {
   const parts: Part[] = [];
   const accent = displayBoard(spec, zone);
   const band = edgeBandForConstructionBoard(spec, accent, spec.carcass.edgeBand);
-  const setback = spec.carcass.shelfSetback;
+  const setback = shelfSetbackOf(spec);
   // Where the display's back stands, from the front edge.
   const backAt = zone.depth ? Math.min(zone.depth, interiorDepth) : interiorDepth;
   const ownBack = zone.back && (Boolean(zone.boardId) || zone.depth !== undefined);
@@ -1614,6 +1618,133 @@ export type DoorLeaf = FrontRect & {
   aligned: boolean;
 };
 
+/**
+ * Whether a bay shows a door or a drawer front, so that a door beside it
+ * shares the board between them and a door beside nothing does not.
+ */
+function bayHasFront(bay: Bay): boolean {
+  if (bay.display) return false;
+  if (bay.fitting.kind === "drawers" && !bay.fitting.internal) return true;
+  if (bay.fitting.kind === "stack") {
+    return bay.fitting.sections.some((section) => section.kind === "drawers" && !section.internal)
+      || (bay.door !== "none" && bay.fitting.sections.some((section) => doorSection(section)));
+  }
+  return bay.door !== "none";
+}
+
+/**
+ * What lies beyond a stretch of a stacked bay's bands, above and below, for
+ * the fronts over it: the cabinet's own top or bottom where there is no band
+ * beyond, another front's board where the band beyond has a front, and an
+ * open end where it is an open display. Bands run top first.
+ */
+function stackEdges(bands: { section: StackSection }[], first: number, last: number, board: number): { low: Edge; high: Edge } {
+  const beyond = (index: number): Edge => {
+    const next = bands[index];
+    if (!next) return { kind: "outer", board };
+    const framed = (next.section.kind === "drawers" && !next.section.internal) || doorSection(next.section);
+    return { kind: framed ? "shared" : "open", board };
+  };
+  return { high: beyond(first - 1), low: beyond(last + 1) };
+}
+
+/**
+ * Which ends of a cabinet stand at an inside corner, against the other run's
+ * own structure: the cabinet's end touches the corner block of a corner its
+ * run belongs to. A front there cannot reach out over the end board — what is
+ * past it is the other run, with fronts of its own — so it stops at the
+ * opening, as it does beside an open bay. A straight run has none, and
+ * resolves nothing to say so.
+ */
+function cornerEnds(spec: DesignSpec, cabinet: Cabinet): { start: boolean; end: boolean } {
+  const none = { start: false, end: false };
+  if (spec.layout === "straight" || spec.layout === "island") return none;
+  const resolved = resolveDesign(spec);
+  const placed = resolved.cabinets.find((entry) => entry.cabinet.id === cabinet.id);
+  if (!placed || resolved.layout.corners.length === 0) return none;
+  const touches = (localX: number) => {
+    const point = rotateThenPlace({ x: localX, y: 0, z: cabinet.size.depth / 2 }, placed.rotation, placed.x, 0, placed.z);
+    return resolved.layout.corners.some((corner) =>
+      (placed.runId === null || corner.between.includes(placed.runId)) &&
+      point.x >= corner.x - 0.01 && point.x <= corner.x + (corner.width ?? corner.size) + 0.01 &&
+      point.z >= corner.z - 0.01 && point.z <= corner.z + (corner.depth ?? corner.size) + 0.01);
+  };
+  return { start: touches(0), end: touches(cabinet.size.width) };
+}
+
+/**
+ * The two ends of a bay's opening across the cabinet, and the span a front
+ * covers between them: boards the front reaches over, shared with the front
+ * of the bay beyond or standing at the cabinet's own edge.
+ */
+function bayFrontSpan(spec: DesignSpec, cabinet: Cabinet, index: number, hinge: DoorSizing["hinge"]): { lo: number; hi: number } {
+  const t = constructionMaterials(spec).body.thickness;
+  const layout = bayLayout(cabinet, t);
+  const place = layout[index]!;
+  const sizing = { ...doorSizingOf(spec), hinge };
+  const neighbour = (other: (typeof layout)[number] | undefined, joint: boolean): Edge =>
+    joint ? { kind: "shared", board: 2 * t } : other && bayHasFront(other.bay) ? { kind: "shared", board: t } : { kind: "open", board: t };
+  // The cabinet's own ends are its outer edges, unless they stand at a corner.
+  const first = index === 0;
+  const last = index === layout.length - 1;
+  const corner = first || last ? cornerEnds(spec, cabinet) : { start: false, end: false };
+  const low: Edge = first ? { kind: corner.start ? "open" : "outer", board: t } : neighbour(layout[index - 1], place.jointLeft);
+  const high: Edge = last ? { kind: corner.end ? "open" : "outer", board: t } : neighbour(layout[index + 1], place.jointRight);
+  return frontExtent(sizing, place.x, place.x + place.width, low, high);
+}
+
+/**
+ * The visible fronts of one drawer band, bottom to top: where each stands and
+ * how tall it is. The one place they are worked out, for the drawing and the
+ * cut list alike.
+ *
+ * A design sized the old way fills the band, less a finger gap between fronts
+ * where the grip asks for one. One sized by hinge type reaches over the band's
+ * boards as a door beside it does, so the two line up, and leaves at least the
+ * clearance between fronts.
+ */
+function drawerFaceRects(
+  spec: DesignSpec,
+  cabinet: Cabinet,
+  bay: Bay,
+  count: number,
+  explicit: number[] | undefined,
+  band: { floor: number; height: number },
+  edges: { low: Edge; high: Edge },
+): { index: number; y: number; height: number }[] {
+  const materials = constructionMaterials(spec);
+  const interiorDepth = cabinet.size.depth - materials.back.thickness;
+  const sizing = doorSizingOf(spec);
+  const construction = drawerConstructionFor(spec, bay.width, band.height, band.floor, interiorDepth, count, explicit);
+  const grip = bay.fitting.kind === "drawers" ? bay.fitting.grip ?? "finger-gap" : "finger-gap";
+  const fingerGap = grip === "finger-gap" && count > 1
+    ? Math.min(bay.fitting.kind === "drawers" ? bay.fitting.gripClearance ?? 25 : 25, 40)
+    : 0;
+  // Finger-gap fronts get a deliberate access gap between adjacent drawers.
+  // Reduce the visible front heights rather than moving the drawer boxes:
+  // the carcass and runner geometry remains unchanged and the front schedule
+  // (including the cut list) uses these exact visible sizes.
+  let floor = band.floor;
+  let span = band.height;
+  let between = fingerGap;
+  if (!sizing.legacy) {
+    const extent = frontExtent(sizing, band.floor, band.floor + band.height, edges.low, edges.high);
+    floor = extent.lo;
+    span = extent.hi - extent.lo;
+    between = construction.faces.length > 1 ? Math.max(fingerGap, sizing.clearance) : 0;
+  }
+  const totalGap = between * Math.max(0, construction.faces.length - 1);
+  const originalTotal = construction.faces.reduce((sum, face) => sum + face.height, 0);
+  const heightBudget = Math.max(0, span - totalGap);
+  let y = floor;
+  return construction.faces.map((face, index) => {
+    const height = originalTotal > 0 ? face.height * heightBudget / originalTotal : face.height;
+    const rect = { index: face.index, y, height };
+    y += height + (index < construction.faces.length - 1 ? between : 0);
+    return rect;
+  });
+}
+
 export type CabinetFronts = {
   leaves: DoorLeaf[];
   drawers: (FrontRect & { bayId: string })[];
@@ -1680,11 +1811,11 @@ function alignedKitchenDoors(spec: DesignSpec, cabinet: Cabinet): boolean {
  */
 export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts {
   const materials = constructionMaterials(spec);
-  const gap = spec.carcass.doorGap;
+  const sizing = doorSizingOf(spec);
+  const gap = sizing.clearance;
   const plinth = cabinet.plinthHeight;
   const t = materials.body.thickness;
   const height = cabinet.size.height;
-  const interiorDepth = cabinet.size.depth - materials.back.thickness;
   const leaves: DoorLeaf[] = [];
   const drawers: CabinetFronts["drawers"] = [];
   // A profile or a channel takes its height off the door's grip edge: the
@@ -1699,47 +1830,54 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
       : { ...rect, y: rect.y + cut, height: rect.height - cut };
   };
 
-  for (const place of bayLayout(cabinet, t)) {
+  bayLayout(cabinet, t).forEach((place, bayIndex) => {
     const bay = place.bay;
     const span = frontSpanOf(place, t);
     const opening = height - plinth - 2 * t;
     const openingFloor = plinth + t;
+    // Only a hinged door hangs on the hinge type; a sliding or bifold leaf is
+    // sized as a full overlay does, and the drawers follow the cabinet.
+    const hingeHere = bay.door === "hinged" ? sizing.hinge : "full";
+    const across = sizing.legacy ? null : bayFrontSpan(spec, cabinet, bayIndex, hingeHere);
+    const drawerAcross = sizing.legacy ? null : bayFrontSpan(spec, cabinet, bayIndex, sizing.hinge);
 
-    const drawerFaces = (count: number, explicit: number[] | undefined, bandFloor: number, bandHeight: number) => {
-      const construction = drawerConstructionFor(spec, bay.width, bandHeight, bandFloor, interiorDepth, count, explicit);
-      const grip = bay.fitting.kind === "drawers" ? bay.fitting.grip ?? "finger-gap" : "finger-gap";
-      const clearance = grip === "finger-gap" && count > 1
-        ? Math.min(bay.fitting.kind === "drawers" ? bay.fitting.gripClearance ?? 25 : 25, 40)
-        : 0;
-      // Finger-gap fronts get a deliberate access gap between adjacent drawers.
-      // Reduce the visible front heights rather than moving the drawer boxes:
-      // the carcass and runner geometry remains unchanged and the front schedule
-      // (including the cut list) uses these exact visible sizes.
-      const totalGap = clearance * Math.max(0, construction.faces.length - 1);
-      const originalTotal = construction.faces.reduce((sum, face) => sum + face.height, 0);
-      const heightBudget = Math.max(0, originalTotal - totalGap);
-      let y = bandFloor;
-      construction.faces.forEach((face, index) => {
-        const height = originalTotal > 0 ? face.height * heightBudget / originalTotal : face.height;
-        drawers.push({
-          bayId: bay.id,
-          x: span.x + gap,
-          y,
-          width: span.width - 2 * gap,
-          height,
-        });
-        y += height + (index < construction.faces.length - 1 ? clearance : 0);
-      });
+    const plainEdges = { low: { kind: "outer", board: t }, high: { kind: "outer", board: t } } as { low: Edge; high: Edge };
+    const drawerFaces = (count: number, explicit: number[] | undefined, bandFloor: number, bandHeight: number, edges: { low: Edge; high: Edge }) => {
+      for (const face of drawerFaceRects(spec, cabinet, bay, count, explicit, { floor: bandFloor, height: bandHeight }, edges)) {
+        drawers.push(drawerAcross
+          ? { bayId: bay.id, x: drawerAcross.lo, y: face.y, width: drawerAcross.hi - drawerAcross.lo, height: face.height }
+          : { bayId: bay.id, x: span.x + gap, y: face.y, width: span.width - 2 * gap, height: face.height });
+      }
     };
-    const doorRun = (run: number, bandFloor: number, bandHeight: number) => {
+    // `band` says what a door run's two ends are: the cabinet's own top or
+    // bottom, or a board another front meets. Absent for a design sized the
+    // old way, which does not ask.
+    type Band = { a: number; b: number; low: Edge; high: Edge };
+    const doorRun = (run: number, bandFloor: number, bandHeight: number, band: Band) => {
       const preferredWidth = cabinet.kind === "wall" ? 300 : 400;
+      const grip = gripOf(spec, bay);
+      if (across && !sizing.legacy) {
+        const vertical = frontExtent({ ...sizing, hinge: hingeHere }, band.a, band.b, band.low, band.high);
+        // The count is chosen from the span the leaves share, the clearance between each.
+        const width = across.hi - across.lo;
+        const count = spec.furnitureType === "kitchen" && bay.door === "hinged"
+          ? preferredKitchenDoorLeaves(width + gap, gap, 0, preferredWidth)
+          : bay.doorLeaves;
+        const leafHeight = vertical.hi - vertical.lo;
+        const columns = leavesAcross(gap, across, count);
+        if (leafHeight <= 0 || columns[0]!.width <= 0) return;
+        columns.forEach((column, leaf) => {
+          const auto = shortenForGrip({ x: column.x, y: vertical.lo, width: column.width, height: leafHeight }, grip);
+          leaves.push({ ...auto, bayId: bay.id, run, leaf, leaves: count, style: bay.door, frontGrip: grip, manual: false, auto, aligned: false });
+        });
+        return;
+      }
       const count = spec.furnitureType === "kitchen" && bay.door === "hinged"
         ? preferredKitchenDoorLeaves(span.width, gap, 1, preferredWidth)
         : bay.doorLeaves;
       const leafWidth = Math.floor((span.width - gap * (count + 1)) / count);
       const leafHeight = bandHeight - 2 * gap;
       if (leafHeight <= 0 || leafWidth <= 0) return;
-      const grip = gripOf(spec, bay);
       for (let leaf = 0; leaf < count; leaf += 1) {
         const auto = shortenForGrip({ x: span.x + gap + leaf * (leafWidth + gap), y: bandFloor + gap, width: leafWidth, height: leafHeight }, grip);
         leaves.push({ ...auto, bayId: bay.id, run, leaf, leaves: count, style: bay.door, frontGrip: grip, manual: false, auto, aligned: false });
@@ -1747,49 +1885,73 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
     };
 
     // An open display has no door, whatever the bay's door says.
-    if (bay.display) continue;
+    if (bay.display) return;
     if (bay.fitting.kind === "drawers" && !bay.fitting.internal) {
-      drawerFaces(bay.fitting.count, bay.fitting.frontHeights, openingFloor, opening);
-      continue;
+      drawerFaces(bay.fitting.count, bay.fitting.frontHeights, openingFloor, opening, plainEdges);
+      return;
     }
     if (bay.fitting.kind === "stack") {
       const bands = sectionBands(bay.fitting.sections, openingFloor, opening, t);
-      let run: { floor: number; top: number } | null = null;
+      // Typed as a cast: closeRun, below, clears it, which the narrowing cannot see.
+      let run = null as { floor: number; top: number; first: number; last: number } | null;
       let runIndex = 0;
       const closeRun = () => {
         if (!run) return;
-        if (bay.door !== "none") doorRun(runIndex, run.floor, run.top - run.floor);
+        if (bay.door !== "none") {
+          doorRun(runIndex, run.floor, run.top - run.floor, { a: run.floor, b: run.top, ...stackEdges(bands, run.first, run.last, t) });
+        }
         runIndex += 1;
         run = null;
       };
-      for (const band of bands) {
+      for (const [index, band] of bands.entries()) {
         if (!doorSection(band.section)) {
           closeRun();
-          if (band.section.kind === "drawers") drawerFaces(band.section.drawers ?? 2, undefined, band.floor, band.height);
+          if (band.section.kind === "drawers") drawerFaces(band.section.drawers ?? 2, undefined, band.floor, band.height, stackEdges(bands, index, index, t));
           continue;
         }
         const top = band.floor + band.height;
-        run = run ? { floor: band.floor, top: run.top } : { floor: band.floor, top };
+        run = run ? { ...run, floor: band.floor, last: index } : { floor: band.floor, top, first: index, last: index };
       }
       closeRun();
-      continue;
+      return;
     }
-    if (bay.door === "none") continue;
-    doorRun(0, plinth, height - plinth);
-  }
+    if (bay.door === "none") return;
+    doorRun(0, plinth, height - plinth, { a: plinth + t, b: height - t, ...plainEdges });
+  });
 
   // A kitchen unit with its details set hangs its doors across the whole
   // front, insets and all, rather than inside its one bay.
   if (alignedKitchenDoors(spec, cabinet)) {
     const bay = cabinet.bays[0]!;
-    const frontWidth = cabinet.size.width - (cabinet.frontInsets?.start ?? 0) - (cabinet.frontInsets?.end ?? 0);
-    const count = preferredKitchenDoorLeaves(frontWidth, gap, 0);
-    const leafWidth = (frontWidth - count * gap) / count;
+    const insetStart = cabinet.frontInsets?.start ?? 0;
+    const frontWidth = cabinet.size.width - insetStart - (cabinet.frontInsets?.end ?? 0);
     leaves.length = 0;
     const grip = gripOf(spec, bay);
-    for (let leaf = 0; leaf < count && leafWidth > 0; leaf += 1) {
-      const auto = shortenForGrip({ x: (cabinet.frontInsets?.start ?? 0) + gap / 2 + leaf * (leafWidth + gap), y: plinth + gap / 2, width: leafWidth, height: height - plinth - gap }, grip);
-      leaves.push({ ...auto, bayId: bay.id, run: 0, leaf, leaves: count, style: "hinged", frontGrip: grip, manual: false, auto, aligned: true });
+    if (sizing.legacy) {
+      const count = preferredKitchenDoorLeaves(frontWidth, gap, 0);
+      const leafWidth = (frontWidth - count * gap) / count;
+      for (let leaf = 0; leaf < count && leafWidth > 0; leaf += 1) {
+        const auto = shortenForGrip({ x: insetStart + gap / 2 + leaf * (leafWidth + gap), y: plinth + gap / 2, width: leafWidth, height: height - plinth - gap }, grip);
+        leaves.push({ ...auto, bayId: bay.id, run: 0, leaf, leaves: count, style: "hinged", frontGrip: grip, manual: false, auto, aligned: true });
+      }
+    } else {
+      // Across the whole front: both ends are the cabinet's own sides, as are
+      // its top and its bottom, whatever the hinge.
+      const corner = cornerEnds(spec, cabinet);
+      const outer: Edge = { kind: "outer", board: t };
+      const horizontal = frontExtent(
+        sizing, insetStart + t, cabinet.size.width - (cabinet.frontInsets?.end ?? 0) - t,
+        { kind: corner.start ? "open" : "outer", board: t }, { kind: corner.end ? "open" : "outer", board: t },
+      );
+      const vertical = frontExtent(sizing, plinth + t, height - t, outer, outer);
+      const count = preferredKitchenDoorLeaves(horizontal.hi - horizontal.lo + gap, gap, 0);
+      const columns = leavesAcross(gap, horizontal, count);
+      if (columns[0]!.width > 0 && vertical.hi > vertical.lo) {
+        columns.forEach((column, leaf) => {
+          const auto = shortenForGrip({ x: column.x, y: vertical.lo, width: column.width, height: vertical.hi - vertical.lo }, grip);
+          leaves.push({ ...auto, bayId: bay.id, run: 0, leaf, leaves: count, style: "hinged", frontGrip: grip, manual: false, auto, aligned: true });
+        });
+      }
     }
   }
 
@@ -1803,7 +1965,9 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
     let changed = false;
     for (const leaf of leaves.filter((entry) => entry.manual)) {
       const others = [...drawers, ...leaves.filter((entry) => entry !== leaf)];
-      const problem = doorRectProblem(leaf, cabinet.size, others);
+      // A design sized by hinge type keeps its clearance between fronts, and
+      // a size that would close it up is refused as one that overlaps is.
+      const problem = doorRectProblem(leaf, cabinet.size, others, sizing.legacy ? 0 : gap);
       if (!problem) continue;
       warnings.push(`${cabinet.label || "Cabinet"}, door ${leaf.leaf + 1}: ${problem} — kept at its automatic size`);
       Object.assign(leaf, { ...leaf.auto, manual: false });
@@ -1878,12 +2042,16 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     board,
     spec.carcass.edgeBand,
   );
-  const gap = spec.carcass.doorGap;
+  const sizing = doorSizingOf(spec);
+  const gap = sizing.clearance;
   const plinth = cabinet.plinthHeight;
   const t = materials.body.thickness;
   const frontThickness = board.thickness;
   const height = cabinet.size.height;
-  const interiorDepth = cabinet.size.depth - materials.back.thickness;
+  // Where a front stands from the carcass front: proud by its thickness, or
+  // for an inset door flush with the front.
+  const faceZ = (style?: Part["doorStyle"]) => -doorFrontOffset(spec, frontThickness, style);
+  const drawerFaceZ = -(doorsAreInset(spec) ? 0 : frontThickness);
 
   // Doors: every leaf from cabinetFronts, automatic or sized by hand. A run
   // whose leaves are all automatic stays the one part it always was, a pair
@@ -1921,7 +2089,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
           length: leaf.height, width: leaf.width, quantity: 1,
           edges: { front: true, back: false, top: true, bottom: false },
           size: { x: leaf.width, y: leaf.height, z: frontThickness },
-          placements: [{ x: leaf.x, y: leaf.y, z: -frontThickness }], axis: "z",
+          placements: [{ x: leaf.x, y: leaf.y, z: faceZ("hinged") }], axis: "z",
           doorStyle: "hinged", ...gripDetail(leaf), bayId: bay.id, doorLeaf: { run: leaf.run, first: leaf.leaf },
         });
       }
@@ -1938,20 +2106,21 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     });
     if (leavesOfRun.every((leaf) => !leaf.manual)) {
       // Side by side across the bay, a gap between each and at both ends.
-      parts.push(shared(first, `${bay.id}-door${idSuffix}`, `Door${bayLabelSuffix(cabinet, bay.id)}${leavesOfRun.length > 1 ? ` (pair)` : ""}`, leavesOfRun.length, leavesOfRun.map((leaf) => ({ x: leaf.x, y: leaf.y, z: -frontThickness }))));
+      parts.push(shared(first, `${bay.id}-door${idSuffix}`, `Door${bayLabelSuffix(cabinet, bay.id)}${leavesOfRun.length > 1 ? ` (pair)` : ""}`, leavesOfRun.length, leavesOfRun.map((leaf) => ({ x: leaf.x, y: leaf.y, z: faceZ(doorStyle) }))));
       return;
     }
     for (const leaf of leavesOfRun) {
-      parts.push(shared(leaf, `${bay.id}-door${idSuffix}-leaf-${leaf.leaf}`, `Door${bayLabelSuffix(cabinet, bay.id)}${leavesOfRun.length > 1 ? ` ${leaf.leaf + 1} of ${leavesOfRun.length}` : ""}`, 1, [{ x: leaf.x, y: leaf.y, z: -frontThickness }]));
+      parts.push(shared(leaf, `${bay.id}-door${idSuffix}-leaf-${leaf.leaf}`, `Door${bayLabelSuffix(cabinet, bay.id)}${leavesOfRun.length > 1 ? ` ${leaf.leaf + 1} of ${leavesOfRun.length}` : ""}`, 1, [{ x: leaf.x, y: leaf.y, z: faceZ(doorStyle) }]));
     }
   };
 
-  for (const place of bayLayout(cabinet, t)) {
+  for (const [bayIndex, place] of bayLayout(cabinet, t).entries()) {
     const bay = place.bay;
     const span = frontSpanOf(place, t);
 
     const opening = height - plinth - 2 * t;
     const openingFloor = plinth + t;
+    const drawerAcross = sizing.legacy ? null : bayFrontSpan(spec, cabinet, bayIndex, sizing.hinge);
 
     const drawerFronts = (
       idPrefix: string,
@@ -1959,48 +2128,33 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       explicit: number[] | undefined,
       bandFloor: number,
       bandHeight: number,
+      edges: { low: Edge; high: Edge },
     ) => {
-      const construction = drawerConstructionFor(
-        spec,
-        bay.width,
-        bandHeight,
-        bandFloor,
-        interiorDepth,
-        count,
-        explicit,
-      );
-
       const grip = bay.fitting.kind === "drawers" ? bay.fitting.grip ?? "finger-gap" : "finger-gap";
-      const clearance = grip === "finger-gap" && count > 1
-        ? Math.min(bay.fitting.kind === "drawers" ? bay.fitting.gripClearance ?? 25 : 25, 40)
-        : 0;
-      const totalClearance = clearance * Math.max(0, construction.faces.length - 1);
-      const originalHeight = construction.faces.reduce((sum, face) => sum + face.height, 0);
-      const heightBudget = Math.max(0, originalHeight - totalClearance);
-      let frontY = bandFloor;
-      for (const [index, face] of construction.faces.entries()) {
-        const frontHeight = originalHeight > 0 ? face.height * heightBudget / originalHeight : face.height;
+      // The same fronts cabinetFronts draws: one place works them out.
+      const x = drawerAcross ? drawerAcross.lo : span.x + gap;
+      const frontWidth = drawerAcross ? drawerAcross.hi - drawerAcross.lo : span.width - 2 * gap;
+      for (const face of drawerFaceRects(spec, cabinet, bay, count, explicit, { floor: bandFloor, height: bandHeight }, edges)) {
         parts.push({
           id: `${idPrefix}-front-${face.index}`,
           role: "drawer_front",
           label: `Drawer front ${face.index + 1}${bayLabelSuffix(cabinet, bay.id)}`,
           bayId: bay.id,
           board,
-          length: frontHeight,
-          width: span.width - 2 * gap,
+          length: face.height,
+          width: frontWidth,
           quantity: 1,
           edges: { front: true, back: true, top: true, bottom: true },
           edgeBand: frontBand,
           frontGrip: grip,
-          placements: [{ x: span.x + gap, y: frontY, z: -frontThickness }],
+          placements: [{ x, y: face.y, z: drawerFaceZ }],
           size: {
-            x: span.width - 2 * gap,
-            y: frontHeight,
+            x: frontWidth,
+            y: face.height,
             z: frontThickness,
           },
           axis: "z",
         });
-        frontY += frontHeight + (index < construction.faces.length - 1 ? clearance : 0);
       }
     };
 
@@ -2013,6 +2167,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         bay.fitting.frontHeights,
         openingFloor,
         opening,
+        { low: { kind: "outer", board: t }, high: { kind: "outer", board: t } },
       );
       continue;
     }
@@ -2031,7 +2186,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         runIndex += 1;
         inRun = false;
       };
-      for (const band of bands) {
+      for (const [index, band] of bands.entries()) {
         if (doorSection(band.section)) { inRun = true; continue; }
         closeRun();
         // An open display zone closes the door run and has no front at all.
@@ -2042,6 +2197,7 @@ function doorParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
           undefined,
           band.floor,
           band.height,
+          stackEdges(bands, index, index, t),
         );
       }
       closeRun();
@@ -2095,7 +2251,16 @@ function hardwareFor(
   const hingedDoors = doors.filter(
     (door) => door.doorStyle === undefined || door.doorStyle === "hinged",
   );
-  const hinge = pick("hinge");
+  // The hinge is the one the door hangs on: a half-overlay or an inset door
+  // has a differently cranked hinge from a full-overlay one, and is ordered
+  // as such. A design sized the old way, or by full overlay, takes whichever
+  // concealed hinge its hardware list names.
+  const sizingHinge = doorSizingOf(spec);
+  const hinge = !sizingHinge.legacy && sizingHinge.hinge === "half"
+    ? findHardware("hinge-half-overlay")
+    : !sizingHinge.legacy && sizingHinge.hinge === "inset"
+      ? findHardware("hinge-inset")
+      : pick("hinge");
   if (hinge) {
     const count = hingedDoors.reduce(
       (total, door) => total + door.quantity * hingesForLeaf(door.length),
@@ -2105,7 +2270,7 @@ function hardwareFor(
       lines.push({
         hardware: hinge,
         quantity: count,
-        note: `${hingedDoors.reduce((n, d) => n + d.quantity, 0)} hinged door leaves`,
+        note: `${hingedDoors.reduce((n, d) => n + d.quantity, 0)} hinged door leaves${sizingHinge.legacy ? "" : `, ${HINGE_LABELS[sizingHinge.hinge].toLowerCase()}`}`,
       });
     }
   }

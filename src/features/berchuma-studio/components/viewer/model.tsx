@@ -32,6 +32,7 @@ import { buildParts } from "../../services/geometry";
 import { visibleKitchenParts } from "../../services/kitchen-construction";
 import { partCentre, partRotationRadians } from "../../services/part-transform";
 import { cabinetCentres, closureJoins, explodedOffset } from "../../services/exploded";
+import { doorFrontOffset } from "../../services/door-sizing";
 import {
   designWorldBounds,
   resolveDesign,
@@ -182,7 +183,9 @@ export default function Model({
   // The selected door, as the cut list has it, and where its edges can land.
   const doorLeaf = useMemo(() => (selectedDoor ? doorLeafOf(spec, selectedDoor) : null), [spec, selectedDoor]);
   const doorTargets = useMemo(() => (selectedDoor && doorLeaf ? doorSnapTargetsOf(spec, selectedDoor) : null), [spec, selectedDoor, doorLeaf]);
-  const frontThickness = allParts.find((part) => part.role === "door")?.size.z ?? 18;
+  // How far the door faces stand in front of the carcass: their thickness, or
+  // nothing for inset doors, which sit in the opening flush with it.
+  const frontThickness = doorFrontOffset(spec, allParts.find((part) => part.role === "door")?.size.z ?? 18, "hinged");
   const displayRect = useMemo(() => (selectedDisplay ? displayRectOf(spec, selectedDisplay) : null), [spec, selectedDisplay]);
   const displayTargets = useMemo(() => (selectedDisplay && displayRect ? displaySnapTargetsOf(spec, selectedDisplay) : null), [spec, selectedDisplay, displayRect]);
   const displayEdges = useMemo(() => (selectedDisplay ? displayEdgesOf(spec, selectedDisplay) : []), [spec, selectedDisplay]);

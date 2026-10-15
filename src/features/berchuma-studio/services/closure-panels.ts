@@ -2,6 +2,7 @@ import type { Part, Vec3 } from "../types/parts";
 import { findBoard } from "../types/catalogue";
 import type { Board, ClosurePanelKind, DesignSpec } from "../types/spec";
 import { fingerPullOf, gripEdgeOf, hingeSideOf } from "./door-grip";
+import { doorFrontOffset, doorSizingOf } from "./door-sizing";
 import type { FrontRect } from "./door-layout";
 import type { PlacedCabinet, ResolvedDesign } from "./resolve";
 import { constructionMaterials } from "./wardrobe-materials";
@@ -287,7 +288,11 @@ export function closurePanelsFor(input: ClosureInput): ClosureResult {
   const panels: ClosurePanel[] = [];
   const name = cabinet.label || "Cabinet";
   const hingeAngle = spec.hardware.some((item) => item.kind === "hinge" && /165/.test(item.id)) ? 165 : 110;
-  const swing: SwingLeaf[] = leaves.map((leaf) => ({ ...leaf, thickness: ft, maxAngle: hingeAngle }));
+  // How far a hinged door's face stands in front of the carcass: its
+  // thickness, or nothing for an inset door, which is flush with it.
+  const doorProud = doorFrontOffset(spec, ft, "hinged");
+  const sizing = doorSizingOf(spec);
+  const swing: SwingLeaf[] = leaves.map((leaf) => ({ ...leaf, thickness: leaf.style === "hinged" ? doorProud : ft, maxAngle: hingeAngle }));
   const boxes = parts.flatMap((part) => part.placements.map((at) => ({ part, box: boxOfPart(part, at) })));
   const clashes = (box: ClosureBox) => boxes.find((entry) => boxesOverlap(entry.box, box));
   const sideBoard = (side: "left" | "right") => {
@@ -328,13 +333,17 @@ export function closurePanelsFor(input: ClosureInput): ClosureResult {
     ...frontBoards.map(({ box }) => ({ x: box.x, y: box.y, width: box.sx, height: box.sy })),
   ];
   for (const region of regions) {
+    // The reveal a door stands back by is not an opening: an inset door leaves
+    // its clearance round it, and a sliver that narrow is what makes a door
+    // a door and not a hole.
+    const sliver = sizing.legacy ? MIN_OPENING : Math.max(MIN_OPENING, 2 * sizing.clearance + 1);
     const exposed = subtractRects({ x: region.x, y: region.floor, width: region.width, height: region.top - region.floor }, covers)
-      .filter((rect) => rect.width >= MIN_OPENING && rect.height >= MIN_OPENING);
+      .filter((rect) => rect.width >= sliver && rect.height >= sliver);
     exposed.forEach((rect, index) => {
       // A strip along the grip edge of a channel-grip leaf of this run is the channel.
       const channel = leaves.some((leaf) => leaf.bayId === region.bayId && leaf.run === region.run && leaf.frontGrip === "channel"
         && rect.x < leaf.x + leaf.width && rect.x + rect.width > leaf.x
-        && (gripEdge === "top" ? Math.abs(rect.y - (leaf.y + leaf.height)) <= spec.carcass.doorGap + 1 : Math.abs(rect.y + rect.height - leaf.y) <= spec.carcass.doorGap + 1));
+        && (gripEdge === "top" ? Math.abs(rect.y - (leaf.y + leaf.height)) <= sizing.clearance + 1 : Math.abs(rect.y + rect.height - leaf.y) <= sizing.clearance + 1));
       let setback = channel ? fingerPullOf(spec, "channel", ft).depth : 0;
       let box: ClosureBox = { x: rect.x, y: rect.y, z: setback, sx: rect.width, sy: rect.height, sz: tc };
       if (setback > 0 && clashes(box)) {
@@ -370,7 +379,7 @@ export function closurePanelsFor(input: ClosureInput): ClosureResult {
     // An exposed end: flush with the doors if no door's hinge needs the room.
     const x = side === "left" ? -tc : W;
     const back = D + (rear ? tc : 0);
-    const flush: ClosureBox = { x, y: 0, z: -ft, sx: tc, sy: H, sz: back + ft };
+    const flush: ClosureBox = { x, y: 0, z: -doorProud, sx: tc, sy: H, sz: back + doorProud };
     const decorative = !doorSwingConflict(flush, swing) && !clashes(flush);
     const box = decorative ? flush : { x, y: 0, z: 0, sx: tc, sy: H, sz: back };
     add(decorative ? "decorative_end" : "end", side, box, "x", sideBoard(side),

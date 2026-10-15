@@ -1,6 +1,7 @@
 import type { Cabinet, DesignSpec } from "../types/spec";
 import type { Part } from "../types/parts";
 import { constructionMaterials, zekoloBoardOf } from "./wardrobe-materials";
+import { doorFrontOffset, doorSizingOf, frontExtent, leavesAcross } from "./door-sizing";
 
 /** Refine real cutting parts; the viewer, nesting and costing share this list. */
 export function kitchenConstruction(spec: DesignSpec, cabinet: Cabinet, original: Part[]): Part[] {
@@ -20,7 +21,8 @@ export function kitchenConstruction(spec: DesignSpec, cabinet: Cabinet, original
   if (cabinet.kitchenRole === "fridge") {
     const opening = detail.fridgeHeight;
     const ft = materials.fronts.thickness;
-    const gap = spec.carcass.doorGap;
+    const sizing = doorSizingOf(spec);
+    const gap = sizing.clearance;
     const parts = [
       panel("fridge-left-side", "gable", { x: t, y: opening, z: depth }, { x: 0, y: 0, z: 0 }, "x"),
       panel("fridge-right-side", "gable", { x: t, y: opening, z: depth }, { x: width - t, y: 0, z: 0 }, "x"),
@@ -29,11 +31,24 @@ export function kitchenConstruction(spec: DesignSpec, cabinet: Cabinet, original
       panel("fridge-overhead-right", "gable", { x: t, y: height - opening - t, z: depth }, { x: width - t, y: opening + t, z: 0 }, "x"),
       panel("fridge-overhead-top", "top", { x: width - 2 * t, y: t, z: depth }, { x: t, y: height - t, z: 0 }, "y"),
     ];
-    const leafWidth = (width - 2 * gap) / 2;
-    for (let i = 0; i < 2; i++) {
-      const door = panel(`fridge-overhead-door-${i}`, "door", { x: leafWidth, y: height - opening - gap, z: ft }, { x: gap / 2 + i * (leafWidth + gap), y: opening + gap / 2, z: -ft }, "z", materials.fronts);
-      door.doorStyle = "hinged";
-      parts.push(door);
+    if (sizing.legacy) {
+      const leafWidth = (width - 2 * gap) / 2;
+      for (let i = 0; i < 2; i++) {
+        const door = panel(`fridge-overhead-door-${i}`, "door", { x: leafWidth, y: height - opening - gap, z: ft }, { x: gap / 2 + i * (leafWidth + gap), y: opening + gap / 2, z: -ft }, "z", materials.fronts);
+        door.doorStyle = "hinged";
+        parts.push(door);
+      }
+    } else {
+      // The two doors over the fridge, sized as every other door is: across
+      // the cabinet's own sides, over the board that carries them.
+      const outer = { kind: "outer", board: t } as const;
+      const across = frontExtent(sizing, t, width - t, outer, outer);
+      const up = frontExtent(sizing, opening + t, height - t, outer, outer);
+      for (const [i, column] of leavesAcross(gap, across, 2).entries()) {
+        const door = panel(`fridge-overhead-door-${i}`, "door", { x: column.width, y: up.hi - up.lo, z: ft }, { x: column.x, y: up.lo, z: -doorFrontOffset(spec, ft, "hinged") }, "z", materials.fronts);
+        door.doorStyle = "hinged";
+        parts.push(door);
+      }
     }
     return parts;
   }

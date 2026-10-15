@@ -1,0 +1,374 @@
+[
+ {
+  "name": "full overlay reaches the same at an outer edge as a shared one",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "reach = edge.kind === \"outer\" ? board - c / 2 : board / 2 - c / 2;",
+  "to": "reach = board / 2 - c / 2;"
+ },
+ {
+  "name": "full overlay shared edge ignores the clearance",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": ": board / 2 - c / 2;\n      break;\n    case \"half\"",
+  "to": ": board / 2;\n      break;\n    case \"half\""
+ },
+ {
+  "name": "full overlay outer edge ignores the clearance",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "board - c / 2 :",
+  "to": "board :"
+ },
+ {
+  "name": "half overlay reaches the whole board",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "reach = Math.max(0, (board - c) / 2);",
+  "to": "reach = board;"
+ },
+ {
+  "name": "half overlay reach ignores the clearance",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "reach = Math.max(0, (board - c) / 2);",
+  "to": "reach = board / 2;"
+ },
+ {
+  "name": "half overlay reach may go negative",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "Math.max(0, (board - c) / 2)",
+  "to": "(board - c) / 2"
+ },
+ {
+  "name": "inset door stands level with the opening",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "reach = -c;",
+  "to": "reach = 0;"
+ },
+ {
+  "name": "open end reaches over the board",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "return edge.kind === \"open\" ? Math.min(reach, -c / 2) : reach;",
+  "to": "return reach;"
+ },
+ {
+  "name": "open end ignores the clearance",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "Math.min(reach, -c / 2)",
+  "to": "Math.min(reach, 0)"
+ },
+ {
+  "name": "extent grows the wrong way at the start",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "lo: a - reachAt(sizing, low)",
+  "to": "lo: a + reachAt(sizing, low)"
+ },
+ {
+  "name": "extent shrinks at the end",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "hi: b + reachAt(sizing, high)",
+  "to": "hi: b - reachAt(sizing, high)"
+ },
+ {
+  "name": "leaf widths rounded up",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "Math.floor(((extent.hi",
+  "to": "Math.ceil(((extent.hi"
+ },
+ {
+  "name": "gaps between leaves miscounted",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "clearance * (count - 1)) / count)",
+  "to": "clearance * count) / count)"
+ },
+ {
+  "name": "leaves placed without the gap",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "index * (width + clearance)",
+  "to": "index * width"
+ },
+ {
+  "name": "inset door stands proud",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "? 0 : thickness;",
+  "to": "? thickness : thickness;"
+ },
+ {
+  "name": "sliding leaf sits flush when inset",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "(style === undefined || style === \"hinged\")",
+  "to": "true"
+ },
+ {
+  "name": "inset detected for half overlay",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "sizing.hinge === \"inset\";\n}",
+  "to": "sizing.hinge === \"half\";\n}"
+ },
+ {
+  "name": "inset shelves keep the old setback",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "constructionMaterials(spec).fronts.thickness + 2",
+  "to": "constructionMaterials(spec).fronts.thickness - 40"
+ },
+ {
+  "name": "stored sizing read as the old way",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "if (!stored) return { legacy: true",
+  "to": "if (!stored) return { legacy: false"
+ },
+ {
+  "name": "stored sizing still treated as the old way",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "return { legacy: false, hinge: stored.hinge",
+  "to": "return { legacy: true, hinge: stored.hinge"
+ },
+ {
+  "name": "hinge change forgets the clearance",
+  "file": "src/features/berchuma-studio/services/door-sizing-operations.ts",
+  "from": "spec.doorSizing?.clearance ?? DEFAULT_CLEARANCE } };\n}\n\n/** The gap",
+  "to": "DEFAULT_CLEARANCE } };\n}\n\n/** The gap"
+ },
+ {
+  "name": "clearance not limited",
+  "file": "src/features/berchuma-studio/services/door-sizing-operations.ts",
+  "from": "Math.min(CLEARANCE_LIMITS.max,",
+  "to": "Math.min(100,"
+ },
+ {
+  "name": "clearance may go below nothing",
+  "file": "src/features/berchuma-studio/services/door-sizing-operations.ts",
+  "from": "Math.max(CLEARANCE_LIMITS.min,",
+  "to": "Math.max(-50,"
+ },
+ {
+  "name": "clearance change forgets the hinge",
+  "file": "src/features/berchuma-studio/services/door-sizing-operations.ts",
+  "from": "hinge: spec.doorSizing?.hinge ?? \"full\", clearance: value",
+  "to": "hinge: \"full\", clearance: value"
+ },
+ {
+  "name": "reset all keeps manual sizes",
+  "file": "src/features/berchuma-studio/services/door-sizing-operations.ts",
+  "from": "bays: cabinet.bays.map(({ doorOverrides: _dropped, ...bay }) => { void _dropped; return bay; }),",
+  "to": "bays: cabinet.bays,"
+ },
+ {
+  "name": "manual door count off by default",
+  "file": "src/features/berchuma-studio/services/door-sizing-operations.ts",
+  "from": "(bay.doorOverrides?.length ?? 0)",
+  "to": "(bay.doorOverrides?.length ?? 1)"
+ },
+ {
+  "name": "half overlay ordered with the inset hinge",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "? findHardware(\"hinge-half-overlay\")",
+  "to": "? findHardware(\"hinge-inset\")"
+ },
+ {
+  "name": "inset ordered with the standard hinge",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "? findHardware(\"hinge-inset\")\n      : pick(\"hinge\")",
+  "to": "? pick(\"hinge\")\n      : pick(\"hinge\")"
+ },
+ {
+  "name": "hinge type not on the BOQ line",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "${sizingHinge.legacy ? \"\" : `, ${HINGE_LABELS[sizingHinge.hinge].toLowerCase()}`}",
+  "to": ""
+ },
+ {
+  "name": "plinth recess measured from inset doors",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "cabinetHasVisibleFronts(cabinet) && !doorsAreInset(spec)",
+  "to": "cabinetHasVisibleFronts(cabinet) && true"
+ },
+ {
+  "name": "fixed shelf behind inset door not set back",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "z: doorsAreInset(spec) ? setback : 0 }]",
+  "to": "z: 0 }]"
+ },
+ {
+  "name": "stack neighbour without a front shared",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "return { kind: framed ? \"shared\" : \"open\", board };",
+  "to": "return { kind: \"shared\", board };"
+ },
+ {
+  "name": "stack neighbours swapped",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "return { high: beyond(first - 1), low: beyond(last + 1) };",
+  "to": "return { high: beyond(last + 1), low: beyond(first - 1) };"
+ },
+ {
+  "name": "corner ends never found",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "return { start: touches(0), end: touches(cabinet.size.width) };",
+  "to": "return none;"
+ },
+ {
+  "name": "transport joint counted as one board",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "joint ? { kind: \"shared\", board: 2 * t }",
+  "to": "joint ? { kind: \"shared\", board: t }"
+ },
+ {
+  "name": "bay beside an open bay treated as shared",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "other && bayHasFront(other.bay) ? { kind: \"shared\", board: t } : { kind: \"open\", board: t }",
+  "to": "{ kind: \"shared\", board: t }"
+ },
+ {
+  "name": "corner end called outer edge",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "{ kind: corner.start ? \"open\" : \"outer\", board: t } : neighbour",
+  "to": "{ kind: \"outer\", board: t } : neighbour"
+ },
+ {
+  "name": "drawer gap ignores the clearance",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "Math.max(fingerGap, sizing.clearance)",
+  "to": "fingerGap"
+ },
+ {
+  "name": "manual door gap not enforced",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "doorRectProblem(leaf, cabinet.size, others, sizing.legacy ? 0 : gap)",
+  "to": "doorRectProblem(leaf, cabinet.size, others, 0)"
+ },
+ {
+  "name": "door face ignores inset",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "-doorFrontOffset(spec, frontThickness, style)",
+  "to": "-frontThickness"
+ },
+ {
+  "name": "drawer face ignores inset",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "-(doorsAreInset(spec) ? 0 : frontThickness)",
+  "to": "-frontThickness"
+ },
+ {
+  "name": "kitchen aligned doors ignore the overlay vertically",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "frontExtent(sizing, plinth + t, height - t, outer, outer)",
+  "to": "frontExtent(sizing, plinth, height, outer, outer)"
+ },
+ {
+  "name": "kitchen aligned doors wrong count gap",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "const columns = leavesAcross(gap, horizontal, count);\n      if (columns[0]!.width > 0 && vertical.hi",
+  "to": "const columns = leavesAcross(0, horizontal, count);\n      if (columns[0]!.width > 0 && vertical.hi"
+ },
+ {
+  "name": "bay doors drawn the old way",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "const across = sizing.legacy ? null : bayFrontSpan(spec, cabinet, bayIndex, hingeHere);",
+  "to": "const across = null;"
+ },
+ {
+  "name": "drawer fronts drawn the old way",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "const drawerAcross = sizing.legacy ? null : bayFrontSpan(spec, cabinet, bayIndex, sizing.hinge);\n\n    const drawerFronts",
+  "to": "const drawerAcross = null;\n\n    const drawerFronts"
+ },
+ {
+  "name": "too close tolerance dropped",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "const slack = gap - 0.05;",
+  "to": "const slack = 0;"
+ },
+ {
+  "name": "minimum gap not checked",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "if (minGap > 0 &&",
+  "to": "if (false &&"
+ },
+ {
+  "name": "gap measured on one axis only",
+  "file": "src/features/berchuma-studio/services/door-layout.ts",
+  "from": "a.y < b.y + b.height + slack && b.y < a.y + a.height + slack;",
+  "to": "true;"
+ },
+ {
+  "name": "manual placement ignores the clearance",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "const minGap = doorSizingOf(spec).legacy ? 0 : doorGapOf(spec);",
+  "to": "const minGap = 0;"
+ },
+ {
+  "name": "typed size uses the old gap",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "  // The gap between doors: the clearance the design is sized by.\n  const gap = doorGapOf(spec);",
+  "to": "  // The gap between doors: the clearance the design is sized by.\n  const gap = 2;"
+ },
+ {
+  "name": "snap uses the old gap",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "    gap: doorGapOf(spec),\n",
+  "to": "    gap: 2,\n"
+ },
+ {
+  "name": "make equal uses the old gap",
+  "file": "src/features/berchuma-studio/services/operations.ts",
+  "from": "row.length, doorGapOf(spec))",
+  "to": "row.length, 2)"
+ },
+ {
+  "name": "fridge doors without a gap",
+  "file": "src/features/berchuma-studio/services/kitchen-construction.ts",
+  "from": "leavesAcross(gap, across, 2)",
+  "to": "leavesAcross(0, across, 2)"
+ },
+ {
+  "name": "fridge doors ignore inset",
+  "file": "src/features/berchuma-studio/services/kitchen-construction.ts",
+  "from": "z: -doorFrontOffset(spec, ft, \"hinged\") }",
+  "to": "z: -ft }"
+ },
+ {
+  "name": "closure swing ignores inset",
+  "file": "src/features/berchuma-studio/services/closure-panels.ts",
+  "from": "const doorProud = doorFrontOffset(spec, ft, \"hinged\");",
+  "to": "const doorProud = ft;"
+ },
+ {
+  "name": "clearance allowed to 100",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "z.number().min(0).max(20).default(5)",
+  "to": "z.number().min(0).max(100).default(5)"
+ },
+ {
+  "name": "clearance may be negative",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "z.number().min(0).max(20).default(5)",
+  "to": "z.number().min(-9).max(20).default(5)"
+ },
+ {
+  "name": "no default clearance",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "z.number().min(0).max(20).default(5)",
+  "to": "z.number().min(0).max(20).default(2)"
+ },
+ {
+  "name": "default hinge half",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "hinge: hingeTypeSchema.default(\"full\")",
+  "to": "hinge: hingeTypeSchema.default(\"half\")"
+ },
+ {
+  "name": "hinge type not saved on the design",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "doorSizing: doorSizingSchema.optional(),",
+  "to": ""
+ },
+ {
+  "name": "new designs without door sizing",
+  "file": "src/features/berchuma-studio/services/starting-designs.ts",
+  "from": "    doorSizing: { ...DEFAULT_DOOR_SIZING },\n",
+  "to": ""
+ },
+ {
+  "name": "reference kitchen moved off the old sizing",
+  "file": "src/features/berchuma-studio/services/kitchen-detail.ts",
+  "from": "  delete spec.doorSizing;\n",
+  "to": ""
+ }
+]

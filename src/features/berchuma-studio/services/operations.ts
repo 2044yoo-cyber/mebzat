@@ -7,6 +7,7 @@ import type { Bay, Cabinet, CabinetKind, DesignSpec } from "../types/spec";
 import { drawerFrontHeights } from "./drawer-construction";
 import { cabinetFaceBoards, cabinetFronts, isSideDisplay, sectionBands as sectionBandsOf, type DoorLeaf } from "./geometry";
 import { doorRectProblem, doorSnapTargets, equalLeaves, MIN_DOOR, type FrontRect } from "./door-layout";
+import { doorGapOf, doorSizingOf } from "./door-sizing";
 import { bayLayout, bayModules, carcassInterior, defaultJoints, jointSnapTargets, MIN_MODULE, moduleInterior, modulesOf } from "./transport-modules";
 
 /**
@@ -1553,7 +1554,10 @@ function setDoorRects(spec: DesignSpec, cabinetId: string, changes: { ref: Pick<
   for (const entry of changes) {
     const index = fronts.leaves.findIndex((leaf) => sameLeaf(leaf, entry.ref));
     if (index < 0) return { spec, problem: "That door is not on the design" };
-    const problem = doorRectProblem(entry.rect, cabinet.size, [...fronts.drawers, ...after.filter((_, other) => other !== index)]);
+    // A design sized by hinge type keeps its clearance between fronts; one
+    // sized the old way refuses only an overlap, as it always did.
+    const minGap = doorSizingOf(spec).legacy ? 0 : doorGapOf(spec);
+    const problem = doorRectProblem(entry.rect, cabinet.size, [...fronts.drawers, ...after.filter((_, other) => other !== index)], minGap);
     if (problem) return { spec, problem };
   }
   const next = change(spec, (draft) => {
@@ -1586,7 +1590,8 @@ export function setDoorSize(spec: DesignSpec, ref: DoorRef, size: Partial<FrontR
   const width = size.width ?? leaf.width;
   const x = size.x ?? (size.width !== undefined && partnerLeft ? leaf.x + leaf.width - width : leaf.x);
   const rect = { x, y: size.y ?? leaf.y, width, height: size.height ?? leaf.height };
-  const gap = spec.carcass.doorGap;
+  // The gap between doors: the clearance the design is sized by.
+  const gap = doorGapOf(spec);
   const changes: { ref: Pick<DoorRef, "bayId" | "run" | "leaf">; rect: FrontRect }[] = [{ ref, rect }];
   for (const partner of partners) {
     const sharesHeight = Math.min(partner.y + partner.height, rect.y + rect.height) > Math.max(partner.y, rect.y);
@@ -1612,7 +1617,7 @@ export function doorSnapTargetsOf(spec: DesignSpec, ref: DoorRef): { x: number[]
   const row = doorRowOf(spec, ref);
   return doorSnapTargets({
     cabinet: cabinet.size,
-    gap: spec.carcass.doorGap,
+    gap: doorGapOf(spec),
     boards: cabinetFaceBoards(spec, cabinet),
     others: [...fronts.drawers, ...fronts.leaves.filter((item) => item !== leaf)],
     row: row.length > 1 ? { left: row[0]!.x, right: row.at(-1)!.x + row.at(-1)!.width, count: row.length } : null,
@@ -1670,7 +1675,7 @@ export function makeDoorsEqual(spec: DesignSpec, ref: DoorRef): { spec: DesignSp
   if (row.length < 2) return { spec, problem: "There is no other door beside this one to share with" };
   const left = row[0]!.x;
   const right = row.at(-1)!.x + row.at(-1)!.width;
-  const shares = equalLeaves(left, right, row.length, spec.carcass.doorGap);
+  const shares = equalLeaves(left, right, row.length, doorGapOf(spec));
   return setDoorRects(spec, ref.cabinetId, row.map((leaf, index) => ({ ref: leaf, rect: { x: shares[index]!.x, y: leaf.y, width: shares[index]!.width, height: leaf.height } })));
 }
 

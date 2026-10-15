@@ -1,0 +1,80 @@
+[
+ {
+  "name": "hinge selector does nothing",
+  "file": "src/features/berchuma-studio/components/editor/closure-panel.tsx",
+  "from": "onChange={(event) => onChange(setHingeType(spec, event.target.value as HingeType))}",
+  "to": "onChange={() => onChange(spec)}"
+ },
+ {
+  "name": "clearance field does nothing",
+  "file": "src/features/berchuma-studio/components/editor/closure-panel.tsx",
+  "from": "onChange={(clearance) => onChange(setDoorClearance(spec, clearance))}",
+  "to": "onChange={() => onChange(spec)}"
+ },
+ {
+  "name": "half overlay missing from the selector",
+  "file": "src/features/berchuma-studio/components/editor/closure-panel.tsx",
+  "from": "{hingeTypes.map((hinge) => <option",
+  "to": "{hingeTypes.filter((hinge) => hinge !== \"half\").map((hinge) => <option"
+ },
+ {
+  "name": "old design not marked as originally sized",
+  "file": "src/features/berchuma-studio/components/editor/closure-panel.tsx",
+  "from": "{sizing.legacy ? <option value=\"original\" disabled>As originally sized</option> : null}",
+  "to": ""
+ },
+ {
+  "name": "clearance editable on an old design",
+  "file": "src/features/berchuma-studio/components/editor/closure-panel.tsx",
+  "from": "disabled={sizing.legacy}\n          onChange={(clearance)",
+  "to": "disabled={false}\n          onChange={(clearance)"
+ },
+ {
+  "name": "Reset to Auto does nothing",
+  "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+  "from": "label=\"Reset to Auto\" disabled={!leaf.manual && !warnings.length} onClick={() => { onProblem(null); onChange(resetDoorSize(spec, door, true)); }}",
+  "to": "label=\"Reset to Auto\" disabled={!leaf.manual && !warnings.length} onClick={() => { onProblem(null); onChange(spec); }}"
+ },
+ {
+  "name": "inset door stands level with the opening",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "reach = -c;",
+  "to": "reach = 0;"
+ },
+ {
+  "name": "full overlay outer edge ignores the clearance",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "board - c / 2 :",
+  "to": "board :"
+ },
+ {
+  "name": "half overlay reaches the whole board",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "reach = Math.max(0, (board - c) / 2);",
+  "to": "reach = board;"
+ },
+ {
+  "name": "leaves placed without the gap",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "index * (width + clearance)",
+  "to": "index * width"
+ },
+ {
+  "name": "inset door stands proud in 3D",
+  "file": "src/features/berchuma-studio/services/door-sizing.ts",
+  "from": "? 0 : thickness;",
+  "to": "? thickness : thickness;"
+ },
+ {
+  "name": "half overlay ordered with the inset hinge",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "? findHardware(\"hinge-half-overlay\")",
+  "to": "? findHardware(\"hinge-inset\")"
+ },
+ {
+  "name": "hinge type not saved on the design",
+  "file": "src/features/berchuma-studio/types/spec.ts",
+  "from": "doorSizing: doorSizingSchema.optional(),",
+  "to": ""
+ }
+]
