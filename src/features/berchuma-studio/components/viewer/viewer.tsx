@@ -65,13 +65,16 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
             icon={Box}
             label="3D"
           />
-          <ViewTab active={view === "connections"} onClick={() => setView("connections")} icon={Network} label="MDF Connections" />
-          <ViewTab active={view === "exploded"} onClick={() => setView("exploded")} icon={Layers3} label="Exploded" />
+
         </div>
 
         {view === "solid" ? (
           <div className="flex items-center gap-2">
-          <SurfaceToggle value={surface} onChange={setSurface} />
+          <div className="flex flex-wrap items-center justify-end gap-1 rounded-lg border bg-background/70 p-0.5 text-[11px] backdrop-blur-xl" role="group" aria-label="Model display">
+            <SurfaceToggle value={surface} onChange={setSurface} />
+            <button type="button" aria-pressed={view === "connections"} onClick={() => setView("connections")} className={cn("rounded-md px-2 py-1 transition-colors", view === "connections" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>Connections</button>
+            <button type="button" aria-pressed={view === "exploded"} onClick={() => setView("exploded")} className={cn("rounded-md px-2 py-1 transition-colors", view === "exploded" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>Exploded</button>
+          </div>
           <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <input
               type="checkbox"
