@@ -68,7 +68,7 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
 
         </div>
 
-        {view === "solid" ? (
+        {view !== "flat" ? (
           <div className="flex items-center gap-2">
           <div className="flex flex-wrap items-center justify-end gap-1 rounded-lg border bg-background/70 p-0.5 text-[11px] backdrop-blur-xl" role="group" aria-label="Model display">
             <SurfaceToggle value={surface} onChange={setSurface} />
