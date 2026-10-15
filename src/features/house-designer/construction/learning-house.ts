@@ -316,7 +316,7 @@ export function stairLayout(p: LearningHouseParams) {
 /** The slab opening a stair needs: its footprint plus a little working room, as a plan rectangle. */
 export function stairOpening(p: LearningHouseParams): { x0: number; y0: number; x1: number; y1: number } {
   const { fields, x, y } = stairLayout(p);
-  const ease = 25;
+  const ease = 10;
   return { x0: x - fields.width / 2 - ease, x1: x + fields.width / 2 + ease, y0: y - fields.length / 2 - ease, y1: y + fields.length / 2 + ease };
 }
 

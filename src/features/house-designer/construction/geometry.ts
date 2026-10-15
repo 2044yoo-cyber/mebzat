@@ -17,7 +17,7 @@ export type V3 = { x: number; y: number; z: number };
 export type Shape =
   | { t: "box"; c: V3; s: V3; rx?: number; ry?: number; rz?: number }
   | { t: "cyl"; c: V3; r: number; len: number; axis: "x" | "y" | "z" }
-  | { t: "prism"; poly: P2[]; z0: number; z1: number };
+  | { t: "prism"; poly: P2[]; z0: number; z1: number; holes?: P2[][] };
 
 export const v3 = (x: number, y: number, z: number): V3 => ({ x, y, z });
 
@@ -34,8 +34,13 @@ export function cyl(cx: number, cy: number, cz: number, r: number, len: number, 
   return { t: "cyl", c: { x: cx, y: cy, z: cz }, r, len, axis };
 }
 
-export function prism(poly: P2[], z0: number, z1: number): Shape {
-  return { t: "prism", poly: poly.map((p) => ({ x: p.x, y: p.y })), z0, z1 };
+export function prism(poly: P2[], z0: number, z1: number, holes?: P2[][]): Shape {
+  return { t: "prism", poly: poly.map((p) => ({ x: p.x, y: p.y })), z0, z1, ...(holes && holes.length ? { holes: holes.map((h) => h.map((p) => ({ x: p.x, y: p.y }))) } : {}) };
+}
+
+/** A rectangle as a counter-clockwise plan outline. */
+export function rectPoly(x0: number, y0: number, x1: number, y1: number): P2[] {
+  return [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
 }
 
 /** A beam, wall or pipe run: a box along a plan line between two points. */
@@ -104,14 +109,14 @@ export const round3 = (value: number) => Math.round(value * 1000) / 1000;
 // ---------------------------------------------------------------------------
 
 /** A convex vertical prism: a counter-clockwise convex plan outline between two heights. */
-export type Prism = { poly: P2[]; z0: number; z1: number };
+export type Prism = { poly: P2[]; z0: number; z1: number; holes?: P2[][] };
 
 export function prismOfShape(shape: Shape): Prism | null {
   if (shape.t === "box") {
     if ((shape.rx ?? 0) !== 0 || (shape.ry ?? 0) !== 0) return null;
     return { poly: boxFootprint(shape), z0: shape.c.z - shape.s.z / 2, z1: shape.c.z + shape.s.z / 2 };
   }
-  if (shape.t === "prism") return { poly: ensureCcw(shape.poly), z0: shape.z0, z1: shape.z1 };
+  if (shape.t === "prism") return { poly: ensureCcw(shape.poly), z0: shape.z0, z1: shape.z1, ...(shape.holes ? { holes: shape.holes } : {}) };
   return null;
 }
 
@@ -157,24 +162,60 @@ export function clipConvex(subject: P2[], clip: P2[]): P2[] {
   return output;
 }
 
-/** Area of the union of convex polygons, by inclusion–exclusion (the sets are small: a member's neighbours). */
+/** `subject` cut by the left side (inside, for a counter-clockwise clip) of the directed edge a→b. */
+function leftOfEdge(subject: P2[], a: P2, b: P2): P2[] {
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const ux = (b.x - a.x) / len;
+  const uy = (b.y - a.y) / len;
+  const F = 1e7;
+  const nx = -uy * F;
+  const ny = ux * F;
+  return clipConvex(subject, [{ x: a.x - ux * F, y: a.y - uy * F }, { x: a.x + ux * F, y: a.y + uy * F }, { x: a.x + ux * F + nx, y: a.y + uy * F + ny }, { x: a.x - ux * F + nx, y: a.y - uy * F + ny }]);
+}
+
+function rightOfEdge(subject: P2[], a: P2, b: P2): P2[] {
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const ux = (b.x - a.x) / len;
+  const uy = (b.y - a.y) / len;
+  const F = 1e7;
+  const nx = -uy * F;
+  const ny = ux * F;
+  return clipConvex(subject, [{ x: a.x - ux * F, y: a.y - uy * F }, { x: a.x - ux * F - nx, y: a.y - uy * F - ny }, { x: a.x + ux * F - nx, y: a.y + uy * F - ny }, { x: a.x + ux * F, y: a.y + uy * F }]);
+}
+
+/** The part of convex `p` that lies outside convex counter-clockwise `q`, as disjoint convex pieces. */
+export function subtractConvex(p: P2[], q: P2[]): P2[][] {
+  const pieces: P2[][] = [];
+  let remaining = p;
+  for (let i = 0; i < q.length && remaining.length >= 3; i += 1) {
+    const a = q[i]!;
+    const b = q[(i + 1) % q.length]!;
+    const outside = rightOfEdge(remaining, a, b);
+    if (outside.length >= 3 && polygonArea(outside) > 1e-6) pieces.push(outside);
+    remaining = leftOfEdge(remaining, a, b);
+  }
+  return pieces;
+}
+
+/**
+ * Area of the union of convex polygons, any number of them. Each is cut
+ * against what has already been counted and only its new part is added, so
+ * a connected grid of beams and columns costs no more than the sum of its
+ * parts.
+ */
 export function unionArea(polys: P2[][]): number {
-  const n = polys.length;
-  if (n === 0) return 0;
-  if (n > 14) throw new Error("Too many overlapping members to count exactly; split the model.");
-  let total = 0;
-  const walk = (index: number, current: P2[] | null, size: number) => {
-    if (index === n) {
-      if (size === 0 || !current) return;
-      total += (size % 2 === 1 ? 1 : -1) * polygonArea(current);
-      return;
+  const disjoint: P2[][] = [];
+  for (const raw of polys) {
+    const poly = ensureCcw(raw);
+    if (poly.length < 3) continue;
+    let pieces: P2[][] = [poly];
+    for (const existing of disjoint) {
+      pieces = pieces.flatMap((piece) => subtractConvex(piece, existing));
+      if (pieces.length === 0) break;
     }
-    walk(index + 1, current, size);
-    const next = current === null ? polys[index]! : clipConvex(current, polys[index]!);
-    if (next.length >= 3 && polygonArea(next) > 1e-6) walk(index + 1, next, size + 1);
-  };
-  walk(0, null, 0);
-  return total;
+    disjoint.push(...pieces);
+  }
+  return disjoint.reduce((sum, piece) => sum + polygonArea(piece), 0);
 }
 
 /**
@@ -187,7 +228,8 @@ export function netVolumes(prisms: readonly Prism[]): number[] {
   const out: number[] = [];
   for (let i = 0; i < prisms.length; i += 1) {
     const me = prisms[i]!;
-    const gross = polygonArea(me.poly) * (me.z1 - me.z0);
+    const holeArea = (me.holes ?? []).reduce((sum, hole) => sum + polygonArea(hole), 0);
+    const gross = (polygonArea(me.poly) - holeArea) * (me.z1 - me.z0);
     const earlier = prisms.slice(0, i).filter((p) => p.z0 < me.z1 - 1e-9 && p.z1 > me.z0 + 1e-9);
     if (earlier.length === 0) { out.push(gross); continue; }
     const cuts = [me.z0, me.z1, ...earlier.flatMap((p) => [p.z0, p.z1])].filter((z) => z >= me.z0 - 1e-9 && z <= me.z1 + 1e-9).sort((a, b) => a - b);

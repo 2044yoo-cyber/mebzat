@@ -1,4 +1,5 @@
 import type { HouseProject, HouseRoom } from "../types/project";
+import type { ApprovedBar } from "./helpers";
 import { centroid, dist, pointInPolygon, polygonArea, polygonBounds, type P2, type V3 } from "./geometry";
 import type {
   CategoryId, ComponentRecord, DimensionKey, Dimension, EstimatingRules, GeometrySource, LayerId, ModelOptions, Provenance, QuantityItem, StageId, StoreyInfo,
@@ -12,7 +13,7 @@ import { PROVENANCE } from "./types";
  */
 export const ASSUME = {
   /** Natural ground, relative to the ground-floor structural level (negative is below it). */
-  naturalGround: -300,
+  naturalGround: -450,
   topsoilStrip: 150,
   working: 300,
   blindingThickness: 75,
@@ -177,7 +178,7 @@ export class Ctx {
   readonly bounds: ReturnType<typeof polygonBounds>;
   private seq = new Map<number, number>();
 
-  constructor(readonly project: HouseProject, readonly options: ModelOptions, readonly rules: EstimatingRules) {
+  constructor(readonly project: HouseProject, readonly options: ModelOptions, readonly rules: EstimatingRules, readonly approved: readonly ApprovedBar[] = []) {
     const groundSlab = project.slabs.find((slab) => slab.levelId === project.levels[0]?.id);
     void groundSlab;
     this.levels = project.levels.map((level, index) => {
