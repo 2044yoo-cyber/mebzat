@@ -376,15 +376,15 @@ export function closurePanelsFor(input: ClosureInput): ClosureResult {
         `A ${Math.round(gap)} mm gap to the ${against === "wall" ? "wall" : "next cabinet"}`);
       continue;
     }
-    // An exposed end: flush with the doors if no door's hinge needs the room.
+    // Keep the necessary side cover panel, but never add a separate decorative
+    // end panel. Set the cover back inside the carcass so hinged doors have
+    // room to swing and the panel remains a functional closure, not a facade.
     const x = side === "left" ? -tc : W;
     const back = D + (rear ? tc : 0);
-    const flush: ClosureBox = { x, y: 0, z: -doorProud, sx: tc, sy: H, sz: back + doorProud };
-    const decorative = !doorSwingConflict(flush, swing) && !clashes(flush);
-    const box = decorative ? flush : { x, y: 0, z: 0, sx: tc, sy: H, sz: back };
-    add(decorative ? "decorative_end" : "end", side, box, "x", sideBoard(side),
+    const box: ClosureBox = { x, y: 0, z: 0, sx: tc, sy: H, sz: back };
+    add("end", side, box, "x", sideBoard(side),
       { x: side === "left" ? 0 : W, y: H / 2, z: D / 2 },
-      decorative ? "An exposed end, flush with the doors" : "An exposed end; set back to clear the door hinges");
+      "An exposed end; functional side cover panel set back to clear the door hinges");
   }
 
   // ---- Up to the ceiling --------------------------------------------------
