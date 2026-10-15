@@ -213,9 +213,22 @@ export async function POST(request: Request) {
         : [];
       if (ids.length === 0) return NextResponse.json({ recorded: 0 });
 
-      const { error } = await supabase.rpc("feed_record_views", {
-        p_posts: ids.slice(0, 40),
-      });
+      // The clock of the reading these were seen in (the cursor's `now`), so
+      // that reading keeps ranking them as it did. Not trusted for anything
+      // else: a wrong one only misplaces the sender's own cards.
+      const session =
+        typeof body.session === "string" && !Number.isNaN(Date.parse(body.session))
+          ? new Date(body.session).toISOString()
+          : null;
+      const rpc = supabase.rpc.bind(supabase) as unknown as (
+        name: string,
+        params: Record<string, unknown>,
+      ) => PromiseLike<{ error: { code?: string; message: string } | null }>;
+      let { error } = await rpc("feed_record_views", { p_posts: ids.slice(0, 40), p_session: session });
+      // Before 0109 there is only the one-argument form.
+      if (error && (error.code === "PGRST202" || error.code === "42883")) {
+        ({ error } = await rpc("feed_record_views", { p_posts: ids.slice(0, 40) }));
+      }
       if (error) return failed(error.message);
       return NextResponse.json({ recorded: ids.length });
     }

@@ -1,4 +1,20 @@
-import type { FeedComment, FeedCursor, FeedPage } from "@/lib/feed/types";
+import type { FeedComment, FeedCursor, FeedPage, FeedPost } from "@/lib/feed/types";
+
+/**
+ * A change the server has confirmed — a like, a save, a follow — told to the
+ * rest of the page. Every card by the same author shows the follow, and the
+ * feed keeps its own copy right, so coming back to it does not show the old
+ * state.
+ */
+export const FEED_CHANGE = "medosha:feed-change";
+export type FeedChange =
+  | { postId: string; patch: Partial<Pick<FeedPost, "viewerLiked" | "viewerSaved" | "likeCount">> }
+  | { authorKey: string; patch: Pick<FeedPost, "viewerFollows"> };
+
+export function announceChange(change: FeedChange): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<FeedChange>(FEED_CHANGE, { detail: change }));
+}
 
 /**
  * The browser's half of the feed.
@@ -64,8 +80,8 @@ export const feedApi = {
   likeComment: (commentId: string) => post({ action: "comment-like", commentId }),
   report: (postId: string, reason: string, detail?: string) =>
     post({ action: "report", postId, reason, detail }),
-  /** Impressions, sent in batches. Failure is silent by design. */
-  view: (postIds: string[]) => post({ action: "view", postIds }),
+  /** Impressions, sent in batches, with the clock of the reading they were seen in. Failure is silent by design. */
+  view: (postIds: string[], session?: string | null) => post({ action: "view", postIds, session: session ?? null }),
 };
 
 /**
@@ -146,20 +162,26 @@ export async function fetchFeedPage(request: FeedRequest): Promise<FeedPage> {
   // POST only when there is a list to send: four hundred uuids do not fit in
   // a URL. Everything else stays a plain GET.
   const seen = request.seenIds ?? [];
-  const response = seen.length > 0
-    ? await fetch(`/api/feed?${params.toString()}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ seen }),
-        signal: request.signal,
-      })
-    : await fetch(`/api/feed?${params.toString()}`, { signal: request.signal });
+  // A failure is reported as one, never as an empty last page: the caller
+  // keeps its cursor and can ask again, where "no cursor" would end the feed.
+  const failed: FeedPage = { posts: [], cursor: null, available: true, failed: true };
+  try {
+    const response = seen.length > 0
+      ? await fetch(`/api/feed?${params.toString()}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ seen }),
+          signal: request.signal,
+        })
+      : await fetch(`/api/feed?${params.toString()}`, { signal: request.signal });
 
-  if (!response.ok) {
-    return { posts: [], cursor: null, available: true };
+    if (!response.ok) return failed;
+    const page = (await response.json()) as FeedPage;
+    return Array.isArray(page.posts) ? page : failed;
+  } catch {
+    // Offline, or aborted by a navigation.
+    return failed;
   }
-
-  return (await response.json()) as FeedPage;
 }
 
 export async function fetchComments(postId: string): Promise<FeedComment[]> {

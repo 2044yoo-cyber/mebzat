@@ -81,7 +81,13 @@ begin
   insert into probe values ('publishing sets visibility and a timestamp',
     d.visibility = 'public' and d.published_at is not null, d.visibility::text);
 
-  -- The feed card. Written by the author, under `feed_posts_write`.
+  -- Since 0109 publishing puts the card on the feed by itself.
+  insert into probe
+  select 'publishing reaches the feed without the app', count(*) = 1, count(*)::text
+  from public.feed_posts where entity_type = 'design' and entity_id = d.id and status = 'published';
+
+  -- The app's own card, written by the author under `feed_posts_write`, is
+  -- then the duplicate it already treats as done (23505).
   insert into public.feed_posts (
     kind, topic, title, body, author_id, author_key, author_name,
     link_href, link_label, entity_type, entity_id, status, published_at
@@ -91,7 +97,8 @@ begin
     'bbbbbbbb-0000-4000-8000-000000000001',
     'profile:bbbbbbbb-0000-4000-8000-000000000001', 'Probe author',
     '/designs/' || d.slug, 'Open the design', 'design', d.id, 'published', now()
-  );
+  )
+  on conflict do nothing;
 
   insert into probe
   select 'publishing puts one card on the feed', count(*) = 1, count(*)::text
@@ -133,7 +140,10 @@ begin
            'bbbbbbbb-0000-4000-8000-000000000001',
            'profile:bbbbbbbb-0000-4000-8000-000000000001', 'Probe author',
            'design', s.id, 'published', now()
-    from public.designs s where s.title = 'Second design';
+    from public.designs s where s.title = 'Second design'
+    -- Since 0109 a public design reaches the feed by itself; the app's own
+    -- insert after it is then the no-op it already treats a duplicate as.
+    on conflict do nothing;
 
     insert into probe
     select 'a second design still gets its own card', count(*) = 2, count(*)::text

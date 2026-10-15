@@ -91,6 +91,13 @@ export type FeedPost = {
 
   /** The ranking score. Carried back as the pagination cursor. */
   score: string;
+
+  /**
+   * Promoted by Medosha (an editorial boost, which only the platform can set)
+   * and real rather than sample content. The card says so; nothing else about
+   * it changes.
+   */
+  featured: boolean;
 };
 
 /**
@@ -104,6 +111,18 @@ export type FeedPage = {
   cursor: FeedCursor | null;
   /** False when the feed tables are not installed, so the page can say so. */
   available: boolean;
+  /**
+   * The page could not be read — a network or database failure, not the end
+   * of the feed. The client keeps its cursor and offers to try again rather
+   * than declaring there is nothing more.
+   */
+  failed?: boolean;
+  /**
+   * The clock this page was ranked against: the reading's start. Sightings
+   * are recorded against it, so the reading keeps ranking a card it has just
+   * shown as it did before showing it.
+   */
+  session?: string;
 };
 
 export type FeedCursor = {
