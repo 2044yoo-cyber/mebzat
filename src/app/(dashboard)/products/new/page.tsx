@@ -5,7 +5,7 @@ import { ProductForm } from "@/components/products/product-form";
 import { SELLABLE_CONDITIONS } from "@/lib/constants/product-categories";
 import { getProductCategories } from "@/lib/data/products";
 import { createClient } from "@/lib/supabase/server";
-import type { ProductCondition } from "@/types/database.types";
+import type { ProductCondition, ProductFulfilment } from "@/types/database.types";
 
 export const metadata: Metadata = { title: "Add Product" };
 
@@ -23,6 +23,11 @@ export default async function NewProductPage(props: {
       ? (raw as ProductCondition)
       : undefined;
 
+  // The same rule for `fulfilment`: only what the form offers.
+  const rawFulfilment = Array.isArray(sp.fulfilment) ? sp.fulfilment[0] : sp.fulfilment;
+  const fulfilment: ProductFulfilment | undefined =
+    rawFulfilment === "digital" || rawFulfilment === "rental" ? rawFulfilment : undefined;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -36,7 +41,9 @@ export default async function NewProductPage(props: {
     // the OAuth callback's name for the same idea and is ignored here.
     const target = condition
       ? `/products/new?condition=${condition}`
-      : "/products/new";
+      : fulfilment
+        ? `/products/new?fulfilment=${fulfilment}`
+        : "/products/new";
     redirect(`/login?redirect=${encodeURIComponent(target)}`);
   }
 
@@ -47,18 +54,21 @@ export default async function NewProductPage(props: {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          {secondHand ? "Sell something used" : "List a product"}
+          {secondHand ? "Sell something used" : fulfilment === "digital" ? "Sell a digital product" : "List a product"}
         </h1>
         <p className="text-muted-foreground">
           {secondHand
             ? "Photos, a price and an honest description of the condition. It publishes to Marketplace → Used Items."
-            : "Add photos, pricing, and details to publish this product to the marketplace."}
+            : fulfilment === "digital"
+              ? "A floor plan, CAD drawing, 3D model, BOQ or template: upload the file, set a price, and it publishes to Marketplace → Digital."
+              : "Add photos, pricing, and details to publish this product to the marketplace."}
         </p>
       </div>
       <ProductForm
         userId={user.id}
         categories={categories}
         initialCondition={condition}
+        initialFulfilment={fulfilment}
       />
     </div>
   );

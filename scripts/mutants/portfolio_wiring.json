@@ -1,0 +1,38 @@
+[
+ {
+  "name": "signed-out not redirected",
+  "file": "src/app/(dashboard)/projects/page.tsx",
+  "from": "  if (!user) redirect(\"/login?redirect=/projects\");",
+  "to": "  if (!user) redirect(\"/login\");"
+ },
+ {
+  "name": "stats swapped",
+  "file": "src/app/(dashboard)/projects/page.tsx",
+  "from": "          { label: \"Posts\", value: counts.designs },",
+  "to": "          { label: \"Posts\", value: counts.projects },"
+ },
+ {
+  "name": "first section read for nobody",
+  "file": "src/app/(dashboard)/projects/page.tsx",
+  "from": "readSectionPage(supabase, user.id, first, null, PAGE_SIZE)",
+  "to": "readSectionPage(supabase, String(query.owner ?? user.id), first, null, PAGE_SIZE)"
+ },
+ {
+  "name": "action takes an owner",
+  "file": "src/app/(dashboard)/projects/portfolio-actions.ts",
+  "from": "export async function loadPortfolioPage(section: string, cursor: string | null, limit: number = PAGE_SIZE)",
+  "to": "export async function loadPortfolioPage(section: string, cursor: string | null, limit: number = PAGE_SIZE, owner?: string)"
+ },
+ {
+  "name": "fulfilment trusted",
+  "file": "src/app/(dashboard)/products/new/page.tsx",
+  "from": "    rawFulfilment === \"digital\" || rawFulfilment === \"rental\" ? rawFulfilment : undefined;",
+  "to": "    (rawFulfilment as ProductFulfilment | undefined);"
+ },
+ {
+  "name": "form ignores fulfilment",
+  "file": "src/components/products/product-form.tsx",
+  "from": "?? initialFulfilment ?? \"physical\",",
+  "to": "?? \"physical\","
+ }
+]

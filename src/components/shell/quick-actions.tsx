@@ -5,11 +5,13 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   Briefcase,
+  FileDown,
   FileSpreadsheet,
   HardHat,
   Home,
   MessageSquare,
   Package,
+  PenTool,
   Plus,
   Rotate3d,
   Sparkles,
@@ -78,12 +80,28 @@ export const QUICK_CREATE: (QuickCreate & { href: string })[] = [
     keywords: "used second hand salvage surplus reclaimed sell materials",
   },
   {
+    id: "digital",
+    label: "Sell Digital Product",
+    icon: FileDown,
+    href: "/products/new?fulfilment=digital",
+    hint: "Floor plans, CAD, 3D models, BOQs, templates",
+    keywords: "digital download file floor plan cad dwg 3d model boq template sketchup sell",
+  },
+  {
     id: "project",
     label: "Create Project",
     icon: HardHat,
     href: "/projects/new",
     hint: "Publish a build",
     keywords: "new project build portfolio showcase",
+  },
+  {
+    id: "design",
+    label: "Design Furniture",
+    icon: PenTool,
+    href: "/studio",
+    hint: "Wardrobes, kitchens, cabinets — priced as you draw",
+    keywords: "design furniture cabinet wardrobe kitchen studio berchuma",
   },
   {
     id: "service",
