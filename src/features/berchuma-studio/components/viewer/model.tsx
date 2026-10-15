@@ -539,6 +539,14 @@ function PartMesh({
         emissiveIntensity={part.role === "led" ? 1.4 : doorSelected ? 0.35 : selected && !accentColour(part, spec) ? 0.22 : 0}
       />
       {visualMode === "connections" ? <lineSegments raycast={() => null}><edgesGeometry args={[shapedGeometry ?? new THREE.BoxGeometry(...size)]} /><lineBasicMaterial color="#111827" linewidth={1} /></lineSegments> : null}
+      {visualMode === "exploded" ? (
+        <DimensionLabel
+          text={`${part.label} · ${Math.round(part.size.x)}×${Math.round(part.size.y)}×${Math.round(part.size.z)} mm`}
+          position={[0, size[1] / 2 + 0.045, 0]}
+          scale={Math.max(0.65, Math.min(1.15, Math.max(...size) * 1.5))}
+          tone="brand"
+        />
+      ) : null}
       {part.frontGrip === "handle" && part.doorStyle !== "fixed" && !part.internal ? (
         <mesh position={part.role === "drawer_front"
           ? [0, size[1] / 2 - 0.025, size[2] / 2 + 0.007]
