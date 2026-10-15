@@ -29,6 +29,7 @@ import {
   layOutBays,
 } from "../../services/bay-layout";
 import { buildParts } from "../../services/geometry";
+import { cutListPartTags } from "../../services/cutlist";
 import { visibleKitchenParts } from "../../services/kitchen-construction";
 import { partCentre, partRotationRadians } from "../../services/part-transform";
 import { cabinetCentres, closureJoins, explodedOffset } from "../../services/exploded";
@@ -140,7 +141,11 @@ export default function Model({
 }) {
   // Every part, fronts included: the dimensions measure the drawer fronts
   // even while they are taken off to show what is inside.
-  const allParts = useMemo(() => visibleKitchenParts(buildParts(spec).parts, hideCountertop), [spec, hideCountertop]);
+  const breakdown = useMemo(() => buildParts(spec), [spec]);
+  const allParts = useMemo(() => visibleKitchenParts(breakdown.parts, hideCountertop), [breakdown, hideCountertop]);
+  // These are the same Part IDs printed on the cut list, not a second numbering scheme.
+  const partTags = useMemo(() => cutListPartTags(spec, breakdown.parts), [spec, breakdown]);
+  const showPartTags = exploded || visualMode === "exploded" || visualMode === "connections";
   const parts = useMemo(() => {
     // A closure panel hidden in the list is still made; it is only not drawn.
     const shown = allParts.filter((part) => !part.closure?.hidden);
@@ -262,6 +267,8 @@ export default function Model({
             <PartMesh
               key={`${part.id}-${index}`}
               part={part}
+              tag={partTags.get(part.id) ?? null}
+              showTag={showPartTags}
               placement={placement}
               offset={exploded ? explodedOffset(part, placement, centres.get(part.cabinetId ?? "") ?? placement, 1) : null}
               outline={outlines || exploded}
@@ -360,7 +367,7 @@ export default function Model({
                   <lineBasicMaterial attach="material" color="#f4a63a" />
                 </line>
               ) : null}
-              {exploded ? <DimensionLabel text={part.label.split(" — ")[0]!} position={[from.x, from.y + 0.05, from.z]} scale={Math.max(1, reach * 0.4)} /> : null}
+
             </group>
           );
         }) : null}
@@ -498,6 +505,8 @@ function PartMesh({
   offset = null,
   outline = false,
   closureSelected = false,
+  tag = null,
+  showTag = false,
   spec,
   surface = "model",
   visualMode = "normal",
@@ -515,6 +524,9 @@ function PartMesh({
   /** Draws the board's outline, as the connection view shows each one. */
   outline?: boolean;
   closureSelected?: boolean;
+  /** The cut-list Part ID displayed when inspecting exploded/connections views. */
+  tag?: string | null;
+  showTag?: boolean;
   spec: DesignSpec;
   surface?: SurfaceView;
   visualMode?: "normal" | "connections" | "exploded";
@@ -590,6 +602,13 @@ function PartMesh({
       }
     >
       {shapedGeometry ? <primitive object={shapedGeometry} attach="geometry" /> : <boxGeometry args={size} />}
+      {showTag && tag ? (
+        <DimensionLabel
+          text={tag}
+          position={[0, 0, size[2] / 2 + 0.012]}
+          scale={0.9}
+        />
+      ) : null}
       <meshStandardMaterial
         color={visualMode === "connections" ? "#f5f5f2" : colourFor(part, spec, surface)}
         roughness={roughnessFor(part, spec)}
