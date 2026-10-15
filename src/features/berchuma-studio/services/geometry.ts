@@ -563,12 +563,13 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   const methods = constructionMethods(spec);
   const backBoard = materials.back;
   const backThickness = backBoard.thickness;
-  // The 6 mm back is applied at the rear of the shell. Carcass boards stop at
-  // its front face, so the complete cabinet still keeps its specified depth
-  // without the back intersecting gables, dividers or top/bottom boards.
-  const shellDepth = methods.backFixing === "inset" ? depth : depth - backThickness;
-  /** Usable depth in front of the applied back panel. */
-  const interiorDepth = depth - backThickness;
+  // Cabinet depth is the specified carcass depth. The back panel is a
+  // separate rear-mounted component and must not silently deduct its thickness
+  // from the user's requested depth (for example, 480 mm must remain 480 mm).
+  // Back placement is handled independently below.
+  const shellDepth = depth;
+  /** Use the full specified depth; back thickness is not deducted here. */
+  const interiorDepth = depth;
 
   const push = (part: Omit<Part, "edgeBand">, edgeBand = bodyBand) =>
     parts.push({ ...part, edgeBand });
