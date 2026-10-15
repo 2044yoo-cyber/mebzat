@@ -297,6 +297,10 @@ export type ViewState = {
   frameView: FrameView;
   /** How many placement zones have been poured, for the placement sequence. */
   pourStep: number;
+  /** How much of each blockwork wall is built (0 to 1) while the masonry stage is taught. */
+  wallProgress: number;
+  /** Show reinforcement that is inside finished concrete (set when a layer is isolated). */
+  showEmbedded: boolean;
   storeysOff: string[];
   categoriesOff: CategoryId[];
   layersOff: LayerId[];
@@ -317,8 +321,10 @@ export const DEFAULT_VIEW: ViewState = {
   stage: 1,
   onlyThisStage: false,
   ghostFuture: false,
-  frameView: "completed",
+  frameView: "complete",
   pourStep: 99,
+  wallProgress: 1,
+  showEmbedded: false,
   storeysOff: [],
   categoriesOff: [],
   layersOff: [],
