@@ -23,7 +23,7 @@ import { LengthField, LengthInput } from "../ui/length-field";
 import { DisplayPanel, WardrobeDisplayTools, ZoneEditor } from "./display-panel";
 import { HeightModulesPanel } from "./height-modules-panel";
 import { ZekoloDesignPanel, ZekoloPanel } from "./zekolo-panel";
-import { ClosurePanelSection } from "./closure-panel";
+import { ClosurePanelSection, DoorFitting } from "./closure-panel";
 import { JointPanel, TransportPanel, type JointRef } from "./transport-panel";
 import { isSideDisplay } from "../../services/geometry";
 
@@ -372,7 +372,8 @@ function DoorSizing({
     );
 
   return (
-    <Section title="Door" icon={DoorOpen} defaultOpen>
+    <Section title="Door options" icon={DoorOpen} defaultOpen>
+      <DoorFitting spec={spec} onChange={onChange} />
       <p className="text-[11px] text-muted-foreground">
         {leaf.style === "sliding" ? "Sliding" : leaf.style === "bifold" ? "Bifold" : "Hinged"} door
         {leaf.leaves > 1 ? ` · leaf ${leaf.leaf + 1} of ${leaf.leaves}` : ""}
