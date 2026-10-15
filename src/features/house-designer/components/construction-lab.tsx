@@ -15,6 +15,7 @@ import {
 } from "../construction/types";
 import { indexModel, resetView, setStage, stepStage } from "../construction/view";
 import type { HouseProject } from "../types/project";
+import { layoutLabels } from "../construction/label-layout";
 import type { CameraPreset, ScreenLabel } from "./construction-scene";
 import { EstimatePanel, InspectorPanel, LayersPanel, LessonPanel, PartsPanel, QuantitiesPanel, Section, Segmented, stageCounts } from "./construction-panels";
 
@@ -114,7 +115,7 @@ export function ConstructionLab({ project }: { project: HouseProject }) {
           </div>
           <button type="button" aria-label="Next stage" data-testid="stage-next" disabled={view.stage === 18} onClick={() => setView((v) => stepStage(v, 1))} className="flex size-10 shrink-0 items-center justify-center rounded-lg border disabled:opacity-40"><ChevronRight className="size-5" /></button>
         </div>
-        <div role="tablist" aria-label="Construction stages" className="mt-2 flex gap-1 overflow-x-auto pb-1">
+        <div role="tablist" aria-label="Construction stages" className="relative mt-2 flex gap-1 overflow-x-auto pb-1">
           {STAGE_IDS.map((s) => (
             <button key={s} type="button" role="tab" aria-selected={s === view.stage} data-stage={s} title={STAGE_BY_ID[s].title} onClick={() => goStage(s)} className={cn("flex min-h-10 min-w-[3.6rem] shrink-0 flex-col items-center justify-center rounded-lg border px-1.5 text-[10px] leading-tight", s === view.stage ? "border-brand bg-brand text-brand-foreground" : s < view.stage ? "bg-muted text-foreground" : "text-muted-foreground")}>
               <span className="text-xs font-semibold">{s}</span>
@@ -155,7 +156,7 @@ export function ConstructionLab({ project }: { project: HouseProject }) {
         </div>
 
         <aside className="min-w-0 space-y-2" aria-label="Details">
-          <div role="tablist" aria-label="Panels" className="flex gap-1 overflow-x-auto rounded-xl bg-muted p-1">
+          <div role="tablist" aria-label="Panels" className="relative flex gap-1 overflow-x-auto rounded-xl bg-muted p-1">
             {tabs.map((t) => (
               <button key={t.id} type="button" role="tab" aria-selected={activeTab === t.id} onClick={() => { setTab(t.id); setSettingsOpen(false); }} data-tab={t.id} className={cn("min-h-9 shrink-0 flex-1 rounded-lg px-3 text-xs font-semibold", activeTab === t.id ? "bg-background text-brand shadow-sm" : "text-muted-foreground")}>{t.id === "selected" && view.selectedId ? "Selected part •" : t.label}</button>
             ))}
@@ -184,13 +185,21 @@ export function ConstructionLab({ project }: { project: HouseProject }) {
 /** Labels with leader lines ------------------------------------------------------ */
 
 function LabelLayer({ labels, onPick }: { labels: ScreenLabel[]; onPick: (id: string) => void }) {
+  const width = labels[0]?.width ?? 0;
+  const height = labels[0]?.height ?? 0;
+  const boxes = useMemo(() => layoutLabels(labels.filter((l) => l.x >= 0 && l.y >= 0 && l.x <= width && l.y <= height), width, height), [labels, width, height]);
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" data-testid="label-layer">
       <svg className="absolute inset-0 size-full" aria-hidden>
-        {labels.map((l, i) => { const bx = l.x + 26; const by = l.y - 24 - (i % 3) * 18; return <g key={l.id}><line x1={l.x} y1={l.y} x2={bx} y2={by} stroke="#1473e6" strokeWidth="1.2" /><circle cx={l.x} cy={l.y} r="3" fill="#1473e6" /></g>; })}
+        {boxes.map((l) => (
+          <g key={l.id}>
+            <line x1={l.x} y1={l.y} x2={Math.min(Math.max(l.x, l.bx), l.bx + l.w)} y2={l.by + l.h / 2} stroke="#1473e6" strokeWidth="1.2" />
+            <circle cx={l.x} cy={l.y} r="3" fill="#1473e6" />
+          </g>
+        ))}
       </svg>
-      {labels.map((l, i) => (
-        <button key={l.id} type="button" data-label-for={l.id} onClick={() => onPick(l.id)} style={{ left: l.x + 26, top: l.y - 24 - (i % 3) * 18, transform: "translate(0,-100%)" }} className="pointer-events-auto absolute max-w-40 truncate rounded-md border border-brand/40 bg-background/95 px-2 py-1 text-[11px] font-medium shadow-sm">{l.text}</button>
+      {boxes.map((l) => (
+        <button key={l.id} type="button" data-label-for={l.id} onClick={() => onPick(l.id)} style={{ left: l.bx, top: l.by, width: l.w, height: l.h }} className="pointer-events-auto absolute truncate rounded-md border border-brand/40 bg-background/95 px-2 text-left text-[11px] font-medium leading-[20px] shadow-sm">{l.text}</button>
       ))}
     </div>
   );

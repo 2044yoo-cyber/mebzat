@@ -18,8 +18,6 @@ const SASH = 40;
 const SILL_DROP = 40;
 const SILL_PROJECTION = 60;
 
-const slug = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
 /** A box in wall coordinates: `s0..s1` along the wall, `n0..n1` across it (positive to the left), `z0..z1` up. */
 function wb(wall: WallFrame, base: number, s0: number, s1: number, n0: number, n1: number, z0: number, z1: number): Shape {
   const c = onWall(wall, (s0 + s1) / 2, (n0 + n1) / 2);
@@ -116,8 +114,8 @@ function opening(ctx: Ctx, level: LevelInfo, wall: WallFrame, o: OpeningFrame): 
       // Hardware: three hinges and a lock set.
       const hs = hingeAtStart ? o.s0 + FRAME - 6 : o.s1 - FRAME + 6;
       const ls = hingeAtStart ? o.s1 - FRAME - CLEAR - 60 : o.s0 + FRAME + CLEAR + 60;
-      const hp = (s: number, _z: number): P2 => onWall(wall, s, 0);
-      const hinges: Shape[] = [o.z0 + 200, (o.z0 + o.z1) / 2, o.z1 - 250].map((z) => cyl(hp(hs, z).x, hp(hs, z).y, base + z, 6, 90, "z"));
+      const hp = (s: number): P2 => onWall(wall, s, 0);
+      const hinges: Shape[] = [o.z0 + 200, (o.z0 + o.z1) / 2, o.z1 - 250].map((z) => cyl(hp(hs).x, hp(hs).y, base + z, 6, 90, "z"));
       const lockCentre = onWall(wall, ls, 0);
       const handle: Shape[] = [wb(wall, base, ls - 70, ls + 70, LEAF / 2, LEAF / 2 + 8, o.z0 + 1000, o.z0 + 1030), wb(wall, base, ls - 70, ls + 70, -LEAF / 2 - 8, -LEAF / 2, o.z0 + 1000, o.z0 + 1030), cyl(lockCentre.x, lockCentre.y, base + o.z0 + 1000, 8, 40, "z")];
       const hw = ctx.add({

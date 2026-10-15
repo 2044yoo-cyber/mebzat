@@ -1,5 +1,5 @@
 import { ASSUME, UP, dim, onWall, type Ctx, type WallFrame } from "../context";
-import { alongLine, box, boxAt, cyl, netVolumes, prismOfShape, v3, type P2, type Prism, type Shape } from "../geometry";
+import { alongLine, box, boxAt, cyl, netVolumes, prismOfShape, v3, type Prism, type Shape } from "../geometry";
 import { addQuantity, barBetween, concreteQuantity, f2, f3, formworkQuantity, hoopXY, m2, m3, rebarQuantity, round, spaced } from "../helpers";
 import { footingGroups, groundBeams, pedestalsOf } from "../structure-data";
 
@@ -134,7 +134,6 @@ export function generateFoundation(ctx: Ctx): void {
   beams.forEach((beam, index) => {
     const net = nets[pedestals.length + index]!;
     const sid = beam.id.replace(/[^\w]+/g, "-");
-    const grid = ctx.gridSpanX(ground.levelId, (beam.a.x + beam.b.x) / 2) ?? undefined;
     const depth = beam.z1 - beam.z0;
     const concrete = ctx.add({
       id: `found:${sid}`, name: `Ground beam ${beam.fromColumn ? ctx.gridRef(ground.levelId, beam.a.x, beam.a.y) : ""}–${ctx.gridRef(ground.levelId, beam.b.x, beam.b.y) ?? ""}`, kind: "ground-beam", category: "substructure", subcategory: "Ground beams", stage: 3, layer: "concrete", materialId: "concrete",

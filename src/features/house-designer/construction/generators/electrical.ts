@@ -1,4 +1,4 @@
-import { onWall, type Ctx, type LevelInfo } from "../context";
+import { onWall, type Ctx } from "../context";
 import { box, cyl, v3, type P2, type Shape } from "../geometry";
 import { addQuantity, f2, round } from "../helpers";
 import { freeRuns, longestFreeRun, manhattan, onEdge, roomLayout, wallBox, type Edge, type RoomLayout } from "../layout";
@@ -66,13 +66,13 @@ export function generateElectrical(ctx: Ctx): void {
   });
   addQuantity(ctx, service, { workItem: "electrical.conduit", description: "Conduit", section: "Q", unit: "m", value: round(svc.length / 1000, 3), formula: `Σ straight segments = ${f2(svc.length / 1000)} m`, inputs: { length: round(svc.length, 0) }, status: "assumed" }, { allowance: { rule: "Bends, offsets and waste (example assumption)", percent: ctx.rules.allowances.conduit } });
 
-  const boardPlan = (level: LevelInfo): P2 => ({ x: dbPlan.x, y: dbPlan.y });
+  const boardPlan = (): P2 => ({ x: dbPlan.x, y: dbPlan.y });
   const riserShapes: Shape[] = [];
   let riserLen = 0;
   const boardIds: string[] = [];
   const firstRoomId = new Map<string, string>();
   for (const level of ctx.levels) {
-    const p = boardPlan(level);
+    const p = boardPlan();
     const board = ctx.add({
       id: `elec:${level.index}:board`, name: `Distribution board — ${level.name}`, kind: "distribution-board", category: "electrical", subcategory: "Distribution", stage: 9, level, layer: "electrical", materialId: "switchgear",
       shapes: [wallBox({ room: hall, level, clear: hallLayout.clear, edges: hallLayout.edges }, dbEdge, dbT, DB_H, 300, 400, 100)], source: "schematic", room: hall.name, explode: { layerIndex: 0, dir: v3(dbEdge.nx, dbEdge.ny, 0) },
@@ -134,7 +134,7 @@ export function generateElectrical(ctx: Ctx): void {
       const conduit: Shape[] = [];
       let conduitLen = 0;
       const add = (pts: { x: number; y: number; z: number }[]) => { const m = manhattan(pts, CONDUIT); conduit.push(...m.shapes); conduitLen += m.length; };
-      const bp = boardPlan(level);
+      const bp = boardPlan();
       add([{ x: bp.x + dbEdge.nx * 60, y: bp.y + dbEdge.ny * 60, z: level.floorZ + DB_H + 200 }, { x: bp.x + dbEdge.nx * 60, y: bp.y + dbEdge.ny * 60, z: zc + lift }, { x: light.x, y: bp.y + dbEdge.ny * 60, z: zc + lift }, { x: light.x, y: light.y, z: zc + lift }]);
       for (const s of switches) {
         const w = onEdge(s.edge, s.t, -40);

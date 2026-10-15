@@ -1,0 +1,86 @@
+[
+ {
+  "name": "timeline: stage chips do nothing",
+  "file": "src/features/house-designer/components/construction-lab.tsx",
+  "from": "const goStage = (stage: StageId) => setView((v) => setStage(v, stage));",
+  "to": "const goStage = (_stage: StageId) => setView((v) => v);"
+ },
+ {
+  "name": "timeline: next does not advance",
+  "file": "src/features/house-designer/components/construction-lab.tsx",
+  "from": "setView((v) => stepStage(v, 1))",
+  "to": "setView((v) => v)"
+ },
+ {
+  "name": "touching the model selects nothing",
+  "file": "src/features/house-designer/components/construction-scene.tsx",
+  "from": "if (owner) onPick(owner.id, owner.shapes.length > 1 ? group.shape[i]! : null);",
+  "to": "if (false) onPick(owner!.id, null);"
+ },
+ {
+  "name": "selection does not open the part panel",
+  "file": "src/features/house-designer/components/construction-lab.tsx",
+  "from": "    setTab(\"selected\");\n  }, []);",
+  "to": "  }, []);"
+ },
+ {
+  "name": "explode slider does nothing",
+  "file": "src/features/house-designer/components/construction-lab.tsx",
+  "from": "onChange={(e) => setEx({ amount: Number(e.target.value) })}",
+  "to": "onChange={() => setEx({ amount: 0 })}"
+ },
+ {
+  "name": "assemble does not assemble",
+  "file": "src/features/house-designer/components/construction-lab.tsx",
+  "from": "data-testid=\"assemble\" onClick={() => setEx({ amount: 0 })}",
+  "to": "data-testid=\"assemble\" onClick={() => setEx({})}"
+ },
+ {
+  "name": "reset model does nothing",
+  "file": "src/features/house-designer/components/construction-lab.tsx",
+  "from": "onClick={() => setView((v) => ({ ...resetView(options), stage: v.stage }))}",
+  "to": "onClick={() => setView((v) => v)}"
+ },
+ {
+  "name": "hiding a floor does nothing",
+  "file": "src/features/house-designer/components/construction-panels.tsx",
+  "from": "onClick={() => onView({ storeysOff: toggleIn(view.storeysOff, s.id) })}",
+  "to": "onClick={() => onView({})}"
+ },
+ {
+  "name": "quantity lines do not light up their parts",
+  "file": "src/features/house-designer/components/construction-panels.tsx",
+  "from": "onHighlight(isOpen ? [] : l.componentIds);",
+  "to": "onHighlight([]);"
+ },
+ {
+  "name": "the estimate can price",
+  "file": "src/features/house-designer/components/construction-panels.tsx",
+  "from": "<button type=\"button\" disabled className=\"min-h-11 w-full rounded-xl border bg-muted",
+  "to": "<button type=\"button\" className=\"min-h-11 w-full rounded-xl border bg-muted"
+ },
+ {
+  "name": "missing data is not shown",
+  "file": "src/features/house-designer/components/construction-panels.tsx",
+  "from": "{missing.length ? (\n        <div className=\"rounded-xl border border-red-200",
+  "to": "{false ? (\n        <div className=\"rounded-xl border border-red-200"
+ },
+ {
+  "name": "the learning notice is dropped",
+  "file": "src/features/house-designer/components/construction-lab.tsx",
+  "from": "Dimensions, reinforcement and services are examples for teaching the order of work \u2014 not a design, and not safe or ready to build.",
+  "to": "Learn how houses are built."
+ },
+ {
+  "name": "selected parts are not lit",
+  "file": "src/features/house-designer/construction/draw-list.ts",
+  "from": "const selectedComponent = view.selectedId === c.id || view.highlightIds.includes(c.id);",
+  "to": "const selectedComponent = false;"
+ },
+ {
+  "name": "the frame views are not offered",
+  "file": "src/features/house-designer/components/construction-lab.tsx",
+  "from": "if (s === 3 || s === 5) {",
+  "to": "if (s === -1) {"
+ }
+]

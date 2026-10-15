@@ -89,7 +89,6 @@ export function generatePlumbing(ctx: Ctx): void {
   const utilRun = utilLayout ? longestFreeRun(utilLayout, 250) : null;
   const pumpPlan: P2 = utilLayout && utilRun ? onEdge(utilRun.edge, utilRun.t0 + 250, 250) : { x: b.maxX - 800, y: b.maxY - 800 };
   const entry: P2 = { x: pumpPlan.x, y: b.minY - 3000 };
-  const roofB = { cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2 };
   const tankPlan: P2 = { x: pumpPlan.x, y: Math.min(b.maxY - 900, pumpPlan.y) };
   const tankZ = roofTop + 1500;
   const mains = manhattan([at(entry, ASSUME.naturalGround - 150), at({ x: entry.x, y: pumpPlan.y }, ASSUME.naturalGround - 150), at(pumpPlan, ASSUME.naturalGround - 150), at(pumpPlan, 300)], 25);

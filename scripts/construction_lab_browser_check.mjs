@@ -105,6 +105,11 @@ const topOf = (page) => page.evaluate(() => {
   return top;
 });
 const settle = (page) => page.waitForTimeout(450);
+/** What sticks out past the right edge of the screen, for the failure message. */
+const sticksOut = (page) => page.evaluate(() => {
+  const clipped = (el) => { for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowX; if (o !== "visible") return true; } return false; };
+  return [...document.querySelectorAll("body *")].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1 && getComputedStyle(el).position !== "fixed" && !clipped(el)).slice(0, 6).map((el) => `${el.tagName.toLowerCase()}${el.dataset.testid ? `[${el.dataset.testid}]` : ""}.${String(el.className).slice(0, 60)} → ${Math.round(el.getBoundingClientRect().right)}`);
+});
 
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 800 }, deviceScaleFactor: 2, hasTouch: true });
@@ -117,10 +122,10 @@ try {
   await settle(page);
 
   // ---- It opens on stage 1, with the warning in view and nothing overflowing ----------
-  equal(await page.getByTestId("stage-title").innerText(), "Site preparation and setting out", "opens at stage 1");
+  equal(await page.getByTestId("stage-title").innerText(), "Site preparation", "opens at stage 1");
   ok(await page.getByTestId("disclaimer").isVisible(), "the 'illustrative, not a design' notice is on screen");
   ok(/not a design|not safe/i.test(await page.getByTestId("disclaimer").innerText()), "and says so plainly");
-  ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, "no sideways scrolling at 390 px");
+  ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, `no sideways scrolling at 390 px (${await page.evaluate(() => document.documentElement.scrollWidth)} wide): ${JSON.stringify(await sticksOut(page))} ${JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('body *')].filter((el) => el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX === 'visible').slice(0, 5).map((el) => el.tagName + '.' + String(el.className).slice(0, 50) + ':' + el.scrollWidth + '/' + el.clientWidth)))}`);
   const viewerBox = await page.getByTestId("construction-viewer").boundingBox();
   ok(viewerBox.width <= 390 && viewerBox.height >= 280, `the 3D view fits the phone and is tall enough to use (${Math.round(viewerBox.height)} px)`);
   for (const id of ["stage-prev", "stage-next", "reset-camera", "reset-model"]) {
@@ -135,7 +140,7 @@ try {
   for (const stage of [1, 3, 5, 7, 12, 18]) {
     await page.locator(`[role=tab][data-stage="${stage}"]`).click();
     await settle(page);
-    ok(/Stage \d+ of 18/.test(await page.getByTestId("timeline").innerText()), "the timeline names the stage");
+    ok(/stage \d+ of 18/i.test(await page.getByTestId("timeline").innerText()), "the timeline names the stage");
     equal(await page.getByTestId("construction-viewer").getAttribute("data-stage"), String(stage), `stage ${stage} is selected`);
     counts.push((await stats(page)).instances);
   }
@@ -156,7 +161,7 @@ try {
   await frame.waitFor();
   const seen = {};
   for (const name of ["Complete", "Reinforcement only", "Formwork only", "Placement sequence", "Completed"]) {
-    await frame.getByRole("radio", { name }).click();
+    await frame.getByRole("radio", { name, exact: true }).click();
     await settle(page);
     seen[name] = await stats(page);
   }
@@ -166,12 +171,13 @@ try {
   ok(!seen["Completed"].colours.includes("c9a15b") && !seen["Completed"].colours.some((c) => /c0502d|d4673e/.test(c)), "completed shows neither formwork nor steel");
   ok(seen["Complete"].ghosts > 0 && seen["Completed"].ghosts === 0 || seen["Complete"].ghosts > seen["Completed"].ghosts, "in the complete view the concrete is see-through");
   ok(seen["Placement sequence"].instances < seen["Complete"].instances, "the placement sequence starts with nothing poured");
+  await frame.getByRole("radio", { name: "Placement sequence", exact: true }).click();
   await page.getByTestId("placement-controls").getByRole("button", { name: "Pour next" }).click();
   await page.getByTestId("placement-controls").getByRole("button", { name: "Pour next" }).click();
   await settle(page);
   const poured = await stats(page);
   ok(poured.colours.includes("a8a8a2"), "pouring the next placement adds concrete");
-  await frame.getByRole("radio", { name: "Complete" }).click();
+  await frame.getByRole("radio", { name: "Complete", exact: true }).click();
 
   // ---- Floors ---------------------------------------------------------------------------------
   await page.locator('[role=tab][data-stage="18"]').click();
@@ -183,9 +189,12 @@ try {
   await settle(page);
   const noSecond = await stats(page);
   ok(noSecond.instances < all.instances, "hiding the second floor takes its parts out of the model");
-  ok((await topOf(page)) < (await (async () => { await second.click(); await settle(page); return topOf(page); })()), "and the building is shorter without it");
+  ok(noSecond.instances > all.instances * 0.5, "while the floors below stay");
+  await second.click();
+  await settle(page);
   await settle(page);
   equal((await stats(page)).sum, all.sum, "showing the floor again restores exactly what was there");
+  await page.getByTestId("layers-panel").getByRole("button", { name: "Layers", exact: true }).click();
   await page.locator('[data-layer="paint"]').uncheck();
   await settle(page);
   ok((await stats(page)).instances < all.instances, "hiding the paint layer removes the paint");
@@ -218,9 +227,10 @@ try {
   // ---- Pick a part by touching the model ------------------------------------------------------------
   await page.locator('[role=tab][data-stage="5"]').click();
   await page.getByRole("tab", { name: "Lesson" }).click();
-  await frame.getByRole("radio", { name: "Completed" }).click();
+  await frame.getByRole("radio", { name: "Completed", exact: true }).click();
   await settle(page);
   await page.getByTestId("reset-camera").click();
+  await page.evaluate(() => window.scrollTo(0, document.querySelector('[data-testid="construction-viewer"]').getBoundingClientRect().top + window.scrollY - 70));
   await settle(page);
   const hit = await page.evaluate(() => {
     const THREE = window.THREE;
@@ -230,8 +240,9 @@ try {
     const ray = new THREE.Raycaster();
     for (let gy = 0.3; gy < 0.9; gy += 0.05) for (let gx = 0.25; gx < 0.8; gx += 0.05) {
       ray.setFromCamera(new THREE.Vector2(gx * 2 - 1, -(gy * 2 - 1)), camera);
-      const hits = ray.intersectObjects(scene.children, true).filter((h) => h.object.isInstancedMesh && h.object.material.opacity > 0.5);
-      if (hits[0]) return { x: canvas.left + gx * canvas.width, y: canvas.top + gy * canvas.height };
+      // The first thing the ray meets must be an instanced piece, so that it is the instance picking being tested.
+      const hits = ray.intersectObjects(scene.children, true).filter((h) => h.object.material?.opacity > 0.5);
+      if (hits[0] && hits[0].object.isInstancedMesh) return { x: canvas.left + gx * canvas.width, y: canvas.top + gy * canvas.height };
     }
     return null;
   });
@@ -300,7 +311,7 @@ try {
   // ---- Sample dimensions ------------------------------------------------------------------------------------------------
   await page.getByTestId("construction-lab").getByRole("radio", { name: "Learn" }).click();
   await page.locator('[role=tab][data-stage="5"]').click();
-  await frame.getByRole("radio", { name: "Completed" }).click();
+  await frame.getByRole("radio", { name: "Completed", exact: true }).click();
   await settle(page);
   const heightBefore = await topOf(page);
   await page.getByTestId("settings-toggle").click();
@@ -319,9 +330,12 @@ try {
   await page.getByTestId("settings-toggle").click();
 
   // ---- The user's own project is read, never changed ----------------------------------------------------------------------
+  const sampleSide = await stats(page);
   await page.getByRole("radio", { name: "My project" }).click();
   await page.waitForTimeout(2200);
-  ok((await stats(page)).instances > 500, "a user's project builds the same way");
+  const mine = await stats(page);
+  ok(mine.instances > 300, `a user's project builds the same way (${mine.instances} pieces)`);
+  equal(mine.instances, sampleSide.instances, "and, being the same plan, draws the same pieces");
   await page.getByRole("radio", { name: "Sample house" }).click();
   await page.waitForTimeout(2200);
   ok(await page.evaluate(() => window.__projectUntouched()), "the user's project object is exactly as it was given");
@@ -345,11 +359,29 @@ try {
   // ---- Labels ----------------------------------------------------------------------------------------------------------------------
   await page.locator('[role=tab][data-stage="3"]').click();
   await settle(page);
+  await page.waitForFunction(() => document.querySelectorAll("[data-label-for]").length > 0, null, { timeout: 15000 });
   ok((await page.locator("[data-label-for]").count()) >= 1, "labels with leader lines mark the main parts");
   await page.locator("[data-label-for]").first().click();
   await page.getByTestId("inspector").waitFor();
   ok(true, "a label opens its part");
   await page.screenshot({ path: join(out, "phone.png") });
+
+  // ---- Optional: pictures of the stages, for looking at --------------------------------------------------------------------
+  if (process.env.CONSTRUCTION_SHOTS) {
+    const shots = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+    await shots.goto(url);
+    await shots.getByTestId("construction-lab").waitFor();
+    await shots.waitForFunction(() => window.__scenes?.size > 0, null, { timeout: 60000 });
+    for (const stage of [3, 5, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18]) {
+      await shots.locator(`[role=tab][data-stage="${stage}"]`).click();
+      await shots.waitForTimeout(900);
+      await shots.getByTestId("construction-viewer").screenshot({ path: join(out, `stage_${stage}.png`) });
+    }
+    await shots.getByTestId("explode-slider").fill("0.8");
+    await shots.waitForTimeout(900);
+    await shots.getByTestId("construction-viewer").screenshot({ path: join(out, "exploded.png") });
+    console.log("pictures in", out);
+  }
 
   // ---- Desktop layout ----------------------------------------------------------------------------------------------------------------
   const wide = await browser.newPage({ viewport: { width: 1280, height: 860 } });

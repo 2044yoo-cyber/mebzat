@@ -115,7 +115,6 @@ export function generateStairs(ctx: Ctx): void {
     });
     const riserFace = (pieces.length) * (params.stairWidth) * riser * 1e-6;
     addQuantity(ctx, fin, { workItem: "flooring.stair", description: "Stair tread and riser finish", section: "K", unit: "m²", value: round(treadsArea + riserFace, 3), formula: `treads ${f2(treadsArea)} m² + risers ${pieces.length} × ${f3(params.stairWidth / 1000)} × ${f3(riser / 1000)} = ${f2(treadsArea + riserFace)} m²`, inputs: { treads: round(treadsArea, 3), risers: pieces.length, width: params.stairWidth }, status: "calculated" }, { allowance: { rule: "Tile cutting waste (example)", percent: ctx.rules.allowances.tiles }, assumptions: ["Riser faces taken as one flight width wide."] });
-    ctx.options.floorFinish;
 
     // Handrail on the inner side of each flight and balustrade round the opening at the upper floor.
     const hand: Shape[] = [];

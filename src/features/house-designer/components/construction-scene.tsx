@@ -19,7 +19,7 @@ const BRAND = "#1473e6";
 const PICK = "#ffb703";
 
 export type CameraPreset = "orbit" | "top" | "front" | "side";
-export type ScreenLabel = { id: string; text: string; x: number; y: number; z: number };
+export type ScreenLabel = { id: string; text: string; x: number; y: number; z: number; width: number; height: number };
 
 export function ConstructionScene({
   model,
@@ -42,7 +42,7 @@ export function ConstructionScene({
 }) {
   const index = useMemo(() => indexModel(model), [model]);
   const centre = useMemo(() => viewerCentre(model), [model]);
-  const building = useMemo(() => buildingBounds(model), [model]);
+  const building = useMemo(() => buildingBounds(model, view.stage <= 2), [model, view.stage <= 2]); // eslint-disable-line react-hooks/exhaustive-deps
   const visible = useMemo(() => visibleComponents(model, view, index), [model, view, index]);
   const list = useMemo(() => buildDrawList(model, index, view, visible, centre), [model, index, view, visible, centre]);
   const plane = useMemo(() => clipPlane(model, view, centre), [model, view, centre]);
@@ -194,7 +194,7 @@ function PrismGroup({ prism, list, centre, plane, onPick }: { prism: PrismDraw; 
 function LabelProbe({ list, model, view, centre, onLabels }: { list: DrawList; model: ConstructionModel; view: ViewState; centre: { x: number; y: number }; onLabels: (labels: ScreenLabel[]) => void }) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
-  const last = useRef("");
+  const last = useRef<string | null>(null);
   const anchors = useMemo(() => {
     const out: { id: string; text: string; at: THREE.Vector3; stage: number }[] = [];
     for (const c of list.owners) {
@@ -205,21 +205,21 @@ function LabelProbe({ list, model, view, centre, onLabels }: { list: DrawList; m
     }
     // The lesson being taught first, then the rest, and not so many that they crowd the model.
     out.sort((a, b) => Number(b.stage === view.stage) - Number(a.stage === view.stage) || b.stage - a.stage);
-    return out.slice(0, 14);
-  }, [list, model, view, centre]);
+    return out.slice(0, size.width < 520 ? 6 : 12);
+  }, [list, model, view, centre, size.width]);
   const v = useMemo(() => new THREE.Vector3(), []);
   useFrame(() => {
     const labels: ScreenLabel[] = [];
     for (const a of anchors) {
       v.copy(a.at).project(camera);
       if (v.z > 1 || v.z < -1) continue;
-      labels.push({ id: a.id, text: a.text, x: Math.round(((v.x + 1) / 2) * size.width), y: Math.round(((1 - v.y) / 2) * size.height), z: v.z });
+      labels.push({ id: a.id, text: a.text, x: Math.round(((v.x + 1) / 2) * size.width), y: Math.round(((1 - v.y) / 2) * size.height), z: v.z, width: size.width, height: size.height });
     }
     const signature = labels.map((l) => `${l.id}:${l.x}:${l.y}`).join("|");
     if (signature !== last.current) { last.current = signature; onLabels(labels); }
   });
   const invalidate = useThree((s) => s.invalidate);
-  useEffect(() => { last.current = ""; invalidate(); }, [anchors, invalidate]);
+  useEffect(() => { last.current = null; invalidate(); }, [anchors, invalidate]);
   return null;
 }
 
@@ -284,8 +284,9 @@ function CameraRig({ building, preset, resetKey, focusKey, focusTarget }: { buil
 }
 
 /** The building itself (frame, roof, walls), not the plot or the pits, for framing the camera. */
-function buildingBounds(model: ConstructionModel) {
-  const shapes = model.components.filter((c) => c.category === "frame" || c.category === "masonry" || c.category === "roof").flatMap((c) => c.shapes);
+function buildingBounds(model: ConstructionModel, site: boolean) {
+  // Setting out and excavation are about the whole plot; everything after is about the building.
+  const shapes = model.components.filter((c) => (site ? c.category === "site" : c.category === "frame" || c.category === "masonry" || c.category === "roof")).flatMap((c) => c.shapes);
   const { min, max } = boundsOf(shapes);
   const centre = viewerCentre(model);
   const lo = toViewer(min, centre);

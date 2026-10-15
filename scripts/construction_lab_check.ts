@@ -15,11 +15,12 @@ import { startingDesign } from "../src/features/berchuma-studio/services/startin
 import { buildParts } from "../src/features/berchuma-studio/services/geometry";
 import { createHouseProject, houseProjectSchema } from "../src/features/house-designer/types/project";
 import {
-  CATEGORY_IDS, DEFAULT_OPTIONS, DEFAULT_VIEW, LAYER_IDS, PROVENANCE, STAGES, STAGE_IDS, aggregateQuantities, buildConstructionModel, buildLearningHouseProject, buildLearningModel, countedComponents, cutPlane, describeComponent, explodeInfo,
+  CATEGORY_IDS, DEFAULT_OPTIONS, DEFAULT_VIEW, LAYER_IDS, PROVENANCE, STAGES, STAGE_IDS, aggregateQuantities, buildConstructionModel, buildLearningModel, cutPlane, describeComponent, explodeInfo,
   indexModel, isolateLayer, knowledgeFor, materialOf, missingData, normalizeParams, resetView, setStage, shapeOffset, shapeVisible, showStoreysUpTo, steelKgPerMetre, stepStage, subtreeOf, toBoqDraft, totalOf, visibilityOf,
   visibleComponents,
   type ComponentRecord, type ConstructionModel, type StageId, type ViewState,
 } from "../src/features/house-designer/construction";
+import { layoutLabels } from "../src/features/house-designer/construction/label-layout";
 import type { Shape } from "../src/features/house-designer/construction/geometry";
 
 let checks = 0;
@@ -321,6 +322,21 @@ const line = (workItem: string) => lines.find((l) => l.workItem === workItem);
 }
 
 // ---------------------------------------------------------------------------
+// Labels never overlap and never leave the view
+// ---------------------------------------------------------------------------
+{
+  const anchors = Array.from({ length: 14 }, (_, i) => ({ id: `a${i}`, text: `Label number ${i}`, x: 120 + (i % 3) * 14, y: 160 + (i % 2) * 6 }));
+  const boxes = layoutLabels(anchors, 360, 300);
+  ok(boxes.length >= 8, "crowded labels are mostly placed");
+  for (const a of boxes) {
+    ok(a.bx >= 0 && a.by >= 0 && a.bx + a.w <= 360 && a.by + a.h <= 300, `${a.id} stays inside the view`);
+    for (const b of boxes) if (a !== b) ok(a.bx >= b.bx + b.w || b.bx >= a.bx + a.w || a.by >= b.by + b.h || b.by >= a.by + a.h, `${a.id} and ${b.id} do not overlap`);
+  }
+  equal(layoutLabels([{ id: "x", text: "Lonely", x: 100, y: 100 }], 360, 300).length, 1, "a single label is placed");
+  equal(layoutLabels([{ id: "x", text: "Lonely", x: 100, y: 100 }], 20, 20).length, 0, "a label that cannot fit is left out rather than overlapping");
+}
+
+// ---------------------------------------------------------------------------
 // Selection and the learning panel
 // ---------------------------------------------------------------------------
 {
@@ -349,7 +365,6 @@ const line = (workItem: string) => lines.find((l) => l.workItem === workItem);
 // ---------------------------------------------------------------------------
 // Quantities: concrete counted once
 // ---------------------------------------------------------------------------
-type Prism = { poly: { x: number; y: number }[]; z0: number; z1: number; holes?: { x: number; y: number }[][] };
 function inPoly(x: number, y: number, poly: readonly { x: number; y: number }[]) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {

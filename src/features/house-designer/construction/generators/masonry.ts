@@ -248,7 +248,7 @@ export function generateMasonry(ctx: Ctx): void {
       const tieShapes: Shape[] = [];
       for (const iv of intervals) {
         for (const [edge, sign] of [[iv.a, 1], [iv.b, -1]] as const) {
-          const atColumn = cuts.some(([c0, c1]) => Math.abs(c1 - edge) < 2 && sign === 1) || cuts.some(([c0]) => Math.abs(c0 - edge) < 2 && sign === -1);
+          const atColumn = cuts.some(([, c1]) => Math.abs(c1 - edge) < 2 && sign === 1) || cuts.some(([c0]) => Math.abs(c0 - edge) < 2 && sign === -1);
           if (!atColumn) continue;
           for (let z = base + 300; z < topAt(iv.a, iv.b) - 150; z += TIE_SPACING) {
             const q = onWall(wall, edge + sign * 200);
