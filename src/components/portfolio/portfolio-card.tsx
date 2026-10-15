@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Eye, Heart, ImageOff, MessageSquare, ShoppingCart } from "lucide-react";
+import { Eye, Heart, ImageOff, MessageSquare, ShoppingCart, Pencil, Trash2, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { deletePost, getOwnPost, updatePost } from "@/app/community/actions";
 
 import { FrontDrawing } from "@/features/berchuma-studio/components/front-drawing-view";
 import type { PortfolioCard, SectionId } from "@/lib/portfolio/model";
@@ -77,6 +79,28 @@ export const SECTION_GRID: Record<SectionId, string> = {
 };
 
 export function PortfolioCardView({ card, section, onOpen }: { card: PortfolioCard; section: SectionId; onOpen: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const isOwnPost = card.source === "post";
+  const editPost = async () => {
+    setBusy(true); setMessage(null);
+    try {
+      const current = await getOwnPost(card.id);
+      if (!current.post) { setMessage(current.error ?? "Could not load post."); return; }
+      const title = window.prompt("Post title (leave blank for no title):", current.post.title);
+      if (title === null) return;
+      const body = window.prompt("Post text:", current.post.body);
+      if (body === null) return;
+      const result = await updatePost({ postId: card.id, title, body });
+      if (result.error) setMessage(result.error); else window.location.reload();
+    } finally { setBusy(false); }
+  };
+  const removePost = async () => {
+    if (!window.confirm("Delete this post? This cannot be undone.")) return;
+    setBusy(true); setMessage(null);
+    try { const result = await deletePost(card.id); if (result.error) setMessage(result.error); else window.location.reload(); }
+    finally { setBusy(false); }
+  };
   const base = "group relative block min-w-0 overflow-hidden rounded-2xl border bg-card transition-colors hover:border-brand/60 focus-visible:outline-2 focus-visible:outline-brand";
 
   // Words first: posts and jobs carry no picture, and an empty grey box above
@@ -91,6 +115,17 @@ export function PortfolioCardView({ card, section, onOpen }: { card: PortfolioCa
           <span className="truncate text-xs text-muted-foreground">{card.subtitle}</span>
           <Stats stats={card.stats} />
         </div>
+        {isOwnPost ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-2" onClick={(event) => event.preventDefault()}>
+            <button type="button" disabled={busy} onClick={editPost} className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium disabled:opacity-50">
+              {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Pencil className="size-3.5" />} Edit
+            </button>
+            <button type="button" disabled={busy} onClick={removePost} className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-destructive/30 px-2.5 text-xs font-medium text-destructive disabled:opacity-50">
+              <Trash2 className="size-3.5" /> Delete
+            </button>
+            {message ? <span role="status" className="w-full text-xs text-muted-foreground">{message}</span> : null}
+          </div>
+        ) : null}
       </Link>
     );
   }
