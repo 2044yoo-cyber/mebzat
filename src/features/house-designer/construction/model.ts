@@ -8,6 +8,8 @@ import { generateFoundation } from "./generators/foundation";
 import { generateGroundFloor } from "./generators/ground-floor";
 import { generateFrame } from "./generators/frame";
 import { generateStairs } from "./generators/stairs";
+import { generateMasonry } from "./generators/masonry";
+import { generateRoof } from "./generators/roof";
 import type { Shape, V3 } from "./geometry";
 
 export type BuildExtras = {
@@ -49,7 +51,7 @@ export function buildConstructionModel(
   };
 }
 
-const GENERATORS: ((ctx: Ctx) => void)[] = [generateSite, generateEarthworks, generateFoundation, generateGroundFloor, generateFrame, generateStairs];
+const GENERATORS: ((ctx: Ctx) => void)[] = [generateSite, generateEarthworks, generateFoundation, generateGroundFloor, generateFrame, generateStairs, generateMasonry, generateRoof];
 
 export function boundsOf(shapes: Shape[]): { min: V3; max: V3 } {
   const min = { x: Infinity, y: Infinity, z: Infinity };
