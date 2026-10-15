@@ -170,6 +170,7 @@ export function ClosurePanelSection({
       </button>
       {open ? (
         <div className="space-y-3 px-3 pb-3 text-[11px]">
+          <DoorFitting spec={spec} onChange={onChange} />
           <GripSelect label="Handle type" value={grip} onChange={(next) => onChange(setDesignGrip(spec, next ?? "handle"))} />
           {selected ? (
             <GripSelect
