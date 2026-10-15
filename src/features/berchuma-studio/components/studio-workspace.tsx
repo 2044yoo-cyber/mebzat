@@ -154,6 +154,8 @@ export function StudioWorkspace({
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [cuttingLayouts, setCuttingLayouts] = useState<ProjectProductionSummary["layouts"]>([]);
+  const [cutRows, setCutRows] = useState<ProjectProductionSummary["rows"]>([]);
+  const [boardTotals, setBoardTotals] = useState<ProjectProductionSummary["sheets"]>([]);
   const [offcutCandidates, setOffcutCandidates] = useState<ProjectProductionSummary["offcuts"]>([]);
   const [offcutsSaved, setOffcutsSaved] = useState(false);
   const [savingOffcuts, setSavingOffcuts] = useState(false);
@@ -222,6 +224,39 @@ export function StudioWorkspace({
     }
   };
 
+  const previewCombined = () => {
+    if (!design.spec) return;
+    try {
+      const result = buildProjectCutList(design.spec);
+      setCuttingLayouts(result.layouts);
+      setCutRows(result.rows);
+      setBoardTotals(result.sheets);
+      setProjectMessage(`Private cut-list preview ready: ${result.designs} design(s), ${result.pieces} pieces. This does not publish your project.`);
+    } catch (problem) {
+      setProjectMessage(problem instanceof Error ? problem.message : "Could not prepare the cut list.");
+    }
+  };
+
+  const downloadCutListPdf = () => {
+    if (!cutRows.length) {
+      previewCombined();
+      setProjectMessage("Preview the cut list first, then tap Print / Save PDF.");
+      return;
+    }
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      setProjectMessage("Your browser blocked the PDF preview. Allow pop-ups for Medosha and try again.");
+      return;
+    }
+    const esc = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c] ?? c));
+    const finishedDimensions = projectItems.map((item, index) => `<tr><td>${index + 1}. ${esc(item.spec.title)}</td><td>${item.spec.envelope.width}</td><td>${item.spec.envelope.height}</td><td>${item.spec.envelope.depth}</td></tr>`).join("");
+    const rows = cutRows.map(r => `<tr><td>${esc(r.partId)}</td><td>${esc(r.design)}</td><td>${esc(r.cabinet)}</td><td>${esc(r.label)}</td><td>${esc(r.board)}</td><td>${r.length}</td><td>${r.width}</td><td>${r.thickness}</td><td>${r.quantity}</td></tr>`).join("");
+    const totals = boardTotals.map(b => `<tr><td>${esc(b.board)}</td><td>${b.sheets}</td><td>${b.pieces}</td><td>${b.area.toFixed(2)}</td></tr>`).join("");
+    const diagrams = cuttingLayouts.map(l => `<section><h3>${esc(l.board)} — Sheet ${l.sheet} (${l.length} × ${l.width} mm)</h3><svg viewBox="0 0 ${l.length} ${l.width}" style="width:100%;max-height:160mm;border:1px solid #aaa">${l.parts.map((p,i)=>`<rect x="${p.x}" y="${p.y}" width="${p.width}" height="${p.height}" fill="#e8f1ff" stroke="#1d4ed8" stroke-width="5"/><text x="${p.x+p.width/2}" y="${p.y+p.height/2}" text-anchor="middle" dominant-baseline="middle" font-size="40">${i+1}</text>`).join("")}</svg><p>${l.parts.map((p,i)=>`${i+1}. ${esc(p.label)} — ${Math.round(p.width)} × ${Math.round(p.height)} mm`).join(" · ")}</p></section>`).join("");
+    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Private Medosha cut list</title><style>body{font:12px Arial;margin:18px;color:#111}table{border-collapse:collapse;width:100%;font-size:9px}th,td{border:1px solid #aaa;padding:4px;text-align:left}h2{margin-top:20px}.private{padding:8px;background:#fff7d6}section{break-inside:avoid}@page{size:A4 landscape;margin:10mm}</style></head><body><h1>Medosha — Combined Cabinet Cut List</h1><p class="private">Private workshop report. Not published publicly.</p><h2>Finished external cabinet dimensions (mm)</h2><table><thead><tr><th>Design</th><th>Width</th><th>Height</th><th>Depth</th></tr></thead><tbody>${finishedDimensions}</tbody></table><p>Panel dimensions in the cut list are individual manufacturing sizes. They must not be mistaken for or used to replace the finished external dimensions above.</p><h2>Board totals</h2><table><thead><tr><th>Board</th><th>Sheets to buy</th><th>Pieces</th><th>Area m²</th></tr></thead><tbody>${totals}</tbody></table><h2>Cut list</h2><table><thead><tr><th>Part ID</th><th>Design</th><th>Cabinet</th><th>Part</th><th>Board</th><th>Length</th><th>Width</th><th>Thickness</th><th>Qty</th></tr></thead><tbody>${rows}</tbody></table><h2>Cutting diagrams</h2>${diagrams}<script>window.onload=()=>window.print()</script></body></html>`);
+    printWindow.document.close();
+  };
+
   const downloadCombined = async () => {
     if (!design.spec) return;
     setExporting(true);
@@ -232,6 +267,8 @@ export function StudioWorkspace({
       // iOS Safari, where the XLSX button appeared to do nothing.
       const result = buildProjectCutList(design.spec);
       setCuttingLayouts(result.layouts);
+      setCutRows(result.rows);
+      setBoardTotals(result.sheets);
       setOffcutCandidates(result.offcuts.filter(item => item.reusable && item.thicknessMm !== null));
       setOffcutsSaved(false);
       const blob = new Blob([result.workbook.slice().buffer as ArrayBuffer],
@@ -681,10 +718,10 @@ export function StudioWorkspace({
               <section aria-label="Cabinets in this project" className="space-y-2 border-b bg-background px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold">Cabinets in project ({projectItems.length})</span>
-                  <button type="button" onClick={() => void downloadCombined()} disabled={exporting}
+                  <button type="button" onClick={previewCombined} disabled={exporting}
                     className="inline-flex min-h-9 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium disabled:opacity-50">
                     <FileSpreadsheet className="size-4" aria-hidden />
-                    {exporting ? "Preparing…" : "Combined cut list (.xlsx)"}
+                    Preview cut list
                   </button>
                 </div>
                 <div role="tablist" aria-label="Cabinet designs" className="flex gap-2 overflow-x-auto pb-1">
@@ -734,6 +771,17 @@ export function StudioWorkspace({
                                 }} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium">
                                 <Copy className="size-3" aria-hidden /> Copy
                               </button>
+                              <button type="button" aria-label={`Delete cabinet ${item.spec.title}`} disabled={projectItems.length === 1}
+                                onClick={() => {
+                                  if (!design.spec || !window.confirm(`Delete "${item.spec.title}" from this project? If it is the main cabinet, the next cabinet will become main.`)) return;
+                                  try {
+                                    design.set(removeProjectDesign(design.spec, item.id));
+                                    setActiveItemId("primary");
+                                    setProjectMessage("Cabinet deleted. Save changes to keep this deletion.");
+                                  } catch (error) { setProjectMessage(error instanceof Error ? error.message : "Could not delete this cabinet."); }
+                                }} className="inline-flex items-center gap-1 rounded-md border border-destructive/50 px-2 py-1 text-xs font-medium text-destructive disabled:opacity-40">
+                                <Trash2 className="size-3" aria-hidden /> Delete
+                              </button>
                             </div>
                           </div>
                           <TemplateThumb spec={item.spec}
@@ -766,16 +814,7 @@ export function StudioWorkspace({
                     className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">
                     <Plus className="size-4" aria-hidden /> Create &amp; model
                   </button>
-                  {activeItemId !== "primary" ? (
-                    <button type="button" onClick={() => {
-                      if (!design.spec || !window.confirm("Remove this cabinet design from the project? Undo can restore it.")) return;
-                      design.set(removeProjectDesign(design.spec, activeItemId));
-                      setActiveItemId("primary");
-                      setProjectMessage("Cabinet removed from this project. Use Undo to restore it.");
-                    }} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-destructive/50 px-2 text-xs text-destructive">
-                      <Trash2 className="size-3.5" aria-hidden /> Remove design
-                    </button>
-                  ) : null}
+
                 </div>
                 {projectMessage ? <p role={projectMessage.startsWith("Exported ") ? "status" : "alert"} aria-live="polite" className={cn("break-words rounded-lg border px-3 py-2 text-xs", projectMessage.startsWith("Exported ") ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "border-amber-500/40 text-foreground")}>{projectMessage}</p> : null}
                 {projectItems.length > 1 ? <p className="text-[11px] text-muted-foreground">
@@ -784,7 +823,15 @@ export function StudioWorkspace({
                   when a shared arrangement reduces waste.
                 </p> : null}
               </section>
-              {cuttingLayouts.length ? <div className="px-3 pb-3"><CuttingPlanPreview layouts={cuttingLayouts} /></div> : null}
+              {cutRows.length ? <section className="mx-3 mb-3 space-y-3 rounded-xl border p-3" aria-label="Private cut-list preview">
+                <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-semibold">Private cut-list preview</h3><p className="text-xs text-muted-foreground">{cutRows.length} cut rows · {boardTotals.reduce((n,b)=>n+b.sheets,0)} board sheets · not public</p></div>
+                  <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void downloadCombined()} disabled={exporting} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold"><FileSpreadsheet className="size-4" aria-hidden />{exporting ? "Preparing…" : "Download Excel"}</button><button type="button" onClick={downloadCutListPdf} className="inline-flex min-h-10 items-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">Print / Save PDF</button></div>
+                </div>
+                <section className="rounded-lg bg-muted/30 p-3"><h4 className="text-xs font-semibold">Finished external cabinet dimensions</h4><p className="mb-2 text-[11px] text-muted-foreground">These are the final outside dimensions you entered. Individual panel cut sizes below can be smaller to allow for board thickness and back-panel construction; they do not change the finished cabinet size.</p><div className="grid gap-2 sm:grid-cols-2">{projectItems.map((item,index)=><div key={item.id} className="rounded-md border bg-background p-2 text-xs"><p className="font-semibold">{index+1}. {item.spec.title}</p><p>W × H × D: <strong>{item.spec.envelope.width} × {item.spec.envelope.height} × {item.spec.envelope.depth} mm</strong></p></div>)}</div></section>
+                <div className="overflow-x-auto"><table className="w-full min-w-[680px] border-collapse text-left text-xs"><thead><tr className="border-b">{["Part ID","Cabinet","Part","Board","Length","Width","Thick.","Qty"].map(t=><th key={t} className="p-2">{t}</th>)}</tr></thead><tbody>{cutRows.map((r,i)=><tr key={r.partId+"-"+i} className="border-b"><td className="p-2">{r.partId}</td><td className="p-2">{r.cabinet}</td><td className="p-2">{r.label}</td><td className="p-2">{r.board}</td><td className="p-2">{r.length}</td><td className="p-2">{r.width}</td><td className="p-2">{r.thickness}</td><td className="p-2">{r.quantity}</td></tr>)}</tbody></table></div>
+                {cuttingLayouts.length ? <CuttingPlanPreview layouts={cuttingLayouts} /> : null}
+                <p className="text-[11px] text-muted-foreground">Save or download privately; only Publish makes this design public.</p>
+              </section> : null}
               {offcutCandidates.length ? (
                 <section className="mx-3 mb-3 rounded-xl border bg-muted/20 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">

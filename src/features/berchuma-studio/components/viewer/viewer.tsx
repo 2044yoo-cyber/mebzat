@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Box, Loader2, Ruler } from "lucide-react";
+import { Box, Loader2, Ruler, Layers3, Network, RotateCcw } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ const Model = dynamic(() => import("./model"), {
   loading: () => <Loading />,
 });
 
-type View = "flat" | "solid";
+type View = "flat" | "solid" | "connections" | "exploded";
 
 export function Viewer({ spec }: { spec: DesignSpec }) {
   const [view, setView] = useState<View>("flat");
@@ -43,6 +43,7 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
   // it is being looked at, so switching back to the elevation releases the
   // WebGL context rather than leaving it running behind a hidden div.
   const [ready, setReady] = useState(false);
+  const [explodeDistance, setExplodeDistance] = useState(0.35);
 
   return (
     <div className="rounded-xl border bg-card p-3">
@@ -64,6 +65,8 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
             icon={Box}
             label="3D"
           />
+          <ViewTab active={view === "connections"} onClick={() => setView("connections")} icon={Network} label="MDF Connections" />
+          <ViewTab active={view === "exploded"} onClick={() => setView("exploded")} icon={Layers3} label="Exploded" />
         </div>
 
         {view === "solid" ? (
@@ -83,12 +86,15 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
       </div>
 
       {view === "solid" && spec.furnitureType === "kitchen" ? <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showCountertop} onChange={(event) => setShowCountertop(event.target.checked)} />Show countertop</label> : null}
+      {view === "exploded" ? <div className="mb-2 flex items-center gap-3 text-xs"><label htmlFor="berchuma-explode-distance" className="shrink-0">Explode distance</label><input id="berchuma-explode-distance" type="range" min="0.1" max="0.9" step="0.05" value={explodeDistance} onChange={event => setExplodeDistance(Number(event.target.value))} className="min-w-0 flex-1 accent-primary" /><span className="w-10 text-right tabular-nums">{Math.round(explodeDistance * 100)}%</span><button type="button" onClick={() => setExplodeDistance(0.35)} className="inline-flex items-center gap-1 rounded border px-2 py-1"><RotateCcw className="size-3" />Reset</button></div> : null}
       <div className="aspect-[4/3] w-full @lg/ws:aspect-[16/10]">
         {view === "flat" ? (
           <Elevation spec={spec} />
         ) : (
           <Model
             spec={spec}
+            visualMode={view === "connections" ? "connections" : view === "exploded" ? "exploded" : "normal"}
+            explodeDistance={explodeDistance}
             hideFronts={hideFronts}
             surface={surface}
             hideCountertop={spec.furnitureType === "kitchen" && !showCountertop}
@@ -98,11 +104,7 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
       </div>
 
       <p className="mt-2 text-center text-[11px] text-muted-foreground">
-        {view === "flat"
-          ? "Front elevation, to scale."
-          : ready
-            ? "Drag to turn, pinch to zoom. Every panel is a part on the cut list."
-            : "Building the model…"}
+        {view === "flat" ? "Front elevation, to scale." : ready ? view === "connections" ? "Black outlines reveal individual MDF panel boundaries. Rotate and zoom to inspect joints." : view === "exploded" ? "Parts are separated from the same cabinet geometry. Adjust distance, rotate and zoom." : "Drag to turn, pinch to zoom. Every panel is a part on the cut list." : "Building the model…"}
       </p>
     </div>
   );

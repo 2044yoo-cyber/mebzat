@@ -66,6 +66,8 @@ const MM = 0.001;
 
 export default function Model({
   spec,
+  visualMode = "normal",
+  explodeDistance = 0.35,
   hideFronts = false,
   surface = "model",
   hideCountertop = spec.furnitureType === "kitchen",
@@ -91,6 +93,9 @@ export default function Model({
   onSelectClosure,
 }: {
   spec: DesignSpec;
+  visualMode?: "normal" | "connections" | "exploded";
+  /** Normalized visual separation, applied only in exploded view. */
+  explodeDistance?: number;
   /** Takes the doors and drawer fronts off, to show what is inside. */
   hideFronts?: boolean;
   /**
@@ -263,6 +268,9 @@ export default function Model({
               closureSelected={Boolean(part.closure && part.closure.id === selectedClosureId)}
               spec={spec}
               surface={surface}
+              visualMode={visualMode}
+              explodeDistance={explodeDistance}
+              modelBounds={{ x: originX + width / 2, y: height / 2, z: originZ + depth / 2 }}
               selected={
                 selectedCabinetId !== null && part.cabinetId === selectedCabinetId
               }
@@ -492,6 +500,9 @@ function PartMesh({
   closureSelected = false,
   spec,
   surface = "model",
+  visualMode = "normal",
+  explodeDistance = 0.35,
+  modelBounds = { x: 1000, y: 1000, z: 600 },
   selected,
   doorSelected = false,
   onSelect,
@@ -506,6 +517,9 @@ function PartMesh({
   closureSelected?: boolean;
   spec: DesignSpec;
   surface?: SurfaceView;
+  visualMode?: "normal" | "connections" | "exploded";
+  explodeDistance?: number;
+  modelBounds?: { x: number; y: number; z: number };
   selected: boolean;
   /** The one door being sized, lit more strongly than its cabinet. */
   doorSelected?: boolean;
@@ -542,6 +556,16 @@ function PartMesh({
   const [sx, sy, sz] = size;
   const edges = useMemo(() => (outline ? new THREE.EdgesGeometry(new THREE.BoxGeometry(sx, sy, sz)) : null), [outline, sx, sy, sz]);
   useEffect(() => () => { edges?.dispose(); }, [edges]);
+  if (visualMode === "exploded") {
+    const dx = centre.x - modelBounds.x / 2;
+    const dy = centre.y - modelBounds.y / 2;
+    const dz = centre.z - modelBounds.z / 2;
+    const length = Math.hypot(dx, dy, dz) || 1;
+    const offset = explodeDistance * 0.9;
+    position[0] += (dx / length) * offset;
+    position[1] += (dy / length) * offset;
+    position[2] -= (dz / length) * offset;
+  }
 
   return (
     <mesh
@@ -567,7 +591,7 @@ function PartMesh({
     >
       {shapedGeometry ? <primitive object={shapedGeometry} attach="geometry" /> : <boxGeometry args={size} />}
       <meshStandardMaterial
-        color={colourFor(part, spec, surface)}
+        color={visualMode === "connections" ? "#f5f5f2" : colourFor(part, spec, surface)}
         roughness={roughnessFor(part, spec)}
         metalness={0.02}
         // Lit rather than tinted. Tinting the selection changed what the
@@ -597,6 +621,7 @@ function PartMesh({
           <meshStandardMaterial color="#c9ced4" metalness={0.75} roughness={0.3} />
         </mesh>
       ) : null}
+      {visualMode === "connections" ? <lineSegments raycast={() => null}><edgesGeometry args={[shapedGeometry ?? new THREE.BoxGeometry(...size)]} /><lineBasicMaterial color="#111827" linewidth={1} /></lineSegments> : null}
       {part.frontGrip === "handle" && part.doorStyle !== "fixed" && !part.internal ? (
         <mesh position={part.role === "drawer_front"
           ? [0, size[1] / 2 - 0.025, size[2] / 2 + 0.007]
