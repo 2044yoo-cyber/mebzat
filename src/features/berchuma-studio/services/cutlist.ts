@@ -336,7 +336,6 @@ export function cutListPartTags(spec: DesignSpec, parts: Part[]): Map<string, st
 }
 
 /**
-/**
  * Each cabinet's short code: a letter for what it is and its place in the
  * design — W01 for the first wardrobe carcass, K02 for the second kitchen
  * cabinet. The letter is the design's type, because "the second cabinet of the
