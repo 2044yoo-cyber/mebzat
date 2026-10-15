@@ -174,7 +174,7 @@ check("and leaving cancels the pending sighting",
 check("the tracker runs signed out too, or a signed-out feed cannot change",
   !/if \(!signedIn(?: \|\|[^)]*)?\) return;/.test(bodyOf(feed, "ImpressionTracker")));
 check("signed out, sightings go to the session store instead of the server",
-  /if \(signedIn\) void feedApi\.view\(batch, clock\.current\);\s*else rememberSeen\(batch\);/.test(bodyOf(feed, "ImpressionTracker")));
+  /if \(signedIn\) \{\s*if \(ranking\.current === "mixed"\) void feedApi\.view\(batch, clock\.current\);\s*\}\s*else rememberSeen\(batch\);/.test(bodyOf(feed, "ImpressionTracker")));
 
 // ---------------------------------------------------------------------------
 // 5. The session store is a session's memory, not a profile

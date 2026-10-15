@@ -124,6 +124,9 @@ export function Feed({
   const sessionSeen = useRef<string[] | null>(restored?.seen ?? null);
   // When this reading began, as the server ranked it.
   const clock = useRef<string | null>(restored ? restored.session : (initial.session ?? null));
+  // Which ranking it came from. See FeedPage.ranking: only 0109's may be told
+  // what was seen.
+  const ranking = useRef(restored ? restored.ranking : (initial.ranking ?? null));
 
   // Card heights, kept with the snapshot so the cards above the one being
   // returned to hold their real space and the scroll lands where it was.
@@ -206,6 +209,7 @@ export function Feed({
       setCursor(null);
     } else {
       clock.current = page.session ?? null;
+      ranking.current = page.ranking ?? null;
       setPosts(page.posts);
       setCursor(page.cursor);
       setExhausted(page.cursor === null);
@@ -262,6 +266,7 @@ export function Feed({
       inFlight.current = false;
       if (page.failed || page.posts.length === 0) return;
       clock.current = page.session ?? null;
+      ranking.current = page.ranking ?? null;
       setPosts(page.posts);
       setCursor(page.cursor);
       setExhausted(page.cursor === null);
@@ -283,9 +288,20 @@ export function Feed({
       workspace.scrollTop += card.getBoundingClientRect().top - top - restored.anchor!.offset;
     };
     place();
-    // Once more after the images above it have had a frame to take their size.
-    const frame = requestAnimationFrame(place);
-    return () => cancelAnimationFrame(frame);
+    // And again while the cards above it mount and their pictures take their
+    // size, for about a second — unless the reader starts scrolling first, at
+    // which point where they are is theirs.
+    let moved = false;
+    const stop = () => { moved = true; };
+    const events = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    for (const name of events) window.addEventListener(name, stop, { passive: true, once: true });
+    const frame = requestAnimationFrame(() => { if (!moved) place(); });
+    const timers = [100, 250, 500, 900].map((ms) => setTimeout(() => { if (!moved) place(); }, ms));
+    return () => {
+      cancelAnimationFrame(frame);
+      for (const timer of timers) clearTimeout(timer);
+      for (const name of events) window.removeEventListener(name, stop);
+    };
     // Mount only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -312,9 +328,23 @@ export function Feed({
     const onScroll = () => {
       if (timer === null) timer = setTimeout(measure, 120);
     };
+    // And at the moment of leaving. The page can move without a scroll — a
+    // card above settling to its real height — and an anchor measured at the
+    // last scroll would then put the reader back somewhere they never were.
+    // Capture phase, so it runs before the link's own click navigates.
+    const leaving = () => {
+      if (timer !== null) clearTimeout(timer);
+      measure();
+    };
     target.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("pointerdown", leaving, { capture: true, passive: true });
+    window.addEventListener("click", leaving, { capture: true });
+    window.addEventListener("pagehide", leaving);
     return () => {
       target.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pointerdown", leaving, { capture: true });
+      window.removeEventListener("click", leaving, { capture: true });
+      window.removeEventListener("pagehide", leaving);
       if (timer !== null) clearTimeout(timer);
     };
   }, []);
@@ -333,6 +363,7 @@ export function Feed({
         ...latest.current,
         seen: sessionSeen.current,
         session: clock.current,
+        ranking: ranking.current,
         anchor: anchor.current,
         heights: [...heights.current].filter(([id]) => latest.current.posts.some((post) => post.id === id)),
       });
@@ -408,7 +439,7 @@ export function Feed({
         )
       ) : (
         <>
-          <ImpressionTracker posts={posts} signedIn={signedIn} clock={clock} />
+          <ImpressionTracker posts={posts} signedIn={signedIn} clock={clock} ranking={ranking} />
           <VirtualList
             posts={posts}
             signedIn={signedIn}
@@ -651,11 +682,14 @@ function ImpressionTracker({
   posts,
   signedIn,
   clock,
+  ranking,
 }: {
   posts: FeedPost[];
   signedIn: boolean;
   /** The reading's start, sent with each batch. */
   clock: { current: string | null };
+  /** Which ranking the reading came from; the older one is not told what was seen. */
+  ranking: { current: "mixed" | "legacy" | null };
 }) {
   const pending = useRef(new Set<string>());
   const sent = useRef(new Set<string>());
@@ -676,7 +710,9 @@ function ImpressionTracker({
       if (batch.length === 0) return;
 
       const send = () => {
-        if (signedIn) void feedApi.view(batch, clock.current);
+        if (signedIn) {
+          if (ranking.current === "mixed") void feedApi.view(batch, clock.current);
+        }
         else rememberSeen(batch);
       };
       if (typeof requestIdleCallback === "function") {
@@ -726,7 +762,7 @@ function ImpressionTracker({
       if (timer !== null) clearTimeout(timer);
       flush();
     };
-  }, [posts.length, signedIn, clock]);
+  }, [posts.length, signedIn, clock, ranking]);
 
   return null;
 }

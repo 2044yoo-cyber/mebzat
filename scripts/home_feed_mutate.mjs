@@ -26,6 +26,17 @@ function passes(checks) {
   }
 }
 
+// A red baseline makes every mutant look caught. Each set of checks the plan
+// aims at must pass on the unmutated build first.
+buildApp();
+for (const checks of new Set(plan.map((mutant) => mutant.checks))) {
+  if (!passes(checks)) {
+    console.log(`BASELINE IS RED for checks ${checks} — fix the check before mutating. Nothing was run.`);
+    process.exit(2);
+  }
+}
+console.log("baseline green\n");
+
 let survived = 0;
 for (const { name, file, from, to, checks } of plan) {
   const original = readFileSync(file, "utf8");

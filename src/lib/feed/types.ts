@@ -123,6 +123,13 @@ export type FeedPage = {
    * shown as it did before showing it.
    */
   session?: string;
+  /**
+   * Which ranking answered: 0109's, or the older one standing in until that
+   * migration is run. The older one counts every card shown as interest in
+   * its kind, so sightings are only recorded for the new one — recording them
+   * for the old would narrow the feed to one kind within a couple of visits.
+   */
+  ranking?: "mixed" | "legacy";
 };
 
 export type FeedCursor = {

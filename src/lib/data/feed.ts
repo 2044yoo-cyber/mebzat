@@ -299,8 +299,10 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
     name: string,
     params: typeof args,
   ) => PromiseLike<{ data: unknown; error: { code?: string; message: string; details?: string } | null }>;
+  let ranking: "mixed" | "legacy" = "mixed";
   let { data, error } = await rpc("feed_page_mixed", args);
   if (error && isMissing(error)) {
+    ranking = "legacy";
     ({ data, error } = await rpc("feed_page_personalized", args));
   }
 
@@ -355,6 +357,7 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
       : null,
     available: true,
     session: args.p_now,
+    ranking,
   };
 }
 

@@ -24,8 +24,15 @@ for (const event of ["uncaughtException", "unhandledRejection"]) {
 }
 const failures = [];
 const ok = (message) => console.log(`  ok   ${message}`);
-// `CHECKS=4,6` runs only those, for a mutant aimed at them; setup still runs.
-const only = process.env.CHECKS ? new Set(process.env.CHECKS.split(",")) : null;
+// `CHECKS=4,6` runs only those, for a mutant aimed at them, with the checks
+// they build on: later checks read the page earlier ones left. Without them a
+// check fails on missing setup, and a mutant looks caught when nothing caught it.
+const NEEDS = { 2: [1], 3: [2], 4: [3], 5: [1], 6: [3], 7: [2], 8: [2], 9: [8], 10: [9], 11: [1], 12: [9] };
+const only = process.env.CHECKS ? new Set() : null;
+for (const wanted of process.env.CHECKS?.split(",") ?? []) {
+  const add = (n) => { if (only.has(String(n))) return; only.add(String(n)); for (const need of NEEDS[n] ?? []) add(need); };
+  add(Number(wanted));
+}
 async function check(name, body) {
   if (only && !only.has(name.split(".")[0])) return;
   try { await body(); ok(name); } catch (error) { failures.push(name); console.log(`  FAIL ${name}\n       ${String(error?.message ?? error).split("\n").slice(0, 6).join("\n       ")}`); }
@@ -227,16 +234,29 @@ await check("6. Opening a card and coming back returns to the same card, with th
   const asked = page.feed.length;
   const link = page.locator(`[data-feed-post="${target}"] a[href^='/']`).filter({ hasNotText: /^#/ }).first();
   const href = await link.getAttribute("href");
+  // Where the card is on the screen as it is left: the click below scrolls
+  // nothing further, since the link is already in view.
+  await link.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
+  const offset = (id) => page.evaluate((card) => {
+    const ws = document.getElementById("workspace");
+    return document.querySelector(`[data-feed-post="${card}"]`).getBoundingClientRect().top - ws.getBoundingClientRect().top;
+  }, id);
+  // As the press lands — Playwright may scroll first, to clear the sticky chip bar.
+  await page.evaluate((card) => {
+    addEventListener("pointerdown", () => {
+      const ws = document.getElementById("workspace");
+      sessionStorage.setItem("__left", String(document.querySelector(`[data-feed-post="${card}"]`).getBoundingClientRect().top - ws.getBoundingClientRect().top));
+    }, { capture: true, once: true });
+  }, target);
   await link.click();
   await page.waitForURL((url) => url.pathname === href.split("?")[0], { timeout: 20_000 });
   await page.goBack();
   await page.waitForSelector(`[data-feed-post="${target}"]`, { timeout: 20_000 });
   await page.waitForTimeout(500);
-  const place = await page.evaluate((id) => {
-    const ws = document.getElementById("workspace");
-    return document.querySelector(`[data-feed-post="${id}"]`).getBoundingClientRect().top - ws.getBoundingClientRect().top;
-  }, target);
-  assert.ok(Math.abs(place) < 80, `came back ${Math.round(place)}px from the card`);
+  const back = await offset(target);
+  const left = Number(await page.evaluate(() => sessionStorage.getItem("__left")));
+  assert.ok(Math.abs(back - left) < 80, `left the card ${Math.round(left)}px down the screen, came back to it at ${Math.round(back)}px`);
   assert.equal((await slots(page)).length, count, "came back to a different number of cards");
   const firstPages = page.feed.slice(asked).filter((entry) => !entry.url.searchParams.get("after"));
   assert.equal(firstPages.length, 0, "coming back asked for the first page again");
@@ -363,8 +383,21 @@ await check("14. A visitor gets the feed too, pages without repeats, and a retur
   // reading started with, so none of them brings back what the first showed.
   await nextPage(p);
   await nextPage(p);
-  const later = p.feed.filter((entry) => entry.url.searchParams.get("after")).flatMap((entry) => entry.body?.posts.map((post) => post.id) ?? []);
+  const pages = p.feed.filter((entry) => entry.url.searchParams.get("after"));
+  const later = pages.flatMap((entry) => entry.body?.posts.map((post) => post.id) ?? []);
   assert.ok(later.length >= 24, `only ${later.length} cards on later pages`);
+  // The order this reading should have had: from the first page's cursor, with
+  // the seen list the reading began with (none), in one request. Later pages
+  // ranked against a list that grew while the visitor read would differ —
+  // cards skipped, cards moved — even where none of them repeats.
+  const start = pages[0].url.searchParams;
+  const expected = await p.evaluate(async ({ query, limit }) => {
+    const response = await fetch(`/api/feed?limit=${limit}&${query}`);
+    return (await response.json()).posts.map((post) => post.id);
+  }, { query: ["score", "after", "now", "seed"].map((key) => `${key}=${encodeURIComponent(start.get(key))}`).join("&"), limit: Math.min(later.length, 24) });
+  // The server reorders within a page for variety, so compare each page's cards as a set.
+  const sorted = (ids) => [...ids].sort().join(",");
+  assert.equal(sorted(later.slice(0, expected.length)), sorted(expected), "a visitor's later pages are not the reading's own order: cards were skipped or moved");
   assert.equal(new Set(later).size, later.length, "a visitor's later pages repeat each other");
   assert.ok(!later.some((id) => first.includes(id)), "a visitor's later page brought back a card from the first");
   const dom = await slots(p);
@@ -385,6 +418,28 @@ await check("15. A filter with nothing in it says so", async () => {
   await p.getByRole("tab", { name: /Property/ }).click();
   await p.getByText("Nothing here yet").waitFor({ timeout: 10_000 });
   await p.unroute("**/api/feed?**");
+});
+
+const early = await open("newcomer");
+await check("16. Deployed before 0109 is run: Home still fills from the older ranking, and is not told what was seen", async () => {
+  // As a database without the migration: the new ranking is not there.
+  sql("alter function public.feed_page_mixed rename to feed_page_mixed_away; notify pgrst, 'reload schema';");
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const p = early.page;
+    const before = sql(`select count(*) from public.feed_views where user_id = '${PEOPLE.newcomer}'`);
+    await home(p);
+    const shown = (await cards(p)).slice(0, 6);
+    assert.ok(shown.length >= 6, "Home is empty without 0109");
+    for (const card of shown) {
+      await p.locator(`[data-feed-post="${card.id}"]`).scrollIntoViewIfNeeded();
+      await p.waitForTimeout(1300);
+    }
+    await p.waitForTimeout(3000);
+    assert.equal(sql(`select count(*) from public.feed_views where user_id = '${PEOPLE.newcomer}'`), before, "sightings were recorded for the older ranking, which would narrow the feed to one kind");
+  } finally {
+    sql("alter function public.feed_page_mixed_away rename to feed_page_mixed; notify pgrst, 'reload schema';");
+  }
 });
 
 await browser.close();

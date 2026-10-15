@@ -30,8 +30,8 @@
  {
   "name": "returns to the cards but not the place",
   "file": "src/components/feed/feed.tsx",
-  "from": "    place();\n    // Once more after the images above it have had a frame to take their size.\n    const frame = requestAnimationFrame(place);",
-  "to": "    const frame = requestAnimationFrame(() => {});",
+  "from": "      workspace.scrollTop += card.getBoundingClientRect().top - top - restored.anchor!.offset;\n",
+  "to": "      void top;\n",
   "checks": "6"
  },
  {
@@ -82,5 +82,19 @@
   "from": "        Tune your feed\n",
   "to": "        Feed\n",
   "checks": "2"
+ },
+ {
+  "name": "sightings sent to the older ranking",
+  "file": "src/components/feed/feed.tsx",
+  "from": "          if (ranking.current === \"mixed\") void feedApi.view(batch, clock.current);",
+  "to": "          void feedApi.view(batch, clock.current);",
+  "checks": "16"
+ },
+ {
+  "name": "no fallback before 0109",
+  "file": "src/lib/data/feed.ts",
+  "from": "    ({ data, error } = await rpc(\"feed_page_personalized\", args));",
+  "to": "    void 0;",
+  "checks": "16"
  }
 ]

@@ -27,6 +27,8 @@ export type FeedSnapshot = {
   posts: FeedPost[];
   cursor: FeedCursor | null;
   exhausted: boolean;
+  /** Which ranking the reading came from; sightings are recorded only for 0109's. */
+  ranking: "mixed" | "legacy" | null;
   /** The reading's clock, which sightings are recorded against. */
   session: string | null;
   /** The signed-out session's frozen seen list, so page two ranks as page one did. */
