@@ -152,6 +152,12 @@ try {
   ok(await shows(section("My Designs & Posts").getByRole("link", { name: "Finishing the stair" })), "5: Designs & Posts shows designs, tours and posts");
   ok((await section("My Designs & Posts").getByRole("link", { name: "Which tile for a wet room?" }).count()) === 1, "5: a post without a title shows its words");
   ok((await section("My Designs & Posts").getByText("Private").count()) >= 1, "5: a private design is marked private, to its owner");
+  // A design with no cover shows the design itself, drawn from its spec; one with a cover keeps it.
+  const drawn = section("My Designs & Posts").getByRole("link", { name: "Kitchen A" });
+  ok(await drawn.locator("[data-design-drawing] svg rect").count() > 10, "5: a design with no picture shows its front view, drawn from the design");
+  equal(await drawn.locator("img").count(), 0, "5: and no broken picture");
+  const covered = section("My Designs & Posts").getByRole("link", { name: "Walnut wardrobe" });
+  ok(await covered.locator("img").count() === 1 && await covered.locator("[data-design-drawing]").count() === 0, "5: a design with a cover keeps its cover");
   await page.getByRole("button", { name: "Digital Products" }).click();
   await shows(section("My Digital Products").getByRole("link").first());
   await toBottom();

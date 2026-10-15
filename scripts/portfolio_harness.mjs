@@ -60,7 +60,8 @@ export function seed() {
     db.products.push(row); mine.digital.push(row);
   }
   db.designs.push({ id: id("f1000000", 0), slug: "walnut-wardrobe", owner_id: ME, title: "Walnut wardrobe", kind: "wardrobe", cover_url: img("design0"), visibility: "public", view_count: 4, created_at: at(400) });
-  db.designs.push({ id: id("f1000000", 1), slug: "kitchen-a", owner_id: ME, title: "Kitchen A", kind: "kitchen", cover_url: img("design1"), visibility: "private", view_count: 0, created_at: at(401) });
+  // Private and never rendered: no cover, only its spec — the card draws it.
+  db.designs.push({ id: id("f1000000", 1), slug: "kitchen-a", owner_id: ME, title: "Kitchen A", kind: "kitchen", cover_url: null, spec: "__SPEC__", visibility: "private", view_count: 0, created_at: at(401) });
   db.tours.push({ id: id("f2000000", 0), owner_id: ME, title: "Living room tour", thumbnail_url: img("tour0"), visibility: "published", view_count: 9, created_at: at(402) });
   db.posts.push({ id: id("f3000000", 0), author_id: ME, title: "Finishing the stair", body: "Oak treads and a steel stringer.", kind: "showcase", status: "published", like_count: 12, comment_count: 3, view_count: 40, created_at: at(403) });
   db.posts.push({ id: id("f3000000", 1), author_id: ME, title: null, body: "Which tile for a wet room?", kind: "question", status: "published", like_count: 1, comment_count: 4, view_count: 9, created_at: at(404) });
@@ -99,11 +100,18 @@ import { QuickActions } from "@/components/shell/quick-actions";
 import { encodeCursor, isSectionId, PAGE_SIZE, SECTIONS } from "@/lib/portfolio/model";
 import { countSections, readSectionPage } from "@/lib/portfolio/sources";
 import { fakeClient } from "${join(root, "scripts/portfolio_fake_supabase.ts")}";
+import { wardrobeExample } from "@/features/berchuma-studio/services/examples";
+import { validateSpec } from "@/features/berchuma-studio/types/spec";
 
 const PEOPLE = { me: "${ME}", other: "${OTHER}", empty: "${EMPTY}" };
 const query = new URLSearchParams(location.search);
 if (query.get("as")) sessionStorage.setItem("__portfolio_user", PEOPLE[query.get("as")] ?? "");
-if (!localStorage.getItem("__portfolio_db")) localStorage.setItem("__portfolio_db", ${JSON.stringify(JSON.stringify(db))});
+if (!localStorage.getItem("__portfolio_db")) {
+  const seeded = JSON.parse(${JSON.stringify(JSON.stringify(db))});
+  // A real design spec, as the studio saves one.
+  for (const row of seeded.designs) if (row.spec === "__SPEC__") row.spec = validateSpec(wardrobeExample()).spec;
+  localStorage.setItem("__portfolio_db", JSON.stringify(seeded));
+}
 // Never kept in the back-forward cache, so "back" reloads the page as a phone often does.
 addEventListener("unload", () => {});
 

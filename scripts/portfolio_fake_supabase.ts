@@ -81,6 +81,12 @@ class Query {
         });
       }
       rows = rows.slice(0, this.max);
+      // Only the columns asked for, as PostgREST answers: a field the page
+      // reads but never selects is a field it does not get.
+      const wanted = this.columns && this.columns.trim() !== "*" && !this.columns.includes("(")
+        ? this.columns.split(",").map((column) => column.trim()).filter(Boolean)
+        : null;
+      if (wanted) rows = rows.map((row) => Object.fromEntries(wanted.filter((column) => column in row).map((column) => [column, row[column]])));
       done({ data: this.one ? rows[0] ?? null : rows, error: null });
     }, 20)).then(resolve, reject);
   }

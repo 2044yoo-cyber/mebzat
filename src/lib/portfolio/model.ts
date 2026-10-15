@@ -1,3 +1,5 @@
+import type { FrontDrawingData } from "@/features/berchuma-studio/services/front-drawing";
+
 /**
  * The creator portfolio's vocabulary: which sections there are, what a card
  * carries, and how pages of several tables are merged into one stream.
@@ -43,6 +45,12 @@ export type PortfolioCard = {
   stats: { likes?: number; comments?: number; views?: number };
   /** Text-first items (posts) show a line of their body. */
   excerpt?: string | null;
+  /**
+   * A design with no picture of its own: its front view, drawn from its spec
+   * on the server — the same drawing the studio's project cards show — so a
+   * private design is recognisable without anybody having to photograph it.
+   */
+  drawing?: FrontDrawingData | null;
 };
 
 export type SourceId =

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Eye, Heart, ImageOff, MessageSquare, ShoppingCart } from "lucide-react";
 
+import { FrontDrawing } from "@/features/berchuma-studio/components/front-drawing-view";
 import type { PortfolioCard, SectionId } from "@/lib/portfolio/model";
 import { cn } from "@/lib/utils";
 
@@ -19,10 +20,16 @@ function optimisable(src: string) {
   try { return OPTIMISED.has(new URL(src).host); } catch { return false; }
 }
 
-function Thumb({ src, alt, sizes, className }: { src: string | null; alt: string; sizes: string; className?: string }) {
+function Thumb({ src, alt, sizes, className, drawing }: { src: string | null; alt: string; sizes: string; className?: string; drawing?: PortfolioCard["drawing"] }) {
   return (
     <div className={cn("relative overflow-hidden bg-muted", className)}>
-      {src ? (
+      {!src && drawing ? (
+        // The design itself, drawn from the front, on a light ground so the
+        // board outlines read in either theme.
+        <div data-design-drawing className="absolute inset-0 flex items-center justify-center bg-slate-50 p-4 [--thumb-front:#e2e8f0] dark:bg-slate-100">
+          <FrontDrawing drawing={drawing} className="h-full w-full" />
+        </div>
+      ) : src ? (
         optimisable(src) ? (
           <Image src={src} alt={alt} fill sizes={sizes} className="object-cover transition-transform duration-300 group-hover:scale-105" />
         ) : (
@@ -129,7 +136,7 @@ export function PortfolioCardView({ card, section, onOpen }: { card: PortfolioCa
     <Link href={card.href} onClick={onOpen} className={cn(base, "flex flex-col")} aria-label={card.title}>
       <div className="relative">
         <Badge text={card.badge} />
-        <Thumb src={card.image} alt={card.title} sizes={section === "projects" ? "(max-width: 420px) 100vw, (max-width: 1024px) 50vw, 33vw" : "(max-width: 768px) 50vw, 25vw"} className={section === "projects" ? "aspect-[16/10]" : "aspect-square"} />
+        <Thumb src={card.image} drawing={card.drawing} alt={card.title} sizes={section === "projects" ? "(max-width: 420px) 100vw, (max-width: 1024px) 50vw, 33vw" : "(max-width: 768px) 50vw, 25vw"} className={section === "projects" ? "aspect-[16/10]" : "aspect-square"} />
       </div>
       <div className="flex min-w-0 items-end justify-between gap-2 p-2.5">
         <div className="min-w-0">

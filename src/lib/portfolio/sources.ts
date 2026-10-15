@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { frontDrawing } from "@/features/berchuma-studio/services/front-drawing";
+import { parseSpec } from "@/features/berchuma-studio/types/spec";
 import { mergePage, SECTION_SOURCES, type Cursor, type PortfolioCard, type SectionId, type SourceId } from "@/lib/portfolio/model";
 import type { Database } from "@/types/database.types";
 
@@ -43,6 +45,17 @@ const money = (amount: unknown, currency: unknown, per?: unknown) =>
   typeof amount === "number" && amount > 0 ? { amount, currency: text(currency) ?? "ETB", per: text(per) } : null;
 /** A state only the owner sees, said in a word; public states say nothing. */
 const hidden = (value: unknown, words: Record<string, string>) => (typeof value === "string" ? words[value] ?? null : null);
+
+/** A design's front view from its stored spec, or null when there is none to draw. */
+function designDrawing(spec: unknown) {
+  if (!spec || typeof spec !== "object") return null;
+  try {
+    const decoded = parseSpec(spec);
+    return decoded.ok ? frontDrawing(decoded.spec) : null;
+  } catch {
+    return null;
+  }
+}
 
 const SOURCES: Record<SourceId, Source> = {
   project: {
@@ -114,11 +127,14 @@ const SOURCES: Record<SourceId, Source> = {
   },
   design: {
     table: "designs", owner: "owner_id",
-    columns: "id, slug, title, kind, cover_url, visibility, view_count, remix_count, created_at",
+    columns: "id, slug, title, kind, cover_url, visibility, view_count, remix_count, created_at, spec",
     card: (row) => ({
       title: text(row.title) ?? "Untitled design",
       subtitle: `${label(row.kind) ?? "Furniture"} design`,
       image: text(row.cover_url),
+      // No cover: the design drawn from its own spec. One that no longer
+      // parses keeps the empty picture rather than taking the page down.
+      drawing: text(row.cover_url) ? null : designDrawing(row.spec),
       href: `/designs/${String(row.slug ?? row.id)}`,
       badge: hidden(row.visibility, { private: "Private", unlisted: "Unlisted" }),
       price: null,

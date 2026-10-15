@@ -94,5 +94,23 @@
   "file": "src/components/portfolio/portfolio-feed.tsx",
   "from": "}, { root: document.getElementById(\"workspace\"), rootMargin: \"600px 0px\" });",
   "to": "}, { rootMargin: \"600px 0px\" });"
+ },
+ {
+  "name": "design drawing not made",
+  "file": "src/lib/portfolio/sources.ts",
+  "from": "      drawing: text(row.cover_url) ? null : designDrawing(row.spec),",
+  "to": "      drawing: null,"
+ },
+ {
+  "name": "design spec not read",
+  "file": "src/lib/portfolio/sources.ts",
+  "from": "remix_count, created_at, spec\",",
+  "to": "remix_count, created_at\","
+ },
+ {
+  "name": "drawing never shown",
+  "file": "src/components/portfolio/portfolio-card.tsx",
+  "from": "      {!src && drawing ? (",
+  "to": "      {false ? ("
  }
 ]
