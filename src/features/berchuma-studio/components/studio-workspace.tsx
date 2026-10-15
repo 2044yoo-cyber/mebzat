@@ -154,6 +154,8 @@ export function StudioWorkspace({
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [cuttingLayouts, setCuttingLayouts] = useState<ProjectProductionSummary["layouts"]>([]);
+  const [cutRows, setCutRows] = useState<ProjectProductionSummary["rows"]>([]);
+  const [boardTotals, setBoardTotals] = useState<ProjectProductionSummary["sheets"]>([]);
   const [offcutCandidates, setOffcutCandidates] = useState<ProjectProductionSummary["offcuts"]>([]);
   const [offcutsSaved, setOffcutsSaved] = useState(false);
   const [savingOffcuts, setSavingOffcuts] = useState(false);
@@ -232,6 +234,8 @@ export function StudioWorkspace({
       // iOS Safari, where the XLSX button appeared to do nothing.
       const result = buildProjectCutList(design.spec);
       setCuttingLayouts(result.layouts);
+      setCutRows(result.rows);
+      setBoardTotals(result.sheets);
       setOffcutCandidates(result.offcuts.filter(item => item.reusable && item.thicknessMm !== null));
       setOffcutsSaved(false);
       const blob = new Blob([result.workbook.slice().buffer as ArrayBuffer],
@@ -269,6 +273,54 @@ export function StudioWorkspace({
     } finally {
       setExporting(false);
     }
+  };
+
+  const previewCombined = () => {
+    if (!design.spec) return;
+    setProjectMessage(null);
+    try {
+      const result = buildProjectCutList(design.spec);
+      setCuttingLayouts(result.layouts);
+      setCutRows(result.rows);
+      setBoardTotals(result.sheets);
+      setOffcutCandidates(result.offcuts.filter(item => item.reusable && item.thicknessMm !== null));
+      setOffcutsSaved(false);
+      setProjectMessage(`Private cut-list preview ready: ${result.designs} design(s), ${result.pieces} pieces, ${result.sheets.reduce((sum, board) => sum + board.sheets, 0)} board sheets. This does not publish your project.`);
+    } catch (problem) {
+      setProjectMessage(problem instanceof Error ? problem.message : "Could not prepare the cut list.");
+    }
+  };
+
+  const downloadCutListPdf = () => {
+    if (!cutRows.length) {
+      previewCombined();
+      setProjectMessage("Preview the cut list first, then tap Print / Save PDF.");
+      return;
+    }
+    // Open synchronously from the button press so mobile browsers do not block
+    // the print view. The browser print dialog can save this private report as PDF.
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      setProjectMessage("Your browser blocked the PDF preview. Allow pop-ups for Medosha and try again.");
+      return;
+    }
+    const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[char] ?? char));
+    const cutRowsHtml = cutRows.map(row => `<tr><td>${escapeHtml(row.partId)}</td><td>${escapeHtml(row.design)}</td><td>${escapeHtml(row.cabinet)}</td><td>${escapeHtml(row.label)}</td><td>${escapeHtml(row.board)}</td><td>${row.length}</td><td>${row.width}</td><td>${row.thickness}</td><td>${row.quantity}</td><td>${escapeHtml(row.banding)}</td></tr>`).join("");
+    const totalsHtml = boardTotals.map(board => `<tr><td>${escapeHtml(board.board)}</td><td>${board.sheets}</td><td>${board.pieces}</td><td>${board.area.toFixed(2)}</td><td>${board.separateSheets - board.sheets}</td></tr>`).join("");
+    const layoutsHtml = cuttingLayouts.map(layout => {
+      const labels = layout.parts.map((part, index) => {
+        const label = part.width > 100 && part.height > 60
+          ? `<text x="${part.x + part.width / 2}" y="${part.y + part.height / 2}" text-anchor="middle" dominant-baseline="middle" font-size="${Math.max(18, Math.min(70, Math.min(part.width, part.height) / 7))}">${index + 1}</text>` : "";
+        return `<rect x="${part.x}" y="${part.y}" width="${part.width}" height="${part.height}" fill="#e8f1ff" stroke="#1d4ed8" stroke-width="5"/>${label}`;
+      }).join("");
+      return `<section class="layout"><h3>${escapeHtml(layout.board)} — Sheet ${layout.sheet} (${layout.length} × ${layout.width} mm)</h3><svg viewBox="0 0 ${layout.length} ${layout.width}" role="img" aria-label="Board cutting layout">${labels}</svg><p>${layout.parts.length} panels · ${Math.round(layout.utilisation * 100)}% utilisation</p><ol>${layout.parts.map((part, index) => `<li>${index + 1}. ${escapeHtml(part.label)} — ${Math.round(part.width)} × ${Math.round(part.height)} mm</li>`).join("")}</ol></section>`;
+    }).join("");
+    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Medosha private cut list</title><style>
+      *{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#111;margin:18px}h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:22px 0 8px}h3{font-size:13px}p{color:#444}table{border-collapse:collapse;width:100%;font-size:9px}th,td{border:1px solid #bbb;padding:4px;text-align:left;overflow-wrap:anywhere}th{background:#eee}.layout{break-inside:avoid;margin:16px 0}.layout svg{width:100%;max-height:180mm;border:1px solid #bbb}.layout ol{columns:2;font-size:9px}.private{padding:8px;background:#fff7d6;border:1px solid #d6b656;margin:10px 0}@page{size:A4 landscape;margin:10mm}@media print{button{display:none}}
+      </style></head><body><h1>Medosha — Combined Cabinet Cut List</h1><p>Private workshop copy · Not published publicly · Generated from the current draft</p><div class="private">This report is private. Downloading or printing it does not publish the design.</div><h2>Board totals</h2><table><thead><tr><th>Board material</th><th>Sheets to buy</th><th>Pieces</th><th>Area (m²)</th><th>Sheets saved</th></tr></thead><tbody>${totalsHtml}</tbody></table><h2>Cut list</h2><table><thead><tr><th>Part ID</th><th>Design</th><th>Cabinet</th><th>Part</th><th>Board</th><th>Length mm</th><th>Width mm</th><th>Thickness mm</th><th>Qty</th><th>Banding</th></tr></thead><tbody>${cutRowsHtml}</tbody></table><h2>Board cutting diagrams</h2>${layoutsHtml}<script>window.onload=()=>window.print();</script></body></html>`);
+    printWindow.document.close();
   };
 
   // ---- the draft ---------------------------------------------------------
@@ -681,10 +733,10 @@ export function StudioWorkspace({
               <section aria-label="Cabinets in this project" className="space-y-2 border-b bg-background px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold">Cabinets in project ({projectItems.length})</span>
-                  <button type="button" onClick={() => void downloadCombined()} disabled={exporting}
+                  <button type="button" onClick={previewCombined} disabled={exporting}
                     className="inline-flex min-h-9 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium disabled:opacity-50">
                     <FileSpreadsheet className="size-4" aria-hidden />
-                    {exporting ? "Preparing…" : "Combined cut list (.xlsx)"}
+                    Preview cut list
                   </button>
                 </div>
                 <div role="tablist" aria-label="Cabinet designs" className="flex gap-2 overflow-x-auto pb-1">
@@ -784,7 +836,35 @@ export function StudioWorkspace({
                   when a shared arrangement reduces waste.
                 </p> : null}
               </section>
-              {cuttingLayouts.length ? <div className="px-3 pb-3"><CuttingPlanPreview layouts={cuttingLayouts} /></div> : null}
+              {cutRows.length ? (
+                <section className="mx-3 mb-3 space-y-3 rounded-xl border p-3" aria-label="Private cut list preview">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div><h3 className="text-sm font-semibold">Private cut-list preview</h3>
+                    <p className="text-xs text-muted-foreground">{cutRows.length} cut-list rows · {boardTotals.reduce((sum, board) => sum + board.sheets, 0)} board sheets · not public</p></div>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void downloadCombined()} disabled={exporting}
+                        className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold disabled:opacity-50">
+                        <FileSpreadsheet className="size-4" aria-hidden />{exporting ? "Preparing…" : "Download Excel"}
+                      </button>
+                      <button type="button" onClick={downloadCutListPdf}
+                        className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">
+                        Print / Save PDF
+                      </button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto"><table className="w-full min-w-[680px] border-collapse text-left text-xs">
+                    <thead><tr className="border-b bg-muted/40">{["Part ID","Cabinet","Part","Board","Length","Width","Thick.","Qty"].map(label => <th key={label} className="p-2 font-semibold">{label}</th>)}</tr></thead>
+                    <tbody>{cutRows.map((row, index) => <tr key={row.partId + "-" + index} className="border-b last:border-0">
+                      <td className="p-2">{row.partId}</td><td className="p-2">{row.cabinet}</td><td className="p-2">{row.label}</td><td className="p-2">{row.board}</td><td className="p-2">{row.length} mm</td><td className="p-2">{row.width} mm</td><td className="p-2">{row.thickness} mm</td><td className="p-2">{row.quantity}</td>
+                    </tr>)}</tbody>
+                  </table></div>
+                  <div className="grid gap-2 sm:grid-cols-2">{boardTotals.map(board => <div key={board.boardId} className="rounded-lg bg-muted/30 p-3 text-xs">
+                    <p className="font-semibold">{board.board}</p><p>{board.sheets} sheet(s) to buy · {board.pieces} pieces · {board.area.toFixed(2)} m²</p>
+                  </div>)}</div>
+                  {cuttingLayouts.length ? <CuttingPlanPreview layouts={cuttingLayouts} /> : null}
+                  <p className="text-[11px] text-muted-foreground">Saving or downloading this report does not publish your design. Only the separate Publish button makes it public.</p>
+                </section>
+              ) : null}
               {offcutCandidates.length ? (
                 <section className="mx-3 mb-3 rounded-xl border bg-muted/20 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
