@@ -49,11 +49,49 @@ export function CuttingPlanPreview({ layouts }: {
             return <g key={`${part.label}-${index}`}>
               <rect x={x} y={y} width={w} height={h} fill="currentColor" fillOpacity="0.13"
                 stroke="currentColor" strokeOpacity="0.75" strokeWidth="1"/>
-              {w > 42 && h > 20 ? <text x={x + w / 2} y={y + h / 2}
-                textAnchor="middle" dominantBaseline="middle" fill="currentColor"
-                fontSize={Math.max(8, Math.min(13, Math.min(w / 5, h / 2.6)))}>
-                {index + 1}
-              </text> : null}
+              {w > 24 && h > 18 ? (
+                <>
+                  <text x={x + w / 2} y={y + h / 2 - (h > 46 ? 5 : 0)}
+                    textAnchor="middle" dominantBaseline="middle" fill="currentColor"
+                    fontSize={Math.max(8, Math.min(13, Math.min(w / 5, h / 2.6)))}>
+                    {index + 1}
+                  </text>
+                  {w > 58 && h > 34 ? (
+                    <text x={x + w / 2} y={y + h / 2 + 10}
+                      textAnchor="middle" dominantBaseline="middle" fill="currentColor"
+                      fontSize={Math.max(7, Math.min(10, Math.min(w / 7, h / 4)))} opacity="0.9">
+                      {Math.round(part.width)} × {Math.round(part.height)} mm
+                    </text>
+                  ) : null}
+                </>
+              ) : null}
+              {/* Horizontal dimension line with end ticks, measured in mm. */}
+              {w > 44 ? (
+                <g stroke="#2457b7" strokeWidth="0.8" fill="none">
+                  <line x1={x} y1={y - 5} x2={x + w} y2={y - 5} />
+                  <line x1={x} y1={y - 8} x2={x} y2={y - 2} />
+                  <line x1={x + w} y1={y - 8} x2={x + w} y2={y - 2} />
+                  <text x={x + w / 2} y={y - 7} textAnchor="middle" dominantBaseline="auto"
+                    stroke="none" fill="#2457b7" fontSize={Math.max(7, Math.min(10, w / 12))}
+                    paintOrder="stroke" style={{ paintOrder: "stroke", stroke: "white", strokeWidth: 2 }}>
+                    {Math.round(part.width)}
+                  </text>
+                </g>
+              ) : null}
+              {/* Vertical dimension line with end ticks; rotated label stays readable. */}
+              {h > 44 ? (
+                <g stroke="#2457b7" strokeWidth="0.8" fill="none">
+                  <line x1={x - 5} y1={y} x2={x - 5} y2={y + h} />
+                  <line x1={x - 8} y1={y} x2={x - 2} y2={y} />
+                  <line x1={x - 8} y1={y + h} x2={x - 2} y2={y + h} />
+                  <text x={x - 7} y={y + h / 2} textAnchor="middle" dominantBaseline="middle"
+                    transform={`rotate(-90 ${x - 7} ${y + h / 2})`}
+                    stroke="none" fill="#2457b7" fontSize={Math.max(7, Math.min(10, h / 12))}
+                    style={{ paintOrder: "stroke", stroke: "white", strokeWidth: 2 }}>
+                    {Math.round(part.height)}
+                  </text>
+                </g>
+              ) : null}
             </g>;
           })}
         </svg>
