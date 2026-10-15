@@ -307,14 +307,29 @@ export function DesignEditor({
         case "move":
           nudge(shortcut.axis, shortcut.direction, nudgeStep(event));
           return;
-        case "delete":
+        case "delete": {
+          // Never delete a cabinet from a keyboard shortcut without confirmation.
+          // The operation itself protects the final cabinet; this message makes
+          // that restriction clear instead of silently doing nothing.
+          if (spec.cabinets.length <= 1) {
+            window.alert("You cannot delete the last cabinet in a project. Add another cabinet first.");
+            return;
+          }
+          const confirmed = window.confirm(
+            `Delete "${selected.label}" (${Math.round(selected.size.width)} × ${Math.round(selected.size.height)} × ${Math.round(selected.size.depth)} mm)? This cannot be undone after saving.`,
+          );
+          if (!confirmed) return;
           // The selection is dropped first: leaving it pointing at a cabinet
           // that no longer exists leaves the panel showing controls for
           // nothing.
           setSelectedDoor(null);
           setSelectedId(null);
+          setSelectedDisplay(null);
+          setSelectedJoint(null);
+          setSelectedPartition(null);
           onChange(removeCabinet(spec, selected.id));
           return;
+        }
         case "duplicate":
           onChange(duplicateCabinet(spec, selected.id));
           return;
