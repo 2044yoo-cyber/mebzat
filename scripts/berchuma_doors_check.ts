@@ -169,13 +169,21 @@ const manual = setDoorManual(wardrobe, left);
 equal(doorLeafOf(manual, left)!.manual, true, "Manual keeps the door's size as its own");
 equal(placed(doors(manual).filter((part) => part.bayId === bay1!.id)), placed(autoDoors.filter((part) => part.bayId === bay1!.id)), "without moving it");
 // Single doors side by side across bays share their row.
-const vanity = startingDesign("vanity");
-const wall = vanity.cabinets.find((item) => item.kind === "wall")!;
-const vanityLeft: DoorRef = { cabinetId: wall.id, bayId: wall.bays[0]!.id, run: 0, leaf: 0 };
-const vanityUneven = setDoorSize(vanity, vanityLeft, { width: 400 }).spec;
-const vanityEqual = makeDoorsEqual(vanityUneven, vanityLeft);
-equal(vanityEqual.problem, null, "two single doors on two bays can be made equal");
-equal(cabinetFronts(vanityEqual.spec, vanityEqual.spec.cabinets.find((item) => item.id === wall.id)!).leaves.map((leaf) => [leaf.x, leaf.width]), [[20, 579], [601, 579]], "1160 across them, a gap between, 579 each");
+// A design saved before door sizing was stored is sized as it always was; a new
+// one starts as full overlay with a 5 mm clearance.
+const asSavedBefore = (spec: DesignSpec): DesignSpec => { const copy = structuredClone(spec); delete copy.doorSizing; return copy; };
+const vanityNew = startingDesign("vanity");
+for (const [label, vanity, expected] of [
+  ["saved before door sizing", asSavedBefore(vanityNew), [[20, 579], [601, 579]]],
+  ["new: full overlay, 5 mm", vanityNew, [[2.5, 595], [602.5, 595]]],
+] as const) {
+  const wall = vanity.cabinets.find((item) => item.kind === "wall")!;
+  const vanityLeft: DoorRef = { cabinetId: wall.id, bayId: wall.bays[0]!.id, run: 0, leaf: 0 };
+  const vanityUneven = setDoorSize(vanity, vanityLeft, { width: 400 }).spec;
+  const vanityEqual = makeDoorsEqual(vanityUneven, vanityLeft);
+  equal(vanityEqual.problem, null, `${label}: two single doors on two bays can be made equal`);
+  equal(cabinetFronts(vanityEqual.spec, vanityEqual.spec.cabinets.find((item) => item.id === wall.id)!).leaves.map((leaf) => [leaf.x, leaf.width]), expected as unknown as number[][], `${label}: 1200 across, a gap between, equal widths`);
+}
 const loneDoorDesign = structuredClone(startingDesign("wardrobe"));
 const loneDoorCabinet = loneDoorDesign.cabinets[0]!;
 loneDoorCabinet.bays = [loneDoorCabinet.bays[0]!];
@@ -211,11 +219,18 @@ equal(stackSized.problem, null, "a door over a stack's hanging section can be si
 equal(doors(stackSized.spec).filter((part) => part.bayId === bay2!.id).map((part) => [part.id.split("/")[1], part.length]), [[`${bay2!.id}-door-0-leaf-0`, 1300], [`${bay2!.id}-door-0-leaf-1`, 1582]], "the stack's door run, leaf by leaf");
 equal(strip(fronts(stackSized.spec)), drawersBefore, "and the drawer fronts under it are exactly as they were");
 
-const kitchen = startingDesign("kitchen");
+const kitchenNew = startingDesign("kitchen");
 const base: DoorRef = { cabinetId: "base-11", bayId: "bay-6", run: 0, leaf: 0 };
-const baseSized = setDoorSize(kitchen, base, { height: 600 });
-equal(baseSized.problem, null, "a kitchen base door can be sized");
-equal(doors(baseSized.spec, "base-11").map((part) => [part.width, part.length, part.quantity]), [[279, 600, 1], [279, 766, 1]], "two preferred-width base doors stay on the cut list");
+for (const [label, kitchen, expected] of [
+  ["saved before door sizing", asSavedBefore(kitchenNew), [[279, 600, 1], [279, 766, 1]]],
+  ["new: full overlay, 5 mm", kitchenNew, [[295, 600, 1], [295, 765, 1]]],
+] as const) {
+  const baseSized = setDoorSize(kitchen, base, { height: 600 });
+  equal(baseSized.problem, null, `${label}: a kitchen base door can be sized`);
+  equal(doors(baseSized.spec, "base-11").map((part) => [part.width, part.length, part.quantity]), expected as unknown as number[][], `${label}: two preferred-width base doors stay on the cut list`);
+}
+// The rest is the sizing these checks were written for: a design saved before door sizing.
+const kitchen = asSavedBefore(kitchenNew);
 const wallRef: DoorRef = { cabinetId: "wall-14", bayId: "bay-13", run: 0, leaf: 0 };
 const wallSized = setDoorSize(kitchen, wallRef, { width: 300 });
 equal(doors(wallSized.spec, "wall-14").map((part) => [part.width, part.length]), [[300, 716], [379, 716]], "a wall unit's left leaf at 300");

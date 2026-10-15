@@ -567,19 +567,21 @@ function findEocd(bytes: Uint8Array): number {
     );
 
     // Everything inside the envelope, except fronts, which stand proud of it
-    // by their own thickness and are allowed to.
+    // by their own thickness and are allowed to, and an overlaid back, which is
+    // fixed behind the carcass: the depth entered is the carcass depth.
     const outside = parts.filter((part) => {
       const size = part.size;
       return part.placements.some((at) => {
         const front = part.role === "door" || part.role === "drawer_front";
         const minZ = front ? -part.board.thickness - 0.5 : -0.5;
+        const behind = part.role === "back" ? part.board.thickness : 0;
         return (
           at.x < -0.5 ||
           at.y < -0.5 ||
           at.z < minZ ||
           at.x + size.x > spec.envelope.width + 0.5 ||
           at.y + size.y > spec.envelope.height + 0.5 ||
-          at.z + size.z > spec.envelope.depth + 0.5
+          at.z + size.z > spec.envelope.depth + behind + 0.5
         );
       });
     });
@@ -2437,8 +2439,18 @@ function normalise(v: Vec): Vec {
   // Fittings only. The bay's back panel carries the bay's id too, and it
   // rightly reaches down past the interior floor to the plinth — it covers the
   // bottom board rather than sitting on it.
-  const fittings = inBay.filter((part) => part.role !== "back");
+  // Fronts too, but a full-overlay front covers the bottom board by design: it
+  // may reach down to the plinth, and no further.
+  const covers = (part: { role: string }) => part.role === "drawer_front" || part.role === "door";
+  const fittings = inBay.filter((part) => part.role !== "back" && !covers(part));
+  const fronts = inBay.filter(covers);
 
+  check(
+    "no front in the stack hangs below the carcass",
+    fronts.every((part) =>
+      part.placements.every((placement) => placement.y >= configured.cabinets[0]!.plinthHeight - 1),
+    ),
+  );
   check(
     "nothing in the stack hangs below the carcass floor",
     fittings.every((part) =>

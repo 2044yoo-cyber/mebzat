@@ -370,5 +370,11 @@
   "file": "src/features/berchuma-studio/services/kitchen-detail.ts",
   "from": "  delete spec.doorSizing;\n",
   "to": ""
+ },
+ {
+  "name": "legacy drawer fronts share out the band, not their own faces",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "(sizing.legacy ? originalTotal : span) - totalGap",
+  "to": "span - totalGap"
  }
 ]

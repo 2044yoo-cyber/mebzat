@@ -1731,7 +1731,10 @@ function drawerFaceRects(
   }
   const totalGap = between * Math.max(0, construction.faces.length - 1);
   const originalTotal = construction.faces.reduce((sum, face) => sum + face.height, 0);
-  const heightBudget = Math.max(0, span - totalGap);
+  // A design sized the old way shares out what the drawer boxes' own faces add
+  // up to, as it always did; one sized by hinge type shares out the span its
+  // hinge gives the run.
+  const heightBudget = Math.max(0, (sizing.legacy ? originalTotal : span) - totalGap);
   let y = floor;
   return construction.faces.map((face, index) => {
     const height = originalTotal > 0 ? face.height * heightBudget / originalTotal : face.height;

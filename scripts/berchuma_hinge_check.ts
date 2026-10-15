@@ -59,6 +59,12 @@ const plinth = cabinet.plinthHeight;
 ok(!wardrobe.doorSizing, "the example wardrobe, as saved long ago, carries no door sizing");
 equal(leavesOf(wardrobe).slice(0, 2).map((leaf) => [leaf.x, leaf.width, leaf.y, leaf.height]), [[20, 385, 102, 2296], [407, 385, 102, 2296]], "and its doors are the old ones: 2 mm gaps, inside the opening, full height");
 equal(doors(wardrobe)[0]!.placements[0]!.z, -18, "standing proud, as before");
+// Drawer fronts too: the numbers this wardrobe had before door sizing was stored (and have on main today).
+equal(
+  parts(wardrobe).filter((part) => part.role === "drawer_front").map((part) => [part.width, Math.round(part.length * 100) / 100, part.placements[0]!.x, Math.round(part.placements[0]!.y * 100) / 100]),
+  [[772, 201.33, 814, 118], [772, 201.33, 814, 344.33], [772, 201.33, 814, 570.67]],
+  "and so are its drawer fronts: 201.33 mm tall with the 25 mm finger gap, as before",
+);
 const reopenedOld = parseSpec(JSON.parse(JSON.stringify(wardrobe)));
 ok(reopenedOld.ok && !reopenedOld.spec.doorSizing, "it reopens without door sizing");
 equal(parts(reopenedOld.ok ? reopenedOld.spec : wardrobe), parts(wardrobe), "and makes the same parts");

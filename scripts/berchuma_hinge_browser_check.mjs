@@ -95,10 +95,19 @@ try {
   await page.waitForFunction(() => window.__spec);
   await page.getByRole("tab", { name: "Elevation" }).click();
   await page.locator("[data-door] > rect").first().waitFor();
-  const section = page.getByRole("region", { name: "Doors and closure panels" });
-  await section.getByRole("button", { name: /Doors & closure panels/ }).click();
-  const hinge = section.getByLabel("Hinge type");
-  const clearance = section.getByLabel("Door clearance");
+  // The hinge controls live under "Door options", for the door that is selected:
+  // tap a cabinet, tap its door.
+  const fitting = page.locator("[data-door-fitting]");
+  const hinge = fitting.getByLabel("Hinge type");
+  const clearance = fitting.getByLabel("Door clearance");
+  const selectDoor = async () => {
+    if (await fitting.count()) return;
+    const leaf = page.locator('[data-door="bay-1:0:0"] > rect');
+    await leaf.click({ position: { x: 20, y: 60 } });
+    if (!(await fitting.count())) await leaf.click({ position: { x: 20, y: 60 } });
+    await fitting.waitFor();
+  };
+  await selectDoor();
 
   // ---- A design from before: sized as it was, and says so -------------------
   assert.equal(await hinge.inputValue(), "original", "an old design is shown as originally sized");
@@ -124,7 +133,7 @@ try {
     }
     assert.ok(rects.every((rect) => cut.some((part) => Math.abs(part.width - rect.width) < 0.51 && Math.abs(part.length - rect.height) < 0.51)), `${label}: every door drawn is a door cut, at its size`);
     assert.deepEqual(await page.evaluate(() => window.__hinges()), [type === "full" ? "hinge-soft-close" : type === "half" ? "hinge-half-overlay" : "hinge-inset"], `${label}: the hinge ordered is its own`);
-    await section.locator("[data-door-fitting-summary]").filter({ hasText: type === "inset" ? /flush with the carcass front, 5 mm apart/ : type === "half" ? /reaches 6\.5 mm over a side panel.*5 mm between doors/ : /cover 15\.5 mm of the side panel.*6\.5 mm of a shared divider.*5 mm between doors/ }).waitFor();
+    await fitting.locator("[data-door-fitting-summary]").filter({ hasText: type === "inset" ? /flush with the carcass front, 5 mm apart/ : type === "half" ? /reaches 6\.5 mm over a side panel.*5 mm between doors/ : /cover 15\.5 mm of the side panel.*6\.5 mm of a shared divider.*5 mm between doors/ }).waitFor();
   }
   assert.ok(seen.full.rects[0].width > seen.half.rects[0].width && seen.half.rects[0].width > seen.inset.rects[0].width, "full > half > inset in width, drawn");
   assert.ok(seen.full.rects[0].height > seen.half.rects[0].height && seen.half.rects[0].height > seen.inset.rects[0].height, "and in height");
@@ -157,6 +166,7 @@ try {
   await hinge.selectOption("full");
   await page.waitForFunction((was) => { const box = new window.THREE.Box3(); [...window.__scenes].at(-1).traverse((object) => { if (object.isMesh && object.geometry?.type === "BoxGeometry") box.expandByObject(object); }); return Math.abs(box.max.z - box.min.z - was) < 0.0006; }, proud, { timeout: 10000 });
   await page.getByRole("tab", { name: "Elevation" }).click();
+  await selectDoor();
 
   // ---- By hand, then Reset to Auto under the hinge now chosen -----------------
   await hinge.selectOption("full");
@@ -197,8 +207,8 @@ try {
   assert.deepEqual(await drawn(page), before, "and the doors are the same");
 
   // ---- It fits a phone ------------------------------------------------------------
-  const overflow = await page.evaluate(() => [...document.querySelectorAll('[aria-label="Doors and closure panels"] *')].filter((node) => node.getBoundingClientRect().right > innerWidth + 1).length);
-  assert.equal(overflow, 0, "nothing in the section runs past a 390 px screen");
+  const overflow = await page.evaluate(() => [...document.querySelectorAll("[data-door-fitting] *")].filter((node) => node.getBoundingClientRect().right > innerWidth + 1).length);
+  assert.equal(overflow, 0, "nothing in the door fitting runs past a 390 px screen");
   assert.deepEqual(errors, [], "page errors");
 } finally {
   await browser.close();
