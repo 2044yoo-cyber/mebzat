@@ -10,6 +10,10 @@ import { generateFrame } from "./generators/frame";
 import { generateStairs } from "./generators/stairs";
 import { generateMasonry } from "./generators/masonry";
 import { generateRoof } from "./generators/roof";
+import { generateElectrical } from "./generators/electrical";
+import { generatePlumbing } from "./generators/plumbing";
+import { generateFinishes } from "./generators/finishes";
+import { generateOpenings } from "./generators/openings";
 import type { Shape, V3 } from "./geometry";
 
 export type BuildExtras = {
@@ -51,7 +55,7 @@ export function buildConstructionModel(
   };
 }
 
-const GENERATORS: ((ctx: Ctx) => void)[] = [generateSite, generateEarthworks, generateFoundation, generateGroundFloor, generateFrame, generateStairs, generateMasonry, generateRoof];
+const GENERATORS: ((ctx: Ctx) => void)[] = [generateSite, generateEarthworks, generateFoundation, generateGroundFloor, generateFrame, generateStairs, generateMasonry, generateRoof, generateElectrical, generatePlumbing, generateFinishes, generateOpenings];
 
 export function boundsOf(shapes: Shape[]): { min: V3; max: V3 } {
   const min = { x: Infinity, y: Infinity, z: Infinity };

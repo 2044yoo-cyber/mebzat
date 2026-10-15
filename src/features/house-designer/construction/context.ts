@@ -160,6 +160,8 @@ export type AddInput = {
   variant?: ComponentRecord["variant"];
   pour?: number;
   label?: ComponentRecord["label"];
+  concealed?: boolean;
+  loose?: boolean;
   note?: string;
 };
 
@@ -306,6 +308,7 @@ export class Ctx {
       parentId: input.parentId ?? null, connectedIds: input.connectedIds ?? [], sequence: this.next(input.stage),
       explode: { layerIndex: input.explode?.layerIndex ?? 0, dir: input.explode?.dir ?? UP },
       ...(input.variant ? { variant: input.variant } : {}), ...(input.pour ? { pour: input.pour } : {}), ...(input.label ? { label: input.label } : {}),
+      ...(input.concealed ? { concealed: true } : {}), ...(input.loose ? { loose: true } : {}),
       ...(input.note ? { note: input.note } : {}), quantities: [],
     };
     this.components.push(record);
@@ -313,9 +316,9 @@ export class Ctx {
   }
 
   /** Attach a quantity to a component, with everything the BOQ needs to trace it. */
-  quantity(component: ComponentRecord, q: Omit<QuantityItem, "id" | "componentId" | "cost" | "storeyId" | "room" | "allowance" | "assumptions" | "exclusions" | "sourceGeometry" | "materialSpec"> & Partial<Pick<QuantityItem, "allowance" | "assumptions" | "exclusions" | "sourceGeometry" | "materialSpec">>): QuantityItem {
+  quantity(component: ComponentRecord, q: Omit<QuantityItem, "id" | "componentId" | "cost" | "storeyId" | "room" | "allowance" | "assumptions" | "exclusions" | "sourceGeometry" | "materialSpec"> & Partial<Pick<QuantityItem, "allowance" | "assumptions" | "exclusions" | "sourceGeometry" | "materialSpec" | "room">>): QuantityItem {
     const item: QuantityItem = {
-      id: `${component.id}#${component.quantities.length + 1}`, componentId: component.id, cost: { ...NO_COST }, storeyId: component.storeyId, room: component.room,
+      id: `${component.id}#${component.quantities.length + 1}`, componentId: component.id, cost: { ...NO_COST }, storeyId: component.storeyId, room: q.room !== undefined ? q.room : component.room,
       allowance: q.allowance ?? null, assumptions: q.assumptions ?? [], exclusions: q.exclusions ?? [],
       sourceGeometry: q.sourceGeometry ?? (component.sourceRef ? `project:${component.sourceRef}` : "schematic"), materialSpec: q.materialSpec ?? component.materialId,
       workItem: q.workItem, description: q.description, section: q.section, unit: q.unit, value: q.value, formula: q.formula, inputs: q.inputs, status: q.status,

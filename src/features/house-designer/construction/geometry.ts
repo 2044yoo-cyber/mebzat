@@ -22,6 +22,12 @@ export type Shape =
 export const v3 = (x: number, y: number, z: number): V3 => ({ x, y, z });
 
 export function box(cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, rz = 0): Shape {
+  // A turn by a multiple of a quarter circle is the same box with its sides swapped: keep it axis-aligned.
+  const quarter = Math.round(rz / (Math.PI / 2));
+  if (Math.abs(rz - quarter * (Math.PI / 2)) < 1e-9) {
+    const odd = Math.abs(quarter) % 2 === 1;
+    return { t: "box", c: { x: cx, y: cy, z: cz }, s: odd ? { x: sy, y: sx, z: sz } : { x: sx, y: sy, z: sz } };
+  }
   return rz === 0 ? { t: "box", c: { x: cx, y: cy, z: cz }, s: { x: sx, y: sy, z: sz } } : { t: "box", c: { x: cx, y: cy, z: cz }, s: { x: sx, y: sy, z: sz }, rz };
 }
 

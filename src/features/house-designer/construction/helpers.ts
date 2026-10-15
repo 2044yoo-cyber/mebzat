@@ -84,9 +84,9 @@ export function addQuantity(
   ctx: Ctx,
   component: ComponentRecord,
   base: Common & { value: number | null; formula: string; inputs: Record<string, number | string>; status: Provenance },
-  extra: { allowance?: Allowance | null; assumptions?: string[]; exclusions?: string[]; sourceGeometry?: string; materialSpec?: string } = {},
+  extra: { allowance?: Allowance | null; assumptions?: string[]; exclusions?: string[]; sourceGeometry?: string; materialSpec?: string; room?: string | null } = {},
 ): QuantityItem {
-  return ctx.quantity(component, { ...base, ...(extra.allowance !== undefined ? { allowance: extra.allowance } : {}), assumptions: extra.assumptions ?? [], exclusions: extra.exclusions ?? [], ...(extra.sourceGeometry ? { sourceGeometry: extra.sourceGeometry } : {}), ...(extra.materialSpec ? { materialSpec: extra.materialSpec } : {}) });
+  return ctx.quantity(component, { ...base, ...(extra.allowance !== undefined ? { allowance: extra.allowance } : {}), assumptions: extra.assumptions ?? [], exclusions: extra.exclusions ?? [], ...(extra.sourceGeometry ? { sourceGeometry: extra.sourceGeometry } : {}), ...(extra.materialSpec ? { materialSpec: extra.materialSpec } : {}), ...(extra.room !== undefined ? { room: extra.room } : {}) });
 }
 
 /** Net concrete volume; the allowance is a separate field. */

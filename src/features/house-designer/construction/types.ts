@@ -176,6 +176,10 @@ export type ComponentRecord = {
   pour?: number;
   /** A label for the 3D view, with where to anchor it. */
   label?: { text: string; anchor: V3 };
+  /** Buried in the building once it is finished (conduit, pipes, hangers); the finished-building view leaves it out. */
+  concealed?: boolean;
+  /** Loose equipment rather than the building works. */
+  loose?: boolean;
   note?: string;
   quantities: QuantityItem[];
 };
@@ -224,7 +228,7 @@ export type EstimatingRules = {
   /** Reinforcement is never taken from the schematic bars. */
   steelFromSchematic: false;
   /** Allowances, percent, kept apart from net quantities. */
-  allowances: { concrete: number; blocks: number; tiles: number; paint: number; plaster: number; pipes: number; conduit: number };
+  allowances: { concrete: number; blocks: number; tiles: number; paint: number; plaster: number; pipes: number; conduit: number; boards: number };
 };
 
 export const DEFAULT_RULES: EstimatingRules = {
@@ -232,7 +236,7 @@ export const DEFAULT_RULES: EstimatingRules = {
   openingThresholdM2: 0.5,
   jointMm: 10,
   steelFromSchematic: false,
-  allowances: { concrete: 5, blocks: 5, tiles: 10, paint: 5, plaster: 5, pipes: 10, conduit: 10 },
+  allowances: { concrete: 5, blocks: 5, tiles: 10, paint: 5, plaster: 5, pipes: 10, conduit: 10, boards: 10 },
 };
 
 export type StoreyInfo = { id: string; name: string; index: number; elevation: number; floorToFloor: number; slabThickness: number };
