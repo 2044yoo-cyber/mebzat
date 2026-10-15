@@ -18,7 +18,7 @@ import {
   CATEGORY_IDS, DEFAULT_OPTIONS, DEFAULT_VIEW, LAYER_IDS, PROVENANCE, STAGES, STAGE_IDS, aggregateQuantities, buildConstructionModel, buildLearningHouseProject, buildLearningModel, countedComponents, cutPlane, describeComponent, explodeInfo,
   indexModel, isolateLayer, knowledgeFor, materialOf, missingData, normalizeParams, resetView, setStage, shapeOffset, shapeVisible, showStoreysUpTo, steelKgPerMetre, stepStage, subtreeOf, toBoqDraft, totalOf, visibilityOf,
   visibleComponents,
-  type ConstructionModel, type ViewState,
+  type ComponentRecord, type ConstructionModel, type StageId, type ViewState,
 } from "../src/features/house-designer/construction";
 import type { Shape } from "../src/features/house-designer/construction/geometry";
 
@@ -166,16 +166,34 @@ const line = (workItem: string) => lines.find((l) => l.workItem === workItem);
   const all = at("placement", 99);
   equal(layerCounts(none, "concrete"), 0, "placement sequence: nothing poured at step 0");
   ok(layerCounts(all, "concrete") === layerCounts(done, "concrete"), "placement sequence: everything poured at the end");
-  const mid = at("placement", 4);
+  const mid = at("placement", 5);
   ok(layerCounts(mid, "concrete") > 0 && layerCounts(mid, "concrete") < layerCounts(all, "concrete"), "placement sequence: part way, part poured");
   const poured = mid.filter((x) => x.component.layer === "concrete").map((x) => x.component.pour ?? 0);
-  ok(poured.every((p) => p <= 4), "placement sequence: only zones up to the step are poured");
+  ok(poured.every((p) => p <= 5) && Math.max(...poured) === 5, "placement sequence: zones up to the step are poured, and the step itself is");
   ok(index.maxPour >= 8, "a placement sequence of several zones");
   // After the stage the steel is inside the concrete.
   ok(!visibleComponents(model, view({ stage: 9 }), index).some((x) => x.component.layer === "reinforcement" && x.component.stage < 9), "steel is inside the concrete once the stage is over");
   // Foundation stage has the same views.
   const f = visibleComponents(model, view({ stage: 3, frameView: "reinforcement" }), index).filter((x) => x.component.stage === 3);
   ok(f.some((x) => x.component.layer === "reinforcement") && !f.some((x) => x.component.layer === "formwork"), "foundation steel-only view");
+}
+
+// ---------------------------------------------------------------------------
+// Services: seen through the walls, or left inside them
+// ---------------------------------------------------------------------------
+{
+  const conduit = model.components.find((c) => c.kind === "conduit" && c.category === "electrical" && c.concealed)!;
+  const pipes = model.components.find((c) => c.kind === "pipe-cold" && c.concealed)!;
+  const framing = model.components.find((c) => c.kind === "ceiling-channel" && c.concealed)!;
+  const seen = (c: ComponentRecord, stage: StageId, mepView: "concealed" | "visible" | "finished") => visibleIds(view({ stage, options: { ...DEFAULT_OPTIONS, mepView } })).has(c.id);
+  ok(seen(conduit, 9, "finished") && seen(conduit, 10, "finished"), "conduit is seen while it is being fixed");
+  ok(!seen(conduit, 11, "finished") && !seen(conduit, 18, "finished"), "and is inside the plaster once the walls are finished");
+  ok(seen(conduit, 18, "visible") && seen(conduit, 18, "concealed"), "the visible and concealed views keep the services on show");
+  ok(!seen(pipes, 11, "finished") && seen(pipes, 10, "finished") && seen(pipes, 18, "visible"), "pipes follow the same rule");
+  ok(seen(framing, 12, "finished") && !seen(framing, 13, "finished") && seen(framing, 18, "visible"), "ceiling framing is covered by the boards at the next stage");
+  const wall = model.components.find((c) => c.kind === "wall-blocks")!;
+  equal(visibilityOf(wall, view({ stage: 10, options: { ...DEFAULT_OPTIONS, mepView: "concealed" } }), index), "ghost", "the concealed view sees through the walls");
+  equal(visibilityOf(wall, view({ stage: 10, options: { ...DEFAULT_OPTIONS, mepView: "finished" } }), index), "solid", "the finished view keeps them solid");
 }
 
 // ---------------------------------------------------------------------------
@@ -278,6 +296,7 @@ const line = (workItem: string) => lines.find((l) => l.workItem === workItem);
   const wall = model.components.find((c) => c.kind === "wall-blocks")!;
   const mortar = model.components.find((c) => c.kind === "mortar" && c.parentId === wall.id)!;
   const lay = view({ explode: { amount: 1, floors: false, categories: false, layers: true } });
+  equal(explodeInfo(mortar, view({ explode: { amount: 1, floors: true, categories: true, layers: false } }), model).layerDistance, 0, "with the layers switch off layers stay together");
   const dWall = explodeInfo(wall, lay, model).layerDistance;
   const dMortar = explodeInfo(mortar, lay, model).layerDistance;
   ok(dMortar > dWall, "the mortar layer sits further out than the blocks");
@@ -530,6 +549,13 @@ function shapeVolumeM3(s: Shape): number {
   ok(allItems.every((q) => q.value === null ? q.status === "missing" : q.status !== "missing"), "a missing number is marked missing and nothing else is");
   ok(lines.every((l) => l.cost.unitMaterial === null), "bill lines have empty cost fields too");
   ok(allItems.some((q) => q.status === "assumed") && allItems.some((q) => q.status === "calculated") && allItems.some((q) => q.status === "measured") && allItems.some((q) => q.status === "missing"), "the statuses are all in use");
+  // A number that is missing is flagged whatever status the item claims.
+  const tampered = structuredClone(model);
+  const victim = tampered.components.find((c) => c.quantities.some((q) => q.workItem === "concrete.column"))!;
+  victim.quantities.find((q) => q.workItem === "concrete.column")!.value = null;
+  const tamperedLines = aggregateQuantities(tampered);
+  equal(tamperedLines.find((l) => l.workItem === "concrete.column")!.status, "missing", "a line with an item that has no number is marked missing");
+  ok(missingData(tamperedLines).some((l) => l.workItem === "concrete.column"), "and listed as missing data");
   const draft = toBoqDraft(lines);
   ok(draft.every((d) => d.quantity !== null && d.elementIds.length > 0 && d.formula), "draft bill items keep their formulas and element ids");
   ok(draft.every((d) => d.rate === undefined), "and carry no rate");
