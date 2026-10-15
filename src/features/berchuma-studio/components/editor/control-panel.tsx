@@ -63,6 +63,7 @@ import {
   resizeCabinet,
   setBayDisplay,
   setBayDoor,
+  setBayDoorLeafMode,
   setBayFitting,
   setBayWidth,
   setCabinetKind,
@@ -767,6 +768,21 @@ function Structure({
               </button>
             ))}
           </div>
+          {!bay.display && bay.door === "hinged" ? (
+            <label className="block space-y-1 pt-1">
+              <span className="text-[11px] text-muted-foreground">Doors per section</span>
+              <select
+                aria-label={`Doors per section ${index + 1}`}
+                className="w-full rounded-md border bg-background px-2 py-1.5 text-[11px]"
+                value={bay.doorLeafMode ?? "auto"}
+                onChange={(event) => onChange(setBayDoorLeafMode(spec, cabinet.id, bay.id, event.target.value as "auto" | "single" | "double"))}
+              >
+                <option value="single">1 door per section</option>
+                <option value="double">2 doors per section</option>
+                <option value="auto">Automatic door count</option>
+              </select>
+            </label>
+          ) : null}
         </div>
       ))}
 
