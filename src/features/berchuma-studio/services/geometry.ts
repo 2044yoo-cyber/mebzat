@@ -1856,7 +1856,7 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
         const vertical = frontExtent({ ...sizing, hinge: hingeHere }, band.a, band.b, band.low, band.high);
         // The count is chosen from the span the leaves share, the clearance between each.
         const width = across.hi - across.lo;
-        const count = spec.furnitureType === "kitchen" && bay.door === "hinged"
+        const count = spec.furnitureType === "kitchen" && bay.door === "hinged" && (!bay.doorLeafMode || bay.doorLeafMode === "auto")
           ? preferredKitchenDoorLeaves(width + gap, gap, 0, preferredWidth)
           : bay.doorLeaves;
         const leafHeight = vertical.hi - vertical.lo;
@@ -1868,7 +1868,7 @@ export function cabinetFronts(spec: DesignSpec, cabinet: Cabinet): CabinetFronts
         });
         return;
       }
-      const count = spec.furnitureType === "kitchen" && bay.door === "hinged"
+      const count = spec.furnitureType === "kitchen" && bay.door === "hinged" && (!bay.doorLeafMode || bay.doorLeafMode === "auto")
         ? preferredKitchenDoorLeaves(span.width, gap, 1, preferredWidth)
         : bay.doorLeaves;
       const leafWidth = Math.floor((span.width - gap * (count + 1)) / count);
