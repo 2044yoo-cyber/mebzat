@@ -49,11 +49,46 @@ export function CuttingPlanPreview({ layouts }: {
             return <g key={`${part.label}-${index}`}>
               <rect x={x} y={y} width={w} height={h} fill="currentColor" fillOpacity="0.13"
                 stroke="currentColor" strokeOpacity="0.75" strokeWidth="1"/>
-              {w > 42 && h > 20 ? <text x={x + w / 2} y={y + h / 2}
-                textAnchor="middle" dominantBaseline="middle" fill="currentColor"
-                fontSize={Math.max(8, Math.min(13, Math.min(w / 5, h / 2.6)))}>
-                {index + 1}
-              </text> : null}
+              {/* Dimension graphics are drawn inside each panel so they are
+                  never clipped by the sheet boundary or hidden off-canvas. */}
+              {w > 30 && h > 24 ? (
+                <g>
+                  <line x1={x + 4} y1={y + 5} x2={x + w - 4} y2={y + 5}
+                    stroke="#1757b8" strokeWidth="1.2" />
+                  <line x1={x + 4} y1={y + 1} x2={x + 4} y2={y + 9}
+                    stroke="#1757b8" strokeWidth="1.2" />
+                  <line x1={x + w - 4} y1={y + 1} x2={x + w - 4} y2={y + 9}
+                    stroke="#1757b8" strokeWidth="1.2" />
+                  <text x={x + w / 2} y={y + 17} textAnchor="middle"
+                    dominantBaseline="middle" fill="#174a9c"
+                    fontSize={Math.max(7, Math.min(11, w / 10))}
+                    fontWeight="600" style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 2 }}>
+                    {Math.round(part.width)} mm
+                  </text>
+                  <line x1={x + 5} y1={y + 24} x2={x + 5} y2={y + h - 4}
+                    stroke="#1757b8" strokeWidth="1.2" />
+                  <line x1={x + 1} y1={y + 24} x2={x + 9} y2={y + 24}
+                    stroke="#1757b8" strokeWidth="1.2" />
+                  <line x1={x + 1} y1={y + h - 4} x2={x + 9} y2={y + h - 4}
+                    stroke="#1757b8" strokeWidth="1.2" />
+                  <text x={x + 17} y={y + Math.max(34, h / 2)} textAnchor="middle"
+                    dominantBaseline="middle" transform={`rotate(-90 ${x + 17} ${y + Math.max(34, h / 2)})`}
+                    fill="#174a9c" fontSize={Math.max(7, Math.min(11, h / 10))}
+                    fontWeight="600" style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 2 }}>
+                    {Math.round(part.height)} mm
+                  </text>
+                  <text x={x + w / 2} y={y + h - 10} textAnchor="middle"
+                    dominantBaseline="middle" fill="currentColor"
+                    fontSize={Math.max(8, Math.min(12, Math.min(w / 5, h / 4)))}>
+                    #{index + 1}
+                  </text>
+                </g>
+              ) : (
+                <text x={x + w / 2} y={y + h / 2} textAnchor="middle"
+                  dominantBaseline="middle" fill="currentColor" fontSize="8">
+                  #{index + 1}
+                </text>
+              )}
             </g>;
           })}
         </svg>
