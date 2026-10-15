@@ -572,7 +572,9 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   const shellDepth =
     methods.backFixing === "inset" ? depth : depth - backThickness;
   /** Usable depth in front of the applied back panel. */
-  const interiorDepth = shellDepth;
+  // The usable interior always stops at the back panel's inner face,
+  // regardless of whether the panel is overlaid or seated in grooves.
+  const interiorDepth = depth - backThickness;
 
   const push = (part: Omit<Part, "edgeBand">, edgeBand = bodyBand) =>
     parts.push({ ...part, edgeBand });
