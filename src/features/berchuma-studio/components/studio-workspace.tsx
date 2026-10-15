@@ -786,6 +786,27 @@ export function StudioWorkspace({
                                 }} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium">
                                 <Copy className="size-3" aria-hidden /> Copy
                               </button>
+                              <button type="button" aria-label={`Delete cabinet ${item.spec.title}`}
+                                disabled={projectItems.length === 1}
+                                onClick={() => {
+                                  if (!design.spec) return;
+                                  const warning = item.id === "primary"
+                                    ? `Delete "${item.spec.title}"? The next cabinet will become the main cabinet in this project.`
+                                    : `Delete "${item.spec.title}" from this project? This cannot be undone after saving.`;
+                                  if (!window.confirm(warning)) return;
+                                  try {
+                                    const next = removeProjectDesign(design.spec, item.id);
+                                    design.set(next);
+                                    setActiveItemId("primary");
+                                    setProjectMessage(item.id === "primary"
+                                      ? "Cabinet deleted. The next cabinet is now the main cabinet. Save changes to keep this."
+                                      : "Cabinet deleted from this project. Save changes to keep this.");
+                                  } catch (error) {
+                                    setProjectMessage(error instanceof Error ? error.message : "Could not delete this cabinet.");
+                                  }
+                                }} className="inline-flex items-center gap-1 rounded-md border border-destructive/50 px-2 py-1 text-xs font-medium text-destructive disabled:cursor-not-allowed disabled:opacity-40">
+                                <Trash2 className="size-3" aria-hidden /> Delete
+                              </button>
                             </div>
                           </div>
                           <TemplateThumb spec={item.spec}
@@ -818,16 +839,7 @@ export function StudioWorkspace({
                     className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">
                     <Plus className="size-4" aria-hidden /> Create &amp; model
                   </button>
-                  {activeItemId !== "primary" ? (
-                    <button type="button" onClick={() => {
-                      if (!design.spec || !window.confirm("Remove this cabinet design from the project? Undo can restore it.")) return;
-                      design.set(removeProjectDesign(design.spec, activeItemId));
-                      setActiveItemId("primary");
-                      setProjectMessage("Cabinet removed from this project. Use Undo to restore it.");
-                    }} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-destructive/50 px-2 text-xs text-destructive">
-                      <Trash2 className="size-3.5" aria-hidden /> Remove design
-                    </button>
-                  ) : null}
+
                 </div>
                 {projectMessage ? <p role={projectMessage.startsWith("Exported ") ? "status" : "alert"} aria-live="polite" className={cn("break-words rounded-lg border px-3 py-2 text-xs", projectMessage.startsWith("Exported ") ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "border-amber-500/40 text-foreground")}>{projectMessage}</p> : null}
                 {projectItems.length > 1 ? <p className="text-[11px] text-muted-foreground">
