@@ -451,7 +451,7 @@ export const baySchema = z.object({
   /** Visible front treatment, separate from how the door opens. Absent: the design's door hardware. */
   frontGrip: z.enum(frontGrips).optional(),
   /** The number of door leaves: automatic preserves width-based sizing; single forces one leaf per section. */
-  doorLeafMode: z.enum(["auto", "single", "double"]).default("auto"),
+  doorLeafMode: z.enum(["auto", "single", "double"]).optional(),
   /** The resolved number of door leaves on this bay. */
   doorLeaves: z.number().int().min(1).max(2).default(1),
   /**
