@@ -596,12 +596,18 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
   const methods = constructionMethods(spec);
   const backBoard = materials.back;
   const backThickness = backBoard.thickness;
-  // The 6 mm back is applied at the rear of the shell. Carcass boards stop at
-  // its front face, so the complete cabinet still keeps its specified depth
-  // without the back intersecting gables, dividers or top/bottom boards.
-  const shellDepth = depth - backThickness;
+  // The user-entered depth is the finished outside envelope, including the
+  // back. For an overlaid back, carcass boards stop at the back's inner face,
+  // so their cut depth is envelope depth minus back thickness. For an inset
+  // back, the panel sits in grooves at the rear edge: carcass boards retain
+  // the full envelope depth and the groove is a joinery operation, not a
+  // reason to shorten the finished cabinet or its side-panel blanks.
+  const shellDepth =
+    methods.backFixing === "inset" ? depth : depth - backThickness;
   /** Usable depth in front of the applied back panel. */
-  const interiorDepth = shellDepth;
+  // The usable interior always stops at the back panel's inner face,
+  // regardless of whether the panel is overlaid or seated in grooves.
+  const interiorDepth = depth - backThickness;
 
   const push = (part: Omit<Part, "edgeBand">, edgeBand = bodyBand) =>
     parts.push({ ...part, edgeBand });
