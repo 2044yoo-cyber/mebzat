@@ -123,6 +123,14 @@ export async function deletePost(postId: string): Promise<CommunityResult> {
   return {};
 }
 
+/** Read a post for its author to edit; never exposes another author's draft. */
+export async function getOwnPost(postId: string): Promise<{ post?: { title: string; body: string }; error?: string }> {
+  const { supabase, user } = await requireUser("/projects");
+  const { data, error } = await supabase.from("posts").select("title, body").eq("id", postId).eq("author_id", user.id).maybeSingle();
+  if (error || !data) return { error: "Could not load that post for editing." };
+  return { post: { title: data.title ?? "", body: data.body } };
+}
+
 /** Update a post owned by the signed-in author. */
 export async function updatePost(input: {
   postId: string;
