@@ -371,7 +371,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     { name: "Board totals", rows: sheetSummary, widths: [36, 21, 25, 16, 14, 19] },
     { name: "Cutting layout", rows: layout, widths: [32, 10, 55, 12, 12, 18, 19, 12] },
     { name: "Hardware", rows: hardware, widths: [34, 32, 12, 12, 50] },
-    { name: "Finished dimensions", rows: [["Design", "Width (mm)", "Height (mm)", "Depth (mm)"], ...designs.map(item => [item.title, item.spec.envelope.width, item.spec.envelope.height, item.spec.envelope.depth])], widths: [38, 16, 16, 16] },
+    { name: "Finished dimensions", rows: [["Design", "Width (mm)", "Height (mm)", "Depth (mm)"], ...designs.map(item => [item.spec.title, item.spec.envelope.width, item.spec.envelope.height, item.spec.envelope.depth])], widths: [38, 16, 16, 16] },
     { name: "Validation report", rows: validationRows, widths: [13, 30, 27, 30, 64, 68] },
   ];
   const purchasingHardware = new Map<string, {
