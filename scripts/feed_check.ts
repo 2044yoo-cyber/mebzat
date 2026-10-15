@@ -132,14 +132,24 @@ check("ids from a request body are validated as uuids, not trusted",
 // 3. Every request that can repeat content carries the session's memory
 //
 // Per function. This is the rule that goes wrong one call site at a time.
+//
+// The memory is taken when a reading starts (`restart`: a chip, a refresh)
+// and every later page of that reading sends the same list (`loadMore`). A
+// list that grew between pages would re-rank page two against a different
+// list from page one, and a card read on page one would sink below the cursor
+// and come round again — so `loadMore` must not read it afresh.
 // ---------------------------------------------------------------------------
 
-for (const name of ["loadMore", "changeFilter"]) {
-  const body = bodyOf(feed, name);
-  check(`${name} exists`, body.length > 0);
-  check(`${name} sends what this session has already been shown`,
-    /seenIds: signedIn \? null : recallSeen\(\)/.test(body), name);
-}
+const restartBody = bodyOf(feed, "restart");
+check("restart exists", restartBody.length > 0);
+check("a new reading takes what this session has already been shown, and keeps it",
+  /const seenIds = signedIn \? null : recallSeen\(\);\s*sessionSeen\.current = seenIds;/.test(restartBody)
+    && /seenIds,/.test(restartBody), "restart");
+const loadMoreBody = bodyOf(feed, "loadMore");
+check("loadMore exists", loadMoreBody.length > 0);
+check("loadMore sends the reading's list, unchanged",
+  /seenIds: signedIn \? null : \(sessionSeen\.current \?\? \[\]\)/.test(loadMoreBody)
+    && !/recallSeen\(\)/.test(loadMoreBody), "loadMore");
 
 // ---------------------------------------------------------------------------
 // 4. A sighting means the reader looked, not that the browser painted
@@ -164,7 +174,7 @@ check("and leaving cancels the pending sighting",
 check("the tracker runs signed out too, or a signed-out feed cannot change",
   !/if \(!signedIn(?: \|\|[^)]*)?\) return;/.test(bodyOf(feed, "ImpressionTracker")));
 check("signed out, sightings go to the session store instead of the server",
-  /if \(signedIn\) void feedApi\.view\(batch\);\s*else rememberSeen\(batch\);/.test(feed));
+  /if \(signedIn\) void feedApi\.view\(batch, clock\.current\);\s*else rememberSeen\(batch\);/.test(bodyOf(feed, "ImpressionTracker")));
 
 // ---------------------------------------------------------------------------
 // 5. The session store is a session's memory, not a profile
@@ -190,15 +200,17 @@ check("the list is bounded",
 // `p_limit: 200` for the comment tree, which is a different function asking a
 // different question — and matching it here failed the check over code that
 // was never in scope.
-const feedPageCall = /rpc\("feed_page", \{[\s\S]*?\n  \}\);/.exec(dataFeed)?.[0] ?? "";
-check("there is a feed_page call to inspect", feedPageCall.length > 0);
+// The arguments are built once and sent to whichever ranking is installed.
+const feedPageCall = /const args = \{[\s\S]*?\n  \};/.exec(dataFeed)?.[0] ?? "";
+check("there is a feed_page call to inspect",
+  feedPageCall.length > 0 && /rpc\("feed_page_mixed", args\)/.test(dataFeed));
 check("the client asks for a page, not for everything",
   !/limit=\d{3,}/.test(client) && !/p_limit: \d{3,}/.test(feedPageCall));
 check("posts are appended, not re-sorted in the browser",
   !/posts\.sort\(|\.sort\(\(a, b\) => b\.score/.test(feed));
 check("duplicates are dropped on arrival",
-  /const seen = new Set\(current\.map\(\(post\) => post\.id\)\)/.test(
-    bodyOf(feed, "loadMore")));
+  /const shown = new Set\(current\.map\(\(post\) => post\.id\)\);\s*return \[\.\.\.current, \.\.\.page\.posts\.filter\(\(post\) => !shown\.has\(post\.id\)\)\]/.test(
+    loadMoreBody));
 
 // ---------------------------------------------------------------------------
 // 7. A long seen list travels in a body, not a URL

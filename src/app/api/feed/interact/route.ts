@@ -79,7 +79,13 @@ export async function POST(request: Request) {
   }
 
   const postId = typeof body.postId === "string" ? body.postId : null;
-  if (action !== "follow" && action !== "comment-like" && !UUID.test(postId ?? "")) {
+  // Only the actions about one post carry `postId`. A view batch carries
+  // `postIds` and a download `fileId`, each checked in its own case; asking
+  // them for a `postId` here rejected every impression batch with a 400 —
+  // silently, because view failures are silent by design — so no sighting
+  // was ever recorded and the feed never knew what anybody had seen.
+  const ABOUT_ONE_POST: Action[] = ["like", "save", "share", "open", "hide", "unhide", "report"];
+  if (ABOUT_ONE_POST.includes(action) && !UUID.test(postId ?? "")) {
     return NextResponse.json({ error: "Unknown post." }, { status: 400 });
   }
 

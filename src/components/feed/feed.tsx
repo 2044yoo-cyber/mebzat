@@ -748,7 +748,7 @@ function FilterChips({
     <div
       role="tablist"
       aria-label="Filter the feed"
-      className="sticky top-0 z-20 -mx-3 mb-3 flex gap-2 overflow-x-auto bg-background/85 px-3 py-2 backdrop-blur [scrollbar-width:none] @lg/ws:mx-0 @lg/ws:rounded-2xl @lg/ws:px-2 [&::-webkit-scrollbar]:hidden"
+      className="sticky top-0 z-20 mb-3 flex gap-2 overflow-x-auto bg-background/85 px-3 py-2 backdrop-blur [scrollbar-width:none] @lg/ws:rounded-2xl @lg/ws:px-2 [&::-webkit-scrollbar]:hidden"
     >
       {FEED_FILTERS.map((chip) => (
         <button

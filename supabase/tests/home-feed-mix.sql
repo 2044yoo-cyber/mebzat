@@ -390,6 +390,27 @@ begin
   end if;
   raise notice 'ok 9c: the feed shows a creator only what is published, not their withdrawn posts';
 end $$;
+-- And what they have just published, they see first.
+reset role;
+insert into public.feed_posts (kind, topic, title, author_id, author_key, author_name, status, published_at, created_at)
+values ('progress', 'construction', 'HF just posted', 'cb000000-0000-4000-8000-0000000000c0', 'profile:cb000000-0000-4000-8000-0000000000c0', 'Selam', 'published', now() - interval '5 minutes', now() - interval '5 minutes');
+set role authenticated;
+set local request.jwt.claim.sub = 'cb000000-0000-4000-8000-0000000000c0';
+do $$
+declare mine numeric; theirs numeric;
+begin
+  if not exists (select 1 from (select title from public.feed_page_mixed(p_limit => 3, p_seed => 11)) top where top.title = 'HF just posted') then
+    raise exception 'FAIL 9d: a creator does not see what they just published near the top of their feed';
+  end if;
+  select score into mine from public.feed_page_mixed(p_limit => 40, p_seed => 11, p_search => 'just posted') where title = 'HF just posted';
+  -- The same post, the same clock and seed, read by somebody else.
+  set local request.jwt.claim.sub = 'cb000000-0000-4000-8000-000000000003';
+  select score into theirs from public.feed_page_mixed(p_limit => 40, p_seed => 11, p_search => 'just posted') where title = 'HF just posted';
+  if mine - theirs < 20 then
+    raise exception 'FAIL 9d: the creator''s own new post scores % for them and % for others — lifted for everyone or for nobody', mine, theirs;
+  end if;
+  raise notice 'ok 9d: a creator sees what they just published first (% for them, % for others)', mine, theirs;
+end $$;
 reset role;
 
 -- ================================================== 10. different readers differ
@@ -439,6 +460,24 @@ begin
   end if;
   raise notice 'ok 10: likes and saves lean the feed (% vs % materials and furniture in 24), and turning that off undoes it', two.leaning, three.leaning;
 end $$;
+
+-- Choosing topics, and nothing else, is enough to see them: someone who asks
+-- for materials and equipment gets most of what there is near the top.
+insert into auth.users (id, email) values ('cb000000-0000-4000-8000-000000000004', 'feed-chooser@example.test') on conflict do nothing;
+insert into public.feed_interests (user_id, topics) values ('cb000000-0000-4000-8000-000000000004', '{materials,equipment}');
+set role authenticated;
+set local request.jwt.claim.sub = 'cb000000-0000-4000-8000-000000000004';
+do $$
+declare chosen int; supply int; kinds int;
+begin
+  select count(*) filter (where topic in ('materials', 'equipment')), count(distinct kind) into chosen, kinds
+  from public.feed_page_mixed(p_limit => 24, p_seed => 3);
+  select count(*) into supply from public.feed_posts where status = 'published' and topic in ('materials', 'equipment');
+  if chosen * 3 < supply * 2 then raise exception 'FAIL 10b: chose materials and equipment, got % of % in the first 24', chosen, supply; end if;
+  if kinds < 8 then raise exception 'FAIL 10b: choosing topics narrowed the feed to % kinds', kinds; end if;
+  raise notice 'ok 10b: chosen topics alone bring % of their % posts into the first 24, which still holds % kinds', chosen, supply, kinds;
+end $$;
+reset role;
 
 -- ========================================= 11. featured is labelled and limited
 -- Sixteen listings Medosha has featured, from sixteen different people, so

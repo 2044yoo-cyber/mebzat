@@ -567,6 +567,11 @@ candidates as (
   order by p.published_at desc, p.id desc
   limit 4000
 ),
+latest_own as (
+  select c.id from candidates c
+  where c.author_id = (select uid from viewer) and c.published_at > p_now - interval '6 hours'
+  order by c.published_at desc, c.id desc limit 1
+),
 reported as (
   select r.post_id, count(distinct r.reporter_id) n from public.feed_reports r
   where r.resolved_at is null and r.created_at <= p_now and r.post_id in (select c.id from candidates c)
@@ -593,7 +598,7 @@ scored as (
       -- Editorial boost, which only Medosha can set (see the guard above).
       + least(greatest(c.boost, 0), 10)
       -- Interest: what they chose, and what they have done, as a share.
-      + case when exists (select 1 from chosen x where x.topic = c.topic) then 10 else 0 end
+      + case when exists (select 1 from chosen x where x.topic = c.topic) then 16 else 0 end
       + (select c2.c from confidence c2) * (
           10 * coalesce((select k.share from kind_share k where k.kind = c.kind), 0)
           + 6 * coalesce((select t.share from topic_share t where t.topic = c.topic), 0))
@@ -613,6 +618,10 @@ scored as (
                and c.topic in ('construction', 'materials', 'finance') then 6
           else 0 end
       + case when c.city is not null and c.city = (select location_city from me) and (select personalised from pref) then 5 else 0 end
+      -- What the reader has just published comes back to them first: after
+      -- posting, Home shows it, rather than a ranking it has had no time to
+      -- earn a place in. Their newest post only, and only for a few hours.
+      + case when c.id = (select l.id from latest_own l) then 30 else 0 end
       -- Reported and not yet looked at.
       - least(coalesce(r.n, 0), 2) * 8
       -- A steady, per-reader tie-break, so equal posts do not always fall the same way.

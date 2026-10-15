@@ -67,6 +67,8 @@ export function FeedCard({
   return (
     <article
       data-feed-post={post.id}
+      data-feed-kind={post.kind}
+      data-feed-featured={post.featured ? "" : undefined}
       className="overflow-hidden border-b border-border bg-background @lg/ws:rounded-2xl @lg/ws:border"
     >
       <Header post={post} signedIn={signedIn} />

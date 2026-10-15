@@ -160,5 +160,23 @@
   "file": "supabase/migrations/0109_home_feed_mix.sql",
   "from": "  using (user_id = auth.uid())\n  with check (user_id = auth.uid());\nrevoke all on public.feed_interests",
   "to": "  using (true)\n  with check (true);\nrevoke all on public.feed_interests"
+ },
+ {
+  "name": "own fresh post not lifted",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "      + case when c.id = (select l.id from latest_own l) then 30 else 0 end\n",
+  "to": ""
+ },
+ {
+  "name": "everyone's fresh posts lifted",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  where c.author_id = (select uid from viewer) and c.published_at > p_now - interval '6 hours'\n  order by c.published_at desc, c.id desc limit 1",
+  "to": "  where c.published_at > p_now - interval '6 hours'\n  order by c.published_at desc, c.id desc limit 1"
+ },
+ {
+  "name": "chosen topics barely count",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "x.topic = c.topic) then 16 else 0 end",
+  "to": "x.topic = c.topic) then 4 else 0 end"
  }
 ]
