@@ -374,7 +374,6 @@ function DoorSizing({
 
   return (
     <Section title="Door options" icon={DoorOpen} defaultOpen>
-      <DoorFitting spec={spec} onChange={onChange} />
       <p className="text-[11px] text-muted-foreground">
         {leaf.style === "sliding" ? "Sliding" : leaf.style === "bifold" ? "Bifold" : "Hinged"} door
         {leaf.leaves > 1 ? ` · leaf ${leaf.leaf + 1} of ${leaf.leaves}` : ""}
