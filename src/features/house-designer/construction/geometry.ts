@@ -225,13 +225,50 @@ export function subtractConvex(p: P2[], q: P2[]): P2[][] {
   return pieces;
 }
 
+type Rect4 = { x0: number; y0: number; x1: number; y1: number };
+
+/**
+ * The rectangle a polygon is, when it is one with its sides along the axes; otherwise null. A convex polygon whose
+ * area equals that of its bounding box is that box, however many repeated or collinear points it was given with.
+ */
+function asAxisRect(poly: P2[]): Rect4 | null {
+  if (poly.length < 3) return null;
+  const xs = poly.map((p) => p.x);
+  const ys = poly.map((p) => p.y);
+  const x0 = Math.min(...xs); const x1 = Math.max(...xs); const y0 = Math.min(...ys); const y1 = Math.max(...ys);
+  const box = (x1 - x0) * (y1 - y0);
+  if (box <= 0) return null;
+  return Math.abs(polygonArea(poly) - box) <= box * 1e-9 + 1e-9 ? { x0, y0, x1, y1 } : null;
+}
+
+/** Area of a union of axis-aligned rectangles by compressing the coordinates: exact, and never worse than n³ however the rectangles touch. */
+function unionOfRects(rects: Rect4[]): number {
+  const xs = [...new Set(rects.flatMap((r) => [r.x0, r.x1]))].sort((a, b) => a - b);
+  const ys = [...new Set(rects.flatMap((r) => [r.y0, r.y1]))].sort((a, b) => a - b);
+  let area = 0;
+  for (let i = 0; i + 1 < xs.length; i += 1) {
+    const cx = (xs[i]! + xs[i + 1]!) / 2;
+    const live = rects.filter((r) => r.x0 <= cx && r.x1 >= cx);
+    if (!live.length) continue;
+    for (let j = 0; j + 1 < ys.length; j += 1) {
+      const cy = (ys[j]! + ys[j + 1]!) / 2;
+      if (live.some((r) => r.y0 <= cy && r.y1 >= cy)) area += (xs[i + 1]! - xs[i]!) * (ys[j + 1]! - ys[j]!);
+    }
+  }
+  return area;
+}
+
 /**
  * Area of the union of convex polygons, any number of them. Each is cut
  * against what has already been counted and only its new part is added, so
  * a connected grid of beams and columns costs no more than the sum of its
  * parts.
  */
-export function unionArea(polys: P2[][]): number {
+export function unionArea(all: P2[][]): number {
+  // A sliver with no area (a beam lying along the edge of the region) adds nothing and only multiplies the pieces.
+  const polys = all.filter((poly) => poly.length >= 3 && polygonArea(poly) > 1e-6);
+  const rects = polys.map(asAxisRect);
+  if (rects.length && rects.every((r) => r !== null)) return unionOfRects(rects as Rect4[]);
   const disjoint: P2[][] = [];
   for (const raw of polys) {
     const poly = ensureCcw(raw);

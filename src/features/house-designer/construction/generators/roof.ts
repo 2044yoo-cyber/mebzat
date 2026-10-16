@@ -3,7 +3,7 @@ import { alongLine, box, cyl, polygonArea, prism, v3, type P2, type Shape } from
 import { addQuantity, f2, f3, round } from "../helpers";
 import { insetOutline } from "../structure-data";
 import { planPlumbing } from "../plumbing-plan";
-import { OVERHANG, PITCH_DEG, PLATE, TRUSS_D, pitchedGutter } from "../roof-geometry";
+import { OVERHANG, PITCH_DEG, PLATE, TRUSS_D, pitchedCover, pitchedGutter } from "../roof-geometry";
 
 /**
  * Stage 8: the roof, as two selectable alternatives on the same roof slab.
@@ -209,8 +209,7 @@ function generatePitched(ctx: Ctx, slabTop: number): void {
   // Underlay and covering: sloped areas, longer than the plan area they cover.
   const slopeRun = half + OVERHANG;
   const slopedLen = slopeRun / Math.cos(theta);
-  const planCover = (lengthX + 2 * OVERHANG) * (spanY + 2 * OVERHANG) * 1e-6;
-  const slopedCover = planCover / Math.cos(theta);
+  const { plan: planCover, sloped: slopedCover } = pitchedCover(lengthX, b.maxY - b.minY);
   const coverX = lengthX + 2 * OVERHANG;
   const makeSkin = (south: boolean, thickness: number, offset: number): Shape => {
     const yEave = south ? yBearingS - OVERHANG : yBearingN + OVERHANG;

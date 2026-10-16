@@ -11,6 +11,17 @@ export const TRUSS_D = 100;
 /** Wall plate inset from the slab edge. */
 export const PLATE = 100;
 
+/**
+ * The pitched roof's covering: its area in plan (the eaves overhang the slab at the gables by `OVERHANG`, and by
+ * `OVERHANG` beyond the wall plates along the eaves) and along the slope. The roof generator and the building
+ * configurator both read it from here, so the area quoted for a building is the area that is drawn.
+ */
+export function pitchedCover(lengthX: number, depthY: number): { plan: number; sloped: number; spanY: number } {
+  const spanY = depthY - 2 * PLATE;
+  const plan = (lengthX + 2 * OVERHANG) * (spanY + 2 * OVERHANG) * 1e-6;
+  return { plan, sloped: plan / Math.cos((PITCH_DEG * Math.PI) / 180), spanY };
+}
+
 /** Where the eaves gutters hang: the two y positions and the z of their centre line. */
 export function pitchedGutter(bounds: { minY: number; maxY: number }, slabTop: number): { southY: number; northY: number; z: number } {
   const theta = (PITCH_DEG * Math.PI) / 180;

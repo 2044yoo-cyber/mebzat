@@ -1,0 +1,50 @@
+[
+  {
+    "name": "sliver filter removed",
+    "file": "src/features/house-designer/construction/geometry.ts",
+    "from": "const polys = all.filter((poly) => poly.length >= 3 && polygonArea(poly) > 1e-6);",
+    "to": "const polys = all.filter((poly) => poly.length >= 3);"
+  },
+  {
+    "name": "rectangle shortcut removed",
+    "file": "src/features/house-designer/construction/geometry.ts",
+    "from": "if (rects.length && rects.every((r) => r !== null)) return unionOfRects(rects as Rect4[]);",
+    "to": ""
+  },
+  {
+    "name": "every polygon taken for its bounding box",
+    "file": "src/features/house-designer/construction/geometry.ts",
+    "from": "return Math.abs(polygonArea(poly) - box) <= box * 1e-9 + 1e-9 ? { x0, y0, x1, y1 } : null;",
+    "to": "return { x0, y0, x1, y1 };"
+  },
+  {
+    "name": "rectangles counted where any is missing",
+    "file": "src/features/house-designer/construction/geometry.ts",
+    "from": "if (live.some((r) => r.y0 <= cy && r.y1 >= cy)) area +=",
+    "to": "if (live.every((r) => r.y0 <= cy && r.y1 >= cy)) area +="
+  },
+  {
+    "name": "slope divided the wrong way",
+    "file": "src/features/house-designer/construction/roof-geometry.ts",
+    "from": "sloped: plan / Math.cos((PITCH_DEG * Math.PI) / 180)",
+    "to": "sloped: plan * Math.cos((PITCH_DEG * Math.PI) / 180)"
+  },
+  {
+    "name": "eaves overhang ignores the plates",
+    "file": "src/features/house-designer/construction/roof-geometry.ts",
+    "from": "const spanY = depthY - 2 * PLATE;",
+    "to": "const spanY = depthY;"
+  },
+  {
+    "name": "gable overhang dropped",
+    "file": "src/features/house-designer/construction/roof-geometry.ts",
+    "from": "const plan = (lengthX + 2 * OVERHANG) * (spanY + 2 * OVERHANG) * 1e-6;",
+    "to": "const plan = lengthX * (spanY + 2 * OVERHANG) * 1e-6;"
+  },
+  {
+    "name": "eaves overhang dropped",
+    "file": "src/features/house-designer/construction/roof-geometry.ts",
+    "from": "const plan = (lengthX + 2 * OVERHANG) * (spanY + 2 * OVERHANG) * 1e-6;",
+    "to": "const plan = (lengthX + 2 * OVERHANG) * spanY * 1e-6;"
+  }
+]
