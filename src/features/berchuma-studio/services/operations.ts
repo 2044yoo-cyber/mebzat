@@ -1,3 +1,4 @@
+import { verticalDividerBlocker } from "./vertical-divider";
 import { MIN_HEIGHT_MODULE, PREFERRED_LOWER, heightStackOf, planHeights } from "./height-modules";
 import { findModule } from "./kitchen-modules";
 import { placeOnRun, solveLayout } from "./layout";
@@ -1106,6 +1107,8 @@ export function setBayVerticalDivider(
     const cabinet = find(draft, cabinetId);
     const bay = cabinet?.bays.find((entry) => entry.id === bayId);
     if (!bay) return;
+    // Switching it off is always allowed; switching it on only where it can stand.
+    if (enabled && verticalDividerBlocker(bay)) return;
     bay.verticalDivider = enabled;
   });
 }

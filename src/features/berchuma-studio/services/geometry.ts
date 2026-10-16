@@ -1,3 +1,4 @@
+import { verticalDividerBuilt } from "./vertical-divider";
 import { doorRectProblem, type FaceBoard, type FrontRect } from "./door-layout";
 import type {
   BandedEdges,
@@ -856,7 +857,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       }).flatMap((part) => {
         // A full-height divider also divides horizontal shelves into two
         // manufacturable pieces. This keeps the model and cut list honest.
-        if (!bay.verticalDivider || part.role !== "shelf") {
+        if (!verticalDividerBuilt(bay) || part.role !== "shelf") {
           return [{ ...part, ...moduleTag(place.module) }];
         }
         const half = (part.size.x - t) / 2;
@@ -879,7 +880,7 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
     );
 
     // A real upright board inside this bay, included in rendering and the cut list.
-    if (bay.verticalDivider) {
+    if (verticalDividerBuilt(bay)) {
       push({
         id: `vertical-divider-${bay.id}`,
         role: "divider",

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { KitchenSetup } from "../kitchen-setup";
+import { verticalDividerBlocker } from "../../services/vertical-divider";
 import { addKitchenUpper } from "../../services/kitchen-setup";
 import {
   Boxes,
@@ -740,19 +741,33 @@ function Structure({
             <ZoneEditor spec={spec} cabinet={cabinet} bay={bay} onChange={onChange} onSelectDisplay={onSelectDisplay} />
           ) : null}
 
-          <button
-            type="button"
-            aria-pressed={Boolean(bay.verticalDivider)}
-            onClick={() => onChange(setBayVerticalDivider(spec, cabinet.id, bay.id, !bay.verticalDivider))}
-            className={cn(
-              "w-full rounded-md border px-2 py-1.5 text-left text-xs transition-colors",
-              bay.verticalDivider
-                ? "border-brand bg-brand/10 text-brand"
-                : "text-muted-foreground hover:border-brand/50",
-            )}
-          >
-            {bay.verticalDivider ? "Remove vertical divider" : "Add vertical divider"}
-          </button>
+          {(() => {
+            const blocker = verticalDividerBlocker(bay);
+            const on = Boolean(bay.verticalDivider);
+            const disabled = !on && blocker !== null;
+            return (
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  aria-pressed={on}
+                  disabled={disabled}
+                  data-vertical-divider
+                  onClick={() => onChange(setBayVerticalDivider(spec, cabinet.id, bay.id, !on))}
+                  className={cn(
+                    "w-full rounded-md border px-2 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                    on ? "border-brand bg-brand/10 text-brand" : "text-muted-foreground hover:border-brand/50",
+                  )}
+                >
+                  {on ? "Remove vertical divider" : "Add vertical divider"}
+                </button>
+                {blocker && (disabled || on) ? (
+                  <p role="note" className="text-[11px] text-muted-foreground">
+                    {on ? "This divider is not built. " : ""}{blocker}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })()}
 
           {bay.fitting.kind === "drawers" ? (
             <DrawerList
