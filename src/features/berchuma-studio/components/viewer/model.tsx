@@ -253,6 +253,7 @@ export default function Model({
               spec={spec}
               surface={surface}
               visualMode={visualMode}
+              renderQuality={renderQuality}
               explodeDistance={explodeDistance}
               modelBounds={{ x: originX + width / 2, y: height / 2, z: originZ + depth / 2 }}
               selected={
@@ -452,6 +453,7 @@ function PartMesh({
   spec,
   surface = "model",
   visualMode = "normal",
+  renderQuality = false,
   explodeDistance = 0.35,
   modelBounds = { x: 1000, y: 1000, z: 600 },
   selected,
@@ -464,6 +466,7 @@ function PartMesh({
   spec: DesignSpec;
   surface?: SurfaceView;
   visualMode?: "normal" | "connections" | "exploded";
+  renderQuality?: boolean;
   explodeDistance?: number;
   modelBounds?: { x: number; y: number; z: number };
   selected: boolean;
