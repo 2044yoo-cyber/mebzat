@@ -56,6 +56,14 @@ export function spaced(from: number, to: number, spacing: number): number[] {
   return Array.from({ length: n + 1 }, (_, i) => from + i * step);
 }
 
+/** Points from `from` to `to`, evenly spread, no two more than `max` apart, the ends included. (`spaced` can leave nearly twice its spacing between two.) */
+export function spacedWithin(from: number, to: number, max: number): number[] {
+  if (to <= from) return [from];
+  const n = Math.max(1, Math.ceil((to - from) / max - 1e-9));
+  const step = (to - from) / n;
+  return Array.from({ length: n + 1 }, (_, i) => from + i * step);
+}
+
 // ---------------------------------------------------------------------------
 // Steel: weight only from approved data
 // ---------------------------------------------------------------------------

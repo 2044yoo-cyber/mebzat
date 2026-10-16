@@ -2,22 +2,14 @@ import { ASSUME, UP, dim, type Ctx, type LevelInfo } from "../context";
 import { alongLine, box, boxAt, clipConvex, cyl, netVolumes, pointInPolygon, polygonArea, prism, prismOfShape, rectPoly, unionArea, v3, type P2, type Prism, type Shape } from "../geometry";
 import { addQuantity, barBetween, concreteQuantity, f2, f3, formworkQuantity, hoopXY, hoopXZ, hoopYZ, m3, rebarQuantity, round, spaced } from "../helpers";
 import { offsetPolygon } from "../region";
-import { slabCastOutline } from "../slab-cast";
+import { halfPlane, pourXCut, slabCastOutline } from "../slab-cast";
 import { slabOpenings } from "../slab-openings";
+import { balconyRootZones, generateBalconyStructure } from "./balcony";
 import { lattice, supportSteel } from "./slab-steel";
 
 /** Stage 5: the reinforced-concrete frame, storey by storey. */
 
 type Hole = { id: string; x0: number; y0: number; x1: number; y1: number };
-
-export function pourXCut(ctx: Ctx): number {
-  const xs = ctx.project.structuralGrid.filter((g) => g.levelId === ctx.ground?.levelId && g.axis === "x").map((g) => g.position).sort((a, b) => a - b);
-  const mid = (ctx.bounds.minX + ctx.bounds.maxX) / 2;
-  if (xs.length === 0) return mid;
-  return xs.reduce((best, x) => (Math.abs(x - mid) < Math.abs(best - mid) - 1e-9 || (Math.abs(Math.abs(x - mid) - Math.abs(best - mid)) < 1e-9 && x > best) ? x : best), xs[0]!);
-}
-
-const halfPlane = (xcut: number, side: "west" | "east"): P2[] => (side === "west" ? rectPoly(-1e7, -1e7, xcut, 1e7) : rectPoly(xcut, -1e7, 1e7, 1e7));
 
 export function generateFrame(ctx: Ctx): void {
   const cut = pourXCut(ctx);
@@ -182,6 +174,8 @@ export function generateFrame(ctx: Ctx): void {
     const isRoof = !above;
     const holes: Hole[] = slabOpenings(ctx, slabLevel);
     const holePolys = holes.map((h) => rectPoly(h.x0, h.y0, h.x1, h.y1));
+    // Where a balcony is carried out over the edge beam, the steel over the beam is the balcony's own (see balcony.ts): the slab's top bars give way to it.
+    const balconyRoots = above ? balconyRootZones(ctx, above.levelId, level.levelId) : [];
     // The slab is cast out past the outline to the outer face of the frame (see slab-cast.ts).
     const cast = slabCastOutline(ctx, level.levelId);
     const zones: { name: string; poly: P2[]; pour: number }[] = outlineConvex
@@ -222,7 +216,7 @@ export function generateFrame(ctx: Ctx): void {
       // Top bars over the supports (the negative steel): over every beam, reaching a third of the panel span into the slab each side, with the
       // bars along the beam they rest on, and a leg turned down where the slab ends.
       const topZ = z1 - cover - r;
-      const steel = supportSteel({ beams: beams.map((bb) => ({ start: bb.start, end: bb.end, width: bb.width })), zone: zone.poly, outline: cast, holes: zoneHoleRects.map((h) => rectPoly(h.x0, h.y0, h.x1, h.y1)), spacing: ASSUME.slabSpacing, zTop: topZ, zBottomBars: zb + 2 * r, cover, r, thickness: slabThickness });
+      const steel = supportSteel({ beams: beams.map((bb) => ({ start: bb.start, end: bb.end, width: bb.width })), zone: zone.poly, outline: cast, holes: [...zoneHoleRects.map((h) => rectPoly(h.x0, h.y0, h.x1, h.y1)), ...balconyRoots], spacing: ASSUME.slabSpacing, zTop: topZ, zBottomBars: zb + 2 * r, cover, r, thickness: slabThickness });
       const tm = ctx.add({
         id: `frame:slab:${slabId}:${zone.name.replace(/\W+/g, "-")}:top`, name: `${slabName} top reinforcement over supports (schematic)${zones.length > 1 ? ` — ${zone.name}` : ""}`, kind: "slab-bars-top", category: "frame", subcategory: "Reinforcement", stage: 5, level, layer: "reinforcement", materialId: "steel-mesh",
         shapes: [...steel.mains, ...steel.distribution, ...steel.hooks], repeated: { noun: "bar" }, source: "schematic", parentId: concrete.id, connectedIds: [concrete.id], explode: { layerIndex: 2, dir: UP },
@@ -276,6 +270,8 @@ export function generateFrame(ctx: Ctx): void {
         note: "Props stay until the slab has gained the strength the specification asks for.",
       });
     }
+    // Balconies carried out from this slab: cast in one with it.
+    if (above) generateBalconyStructure(ctx, level, above, baseBeamPour);
     // Construction joint between the two pour zones.
     if (zones.length > 1) {
       const b = polygonBoundsOf(ctx.outline);

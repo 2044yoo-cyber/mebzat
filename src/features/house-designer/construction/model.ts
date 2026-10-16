@@ -13,6 +13,7 @@ import { generateRoof } from "./generators/roof";
 import { generateElectrical } from "./generators/electrical";
 import { generatePlumbing } from "./generators/plumbing";
 import { generateServiceStructure } from "./generators/service-structure";
+import { generateBalconyFloors } from "./generators/balcony";
 import { generateFinishes } from "./generators/finishes";
 import { generateOpenings } from "./generators/openings";
 import { generateJoinery } from "./generators/joinery";
@@ -59,7 +60,7 @@ export function buildConstructionModel(
   };
 }
 
-const GENERATORS: ((ctx: Ctx) => void)[] = [generateSite, generateEarthworks, generateFoundation, generateGroundFloor, generateFrame, generateStairs, generateMasonry, generateRoof, generateElectrical, generatePlumbing, generateServiceStructure, generateFinishes, generateOpenings, generateJoinery, generateFurniture, generateExternal];
+const GENERATORS: ((ctx: Ctx) => void)[] = [generateSite, generateEarthworks, generateFoundation, generateGroundFloor, generateFrame, generateStairs, generateMasonry, generateRoof, generateElectrical, generatePlumbing, generateServiceStructure, generateFinishes, generateBalconyFloors, generateOpenings, generateJoinery, generateFurniture, generateExternal];
 
 export function boundsOf(shapes: Shape[]): { min: V3; max: V3 } {
   const min = { x: Infinity, y: Infinity, z: Infinity };

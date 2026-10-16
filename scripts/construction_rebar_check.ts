@@ -250,7 +250,7 @@ const byId = (id: string) => model.components.find((c) => c.id === id)!;
   // A leg turned down stands at the outer edge of the slab as cast, a cover in: nowhere else, not at the joint between the two pours or at an opening.
   const ctx = new Ctx(existing.project, DEFAULT_OPTIONS, DEFAULT_RULES);
   const legsOf = new Map<string, number>();
-  for (const c of model.components.filter((x) => x.kind === "slab-bars-top")) {
+  for (const c of model.components.filter((x) => x.kind === "slab-bars-top" && x.id.startsWith("frame:slab:"))) {
     const cast = slabCastOutline(ctx, c.storeyId!);
     const slabName = c.id.split(":")[2]!;
     for (const shape of c.shapes) {
@@ -262,7 +262,8 @@ const byId = (id: string) => model.components.find((c) => c.id === id)!;
   }
   // The roof slab has no stairwell: its legs are the 200 of the unit case above, split between the two pours without losing or doubling one. The floors lose the few the stairwell cuts off.
   equal(legsOf.get("roof"), 2 * 44 + 2 * 56, "the roof slab has a leg at each of the 200 bars that end at its edge, over its two pours");
-  ok([...legsOf].filter(([name]) => name !== "roof").every(([, n]) => n >= 180 && n <= 200), `and the floors have nearly as many (${[...legsOf].map(([name, n]) => `${name} ${n}`).join(", ")})`);
+  // The first floor also loses those over the root of its balcony, where the balcony's own steel is (construction_balcony_check.ts counts them exactly).
+  ok([...legsOf].filter(([name]) => name !== "roof").every(([, n]) => n >= 170 && n <= 200), `and the floors have nearly as many (${[...legsOf].map(([name, n]) => `${name} ${n}`).join(", ")})`);
 
   // The ground slab's mesh: bars stop short of the columns that come up through it and of the shafts.
   const mesh = byId("ground:mesh");

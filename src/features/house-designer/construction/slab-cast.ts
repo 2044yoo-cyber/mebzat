@@ -1,5 +1,5 @@
 import type { Ctx } from "./context";
-import type { P2 } from "./geometry";
+import { rectPoly, type P2 } from "./geometry";
 import { offsetPolygon } from "./region";
 
 /**
@@ -18,3 +18,14 @@ export function slabCastOutline(ctx: Ctx, levelId: string): P2[] {
   const half = frameHalfOf(ctx, levelId);
   return half > 0 ? offsetPolygon(ctx.outline, half) : ctx.outline;
 }
+
+/** The line, x = this, where the slab is poured in two: the grid line nearest the middle of the building. Where two lie equally near, the eastern one. */
+export function pourXCut(ctx: Ctx): number {
+  const xs = ctx.project.structuralGrid.filter((g) => g.levelId === ctx.ground?.levelId && g.axis === "x").map((g) => g.position).sort((a, b) => a - b);
+  const mid = (ctx.bounds.minX + ctx.bounds.maxX) / 2;
+  if (xs.length === 0) return mid;
+  return xs.reduce((best, x) => (Math.abs(x - mid) < Math.abs(best - mid) - 1e-9 || (Math.abs(Math.abs(x - mid) - Math.abs(best - mid)) < 1e-9 && x > best) ? x : best), xs[0]!);
+}
+
+/** The half of the plan on one side of the pour line: a rectangle far bigger than any building, counter-clockwise, to clip a slab against. */
+export const halfPlane = (xcut: number, side: "west" | "east"): P2[] => (side === "west" ? rectPoly(-1e7, -1e7, xcut, 1e7) : rectPoly(xcut, -1e7, 1e7, 1e7));

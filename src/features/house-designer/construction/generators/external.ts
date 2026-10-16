@@ -2,6 +2,7 @@ import { ASSUME, UP, dim, onWall, type Ctx, type LevelInfo, type WallFrame } fro
 import { alongLine, box, boxAt, cyl, polygonArea, polygonBounds, prism, rectPoly, subtractConvex, v3, type P2, type Shape } from "../geometry";
 import { addQuantity, concreteQuantity, f2, f3, round } from "../helpers";
 import { insetOutline } from "../structure-data";
+import { generateBalconyFinish } from "./balcony";
 import { outwardSign } from "./foundation";
 
 /**
@@ -17,10 +18,6 @@ const EXT_COATS = [
   { id: "final", name: "External plaster, final coat", material: "plaster-final", t: ASSUME.plasterFinal + ASSUME.externalPlasterExtra, workItem: "plaster.external-final", desc: "External plaster final coat", section: "J" as const },
   { id: "paint", name: "External paint", material: "paint-ext", t: ASSUME.paint, workItem: "paint.external", desc: "Exterior masonry paint", section: "M" as const },
 ];
-
-function slug(text: string) {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
 
 type Piece = { s0: number; s1: number; z0: number; z1: number };
 function facadePieces(wall: WallFrame, z0: number, z1: number, base: number): Piece[] {
@@ -274,18 +271,6 @@ export function generateExternal(ctx: Ctx): void {
     addQuantity(ctx, marks, { workItem: "handover.snagging", description: "Snagging, cleaning and handover", section: "A", unit: "lump sum", value: 1, formula: "1 handover", inputs: { count: 1 }, status: "assumed" });
   }
 
-  // --- Balconies and railings from the project, when it has any ---------------------------------------
-  for (const balcony of ctx.project.balconies) {
-    const level = ctx.level(balcony.levelId);
-    if (!level) continue;
-    const rad = (balcony.rotation * Math.PI) / 180;
-    const slab = box(balcony.x, balcony.y, balcony.elevation - balcony.thickness / 2, balcony.width, balcony.depth, balcony.thickness, rad);
-    const vol = balcony.width * balcony.depth * balcony.thickness * 1e-9;
-    const comp = ctx.add({ id: `ext:balcony:${slug(balcony.id)}`, name: `Balcony — ${level.name}`, kind: "balcony", category: "external", subcategory: "Balconies", stage: 18, level, layer: "concrete", materialId: "concrete", shapes: [slab], source: "project", sourceRef: balcony.id, explode: { layerIndex: 0, dir: UP }, dims: { length: dim(balcony.width, "mm", "measured"), width: dim(balcony.depth, "mm", "measured"), thickness: dim(balcony.thickness, "mm", "measured") }, note: "A cantilever balcony slab must be designed by an engineer; it is cast with the floor slab." });
-    concreteQuantity(ctx, comp, "concrete.balcony", "Balcony slab", vol, `${f3(balcony.width / 1000)} × ${f3(balcony.depth / 1000)} × ${f3(balcony.thickness / 1000)} m`, { width: balcony.width, depth: balcony.depth, thickness: balcony.thickness }, "review", ["Cantilever: structural design required."]);
-    const rh = balcony.railingHeight || 1000;
-    const rail = [alongLine({ x: balcony.x - balcony.width / 2, y: balcony.y - balcony.depth / 2 }, { x: balcony.x + balcony.width / 2, y: balcony.y - balcony.depth / 2 }, 40, balcony.elevation + rh - 40, balcony.elevation + rh)];
-    const r = ctx.add({ id: `ext:balcony:${slug(balcony.id)}:railing`, name: `Balcony railing — ${level.name}`, kind: "railing", category: "external", subcategory: "Railings", stage: 18, level, layer: "external", materialId: "railing", shapes: rail, source: "project", sourceRef: balcony.id, parentId: comp.id, explode: { layerIndex: 1, dir: UP } });
-    addQuantity(ctx, r, { workItem: "external.railing", description: "Railings and handrails", section: "W", unit: "m", value: round(balcony.width / 1000, 3), formula: `railing along the outer edge ${f2(balcony.width / 1000)} m`, inputs: { length: balcony.width }, status: "review" });
-  }
+  // --- Balconies: the render and paint on them, and the railings (their slab is cast with the floor, at stage 5) ---------------------------------
+  generateBalconyFinish(ctx);
 }

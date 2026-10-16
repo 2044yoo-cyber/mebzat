@@ -78,6 +78,8 @@ export const STAGES: StageDef[] = [
       "Columns carry loads down to the footings; beams carry the slabs and the walls over openings; slabs form the floors.",
       "Column bars run the full height with stirrups (ties) around them. Beam bars are held by stirrups that are closer together near the supports.",
       "Where a beam meets a column the joint is congested. Its steel layout is critical and comes from the structural design.",
+      "Where a slab or beam carries on over a support, the top of the concrete is in tension there. The top bars over the supports (the negative steel) reach roughly a third of the span either side, and sit on chairs so they stay at the top of the slab.",
+      "A balcony is a cantilever: nothing is under its free end. Its top bars run from the tip, over the edge beam and back into the floor slab, at least one and a half times the length it projects, and it is propped from the ground until the concrete has the strength the design asks for.",
       "Formwork gives the concrete its shape and is propped until the concrete has gained enough strength. Props are not removed early.",
       "Concrete is placed in zones with planned construction joints. Joints are placed where the designer allows, not where it happens to be convenient.",
       "Curing keeps the concrete moist so it reaches its strength. Formwork is removed only when the specification allows.",

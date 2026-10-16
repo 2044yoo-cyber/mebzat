@@ -1,0 +1,176 @@
+[
+  {
+    "name": "the top bars stop at the beam",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "const backTo = f.beamFace - Math.ceil((1.5 * span) / 50) * 50;",
+    "to": "const backTo = f.beamFace;"
+  },
+  {
+    "name": "the top bars are anchored one reach, not one and a half",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "Math.ceil((1.5 * span) / 50) * 50;",
+    "to": "Math.ceil((1.0 * span) / 50) * 50;"
+  },
+  {
+    "name": "the balcony starts at the wall, not at the edge of the slab",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "    edge: frameHalfOf(ctx, lowerLevelId),",
+    "to": "    edge: wallHalf,"
+  },
+  {
+    "name": "the balcony reaches only its depth, not past the wall as well",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "    tip: wallHalf + balcony.depth,",
+    "to": "    tip: balcony.depth,"
+  },
+  {
+    "name": "the beam face is the widest beam anywhere in the storey",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "[b.start, b.end].every((p) => Math.abs((p.x - wall.start.x) * wall.nx + (p.y - wall.start.y) * wall.ny) <= 150)",
+    "to": "[b.start, b.end].every((p) => Math.abs((p.x - wall.start.x) * wall.nx + (p.y - wall.start.y) * wall.ny) <= 1e9)"
+  },
+  {
+    "name": "the slab's own top bars run through the root of the balcony",
+    "file": "src/features/house-designer/construction/generators/frame.ts",
+    "from": "...zoneHoleRects.map((h) => rectPoly(h.x0, h.y0, h.x1, h.y1)), ...balconyRoots], spacing:",
+    "to": "...zoneHoleRects.map((h) => rectPoly(h.x0, h.y0, h.x1, h.y1))], spacing:"
+  },
+  {
+    "name": "the root zone is cut across the whole slab",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "return rectAt(f, -f.width / 2 - 1, f.width / 2 + 1, -400, 400);",
+    "to": "return rectAt(f, -1e6, 1e6, -400, 400);"
+  },
+  {
+    "name": "the props stop at the soffit instead of under the deck",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "const height = f.bottom - ply - ground;",
+    "to": "const height = f.bottom - ground;"
+  },
+  {
+    "name": "the props do not reach the ground",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "const ground = ASSUME.naturalGround;",
+    "to": "const ground = f.bottom - 1500;"
+  },
+  {
+    "name": "props far apart",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "spacedWithin(-f.width / 2 + 300, f.width / 2 - 300, 1000)",
+    "to": "spacedWithin(-f.width / 2 + 300, f.width / 2 - 300, 3000)"
+  },
+  {
+    "name": "the balcony formwork is never struck",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "subcategory: \"Formwork\", stage: 5, removedAfter: 5, level: lower, layer: \"formwork\"",
+    "to": "subcategory: \"Formwork\", stage: 5, level: lower, layer: \"formwork\""
+  },
+  {
+    "name": "the balcony props are never struck",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "subcategory: \"Props\", stage: 5, removedAfter: 5, level: lower, layer: \"props\"",
+    "to": "subcategory: \"Props\", stage: 5, level: lower, layer: \"props\""
+  },
+  {
+    "name": "the balcony is cast with the finishes",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "subcategory: \"Cantilever slabs\", stage: 5,",
+    "to": "subcategory: \"Cantilever slabs\", stage: 18,"
+  },
+  {
+    "name": "no leg at the tip of the top bars",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "      if (leg < 30) continue;",
+    "to": "      continue;"
+  },
+  {
+    "name": "the legs are not kept a cover above the soffit",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "const leg = zTop - (f.bottom + cover + ASSUME.slabBar + 2);",
+    "to": "const leg = zTop - (f.bottom + 2);"
+  },
+  {
+    "name": "the top bars sit under the surface by no cover",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "const zTop = f.top - cover - ASSUME.slabBar / 2 - ASSUME.slabBar - 1;",
+    "to": "const zTop = f.top - 2;"
+  },
+  {
+    "name": "top bars far apart",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "for (const a of spaced(-half, half, 150)) {",
+    "to": "for (const a of spaced(-half, half, 450)) {"
+  },
+  {
+    "name": "one pour for a balcony across the joint",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "  const convex = ctx.outline.length === 4;\n  for (const balcony of",
+    "to": "  const convex = false;\n  for (const balcony of"
+  },
+  {
+    "name": "the slab volume includes the upstand",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "const slabVolume = partArea * f.thickness * 1e-9;",
+    "to": "const slabVolume = partArea * (f.thickness + KERB_HEIGHT) * 1e-9;"
+  },
+  {
+    "name": "formwork ignores the edges",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "const edges = (f.width + 2 * reach) * (f.thickness + KERB_HEIGHT) * 1e-6;",
+    "to": "const edges = 0;"
+  },
+  {
+    "name": "waterproofing is not turned up the upstand",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "const wpArea = innerArea + (upstandLength * KERB_HEIGHT) * 1e-6;",
+    "to": "const wpArea = innerArea;"
+  },
+  {
+    "name": "tiles run over the upstand",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "const inner = rectAt(f, -f.width / 2 + KERB_WIDTH, f.width / 2 - KERB_WIDTH, f.edge, f.tip - KERB_WIDTH);",
+    "to": "const inner = rectAt(f, -f.width / 2, f.width / 2, f.edge, f.tip);"
+  },
+  {
+    "name": "the balcony floor is higher than the floor inside",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "const screedAvg = 20 + (fall * (reach - KERB_WIDTH)) / 2;",
+    "to": "const screedAvg = 70 + (fall * (reach - KERB_WIDTH)) / 2;"
+  },
+  {
+    "name": "the handrail is too low",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "rails.push(alongLine(a, b, 50, f.top + height - 30, f.top + height + 20));",
+    "to": "rails.push(alongLine(a, b, 50, f.top + height - 330, f.top + height - 280));"
+  },
+  {
+    "name": "the railing is not along the upstand",
+    "file": "src/features/house-designer/construction/generators/balcony.ts",
+    "from": "      [at(f, -f.width / 2 + KERB_WIDTH / 2, f.tip - KERB_WIDTH / 2), at(f, f.width / 2 - KERB_WIDTH / 2, f.tip - KERB_WIDTH / 2)],",
+    "to": "      [at(f, -f.width / 2 + KERB_WIDTH / 2, f.tip - 3 * KERB_WIDTH), at(f, f.width / 2 - KERB_WIDTH / 2, f.tip - 3 * KERB_WIDTH)],"
+  },
+  {
+    "name": "the balcony finish is not made",
+    "file": "src/features/house-designer/construction/generators/external.ts",
+    "from": "  generateBalconyFinish(ctx);",
+    "to": ""
+  },
+  {
+    "name": "the balcony floor is not made",
+    "file": "src/features/house-designer/construction/model.ts",
+    "from": "generateFinishes, generateBalconyFloors, generateOpenings",
+    "to": "generateFinishes, generateOpenings"
+  },
+  {
+    "name": "the balcony structure is not made",
+    "file": "src/features/house-designer/construction/generators/frame.ts",
+    "from": "    if (above) generateBalconyStructure(ctx, level, above, baseBeamPour);",
+    "to": ""
+  },
+  {
+    "name": "the pour line is not the grid line nearest the middle",
+    "file": "src/features/house-designer/construction/slab-cast.ts",
+    "from": "return xs.reduce((best, x) => (Math.abs(x - mid) < Math.abs(best - mid) - 1e-9 || (Math.abs(Math.abs(x - mid) - Math.abs(best - mid)) < 1e-9 && x > best) ? x : best), xs[0]!);",
+    "to": "return xs[0]!;"
+  }
+]
