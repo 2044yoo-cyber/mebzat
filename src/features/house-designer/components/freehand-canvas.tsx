@@ -55,6 +55,7 @@ export function FreehandCanvas({
   const [tool, setTool] = useState<"draw" | "erase" | "pan" | "point">(
     readOnly ? "pan" : "draw",
   );
+  const [markKind, setMarkKind] = useState<"wall" | "door" | "window" | "furniture" | "kitchen">("wall");
   const [selectedPoint, setSelectedPoint] = useState<{ strokeId: string; end: "start" | "end" } | null>(null);
   const pointStart = useRef<Point | null>(null);
   const [past, setPast] = useState<Sketch[]>([]),
@@ -128,7 +129,10 @@ export function FreehandCanvas({
       ctx.stroke();
     };
     for (const stroke of state.current.sketch.strokes) {
-      if (!gesture.current?.erase.has(stroke.id)) draw(stroke.points, "#bdc5cf", 1);
+      if (gesture.current?.erase.has(stroke.id)) continue;
+      const kind = stroke.kind ?? "wall";
+      const color = stroke.color ?? (kind === "kitchen" ? "#dc2626" : kind === "furniture" ? "#0d9488" : kind === "door" ? "#7c3aed" : kind === "window" ? "#0284c7" : "#bdc5cf");
+      draw(stroke.points, color, kind === "wall" ? 1 : 1.5);
     }
     // Preview exactly the same joined, split wall graph used by Convert to Plan.
     // Cache while moving the pointer so drawing stays responsive on phones.
@@ -343,6 +347,7 @@ export function FreehandCanvas({
     if (!selectedPoint || readOnly) return;
     const target = sketch.strokes.find(stroke => stroke.id === selectedPoint.strokeId);
     if (!target || target.points.length < 2) return;
+    if (target.locked) { setMessage("This stroke is locked. Unlock it before editing."); return; }
     const first = selectedPoint.end === "start";
     const endpoint = first ? target.points[0]! : target.points[target.points.length - 1]!;
     const neighbour = first ? target.points[1]! : target.points[target.points.length - 2]!;
@@ -535,13 +540,12 @@ export function FreehandCanvas({
         role="toolbar"
         aria-label="Sketch tools"
       >
-        {button(
-          "Draw wall",
-          Pencil,
-          () => setTool("draw"),
-          tool === "draw",
-          readOnly,
-        )}
+        {button(markKind === "wall" ? "Draw wall" : markKind === "door" ? "Mark door" : markKind === "window" ? "Mark window" : markKind === "kitchen" ? "Kitchen guide" : "Furniture guide", Pencil, () => setTool("draw"), tool === "draw", readOnly)}
+        <label className="flex items-center gap-1 whitespace-nowrap text-xs">Mark
+          <select aria-label="Sketch mark type" value={markKind} disabled={readOnly} onChange={e => setMarkKind(e.target.value as typeof markKind)} className="max-w-28 rounded border bg-white p-2">
+            <option value="wall">Wall</option><option value="door">Door</option><option value="window">Window</option><option value="furniture">Furniture</option><option value="kitchen">Kitchen (red)</option>
+          </select>
+        </label>
         {button("Edit endpoints", MousePointer2, () => { setTool("point"); setSelectedPoint(null); }, tool === "point", readOnly)}
         {tool === "point" ? button("Trim selected wall endpoint to nearest junction", Trash2, deleteSelectedPoint, false, !selectedPoint || readOnly) : null}
         {button(
@@ -567,6 +571,7 @@ export function FreehandCanvas({
           readOnly,
         )}
         {button("Set scale", Ruler, calibrate, false, readOnly)}
+        {selectedPoint ? (() => { const selected = sketch.strokes.find(s => s.id === selectedPoint.strokeId); return selected ? button(selected.locked ? "Unlock selected stroke" : "Lock selected stroke", selected.locked ? Check : Magnet, () => commit({ ...sketch, strokes: sketch.strokes.map(s => s.id === selected.id ? { ...s, locked: !s.locked } : s) }), !!selected.locked, readOnly) : null; })() : null}
         {button("Zoom in", ZoomIn, () => zoom(1.25))}
         {button("Zoom out", ZoomOut, () => zoom(0.8))}
         <label className="flex items-center gap-1 whitespace-nowrap text-xs">
@@ -666,7 +671,7 @@ export function FreehandCanvas({
               const to = point(e), from = pointStart.current;
               if (Math.hypot(to.x - from.x, to.y - from.y) > 5 / view.current.zoom) {
                 const target = sketch.strokes.find(stroke => stroke.id === selectedPoint.strokeId);
-                if (target) {
+                if (target && !target.locked) {
                   const next = sketch.strokes.map(stroke => {
                     if (stroke.id !== target.id) return stroke;
                     const pts = stroke.points.map(p => ({...p}));
@@ -677,7 +682,7 @@ export function FreehandCanvas({
                 }
               }
             } else if (tool === "draw" && live.current.length > 1 && sketch.strokes.length < 500) {
-              const stroke = { id: crypto.randomUUID(), points: alignWall(live.current[0]!, point(e)), thickness };
+              const stroke = { id: crypto.randomUUID(), points: alignWall(live.current[0]!, point(e)), thickness, kind: markKind, locked: false, color: markKind === "kitchen" ? "#dc2626" : markKind === "furniture" ? "#0d9488" : markKind === "door" ? "#7c3aed" : markKind === "window" ? "#0284c7" : undefined };
               if (strokeSegments(stroke).length)
                 commit({ ...sketch, strokes: [...sketch.strokes, stroke] });
             } else if (tool === "erase" && g.erase.size)
