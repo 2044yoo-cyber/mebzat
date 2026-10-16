@@ -40,6 +40,7 @@ const empty: Sketch = {
   version: 1,
   strokes: [],
   openings: [],
+  lockedDimensions: [],
   mmPerUnit: 20,
   calibrated: false,
 };
@@ -335,6 +336,31 @@ export function FreehandCanvas({
       x: (e.clientX - r.left - v.x) / v.zoom,
       y: (e.clientY - r.top - v.y) / v.zoom,
     };
+  }
+  // Dimension identity is based on its canonical endpoints in calibrated mm,
+  // so the lock survives closing/reopening the sketch and remains independent
+  // of the order in which dimensions are displayed.
+  function dimensionKey(start: Point, end: Point) {
+    const key = (p: Point) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+    const a = key(start), b = key(end);
+    return a < b ? `${a}|${b}` : `${b}|${a}`;
+  }
+  function isDimensionLocked(start: Point, end: Point) {
+    const key = dimensionKey(start, end);
+    return (sketch.lockedDimensions ?? []).some(item => item.key === key);
+  }
+  function toggleDimensionLock(start: Point, end: Point) {
+    const key = dimensionKey(start, end);
+    const existing = sketch.lockedDimensions ?? [];
+    const locked = existing.some(item => item.key === key);
+    const lengthMm = Math.hypot(end.x - start.x, end.y - start.y);
+    const lockedDimensions = locked
+      ? existing.filter(item => item.key !== key)
+      : [...existing, { key, start: { ...start }, end: { ...end }, lengthMm }];
+    commit({ ...sketch, lockedDimensions });
+    setMessage(locked
+      ? "Wall length unlocked. You can move its endpoint again."
+      : `Wall length locked at ${(lengthMm / 1000).toFixed(2)} m. Its endpoint cannot be dragged until you unlock it.`);
   }
   // Orthogonal pencil: every gesture creates one horizontal or vertical wall.
   // Nearby wall endpoints become exact shared junctions.
@@ -704,6 +730,11 @@ export function FreehandCanvas({
             if (tool === "point" && selectedPoint && pointStart.current) {
               const to = point(e), from = pointStart.current;
               if (Math.hypot(to.x - from.x, to.y - from.y) > 5 / view.current.zoom) {
+                const lockedEndpoint = (p: Point) => (sketch.lockedDimensions ?? []).some(item =>
+                  [item.start, item.end].some(q => Math.hypot(p.x * sketch.mmPerUnit - q.x, p.y * sketch.mmPerUnit - q.y) <= 3));
+                if (lockedEndpoint(from)) {
+                  setMessage("This endpoint belongs to a locked wall length. Tap its lock icon in Inside wall dimensions to unlock it first.");
+                } else {
                 const target = sketch.strokes.find(stroke => stroke.id === selectedPoint.strokeId);
                 if (target) {
                   const next = sketch.strokes.map(stroke => {
@@ -713,6 +744,7 @@ export function FreehandCanvas({
                     return { ...stroke, points: pts };
                   });
                   commit({ ...sketch, strokes: next });
+                }
                 }
               }
             } else if ((tool === "door" || tool === "window") && live.current.length > 1) {
@@ -765,9 +797,15 @@ export function FreehandCanvas({
           <div className="max-h-[16dvh] space-y-1 overflow-y-auto px-2 pb-2">
             {dimensionSegments.map((wall, index) => {
               const metres = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y) / 1000;
+              const locked = isDimensionLocked(wall.start, wall.end);
               return <div key={`${index}-${wall.start.x}-${wall.start.y}-${wall.end.x}-${wall.end.y}`} className="flex items-center justify-between gap-2 rounded border bg-white px-2 py-1.5">
-                <span>Wall {index + 1}: <strong>{sketch.calibrated ? "" : "≈ "}{metres.toFixed(2)} m</strong></span>
-                {!readOnly ? <button type="button" className="shrink-0 rounded border border-blue-200 px-2 py-1 text-blue-700" onClick={() => calibrate(index)}>Set known inside length</button> : null}
+                <span className="min-w-0 flex-1">Wall {index + 1}: <strong>{sketch.calibrated ? "" : "≈ "}{metres.toFixed(2)} m</strong></span>
+                {!readOnly ? <>
+                  <button type="button" title={locked ? "Unlock wall length" : "Lock wall length"} aria-label={`${locked ? "Unlock" : "Lock"} Wall ${index + 1} length`} aria-pressed={locked} className={`size-10 shrink-0 rounded-lg border flex items-center justify-center ${locked ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600"}`} onClick={() => toggleDimensionLock(wall.start, wall.end)}>
+                    {locked ? <Lock className="size-4" /> : <Unlock className="size-4" />}
+                  </button>
+                  <button type="button" className="shrink-0 rounded border border-blue-200 px-2 py-1 text-blue-700" onClick={() => calibrate(index)}>Set known inside length</button>
+                </> : locked ? <Lock className="size-4 shrink-0 text-blue-700" aria-label="Locked wall length" /> : null}
               </div>;
             })}
           </div>
