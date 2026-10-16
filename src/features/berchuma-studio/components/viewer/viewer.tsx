@@ -104,6 +104,7 @@ export function Viewer({ spec }: { spec: DesignSpec }) {
         ) : (
           <Model
             spec={spec}
+            renderQuality={renderMode}
             visualMode={view === "connections" ? "connections" : view === "exploded" ? "exploded" : "normal"}
             explodeDistance={explodeDistance}
             hideFronts={hideFronts}
