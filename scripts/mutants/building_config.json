@@ -1,0 +1,134 @@
+[
+  {
+    "name": "areas read at half size",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "return slab ? polygonArea(slab.boundary) * 1e-6 : 0;",
+    "to": "return slab ? polygonArea(slab.boundary) * 1e-6 * 0.5 : 0;"
+  },
+  {
+    "name": "gross floor area is only the ground floor",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "const grossFloorArea = areaPerFloor.reduce((s, a) => s + a, 0);",
+    "to": "const grossFloorArea = areaPerFloor[0] ?? 0;"
+  },
+  {
+    "name": "footprint is the gross floor area",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "footprint: areaPerFloor[0] ?? 0,",
+    "to": "footprint: grossFloorArea,"
+  },
+  {
+    "name": "balconies left out of the slab total",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "totalSlabArea: grossFloorArea + balconyPerFloor.reduce((s, a) => s + a, 0),",
+    "to": "totalSlabArea: grossFloorArea,"
+  },
+  {
+    "name": "balcony area counted in the floors",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "const grossFloorArea = areaPerFloor.reduce((s, a) => s + a, 0);",
+    "to": "const grossFloorArea = areaPerFloor.reduce((s, a) => s + a, 0) + balconyPerFloor.reduce((s, a) => s + a, 0);"
+  },
+  {
+    "name": "area search aims off the mark",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "const width = clamp(snap50(target / length) + nudge * 50, wLo, wHi);",
+    "to": "const width = clamp(snap50(target / length) + nudge * 50 + 100, wLo, wHi);"
+  },
+  {
+    "name": "area tolerance far too loose",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "const bucket = Math.floor(error / 0.05);",
+    "to": "const bucket = Math.floor(error / 5);"
+  },
+  {
+    "name": "area search starts from the wrong length",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "const ideal = clamp(Math.sqrt(target * aspect), lLo, lHi);",
+    "to": "const ideal = clamp(Math.sqrt(target / aspect), lLo, lHi);"
+  },
+  {
+    "name": "floors never limited",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "Math.round(clamp(rawFloors, def.limits.floors[0], def.limits.floors[1]))",
+    "to": "Math.round(rawFloors)"
+  },
+  {
+    "name": "stair rule dropped",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "    if (width < fitting) {",
+    "to": "    if (false) {"
+  },
+  {
+    "name": "last grid line short of the length",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "lines[lines.length - 1] = length;",
+    "to": "lines[lines.length - 1] = length - 100;"
+  },
+  {
+    "name": "flat roof measured to the outline",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "const inner = (L - 2 * ASSUME.parapetThickness) * (W - 2 * ASSUME.parapetThickness) * 1e-6;",
+    "to": "const inner = L * W * 1e-6;"
+  },
+  {
+    "name": "pitched roof measured in plan",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "return { covering: cover.sloped, plan: cover.plan };",
+    "to": "return { covering: cover.plan, plan: cover.plan };"
+  },
+  {
+    "name": "existing building no longer the original",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "buildLearningHouseProject({ ...(original ? {} : base), ...overrides })",
+    "to": "buildLearningHouseProject({ ...base, ...overrides })"
+  },
+  {
+    "name": "typed sizes ignored by the new templates",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "    ...overrides,\n  }, counts);",
+    "to": "  }, counts);"
+  },
+  {
+    "name": "typed sizes ignored by the existing building",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "buildLearningHouseProject({ ...(original ? {} : base), ...overrides })",
+    "to": "buildLearningHouseProject(original ? {} : base)"
+  },
+  {
+    "name": "typed column lines honoured everywhere",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "    if (template !== \"existing\") {\n      issues.push({ field, message: `${def.label} lays out",
+    "to": "    if (false) {\n      issues.push({ field, message: `${def.label} lays out"
+  },
+  {
+    "name": "villa loses its second balcony",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": ", { id: \"right\", centre: front * 0.78, width: Math.min(front * 0.26, 4500), depth: 1500 }]",
+    "to": "]"
+  },
+  {
+    "name": "area request keeps typed lines",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "normalizeConfig({ ...config, gridX: undefined, gridY: undefined, length: best!.length, width: best!.width })",
+    "to": "normalizeConfig({ ...config, length: best!.length, width: best!.width })"
+  },
+  {
+    "name": "storey height ignored",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "storeys: config.floors, floorToFloor: config.floorToFloor, ...structure }",
+    "to": "storeys: config.floors, ...structure }"
+  },
+  {
+    "name": "floors ignored",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "storeys: config.floors, floorToFloor: config.floorToFloor, ...structure }",
+    "to": "floorToFloor: config.floorToFloor, ...structure }"
+  },
+  {
+    "name": "roof generator keeps its own formula",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const { plan: planCover, sloped: slopedCover } = pitchedCover(lengthX, b.maxY - b.minY);",
+    "to": "const planCover = (lengthX + 2 * OVERHANG) * (spanY + 2 * OVERHANG) * 1e-6;\n  const slopedCover = planCover;"
+  }
+]

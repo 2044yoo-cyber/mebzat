@@ -10,6 +10,8 @@ export { MATERIALS, CATEGORY_COLORS, materialOf, knowledgeFor } from "./catalogu
 export { buildConstructionModel, boundsOf } from "./model";
 export { buildLearningHouseProject, DEFAULT_LEARNING_PARAMS, LEARNING_HOUSE_ID, normalizeParams } from "./learning-house";
 export type { LearningHouseParams } from "./learning-house";
+export { BUILDING_TEMPLATES, TEMPLATES, areaRange, areasOf, buildBuilding, configForArea, defaultConfig, normalizeConfig, roofAreaOf, widthBounds } from "./building-config";
+export type { BuildingAreas, BuildingConfig, BuildingTemplateId, BuiltBuilding, StructureOverrides } from "./building-config";
 export { indexModel, subtreeOf, visibilityOf, visibleComponents, shapeVisible, cutPlane, resetView, setStage, stepStage, toggleIn, isolateLayer, showAll, showStoreysUpTo, categoriesPresent } from "./view";
 export type { ModelIndex, Visibility, Visible, CutPlane } from "./view";
 export { explodeInfo, shapeOffset, isAssembled, FLOOR_STEP, CATEGORY_STEP, LAYER_STEP } from "./explode";

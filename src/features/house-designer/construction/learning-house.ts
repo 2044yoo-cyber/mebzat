@@ -48,6 +48,8 @@ export type LearningHouseParams = {
   windowHeight: number;
   windowSill: number;
   stairFlightWidth: number;
+  /** Where the stair stands, as a plan rectangle. When left out it is the hall between grid lines 3 and 4 on the north bay. */
+  stairHall?: { x0: number; y0: number; x1: number; y1: number };
 };
 
 export const LEARNING_HOUSE_TITLE = "Medosha Three-Storey Learning House";
@@ -87,7 +89,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
  * order), and the editor must say so rather than silently produce a broken
  * model.
  */
-export function normalizeParams(input: Partial<LearningHouseParams>): { params: LearningHouseParams; issues: ParamIssue[] } {
+export function normalizeParams(input: Partial<LearningHouseParams>, gridCounts: { x: number; y: number } = { x: 5, y: 3 }): { params: LearningHouseParams; issues: ParamIssue[] } {
   const issues: ParamIssue[] = [];
   const base = { ...DEFAULT_LEARNING_PARAMS, ...input };
   const num = (field: keyof LearningHouseParams, min: number, max: number) => {
@@ -104,8 +106,8 @@ export function normalizeParams(input: Partial<LearningHouseParams>): { params: 
   };
   const params: LearningHouseParams = {
     title: String(base.title || LEARNING_HOUSE_TITLE).slice(0, 80),
-    gridX: grid("gridX", 5, DEFAULT_LEARNING_PARAMS.gridX),
-    gridY: grid("gridY", 3, DEFAULT_LEARNING_PARAMS.gridY),
+    gridX: grid("gridX", gridCounts.x, DEFAULT_LEARNING_PARAMS.gridX),
+    gridY: grid("gridY", gridCounts.y, DEFAULT_LEARNING_PARAMS.gridY),
     storeys: Math.round(num("storeys", 1, 4)),
     floorToFloor: num("floorToFloor", 2600, 4500),
     slabThickness: num("slabThickness", 120, 350),
@@ -124,6 +126,7 @@ export function normalizeParams(input: Partial<LearningHouseParams>): { params: 
     windowHeight: num("windowHeight", 600, 1800),
     windowSill: num("windowSill", 300, 1400),
     stairFlightWidth: num("stairFlightWidth", 800, 1400),
+    ...(base.stairHall ? { stairHall: base.stairHall } : {}),
   };
   // The beam hangs below the slab, so it cannot be deeper than the room it leaves.
   const clear = params.floorToFloor - params.slabThickness;
@@ -145,11 +148,11 @@ export function normalizeParams(input: Partial<LearningHouseParams>): { params: 
 // The plan: rooms as rectangles on the structural grid
 // ---------------------------------------------------------------------------
 
-type Zone = { id: string; name: string; x0: number; y0: number; x1: number; y1: number; floor: string };
-type DoorSpec = { a: string; b: string; at: number; width?: number; kind?: "door" | "passage"; swing?: "in-left" | "in-right" | "out-left" | "out-right" };
-type WindowSpec = { zone: string; side: "S" | "E" | "N" | "W"; at: number; width?: number; height?: number; sill?: number };
+export type Zone = { id: string; name: string; x0: number; y0: number; x1: number; y1: number; floor: string };
+export type DoorSpec = { a: string; b: string; at: number; width?: number; kind?: "door" | "passage"; swing?: "in-left" | "in-right" | "out-left" | "out-right" };
+export type WindowSpec = { zone: string; side: "S" | "E" | "N" | "W"; at: number; width?: number; height?: number; sill?: number };
 
-type PlanSpec = { zones: Zone[]; open: [string, string][]; doors: DoorSpec[]; windows: WindowSpec[] };
+export type PlanSpec = { zones: Zone[]; open: [string, string][]; doors: DoorSpec[]; windows: WindowSpec[] };
 
 const sameEdge = (a: number, b: number) => Math.abs(a - b) < 1;
 
@@ -250,11 +253,15 @@ function exteriorOffset(side: "S" | "E" | "N" | "W", along: number, width: numbe
 }
 
 function buildPlan(kind: "ground" | "first" | "second", p: LearningHouseParams): Room {
-  const spec = planSpec(kind, p);
+  return buildPlanFromSpec(planSpec(kind, p), p);
+}
+
+/** One storey's plan from a list of rooms on the grid: the walls between them, the doors and windows, the columns on every grid crossing. */
+export function buildPlanFromSpec(spec: PlanSpec, p: LearningHouseParams): Room {
   const x0 = p.gridX[0]!;
-  const x4 = p.gridX[4]!;
+  const x4 = p.gridX[p.gridX.length - 1]!;
   const y0 = p.gridY[0]!;
-  const y2 = p.gridY[2]!;
+  const y2 = p.gridY[p.gridY.length - 1]!;
   const W = x4 - x0;
   const D = y2 - y0;
   const ceilingHeight = p.floorToFloor - p.slabThickness;
@@ -306,7 +313,7 @@ export function stairLayout(p: LearningHouseParams) {
   const params = stairPreset("dog-legged", p.floorToFloor, p.stairFlightWidth, 280);
   const fields = stairFields(params);
   const geometry = stairGeometry(params);
-  const hall = { x0: p.gridX[2]!, x1: p.gridX[3]!, y0: p.gridY[1]!, y1: p.gridY[2]! };
+  const hall = p.stairHall ?? { x0: p.gridX[2]!, x1: p.gridX[3]!, y0: p.gridY[1]!, y1: p.gridY[2]! };
   // Clear of the grid columns at the hall's corners (200 mm from the west grid line), and 20 mm off the north wall's face.
   const x = hall.x0 + 200 + fields.width / 2;
   const y = hall.y1 - 120 - fields.length / 2;
@@ -325,8 +332,24 @@ export function buildLearningHouseProject(input: Partial<LearningHouseParams> = 
   const kinds: ("ground" | "first" | "second")[] = ["ground", "first", "second"];
   // Ground floor, then typical upper floors, with a different top floor when there are three or more.
   const planOf = (index: number) => buildPlan(index === 0 ? kinds[0]! : index === p.storeys - 1 && p.storeys >= 3 ? kinds[2]! : kinds[1]!, p);
+  return { project: buildProjectFromPlans(p, planOf), params: p, issues };
+}
+
+/** What a building template may change in the generic build. */
+export type BuildHooks = {
+  id?: string;
+  /** The roof slab's upstand, mm (the parapet of a flat roof). */
+  parapet?: number;
+  /** Slab overhang beyond the outline on the roof, mm. */
+  roofOverhang?: number;
+  /** Added after the structure is built and before the project is checked: balconies, verandas, anything else the template carries. */
+  finish?: (project: HouseProject, p: LearningHouseParams) => HouseProject;
+};
+
+/** A building from its dimensions and a plan for each storey: structure, slabs, stairs, roof and foundations come from the same rules for every template. */
+export function buildProjectFromPlans(p: LearningHouseParams, planOf: (index: number) => Room, hooks: BuildHooks = {}): HouseProject {
   let project = createHouseProject({
-    id: LEARNING_HOUSE_ID,
+    id: hooks.id ?? LEARNING_HOUSE_ID,
     createdAt: "2026-01-01T00:00:00.000Z",
     title: p.title,
     room: planOf(0),
@@ -351,7 +374,7 @@ export function buildLearningHouseProject(input: Partial<LearningHouseParams> = 
   // Roof: a flat concrete roof slab over the top storey, with a parapet and no overhang.
   const roofs = [{
     id: "main-roof", levelId: top.id, boundary: outline.map((point) => ({ ...point })), elevation: top.elevation + ceilingHeight,
-    type: "flat" as const, height: 300, slope: 0, overhang: 0, thickness: p.slabThickness, material: "Reinforced concrete",
+    type: "flat" as const, height: hooks.parapet ?? 300, slope: 0, overhang: hooks.roofOverhang ?? 0, thickness: p.slabThickness, material: "Reinforced concrete",
   }];
 
   // Stairs: one dog-legged flight pair between each pair of floors.
@@ -396,8 +419,9 @@ export function buildLearningHouseProject(input: Partial<LearningHouseParams> = 
     modelingOptions: { mode: "house", structure: true, foundations: true, roof: true, stairs: true, site: true, floors: true, ceilings: true },
     revisions: [{ id: "learning-house", createdAt: "2026-01-01T00:00:00.000Z", note: "Generated illustrative learning house" }],
   };
+  if (hooks.finish) project = hooks.finish(project, p);
   project = ensureHouseBimState(project);
-  return { project: houseProjectSchema.parse(project), params: p, issues };
+  return houseProjectSchema.parse(project);
 }
 
 /** Wall id helpers, re-exported for the generators and checks. */

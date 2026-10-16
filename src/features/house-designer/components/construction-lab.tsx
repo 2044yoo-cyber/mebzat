@@ -1,13 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, RotateCcw, Settings2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 import { buildConstructionModel } from "../construction/model";
-import { buildLearningHouseProject, DEFAULT_LEARNING_PARAMS, normalizeParams, type LearningHouseParams } from "../construction/learning-house";
+import { TEMPLATES, areasOf, buildBuilding, configForArea, defaultConfig, type BuildingAreas, type BuildingConfig, type BuildingTemplateId, type BuiltBuilding, type StructureOverrides } from "../construction/building-config";
 import { STAGES, STAGE_BY_ID, ENGINEERING_DISCLAIMER } from "../construction/stages";
 import {
   DEFAULT_OPTIONS, DEFAULT_RULES, DEFAULT_VIEW, STAGE_IDS,
@@ -17,6 +17,7 @@ import { indexModel, resetView, setStage, stepStage } from "../construction/view
 import type { HouseProject } from "../types/project";
 import { layoutLabels } from "../construction/label-layout";
 import type { CameraPreset, ScreenLabel } from "./construction-scene";
+import { BuildingPanel, AreaTable, buildingSummary } from "./building-panel";
 import { EstimatePanel, InspectorPanel, LayersPanel, LessonPanel, PartsPanel, QuantitiesPanel, Section, Segmented, ServiceViewPanel, stageCounts } from "./construction-panels";
 
 // Like the 3D tab, three.js loads only when somebody opens this one.
@@ -41,10 +42,23 @@ const MODES: { id: AppMode; label: string }[] = [
   { id: "estimate", label: "Estimate cost" },
 ];
 
+/** A value once it has stopped changing for `ms`, and whether it is still catching up. The first value is used at once. */
+function useSettled<T>(value: T, ms: number): [T, boolean] {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    if (Object.is(settled, value)) return;
+    const t = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(t);
+  }, [value, settled, ms]);
+  return [settled, !Object.is(settled, value)];
+}
+
 /** `project` is the plan open in the editor; with none (opened from a link) only the sample house can be studied. */
 export function ConstructionLab({ project = null }: { project?: HouseProject | null }) {
   const [source, setSource] = useState<Source>("sample");
-  const [params, setParams] = useState<Partial<LearningHouseParams>>({});
+  // What the learner has asked for, as typed: the building (template and overall size) and the structure sizes on top of it.
+  const [config, setConfig] = useState<Partial<BuildingConfig>>(() => defaultConfig("existing"));
+  const [overrides, setOverrides] = useState<StructureOverrides>({});
   const [options, setOptions] = useState<ModelOptions>(DEFAULT_OPTIONS);
   const [rules, setRules] = useState<EstimatingRules>(DEFAULT_RULES);
   const [view, setView] = useState<ViewState>({ ...DEFAULT_VIEW });
@@ -57,22 +71,25 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [ready, setReady] = useState(false);
+  const detailsRef = useRef<HTMLElement | null>(null);
 
   // Let the tab paint before the first, heavier, build.
   useEffect(() => { const t = setTimeout(() => setReady(true), 30); return () => clearTimeout(t); }, []);
 
-  const paramsKey = JSON.stringify(params);
-  const normalized = useMemo(() => normalizeParams(params), [paramsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The building itself is quick to draw (tens of milliseconds), so the numbers on screen follow every change at once;
+  // the construction model behind it takes about a second, so it waits until the typing has stopped.
+  const configKey = JSON.stringify(config);
+  const overridesKey = JSON.stringify(overrides);
+  const building = useMemo(() => buildBuilding(JSON.parse(configKey) as Partial<BuildingConfig>, JSON.parse(overridesKey) as StructureOverrides), [configKey, overridesKey]);
+  const sourceProject = source === "sample" || !project ? building.project : project;
+  const [buildProject, pending] = useSettled(sourceProject, 250);
   const { blockType, floorFinish } = options;
   const built = useMemo<{ model: ConstructionModel; source: HouseProject } | null>(() => {
     if (!ready) return null;
     const buildOptions: ModelOptions = { ...DEFAULT_OPTIONS, blockType, floorFinish };
-    if (source === "sample" || !project) {
-      const sample = buildLearningHouseProject(JSON.parse(paramsKey) as Partial<LearningHouseParams>);
-      return { model: buildConstructionModel(sample.project, buildOptions, rules), source: sample.project };
-    }
-    return { model: buildConstructionModel(project, buildOptions, rules), source: project };
-  }, [ready, source, paramsKey, blockType, floorFinish, rules, project]);
+    return { model: buildConstructionModel(buildProject, buildOptions, rules), source: buildProject };
+  }, [ready, buildProject, blockType, floorFinish, rules]);
+  const areas = useMemo(() => areasOf(sourceProject, options.roofType), [sourceProject, options.roofType]);
   const model = built?.model ?? null;
   const index = useMemo(() => (model ? indexModel(model) : null), [model]);
   const counts = useMemo(() => (model ? stageCounts(model) : null), [model]);
@@ -90,6 +107,21 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
   const chooseMode = (mode: AppMode) => { setView((v) => ({ ...v, mode })); setTab(MODE_TABS[mode][0]!.id); setSettingsOpen(false); };
   const goStage = (stage: StageId) => setView((v) => setStage(v, stage));
 
+  // A new template is a different building: part ids from the old one mean nothing, and its own roof is the roof to show.
+  const chooseTemplate = useCallback((id: BuildingTemplateId) => {
+    setConfig(defaultConfig(id));
+    setOverrides({});
+    setOptions((o) => ({ ...o, roofType: TEMPLATES[id].roofType }));
+    setView((v) => ({ ...v, selectedId: null, selectedInstance: null, isolateId: null, hiddenIds: [], highlightIds: [] }));
+  }, []);
+  const patchConfig = useCallback((p: Partial<BuildingConfig>) => setConfig((c) => ({ ...c, ...p })), []);
+  const setAreaPerFloor = useCallback((area: number) => setConfig((c) => configForArea(buildBuilding(c).config, area).config), []);
+
+  // On a phone the panels stand below the model: opening the building settings should bring them into view.
+  useEffect(() => {
+    if (settingsOpen && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1023px)").matches) detailsRef.current?.scrollIntoView({ block: "start" });
+  }, [settingsOpen]);
+
   const noPlan = !!model && model.components.length === 0;
   const stageDef = STAGE_BY_ID[view.stage];
   const tabs = MODE_TABS[view.mode];
@@ -99,8 +131,9 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
     <div className="min-w-0 space-y-2" data-testid="construction-lab">
       <div className="flex flex-wrap items-center gap-2">
         <Segmented<Source> label="What to study" value={source} onChange={setSource} options={project ? [{ id: "sample", label: "Sample house" }, { id: "project", label: "My project" }] : [{ id: "sample", label: "Sample house" }]} />
-        <button type="button" onClick={() => setSettingsOpen((o) => !o)} aria-pressed={settingsOpen} data-testid="settings-toggle" className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium", settingsOpen && "border-brand bg-brand/10 text-brand")}><Settings2 className="size-4" />Dimensions and options</button>
+        <button type="button" onClick={() => setSettingsOpen((o) => !o)} aria-pressed={settingsOpen} data-testid="settings-toggle" className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium", settingsOpen && "border-brand bg-brand/10 text-brand")}><Settings2 className="size-4" />Building and dimensions</button>
       </div>
+      {source === "sample" || !project ? <p className="text-xs text-muted-foreground" data-testid="building-summary">{buildingSummary(building)}</p> : null}
       <div className="rounded-xl border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950" data-testid="disclaimer">
         <p><strong>Illustrative learning model.</strong> {noteOpen ? ENGINEERING_DISCLAIMER : "Dimensions, reinforcement and services are examples for teaching the order of work — not a design, and not safe or ready to build."} <button type="button" onClick={() => setNoteOpen(!noteOpen)} className="underline">{noteOpen ? "Less" : "More"}</button></p>
       </div>
@@ -139,6 +172,7 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
               </div>
             )}
             {showLabels && model && !noPlan ? <LabelLayer labels={labels} onPick={pickById} /> : null}
+            {pending && model ? <div className="pointer-events-none absolute inset-x-0 bottom-14 flex justify-center" data-testid="model-updating"><span className="inline-flex items-center rounded-full border bg-background/95 px-3 py-1.5 text-xs shadow-sm"><Loader2 className="mr-2 size-3.5 animate-spin" />Updating the model…</span></div> : null}
             <div className="pointer-events-none absolute left-2 right-2 top-2 flex items-start justify-between gap-2">
               <div className="pointer-events-auto flex w-max max-w-full overflow-x-auto rounded-full border bg-background/90 p-1 shadow-sm backdrop-blur" role="radiogroup" aria-label="Camera view">
                 {([["orbit", "Orbit"], ["top", "Top"], ["front", "Front"], ["side", "Side"]] as const).map(([id, label]) => (
@@ -156,7 +190,7 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
           <ViewControls view={viewWithOptions} showLabels={showLabels} onLabels={setShowLabels} onView={patch} />
         </div>
 
-        <aside className="min-w-0 space-y-2" aria-label="Details">
+        <aside ref={detailsRef} className="min-w-0 space-y-2" aria-label="Details">
           <div role="tablist" aria-label="Panels" className="relative flex gap-1 overflow-x-auto rounded-xl bg-muted p-1">
             {tabs.map((t) => (
               <button key={t.id} type="button" role="tab" aria-selected={activeTab === t.id} onClick={() => { setTab(t.id); setSettingsOpen(false); }} data-tab={t.id} className={cn("min-h-9 shrink-0 flex-1 rounded-lg px-3 text-xs font-semibold", activeTab === t.id ? "bg-background text-brand shadow-sm" : "text-muted-foreground")}>{t.id === "selected" && view.selectedId ? "Selected part •" : t.label}</button>
@@ -175,7 +209,7 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
               : activeTab === "layers" ? <LayersPanel model={model} view={viewWithOptions} onView={patch} />
               : activeTab === "quantities" ? <QuantitiesPanel model={model} view={viewWithOptions} rules={rules} onRules={setRules} onHighlight={(ids) => patch({ highlightIds: ids })} onPick={pickById} />
               : activeTab === "estimate" ? <EstimatePanel model={model} view={viewWithOptions} />
-              : <SettingsPanel source={source} params={normalized.params} issues={normalized.issues} onParams={(p) => setParams((old) => ({ ...old, ...p }))} onReset={() => setParams({})} options={options} onOptions={patchOptions} />}
+              : <SettingsPanel source={source} building={building} areas={areas} onPatch={patchConfig} onArea={setAreaPerFloor} onTemplate={chooseTemplate} onOverrides={(p) => setOverrides((old) => ({ ...old, ...p }))} onReset={() => { chooseTemplate(building.config.template); }} options={options} onOptions={patchOptions} />}
           </div>
         </aside>
       </div>
@@ -325,8 +359,7 @@ function StageControls({ view, model, index, onView, onOptions, rules, onRules }
 
 /** Sample house dimensions --------------------------------------------------------------- */
 
-const FIELDS: { key: keyof LearningHouseParams; label: string; min: number; max: number; step: number }[] = [
-  { key: "floorToFloor", label: "Floor to floor height", min: 2600, max: 4500, step: 50 },
+const FIELDS: { key: keyof StructureOverrides; label: string; min: number; max: number; step: number }[] = [
   { key: "slabThickness", label: "Suspended slab thickness", min: 120, max: 350, step: 10 },
   { key: "groundSlabThickness", label: "Ground slab thickness", min: 100, max: 300, step: 10 },
   { key: "externalWall", label: "External wall thickness", min: 100, max: 350, step: 10 },
@@ -343,38 +376,36 @@ const FIELDS: { key: keyof LearningHouseParams; label: string; min: number; max:
   { key: "windowSill", label: "Window sill height", min: 300, max: 1400, step: 50 },
 ];
 
-function SettingsPanel({ source, params, issues, onParams, onReset, options, onOptions }: { source: Source; params: LearningHouseParams; issues: { field: string; message: string }[]; onParams: (p: Partial<LearningHouseParams>) => void; onReset: () => void; options: ModelOptions; onOptions: (p: Partial<ModelOptions>) => void }) {
-  const [gridX, setGridX] = useState(params.gridX.join(", "));
-  const [gridY, setGridY] = useState(params.gridY.join(", "));
-  const parse = (text: string) => text.split(/[ ,;]+/).map(Number).filter((n) => Number.isFinite(n));
+function SettingsPanel({ source, building, areas, onPatch, onArea, onTemplate, onOverrides, onReset, options, onOptions }: {
+  source: Source; building: BuiltBuilding; areas: BuildingAreas;
+  onPatch: (p: Partial<BuildingConfig>) => void; onArea: (areaM2: number) => void; onTemplate: (id: BuildingTemplateId) => void;
+  onOverrides: (p: StructureOverrides) => void; onReset: () => void; options: ModelOptions; onOptions: (p: Partial<ModelOptions>) => void;
+}) {
+  const { params, issues } = building;
   return (
     <div className="space-y-2" data-testid="settings-panel">
       {source === "project" ? (
-        <div className="rounded-xl border bg-card p-3 text-sm">Your project&apos;s own dimensions are used as drawn. Change them on the Plan tab; this view only reads them and never changes your house.</div>
+        <>
+          <div className="rounded-xl border bg-card p-3 text-sm">Your project&apos;s own dimensions are used as drawn. Change them on the Plan tab; this view only reads them and never changes your house.</div>
+          <Section title="Areas" testId="areas-section"><AreaTable areas={areas} /></Section>
+        </>
       ) : (
         <>
           <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">These sizes are examples for learning. The sample is built in memory only: it is never saved over your own houses. Do not use it as a design.</div>
           {issues.length ? (
             <ul className="space-y-1 rounded-xl border border-orange-300 bg-orange-50 p-3 text-xs text-orange-950" data-testid="param-issues">{issues.map((i) => <li key={i.field + i.message}>{i.message}</li>)}</ul>
           ) : null}
-          <Section title="Dimensions (millimetres)">
+          <BuildingPanel building={building} areas={areas} onPatch={onPatch} onArea={onArea} onTemplate={onTemplate} onReset={onReset} />
+          <Section title="Structure and openings (millimetres)" defaultOpen={false}>
+            <p className="text-xs text-muted-foreground">Sized from the spans for this building. Change one to see what it does; the others stay as they are.</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {FIELDS.map((f) => (
                 <label key={f.key} className="block text-xs">{f.label}
-                  <input type="number" inputMode="decimal" data-field={f.key} min={f.min} max={f.max} step={f.step} value={params[f.key] as number} onChange={(e) => onParams({ [f.key]: e.target.value === "" ? undefined : Number(e.target.value) } as Partial<LearningHouseParams>)} className="mt-1 min-h-11 w-full rounded-lg border bg-background px-2 text-sm" />
+                  <input type="number" inputMode="decimal" data-field={f.key} min={f.min} max={f.max} step={f.step} value={params[f.key] as number} onChange={(e) => onOverrides({ [f.key]: e.target.value === "" ? undefined : Number(e.target.value) } as StructureOverrides)} className="mt-1 min-h-11 w-full rounded-lg border bg-background px-2 text-sm" />
                 </label>
               ))}
             </div>
           </Section>
-          <Section title="Structural grid (millimetres)" defaultOpen={false}>
-            <label className="block text-xs">Lines across (5, increasing, at least 1500 apart)
-              <input data-field="gridX" value={gridX} onChange={(e) => { setGridX(e.target.value); onParams({ gridX: parse(e.target.value) }); }} className="mt-1 min-h-11 w-full rounded-lg border bg-background px-2 text-sm" />
-            </label>
-            <label className="block text-xs">Lines deep (3)
-              <input data-field="gridY" value={gridY} onChange={(e) => { setGridY(e.target.value); onParams({ gridY: parse(e.target.value) }); }} className="mt-1 min-h-11 w-full rounded-lg border bg-background px-2 text-sm" />
-            </label>
-          </Section>
-          <button type="button" onClick={() => { onReset(); setGridX(DEFAULT_LEARNING_PARAMS.gridX.join(", ")); setGridY(DEFAULT_LEARNING_PARAMS.gridY.join(", ")); }} className="min-h-10 rounded-xl border px-4 text-sm">Back to the example dimensions</button>
         </>
       )}
       <Section title="Build options">

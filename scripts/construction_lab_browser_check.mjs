@@ -105,6 +105,16 @@ const topOf = (page) => page.evaluate(() => {
   return top;
 });
 const settle = (page) => page.waitForTimeout(450);
+/** Poll until `read` gives something truthy: a rebuilt model takes a moment, and a fixed wait is either too long or too short. */
+const until = async (read, message, ms = 90000) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value) return value;
+    if (Date.now() > end) assert.fail(`timed out waiting for: ${message}`);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+};
 /** What sticks out past the right edge of the screen, for the failure message. */
 const sticksOut = (page) => page.evaluate(() => {
   const clipped = (el) => { for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowX; if (o !== "visible") return true; } return false; };
@@ -330,13 +340,14 @@ try {
   ok(/never saved over your own houses|never saved/i.test(await settings.innerText()), "the sample says it is never saved over a user's house");
   await settings.locator('[data-field="floorToFloor"]').fill("3600");
   await page.waitForFunction(() => document.querySelector('[data-field="floorToFloor"]')?.value === "3600");
-  await page.waitForTimeout(2200);
+  await until(async () => (await topOf(page)) > heightBefore + 0.9, "a taller floor-to-floor height makes a taller house");
   ok((await topOf(page)) > heightBefore + 0.9, "a taller floor-to-floor height makes a taller house");
+  await settings.getByRole("button", { name: /Structure and openings/ }).click();
   await settings.locator('[data-field="slabThickness"]').fill("20");
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(500);
   ok(/slabThickness was 20/.test(await page.getByTestId("param-issues").innerText()), "an impossible slab thickness is corrected with a message");
   await page.getByRole("button", { name: "Back to the example dimensions" }).click();
-  await page.waitForTimeout(1800);
+  await until(async () => Math.abs((await topOf(page)) - heightBefore) < 0.01, "the example dimensions put the house back");
   await page.getByTestId("settings-toggle").click();
 
   // ---- The user's own project is read, never changed ----------------------------------------------------------------------

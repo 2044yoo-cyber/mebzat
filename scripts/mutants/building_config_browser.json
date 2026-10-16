@@ -1,0 +1,128 @@
+[
+  {
+    "name": "a template keeps the roof it had",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "    setOptions((o) => ({ ...o, roofType: TEMPLATES[id].roofType }));\n",
+    "to": ""
+  },
+  {
+    "name": "a template keeps the sizes typed for the last one",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "    setConfig(defaultConfig(id));\n    setOverrides({});\n",
+    "to": "    setConfig(defaultConfig(id));\n"
+  },
+  {
+    "name": "a template keeps the last template's size",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "    setConfig(defaultConfig(id));\n",
+    "to": "    setConfig((c) => ({ ...c, template: id }));\n"
+  },
+  {
+    "name": "an area asked for is doubled",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "configForArea(buildBuilding(c).config, area).config",
+    "to": "configForArea(buildBuilding(c).config, area * 2).config"
+  },
+  {
+    "name": "a changed size is not applied",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "const patchConfig = useCallback((p: Partial<BuildingConfig>) => setConfig((c) => ({ ...c, ...p })), []);",
+    "to": "const patchConfig = useCallback((p: Partial<BuildingConfig>) => setConfig((c) => c), []);"
+  },
+  {
+    "name": "typed structure sizes are ignored",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "buildBuilding(JSON.parse(configKey) as Partial<BuildingConfig>, JSON.parse(overridesKey) as StructureOverrides)",
+    "to": "buildBuilding(JSON.parse(configKey) as Partial<BuildingConfig>)"
+  },
+  {
+    "name": "the model is drawn from the user's plan whatever is chosen",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "const sourceProject = source === \"sample\" || !project ? building.project : project;",
+    "to": "const sourceProject = project ?? building.project;"
+  },
+  {
+    "name": "the summary line is fixed text",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "{buildingSummary(building)}</p> : null}",
+    "to": "{\"Existing Building · 12.0 × 9.0 m · 3 floors · 108.0 m² a floor · 324.0 m² in all\"}</p> : null}"
+  },
+  {
+    "name": "the model never follows the numbers",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "useSettled(sourceProject, 250)",
+    "to": "useSettled(sourceProject, 250000)"
+  },
+  {
+    "name": "areas are read for the wrong roof",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "areasOf(sourceProject, options.roofType)",
+    "to": "areasOf(sourceProject, \"flat\")"
+  },
+  {
+    "name": "reset does nothing",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "onReset={() => { chooseTemplate(building.config.template); }}",
+    "to": "onReset={() => {}}"
+  },
+  {
+    "name": "a typed length is ignored",
+    "file": "src/features/house-designer/components/building-panel.tsx",
+    "from": "onCommit={(length) => onPatch({ length, gridX: undefined })}",
+    "to": "onCommit={() => onPatch({ gridX: undefined })}"
+  },
+  {
+    "name": "a typed width is ignored",
+    "file": "src/features/house-designer/components/building-panel.tsx",
+    "from": "onCommit={(width) => onPatch({ width, gridY: undefined })}",
+    "to": "onCommit={() => onPatch({ gridY: undefined })}"
+  },
+  {
+    "name": "floors can be changed on a G+2 building",
+    "file": "src/features/house-designer/components/building-panel.tsx",
+    "from": "disabled={fixedFloors}",
+    "to": "disabled={false}"
+  },
+  {
+    "name": "floors typed are ignored",
+    "file": "src/features/house-designer/components/building-panel.tsx",
+    "from": "onCommit={(floors) => onPatch({ floors })}",
+    "to": "onCommit={() => onPatch({})}"
+  },
+  {
+    "name": "the storey height typed is ignored",
+    "file": "src/features/house-designer/components/building-panel.tsx",
+    "from": "onCommit={(floorToFloor) => onPatch({ floorToFloor })}",
+    "to": "onCommit={() => onPatch({})}"
+  },
+  {
+    "name": "total floor area read as area per floor",
+    "file": "src/features/house-designer/components/building-panel.tsx",
+    "from": "onCommit={(total) => onArea(total / config.floors)}",
+    "to": "onCommit={(total) => onArea(total)}"
+  },
+  {
+    "name": "an out of range number is not brought into range",
+    "file": "src/features/house-designer/components/building-panel.tsx",
+    "from": "    else if (final) onCommit(Math.min(max, Math.max(min, n)));\n",
+    "to": ""
+  },
+  {
+    "name": "the footprint row shows the gross floor area",
+    "file": "src/features/house-designer/components/building-panel.tsx",
+    "from": "{ key: \"footprint\", label: \"Footprint\", value: areas.footprint,",
+    "to": "{ key: \"footprint\", label: \"Footprint\", value: areas.grossFloorArea,"
+  },
+  {
+    "name": "a template card does nothing",
+    "file": "src/features/house-designer/components/building-panel.tsx",
+    "from": "onClick={() => onTemplate(id)}",
+    "to": "onClick={() => {}}"
+  },
+  {
+    "name": "the project source still shows the configurator",
+    "file": "src/features/house-designer/components/construction-lab.tsx",
+    "from": "      {source === \"project\" ? (\n        <>\n          <div className=\"rounded-xl border bg-card p-3 text-sm\">Your project",
+    "to": "      {false ? (\n        <>\n          <div className=\"rounded-xl border bg-card p-3 text-sm\">Your project"
+  }
+]
