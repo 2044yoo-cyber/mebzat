@@ -1095,6 +1095,21 @@ export function setBayWidth(
   });
 }
 
+/** Add or remove a full-height vertical divider inside one selected section. */
+export function setBayVerticalDivider(
+  spec: DesignSpec,
+  cabinetId: string,
+  bayId: string,
+  enabled: boolean,
+): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, cabinetId);
+    const bay = cabinet?.bays.find((entry) => entry.id === bayId);
+    if (!bay) return;
+    bay.verticalDivider = enabled;
+  });
+}
+
 export function setBayFitting(
   spec: DesignSpec,
   cabinetId: string,

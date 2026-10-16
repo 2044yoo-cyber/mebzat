@@ -65,6 +65,7 @@ import {
   setBayDoor,
   setBayDoorLeafMode,
   setBayFitting,
+  setBayVerticalDivider,
   setBayWidth,
   setCabinetKind,
   addTopCabinet,
@@ -738,6 +739,20 @@ function Structure({
           {wardrobe ? (
             <ZoneEditor spec={spec} cabinet={cabinet} bay={bay} onChange={onChange} onSelectDisplay={onSelectDisplay} />
           ) : null}
+
+          <button
+            type="button"
+            aria-pressed={bay.verticalDivider}
+            onClick={() => onChange(setBayVerticalDivider(spec, cabinet.id, bay.id, !bay.verticalDivider))}
+            className={cn(
+              "w-full rounded-md border px-2 py-1.5 text-left text-xs transition-colors",
+              bay.verticalDivider
+                ? "border-brand bg-brand/10 text-brand"
+                : "text-muted-foreground hover:border-brand/50",
+            )}
+          >
+            {bay.verticalDivider ? "Remove vertical divider" : "Add vertical divider"}
+          </button>
 
           {bay.fitting.kind === "drawers" ? (
             <DrawerList

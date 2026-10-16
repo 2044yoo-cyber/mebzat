@@ -853,8 +853,50 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
         y: plinth + t,
         interiorHeight,
         interiorDepth,
-      }).map((part) => ({ ...part, ...moduleTag(place.module) })),
+      }).flatMap((part) => {
+        // A full-height divider also divides horizontal shelves into two
+        // manufacturable pieces. This keeps the model and cut list honest.
+        if (!bay.verticalDivider || part.role !== "shelf") {
+          return [{ ...part, ...moduleTag(place.module) }];
+        }
+        const half = (part.size.x - t) / 2;
+        if (half <= 0) return [{ ...part, ...moduleTag(place.module) }];
+        const halfPart = (side: "left" | "right") => ({
+          ...part,
+          id: `${part.id}-${side}`,
+          label: `${part.label} (${side} of divider)`,
+          length: Math.round(half * 100) / 100,
+          size: { ...part.size, x: half },
+          placements: part.placements.map((at) => ({
+            ...at,
+            x: side === "left" ? at.x : at.x + half + t,
+          })),
+          quantity: part.quantity,
+          ...moduleTag(place.module),
+        });
+        return [halfPart("left"), halfPart("right")];
+      }),
     );
+
+    // A real upright board inside this bay, included in rendering and the cut list.
+    if (bay.verticalDivider) {
+      push({
+        id: `vertical-divider-${bay.id}`,
+        role: "divider",
+        label: `Vertical divider — ${bayLabelSuffix(cabinet, bay.id)}`,
+        cabinetId: cabinet.id,
+        bayId: bay.id,
+        board,
+        length: interiorHeight,
+        width: interiorDepth,
+        quantity: 1,
+        edges: { front: true, back: false, top: true, bottom: true },
+        placements: [{ x: bayX + (bay.width - t) / 2, y: plinth + t, z: 0 }],
+        size: { x: t, y: interiorHeight, z: interiorDepth },
+        axis: "x",
+        ...moduleTag(place.module),
+      });
+    }
 
     const x = bayX + bay.width;
 
