@@ -531,13 +531,12 @@ const reachFor = (hinge: HingeType, board: number, c: number, kind: "outer" | "s
   }
 }
 {
-  // The end panel beside the doors is level with them.
+  // An exposed end is left uncovered: side cover panels are an add-on the user chooses, whatever the hinge type.
   const open = structuredClone(wardrobe);
   open.wardrobePlan = { priority: "balanced", leftEnd: "open", rightEnd: "wall" } as never;
   for (const hinge of HINGES) {
-    const end = closureReport(setClosureSettings(sized(open, hinge), { enabled: true })).panels.find((panel) => panel.kind === "decorative_end")!;
-    ok(end, `${hinge}: an exposed end gets a decorative panel`);
-    equal(end.box.z + 0, hinge === "inset" ? 0 : -18, `${hinge}: level with the doors' faces`);
+    const panels = closureReport(setClosureSettings(sized(open, hinge), { enabled: true })).panels;
+    ok(!panels.some((panel) => panel.kind === "decorative_end" || panel.kind === "end"), `${hinge}: an exposed end is not covered automatically`);
   }
 }
 

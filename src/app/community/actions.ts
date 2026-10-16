@@ -144,7 +144,7 @@ export async function updatePost(input: {
   const title = input.title?.trim().slice(0, 200) || null;
   const { data, error } = await supabase
     .from("posts")
-    .update({ title, body, edited_at: new Date().toISOString() })
+    .update({ title, body, updated_at: new Date().toISOString() })
     .eq("id", input.postId)
     .eq("author_id", user.id)
     .select("id")
