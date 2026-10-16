@@ -6,17 +6,17 @@ import { ChevronDown, ChevronRight, Eye, EyeOff, Focus, Search, Target } from "l
 import { sectionTitle } from "@/lib/takeoff/boq";
 import { cn } from "@/lib/utils";
 
-import { CATEGORY_COLORS } from "../construction/catalogue";
+import { CATEGORY_COLORS, SERVICE_LEGEND, materialOf } from "../construction/catalogue";
 import { describeComponent } from "../construction/inspect";
 import { aggregateQuantities, missingData, toBoqDraft, type QuantityLine } from "../construction/quantities";
 import { constructionTakeoffPackage } from "../construction/takeoff-handoff";
 import { HOUSE_TAKEOFF_SESSION_KEY } from "../services/takeoff-adapter";
 import { STAGE_BY_ID } from "../construction/stages";
 import {
-  CATEGORY_LABELS, LAYER_IDS, LAYER_LABELS, PROVENANCE_LABELS, STAGE_IDS,
-  type CategoryId, type ComponentRecord, type ConstructionModel, type EstimatingRules, type LayerId, type Provenance, type StageId, type ViewState,
+  CATEGORY_LABELS, LAYER_IDS, LAYER_LABELS, PROVENANCE_LABELS, SERVICE_VIEWS, SERVICE_VIEW_LABELS, STAGE_IDS,
+  type CategoryId, type ComponentRecord, type ConstructionModel, type EstimatingRules, type LayerId, type Provenance, type ServiceView, type StageId, type ViewState,
 } from "../construction/types";
-import { isolateLayer, toggleIn, type ModelIndex } from "../construction/view";
+import { applyServiceView, isolateLayer, toggleIn, type ModelIndex } from "../construction/view";
 
 const LAYER_ORDER_NOTE = "Hide layers to look inside the building, or choose Only this to see one kind of work on its own, such as reinforcement or glass.";
 
@@ -155,6 +155,21 @@ export function InspectorPanel({ model, view, onClear, onIsolate, onHide, onFocu
         ) : null}
       </Section>
 
+      {info.service ? (
+        <Section title="Installation" testId="inspector-service">
+          <dl className="grid grid-cols-[7.5rem_1fr] gap-x-2 gap-y-1 text-sm">
+            <dt className="text-muted-foreground">System</dt><dd className="flex items-center gap-1.5"><span aria-hidden className="inline-block size-3 rounded-full border" style={{ backgroundColor: info.service.colour }} />{info.service.system}</dd>
+            <dt className="text-muted-foreground">What it is</dt><dd>{info.service.role}</dd>
+            <dt className="text-muted-foreground">Level</dt><dd>{info.service.level}</dd>
+            <dt className="text-muted-foreground">From</dt><dd data-testid="service-from">{info.service.from}</dd>
+            <dt className="text-muted-foreground">To</dt><dd data-testid="service-to">{info.service.to}</dd>
+            <dt className="text-muted-foreground">Fixed to</dt><dd>{info.service.route}</dd>
+            <dt className="text-muted-foreground">Cover</dt><dd>{info.service.covered}</dd>
+          </dl>
+          {info.note ? <p className="rounded-lg bg-muted p-2 text-xs">Installation: {info.note}</p> : null}
+        </Section>
+      ) : null}
+
       <Section title="Dimensions and source" testId="inspector-dims">
         <p className="text-xs" data-testid="geometry-label">{info.geometryLabel}</p>
         {info.sourceRef ? <p className="text-[11px] text-muted-foreground">Project object: {info.sourceRef}</p> : null}
@@ -209,6 +224,57 @@ export function InspectorPanel({ model, view, onClear, onIsolate, onHide, onFocu
       </Section>
     </div>
   );
+}
+
+/** The six ways of looking at the installation, and what each colour in them stands for. */
+export function ServiceViewPanel({ view, model, onView, rules, onRules }: { view: ViewState; model: ConstructionModel; onView: (patch: Partial<ViewState>) => void; rules: EstimatingRules; onRules: (rules: EstimatingRules) => void }) {
+  const set = (patch: Partial<EstimatingRules["services"]>) => onRules({ ...rules, services: { ...rules.services, ...patch } });
+  const setFall = (key: "waste" | "soil" | "drain", value: number) => set({ fall: { ...rules.services.fall, [key]: value } });
+  const counts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of model.components) if (c.service && c.service.role === "route") { const id = legendOf(c); map.set(id, (map.get(id) ?? 0) + 1); }
+    return map;
+  }, [model]);
+  return (
+    <Section title="Installation views" testId="service-views">
+      <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Installation view">
+        {SERVICE_VIEWS.map((mode: ServiceView) => (
+          <button key={mode} type="button" data-testid={`service-view-${mode}`} aria-pressed={view.serviceView === mode} onClick={() => onView(applyServiceView(view, mode))}
+            className={cn("min-h-10 rounded-lg border px-2 text-left text-xs font-medium", view.serviceView === mode ? "border-brand bg-brand/10 text-brand" : "bg-card")}>
+            {SERVICE_VIEW_LABELS[mode].label}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground" data-testid="service-view-hint">{SERVICE_VIEW_LABELS[view.serviceView].hint}</p>
+      <ul className="space-y-1" data-testid="service-legend" aria-label="Legend">
+        {SERVICE_LEGEND.map((e) => (
+          <li key={e.id} className="flex items-center gap-2 text-xs" data-legend={e.id}>
+            <span aria-hidden className="inline-block h-3 w-6 rounded-sm border" style={{ backgroundColor: materialOf(e.materialId).color }} />
+            <span className="min-w-0 flex-1">{e.label}</span>
+            <span className="tabular-nums text-muted-foreground">{counts.get(e.id) ?? 0}</span>
+          </li>
+        ))}
+      </ul>
+      <details className="rounded-lg border p-2 text-xs" data-testid="service-settings">
+        <summary className="cursor-pointer font-medium">Routing settings</summary>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {([["waste", "Waste fall, 1 in"], ["soil", "Soil pipe fall, 1 in"], ["drain", "Drain fall, 1 in"]] as const).map(([key, label]) => (
+            <label key={key} className="block">{label}<input type="number" min={20} max={200} step={5} value={rules.services.fall[key]} data-testid={`fall-${key}`} onChange={(e) => setFall(key, Number(e.target.value))} className="mt-0.5 h-9 w-full rounded border px-2" /></label>
+          ))}
+          {([["coldHeight", "Cold lane height, mm"], ["hotHeight", "Hot lane height, mm"], ["switchHeight", "Switch height, mm"], ["socketHeight", "Socket height, mm"], ["boardHeight", "Board height, mm"]] as const).map(([key, label]) => (
+            <label key={key} className="block">{label}<input type="number" min={100} max={2200} step={10} value={rules.services[key]} data-testid={`setting-${key}`} onChange={(e) => set({ [key]: Number(e.target.value) })} className="mt-0.5 h-9 w-full rounded border px-2" /></label>
+          ))}
+        </div>
+        <p className="mt-1 text-muted-foreground">Falls are kept between 1 in 20 and 1 in 200. The model is redrawn from these.</p>
+      </details>
+      <p className="text-xs text-muted-foreground">Tap any pipe, conduit or fitting to see its system, where it starts and ends, and how it is fixed. Use the cut-away to look inside a wall.</p>
+    </Section>
+  );
+}
+
+function legendOf(c: ComponentRecord): string {
+  const entry = SERVICE_LEGEND.find((e) => e.kinds?.includes(c.kind)) ?? SERVICE_LEGEND.find((e) => c.service && e.systems.includes(c.service.system));
+  return entry?.id ?? "cold";
 }
 
 function Bullets({ title, items }: { title: string; items: string[] }) {

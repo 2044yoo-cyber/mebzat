@@ -2,7 +2,7 @@ import { ASSUME, UP, dim, type Ctx } from "../context";
 import { alongLine, box, boxAt, cyl, polygonArea, polygonBounds, prism, rectPoly, v3, type P2, type Shape } from "../geometry";
 import { addQuantity, concreteQuantity, f2, f3, formworkQuantity, rebarQuantity, round } from "../helpers";
 import { onPlan, stairGeometry, stairParams } from "../../services/stair-geometry";
-import { slabOpenings } from "../rooms";
+import { stairOpenings as slabOpenings } from "../rooms";
 
 /** Stage 6: stair flights and landings, slab openings, edge steel and protection. */
 

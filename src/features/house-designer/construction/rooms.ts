@@ -86,7 +86,7 @@ export function clearRoom(ctx: Ctx, room: RoomInfo): ClearRoom {
 }
 
 /** The openings stairs cut in the slab of `levelIndex`: the footprints of the stairs that arrive from the level below. */
-export function slabOpenings(ctx: Ctx, levelIndex: number): { id: string; x0: number; y0: number; x1: number; y1: number; rotated: boolean }[] {
+export function stairOpenings(ctx: Ctx, levelIndex: number): { id: string; x0: number; y0: number; x1: number; y1: number; rotated: boolean }[] {
   const below = ctx.levels[levelIndex - 1];
   if (!below) return [];
   const ease = 10;

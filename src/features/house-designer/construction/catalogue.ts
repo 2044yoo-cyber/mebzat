@@ -1,4 +1,4 @@
-import type { CategoryId, ComponentKnowledge } from "./types";
+import type { CategoryId, ComponentKnowledge, ServiceSystem } from "./types";
 
 // ---------------------------------------------------------------------------
 // Materials: a realistic colour each, plus a roughness for the viewer
@@ -27,7 +27,7 @@ export const MATERIALS: Record<string, MaterialDef> = Object.fromEntries([
   mat("roof-membrane", "Roof waterproofing membrane", "#1e3a5f", 0.5, 0.9), mat("roof-protection", "Roof protection layer", "#9aa0a6", 0.8), mat("roof-sheet", "Profiled roof sheet", "#6b7f95", 0.4, 1, 0.5), mat("roof-tile", "Roof tile", "#b5502f", 0.8),
   mat("timber", "Structural timber", "#b88a52", 0.85), mat("steel-section", "Steel section", "#7b8794", 0.5, 1, 0.6), mat("coping", "Coping", "#bdb7ab", 0.85), mat("flashing", "Flashing", "#7f8a96", 0.4, 1, 0.6), mat("gutter", "Gutter & downpipe", "#4b5563", 0.5, 1, 0.4),
   mat("conduit", "Electrical conduit", "#eab308", 0.5), mat("electrical-box", "Electrical box", "#f3f4f6", 0.6), mat("switchgear", "Distribution board", "#475569", 0.5, 1, 0.3), mat("light-fixture", "Light fitting", "#fde68a", 0.4), mat("earth", "Earthing conductor", "#16a34a", 0.5, 1, 0.5),
-  mat("pipe-cold", "Cold-water pipe", "#2563eb", 0.4), mat("pipe-hot", "Hot-water pipe", "#dc2626", 0.4), mat("pipe-waste", "Waste pipe", "#6b7280", 0.5), mat("pipe-vent", "Vent pipe", "#9ca3af", 0.5), mat("pipe-rain", "Rainwater pipe", "#374151", 0.5), mat("valve", "Valve", "#b45309", 0.4, 1, 0.7),
+  mat("pipe-cold", "Cold-water pipe", "#2563eb", 0.4), mat("pipe-hot", "Hot-water pipe", "#dc2626", 0.4), mat("pipe-waste", "Waste pipe", "#6b7280", 0.5), mat("pipe-vent", "Vent pipe", "#9ca3af", 0.5), mat("pipe-rain", "Rainwater pipe", "#374151", 0.5), mat("valve", "Valve", "#b45309", 0.4, 1, 0.7), mat("pipe-clip", "Pipe clip", "#4b5563", 0.5, 1, 0.4),
   mat("sanitary", "Sanitary ware", "#f5f7f8", 0.2), mat("water-tank", "Water tank", "#1d4ed8", 0.5, 0.8), mat("chamber", "Inspection chamber", "#a8a29e", 0.9),
   mat("door-timber", "Timber door", "#8b5a2b", 0.7), mat("frame-timber", "Timber frame", "#7a4b1f", 0.7), mat("aluminium", "Aluminium profile", "#b8bec5", 0.35, 1, 0.7), mat("glass", "Glass", "#b9dcf0", 0.05, 0.35), mat("seal", "Glazing seal", "#111827", 0.6), mat("hardware", "Hinges & locks", "#c7ccd1", 0.3, 1, 0.8), mat("sill", "Sill", "#cfc9bd", 0.7),
   mat("mdf-white", "MDF / melamine board", "#ece9e0", 0.55), mat("mdf-oak", "Oak-finish board", "#b88b55", 0.6), mat("worktop", "Worktop", "#4b4f56", 0.3), mat("backsplash", "Backsplash", "#e2e8ea", 0.3), mat("appliance", "Appliance", "#cbd0d6", 0.3, 1, 0.6),
@@ -37,6 +37,29 @@ export const MATERIALS: Record<string, MaterialDef> = Object.fromEntries([
 ].map((m) => [m.id, m]));
 
 export const materialOf = (id: string): MaterialDef => MATERIALS[id] ?? MATERIALS.concrete!;
+
+// ---------------------------------------------------------------------------
+// The installation's legend: one colour for each service, wherever it is drawn
+// ---------------------------------------------------------------------------
+
+export type ServiceLegendEntry = { id: string; label: string; systems: readonly ServiceSystem[]; materialId: string; kinds?: readonly string[] };
+
+/** What each colour of pipe and conduit stands for. The legend, the model and the checks all read this one list. */
+export const SERVICE_LEGEND: readonly ServiceLegendEntry[] = [
+  { id: "cold", label: "Cold water and the supply to it", systems: ["cold", "supply"], materialId: "pipe-cold" },
+  { id: "hot", label: "Hot water", systems: ["hot"], materialId: "pipe-hot" },
+  { id: "waste", label: "Waste, soil stack and underground drains", systems: ["waste", "soil", "drain"], materialId: "pipe-waste" },
+  { id: "vent", label: "Vent pipes", systems: ["vent"], materialId: "pipe-vent" },
+  { id: "rain", label: "Rainwater", systems: ["rain"], materialId: "pipe-rain" },
+  { id: "electrical", label: "Electrical conduit", systems: ["electrical"], materialId: "conduit" },
+  { id: "earth", label: "Earthing conductor", systems: [], materialId: "earth", kinds: ["earthing-conductor", "earthing"] },
+];
+
+export function legendEntryFor(system: ServiceSystem, kind: string): ServiceLegendEntry {
+  return SERVICE_LEGEND.find((e) => e.kinds?.includes(kind)) ?? SERVICE_LEGEND.find((e) => e.systems.includes(system)) ?? SERVICE_LEGEND[0]!;
+}
+
+export const serviceColour = (system: ServiceSystem, kind = ""): string => materialOf(legendEntryFor(system, kind).materialId).color;
 
 // ---------------------------------------------------------------------------
 // Category colours for the list, the timeline and the filters
@@ -210,6 +233,14 @@ const ENTRIES: Entry[] = [
   ["inspection-chamber", "plumbing", { title: "Inspection chamber", summary: "A chamber giving access to the drain at junctions.", materials: "Precast or masonry", install: ["Build on a concrete base", "Benching to the channel"], connects: "On the underground drain." }],
   ["rain-gutter", "plumbing", { title: "Rainwater gutter", summary: "Collects roof water.", materials: "PVC or metal", install: ["Fix with falls"], connects: "Roof edge to downpipe." }],
   ["rain-downpipe", "plumbing", { title: "Rainwater downpipe", summary: "Takes roof water down.", materials: "PVC or metal", install: ["Fix with clips"], connects: "Gutter to drain." }],
+  ["pipe-clip", "plumbing", { title: "Pipe clip and support", summary: "Holds a pipe to the wall or the roof so that it cannot sag, rattle or pull at its joints.", materials: "Plastic or metal clips", install: ["Fix at the spacing the pipe maker gives", "Leave room for the pipe to expand"], connects: "Pipe to wall." }],
+  ["earthing-conductor", "electrical", { title: "Earthing conductor", summary: "The wire that joins the earth bar in the board to the electrode in the ground.", materials: "Copper conductor", install: ["Run in a sleeve through the wall", "Protect where it leaves the building"], connects: "Board to earth electrode." }],
+  ["wall-chase", "electrical", { title: "Wall chase", summary: "A groove in the blockwork that holds a conduit so that the plaster can cover it.", materials: "Cut in blockwork; made good with mortar", install: ["Cut to the depth of the conduit", "Fix the conduit with clips before filling", "Fill and mesh over before plastering"], connects: "Floor conduit to back box." }],
+  ["beam-sleeve", "plumbing", { title: "Sleeve through a ground beam", summary: "A pipe cast into a beam so that a drain can pass through it later without the beam being cut.", materials: "PVC pipe", install: ["Fix in the formwork in the middle of the beam's depth", "Keep clear of the reinforcement and of the supports", "Seal round the drain after it is laid"], connects: "Drain on one side of the beam to the other." }],
+  ["wall-sleeve", "electrical", { title: "Wall sleeve", summary: "A short pipe set in a wall as it is built so that a service can pass through later.", materials: "PVC pipe", install: ["Set level or to a slight fall outward", "Seal the gap round the service"], connects: "Inside to outside of the wall." }],
+  ["pipe-boot", "plumbing", { title: "Roof flashing collar", summary: "A collar that seals the roof covering round a pipe passing through it.", materials: "Flexible or metal flashing", install: ["Dress the membrane up the pipe", "Clamp and seal at the top"], connects: "Pipe to roof covering." }],
+  ["shaft-cover", "plumbing", { title: "Shaft or cupboard cover", summary: "A panel across the front of a service shaft or cupboard so that the room has a plain wall.", materials: "Board on a light frame", install: ["Fix to the frame after the services are tested", "Leave a removable panel at every valve or access point"], connects: "Shaft to room." }],
+  ["pre-wall-duct", "plumbing", { title: "Pre-wall duct", summary: "A board face standing off a wall that hides the pipes and carries the sanitary fittings.", materials: "Board on a light frame, moisture-resistant", install: ["Frame after the pipes are tested", "Fix fixture carriers to the frame", "Seal and tile the face"], connects: "Hides pipes; carries fixtures." }],
   ["water-heater", "plumbing", { title: "Water heater", summary: "Heats water for the hot supply.", materials: "Electric or solar heater", install: ["Fix to a masonry wall", "Provide relief valve and drain"], connects: "To cold supply and hot branches." }],
   ["wc", "plumbing", { title: "Toilet", summary: "A water closet.", materials: "Vitreous china", install: ["Fix to floor", "Connect waste and supply"], connects: "To the soil pipe." }],
   ["basin", "plumbing", { title: "Washbasin", summary: "A wash hand basin.", materials: "Vitreous china", install: ["Fix to wall", "Connect tap, trap and waste"], connects: "To supply and waste." }],

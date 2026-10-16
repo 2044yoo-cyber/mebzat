@@ -1,6 +1,7 @@
 import * as THREE from "three";
 
 import { explodeInfo, shapeOffset } from "./explode";
+import type { Shape } from "./geometry";
 import type { ComponentRecord, ConstructionModel, ViewState } from "./types";
 import { shapeVisible, type ModelIndex, type Visible } from "./view";
 
@@ -56,6 +57,27 @@ const M = new THREE.Matrix4();
 const QX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
 const QZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
 
+const TILT_AXIS_Z = new THREE.Vector3(0, 0, 1);
+const TILT_AXIS_X = new THREE.Vector3(1, 0, 0);
+const TILT = new THREE.Quaternion();
+
+/**
+ * The turn that stands a unit cylinder (along the viewer's up axis) along the shape's axis,
+ * tipped by its fall: a positive tilt lowers the +axis end, as `cylEnds` in the audit reads it.
+ */
+export function cylinderQuaternion(shape: Extract<Shape, { t: "cyl" }>, out: THREE.Quaternion): THREE.Quaternion {
+  if (shape.axis === "z") out.identity();
+  else if (shape.axis === "x") out.copy(QZ);
+  else out.copy(QX);
+  const tilt = shape.tilt ?? 0;
+  if (tilt !== 0 && shape.axis !== "z") {
+    // The viewer's up is the model's z and its depth axis is the model's -y, so a fall about x lowers +x with a turn about the viewer's z, and +y with a turn about its x.
+    TILT.setFromAxisAngle(shape.axis === "x" ? TILT_AXIS_Z : TILT_AXIS_X, -tilt);
+    out.premultiply(TILT);
+  }
+  return out;
+}
+
 export function buildDrawList(model: ConstructionModel, index: ModelIndex, view: ViewState, visible: Visible[], centre: { x: number; y: number }): DrawList {
   const owners: ComponentRecord[] = [];
   const builders = new Map<string, Builder>();
@@ -87,9 +109,7 @@ export function buildDrawList(model: ConstructionModel, index: ModelIndex, view:
         Q.setFromEuler(EULER);
         SCALE.set(shape.s.x * MM, shape.s.z * MM, shape.s.y * MM);
       } else {
-        if (shape.axis === "z") Q.identity();
-        else if (shape.axis === "x") Q.copy(QZ);
-        else Q.copy(QX);
+        cylinderQuaternion(shape, Q);
         SCALE.set(shape.r * MM, shape.len * MM, shape.r * MM);
       }
       M.compose(POS, Q, SCALE);

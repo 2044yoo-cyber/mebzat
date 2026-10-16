@@ -17,7 +17,7 @@ import { indexModel, resetView, setStage, stepStage } from "../construction/view
 import type { HouseProject } from "../types/project";
 import { layoutLabels } from "../construction/label-layout";
 import type { CameraPreset, ScreenLabel } from "./construction-scene";
-import { EstimatePanel, InspectorPanel, LayersPanel, LessonPanel, PartsPanel, QuantitiesPanel, Section, Segmented, stageCounts } from "./construction-panels";
+import { EstimatePanel, InspectorPanel, LayersPanel, LessonPanel, PartsPanel, QuantitiesPanel, Section, Segmented, ServiceViewPanel, stageCounts } from "./construction-panels";
 
 // Like the 3D tab, three.js loads only when somebody opens this one.
 const ConstructionScene = dynamic(() => import("./construction-scene").then((m) => m.ConstructionScene), {
@@ -167,7 +167,7 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
               : noPlan ? <p className="rounded-xl border p-4 text-sm" data-testid="empty-project">{model.warnings[0] ?? "This project has nothing to build yet."} Switch to the sample house to explore every stage.</p>
               : activeTab === "lesson" ? (
                 <LessonPanel stage={view.stage} model={model} index={index} view={viewWithOptions} onPick={pickById}>
-                  <StageControls view={viewWithOptions} model={model} index={index} onView={patch} onOptions={patchOptions} />
+                  <StageControls view={viewWithOptions} model={model} index={index} onView={patch} onOptions={patchOptions} rules={rules} onRules={setRules} />
                 </LessonPanel>
               )
               : activeTab === "selected" ? <InspectorPanel model={model} view={viewWithOptions} onClear={clearSelection} onIsolate={(id) => patch({ isolateId: id })} onHide={(id) => { patch({ hiddenIds: [...view.hiddenIds, id], selectedId: null, selectedInstance: null }); }} onFocus={() => setFocusKey((k) => k + 1)} onSelect={pickById} />
@@ -254,7 +254,7 @@ const FRAME_VIEWS: { id: FrameView; label: string }[] = [
   { id: "complete", label: "Complete" }, { id: "reinforcement", label: "Reinforcement only" }, { id: "formwork", label: "Formwork only" }, { id: "placement", label: "Placement sequence" }, { id: "completed", label: "Completed" },
 ];
 
-function StageControls({ view, model, index, onView, onOptions }: { view: ViewState; model: ConstructionModel; index: ReturnType<typeof indexModel>; onView: (p: Partial<ViewState>) => void; onOptions: (p: Partial<ModelOptions>) => void }) {
+function StageControls({ view, model, index, onView, onOptions, rules, onRules }: { view: ViewState; model: ConstructionModel; index: ReturnType<typeof indexModel>; onView: (p: Partial<ViewState>) => void; onOptions: (p: Partial<ModelOptions>) => void; rules: EstimatingRules; onRules: (rules: EstimatingRules) => void }) {
   const s = view.stage;
   const blocks: React.ReactNode[] = [];
   if (s === 3 || s === 5) {
@@ -296,6 +296,7 @@ function StageControls({ view, model, index, onView, onOptions }: { view: ViewSt
       </Section>,
     );
   }
+  if (s >= 9) blocks.push(<ServiceViewPanel key="service-views" view={view} model={model} onView={onView} rules={rules} onRules={onRules} />);
   if (s === 9 || s === 10 || s === 11) {
     blocks.push(
       <Section key="mep" title="Services view" testId="mep-controls">

@@ -12,11 +12,12 @@ export type V3 = { x: number; y: number; z: number };
 /**
  * A piece of the model. Boxes may be turned about X, then Y, then Z (radians,
  * extrinsic); cylinders stand along an axis; prisms are a plan outline
- * extruded from z0 to z1.
+ * extruded from z0 to z1. A horizontal cylinder may be tipped by `tilt`
+ * (radians) so that its +axis end is the lower one: a drain's fall.
  */
 export type Shape =
   | { t: "box"; c: V3; s: V3; rx?: number; ry?: number; rz?: number }
-  | { t: "cyl"; c: V3; r: number; len: number; axis: "x" | "y" | "z" }
+  | { t: "cyl"; c: V3; r: number; len: number; axis: "x" | "y" | "z"; tilt?: number }
   | { t: "prism"; poly: P2[]; z0: number; z1: number; holes?: P2[][] };
 
 export const v3 = (x: number, y: number, z: number): V3 => ({ x, y, z });
@@ -38,6 +39,27 @@ export function boxAt(x: number, y: number, z: number, sx: number, sy: number, s
 
 export function cyl(cx: number, cy: number, cz: number, r: number, len: number, axis: "x" | "y" | "z"): Shape {
   return { t: "cyl", c: { x: cx, y: cy, z: cz }, r, len, axis };
+}
+
+/**
+ * A pipe from `a` to `b` that runs along x or y and may fall: the tip of a
+ * horizontal run is worked out from the two ends, so the pipe starts and
+ * ends exactly where it is asked to. Vertical runs stay upright.
+ */
+export function pipeBetween(a: V3, b: V3, r: number): Shape {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const dz = b.z - a.z;
+  const run = Math.hypot(dx, dy);
+  const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 };
+  if (run < 0.5) return { t: "cyl", c, r, len: Math.abs(dz), axis: "z" };
+  if (Math.abs(dx) > 0.5 && Math.abs(dy) > 0.5) throw new Error("pipeBetween: a run must lie along x or y");
+  const along = Math.abs(dx) > 0.5 ? "x" : "y";
+  const sign = along === "x" ? Math.sign(dx) : Math.sign(dy);
+  // Positive tilt lowers the +axis end; a run drawn toward -axis falls the other way round.
+  const tilt = Math.atan2(-dz * sign, run);
+  const len = Math.hypot(run, dz);
+  return Math.abs(tilt) < 1e-9 ? { t: "cyl", c, r, len, axis: along } : { t: "cyl", c, r, len, axis: along, tilt };
 }
 
 export function prism(poly: P2[], z0: number, z1: number, holes?: P2[][]): Shape {

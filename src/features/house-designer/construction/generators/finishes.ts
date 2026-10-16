@@ -1,9 +1,10 @@
 import { ASSUME, UP, dim, type Ctx, type LevelInfo, type RoomInfo } from "../context";
 import type { ModelOptions } from "../types";
-import { alongLine, box, clipConvex, cyl, polygonArea, prism, rectPoly, subtractConvex, v3, type P2, type Shape } from "../geometry";
+import { alongLine, box, clipConvex, cyl, pointInPolygon, polygonArea, prism, rectPoly, subtractConvex, v3, type P2, type Shape } from "../geometry";
 import { addQuantity, f2, f3, round } from "../helpers";
 import { onEdge, roomLayout, type Edge, type RoomLayout } from "../layout";
-import { slabOpenings } from "../rooms";
+import { slabOpenings } from "../slab-openings";
+import { planElectrical } from "../electrical-plan";
 import type { ComponentRecord, LayerId } from "../types";
 
 /**
@@ -268,13 +269,23 @@ function ceilings(ctx: Ctx, layouts: Map<string, RoomLayout>): void {
         const jl = joints.reduce((s, sh) => s + (sh.t === "box" ? Math.max(sh.s.x, sh.s.y) : 0), 0);
         addQuantity(ctx, jc, { workItem: "ceiling.joint", description: "Board joints taped and filled", section: "N", unit: "m", value: round(jl / 1000, 3), formula: `seams between boards = ${f2(jl / 1000)} m`, inputs: { length: round(jl, 0) }, status: "calculated" });
       }
-      // Light cut-out and, in wet rooms, an access panel.
-      const extras: Shape[] = [cyl(room.centre.x, room.centre.y, zc - BOARD.t - 0.5, room.area > 15e6 ? 160 : 120, 1, "z")];
-      const cut = ctx.add({ ...base, id: `${rid}:cutouts`, name: `Light cut-out — ${room.name}, ${level.name}`, kind: "ceiling-cutout", subcategory: "Cut-outs", layer: "ceiling", materialId: "dpm", shapes: extras, repeated: { noun: "cut-out" }, explode: { layerIndex: 4, dir: v3(0, 0, -1) }, parentId: bc.id });
-      addQuantity(ctx, cut, { workItem: "ceiling.cutout", description: "Light cut-outs", section: "N", unit: "piece", value: 1, formula: "1 per luminaire", inputs: { count: 1 }, status: "assumed" });
+      // Cut-outs where the conduit plan put the luminaire and the detector, and, in wet rooms, an access panel beside the light.
+      const electrical = planElectrical(ctx).rooms.find((r) => r.level.index === level.index && r.room.id === room.id);
+      const heads: { at: P2; r: number }[] = [];
+      if (electrical?.lightPoint) heads.push({ at: electrical.lightPoint, r: room.area > 15e6 ? 160 : 120 });
+      if (electrical?.detector) heads.push({ at: electrical.detector.at, r: 60 });
+      if (heads.length) {
+        const extras: Shape[] = heads.map((h) => cyl(h.at.x, h.at.y, zc - BOARD.t - 0.5, h.r, 1, "z"));
+        const cut = ctx.add({ ...base, id: `${rid}:cutouts`, name: `Light cut-out — ${room.name}, ${level.name}`, kind: "ceiling-cutout", subcategory: "Cut-outs", layer: "ceiling", materialId: "dpm", shapes: extras, repeated: { noun: "cut-out" }, explode: { layerIndex: 4, dir: v3(0, 0, -1) }, parentId: bc.id });
+        addQuantity(ctx, cut, { workItem: "ceiling.cutout", description: "Light cut-outs", section: "N", unit: "piece", value: heads.length, formula: "1 per luminaire or detector, where the conduit plan puts it", inputs: { count: heads.length }, status: "assumed" });
+      }
       if (WET.has(room.kind)) {
-        const ap = ctx.add({ ...base, id: `${rid}:access`, name: `Access panel — ${room.name}, ${level.name}`, kind: "access-panel", subcategory: "Access", layer: "ceiling", materialId: "ceiling-steel", shapes: [box(room.centre.x + 700, room.centre.y - 600, zc - BOARD.t - 6, 600, 600, 12)], explode: { layerIndex: 4, dir: v3(0, 0, -1) }, parentId: bc.id, note: "Keeps valves and junction boxes above the ceiling reachable." });
-        addQuantity(ctx, ap, { workItem: "ceiling.access", description: "Access panels", section: "N", unit: "piece", value: 1, formula: "1 per wet room", inputs: { count: 1 }, status: "assumed" });
+        const from = electrical?.lightPoint ?? room.centre;
+        const spot = [[700, 0], [-700, 0], [0, 700], [0, -700], [900, 900], [-900, -900]].map(([dx, dy]) => ({ x: from.x + dx!, y: from.y + dy! })).find((c) => regions.some((region) => rectPoly(c.x - 300, c.y - 300, c.x + 300, c.y + 300).every((q) => pointInPolygon(q, region))));
+        if (spot) {
+          const ap = ctx.add({ ...base, id: `${rid}:access`, name: `Access panel — ${room.name}, ${level.name}`, kind: "access-panel", subcategory: "Access", layer: "ceiling", materialId: "ceiling-steel", shapes: [box(spot.x, spot.y, zc - BOARD.t - 6, 600, 600, 12)], explode: { layerIndex: 4, dir: v3(0, 0, -1) }, parentId: bc.id, note: "Keeps the junction boxes in the slab above reachable." });
+          addQuantity(ctx, ap, { workItem: "ceiling.access", description: "Access panels", section: "N", unit: "piece", value: 1, formula: "1 per wet room", inputs: { count: 1 }, status: "assumed" });
+        }
       }
       if (top) {
         const ins: Shape[] = regions.map((p) => prism(p, zc + 65, zc + 65 + 50));

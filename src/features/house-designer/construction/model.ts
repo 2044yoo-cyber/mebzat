@@ -12,6 +12,7 @@ import { generateMasonry } from "./generators/masonry";
 import { generateRoof } from "./generators/roof";
 import { generateElectrical } from "./generators/electrical";
 import { generatePlumbing } from "./generators/plumbing";
+import { generateServiceStructure } from "./generators/service-structure";
 import { generateFinishes } from "./generators/finishes";
 import { generateOpenings } from "./generators/openings";
 import { generateJoinery } from "./generators/joinery";
@@ -38,7 +39,7 @@ export function buildConstructionModel(
   extras: BuildExtras = {},
 ): ConstructionModel {
   const resolvedOptions: ModelOptions = { ...DEFAULT_OPTIONS, ...options };
-  const resolvedRules: EstimatingRules = { ...DEFAULT_RULES, ...rules, allowances: { ...DEFAULT_RULES.allowances, ...(rules.allowances ?? {}) } };
+  const resolvedRules: EstimatingRules = { ...DEFAULT_RULES, ...rules, allowances: { ...DEFAULT_RULES.allowances, ...(rules.allowances ?? {}) }, services: { ...DEFAULT_RULES.services, ...(rules.services ?? {}), fall: { ...DEFAULT_RULES.services.fall, ...(rules.services?.fall ?? {}) } } };
   const ctx = new Ctx(project, resolvedOptions, resolvedRules, extras.approvedBars ?? []);
   if (project.levels.length === 0 || ctx.outline.length < 3) {
     ctx.warnings.push("This project has no closed floor plan yet, so there is nothing to build. Draw the plan first.");
@@ -58,7 +59,7 @@ export function buildConstructionModel(
   };
 }
 
-const GENERATORS: ((ctx: Ctx) => void)[] = [generateSite, generateEarthworks, generateFoundation, generateGroundFloor, generateFrame, generateStairs, generateMasonry, generateRoof, generateElectrical, generatePlumbing, generateFinishes, generateOpenings, generateJoinery, generateFurniture, generateExternal];
+const GENERATORS: ((ctx: Ctx) => void)[] = [generateSite, generateEarthworks, generateFoundation, generateGroundFloor, generateFrame, generateStairs, generateMasonry, generateRoof, generateElectrical, generatePlumbing, generateServiceStructure, generateFinishes, generateOpenings, generateJoinery, generateFurniture, generateExternal];
 
 export function boundsOf(shapes: Shape[]): { min: V3; max: V3 } {
   const min = { x: Infinity, y: Infinity, z: Infinity };
@@ -85,7 +86,10 @@ export function boundsOf(shapes: Shape[]): { min: V3; max: V3 } {
       }
     } else if (s.t === "cyl") {
       const h = s.len / 2;
-      const ex = s.axis === "x" ? h : s.r; const ey = s.axis === "y" ? h : s.r; const ez = s.axis === "z" ? h : s.r;
+      const tilt = s.tilt ?? 0;
+      const run = Math.cos(tilt) * h;
+      const fall = Math.abs(Math.sin(tilt)) * h;
+      const ex = s.axis === "x" ? run : s.r; const ey = s.axis === "y" ? run : s.r; const ez = s.axis === "z" ? h : s.r + fall;
       grow(s.c.x - ex, s.c.y - ey, s.c.z - ez); grow(s.c.x + ex, s.c.y + ey, s.c.z + ez);
     } else for (const p of s.poly) { grow(p.x, p.y, s.z0); grow(p.x, p.y, s.z1); }
   }

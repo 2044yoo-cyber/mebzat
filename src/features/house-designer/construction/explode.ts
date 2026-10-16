@@ -33,9 +33,32 @@ export type ExplodeInfo = {
 
 const CATEGORY_RANK = new Map<CategoryId, number>(CATEGORY_IDS.map((id, i) => [id, i]));
 
+/**
+ * Pipes, conduits and the equipment on them move as one rigid installation per
+ * system: every part of it gets the same offset, so a branch never parts from
+ * its riser and a conduit never parts from its box. Storeys lifting apart would
+ * pull a stack through its own floors, and layers sliding along their own
+ * directions would pull a fixture off its pipe, so neither applies to them.
+ * The covers, chases and sleeves made for the services belong to the building
+ * and go with the part of it they are built into.
+ */
+export const isInstallation = (c: ComponentRecord): boolean => (c.category === "electrical" || c.category === "plumbing") && c.service?.role !== "structure";
+
+/** The category whose offset a component follows. */
+function hostCategory(c: ComponentRecord): CategoryId {
+  if (!c.service || c.service.role !== "structure") return c.category;
+  return c.stage <= 7 ? "masonry" : c.stage >= 11 ? "finishes" : "roof";
+}
+
 export function explodeInfo(c: ComponentRecord, view: ViewState, model: ConstructionModel): ExplodeInfo {
   const a = Math.max(0, Math.min(1, view.explode.amount));
   if (a === 0) return { base: ZERO, layerDistance: 0, dir: ZERO, radial: false };
+  if (isInstallation(c)) {
+    const rank = (CATEGORY_RANK.get(c.category) ?? 0) - (CATEGORY_IDS.length - 1) / 2;
+    return { base: view.explode.categories ? scale(DIAGONAL, rank * a * CATEGORY_STEP) : ZERO, layerDistance: 0, dir: ZERO, radial: false };
+  }
+  // Builder's work for the services (chases, sleeves, covers) goes with the storey and the part of the building it is built into, and does not slide on its own layer.
+  const followsHost = c.service?.role === "structure";
   let base = ZERO;
   if (view.explode.floors) {
     // Below-ground work sinks, each storey above rises.
@@ -43,12 +66,12 @@ export function explodeInfo(c: ComponentRecord, view: ViewState, model: Construc
     base = add(base, { x: 0, y: 0, z: lift * a * FLOOR_STEP });
   }
   if (view.explode.categories) {
-    const rank = (CATEGORY_RANK.get(c.category) ?? 0) - (CATEGORY_IDS.length - 1) / 2;
+    const rank = (CATEGORY_RANK.get(hostCategory(c)) ?? 0) - (CATEGORY_IDS.length - 1) / 2;
     base = add(base, scale(DIAGONAL, rank * a * CATEGORY_STEP));
   }
   const radial = isZero(c.explode.dir);
   const dir = radial ? ZERO : c.explode.dir;
-  const layerDistance = view.explode.layers ? c.explode.layerIndex * a * LAYER_STEP : 0;
+  const layerDistance = view.explode.layers && !followsHost ? c.explode.layerIndex * a * LAYER_STEP : 0;
   void model;
   return { base, layerDistance, dir, radial };
 }

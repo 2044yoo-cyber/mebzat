@@ -1,5 +1,6 @@
-import { LAYER_IDS, STAGE_IDS, type CategoryId, type ComponentRecord, type ConstructionModel, type CutawayMode, type LayerId, type StageId, type ViewState } from "./types";
+import { LAYER_IDS, STAGE_IDS, type CategoryId, type ComponentRecord, type ConstructionModel, type CutawayMode, type LayerId, type ServiceView, type StageId, type ViewState } from "./types";
 import { DEFAULT_VIEW } from "./types";
+import { isInstallation } from "./explode";
 
 /**
  * What the learner sees, decided from the model and a `ViewState`. Everything
@@ -110,8 +111,12 @@ export function visibilityOf(c: ComponentRecord, view: ViewState, index: ModelIn
   }
   if (v === "hidden") return v;
 
-  // Services: shown through the walls, or left inside them, depending on the view.
-  if (view.stage >= 9) {
+  // The six service views decide what the installation and its surroundings look like.
+  if (view.serviceView !== "off") {
+    const sv = serviceVisibility(c, view, v);
+    if (sv === "hidden") return sv;
+    v = sv;
+  } else if (view.stage >= 9) {
     if (c.concealed && view.options.mepView === "finished" && view.stage >= coverStage(c)) return "hidden";
     if (view.options.mepView === "concealed" && view.stage <= 12 && !c.concealed && !(c.category === "electrical" || c.category === "plumbing") && isBuildingSkin(c)) v = worse(v, "ghost");
   }
@@ -122,6 +127,49 @@ export function visibilityOf(c: ComponentRecord, view: ViewState, index: ModelIn
     if (!set.has(c.id)) v = worse(v, view.transparentContext ? "ghost" : "hidden");
   }
   return v;
+}
+
+const CLUTTER: ReadonlySet<CategoryId> = new Set<CategoryId>(["site", "earthworks", "finishes", "joinery", "furniture", "external"]);
+
+/** What a component looks like in one of the service views, given what the stage already decided. */
+function serviceVisibility(c: ComponentRecord, view: ViewState, current: Visibility): Visibility {
+  const mode = view.serviceView;
+  const installation = isInstallation(c);
+  const structure = c.service?.role === "structure";
+  // The building round the installation: its structure faint, and the finishes and furnishings left out so that they do not hide it.
+  const context: Visibility = view.transparentContext && !CLUTTER.has(c.category) ? "ghost" : "hidden";
+  switch (mode) {
+    case "finished":
+      // The completed building: built-in services are covered, everything else as the stage has it.
+      return c.concealed && view.stage >= coverStage(c) ? "hidden" : current;
+    case "concealed":
+      if (installation) return current;
+      if (structure) return c.stage >= 11 ? worse(current, "ghost") : current;
+      return isBuildingSkin(c) ? worse(current, "ghost") : current;
+    case "plumbing":
+    case "electrical": {
+      const mine = c.category === mode;
+      if (installation) return mine ? current : "hidden";
+      if (structure) return mine ? worse(current, "ghost") : "hidden";
+      return worse(current, context);
+    }
+    default:
+      // combined and exploded: both installations, in place, with the building faint round them.
+      if (installation) return current;
+      if (structure) return worse(current, "ghost");
+      return worse(current, context);
+  }
+}
+
+/** The earliest stage at which a service view has the work it shows: the finished building is the last. */
+const SERVICE_VIEW_STAGE: Record<ServiceView, StageId> = { off: 1, plumbing: 10, electrical: 9, combined: 10, concealed: 10, finished: 18, exploded: 10 };
+
+/** Switch to one of the service views: the stage is moved on if the work it shows is not built yet, and the explosion is set to suit. */
+export function applyServiceView(view: ViewState, mode: ServiceView): ViewState {
+  const stage = mode === "finished" ? 18 : (Math.max(view.stage, SERVICE_VIEW_STAGE[mode]) as StageId);
+  const wasExploded = view.serviceView === "exploded";
+  const amount = mode === "exploded" ? 0.6 : wasExploded ? 0 : view.explode.amount;
+  return { ...view, serviceView: mode, stage: mode === "off" ? view.stage : stage, onlyThisStage: false, isolateId: null, explode: { ...view.explode, amount, categories: mode === "exploded" ? true : view.explode.categories } };
 }
 
 /** The stage at which a buried component is covered: services by the plaster, anything else by the next stage's work. */

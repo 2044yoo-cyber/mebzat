@@ -1,5 +1,6 @@
-import { CATEGORY_LABELS, LAYER_LABELS, PROVENANCE_LABELS, type ComponentKnowledge, type ComponentRecord, type ConstructionModel, type Dimension, type DimensionKey, type Provenance, type QuantityItem, type StageDef } from "./types";
-import { knowledgeFor, materialOf } from "./catalogue";
+import { CATEGORY_LABELS, LAYER_LABELS, SERVICE_LABELS, PROVENANCE_LABELS, type ComponentKnowledge, type ComponentRecord, type ConstructionModel, type Dimension, type DimensionKey, type Provenance, type QuantityItem, type StageDef } from "./types";
+import { knowledgeFor, legendEntryFor, materialOf, serviceColour } from "./catalogue";
+import { coverStage } from "./view";
 import { STAGE_BY_ID } from "./stages";
 
 /** Everything the learning panel shows about one component (and, for a repeated one, one instance of it). */
@@ -36,6 +37,8 @@ export type ComponentInfo = {
   note: string | null;
   loose: boolean;
   concealed: boolean;
+  /** For a pipe, conduit, fitting or the structure made for them. */
+  service: null | { system: string; legend: string; colour: string; role: string; from: string; to: string; route: string; level: string; covered: string };
 };
 
 function fallbackKnowledge(c: ComponentRecord): ComponentKnowledge {
@@ -66,5 +69,11 @@ export function describeComponent(model: ConstructionModel, id: string, instance
     geometryLabel: c.geometrySource === "project" ? "Taken from the project's own geometry" : "Schematic illustration: not taken from the drawing",
     sourceRef: c.sourceRef, status, statusLabel: PROVENANCE_LABELS[status], quantities: c.quantities, quantityMethod: knowledge.quantityMethod,
     instance: instance !== null ? { index: instance, name: name ?? `${c.repeated?.noun ?? "item"} ${instance + 1}` } : null, repeated: c.repeated?.noun ?? null, note: c.note ?? null, loose: !!c.loose, concealed: !!c.concealed,
+    service: c.service ? {
+      system: SERVICE_LABELS[c.service.system], legend: legendEntryFor(c.service.system, c.kind).label, colour: serviceColour(c.service.system, c.kind),
+      role: { route: "Run of pipe or conduit", fitting: "Fitting", equipment: "Equipment", structure: "Builder's work for the services" }[c.service.role],
+      from: c.service.from, to: c.service.to, route: c.service.route, level: c.storeyName ?? "Outside, or below the ground floor",
+      covered: c.concealed ? `Built in at stage ${c.stage}; covered by stage ${coverStage(c)}, so it is hidden in the finished building` : "Stays visible in the finished building",
+    } : null,
   };
 }

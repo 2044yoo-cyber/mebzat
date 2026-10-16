@@ -31,7 +31,12 @@ quantity data a bill of quantities would need.
 | `explode.ts` | Temporary offsets for floors, categories and layers (zero is exactly assembled) |
 | `quantities.ts` | Bill lines by work item, statuses, allowances kept apart, unpriced draft bill |
 | `inspect.ts` | Everything the learning panel shows for a part or an instance of a part |
-| `draw-list.ts` | The model as instance matrices for the renderer |
+| `draw-list.ts` | The model as instance matrices for the renderer (a tipped pipe is turned by its fall) |
+| `service-plan.ts`, `wet-room.ts` | Where the shafts and the riser cupboard stand, found against every storey; a wet room's fixtures and the pipes to them. A shaft is only taken where all of them can reach it |
+| `service-routing.ts` | The shared routing: structure to avoid, runs with falls, pipes round a room's walls, slab layers for conduit, a route round obstacles, drains through ground beams |
+| `electrical-plan.ts`, `plumbing-plan.ts` | The electrical and the plumbing installation as routes, read from the building. The generators draw these |
+| `service-audit.ts` | Reads the finished model back: what each run is fixed to, and what it passes through |
+| `roof-geometry.ts`, `slab-openings.ts`, `service-frame.ts` | The roof's eaves and gutters, what is cut through each slab, the frame a shaft is placed in |
 
 ## Stages and generators
 
@@ -39,6 +44,18 @@ quantity data a bill of quantities would need.
 8 `roof.ts` (flat and pitched alternatives) · 9 `electrical.ts` · 10 `plumbing.ts` ·
 11–13 and 15 `finishes.ts` (plaster coats, ceilings, floors and tiles, paint) · 14 `openings.ts` ·
 16 `joinery.ts` and 17 `furniture.ts` (cabinets from Berchuma's own `buildParts`) · 18 `external.ts`.
+
+## The installation (stages 9 and 10)
+
+The pipes and conduit are laid out from the building, never across the middle of a room.
+
+- **Shafts.** Each wet room gets a shaft (300 × 300, floor to roof) against a wall, clear of beams, columns, doors and stairs on every storey. The soil stack, its vent and the cold riser stand in it, and every slab and the ground slab are opened for it. A shaft in a corner can send its pipes out of its front.
+- **Plumbing.** Fixtures stand on the walls (on a pre-wall duct in a bathroom), only where their pipes can reach them. Waste falls to the stack (settings: 1 in 40, 1 in 60, 1 in 60, kept between 1 in 20 and 1 in 200); the stack goes down to a drain that falls round the footings and, where it must, through ground beams in sleeves cast into them. Roof tank, down-feeds, rising main, pump on its pad, rainwater from the real gutters and outlets.
+- **Electrical.** The board stands in a riser cupboard on every storey. Conduit is cast in the floor slab to the foot of a wall and up a chase to the boxes, and in the slab above to each ceiling light and detector. Meter and earth electrode outside, through sleeves in the wall.
+- **Builder's work** (`generators/service-structure.ts`): chases and wall sleeves at the blockwork stage, sleeves in ground beams at the foundation stage, flashing at the roof, shaft covers, cupboard doors, hatches and pre-wall ducts at the plaster stage.
+- **Views.** Plumbing only, electrical only, combined, concealed installation, finished building, exploded installation, with a legend whose colours are the materials'. The explosion moves each installation as one piece, so no connection comes apart.
+- **When it cannot be done** the plan says so in words (a warning that starts `Plumbing:` or `Electrical:`) and draws nothing through structure.
+- **Settings** (`rules.services`): the falls, the heights of the cold and hot lanes, switches, sockets and the board.
 
 ## Real project geometry or schematic
 
@@ -81,6 +98,8 @@ allowance (a separate field), assumptions, exclusions, and empty cost fields. **
 ```
 npx tsx scripts/construction_lab_check.ts                      # model, timeline, explode, quantities
 node scripts/mutate.mjs "npx tsx scripts/construction_lab_check.ts" scripts/mutants/construction_lab.json
+npx tsx scripts/construction_services_check.ts                 # the installation: no floating, no collisions, falls, views
+node scripts/mutate.mjs "npx tsx scripts/construction_services_check.ts" scripts/mutants/construction_services.json
 npm run build && node scripts/construction_lab_browser_check.mjs   # real browser, 390 px
 node scripts/mutate.mjs "node scripts/construction_lab_browser_check.mjs" scripts/mutants/construction_lab_browser.json
 ```

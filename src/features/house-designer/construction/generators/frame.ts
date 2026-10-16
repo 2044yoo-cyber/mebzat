@@ -1,7 +1,7 @@
 import { ASSUME, UP, dim, type Ctx, type LevelInfo } from "../context";
 import { alongLine, box, boxAt, clipConvex, cyl, netVolumes, polygonArea, prism, prismOfShape, rectPoly, unionArea, v3, type P2, type Prism, type Shape } from "../geometry";
 import { addQuantity, barBetween, concreteQuantity, f2, f3, formworkQuantity, hoopXY, hoopXZ, hoopYZ, m3, rebarQuantity, round, spaced } from "../helpers";
-import { slabOpenings } from "../rooms";
+import { slabOpenings } from "../slab-openings";
 
 /** Stage 5: the reinforced-concrete frame, storey by storey. */
 

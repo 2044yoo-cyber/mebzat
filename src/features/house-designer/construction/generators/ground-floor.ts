@@ -2,6 +2,7 @@ import { ASSUME, UP, dim, type Ctx } from "../context";
 import { alongLine, boxAt, cyl, netVolumes, polygonArea, prism, prismOfShape, rectPoly, v3, type P2, type Prism, type Shape } from "../geometry";
 import { addQuantity, concreteQuantity, f2, f3, rebarQuantity, round, spaced } from "../helpers";
 import { insetOutline, pedestalsOf } from "../structure-data";
+import { serviceHoles } from "../service-plan";
 
 /** The thicknesses of the ground-floor build-up, worked from the slab down. */
 export function groundFloorStack(ctx: Ctx) {
@@ -34,6 +35,10 @@ export function generateGroundFloor(ctx: Ctx): void {
   // Interior pedestals pass through the layers as holes; those on the wall line are netted in the volume instead.
   const b = polygonBoundsOf(inner.poly);
   const holes: P2[][] = peds.filter((p) => p.col.x - p.col.width / 2 > b.minX + 1 && p.col.x + p.col.width / 2 < b.maxX - 1 && p.col.y - p.col.depth / 2 > b.minY + 1 && p.col.y + p.col.depth / 2 < b.maxY - 1).map((p) => rectPoly(p.col.x - p.col.width / 2, p.col.y - p.col.depth / 2, p.col.x + p.col.width / 2, p.col.y + p.col.depth / 2));
+  // The service shafts pass through the slab and the screed in their own openings.
+  const shafts = serviceHoles(ctx, 0);
+  const shaftHoles: P2[][] = shafts.map((h) => rectPoly(h.x0, h.y0, h.x1, h.y1));
+  const slabHoles: P2[][] = [...holes, ...shaftHoles];
   const pedPrisms: Prism[] = peds.map((p) => prismOfShape(boxAt(p.col.x - p.col.width / 2, p.col.y - p.col.depth / 2, p.z0, p.col.width, p.col.depth, p.z1 - p.z0))!);
 
   type Layer = { id: string; name: string; kind: string; layer: "fill" | "waterproofing" | "insulation" | "blinding" | "concrete"; material: string; z0: number; z1: number; note?: string; workItem: string; description: string; section: "B" | "G" | "C"; order: number };
@@ -83,28 +88,30 @@ export function generateGroundFloor(ctx: Ctx): void {
 
   // The ground-bearing slab, net of the pedestals that pass through it.
   const slabPrism = prismOfShape(prism(inner.poly, st.slabBottom, 0, []))!;
-  const nets = netVolumes([...pedPrisms, slabPrism]);
+  const shaftSlab = shafts.map((h) => prismOfShape(boxAt(h.x0, h.y0, st.slabBottom, h.x1 - h.x0, h.y1 - h.y0, -st.slabBottom))!);
+  const nets = netVolumes([...pedPrisms, ...shaftSlab, slabPrism]);
   const slabNet = nets[nets.length - 1]! * 1e-9;
   const slabComp = ctx.add({
     id: "ground:slab", name: "Ground-bearing concrete slab", kind: "ground-slab", category: "substructure", subcategory: "Ground floor", stage: 4, layer: "concrete", materialId: "concrete",
-    shapes: [prism(inner.poly, st.slabBottom, 0, holes)], source: "project", sourceRef: `${ground.levelId}:slab`, level: ground, pour: 1,
-    explode: { layerIndex: 8, dir: UP }, dims: { thickness: dim(st.slab, "mm", "measured"), area: dim(round(area, 2), "m²", "calculated"), volume: dim(round(slabNet, 3), "m³", "calculated", "Net of pedestals") },
+    shapes: [prism(inner.poly, st.slabBottom, 0, slabHoles)], source: "project", sourceRef: `${ground.levelId}:slab`, level: ground, pour: 1,
+    explode: { layerIndex: 8, dir: UP }, dims: { thickness: dim(st.slab, "mm", "measured"), area: dim(round(area, 2), "m²", "calculated"), volume: dim(round(slabNet, 3), "m³", "calculated", "Net of pedestals and shaft openings") },
     label: { text: "Ground-bearing slab", anchor: v3(b.minX + 600, b.minY + 600, 0) },
     note: "Rests on the ground. The upper floors are suspended slabs spanning between beams.",
   });
-  concreteQuantity(ctx, slabComp, "concrete.ground-slab", "Ground-bearing slab", slabNet, `${f2(area)} m² × ${f3(st.slab / 1000)} m − pedestals through it = ${f3(slabNet)} m³`, { area: round(area, 3), thickness: st.slab }, inner.exact ? "calculated" : "review", ["Area is inside the foundation walls."]);
+  concreteQuantity(ctx, slabComp, "concrete.ground-slab", "Ground-bearing slab", slabNet, `${f2(area)} m² × ${f3(st.slab / 1000)} m − pedestals and shaft openings through it = ${f3(slabNet)} m³`, { area: round(area, 3), thickness: st.slab }, inner.exact ? "calculated" : "review", ["Area is inside the foundation walls."]);
 
   // Screed.
   const screedPrism = prismOfShape(prism(inner.poly, 0, ASSUME.screed))!;
   const colPrisms = ctx.project.structuralColumns.filter((c) => c.levelId === ground.levelId).map((c) => prismOfShape(boxAt(c.x - c.width / 2, c.y - c.depth / 2, 0, c.width, c.depth, ground.soffitZ))!);
-  const sn = netVolumes([...colPrisms, screedPrism]);
+  const shaftScreed = shafts.map((h) => prismOfShape(boxAt(h.x0, h.y0, 0, h.x1 - h.x0, h.y1 - h.y0, ASSUME.screed))!);
+  const sn = netVolumes([...colPrisms, ...shaftScreed, screedPrism]);
   const screedNet = sn[sn.length - 1]! * 1e-9;
   const screed = ctx.add({
     id: "ground:screed", name: "Ground-floor screed", kind: "floor-screed", category: "substructure", subcategory: "Ground floor", stage: 4, layer: "screed", materialId: "screed",
-    shapes: [prism(inner.poly, 0, ASSUME.screed, holes)], source: "schematic", level: ground, explode: { layerIndex: 9, dir: UP },
-    dims: { thickness: dim(ASSUME.screed, "mm", "assumed"), volume: dim(round(screedNet, 3), "m³", "calculated", "Net of columns") },
+    shapes: [prism(inner.poly, 0, ASSUME.screed, slabHoles)], source: "schematic", level: ground, explode: { layerIndex: 9, dir: UP },
+    dims: { thickness: dim(ASSUME.screed, "mm", "assumed"), volume: dim(round(screedNet, 3), "m³", "calculated", "Net of columns and shaft openings") },
   });
-  addQuantity(ctx, screed, { workItem: "screed.ground", description: "Cement-sand screed to the ground floor", section: "K", unit: "m³", value: round(screedNet, 3), formula: `${f2(area)} m² × ${f3(ASSUME.screed / 1000)} m − columns = ${f3(screedNet)} m³`, inputs: { area: round(area, 3), thickness: ASSUME.screed }, status: "assumed" }, { assumptions: ["Screed laid wall to wall before partitions; room-by-room areas are in the finishes."], allowance: { rule: "Wastage and level variation (example)", percent: null } });
+  addQuantity(ctx, screed, { workItem: "screed.ground", description: "Cement-sand screed to the ground floor", section: "K", unit: "m³", value: round(screedNet, 3), formula: `${f2(area)} m² × ${f3(ASSUME.screed / 1000)} m − columns and shaft openings = ${f3(screedNet)} m³`, inputs: { area: round(area, 3), thickness: ASSUME.screed }, status: "assumed" }, { assumptions: ["Screed laid wall to wall before partitions; room-by-room areas are in the finishes."], allowance: { rule: "Wastage and level variation (example)", percent: null } });
 }
 
 function polygonBoundsOf(poly: P2[]) {

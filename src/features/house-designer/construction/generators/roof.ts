@@ -2,6 +2,8 @@ import { ASSUME, UP, dim, type Ctx } from "../context";
 import { alongLine, box, cyl, polygonArea, prism, v3, type P2, type Shape } from "../geometry";
 import { addQuantity, f2, f3, round } from "../helpers";
 import { insetOutline } from "../structure-data";
+import { planPlumbing } from "../plumbing-plan";
+import { OVERHANG, PITCH_DEG, PLATE, TRUSS_D, pitchedGutter } from "../roof-geometry";
 
 /**
  * Stage 8: the roof, as two selectable alternatives on the same roof slab.
@@ -11,12 +13,9 @@ import { insetOutline } from "../structure-data";
  */
 
 const PROTECTION = 30;
-const PITCH_DEG = 25;
-const OVERHANG = 450;
 const TRUSS_SPACING = 900;
 const BATTEN_SPACING = 350;
 const TRUSS_W = 50;
-const TRUSS_D = 100;
 const COVERING_T = 6;
 const COPING_T = 40;
 const COPING_OVER = 25;
@@ -55,7 +54,9 @@ function generateFlat(ctx: Ctx, slabTop: number): void {
   const band = planArea - innerArea;
   const ph = ASSUME.parapetHeight;
   const b = ctx.bounds;
-  const outlets = [{ x: b.minX + (b.maxX - b.minX) * 0.25, y: b.minY + parapetT + 250 }, { x: b.minX + (b.maxX - b.minX) * 0.75, y: b.minY + parapetT + 250 }];
+  // The outlets are where the rainwater plan stands the downpipes, so each one drains into a pipe that is really there.
+  const planned = planPlumbing(ctx).rain.flatOutlets;
+  const outlets = planned.length ? planned : [{ x: b.minX + (b.maxX - b.minX) * 0.25, y: b.minY + parapetT + 250 }, { x: b.minX + (b.maxX - b.minX) * 0.75, y: b.minY + parapetT + 250 }];
   const run = Math.max(...inner.poly.map((p) => Math.min(...outlets.map((o) => Math.hypot(p.x - o.x, p.y - o.y)))));
   const minScreed = ASSUME.roofScreedMin;
   const screedAvg = minScreed + (ASSUME.roofFall * run) / 2;
@@ -124,7 +125,7 @@ function generateFlat(ctx: Ctx, slabTop: number): void {
   const outletComp = ctx.add({
     ...common, id: "roof:flat:outlets", name: "Roof outlets", kind: "roof-outlet", subcategory: "Drainage", layer: "plumbing", materialId: "pvc", shapes: outletShapes, repeated: { noun: "outlet" },
     explode: { layerIndex: 7, dir: UP }, dims: {}, label: { text: "Roof outlet", anchor: v3(outlets[0]!.x, outlets[0]!.y, protTop + 100) },
-    note: "Two outlets at the low corners. The number and size come from the rainfall design.",
+    note: "Each outlet drains through the parapet into a downpipe on the outside of the wall. The number and size come from the rainfall design.",
   });
   addQuantity(ctx, outletComp, { workItem: "roof.outlet", description: "Roof outlets", section: "H", unit: "piece", value: outlets.length, formula: `${outlets.length} outlets (example layout)`, inputs: { count: outlets.length }, status: "assumed" });
 }
@@ -138,7 +139,7 @@ function generatePitched(ctx: Ctx, slabTop: number): void {
   const b = ctx.bounds;
   const theta = (PITCH_DEG * Math.PI) / 180;
   const common = { category: "roof" as const, stage: 8 as const, level: top, variant: pitched, source: "schematic" as const };
-  const plate = 100;
+  const plate = PLATE;
   const spanY = b.maxY - b.minY - 2 * plate;
   const half = spanY / 2;
   const rise = half * Math.tan(theta);
@@ -238,7 +239,8 @@ function generatePitched(ctx: Ctx, slabTop: number): void {
     dims: { length: dim(round(coverX, 0), "mm", "calculated") },
   });
   addQuantity(ctx, ridge, { workItem: "roof.ridge", description: "Ridge cap", section: "H", unit: "m", value: round(coverX / 1000, 3), formula: `ridge length ${f2(coverX / 1000)} m`, inputs: { length: round(coverX, 0) }, status: "assumed" });
-  const gutterShapes: Shape[] = [yBearingS - OVERHANG, yBearingN + OVERHANG].map((y) => box((b.minX + b.maxX) / 2, y, plateTop + TRUSS_D + 25 - OVERHANG * Math.tan(theta) - 40, coverX, 110, 80));
+  const gutterAt = pitchedGutter(b, slabTop);
+  const gutterShapes: Shape[] = [gutterAt.southY, gutterAt.northY].map((y) => box((b.minX + b.maxX) / 2, y, gutterAt.z, coverX, 110, 80));
   const gutters = ctx.add({
     ...common, id: "roof:pitched:gutters", name: "Eaves gutters", kind: "gutter", subcategory: "Rainwater", layer: "plumbing", materialId: "pvc", shapes: gutterShapes, repeated: { noun: "run" }, explode: { layerIndex: 6, dir: UP },
     dims: { length: dim(round(coverX, 0), "mm", "calculated") },

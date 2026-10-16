@@ -366,6 +366,72 @@ try {
   equal(await page.getByTestId("construction-viewer").getAttribute("data-stage"), "18", "and stays on the same stage");
   ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, "still no sideways scrolling");
 
+  // ---- Installation views: plumbing, electrical, combined, concealed, finished, exploded -----------------------------------------------
+  await page.getByTestId("construction-lab").getByRole("radio", { name: "Learn" }).click();
+  await page.locator('[role=tab][data-stage="18"]').click();
+  await page.getByRole("tab", { name: "Lesson" }).click();
+  await settle(page);
+  const views = page.getByTestId("service-views");
+  await views.waitFor();
+  for (const id of ["off", "plumbing", "electrical", "combined", "concealed", "finished", "exploded"]) {
+    const box = await page.getByTestId(`service-view-${id}`).boundingBox();
+    ok(box.height >= 36 && box.x + box.width <= 390 + 1 && box.x >= -1, `the ${id} view button fits the phone and is a touch target`);
+  }
+  equal(await page.locator('[data-testid="service-legend"] [data-legend]').count(), 7, "the legend names seven kinds of pipe and conduit");
+  const COLD = "2563eb"; const HOT = "dc2626"; const CONDUIT = "eab308"; const EARTH = "16a34a";
+  await page.getByTestId("service-view-plumbing").click();
+  await settle(page);
+  const plumbingOnly = await stats(page);
+  ok(plumbingOnly.colours.includes(COLD) && plumbingOnly.colours.includes(HOT), "plumbing only draws the cold and the hot pipes, though they are inside the walls");
+  ok(!plumbingOnly.colours.includes(CONDUIT), "and no conduit");
+  ok(plumbingOnly.ghosts > 100, "with the building faint round them");
+  await page.getByTestId("service-view-electrical").click();
+  await settle(page);
+  const electricalOnly = await stats(page);
+  ok(electricalOnly.colours.includes(CONDUIT), "electrical only draws the conduit");
+  ok(!electricalOnly.colours.includes(HOT), "and no hot pipe");
+  await page.getByTestId("service-view-combined").click();
+  await settle(page);
+  const combinedView = await stats(page);
+  ok(combinedView.colours.includes(CONDUIT) && combinedView.colours.includes(COLD), "combined draws both");
+  await page.getByTestId("service-view-concealed").click();
+  await settle(page);
+  const concealedView = await stats(page);
+  ok(concealedView.colours.includes(CONDUIT) && concealedView.colours.includes(HOT), "the concealed installation shows what is built in");
+  await page.getByTestId("service-view-finished").click();
+  await settle(page);
+  const finishedView = await stats(page);
+  ok(!finishedView.colours.includes(EARTH) && !finishedView.colours.includes(HOT), "the finished building has covered the earthing conductor and the hot pipes");
+  ok(concealedView.colours.includes(EARTH), "which the concealed installation does show");
+  ok(finishedView.instances < concealedView.instances, "so it draws fewer pieces than the concealed view, which has the built-in services as well");
+  equal(await page.getByTestId("construction-viewer").getAttribute("data-stage"), "18", "at the last stage");
+  await page.getByTestId("service-view-exploded").click();
+  await settle(page);
+  equal(await page.getByTestId("construction-viewer").getAttribute("data-exploded"), "true", "the exploded installation is exploded");
+  const explodedView = await stats(page);
+  ok(explodedView.colours.includes(CONDUIT) && explodedView.colours.includes(COLD), "and shows both installations");
+  await page.getByTestId("service-view-combined").click();
+  await settle(page);
+  equal(await page.getByTestId("construction-viewer").getAttribute("data-exploded"), "false", "leaving it puts the model back together");
+  // The routing settings redraw the drains.
+  await page.getByTestId("service-settings").locator("summary").click();
+  await page.getByTestId("fall-drain").fill("40");
+  await page.waitForTimeout(2500);
+  ok(await page.getByTestId("service-views").isVisible(), "a steeper drain fall redraws the model and the panel stays");
+  await page.getByTestId("fall-drain").fill("60");
+  await page.waitForTimeout(2000);
+  // Touch a pipe from the list: its source, destination and fixing are shown.
+  await page.getByTestId("construction-lab").getByRole("radio", { name: "Inspect" }).click();
+  await page.getByRole("tab", { name: "Parts" }).click();
+  await page.getByLabel("Search parts").fill("Cold-water pipes");
+  await page.getByRole("listbox", { name: "Parts" }).getByRole("option").first().locator("button").first().click();
+  await page.getByTestId("inspector-service").waitFor();
+  ok(/Cold water/.test(await page.getByTestId("inspector-service").innerText()), "a pipe names its system");
+  ok((await page.getByTestId("service-from").innerText()).length > 3 && (await page.getByTestId("service-to").innerText()).length > 3, "and where it starts and ends");
+  await page.getByTestId("construction-lab").getByRole("radio", { name: "Learn" }).click();
+  await page.getByTestId("service-view-off").click();
+  ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, "no sideways scrolling with the installation views");
+
   // ---- Labels ----------------------------------------------------------------------------------------------------------------------
   await page.locator('[role=tab][data-stage="3"]').click();
   await settle(page);
@@ -390,6 +456,13 @@ try {
     await shots.getByTestId("explode-slider").fill("0.8");
     await shots.waitForTimeout(900);
     await shots.getByTestId("construction-viewer").screenshot({ path: join(out, "exploded.png") });
+    await shots.getByTestId("explode-slider").fill("0");
+    await shots.locator('[role=tab][data-stage="18"]').click();
+    for (const mode of ["plumbing", "electrical", "combined", "concealed", "finished", "exploded"]) {
+      await shots.getByTestId(`service-view-${mode}`).click();
+      await shots.waitForTimeout(1200);
+      await shots.getByTestId("construction-viewer").screenshot({ path: join(out, `services_${mode}.png`) });
+    }
     console.log("pictures in", out);
   }
 

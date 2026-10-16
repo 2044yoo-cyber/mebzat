@@ -138,6 +138,25 @@ export type QuantityItem = {
 // Components
 // ---------------------------------------------------------------------------
 
+/** Which service a pipe, conduit or fitting belongs to: what the colours and the legend stand for. */
+export const SERVICE_SYSTEMS = ["electrical", "cold", "hot", "waste", "soil", "vent", "drain", "rain", "supply"] as const;
+export type ServiceSystem = (typeof SERVICE_SYSTEMS)[number];
+
+export const SERVICE_LABELS: Record<ServiceSystem, string> = {
+  electrical: "Electrical", cold: "Cold water", hot: "Hot water", waste: "Waste", soil: "Soil and vent stack", vent: "Vent", drain: "Underground drain", rain: "Rainwater", supply: "Water supply equipment",
+};
+
+/** What a service component is, where it comes from and goes to, and how it is installed. */
+export type ServiceInfo = {
+  system: ServiceSystem;
+  /** A run of pipe or conduit, a fitting at its end, equipment, or the structure made for it (a shaft, a chase, a sleeve). */
+  role: "route" | "fitting" | "equipment" | "structure";
+  from: string;
+  to: string;
+  /** In words: what it is fixed to or runs in. */
+  route: string;
+};
+
 export type ComponentRecord = {
   /** Stable across rebuilds of the same project and options. */
   id: string;
@@ -182,6 +201,8 @@ export type ComponentRecord = {
   concealed?: boolean;
   /** Loose equipment rather than the building works. */
   loose?: boolean;
+  /** For a pipe, conduit, fitting or the structure made for them: the system, the ends and the way it is installed. */
+  service?: ServiceInfo;
   note?: string;
   quantities: QuantityItem[];
 };
@@ -231,7 +252,23 @@ export type EstimatingRules = {
   steelFromSchematic: false;
   /** Allowances, percent, kept apart from net quantities. */
   allowances: { concrete: number; blocks: number; tiles: number; paint: number; plaster: number; pipes: number; conduit: number; boards: number };
+  /** Where the services run: the falls of the drains and the heights of the lanes and fittings. All are examples, set here. */
+  services: ServiceSettings;
 };
+
+export type ServiceSettings = {
+  /** Falls as "1 in N": waste branches, the soil pipe, underground drains. Between 1 in 20 and 1 in 200. */
+  fall: { waste: number; soil: number; drain: number };
+  /** Height above the floor of the cold and the hot water lanes along the walls, mm. */
+  coldHeight: number;
+  hotHeight: number;
+  /** Heights of the fittings above the floor, mm. */
+  switchHeight: number;
+  socketHeight: number;
+  boardHeight: number;
+};
+
+export const DEFAULT_SERVICES: ServiceSettings = { fall: { waste: 40, soil: 60, drain: 60 }, coldHeight: 520, hotHeight: 590, switchHeight: 1200, socketHeight: 300, boardHeight: 1500 };
 
 export const DEFAULT_RULES: EstimatingRules = {
   openingDeduction: "over-threshold",
@@ -239,6 +276,7 @@ export const DEFAULT_RULES: EstimatingRules = {
   jointMm: 10,
   steelFromSchematic: false,
   allowances: { concrete: 5, blocks: 5, tiles: 10, paint: 5, plaster: 5, pipes: 10, conduit: 10, boards: 10 },
+  services: DEFAULT_SERVICES,
 };
 
 export type StoreyInfo = { id: string; name: string; index: number; elevation: number; floorToFloor: number; slabThickness: number };
@@ -284,6 +322,23 @@ export type StageDef = {
 
 export type FrameView = "complete" | "reinforcement" | "formwork" | "placement" | "completed";
 export type CutawayMode = "off" | "level" | "section-x" | "section-y";
+/**
+ * How the installation is shown. Each is a way of looking at the same model:
+ * nothing is rebuilt, only what is drawn solid, faint or left out changes.
+ */
+export const SERVICE_VIEWS = ["off", "plumbing", "electrical", "combined", "concealed", "finished", "exploded"] as const;
+export type ServiceView = (typeof SERVICE_VIEWS)[number];
+
+export const SERVICE_VIEW_LABELS: Record<ServiceView, { label: string; hint: string }> = {
+  off: { label: "Stage view", hint: "Services as the building stage shows them." },
+  plumbing: { label: "Plumbing only", hint: "Water, waste and drainage, whether concealed or not, with the building faint round them." },
+  electrical: { label: "Electrical only", hint: "Conduit, boxes, boards and earthing, whether concealed or not, with the building faint round them." },
+  combined: { label: "Combined", hint: "Plumbing and electrical together in the building, to see how they share the walls and slabs." },
+  concealed: { label: "Concealed installation", hint: "Services where they are built in: inside the walls, the slabs and the shafts, with the finishes faint." },
+  finished: { label: "Finished building", hint: "The completed building: what is built in is covered, and only the fixtures, covers and fittings show." },
+  exploded: { label: "Exploded installation", hint: "Plumbing and electrical drawn apart, each in one piece, so that every connection stays joined." },
+};
+
 export type AppMode = "learn" | "inspect" | "quantities" | "estimate";
 
 export type ViewState = {
@@ -315,6 +370,8 @@ export type ViewState = {
   cutaway: { mode: CutawayMode; position: number };
   /** The rest of the building as a transparent context around what is isolated. */
   transparentContext: boolean;
+  /** The way the installation is shown: one of the six service views, or the stage's own. */
+  serviceView: ServiceView;
   options: ModelOptions;
 };
 
@@ -338,5 +395,6 @@ export const DEFAULT_VIEW: ViewState = {
   explode: { amount: 0, floors: true, categories: true, layers: true },
   cutaway: { mode: "off", position: 0.5 },
   transparentContext: true,
+  serviceView: "off",
   options: DEFAULT_OPTIONS,
 };

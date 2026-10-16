@@ -2,7 +2,7 @@ import type { HouseProject, HouseRoom } from "../types/project";
 import type { ApprovedBar } from "./helpers";
 import { centroid, dist, pointInPolygon, polygonArea, polygonBounds, type P2, type V3 } from "./geometry";
 import type {
-  CategoryId, ComponentRecord, DimensionKey, Dimension, EstimatingRules, GeometrySource, LayerId, ModelOptions, Provenance, QuantityItem, StageId, StoreyInfo,
+  CategoryId, ComponentRecord, DimensionKey, Dimension, EstimatingRules, GeometrySource, LayerId, ModelOptions, Provenance, QuantityItem, ServiceInfo, StageId, StoreyInfo,
 } from "./types";
 import { NO_COST } from "./types";
 import { PROVENANCE } from "./types";
@@ -163,6 +163,7 @@ export type AddInput = {
   label?: ComponentRecord["label"];
   concealed?: boolean;
   loose?: boolean;
+  service?: ServiceInfo;
   note?: string;
 };
 
@@ -309,7 +310,7 @@ export class Ctx {
       parentId: input.parentId ?? null, connectedIds: input.connectedIds ?? [], sequence: this.next(input.stage),
       explode: { layerIndex: input.explode?.layerIndex ?? 0, dir: input.explode?.dir ?? UP },
       ...(input.variant ? { variant: input.variant } : {}), ...(input.pour ? { pour: input.pour } : {}), ...(input.label ? { label: input.label } : {}),
-      ...(input.concealed ? { concealed: true } : {}), ...(input.loose ? { loose: true } : {}),
+      ...(input.concealed ? { concealed: true } : {}), ...(input.loose ? { loose: true } : {}), ...(input.service ? { service: input.service } : {}),
       ...(input.note ? { note: input.note } : {}), quantities: [],
     };
     this.components.push(record);
