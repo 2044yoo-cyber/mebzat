@@ -147,7 +147,7 @@ export type ProjectProductionSummary = {
   pieces: number;
   sheets: { boardId: string; board: string; sheets: number; separateSheets: number; pieces: number; area: number }[];
   workbook: Uint8Array;
-  layouts: { board: string; sheet: number; length: number; width: number; utilisation: number; parts: { label: string; design: string; x: number; y: number; width: number; height: number; rotated: boolean }[] }[];
+  layouts: { board: string; sheet: number; length: number; width: number; utilisation: number; parts: { label: string; design: string; partId: string; banding: string; x: number; y: number; width: number; height: number; rotated: boolean }[] }[];
   offcuts: { boardId: string; board: string; thicknessMm: number | null; sheet: number; x: number; y: number; length: number; width: number; areaM2: number; reusable: boolean }[];
   rows: { design: string; partId: string; cabinet: string; label: string; board: string;
     length: number; width: number; thickness: number; quantity: number; banding: string }[];
@@ -281,12 +281,14 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
           board: item.board, sheet: sheet.number,
           length: shared!.sheet.length, width: shared!.sheet.width,
           utilisation: sheet.utilisation,
-          parts: sheet.placements.map(place => ({
-            label: group.rows.find(row => row.index === place.index)?.label ?? place.label,
-            design: group.rows.find(row => row.index === place.index)?.cabinet ?? "",
-            x: place.x, y: place.y, width: place.width, height: place.height,
-            rotated: place.rotated,
-          })),
+          parts: sheet.placements.map(place => {
+            const row = group.rows.find(row => row.index === place.index);
+            return {
+              label: row?.label ?? place.label, design: row?.cabinet ?? "",
+              partId: row?.partId ?? `CUT-${place.index}`, banding: row?.banding ?? "—",
+              x: place.x, y: place.y, width: place.width, height: place.height, rotated: place.rotated,
+            };
+          }),
         });
       }
     } else {
@@ -296,10 +298,14 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
             board: item.board, sheet: sheet.number,
             length: source.nesting.sheet.length, width: source.nesting.sheet.width,
             utilisation: sheet.utilisation,
-            parts: sheet.placements.map(place => ({
-              label: place.label, design: source.design, x: place.x, y: place.y,
-              width: place.width, height: place.height, rotated: place.rotated,
-            })),
+            parts: sheet.placements.map(place => {
+              const row = source.rows.find(row => row.index === place.index);
+              return {
+                label: row?.label ?? place.label, design: source.design,
+                partId: row?.partId ?? `CUT-${place.index}`, banding: row?.banding ?? "—",
+                x: place.x, y: place.y, width: place.width, height: place.height, rotated: place.rotated,
+              };
+            }),
           });
         }
       }
