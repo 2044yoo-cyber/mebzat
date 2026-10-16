@@ -42,7 +42,8 @@ export function ConstructionScene({
 }) {
   const index = useMemo(() => indexModel(model), [model]);
   const centre = useMemo(() => viewerCentre(model), [model]);
-  const building = useMemo(() => buildingBounds(model, view.stage <= 2), [model, view.stage <= 2]); // eslint-disable-line react-hooks/exhaustive-deps
+  const groundworkOnly = view.stage <= 2;
+  const building = useMemo(() => buildingBounds(model, groundworkOnly), [model, groundworkOnly]);
   const visible = useMemo(() => visibleComponents(model, view, index), [model, view, index]);
   const list = useMemo(() => buildDrawList(model, index, view, visible, centre), [model, index, view, visible, centre]);
   const plane = useMemo(() => clipPlane(model, view, centre), [model, view, centre]);
