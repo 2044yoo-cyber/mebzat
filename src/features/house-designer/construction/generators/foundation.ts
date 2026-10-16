@@ -10,6 +10,35 @@ export function outwardSign(wall: WallFrame): number {
   return wall.exterior ? -1 : 0;
 }
 
+type Rect = { x0: number; y0: number; x1: number; y1: number };
+
+/** The parts of the line a→b that lie outside every rectangle, as distances along it, mm. */
+export function outsideRects(a: { x: number; y: number }, b: { x: number; y: number }, rects: Rect[]): [number, number][] {
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (len < 1e-6) return [];
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const inside: [number, number][] = [];
+  for (const r of rects) {
+    // The stretch of the segment inside the rectangle, by clipping it against each side in turn.
+    let t0 = 0;
+    let t1 = 1;
+    let hit = true;
+    for (const [p, q] of [[-dx, a.x - r.x0], [dx, r.x1 - a.x], [-dy, a.y - r.y0], [dy, r.y1 - a.y]] as const) {
+      if (Math.abs(p) < 1e-9) { if (q < 0) { hit = false; break; } continue; }
+      const t = q / p;
+      if (p < 0) { if (t > t1) { hit = false; break; } t0 = Math.max(t0, t); } else { if (t < t0) { hit = false; break; } t1 = Math.min(t1, t); }
+    }
+    if (hit && t1 > t0) inside.push([t0 * len, t1 * len]);
+  }
+  inside.sort((p, q) => p[0] - q[0]);
+  const out: [number, number][] = [];
+  let at = 0;
+  for (const [c0, c1] of inside) { if (c0 > at + 1e-6) out.push([at, c0]); at = Math.max(at, c1); }
+  if (at < len - 1e-6) out.push([at, len]);
+  return out;
+}
+
 export function generateFoundation(ctx: Ctx): void {
   const ground = ctx.ground;
   if (!ground) return;
@@ -26,9 +55,11 @@ export function generateFoundation(ctx: Ctx): void {
 
   // Pedestals first, as concrete prisms, so ground beams can be netted against them.
   const pedestals = pedestalsOf(ctx);
+  const footPrisms: Prism[] = groups.map((g) => prismOfShape(boxAt(g.rect.x0, g.rect.y0, g.bottomZ, g.rect.x1 - g.rect.x0, g.rect.y1 - g.rect.y0, g.thickness))!);
   const pedPrisms: Prism[] = pedestals.map((p) => prismOfShape(boxAt(p.col.x - p.col.width / 2, p.col.y - p.col.depth / 2, p.z0, p.col.width, p.col.depth, p.z1 - p.z0))!);
   const beamPrisms: Prism[] = beams.map((b) => prismOfShape(alongLine(b.a, b.b, b.width, b.z0, b.z1))!);
-  const nets = netVolumes([...pedPrisms, ...beamPrisms]);
+  // The footings come first, so the pedestals and the ground beams are counted net of any footing they run into: a project whose footings are thick enough to reach the beams is not billed twice.
+  const nets = netVolumes([...footPrisms, ...pedPrisms, ...beamPrisms]).slice(footPrisms.length);
 
   // --- Footings -------------------------------------------------------------
   for (const group of groups) {
@@ -117,10 +148,11 @@ export function generateFoundation(ctx: Ctx): void {
     rebarQuantity(ctx, starters, "Column starter bars", approved);
     const stirrups: Shape[] = [];
     for (const z of spaced(z0 + 100, z1 - 100, 150)) stirrups.push(...hoopXY(col.x, col.y, z, col.width - 2 * cover, col.depth - 2 * cover, 8));
-    ctx.add({
+    const ties = ctx.add({
       id: `found:pedestal-ties:${sid}`, name: `Pedestal stirrups (schematic)${grid ? ` ${grid}` : ""}`, kind: "column-stirrups", category: "substructure", subcategory: "Reinforcement", stage: 3, layer: "reinforcement", materialId: "steel-bar",
       shapes: stirrups, repeated: { noun: "stirrup" }, source: "schematic", grid, parentId: pedestal.id, explode: { layerIndex: 2, dir: UP },
     });
+    rebarQuantity(ctx, ties, "Pedestal stirrups", approved);
     const form = ctx.add({
       id: `found:pedestal-form:${sid}`, name: `Pedestal formwork${grid ? ` ${grid}` : ""}`, kind: "footing-formwork", category: "substructure", subcategory: "Formwork", stage: 3, removedAfter: 3, layer: "formwork", materialId: "formwork",
       shapes: [boxAt(col.x - col.width / 2 - 18, col.y - col.depth / 2 - 18, z0, col.width + 36, 18, h), boxAt(col.x - col.width / 2 - 18, col.y + col.depth / 2, z0, col.width + 36, 18, h), boxAt(col.x - col.width / 2 - 18, col.y - col.depth / 2, z0, 18, col.depth, h), boxAt(col.x + col.width / 2, col.y - col.depth / 2, z0, 18, col.depth, h)],
@@ -138,10 +170,10 @@ export function generateFoundation(ctx: Ctx): void {
     const concrete = ctx.add({
       id: `found:${sid}`, name: `Ground beam ${beam.fromColumn ? ctx.gridRef(ground.levelId, beam.a.x, beam.a.y) : ""}–${ctx.gridRef(ground.levelId, beam.b.x, beam.b.y) ?? ""}`, kind: "ground-beam", category: "substructure", subcategory: "Ground beams", stage: 3, layer: "concrete", materialId: "concrete",
       shapes: [alongLine(beam.a, beam.b, beam.width, beam.z0, beam.z1)], source: "project", sourceRef: beam.id, grid: ctx.gridRef(ground.levelId, beam.a.x, beam.a.y), connectedIds: [], pour: 1,
-      dims: { length: dim(round(beam.length, 0), "mm", "measured"), width: dim(beam.width, "mm", "measured"), height: dim(depth, "mm", "assumed", "Ground beam depth is an example value"), volume: dim(round(net * 1e-9, 4), "m³", "calculated", "Net of the pedestals it frames into") },
+      dims: { length: dim(round(beam.length, 0), "mm", "measured"), width: dim(beam.width, "mm", "measured"), height: dim(depth, "mm", "assumed", "Ground beam depth is an example value"), volume: dim(round(net * 1e-9, 4), "m³", "calculated", "Net of the pedestals it frames into and of any footing it runs into") },
       explode: { layerIndex: 1, dir: UP },
     });
-    concreteQuantity(ctx, concrete, "concrete.ground-beam", "Ground beams", net * 1e-9, `gross ${f3(m3(beam.length, beam.width, depth))} m³ − part inside pedestals = ${f3(net * 1e-9)} m³`, { length: round(beam.length, 0), width: beam.width, depth }, "calculated", ["Centre-to-centre length less the volume already counted in the pedestals."]);
+    concreteQuantity(ctx, concrete, "concrete.ground-beam", "Ground beams", net * 1e-9, `gross ${f3(m3(beam.length, beam.width, depth))} m³ − part inside pedestals and footings = ${f3(net * 1e-9)} m³`, { length: round(beam.length, 0), width: beam.width, depth }, "calculated", ["Centre-to-centre length less the volume already counted in the pedestals and the footings."]);
     const bars: Shape[] = [];
     for (const sy of [-1, 1]) for (const z of [beam.z0 + 50 + 8, beam.z1 - 50 - 8]) {
       const nx = -(beam.b.y - beam.a.y) / beam.length;
@@ -162,10 +194,20 @@ export function generateFoundation(ctx: Ctx): void {
     });
     const clear = Math.max(0, beam.length - 300);
     formworkQuantity(ctx, form, "formwork.ground-beam", "Formwork to ground beam sides", 2 * clear * depth * 1e-6, `2 sides × ${f2(clear / 1000)} m × ${f3(depth / 1000)} m = ${f3(2 * clear * depth * 1e-6)} m²`, { length: clear, depth }, "calculated", ["Clear length taken as centre length less one column width."]);
-    ctx.add({
-      id: `found:${sid}:blinding`, name: "Blinding — ground beam", kind: "blinding", category: "substructure", subcategory: "Blinding", stage: 3, layer: "blinding", materialId: "blinding",
-      shapes: [alongLine(beam.a, beam.b, beam.width + 200, beam.z0 - ASSUME.blindingThickness, beam.z0)], source: "schematic", parentId: concrete.id, explode: { layerIndex: 0, dir: UP },
-    });
+    // The blinding under the beam lies only where the beam is clear of the footings: over a footing the beam rests on the footing, not on blinding.
+    const spans = outsideRects(beam.a, beam.b, groups.map((g) => g.rect)).filter(([s0, s1]) => s1 - s0 >= 1);
+    if (spans.length) {
+      const ux = (beam.b.x - beam.a.x) / beam.length;
+      const uy = (beam.b.y - beam.a.y) / beam.length;
+      const at = (s: number) => ({ x: beam.a.x + ux * s, y: beam.a.y + uy * s });
+      const strip = ctx.add({
+        id: `found:${sid}:blinding`, name: "Blinding — ground beam", kind: "blinding", category: "substructure", subcategory: "Blinding", stage: 3, layer: "blinding", materialId: "blinding",
+        shapes: spans.map(([s0, s1]) => alongLine(at(s0), at(s1), beam.width + 200, beam.z0 - ASSUME.blindingThickness, beam.z0)), source: "schematic", parentId: concrete.id, explode: { layerIndex: 0, dir: UP },
+      });
+      const stripLength = spans.reduce((sum, [s0, s1]) => sum + (s1 - s0), 0);
+      const stripVolume = m3(stripLength, beam.width + 200, ASSUME.blindingThickness);
+      concreteQuantity(ctx, strip, "concrete.blinding", "Blinding concrete (lean mix)", stripVolume, `${f2(stripLength / 1000)} m clear of the footings × ${f2((beam.width + 200) / 1000)} m × ${f3(ASSUME.blindingThickness / 1000)} m = ${f3(stripVolume)} m³`, { length: round(stripLength, 0), width: beam.width + 200, thickness: ASSUME.blindingThickness }, "assumed", ["Blinding projects 100 mm beyond each side of the beam; 75 mm thick (example). Under a footing the beam rests on the footing, so there is none there."]);
+    }
   });
 
   // --- Foundation walls, DPC, waterproofing, protection, drainage layer ------
@@ -213,15 +255,19 @@ export function generateFoundation(ctx: Ctx): void {
       const wa = (s1 - s0) * (top - bottom + 200);
       addQuantity(ctx, waterproof, { workItem: "waterproofing.foundation", description: "Waterproofing coat to buried wall faces", section: "G", unit: "m²", value: round(wa * 1e-6, 3), formula: `${f2((s1 - s0) / 1000)} m × ${f3((top - bottom + 200) / 1000)} m = ${f3(wa * 1e-6)} m²`, inputs: { length: round(s1 - s0, 0), height: top - bottom + 200 }, status: "calculated" }, { assumptions: ["Outer face only; carried 200 mm below the beam top."], allowance: { rule: "Laps and wastage (example)", percent: null } });
       const pr = outer(half + 3 + 3);
-      ctx.add({
+      const board = ctx.add({
         id: `found:protection:${wid}:${k}`, name: "Protection board over waterproofing", kind: "protection-board", category: "substructure", subcategory: "Protection", stage: 3, layer: "waterproofing", materialId: "protection-board",
         shapes: [alongLine(pr.a, pr.b, 6, bottom - 200, top - 100)], source: "schematic", parentId: waterproof.id, explode: { layerIndex: 3, dir: v3(nx, ny, 0) },
       });
+      const boardArea = (s1 - s0) * (top - 100 - (bottom - 200));
+      addQuantity(ctx, board, { workItem: "waterproofing.protection-board", description: "Protection board over the foundation waterproofing", section: "G", unit: "m²", value: round(boardArea * 1e-6, 3), formula: `${f2((s1 - s0) / 1000)} m × ${f3((top - 100 - (bottom - 200)) / 1000)} m = ${f3(boardArea * 1e-6)} m²`, inputs: { length: round(s1 - s0, 0), height: top - 100 - (bottom - 200) }, status: "assumed" }, { assumptions: ["Over the whole of the waterproofing, stopping 100 mm below floor level."], allowance: { rule: "Laps and cutting waste (example)", percent: 10 } });
       const dr = outer(half + 12 + 150);
-      ctx.add({
-        id: `found:drain-layer:${wid}:${k}`, name: "Drainage aggregate layer", kind: "protection-board", category: "substructure", subcategory: "Drainage layer", stage: 3, layer: "fill", materialId: "sand-layer",
+      const drain = ctx.add({
+        id: `found:drain-layer:${wid}:${k}`, name: "Drainage aggregate layer", kind: "drainage-layer", category: "substructure", subcategory: "Drainage layer", stage: 3, layer: "fill", materialId: "sand-layer",
         shapes: [alongLine(dr.a, dr.b, 300, bottom - 150, gz)], source: "schematic", parentId: waterproof.id, explode: { layerIndex: 4, dir: v3(nx, ny, 0) },
       });
+      const drainVolume = m3(s1 - s0, 300, gz - (bottom - 150));
+      addQuantity(ctx, drain, { workItem: "earth.drainage-layer", description: "Drainage aggregate against the foundation walls", section: "B", unit: "m³", value: round(drainVolume, 3), formula: `${f2((s1 - s0) / 1000)} m × 0.30 m × ${f3((gz - (bottom - 150)) / 1000)} m = ${f3(drainVolume)} m³`, inputs: { length: round(s1 - s0, 0), width: 300, height: gz - (bottom - 150) }, status: "assumed" }, { assumptions: ["300 mm wide, from 150 mm below the beam top up to the ground (examples)."], allowance: { rule: "Compaction (example)", percent: 10 } });
     }
   }
 

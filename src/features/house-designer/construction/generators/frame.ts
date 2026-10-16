@@ -68,11 +68,12 @@ export function generateFrame(ctx: Ctx): void {
       if (beamZone > 0) {
         const joint: Shape[] = [];
         for (const z of spaced(level.soffitZ - beamZone + 40, level.soffitZ - 40, 75)) joint.push(...hoopXY(col.x, col.y, z, col.width - 2 * cover, col.depth - 2 * cover, ASSUME.stirrupBar));
-        ctx.add({
+        const joints = ctx.add({
           id: `frame:${sid}:joint`, name: `Beam–column joint ${grid ?? ""} — ${level.name}`, kind: "beam-column-joint", category: "frame", subcategory: "Joints", stage: 5, level, layer: "reinforcement", materialId: "steel-bar",
           shapes: joint, repeated: { noun: "joint stirrup" }, source: "schematic", grid, parentId: concrete.id, connectedIds: [concrete.id], explode: { layerIndex: 1, dir: UP },
           note: "Closely spaced ties where beams frame into the column. The real detail is designed.",
         });
+        rebarQuantity(ctx, joints, "Beam–column joint ties", approved);
       }
       // Column formwork.
       const f = 18;

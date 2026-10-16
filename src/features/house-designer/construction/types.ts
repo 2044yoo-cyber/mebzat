@@ -243,6 +243,25 @@ export type ModelOptions = {
 
 export const DEFAULT_OPTIONS: ModelOptions = { roofType: "flat", floorFinish: "porcelain", blockType: "hollow", mepView: "finished" };
 
+/**
+ * How reinforcement is quantified. The bars drawn in 3D are an illustration, so their weight is never taken as the weight of steel to order.
+ * With a bar schedule the schedule decides; without one, "ratio" estimates the steel of each member from a typical weight for each cubic metre of its
+ * concrete, and says so on every line.
+ */
+export type ReinforcementRule = {
+  basis: "ratio" | "schedule";
+  /** kg of steel for each m³ of concrete, by the concrete work item of the member. Examples: the structural design replaces them. A member not listed has none counted. */
+  ratios: Record<string, number>;
+};
+
+export const DEFAULT_REINFORCEMENT: ReinforcementRule = {
+  basis: "ratio",
+  ratios: {
+    "concrete.footing": 80, "concrete.combined-footing": 80, "concrete.pedestal": 200, "concrete.ground-beam": 140, "concrete.column": 200, "concrete.beam": 150,
+    "concrete.slab": 100, "concrete.ground-slab": 25, "concrete.stair": 100, "concrete.balcony": 130, "concrete.lintel": 110,
+  },
+};
+
 /** The estimating rules: how a quantity is read off the geometry. Stated, editable, never hidden. */
 export type EstimatingRules = {
   /** Openings deducted from wall area: all, none, or only those larger than the threshold. */
@@ -252,8 +271,9 @@ export type EstimatingRules = {
   jointMm: number;
   /** Reinforcement is never taken from the schematic bars. */
   steelFromSchematic: false;
+  reinforcement: ReinforcementRule;
   /** Allowances, percent, kept apart from net quantities. */
-  allowances: { concrete: number; blocks: number; tiles: number; paint: number; plaster: number; pipes: number; conduit: number; boards: number };
+  allowances: { concrete: number; blocks: number; tiles: number; paint: number; plaster: number; pipes: number; conduit: number; boards: number; steel: number };
   /** Where the services run: the falls of the drains and the heights of the lanes and fittings. All are examples, set here. */
   services: ServiceSettings;
 };
@@ -277,7 +297,8 @@ export const DEFAULT_RULES: EstimatingRules = {
   openingThresholdM2: 0.5,
   jointMm: 10,
   steelFromSchematic: false,
-  allowances: { concrete: 5, blocks: 5, tiles: 10, paint: 5, plaster: 5, pipes: 10, conduit: 10, boards: 10 },
+  reinforcement: DEFAULT_REINFORCEMENT,
+  allowances: { concrete: 5, blocks: 5, tiles: 10, paint: 5, plaster: 5, pipes: 10, conduit: 10, boards: 10, steel: 5 },
   services: DEFAULT_SERVICES,
 };
 

@@ -69,6 +69,7 @@ export function constructionTakeoffPackage(model: ConstructionModel, options: Mo
     warnings: [
       "Illustrative learning model: dimensions and services are examples, not a design.",
       "Net quantities only. Waste allowances are in each line's working, and this package carries no prices.",
+      ...(lines.some((l) => l.section === "D" && l.unit === "kg" && l.status === "assumed") ? ["Reinforcement is an estimate from typical kg per m³ of concrete, not a bar schedule: replace it when the structural design gives one."] : []),
       ...missing.map((m) => `Missing: ${m}`),
     ],
   };

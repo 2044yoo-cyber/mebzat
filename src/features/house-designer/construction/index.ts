@@ -15,8 +15,13 @@ export type { BuildingAreas, BuildingConfig, BuildingTemplateId, BuiltBuilding, 
 export { indexModel, subtreeOf, visibilityOf, visibleComponents, shapeVisible, cutPlane, resetView, setStage, stepStage, toggleIn, isolateLayer, showAll, showStoreysUpTo, categoriesPresent } from "./view";
 export type { ModelIndex, Visibility, Visible, CutPlane } from "./view";
 export { explodeInfo, shapeOffset, isAssembled, FLOOR_STEP, CATEGORY_STEP, LAYER_STEP } from "./explode";
-export { aggregateQuantities, countedComponents, missingData, toBoqDraft, totalOf, worstStatus } from "./quantities";
-export type { QuantityLine, QuantityScope } from "./quantities";
+export { aggregateQuantities, countedComponents, floorOf, missingData, toBoqDraft, totalOf, worstStatus, ROOF_FLOOR, SITE_FLOOR } from "./quantities";
+export type { QuantityLine, QuantityPart, QuantityScope } from "./quantities";
+export { buildBill, floorsOf, groupBill } from "./boq";
+export type { Bill, BillFloor, BillGroup, BillGrouping, BillLine, BillRow } from "./boq";
+export { auditBill, CARRIED_BY_PARENT, EXEMPT_KINDS, shapeVolume } from "./boq-audit";
+export type { BillAudit } from "./boq-audit";
+export { applyReinforcementRule, barWeightKg } from "./reinforcement-rule";
 export { describeComponent } from "./inspect";
 export { constructionTakeoffPackage, elementKindOf } from "./takeoff-handoff";
 export type { ComponentInfo } from "./inspect";

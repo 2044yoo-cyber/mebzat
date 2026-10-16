@@ -18,6 +18,7 @@ import { generateFinishes } from "./generators/finishes";
 import { generateOpenings } from "./generators/openings";
 import { generateJoinery } from "./generators/joinery";
 import { generateExternal } from "./generators/external";
+import { applyReinforcementRule } from "./reinforcement-rule";
 import { generateFurniture } from "./generators/furniture";
 import { profileBox, type Shape, type V3 } from "./geometry";
 
@@ -40,12 +41,18 @@ export function buildConstructionModel(
   extras: BuildExtras = {},
 ): ConstructionModel {
   const resolvedOptions: ModelOptions = { ...DEFAULT_OPTIONS, ...options };
-  const resolvedRules: EstimatingRules = { ...DEFAULT_RULES, ...rules, allowances: { ...DEFAULT_RULES.allowances, ...(rules.allowances ?? {}) }, services: { ...DEFAULT_RULES.services, ...(rules.services ?? {}), fall: { ...DEFAULT_RULES.services.fall, ...(rules.services?.fall ?? {}) } } };
+  const resolvedRules: EstimatingRules = {
+    ...DEFAULT_RULES, ...rules,
+    allowances: { ...DEFAULT_RULES.allowances, ...(rules.allowances ?? {}) },
+    reinforcement: { ...DEFAULT_RULES.reinforcement, ...(rules.reinforcement ?? {}), ratios: { ...DEFAULT_RULES.reinforcement.ratios, ...(rules.reinforcement?.ratios ?? {}) } },
+    services: { ...DEFAULT_RULES.services, ...(rules.services ?? {}), fall: { ...DEFAULT_RULES.services.fall, ...(rules.services?.fall ?? {}) } },
+  };
   const ctx = new Ctx(project, resolvedOptions, resolvedRules, extras.approvedBars ?? []);
   if (project.levels.length === 0 || ctx.outline.length < 3) {
     ctx.warnings.push("This project has no closed floor plan yet, so there is nothing to build. Draw the plan first.");
   } else {
     for (const generate of GENERATORS) generate(ctx);
+    applyReinforcementRule(ctx);
   }
   return {
     projectId: project.id,

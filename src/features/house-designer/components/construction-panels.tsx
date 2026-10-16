@@ -6,9 +6,11 @@ import { ChevronDown, ChevronRight, Eye, EyeOff, Focus, Search, Target } from "l
 import { sectionTitle } from "@/lib/takeoff/boq";
 import { cn } from "@/lib/utils";
 
+import { buildBill, groupBill, type BillGrouping } from "../construction/boq";
+import { auditBill } from "../construction/boq-audit";
 import { CATEGORY_COLORS, SERVICE_LEGEND, materialOf } from "../construction/catalogue";
 import { describeComponent } from "../construction/inspect";
-import { aggregateQuantities, missingData, toBoqDraft, type QuantityLine } from "../construction/quantities";
+import { aggregateQuantities, missingData, toBoqDraft } from "../construction/quantities";
 import { constructionTakeoffPackage } from "../construction/takeoff-handoff";
 import { HOUSE_TAKEOFF_SESSION_KEY } from "../services/takeoff-adapter";
 import { STAGE_BY_ID } from "../construction/stages";
@@ -398,68 +400,125 @@ export function SendToTakeoff({ model, view }: { model: ConstructionModel; view:
 
 /** Quantities ------------------------------------------------------------------ */
 
+const GROUPINGS: { id: BillGrouping; label: string }[] = [
+  { id: "section", label: "By section" },
+  { id: "floor", label: "By floor" },
+  { id: "stage", label: "By stage" },
+  { id: "category", label: "By category" },
+];
+
+const BASIS_LABELS: Record<EstimatingRules["reinforcement"]["basis"], string> = {
+  ratio: "Estimate from kg of steel per m³ of concrete",
+  schedule: "Only an approved bar schedule (no estimate)",
+};
+
+const kgOrTonnes = (kg: number) => (kg >= 10000 ? `${f(kg / 1000, 2)} t` : `${f(kg, 0)} kg`);
+
 export function QuantitiesPanel({ model, view, rules, onRules, onHighlight, onPick }: { model: ConstructionModel; view: ViewState; rules: EstimatingRules; onRules: (rules: EstimatingRules) => void; onHighlight: (ids: string[]) => void; onPick: (id: string) => void }) {
   const [scope, setScope] = useState<"stage" | "all" | "loose">("stage");
+  const [by, setBy] = useState<BillGrouping>("section");
   const [q, setQ] = useState("");
   const [missingOnly, setMissingOnly] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
-  const lines = useMemo(() => aggregateQuantities(model, view.options, scope === "loose" ? "loose" : "building", scope === "stage" ? (c: ComponentRecord) => c.stage <= view.stage : undefined), [model, view.options, scope, view.stage]);
-  const shown = lines.filter((l) => (!missingOnly || l.net === null || l.missingItems > 0) && (!q.trim() || `${l.description} ${l.workItem}`.toLowerCase().includes(q.trim().toLowerCase())));
+  const billScope = scope === "loose" ? "loose" : "building";
+  const bill = useMemo(() => buildBill(model, view.options, billScope, scope === "stage" ? (c: ComponentRecord) => c.stage <= view.stage : undefined), [model, view.options, billScope, scope, view.stage]);
+  const audit = useMemo(() => auditBill(model, view.options, billScope), [model, view.options, billScope]);
+  const lines = bill.lines;
+  const groups = useMemo(() => groupBill(bill, by), [bill, by]);
+  const needle = q.trim().toLowerCase();
+  const shownGroups = useMemo(
+    () => groups.map((g) => ({ ...g, rows: g.rows.filter((r) => (!missingOnly || r.net === null || r.line.missingItems > 0) && (!needle || `${r.line.ref} ${r.line.description} ${r.line.workItem}`.toLowerCase().includes(needle))) })).filter((g) => g.rows.length > 0),
+    [groups, missingOnly, needle],
+  );
+  const shownLines = useMemo(() => [...new Map(shownGroups.flatMap((g) => g.rows.map((r) => [r.line.ref, r.line] as const))).values()], [shownGroups]);
   const missing = missingData(lines);
-  const bySection = useMemo(() => { const m = new Map<string, QuantityLine[]>(); shown.forEach((l) => m.set(l.section, [...(m.get(l.section) ?? []), l])); return [...m.entries()]; }, [shown]);
   const copyCsv = () => {
-    const rows = [["Section", "Work item", "Description", "Net quantity", "Unit", "Status", "Allowance %", "Allowance quantity", "Components", "Formula"], ...shown.map((l) => [l.section, l.workItem, l.description, l.net ?? "", l.unit, l.status, l.allowancePercent ?? "", l.allowanceQuantity ?? "", l.componentIds.length, l.formulas[0] ?? ""])];
+    const rows = [["Ref", "Section", "Work item", "Description", "Net quantity", "Unit", "Status", "Allowance %", "Allowance quantity", "Components", "Formula"], ...shownLines.map((l) => [l.ref, l.section, l.workItem, l.description, l.net ?? "", l.unit, l.status, l.allowancePercent ?? "", l.allowanceQuantity ?? "", l.componentIds.length, l.formulas[0] ?? ""])];
     const csv = rows.map((r) => r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\n");
     void navigator.clipboard?.writeText(csv);
   };
+  const setRatio = (workItem: string, value: number) => onRules({ ...rules, reinforcement: { ...rules.reinforcement, ratios: { ...rules.reinforcement.ratios, [workItem]: value } } });
   return (
     <div className="space-y-2" data-testid="quantities-panel">
       <div className="rounded-xl border bg-card p-3 text-xs text-muted-foreground">
-        Net quantities only. Allowances for waste are kept in their own column, and no price appears anywhere: prices are never invented. A line with no figure says what is missing.
+        Read off the model: change the building and every line follows. Net quantities only; allowances for waste are kept in their own column, and no price appears here. Each line says where it comes from, and a line with no figure says what is missing.
       </div>
       <Segmented label="Quantity scope" value={scope} onChange={setScope} options={[{ id: "stage", label: "Up to this stage" }, { id: "all", label: "Whole building" }, { id: "loose", label: "Loose furniture" }]} />
+      <Segmented label="Group the bill" value={by} onChange={setBy} options={GROUPINGS} />
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter quantities" placeholder="Filter lines" className="min-h-10 w-full rounded-xl border bg-background pl-9 pr-3 text-sm" /></label>
         <label className="flex min-h-10 items-center gap-1.5 text-xs"><input type="checkbox" checked={missingOnly} onChange={(e) => setMissingOnly(e.target.checked)} />Missing data only</label>
       </div>
-      <label className="flex flex-wrap items-center gap-2 text-xs">Openings in wall areas:
-        <select aria-label="Opening deduction rule" value={rules.openingDeduction} onChange={(e) => onRules({ ...rules, openingDeduction: e.target.value as EstimatingRules["openingDeduction"] })} className="min-h-9 rounded-lg border bg-background px-2 text-xs">
-          <option value="over-threshold">deduct those over {rules.openingThresholdM2} m²</option>
-          <option value="all">deduct all</option>
-          <option value="none">deduct none</option>
-        </select>
-      </label>
+      <details className="rounded-xl border bg-card p-3 text-xs" data-testid="quantity-rules">
+        <summary className="cursor-pointer font-semibold">Rules the quantities follow</summary>
+        <div className="mt-2 space-y-2">
+          <label className="flex flex-wrap items-center gap-2">Openings in wall areas:
+            <select aria-label="Opening deduction rule" value={rules.openingDeduction} onChange={(e) => onRules({ ...rules, openingDeduction: e.target.value as EstimatingRules["openingDeduction"] })} className="min-h-9 rounded-lg border bg-background px-2 text-xs">
+              <option value="over-threshold">deduct those over {rules.openingThresholdM2} m²</option>
+              <option value="all">deduct all</option>
+              <option value="none">deduct none</option>
+            </select>
+          </label>
+          <label className="flex flex-wrap items-center gap-2">Reinforcement:
+            <select aria-label="Reinforcement rule" value={rules.reinforcement.basis} onChange={(e) => onRules({ ...rules, reinforcement: { ...rules.reinforcement, basis: e.target.value as EstimatingRules["reinforcement"]["basis"] } })} className="min-h-9 min-w-0 max-w-full rounded-lg border bg-background px-2 text-xs">
+              {(Object.keys(BASIS_LABELS) as (keyof typeof BASIS_LABELS)[]).map((b) => <option key={b} value={b}>{BASIS_LABELS[b]}</option>)}
+            </select>
+          </label>
+          {rules.reinforcement.basis === "ratio" ? (
+            <div data-testid="steel-ratios">
+              <p className="mb-1 text-muted-foreground">kg of steel for each m³ of concrete (examples: the structural design replaces them)</p>
+              <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
+                {Object.entries(rules.reinforcement.ratios).map(([workItem, ratio]) => (
+                  <li key={workItem}><label className="flex items-center justify-between gap-2">{workItem.replace("concrete.", "")}<input type="number" min={0} max={400} step={5} value={ratio} data-testid={`ratio-${workItem.replace("concrete.", "")}`} onChange={(e) => setRatio(workItem, Math.max(0, Number(e.target.value) || 0))} className="h-8 w-16 rounded border px-1.5 text-right" /></label></li>
+                ))}
+              </ul>
+            </div>
+          ) : <p className="text-muted-foreground">Steel stays without a figure until a bar schedule is approved.</p>}
+        </div>
+      </details>
+      <div className={cn("rounded-xl border p-3 text-xs", audit.ok ? "border-emerald-300 bg-emerald-50 text-emerald-950" : "border-red-300 bg-red-50 text-red-950")} data-testid="bill-audit" data-ok={audit.ok ? "true" : "false"} data-omissions={audit.omissions.length} data-duplicates={audit.duplicates.length}>
+        <p className="font-semibold">{audit.ok ? "Checked against the model: nothing left out, nothing counted twice" : "The bill does not agree with the model"}</p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-4">
+          <li>{audit.counted} components checked: {audit.omissions.length} left out of the bill, {audit.duplicates.length} counted twice, {audit.exempt.length} not bought (props, setting-out marks, temporary works).</li>
+          <li>Concrete: {f(audit.concrete.counted, 2)} m³ billed of {f(audit.concrete.drawn, 2)} m³ drawn{audit.concrete.overlap > 0.005 ? `; ${f(audit.concrete.overlap, 2)} m³ is where members overlap, billed once` : ""}.</li>
+          <li>{audit.reinforcement.basis === "ratio" ? `Steel: ${kgOrTonnes(audit.reinforcement.counted)} billed${audit.reinforcement.expected !== null ? ` against ${kgOrTonnes(audit.reinforcement.expected)} from the rule` : ""}; ${audit.reinforcement.unreinforced.length} members without steel.` : `Steel: ${audit.reinforcement.withoutFigure} line items wait for an approved bar schedule.`}</li>
+        </ul>
+        {!audit.ok ? <ul className="mt-1 list-disc space-y-0.5 pl-4">{[...audit.omissions.slice(0, 4).map((o) => `Left out: ${o.name} (${o.kind})`), ...audit.duplicates.slice(0, 4).map((d) => `Twice: ${d.description}`), ...audit.concrete.over.slice(0, 3).map((o) => `More concrete than drawn: ${o.componentId}`)].map((t) => <li key={t}>{t}</li>)}</ul> : null}
+      </div>
       {missing.length ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900" data-testid="missing-data">
           <p className="font-semibold">{missing.length} line{missing.length === 1 ? "" : "s"} cannot be quantified yet</p>
           <ul className="mt-1 list-disc pl-4">{missing.slice(0, 6).map((l) => <li key={l.workItem}>{l.description}: {l.formulas[0]}</li>)}</ul>
         </div>
       ) : null}
-      <p className="text-xs text-muted-foreground" data-testid="quantity-count">{shown.length} line{shown.length === 1 ? "" : "s"} from {new Set(shown.flatMap((l) => l.componentIds)).size} components</p>
-      {bySection.map(([section, rows]) => (
-        <section key={section} className="rounded-xl border bg-card" data-section={section}>
-          <h3 className="border-b px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{section}. {sectionTitle(rows[0]!.section)}</h3>
+      <p className="text-xs text-muted-foreground" data-testid="quantity-count">{shownLines.length} line{shownLines.length === 1 ? "" : "s"} from {new Set(shownLines.flatMap((l) => l.componentIds)).size} components</p>
+      {shownGroups.map((group) => (
+        <section key={group.key} className="rounded-xl border bg-card" data-section={by === "section" ? group.key : undefined} data-group={group.key} data-grouping={by}>
+          <h3 className="border-b px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</h3>
           <ul>
-            {rows.map((l) => {
-              const key = `${l.workItem}|${l.unit}`;
+            {group.rows.map((row) => {
+              const l = row.line;
+              const key = `${group.key}|${l.ref}`;
               const isOpen = open === key;
+              const partOnly = by !== "section";
               return (
-                <li key={key} className="border-b last:border-b-0" data-work-item={l.workItem} data-status={l.status}>
-                  <button type="button" onClick={() => { setOpen(isOpen ? null : key); onHighlight(isOpen ? [] : l.componentIds); }} aria-expanded={isOpen} className="flex min-h-12 w-full items-start gap-2 px-3 py-2 text-left">
-                    <span className="min-w-0 flex-1"><span className="block text-sm leading-tight">{l.description}</span><span className="block text-[11px] text-muted-foreground">{l.itemCount} item{l.itemCount === 1 ? "" : "s"} · {l.componentIds.length} component{l.componentIds.length === 1 ? "" : "s"}</span></span>
-                    <span className="shrink-0 text-right"><span className="block text-sm font-semibold tabular-nums">{l.net === null ? "no figure" : `${f(l.net, 3)} ${l.unit}`}</span>{l.allowanceQuantity !== null ? <span className="block text-[10px] text-muted-foreground">+ allowance {l.allowancePercent !== null ? `${l.allowancePercent}% ` : ""}{f(l.allowanceQuantity, 3)}</span> : null}<StatusBadge status={l.status} /></span>
+                <li key={key} className="border-b last:border-b-0" data-work-item={l.workItem} data-status={row.status} data-ref={l.ref}>
+                  <button type="button" onClick={() => { setOpen(isOpen ? null : key); onHighlight(isOpen ? [] : row.componentIds); }} aria-expanded={isOpen} className="flex min-h-12 w-full items-start gap-2 px-3 py-2 text-left">
+                    <span className="min-w-0 flex-1"><span className="block text-sm leading-tight"><span className="mr-1.5 font-mono text-[11px] text-muted-foreground">{l.ref}</span>{l.description}</span><span className="block text-[11px] text-muted-foreground">{row.parts.length} item{row.parts.length === 1 ? "" : "s"} · {row.componentIds.length} component{row.componentIds.length === 1 ? "" : "s"}{partOnly && row.net !== l.net ? ` · ${f(l.net, 3)} ${l.unit} in all` : ""}</span></span>
+                    <span className="shrink-0 text-right"><span className="block text-sm font-semibold tabular-nums">{row.net === null ? "no figure" : `${f(row.net, 3)} ${l.unit}`}</span>{row.allowance !== null ? <span className="block text-[10px] text-muted-foreground">+ allowance {l.allowancePercent !== null ? `${l.allowancePercent}% ` : ""}{f(row.allowance, 3)}</span> : null}<StatusBadge status={row.status} /></span>
                   </button>
                   {isOpen ? (
                     <div className="space-y-1.5 px-3 pb-3 text-xs">
                       {l.formulas.map((fm) => <p key={fm} className="break-words rounded bg-muted p-1.5">{fm}</p>)}
                       {l.rooms.length ? <p><span className="font-semibold">Rooms: </span>{l.rooms.slice(0, 12).join(", ")}{l.rooms.length > 12 ? "…" : ""}</p> : null}
-                      <p><span className="font-semibold">Storeys: </span>{l.storeys.join(", ")}</p>
+                      <p><span className="font-semibold">Floors: </span>{[...new Set(row.parts.map((p) => bill.floors.find((fl) => fl.key === p.floor)?.name ?? p.floor))].join(", ")}</p>
+                      <p><span className="font-semibold">Stages: </span>{[...new Set(row.parts.map((p) => p.stage))].sort((a, b) => a - b).map((s) => `${s}. ${STAGE_BY_ID[s].short}`).join(", ")}</p>
                       <p><span className="font-semibold">Material: </span>{l.materialSpecs.slice(0, 4).join(", ")}</p>
                       {l.allowanceRules.length ? <p><span className="font-semibold">Allowance: </span>{l.allowanceRules.join("; ")}</p> : null}
                       {l.assumptions.length ? <p><span className="font-semibold">Assumes: </span>{l.assumptions.join(" ")}</p> : null}
                       {l.exclusions.length ? <p><span className="font-semibold">Excludes: </span>{l.exclusions.join(", ")}</p> : null}
-                      <p className="text-muted-foreground">Price fields: empty (no rate, source or date has been entered).</p>
-                      <div className="flex flex-wrap gap-1">{l.componentIds.slice(0, 6).map((id) => <button key={id} type="button" onClick={() => onPick(id)} className="max-w-48 truncate rounded-full border px-2 py-1 text-[11px]">{model.components.find((c) => c.id === id)?.name ?? id}</button>)}{l.componentIds.length > 6 ? <span className="px-1 py-1 text-[11px] text-muted-foreground">+{l.componentIds.length - 6} more lit up in 3D</span> : null}</div>
+                      <p className="text-muted-foreground">Prices are on the Estimate tab.</p>
+                      <div className="flex flex-wrap gap-1">{row.componentIds.slice(0, 6).map((id) => <button key={id} type="button" onClick={() => onPick(id)} className="max-w-48 truncate rounded-full border px-2 py-1 text-[11px]">{model.components.find((c) => c.id === id)?.name ?? id}</button>)}{row.componentIds.length > 6 ? <span className="px-1 py-1 text-[11px] text-muted-foreground">+{row.componentIds.length - 6} more lit up in 3D</span> : null}</div>
                     </div>
                   ) : null}
                 </li>

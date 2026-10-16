@@ -2,6 +2,7 @@ import { rectangularRoom, type Room } from "@/features/berchuma-studio/types/roo
 
 import { rebuildLevel } from "../services/project-edit";
 import { ensureHouseBimState } from "../services/model-state";
+import { ASSUME } from "./context";
 import { stairFields, stairGeometry, stairParams, stairPreset } from "../services/stair-geometry";
 import {
   buildStructuralGrid,
@@ -134,6 +135,13 @@ export function normalizeParams(input: Partial<LearningHouseParams>, gridCounts:
     const fixed = Math.max(250, clear - params.doorHeight - 100);
     issues.push({ field: "beamDepth", message: `beamDepth ${params.beamDepth} would hang below the doors; using ${fixed}.` });
     params.beamDepth = fixed;
+  }
+  // The ground beams run from 1050 to 600 mm below the floor: a footing lies under them, so its top cannot be higher than the underside of the beams.
+  const beamUnderside = -(ASSUME.groundBeamTop - ASSUME.groundBeamDepth);
+  if (params.footingDepth < beamUnderside + params.footingThickness) {
+    const fixed = beamUnderside + params.footingThickness;
+    issues.push({ field: "footingDepth", message: `footingDepth ${params.footingDepth} would put the top of the footing into the ground beams; using ${fixed}.` });
+    params.footingDepth = fixed;
   }
   const lowSill = params.windowSill + params.windowHeight;
   if (lowSill > clear - 150) {

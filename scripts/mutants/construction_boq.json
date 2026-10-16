@@ -1,0 +1,476 @@
+[
+  {
+    "name": "parts lose their net",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "net: item.value, allowance: item.value !== null",
+    "to": "net: null, allowance: item.value !== null"
+  },
+  {
+    "name": "a part's allowance forgets the percent",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "(item.value * item.allowance.percent) / 100 : null, status: item.status",
+    "to": "item.value * item.allowance.percent : null, status: item.status"
+  },
+  {
+    "name": "every part is from stage 1",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "floor: floorOf(c, model), stage: c.stage,",
+    "to": "floor: floorOf(c, model), stage: 1,"
+  },
+  {
+    "name": "every part is in the frame",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "stage: c.stage, category: c.category, net:",
+    "to": "stage: c.stage, category: \"frame\", net:"
+  },
+  {
+    "name": "parts take the status of the worst item",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "net: item.value, allowance: item.value !== null && item.allowance && item.allowance.percent !== null ? (item.value * item.allowance.percent) / 100 : null, status: item.status",
+    "to": "net: item.value, allowance: item.value !== null && item.allowance && item.allowance.percent !== null ? (item.value * item.allowance.percent) / 100 : null, status: \"measured\""
+  },
+  {
+    "name": "a slab is billed with the storey under it",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "if (FLOOR_STRUCTURE.has(at.kind)) return storeys[at.storeyIndex + 1]?.id ?? ROOF_FLOOR;",
+    "to": "if (FLOOR_STRUCTURE.has(at.kind)) return storeys[at.storeyIndex]?.id ?? ROOF_FLOOR;"
+  },
+  {
+    "name": "the roof slab is billed with the foundations",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "return storeys[at.storeyIndex + 1]?.id ?? ROOF_FLOOR;",
+    "to": "return storeys[at.storeyIndex + 1]?.id ?? SITE_FLOOR;"
+  },
+  {
+    "name": "beams are billed with the storey they stand in",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "new Set([\"slab\", \"beam\", \"balcony\"])",
+    "to": "new Set([\"slab\", \"balcony\"])"
+  },
+  {
+    "name": "balconies are billed with the storey under",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "new Set([\"slab\", \"beam\", \"balcony\"])",
+    "to": "new Set([\"slab\", \"beam\"])"
+  },
+  {
+    "name": "slabs are billed with the storey they stand in",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "new Set([\"slab\", \"beam\", \"balcony\"])",
+    "to": "new Set([\"beam\", \"balcony\"])"
+  },
+  {
+    "name": "bars are billed with the storey they are drawn in",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "new Set([\"reinforcement\", \"formwork\", \"props\", \"temporary\"])",
+    "to": "new Set([\"formwork\", \"props\", \"temporary\"])"
+  },
+  {
+    "name": "formwork is billed with the storey it is drawn in",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "new Set([\"reinforcement\", \"formwork\", \"props\", \"temporary\"])",
+    "to": "new Set([\"reinforcement\", \"props\", \"temporary\"])"
+  },
+  {
+    "name": "props are billed with the storey they stand in",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "new Set([\"reinforcement\", \"formwork\", \"props\", \"temporary\"])",
+    "to": "new Set([\"reinforcement\", \"formwork\", \"temporary\"])"
+  },
+  {
+    "name": "parts never follow their member",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "guard < 6 && MADE_FOR_MEMBER",
+    "to": "guard < 0 && MADE_FOR_MEMBER"
+  },
+  {
+    "name": "foundations are billed with the ground storey",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "if (at.category === \"site\" || at.category === \"earthworks\" || at.category === \"substructure\") return SITE_FLOOR;",
+    "to": "if (at.category === \"site\" || at.category === \"earthworks\") return SITE_FLOOR;"
+  },
+  {
+    "name": "earthworks are billed with the ground storey",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "if (at.category === \"site\" || at.category === \"earthworks\" || at.category === \"substructure\") return SITE_FLOOR;",
+    "to": "if (at.category === \"site\" || at.category === \"substructure\") return SITE_FLOOR;"
+  },
+  {
+    "name": "the parapet is billed with its storey",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "at.id.startsWith(\"ext:parapet:\") || ",
+    "to": ""
+  },
+  {
+    "name": "the gables are billed with their storey",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": " || at.id.startsWith(\"ext:gable:\")",
+    "to": ""
+  },
+  {
+    "name": "the roof is billed with its storey",
+    "file": "src/features/house-designer/construction/quantities.ts",
+    "from": "if (at.category === \"roof\" || at.id.startsWith(\"roof:\")",
+    "to": "if (at.id.startsWith(\"roof:\")"
+  },
+  {
+    "name": "references start at 02",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "const n = (counts.get(line.section) ?? 0) + 1;",
+    "to": "const n = (counts.get(line.section) ?? 0) + 2;"
+  },
+  {
+    "name": "a line takes its reference from the lines on show",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "const refs = referencesOf(model, options, scope, filter ? undefined : found);",
+    "to": "const refs = numbered(found);"
+  },
+  {
+    "name": "the furniture's references are kept with the building's",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "const key = `${scope}|${JSON.stringify(options)}`;",
+    "to": "const key = `${JSON.stringify(options)}`;"
+  },
+  {
+    "name": "the floors come top down",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "...model.storeys.map((s) => ({ key: s.id",
+    "to": "...[...model.storeys].reverse().map((s) => ({ key: s.id"
+  },
+  {
+    "name": "the roof is not a floor",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "    { key: ROOF_FLOOR, name: \"Roof\", order: model.storeys.length },\n",
+    "to": ""
+  },
+  {
+    "name": "grouping by floor groups by stage",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "if (by === \"floor\") return part.floor;",
+    "to": "if (by === \"floor\") return String(part.stage);"
+  },
+  {
+    "name": "grouping by stage groups by category",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "if (by === \"stage\") return String(part.stage);",
+    "to": "if (by === \"stage\") return part.category;"
+  },
+  {
+    "name": "a row adds up only its first part",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "net: nets.length ? Math.round(nets.reduce((s, p) => s + p.net!, 0) * 1e6) / 1e6 : null,",
+    "to": "net: nets.length ? Math.round(nets[0]!.net! * 1e6) / 1e6 : null,"
+  },
+  {
+    "name": "a row's allowance is the line's",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "allowance: allowances.length ? Math.round(allowances.reduce((s, p) => s + p.allowance!, 0) * 1e6) / 1e6 : null,",
+    "to": "allowance: line.allowanceQuantity,"
+  },
+  {
+    "name": "a row shows the status of the line",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "status: parts.reduce<Provenance>((w, p) => worstStatus(w, p.status), \"measured\"),",
+    "to": "status: line.status,"
+  },
+  {
+    "name": "a section shows only the first part of each line",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "rows: s.lines.map((line) => rowOf(line, line.parts)) }",
+    "to": "rows: s.lines.map((line) => rowOf(line, line.parts.slice(0, 1))) }"
+  },
+  {
+    "name": "a group lists components of all the line",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "componentIds: [...new Set(parts.map((p) => p.componentId))],",
+    "to": "componentIds: line.componentIds,"
+  },
+  {
+    "name": "a group other than a section has only the first part of each line",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "for (const part of line.parts) {\n      const k = groupKeyOf(part, by);",
+    "to": "for (const part of line.parts.slice(0, 1)) {\n      const k = groupKeyOf(part, by);"
+  },
+  {
+    "name": "the stages are listed last first",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "STAGE_IDS.map(String)",
+    "to": "[...STAGE_IDS].reverse().map(String)"
+  },
+  {
+    "name": "a floor is called by its key",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "return bill.floors.find((f) => f.key === key)?.name ?? key;",
+    "to": "return key;"
+  },
+  {
+    "name": "a stage is called by its number",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "return `${key}. ${STAGE_BY_ID[Number(key) as StageId]?.title ?? key}`;",
+    "to": "return key;"
+  },
+  {
+    "name": "a category is called by its id",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "return CATEGORY_LABELS[key as CategoryId] ?? key;",
+    "to": "return key;"
+  },
+  {
+    "name": "a section is called by its letter",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "label: `${s.code}. ${s.title}`",
+    "to": "label: s.code"
+  },
+  {
+    "name": "props are left out of the bill",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "const reason = EXEMPT_KINDS[c.kind];",
+    "to": "const reason = undefined as string | undefined;"
+  },
+  {
+    "name": "temporary works are left out of the bill",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "if (c.layer === \"temporary\") {",
+    "to": "if (false as boolean) {"
+  },
+  {
+    "name": "the panels of a cabinet are left out of the bill",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "if (CARRIED_BY_PARENT.has(c.kind)) {",
+    "to": "if (false as boolean) {"
+  },
+  {
+    "name": "a wall counted twice is not noticed (the place is ignored)",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": ", c.storeyId ?? \"\", signatureOf(c)].join(\"|\");",
+    "to": ", c.storeyId ?? \"\"].join(\"|\");"
+  },
+  {
+    "name": "walls on two storeys are one wall",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": ", item.formula, c.storeyId ?? \"\", signatureOf(c)].join(\"|\");",
+    "to": ", item.formula, signatureOf(c)].join(\"|\");"
+  },
+  {
+    "name": "two sums for one place are one",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "item.room ?? \"\", item.formula, c.storeyId",
+    "to": "item.room ?? \"\", c.storeyId"
+  },
+  {
+    "name": "two rooms are one",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "item.sourceGeometry, item.room ?? \"\", item.formula",
+    "to": "item.sourceGeometry, item.formula"
+  },
+  {
+    "name": "a duplicate is not a fault",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "ok: omissions.length === 0 && duplicates.length === 0 && over.length === 0 && unreinforced.length === 0",
+    "to": "ok: omissions.length === 0 && over.length === 0 && unreinforced.length === 0"
+  },
+  {
+    "name": "an omission is not a fault",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "ok: omissions.length === 0 && duplicates.length === 0",
+    "to": "ok: duplicates.length === 0"
+  },
+  {
+    "name": "a member with steel missing is not a fault",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "over.length === 0 && unreinforced.length === 0 }",
+    "to": "over.length === 0 }"
+  },
+  {
+    "name": "too much concrete is not noticed",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "if (mine > own + 0.0005)",
+    "to": "if (mine > own + 5)"
+  },
+  {
+    "name": "a member without steel is not noticed",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "if (m.volume > 0.001 && !steelOfMember.get(key))",
+    "to": "if (false as boolean)"
+  },
+  {
+    "name": "a sliver of concrete is expected to have steel",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "if (m.volume > 0.001 && !steelOfMember.get(key))",
+    "to": "if (!steelOfMember.get(key))"
+  },
+  {
+    "name": "the steel expected is the concrete, not the concrete times the ratio",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "expected += m.volume * ratio;",
+    "to": "expected += m.volume;"
+  },
+  {
+    "name": "a balcony in two parts is two members",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "const keyOfMember = (c: ComponentRecord): string => (c.kind === \"balcony\" && c.sourceRef ? `balcony:${c.sourceRef}` : c.id);",
+    "to": "const keyOfMember = (c: ComponentRecord): string => c.id;"
+  },
+  {
+    "name": "the steel is not followed up to its concrete",
+    "file": "src/features/house-designer/construction/boq-audit.ts",
+    "from": "for (let guard = 0; owner && owner.layer !== \"concrete\" && guard < 5; guard += 1)",
+    "to": "for (let guard = 0; owner && owner.layer !== \"concrete\" && guard < 0; guard += 1)"
+  },
+  {
+    "name": "the bar weight of a round bar is out by a thousand",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "Math.PI * shape.r * shape.r * 1e-6 * (shape.len / 1000)",
+    "to": "Math.PI * shape.r * shape.r * 1e-3 * (shape.len / 1000)"
+  },
+  {
+    "name": "a box bar is weighed by its length alone",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "const d = (sides[1]! + sides[2]!) / 2;",
+    "to": "const d = 1;"
+  },
+  {
+    "name": "the rule runs when only a schedule may give steel",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "if (rule.basis !== \"ratio\") return;",
+    "to": ""
+  },
+  {
+    "name": "the rule overwrites a scheduled weight",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "if (!item || item.value !== null) return;",
+    "to": "if (!item) return;"
+  },
+  {
+    "name": "a missing ratio gives steel anyway",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "if (ratio === undefined) {",
+    "to": "if (false as boolean) {"
+  },
+  {
+    "name": "a balcony in two parts has two lots of steel",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "return c.kind === \"balcony\" && c.sourceRef ? `balcony:${c.sourceRef}` : c.id;",
+    "to": "return c.id;"
+  },
+  {
+    "name": "the concrete of the second part is not added",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "m.volume += items.reduce((sum, q) => sum + q.value!, 0);",
+    "to": "m.volume = items.reduce((sum, q) => sum + q.value!, 0);"
+  },
+  {
+    "name": "the groups share the steel equally",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "const share = drawn > 0 ? weights[i]! / drawn : 1 / groups.length;",
+    "to": "const share = 1 / groups.length;"
+  },
+  {
+    "name": "bars with nothing drawn take it all",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "const share = drawn > 0 ? weights[i]! / drawn : 1 / groups.length;",
+    "to": "const share = drawn > 0 ? weights[i]! / drawn : 1;"
+  },
+  {
+    "name": "the steel has no allowance",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "ctx.rules.allowances.steel, ratio, member.workItem);",
+    "to": "0, ratio, member.workItem);"
+  },
+  {
+    "name": "steel from the rule is called calculated",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "item.status = \"assumed\";",
+    "to": "item.status = \"calculated\";"
+  },
+  {
+    "name": "a lintel's own steel is not shared out",
+    "file": "src/features/house-designer/construction/reinforcement-rule.ts",
+    "from": "for (const part of member.parts) if (part.quantities.some((q) => q.workItem.startsWith(\"steel.\") && q.unit === \"kg\")) bars.set",
+    "to": "for (const part of []) if (part.quantities.some((q) => q.workItem.startsWith(\"steel.\") && q.unit === \"kg\")) bars.set"
+  },
+  {
+    "name": "the blinding under a ground beam runs under the footings",
+    "file": "src/features/house-designer/construction/generators/foundation.ts",
+    "from": "const spans = outsideRects(beam.a, beam.b, groups.map((g) => g.rect)).filter(([s0, s1]) => s1 - s0 >= 1);",
+    "to": "const spans: [number, number][] = [[0, beam.length]];"
+  },
+  {
+    "name": "the blinding stops short of the footing",
+    "file": "src/features/house-designer/construction/generators/foundation.ts",
+    "from": "if (c0 > at + 1e-6) out.push([at, c0]);",
+    "to": "if (c0 > at + 1e-6) out.push([at, c0 - 100]);"
+  },
+  {
+    "name": "the blinding forgets the last stretch",
+    "file": "src/features/house-designer/construction/generators/foundation.ts",
+    "from": "if (at < len - 1e-6) out.push([at, len]);",
+    "to": ""
+  },
+  {
+    "name": "a ground beam is not netted against the footings",
+    "file": "src/features/house-designer/construction/generators/foundation.ts",
+    "from": "const nets = netVolumes([...footPrisms, ...pedPrisms, ...beamPrisms]).slice(footPrisms.length);",
+    "to": "const nets = netVolumes([...pedPrisms, ...beamPrisms]);"
+  },
+  {
+    "name": "the steps are counted gross of the columns and pedestals",
+    "file": "src/features/house-designer/construction/generators/external.ts",
+    "from": ".filter((c) => (c.kind === \"column\" && c.storeyIndex === 0) || c.kind === \"pedestal\")",
+    "to": ".filter(() => false)"
+  },
+  {
+    "name": "the steps are counted gross of the columns",
+    "file": "src/features/house-designer/construction/generators/external.ts",
+    "from": "(c.kind === \"column\" && c.storeyIndex === 0) || c.kind === \"pedestal\"",
+    "to": "c.kind === \"pedestal\""
+  },
+  {
+    "name": "the steps are counted gross of the pedestals",
+    "file": "src/features/house-designer/construction/generators/external.ts",
+    "from": "(c.kind === \"column\" && c.storeyIndex === 0) || c.kind === \"pedestal\"",
+    "to": "(c.kind === \"column\" && c.storeyIndex === 0)"
+  },
+  {
+    "name": "a footing may be thicker than the room under the beams",
+    "file": "src/features/house-designer/construction/learning-house.ts",
+    "from": "if (params.footingDepth < beamUnderside + params.footingThickness) {",
+    "to": "if (false as boolean) {"
+  },
+  {
+    "name": "the footing is sunk too far",
+    "file": "src/features/house-designer/construction/learning-house.ts",
+    "from": "const fixed = beamUnderside + params.footingThickness;",
+    "to": "const fixed = beamUnderside + params.footingThickness + 500;"
+  },
+  {
+    "name": "the footing's depth is raised without saying so",
+    "file": "src/features/house-designer/construction/learning-house.ts",
+    "from": "issues.push({ field: \"footingDepth\", message: `footingDepth ${params.footingDepth} would put the top of the footing into the ground beams; using ${fixed}.` });",
+    "to": ""
+  },
+  {
+    "name": "a footing inside another is not skipped",
+    "file": "src/features/house-designer/construction/generators/foundation.ts",
+    "from": "for (const [c0, c1] of inside) { if (c0 > at + 1e-6) out.push([at, c0]); at = Math.max(at, c1); }",
+    "to": "for (const [c0, c1] of inside) { if (c0 > at + 1e-6) out.push([at, c0]); at = c1; }"
+  },
+  {
+    "name": "footings are taken in the order given",
+    "file": "src/features/house-designer/construction/generators/foundation.ts",
+    "from": "inside.sort((p, q) => p[0] - q[0]);",
+    "to": ""
+  },
+  {
+    "name": "a footing's far side is its near side",
+    "file": "src/features/house-designer/construction/generators/foundation.ts",
+    "from": "[dx, r.x1 - a.x]",
+    "to": "[dx, r.x0 - a.x]"
+  },
+  {
+    "name": "a footing is only as long as it is wide",
+    "file": "src/features/house-designer/construction/generators/foundation.ts",
+    "from": "[dy, r.y1 - a.y]",
+    "to": "[dy, r.y0 - a.y]"
+  }
+]

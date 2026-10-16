@@ -172,15 +172,18 @@ function addBuiltIn(ctx: Ctx, b: BuiltIn): void {
       const x0 = cab.position.x;
       if (/fridge/.test(label)) {
         const p = frame.point(x0 + width / 2, cab.size.depth / 2);
-        ctx.add({ ...common, source: "schematic", id: `${rid}:fridge`, name: `Refrigerator — ${b.room.name}`, kind: "appliance", category: "joinery", subcategory: "Appliances", layer: "joinery", materialId: "appliance", shapes: [box(p.x, p.y, frame.base + 900 + 100, width - 40, cab.size.depth - 60, 1800, frame.rz)], parentId: summary.id, explode: { layerIndex, dir: v3(0, 0, 1) }, loose: true });
+        const fridge = ctx.add({ ...common, source: "schematic", id: `${rid}:fridge`, name: `Refrigerator — ${b.room.name}`, kind: "appliance", category: "joinery", subcategory: "Appliances", layer: "joinery", materialId: "appliance", shapes: [box(p.x, p.y, frame.base + 900 + 100, width - 40, cab.size.depth - 60, 1800, frame.rz)], parentId: summary.id, explode: { layerIndex, dir: v3(0, 0, 1) }, loose: true });
+        addQuantity(ctx, fridge, { workItem: "appliance.refrigerator", description: "Refrigerator (loose appliance)", section: "V", unit: "piece", value: 1, formula: "1 refrigerator in its tall unit", inputs: { count: 1 }, status: "assumed" }, { sourceGeometry: `berchuma:${b.id}`, room: b.room.name, assumptions: ["Supplied by the owner or priced as a loose item."] });
       }
       if (/sink/.test(label)) {
         const p = frame.point(x0 + width / 2, cab.size.depth / 2);
-        ctx.add({ ...common, source: "schematic", id: `${rid}:sink`, name: `Kitchen sink — ${b.room.name}`, kind: "kitchen-sink", category: "joinery", subcategory: "Appliances", layer: "joinery", materialId: "sanitary", shapes: [box(p.x, p.y, frame.base + (cab.size.height + (cab.plinthHeight ?? 0)) - 100 + 40, Math.min(800, width - 60), cab.size.depth - 150, 30, frame.rz)], parentId: summary.id, explode: { layerIndex, dir: v3(0, 0, 1) } });
+        const sink = ctx.add({ ...common, source: "schematic", id: `${rid}:sink`, name: `Kitchen sink — ${b.room.name}`, kind: "kitchen-sink", category: "joinery", subcategory: "Appliances", layer: "joinery", materialId: "sanitary", shapes: [box(p.x, p.y, frame.base + (cab.size.height + (cab.plinthHeight ?? 0)) - 100 + 40, Math.min(800, width - 60), cab.size.depth - 150, 30, frame.rz)], parentId: summary.id, explode: { layerIndex, dir: v3(0, 0, 1) } });
+        addQuantity(ctx, sink, { workItem: "kitchen.sink", description: "Kitchen sink with tap", section: "T", unit: "piece", value: 1, formula: "1 sink in its base unit", inputs: { count: 1 }, status: "assumed" }, { sourceGeometry: `berchuma:${b.id}`, room: b.room.name });
       }
       if (/cook|stove|oven|hob/.test(label) && cab.kind === "base") {
         const p = frame.point(x0 + width / 2, cab.size.depth / 2);
-        ctx.add({ ...common, source: "schematic", id: `${rid}:hob`, name: `Cooktop — ${b.room.name}`, kind: "appliance", category: "joinery", subcategory: "Appliances", layer: "joinery", materialId: "appliance", shapes: [box(p.x, p.y, frame.base + (cab.size.height + (cab.plinthHeight ?? 0)) + 10, Math.min(600, width - 40), 500, 20, frame.rz)], parentId: summary.id, explode: { layerIndex, dir: v3(0, 0, 1) } });
+        const hob = ctx.add({ ...common, source: "schematic", id: `${rid}:hob`, name: `Cooktop — ${b.room.name}`, kind: "appliance", category: "joinery", subcategory: "Appliances", layer: "joinery", materialId: "appliance", shapes: [box(p.x, p.y, frame.base + (cab.size.height + (cab.plinthHeight ?? 0)) + 10, Math.min(600, width - 40), 500, 20, frame.rz)], parentId: summary.id, explode: { layerIndex, dir: v3(0, 0, 1) } });
+        addQuantity(ctx, hob, { workItem: "kitchen.cooktop", description: "Cooktop", section: "T", unit: "piece", value: 1, formula: "1 cooktop in its base unit", inputs: { count: 1 }, status: "assumed" }, { sourceGeometry: `berchuma:${b.id}`, room: b.room.name });
       }
     }
   }

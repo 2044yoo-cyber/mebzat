@@ -1,5 +1,5 @@
 import { ASSUME, UP, dim, onWall, type Ctx, type LevelInfo, type WallFrame } from "../context";
-import { alongLine, box, boxAt, cyl, polygonArea, polygonBounds, prism, rectPoly, subtractConvex, v3, type P2, type Shape } from "../geometry";
+import { alongLine, box, boxAt, cyl, netVolumes, polygonArea, polygonBounds, prism, prismOfShape, rectPoly, subtractConvex, v3, type P2, type Prism, type Shape } from "../geometry";
 import { addQuantity, concreteQuantity, f2, f3, round } from "../helpers";
 import { insetOutline } from "../structure-data";
 import { generateBalconyFinish } from "./balcony";
@@ -98,13 +98,18 @@ export function generateExternal(ctx: Ctx): void {
       concreteVolumes.push(platW * d * (topZ - GROUND) * 1e-9);
       offset += d;
     });
-    const total = concreteVolumes.reduce((s, v) => s + v, 0);
+    // The steps are cast against the columns and pedestals that stand beside them: the concrete they share is counted once, in the column or the pedestal.
+    const against = ctx.components.filter((c) => (c.kind === "column" && c.storeyIndex === 0) || c.kind === "pedestal").flatMap((c) => c.shapes.map((sh) => prismOfShape(sh)).filter((p): p is Prism => p !== null));
+    const gross = concreteVolumes.reduce((s, v) => s + v, 0);
+    const net = netVolumes([...against, ...shapes.map((sh) => prismOfShape(sh)!)]).slice(against.length);
+    const total = net.reduce((s, v) => s + v, 0) * 1e-9;
+    const shared = gross - total;
     const steps = ctx.add({
       id: "ext:steps", name: "Entrance landing and steps", kind: "entrance-steps", category: "external", subcategory: "Steps", stage: 18, level: ground, layer: "concrete", materialId: "concrete", shapes, repeated: { noun: "step" }, source: "project", sourceRef: o.id,
       explode: { layerIndex: 0, dir: v3(nx, ny, 0) }, dims: { height: dim(round(FFL - GROUND, 1), "mm", "calculated", `${risers} risers of ${f2(riser)} mm`), width: dim(platW, "mm", "assumed") },
       label: { text: "Entrance steps", anchor: v3(onWall(wall, mid, sign * (faceOut + 700)).x, onWall(wall, mid, sign * (faceOut + 700)).y, FFL + 300) }, note: "Risers are equal. The landing is deep enough to open the door outwards and to stand on.",
     });
-    concreteQuantity(ctx, steps, "concrete.steps", "Entrance steps (solid)", total, `landing + two steps, ${f3(platW / 1000)} m wide, to the ground = ${f3(total)} m³`, { width: platW, risers, riser: round(riser, 1) }, "assumed", ["Cast solid on compacted fill: the foundation of the steps is not designed here."]);
+    concreteQuantity(ctx, steps, "concrete.steps", "Entrance steps (solid)", total, `landing + two steps, ${f3(platW / 1000)} m wide, to the ground${shared > 5e-5 ? ` ${f3(gross)} m³ − ${f3(shared)} m³ inside the columns and pedestals` : ""} = ${f3(total)} m³`, { width: platW, risers, riser: round(riser, 1) }, "assumed", ["Cast solid on compacted fill: the foundation of the steps is not designed here."]);
     // Railing down both sides.
     const rail: Shape[] = [];
     const totalDepth = depths.reduce((s, d) => s + d, 0);

@@ -466,20 +466,31 @@ function shapeVolumeM3(s: Shape): number {
 }
 
 // ---------------------------------------------------------------------------
-// Steel only from an approved schedule
+// Steel: an estimate from a typical ratio unless there is a schedule, and the bars drawn are never weighed
 // ---------------------------------------------------------------------------
 {
   const steel = lines.filter((l) => l.unit === "kg" && l.section === "D");
   ok(steel.length > 0, "reinforcement lines exist");
-  ok(steel.every((l) => l.net === null && l.status === "missing"), "with no approved bar schedule none has a weight, and each says missing");
-  ok(steel.every((l) => l.items.every((i) => i.value === null && /approved bar schedule/.test(i.formula))), "and says what is needed");
-  ok(missingData(lines).length >= steel.length, "missing data is listed");
+  ok(steel.every((l) => l.net !== null && l.net > 0 && l.status === "assumed"), "with no approved bar schedule each has a weight from the ratio rule, and is marked as an assumption");
+  ok(steel.every((l) => l.items.every((i) => i.value !== null && /not a bar schedule/.test(i.assumptions.join(" ")) && /kg\/m³/.test(i.formula))), "and says it is an estimate, with the ratio it used");
+  equal(missingData(lines).filter((l) => l.section === "D").length, 0, "so no reinforcement line is missing");
   const draft = toBoqDraft(lines);
-  ok(!draft.some((d) => d.section === "D" && d.unit === "kg"), "missing lines stay out of the draft bill");
-  // The model's drawn bars do not feed a weight.
+  ok(draft.some((d) => d.section === "D" && d.unit === "kg"), "and the weights go into the draft bill, with their allowance kept apart");
+  // The model's drawn bars do not feed the weight: it is the member's concrete times its ratio.
   const bars = model.components.filter((c) => c.layer === "reinforcement").reduce((s, c) => s + c.shapes.length, 0);
   ok(bars > 1000, "there are plenty of schematic bars drawn");
-  // An approved schedule gives the theoretical weight, π/4·d²·7850.
+  const columnIds = new Set(model.components.filter((c) => c.kind === "column").map((c) => c.id));
+  const columnSteel = model.components.filter((c) => c.parentId && columnIds.has(c.parentId)).flatMap((c) => c.quantities.filter((q) => q.unit === "kg")).reduce((s, q) => s + (q.value ?? 0), 0);
+  near(columnSteel, line("concrete.column")!.net! * 200, "the steel of the columns is their concrete times 200 kg/m³, shared out among their main bars, stirrups and joint ties", 0.1);
+  // Strictly from a schedule, there is no estimate: each line has no weight and says what is needed.
+  const strict = buildLearningModel({}, {}, { reinforcement: { basis: "schedule", ratios: {} } });
+  const strictLines = aggregateQuantities(strict.model, strict.model.options);
+  const strictSteel = strictLines.filter((l) => l.unit === "kg" && l.section === "D");
+  ok(strictSteel.length > 0 && strictSteel.every((l) => l.net === null && l.status === "missing"), "in schedule-only mode no steel has a weight, and each says missing");
+  ok(strictSteel.every((l) => l.items.every((i) => i.value === null && /approved bar schedule/.test(i.formula))), "and says what is needed");
+  ok(missingData(strictLines).length >= strictSteel.length, "missing data is listed");
+  ok(!toBoqDraft(strictLines).some((d) => d.section === "D" && d.unit === "kg"), "missing lines stay out of the draft bill");
+  // An approved schedule gives the theoretical weight, π/4·d²·7850, in either mode.
   const column = model.components.find((c) => c.kind === "column-bars")!;
   const approved = buildLearningModel({}, {}, {}, [{ componentId: column.id, mark: "A", diameterMm: 16, lengthMm: 3000, count: 8 }, { componentId: column.id, mark: "B", diameterMm: 8, lengthMm: 1200, count: 20 }]);
   const item = approved.model.components.find((c) => c.id === column.id)!.quantities.find((q) => q.unit === "kg")!;
@@ -570,8 +581,11 @@ function shapeVolumeM3(s: Shape): number {
     const l = line(q.id.split("|")[0]!);
     ok(l && l.net !== null && q.quantity.value === l.net && q.quantity.unit === l.unit, `${q.id}: the quantity is the bill line's net figure`);
   }
-  ok(!pkg.quantities.some((q) => q.section === "D" && q.quantity.unit === "kg"), "reinforcement with no approved schedule is not handed over as a weight");
-  ok(pkg.warnings.some((w) => /^Missing:.*approved bar schedule/i.test(w)), "and is listed as missing");
+  const steelLines = pkg.quantities.filter((q) => q.section === "D" && q.quantity.unit === "kg");
+  ok(steelLines.length > 5 && steelLines.every((q) => q.quantity.source === "calculated" && q.quantity.confidence <= 0.5 && /kg\/m³/.test(q.quantity.formula)), "reinforcement with no approved schedule is handed over as an estimate: a weight from the ratio rule, sourced as calculated, with low confidence and its working");
+  ok(pkg.warnings.some((w) => /Reinforcement is an estimate from typical kg per m³/.test(w)) && !pkg.warnings.some((w) => /^Missing:.*approved bar schedule/i.test(w)), "and the package says so, with nothing missing");
+  const strictPkg = constructionTakeoffPackage(buildLearningModel({}, {}, { reinforcement: { basis: "schedule", ratios: {} } }).model);
+  ok(!strictPkg.quantities.some((q) => q.section === "D" && q.quantity.unit === "kg") && strictPkg.warnings.some((w) => /^Missing:.*approved bar schedule/i.test(w)), "in schedule-only mode it is not handed over as a weight, and is listed as missing");
   ok(pkg.warnings.some((w) => /no prices/i.test(w)), "the package says it carries no prices");
   const concrete = pkg.quantities.find((q) => q.id === "concrete.column|m³")!;
   ok(/allowance 5%/.test(concrete.quantity.formula) && /not in this figure/.test(concrete.quantity.formula), "the allowance is in the working, not in the number");
@@ -600,7 +614,8 @@ function shapeVolumeM3(s: Shape): number {
   ok(allItems.every((q) => q.id && q.componentId && q.workItem && q.description && q.section && q.unit && q.formula && q.sourceGeometry && q.materialSpec !== undefined), "every item carries the fields a bill needs");
   ok(allItems.every((q) => q.value === null ? q.status === "missing" : q.status !== "missing"), "a missing number is marked missing and nothing else is");
   ok(lines.every((l) => l.cost.unitMaterial === null), "bill lines have empty cost fields too");
-  ok(allItems.some((q) => q.status === "assumed") && allItems.some((q) => q.status === "calculated") && allItems.some((q) => q.status === "measured") && allItems.some((q) => q.status === "missing"), "the statuses are all in use");
+  const strictItems = buildLearningModel({}, {}, { reinforcement: { basis: "schedule", ratios: {} } }).model.components.flatMap((c) => c.quantities);
+  ok(allItems.some((q) => q.status === "assumed") && allItems.some((q) => q.status === "calculated") && allItems.some((q) => q.status === "measured") && strictItems.some((q) => q.status === "missing") && !allItems.some((q) => q.status === "missing"), "the statuses are all in use: nothing is missing by default, and steel is missing when only a schedule will do");
   // A number that is missing is flagged whatever status the item claims.
   const tampered = structuredClone(model);
   const victim = tampered.components.find((c) => c.quantities.some((q) => q.workItem === "concrete.column"))!;

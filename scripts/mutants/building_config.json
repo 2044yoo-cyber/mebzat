@@ -66,10 +66,10 @@
     "to": "lines[lines.length - 1] = length - 100;"
   },
   {
-    "name": "flat roof measured to the outline",
+    "name": "the flat roof is measured to the slab edge, the parapet ignored",
     "file": "src/features/house-designer/construction/building-config.ts",
-    "from": "const inner = (L - 2 * ASSUME.parapetThickness) * (W - 2 * ASSUME.parapetThickness) * 1e-6;",
-    "to": "const inner = L * W * 1e-6;"
+    "from": "const inner = (L + 2 * (frameHalf - ASSUME.parapetThickness)) * (W + 2 * (frameHalf - ASSUME.parapetThickness)) * 1e-6;",
+    "to": "const inner = (L + 2 * frameHalf) * (W + 2 * frameHalf) * 1e-6;"
   },
   {
     "name": "pitched roof measured in plan",

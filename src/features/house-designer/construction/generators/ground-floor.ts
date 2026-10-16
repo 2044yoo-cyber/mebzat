@@ -84,7 +84,7 @@ export function generateGroundFloor(ctx: Ctx): void {
   const meshShapes: Shape[] = [...lattice(meshRegion, meshHoles, "x", 150, mz, 3), ...lattice(meshRegion, meshHoles, "y", 150, mz + 6, 3)];
   const mesh = ctx.add({
     id: "ground:mesh", name: "Slab reinforcement mesh (schematic, where specified)", kind: "floor-mesh", category: "substructure", subcategory: "Ground floor", stage: 4, layer: "reinforcement", materialId: "steel-mesh",
-    shapes: meshShapes, repeated: { noun: "bar" }, source: "schematic", level: ground, explode: { layerIndex: 7, dir: UP }, note: "Mesh type and laps are specified by the designer; none is taken from this illustration.",
+    shapes: meshShapes, repeated: { noun: "bar" }, source: "schematic", level: ground, parentId: "ground:slab", explode: { layerIndex: 7, dir: UP }, note: "Mesh type and laps are specified by the designer; none is taken from this illustration.",
   });
   rebarQuantity(ctx, mesh, "Ground slab mesh", ctx.approved);
 

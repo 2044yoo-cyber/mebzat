@@ -1,5 +1,5 @@
 import { ASSUME, UP, dim, type Ctx } from "../context";
-import { alongLine, box, boxAt, cyl, polygonArea, polygonBounds, prism, rectPoly, v3, type P2, type Shape } from "../geometry";
+import { alongLine, box, boxAt, cyl, pointInPolygon, polygonArea, polygonBounds, prism, rectPoly, v3, type P2, type Shape } from "../geometry";
 import { addQuantity, concreteQuantity, f2, f3, formworkQuantity, rebarQuantity, round } from "../helpers";
 import { onPlan, stairGeometry, stairParams } from "../../services/stair-geometry";
 import { offsetPolygon, clipToRegion } from "../region";
@@ -177,10 +177,11 @@ export function generateStairs(ctx: Ctx): void {
         shapes: hand, source: "schematic", parentId: `stairs:${sid}:flight-1`, explode: { layerIndex: 3, dir: UP }, dims: { height: dim(900, "mm", "assumed", "Height and strength come from the regulations") },
       });
       addQuantity(ctx, hr, { workItem: "metalwork.handrail", description: "Stair handrail", section: "I", unit: "m", value: round(hand.reduce((s, h) => s + (h.t === "box" ? Math.max(h.s.x, h.s.y) : 0), 0) / 1000, 2), formula: "Σ rail lengths along the flights", inputs: { rails: hand.length }, status: "assumed" }, { assumptions: ["Rail height 900 mm is an example."] });
-      ctx.add({
+      const posts = ctx.add({
         id: `stairs:${sid}:balustrade-posts`, name: `${title} — balustrade posts`, kind: "balustrade", category: "stairs", subcategory: "Handrail & balustrade", stage: 6, level, layer: "frame", materialId: "railing",
         shapes: post, repeated: { noun: "post" }, source: "schematic", parentId: `stairs:${sid}:flight-1`, explode: { layerIndex: 3, dir: UP },
       });
+      addQuantity(ctx, posts, { workItem: "metalwork.balustrade-post", description: "Stair balustrade posts", section: "I", unit: "piece", value: post.length, formula: `${post.length} posts, one in every third step along the handrail`, inputs: { posts: post.length }, status: "assumed" }, { assumptions: ["A post every third step is an example."] });
     }
     // Stair formwork and props under the flights and landings (until struck).
     if (propShapes.length) ctx.add({ id: `stairs:${sid}:props`, name: `${title} — props and formwork`, kind: "prop", category: "stairs", subcategory: "Formwork & props", stage: 6, removedAfter: 6, level, layer: "props", materialId: "prop", shapes: propShapes, repeated: { noun: "prop" }, source: "schematic", explode: { layerIndex: 4, dir: UP } });
@@ -216,9 +217,11 @@ export function generateStairs(ctx: Ctx): void {
       };
       for (const y of [h.y0 - 50, h.y1 + 50]) for (const z of [zm - 15, zm + 15]) along({ x: h.x0 - 500, y }, { x: h.x1 + 500, y }, z);
       for (const x of [h.x0 - 50, h.x1 + 50]) for (const z of [zm - 15, zm + 15]) along({ x, y: h.y0 - 500 }, { x, y: h.y1 + 500 }, z);
+      // The bars belong to the slab the opening is cut in: the part of the floor slab that holds its centre.
+      const slabHere = ctx.components.find((c) => c.kind === "slab" && c.id.startsWith(`frame:slab:${level.levelId}:`) && c.shapes.some((sh) => sh.t === "prism" && pointInPolygon({ x: (h.x0 + h.x1) / 2, y: (h.y0 + h.y1) / 2 }, sh.poly)));
       const tr = ctx.add({
         id: `stairs:opening:${level.levelId}:${i + 1}:trimmers`, name: `Stair opening trimmer bars (schematic) — ${level.name} slab`, kind: "slab-edge-bars", category: "frame", subcategory: "Reinforcement", stage: 6, level: above, layer: "reinforcement", materialId: "steel-bar",
-        shapes: trim, repeated: { noun: "bar" }, source: "schematic", sourceRef: h.id, explode: { layerIndex: 2, dir: UP }, note: "Extra bars round an opening where specified; none is invented here.",
+        shapes: trim, repeated: { noun: "bar" }, source: "schematic", sourceRef: h.id, parentId: slabHere?.id ?? null, explode: { layerIndex: 2, dir: UP }, note: "Extra bars round an opening where specified; none is invented here.",
       });
       rebarQuantity(ctx, tr, "Slab opening trimmer bars", approved);
       // Edge protection round three sides while the opening is open.

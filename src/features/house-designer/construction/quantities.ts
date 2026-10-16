@@ -1,6 +1,6 @@
 import type { BoqDraftItem, BoqSectionCode } from "@/lib/takeoff/boq";
 
-import type { ComponentRecord, ConstructionModel, CostFields, ModelOptions, Provenance, QuantityItem, QuantityUnit } from "./types";
+import type { CategoryId, ComponentRecord, ConstructionModel, CostFields, ModelOptions, Provenance, QuantityItem, QuantityUnit, StageId } from "./types";
 import { NO_COST } from "./types";
 
 /**
@@ -12,6 +12,23 @@ import { NO_COST } from "./types";
 
 const WORST: Record<Provenance, number> = { measured: 0, calculated: 1, assumed: 2, review: 3, missing: 4 };
 export const worstStatus = (a: Provenance, b: Provenance): Provenance => (WORST[a] >= WORST[b] ? a : b);
+
+/**
+ * One component's share of a bill line, with where it belongs: the floor, the stage and the category. Every grouping of the bill (by floor, by stage, by
+ * category) is a sum of parts, so each one adds up to the same lines.
+ */
+export type QuantityPart = {
+  componentId: string;
+  /** The floor it is billed with (see `floorOf`): a key into the floors of the bill. */
+  floor: string;
+  stage: StageId;
+  category: CategoryId;
+  /** The net quantity of this part; null when it has no figure yet. */
+  net: number | null;
+  /** The allowance on it, in the unit of the line, when it states one: kept apart from the net. */
+  allowance: number | null;
+  status: Provenance;
+};
 
 export type QuantityLine = {
   workItem: string;
@@ -41,7 +58,47 @@ export type QuantityLine = {
   cost: CostFields;
   /** The items, so a line can be traced to the components and formulas behind it. */
   items: QuantityItem[];
+  /** The items again, each with the floor, stage and category of the component it is from. */
+  parts: QuantityPart[];
 };
+
+/** The floor a component is billed with. */
+export const SITE_FLOOR = "site";
+export const ROOF_FLOOR = "roof";
+
+/** The members that make up the floor over a storey: the slab, the beams under it and the balconies cast with it. */
+const FLOOR_STRUCTURE: ReadonlySet<string> = new Set(["slab", "beam", "balcony"]);
+/** Parts that are billed with the concrete member they are made for. */
+const MADE_FOR_MEMBER: ReadonlySet<string> = new Set(["reinforcement", "formwork", "props", "temporary"]);
+
+const idMaps = new WeakMap<ConstructionModel, Map<string, ComponentRecord>>();
+function idsOf(model: ConstructionModel): Map<string, ComponentRecord> {
+  let ids = idMaps.get(model);
+  if (!ids) { ids = new Map(model.components.map((c) => [c.id, c])); idMaps.set(model, ids); }
+  return ids;
+}
+
+/**
+ * The floor a component belongs to in the bill. The foundations, the earthworks, the ground slab and the site are one group below the building; the roof,
+ * with its parapet, gables and covering, is one above it. The floor structure of a storey (its slab, its beams and its balconies) is the floor over it,
+ * so it is billed with that floor, and its bars, formwork and props with it; everything else is billed with the storey it stands in.
+ */
+export function floorOf(c: ComponentRecord, model: ConstructionModel): string {
+  const ids = idsOf(model);
+  let at = c;
+  // Bars, formwork and props go with the concrete they are made for.
+  for (let guard = 0; guard < 6 && MADE_FOR_MEMBER.has(at.layer) && at.parentId; guard += 1) {
+    const parent = ids.get(at.parentId);
+    if (!parent) break;
+    at = parent;
+  }
+  const storeys = model.storeys;
+  if (at.category === "site" || at.category === "earthworks" || at.category === "substructure") return SITE_FLOOR;
+  if (at.category === "roof" || at.id.startsWith("roof:") || at.id.startsWith("ext:parapet:") || at.id.startsWith("ext:gable:")) return ROOF_FLOOR;
+  if (at.storeyIndex < 0 || at.storeyId === null) return at.category === "external" ? SITE_FLOOR : (storeys[0]?.id ?? SITE_FLOOR);
+  if (FLOOR_STRUCTURE.has(at.kind)) return storeys[at.storeyIndex + 1]?.id ?? ROOF_FLOOR;
+  return at.storeyId;
+}
 
 export type QuantityScope = "building" | "loose" | "all";
 
@@ -68,11 +125,12 @@ export function aggregateQuantities(model: ConstructionModel, options: ModelOpti
       if (!line) {
         line = {
           workItem: item.workItem, description: item.description, section: item.section, unit: item.unit, net: null, status: "measured", missingItems: 0, itemCount: 0, allowancePercent: null, allowanceQuantity: null, allowanceRules: [],
-          componentIds: [], storeys: [], rooms: [], formulas: [], assumptions: [], exclusions: [], materialSpecs: [], cost: { ...NO_COST }, items: [],
+          componentIds: [], storeys: [], rooms: [], formulas: [], assumptions: [], exclusions: [], materialSpecs: [], cost: { ...NO_COST }, items: [], parts: [],
         };
         lines.set(key, line);
       }
       line.items.push(item);
+      line.parts.push({ componentId: c.id, floor: floorOf(c, model), stage: c.stage, category: c.category, net: item.value, allowance: item.value !== null && item.allowance && item.allowance.percent !== null ? (item.value * item.allowance.percent) / 100 : null, status: item.status });
       line.itemCount += 1;
       line.status = worstStatus(line.status, item.status);
       if (item.value === null) line.missingItems += 1;
