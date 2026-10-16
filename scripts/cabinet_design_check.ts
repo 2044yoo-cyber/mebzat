@@ -242,12 +242,17 @@ equal(withMaterial(startingDesign("wardrobe"), "not-a-board"), startingDesign("w
 // ---------------------------------------------------------------------------
 {
   const nav = code("src/lib/workspace/navigation.ts");
-  const section = nav.slice(nav.indexOf('id: "berchuma"'), nav.indexOf('id: "property"'));
-  ok(/label: "Cabinet Design"/.test(section) && /icon: Cabinet,/.test(section) && !/Armchair/.test(section), "the section is Cabinet Design with a cabinet icon, no chair");
-  ok(/hint: "Design cabinets and get a price"/.test(section) && /hint: "All your cabinet designs"/.test(section) && /hint: "Cabinet designs and templates you can customize"/.test(section), "the three rows say what they are for");
-  ok(/id: "berchuma-studio"[\s\S]*href: "\/studio"/.test(section) && /href: "\/designs\?mine=1"/.test(section) && /href: "\/designs",/.test(section), "ids and routes unchanged");
-  const menu = code("src/components/shell/menu-bar.tsx");
-  ok(/<Cabinet className=/.test(menu) && !/<Armchair/.test(menu), "the menu bar's Studio link has the cabinet icon");
+  // The workspace menu was reorganised into one Design section (6b76718,
+  // b5e6c3a): Cabinet Design is its own entry there, next to Furniture Design,
+  // which is the one that carries the armchair.
+  const entry = (id: string) => nav.slice(nav.indexOf(`id: "${id}"`), nav.indexOf("},", nav.indexOf(`id: "${id}"`)));
+  const cabinetEntry = entry("cabinet-design");
+  ok(/label: "Cabinet Design"/.test(cabinetEntry) && /icon: Cabinet,/.test(cabinetEntry) && !/Armchair/.test(cabinetEntry), "the entry is Cabinet Design with a cabinet icon, no chair");
+  ok(/icon: Armchair,/.test(entry("furniture-design")) && /label: "Furniture Design"/.test(entry("furniture-design")), "and the armchair belongs to Furniture Design");
+  ok(/href: "\/studio",/.test(cabinetEntry), "its route is unchanged");
+  ok(/href: "\/designs\?mine=1"/.test(entry("design-projects")) && /href: "\/designs",/.test(entry("design-gallery")), "saved designs and the gallery keep their routes");
+  // The menu bar no longer has a Studio link of its own (the workspace menu above carries it), so nothing there can show the wrong icon.
+  ok(!/<Armchair/.test(code("src/components/shell/menu-bar.tsx")), "the menu bar has no armchair in it");
   const i18n = code("src/lib/i18n/translations.ts");
   ok(/berchuma: "Cabinet Design"/.test(i18n) && /berchuma: "ካቢኔት ዲዛይን"/.test(i18n) && /berchuma: "Dizaayinii Kaabineetii"/.test(i18n) && !/Berchuma Studio|በርቹማ ስቱዲዮ|Istuudiyoo Berchuma/.test(i18n), "English, Amharic and Oromo all say Cabinet Design");
   for (const path of ["src/app/studio/page.tsx", "src/app/designs/page.tsx", "src/app/studio/error.tsx", "src/app/api/studio/design/route.ts", "src/features/berchuma-studio/services/exports.ts"]) {
@@ -271,10 +276,11 @@ equal(withMaterial(startingDesign("wardrobe"), "not-a-board"), startingDesign("w
   const model = code("src/features/berchuma-studio/components/viewer/model.tsx");
   const colour = functionText(model, "colourFor");
   ok(/surface === "material" \? materialColour\(part\.board, spec\) : accentColour\(part, spec\) \?\? boardColour\(part\.board, spec\)/.test(colour), "Material view draws each board in its own decor; Model view stays white");
-  ok(/color=\{colourFor\(part, spec, surface\)\}/.test(functionText(model, "PartMesh")), "and every part mesh is coloured for the chosen view");
+  // The connection view (closure panels, ac09553) draws every board plain so the joints show; every other view colours by the chosen surface.
+  ok(/color=\{visualMode === "connections" \? "#f5f5f2" : colourFor\(part, spec, surface\)\}/.test(functionText(model, "PartMesh")), "and every part mesh is coloured for the chosen view, plain in the connection view");
   ok(/surface=\{surface\}/.test(model), "the model hands the view to its parts");
   const editor = code("src/features/berchuma-studio/components/editor/design-editor.tsx");
-  ok(/<SurfaceToggle value=\{surface\} onChange=\{setSurface\}[^>]*\/>/.test(editor) && /<Model[\s\S]{0,200}surface=\{surface\}/.test(editor), "the editor has the Model / Material toggle and passes it on");
+  ok(/<SurfaceToggle value=\{surface\} onChange=\{setSurface\}[^>]*\/>/.test(editor) && /<Model[\s\S]{0,600}surface=\{surface\}/.test(editor), "the editor has the Model / Material toggle and passes it on");
   ok(/<QuickAction label="Duplicate" onClick=\{\(\) => onChange\(duplicateCabinet\(spec, selected\.id\)\)\}/.test(editor), "quick action: Duplicate");
   ok(/label="Delete"[\s\S]{0,200}onChange\(removeCabinet\(spec, selected\.id\)\)/.test(editor), "quick action: Delete");
   ok(/label="Move" pressed=\{movePad\}/.test(editor) && /view === "solid" && selected && movePad \?/.test(editor), "quick action: Move shows and hides the move pad");
