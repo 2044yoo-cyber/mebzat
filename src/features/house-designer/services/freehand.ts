@@ -163,7 +163,8 @@ export function convertStrokes(
   if (!Number.isFinite(mmPerUnit) || mmPerUnit <= 0)
     throw new Error("Enter a positive drawing scale.");
   const tolerance = snapPixels * unitsPerPixel,
-    lines = strokes.flatMap((s) =>
+    // Non-wall marks are annotations and must never become structural walls.
+    lines = strokes.filter(s => (s.kind ?? "wall") === "wall").flatMap((s) =>
       strokeSegments(s, 3 * unitsPerPixel, snapPixels > 0),
     );
   if (lines.length > 500)
