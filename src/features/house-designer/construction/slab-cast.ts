@@ -1,17 +1,20 @@
-import type { Ctx } from "./context";
+import { ASSUME, type Ctx } from "./context";
 import { rectPoly, type P2 } from "./geometry";
 import { offsetPolygon } from "./region";
+import type { HouseProject } from "../types/project";
 
 /**
  * The slab as it is cast. The columns and the edge beams stand on the plan outline, so the slab runs out past
  * it by half the widest of them: to the outer face of the frame. Without that the outer half of each edge
  * column, and of each edge beam, would have no slab over it between the soffit and the top of the slab.
  */
-export function frameHalfOf(ctx: Ctx, levelId: string): number {
-  const columns = ctx.project.structuralColumns.filter((c) => c.levelId === levelId);
-  const beams = ctx.project.structuralBeams.filter((b) => b.levelId === levelId);
+export function frameHalfOfProject(project: HouseProject, levelId: string): number {
+  const columns = project.structuralColumns.filter((c) => c.levelId === levelId);
+  const beams = project.structuralBeams.filter((b) => b.levelId === levelId);
   return Math.max(0, ...columns.map((c) => Math.max(c.width, c.depth) / 2), ...beams.map((b) => b.width / 2));
 }
+
+export const frameHalfOf = (ctx: Ctx, levelId: string): number => frameHalfOfProject(ctx.project, levelId);
 
 /** The outline of the slab over the storey `levelId`, as cast. */
 export function slabCastOutline(ctx: Ctx, levelId: string): P2[] {
@@ -29,3 +32,12 @@ export function pourXCut(ctx: Ctx): number {
 
 /** The half of the plan on one side of the pour line: a rectangle far bigger than any building, counter-clockwise, to clip a slab against. */
 export const halfPlane = (xcut: number, side: "west" | "east"): P2[] => (side === "west" ? rectPoly(-1e7, -1e7, xcut, 1e7) : rectPoly(xcut, -1e7, 1e7, 1e7));
+
+/**
+ * The parapet round a flat roof stands on the edge of the roof slab, its outer face flush with the slab and so with the frame under it:
+ * the band from the slab as cast, in by the parapet's thickness. `inner` is the edge of the roof surface inside it.
+ */
+export function parapetBand(ctx: Ctx): { outer: P2[]; inner: P2[] } {
+  const outer = ctx.top ? slabCastOutline(ctx, ctx.top.levelId) : ctx.outline;
+  return { outer, inner: offsetPolygon(outer, -ASSUME.parapetThickness) };
+}

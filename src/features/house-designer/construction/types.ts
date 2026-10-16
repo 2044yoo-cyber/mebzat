@@ -237,6 +237,8 @@ export type ModelOptions = {
   floorFinish: FloorFinish;
   blockType: BlockType;
   mepView: MepView;
+  /** The height of the parapet round a flat roof, mm, when the building has one of its own (a template sets it); the example assumption when absent. */
+  parapetHeight?: number;
 };
 
 export const DEFAULT_OPTIONS: ModelOptions = { roofType: "flat", floorFinish: "porcelain", blockType: "hollow", mepView: "finished" };

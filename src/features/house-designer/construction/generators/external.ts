@@ -3,6 +3,7 @@ import { alongLine, box, boxAt, cyl, polygonArea, polygonBounds, prism, rectPoly
 import { addQuantity, concreteQuantity, f2, f3, round } from "../helpers";
 import { insetOutline } from "../structure-data";
 import { generateBalconyFinish } from "./balcony";
+import { EXTERNAL_COATS, frameFaces } from "./facade";
 import { outwardSign } from "./foundation";
 
 /**
@@ -13,11 +14,6 @@ import { outwardSign } from "./foundation";
 
 const GROUND = ASSUME.naturalGround;
 const FFL = ASSUME.floorBuildUp;
-const EXT_COATS = [
-  { id: "base", name: "External plaster, base coat", material: "plaster-base", t: ASSUME.plasterBase, workItem: "plaster.external-base", desc: "External plaster base coat", section: "J" as const },
-  { id: "final", name: "External plaster, final coat", material: "plaster-final", t: ASSUME.plasterFinal + ASSUME.externalPlasterExtra, workItem: "plaster.external-final", desc: "External plaster final coat", section: "J" as const },
-  { id: "paint", name: "External paint", material: "paint-ext", t: ASSUME.paint, workItem: "paint.external", desc: "Exterior masonry paint", section: "M" as const },
-];
 
 type Piece = { s0: number; s1: number; z0: number; z1: number };
 function facadePieces(wall: WallFrame, z0: number, z1: number, base: number): Piece[] {
@@ -44,17 +40,14 @@ export function generateExternal(ctx: Ctx): void {
   const top = ctx.top;
   if (!ground || !top) return;
   const b = ctx.bounds;
-  const roof = ctx.project.roofs[0];
-  const roofTop = roof ? roof.elevation + roof.thickness : top.topZ;
   const plot = (ctx.project.site?.boundary ?? rectPoly(b.minX - 2500, b.minY - 2500, b.maxX + 2500, b.maxY + 2500)).map((p) => ({ x: p.x, y: p.y }));
   const pb = polygonBounds(plot);
 
   // --- External plaster and paint ------------------------------------------------
-  const parapetH = ASSUME.parapetHeight;
   for (const level of ctx.levels) {
     const walls = ctx.wallsOf(level.levelId).filter((w) => w.exterior);
-    EXT_COATS.forEach((coat, ci) => {
-      const before = EXT_COATS.slice(0, ci).reduce((s, c) => s + c.t, 0);
+    EXTERNAL_COATS.forEach((coat, ci) => {
+      const before = EXTERNAL_COATS.slice(0, ci).reduce((s, c) => s + c.t, 0);
       const shapes: Shape[] = [];
       const rows: { wall: WallFrame; net: number; gross: number; out: number; text: string }[] = [];
       for (const wall of walls) {
@@ -68,29 +61,16 @@ export function generateExternal(ctx: Ctx): void {
         rows.push({ wall, gross, out: ded, net: gross - ded, text: `${f2(wall.length / 1000)} m × ${f3((level.topZ - base) / 1000)} m − openings ${f2(ded)} m² = ${f2(gross - ded)} m²` });
       }
       if (shapes.length === 0) return;
+      // The frame between the walls is rendered and painted in the same coats (see facade.ts).
+      shapes.push(...frameFaces(ctx, level, before, coat.t));
       const comp = ctx.add({
         id: `ext:${level.index}:${coat.id}`, name: `${coat.name} — ${level.name}`, kind: coat.id === "paint" ? "paint-layer" : "external-plaster", category: "external", subcategory: "External finishes", stage: 18, level, layer: coat.id === "paint" ? "paint" : "plaster", materialId: coat.material,
-        shapes, repeated: { noun: "panel" }, source: "schematic", explode: { layerIndex: ci, dir: v3(0, 0, 0) }, dims: { thickness: dim(coat.t, "mm", "assumed") }, note: "Measured on the outer wall faces from floor level to the next floor; column and beam faces are not added.",
+        shapes, repeated: { noun: "panel" }, source: "schematic", explode: { layerIndex: ci, dir: v3(0, 0, 0) }, dims: { thickness: dim(coat.t, "mm", "assumed") }, note: "Measured on the outer face of the wall from floor level to the floor over, less the openings: the columns and beams in that height are rendered flush with it and are counted in the same area.",
       });
       for (const r of rows) addQuantity(ctx, comp, { workItem: coat.workItem, description: coat.desc, section: coat.section, unit: "m²", value: round(r.net, 3), formula: r.text, inputs: { length: round(r.wall.length, 0), openings: round(r.out, 3), rule: ctx.rules.openingDeduction }, status: "calculated" },
         { allowance: { rule: coat.section === "J" ? "Wastage and thickness variation (example assumption)" : "Waste and absorbency (example assumption)", percent: coat.section === "J" ? ctx.rules.allowances.plaster : ctx.rules.allowances.paint }, assumptions: [`Openings over ${ctx.rules.openingThresholdM2} m² are deducted (rule: ${ctx.rules.openingDeduction}).`], room: null });
     });
   }
-  // Parapet outer face (flat roof only).
-  {
-    const walls = ctx.wallsOf(top.levelId).filter((w) => w.exterior);
-    const shapes: Shape[] = [];
-    let length = 0;
-    for (const wall of walls) {
-      const sign = outwardSign(wall) || -1;
-      shapes.push(slabOn(wall, sign, { s0: 0, s1: wall.length, z0: top.topZ, z1: roofTop + parapetH }, 0, ASSUME.plasterBase + ASSUME.plasterFinal + ASSUME.externalPlasterExtra));
-      length += wall.length;
-    }
-    const area = length * (roofTop + parapetH - top.topZ) * 1e-6;
-    const comp = ctx.add({ id: "ext:parapet-render", name: "Parapet — external render and paint", kind: "external-plaster", category: "external", subcategory: "External finishes", stage: 18, level: top, layer: "plaster", materialId: "plaster-final", shapes, variant: { group: "roof", value: "flat" }, source: "schematic", explode: { layerIndex: 3, dir: v3(0, 0, 0) } });
-    addQuantity(ctx, comp, { workItem: "plaster.external-final", description: "External plaster final coat", section: "J", unit: "m²", value: round(area, 3), formula: `outer parapet face ${f2(length / 1000)} m × ${f3((roofTop + parapetH - top.topZ) / 1000)} m`, inputs: { length: round(length, 0) }, status: "assumed" }, { allowance: { rule: "Wastage (example assumption)", percent: ctx.rules.allowances.plaster } });
-  }
-
   // --- Entrance steps and railing -----------------------------------------------------
   const entrance = ctx.wallsOf(ground.levelId).filter((w) => w.exterior).flatMap((w) => w.openings.filter((o) => o.kind === "door").map((o) => ({ wall: w, o })))[0];
   const platW = 2000;

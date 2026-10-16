@@ -1,0 +1,200 @@
+[
+  {
+    "name": "only one gable wall",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const gableShapes: Shape[] = [b.minX, b.maxX].map((x) =>",
+    "to": "const gableShapes: Shape[] = [b.minX].map((x) =>"
+  },
+  {
+    "name": "the gable top ignores half the pitch",
+    "file": "src/features/house-designer/construction/roof-geometry.ts",
+    "from": "Math.min(s, spanY - s) * Math.tan(THETA);",
+    "to": "Math.min(s, spanY - s) * Math.tan(THETA) * 0.5;"
+  },
+  {
+    "name": "the gable is narrower than the building",
+    "file": "src/features/house-designer/construction/roof-geometry.ts",
+    "from": "const out = PLATE + wallT / 2;",
+    "to": "const out = wallT / 2;"
+  },
+  {
+    "name": "the gable is half as thick as the wall under it",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "outline.map((p) => ({ s: p.s, z: slabTop + p.z })), wallT));",
+    "to": "outline.map((p) => ({ s: p.s, z: slabTop + p.z })), wallT / 2));"
+  },
+  {
+    "name": "the end trusses stand in the gable wall",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const xFirst = b.minX + wallT / 2 + TRUSS_W / 2;",
+    "to": "const xFirst = b.minX;"
+  },
+  {
+    "name": "the heel is low and the rafters bury themselves in the slab edge",
+    "file": "src/features/house-designer/construction/roof-geometry.ts",
+    "from": "export const PLATE_H = 200;",
+    "to": "export const PLATE_H = 50;"
+  },
+  {
+    "name": "the rafters stop at the plates",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const eaveReach = OVERHANG - FASCIA_SETBACK;",
+    "to": "const eaveReach = 0;"
+  },
+  {
+    "name": "the battens float above the rafters",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const battenCentre = (d: number) => rafterTopZ(d) + 12.5 / cosT;",
+    "to": "const battenCentre = (d: number) => rafterTopZ(d) + 40 / cosT;"
+  },
+  {
+    "name": "the fascia only on one side",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const fasciaShapes: Shape[] = [true, false].map(",
+    "to": "const fasciaShapes: Shape[] = [true].map("
+  },
+  {
+    "name": "the fascia is not at the ends of the rafters",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "yAt(south, dTail) + (south ? -BOARD_T / 2 : BOARD_T / 2)",
+    "to": "yAt(south, dTail)"
+  },
+  {
+    "name": "barge boards at one gable only",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "for (const x of [b.minX - OVERHANG + BOARD_T / 2, b.maxX + OVERHANG - BOARD_T / 2])",
+    "to": "for (const x of [b.minX - OVERHANG + BOARD_T / 2])"
+  },
+  {
+    "name": "the plates run the whole length",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const plateLen = lengthX - wallT;",
+    "to": "const plateLen = lengthX;"
+  },
+  {
+    "name": "the covering stops at the plates",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const slopeRun = half + OVERHANG;",
+    "to": "const slopeRun = half;"
+  },
+  {
+    "name": "the underlay lies in the battens",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "shapes: [makeSkin(true, 2, 12.5 / cosT + 1), makeSkin(false, 2, 12.5 / cosT + 1)]",
+    "to": "shapes: [makeSkin(true, 2, 0), makeSkin(false, 2, 0)]"
+  },
+  {
+    "name": "the gutter hangs above the covering",
+    "file": "src/features/house-designer/construction/roof-geometry.ts",
+    "from": "z: plateTop + TRUSS_D + 25 - OVERHANG * Math.tan(THETA) - 40,",
+    "to": "z: plateTop + TRUSS_D + 25 - OVERHANG * Math.tan(THETA) + 60,"
+  },
+  {
+    "name": "the gable render is for one gable",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "value: round(gableArea, 3), formula: `outer faces of 2 gables",
+    "to": "value: round(gableArea / 2, 3), formula: `outer faces of 2 gables"
+  },
+  {
+    "name": "gable blocks counted without the joint",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const gablePerM2 = 1e6 / ((390 + 10) * (190 + 10));",
+    "to": "const gablePerM2 = 1e6 / (390 * 190);"
+  },
+  {
+    "name": "the parapet is inside the outline again",
+    "file": "src/features/house-designer/construction/slab-cast.ts",
+    "from": "const outer = ctx.top ? slabCastOutline(ctx, ctx.top.levelId) : ctx.outline;",
+    "to": "const outer = ctx.outline;"
+  },
+  {
+    "name": "the parapet is half as thick",
+    "file": "src/features/house-designer/construction/slab-cast.ts",
+    "from": "inner: offsetPolygon(outer, -ASSUME.parapetThickness) };",
+    "to": "inner: offsetPolygon(outer, -ASSUME.parapetThickness / 2) };"
+  },
+  {
+    "name": "the parapet ignores the height the building has",
+    "file": "src/features/house-designer/construction/roof-geometry.ts",
+    "from": "(options.parapetHeight && options.parapetHeight > 0 ? options.parapetHeight : ASSUME.parapetHeight);",
+    "to": "ASSUME.parapetHeight;"
+  },
+  {
+    "name": "a negative parapet height is taken",
+    "file": "src/features/house-designer/construction/roof-geometry.ts",
+    "from": "options.parapetHeight > 0 ? options.parapetHeight",
+    "to": "options.parapetHeight > -1e9 ? options.parapetHeight"
+  },
+  {
+    "name": "the parapet is measured round its outer edge",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const parapetLen = (perimeter(outer) + perimeter(inner.poly)) / 2;",
+    "to": "const parapetLen = perimeter(outer);"
+  },
+  {
+    "name": "the coping is inside the parapet",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const copingOuter = { poly: offsetPolygon(outer, COPING_OVER) };",
+    "to": "const copingOuter = { poly: offsetPolygon(outer, -COPING_OVER) };"
+  },
+  {
+    "name": "the inside of the parapet is not rendered",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "...(innerH > 1 ? edgeSkins(inner.poly, before, coat.t, innerFrom, faceTop, true) : [])",
+    "to": "...([] as Shape[])"
+  },
+  {
+    "name": "the render of the parapet counts only its outside",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const faceArea = (outerLen * ph + innerPerimeter * innerH) * 1e-6;",
+    "to": "const faceArea = (outerLen * ph) * 1e-6;"
+  },
+  {
+    "name": "the band of the frame is missing at the end of each edge",
+    "file": "src/features/house-designer/construction/generators/facade.ts",
+    "from": "    piece(cursor, len, beamBottom, level.topZ);\n  });",
+    "to": "  });"
+  },
+  {
+    "name": "the band runs over the balcony",
+    "file": "src/features/house-designer/construction/generators/facade.ts",
+    "from": "for (const gap of balconyGaps(ctx, level, p, q)) {",
+    "to": "for (const gap of [] as ReturnType<typeof balconyGaps>) {"
+  },
+  {
+    "name": "the beam below the balcony is not rendered",
+    "file": "src/features/house-designer/construction/generators/facade.ts",
+    "from": "      piece(Math.max(0, gap.s0), Math.min(len, gap.s1), beamBottom, gap.soffit);\n",
+    "to": ""
+  },
+  {
+    "name": "the columns are not rendered",
+    "file": "src/features/house-designer/construction/generators/facade.ts",
+    "from": "  for (const col of columns) {\n    ring.forEach(",
+    "to": "  for (const col of [] as typeof columns) {\n    ring.forEach("
+  },
+  {
+    "name": "the column faces are inside the column",
+    "file": "src/features/house-designer/construction/generators/facade.ts",
+    "from": "const shift = hp + offset + thick / 2;",
+    "to": "const shift = -(hp + offset + thick / 2);"
+  },
+  {
+    "name": "the band is on the outline, inside the frame",
+    "file": "src/features/house-designer/construction/generators/facade.ts",
+    "from": "const cast = counterClockwise(slabCastOutline(ctx, level.levelId));",
+    "to": "const cast = counterClockwise(ctx.outline);"
+  },
+  {
+    "name": "a template's parapet height is not passed on",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "...(def.roofType === \"flat\" && hooks.parapet ? { parapetHeight: hooks.parapet } : {}) };",
+    "to": "};"
+  },
+  {
+    "name": "the rising main is taken over a parapet of the example height, not the real one",
+    "file": "src/features/house-designer/construction/plumbing-plan.ts",
+    "from": "const parapetTop = roofTop + parapetHeightOf(ctx.options);",
+    "to": "const parapetTop = roofTop + ASSUME.parapetHeight;"
+  }
+]

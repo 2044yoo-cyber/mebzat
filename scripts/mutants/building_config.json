@@ -130,5 +130,11 @@
     "file": "src/features/house-designer/construction/generators/roof.ts",
     "from": "const { plan: planCover, sloped: slopedCover } = pitchedCover(lengthX, b.maxY - b.minY);",
     "to": "const planCover = (lengthX + 2 * OVERHANG) * (spanY + 2 * OVERHANG) * 1e-6;\n  const slopedCover = planCover;"
+  },
+  {
+    "name": "the flat roof forgets that the slab is cast out past the outline",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "const inner = (L + 2 * (frameHalf - ASSUME.parapetThickness)) * (W + 2 * (frameHalf - ASSUME.parapetThickness)) * 1e-6;",
+    "to": "const inner = (L - 2 * ASSUME.parapetThickness) * (W - 2 * ASSUME.parapetThickness) * 1e-6;"
   }
 ]

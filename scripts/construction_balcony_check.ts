@@ -109,6 +109,21 @@ for (const { name, building } of sizes) {
     ok(parts.every((part) => quantity(part, "concrete.balcony", "Balcony cantilever slab").status === "calculated" && quantity(part, "concrete.balcony", "Balcony upstand (kerb) round the outer edges").status === "assumed"), `${label}: the slab's figure is calculated and the upstand's, whose size is an assumption, says so`);
     equal(parts.reduce((sum, part) => sum + part.quantities.filter((q) => q.workItem === "concrete.balcony").length, 0), 2 * parts.length, `${label}: the concrete of a balcony is counted in two lines for each part and no more`);
 
+    // --- The way out: a glazed door down to the floor in the room behind it ------------------------------------------------------------------------
+    // (The Existing Building keeps its window over the entrance, as it always had: it is the first template and is not changed.)
+    const behind = project.windows.filter((w) => w.wallId === balcony.wallId && w.offset >= x0 - wall.start.x - 1e-6 && w.offset + w.width <= x1 - wall.start.x + 1e-6);
+    ok(behind.length >= 1, `${label}: there is an opening in the wall behind the balcony, inside its width`);
+    if (building.config.template === "existing") ok(behind.every((w) => w.sillHeight >= 900), `${label}: the Existing Building's is a window, as before`);
+    else {
+      const doors = behind.filter((w) => w.sillHeight === 0 && w.height >= 2000);
+      ok(doors.length >= 1, `${label}: one of them is glazed down to the floor, ${doors.map((d) => `${d.width} × ${d.height}`).join(", ")}: the way out onto the balcony`);
+      ok(doors.every((d) => d.offset >= x0 - wall.start.x && d.offset + d.width <= x1 - wall.start.x), `${label}: and it opens onto the balcony, not past the end of it`);
+    }
+
+    // The Existing Building's balcony and the villa's left one are over the entrance door, and so shelter it: that is what their descriptions say.
+    const shelters = project.doors.filter((d) => d.levelId === project.levels[0]!.id && d.wallId.endsWith(":c1") && d.type !== "passage" && d.offset >= x0 - wall.start.x && d.offset + d.width <= x1 - wall.start.x);
+    if (building.config.template === "existing" || (building.config.template === "modern-villa" && balcony.id.endsWith(":left"))) ok(shelters.length === 1, `${label}: the entrance door is under it (${shelters.map((d) => d.id).join(", ")})`);
+
     // --- Top steel: from the tip, over the edge beam, and back into the slab 1.5 times the reach from the support -------------------------
     const topBars = get(`frame:balcony:${id}:top`);
     equal([topBars.stage, topBars.layer, topBars.kind], [5, "reinforcement", "slab-bars-top"], `${label}: the top steel is placed at stage 5`);

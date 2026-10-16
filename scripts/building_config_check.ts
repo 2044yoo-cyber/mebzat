@@ -277,7 +277,8 @@ const ofKind = (model: ConstructionModel, kind: string) => model.components.filt
   for (const c of cases) {
     const { building, model } = modelOf(c.config);
     const outline = building.project.slabs[0]!.boundary as P2[];
-    const flat = roofAreaOf(outline, "flat");
+    const half = Math.max(building.params.columnSize, building.params.beamWidth) / 2;
+    const flat = roofAreaOf(outline, "flat", half);
     const pitched = roofAreaOf(outline, "pitched");
     const flatDrawn = model.components.find((x) => x.id === "roof:flat:membrane");
     const pitchedDrawn = model.components.find((x) => x.id === "roof:pitched:covering");
@@ -291,7 +292,8 @@ const ofKind = (model: ConstructionModel, kind: string) => model.components.filt
     const L = building.config.length; const W = building.config.width;
     near(pitched.plan, ((L + 2 * OVERHANG) * (W - 2 * PLATE + 2 * OVERHANG)) / 1e6, `${c.name}: the pitched roof in plan is the building plus its overhang`, 1e-9);
     near(pitched.covering, ((L + 2 * OVERHANG) * (W - 2 * PLATE + 2 * OVERHANG)) / 1e6 / Math.cos((PITCH_DEG * Math.PI) / 180), `${c.name}: and along the slope it is longer by the pitch`, 1e-9);
-    near(flat.covering, ((L - 300) * (W - 300)) / 1e6, `${c.name}: the flat roof is the slab inside a 150 mm parapet`, 1e-9);
+    // The slab is cast out to the outer face of the frame, half its widest member past the outline, and the 150 mm parapet stands on its edge: the roof surface is inside it.
+    near(flat.covering, ((L + 2 * (half - 150)) * (W + 2 * (half - 150))) / 1e6, `${c.name}: the flat roof is the slab, cast out ${half} mm past the outline, inside a 150 mm parapet on its edge`, 1e-9);
   }
   equal(buildBuilding({ template: "modern-villa" }).options.roofType, "pitched", "the Modern Villa starts with its pitched roof");
   equal(buildBuilding({ template: "modern-house" }).options.roofType, "flat", "and the Modern House with a flat one");

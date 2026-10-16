@@ -84,11 +84,13 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
   const sourceProject = source === "sample" || !project ? building.project : project;
   const [buildProject, pending] = useSettled(sourceProject, 250);
   const { blockType, floorFinish } = options;
+  const parapetHeight = building.options.parapetHeight;
   const built = useMemo<{ model: ConstructionModel; source: HouseProject } | null>(() => {
     if (!ready) return null;
-    const buildOptions: ModelOptions = { ...DEFAULT_OPTIONS, blockType, floorFinish };
+    // The sample building says how high its parapet is; a project of the learner's own has no such setting, so the example is used.
+    const buildOptions: ModelOptions = { ...DEFAULT_OPTIONS, blockType, floorFinish, ...(source === "sample" || !project ? { parapetHeight: parapetHeight } : {}) };
     return { model: buildConstructionModel(buildProject, buildOptions, rules), source: buildProject };
-  }, [ready, buildProject, blockType, floorFinish, rules]);
+  }, [ready, buildProject, blockType, floorFinish, rules, source, project, parapetHeight]);
   const areas = useMemo(() => areasOf(sourceProject, options.roofType), [sourceProject, options.roofType]);
   const model = built?.model ?? null;
   const index = useMemo(() => (model ? indexModel(model) : null), [model]);

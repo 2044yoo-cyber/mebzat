@@ -10,7 +10,7 @@ import {
 } from "./service-routing";
 import type { ChaseSpec, SleeveSpec } from "./electrical-plan";
 import { insetOutline } from "./structure-data";
-import { pitchedGutter } from "./roof-geometry";
+import { parapetHeightOf, pitchedGutter } from "./roof-geometry";
 
 /**
  * The plumbing and drainage, laid out from the building.
@@ -354,7 +354,7 @@ function roofWater(ctx: Ctx, plan: PlumbingPlan, layoutOf: (room: RoomInfo) => R
       // Clear of columns and of every opening on every storey along this line, and of the meter.
       if (ctx.project.structuralColumns.some((c) => Math.abs(c.x - px) < c.width / 2 + 120 && Math.abs(c.y - py) < c.depth / 2 + 120)) continue;
       if (ctx.walls.some((o) => o.exterior && Math.abs(o.ux * w.ux + o.uy * w.uy) > 0.999 && Math.abs((o.start.x - w.start.x) * w.nx + (o.start.y - w.start.y) * w.ny) < 5 && o.openings.some((op) => { const ss = (px - o.start.x) * o.ux + (py - o.start.y) * o.uy; return ss > op.s0 - 150 && ss < op.s1 + 150; }))) continue;
-      const parapetTop = roofTop + ASSUME.parapetHeight;
+      const parapetTop = roofTop + parapetHeightOf(ctx.options);
       const pumpAt = { x: px + out.x * 350, y: py + out.y * 350 };
       const zOver = parapetTop + 150;
       const inward = { x: -out.x, y: -out.y };

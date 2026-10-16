@@ -172,5 +172,11 @@
     "file": "src/features/house-designer/construction/slab-cast.ts",
     "from": "return xs.reduce((best, x) => (Math.abs(x - mid) < Math.abs(best - mid) - 1e-9 || (Math.abs(Math.abs(x - mid) - Math.abs(best - mid)) < 1e-9 && x > best) ? x : best), xs[0]!);",
     "to": "return xs[0]!;"
+  },
+  {
+    "name": "the room behind the balcony has a window, not a door",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "    balconyRooms: modern ? { zones: [\"b\"], width: 2400 } : { zones: [\"a\", \"c\"], width: 1800 },\n",
+    "to": ""
   }
 ]

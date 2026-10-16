@@ -3,6 +3,7 @@ import type { Room } from "@/features/berchuma-studio/types/room";
 import { ASSUME } from "./context";
 import { polygonArea, type P2 } from "./geometry";
 import { pitchedCover } from "./roof-geometry";
+import { frameHalfOfProject } from "./slab-cast";
 import {
   DEFAULT_LEARNING_PARAMS,
   buildLearningHouseProject,
@@ -88,7 +89,7 @@ export const TEMPLATES: Record<BuildingTemplateId, TemplateDef> = {
     defaults: { template: "modern-villa", length: 16000, width: 12000, floors: 2, floorToFloor: 3300 },
     limits: { length: [12000, 26000], width: [9500, 20000], floors: [2, 3], floorToFloor: [2900, 4200] },
     roofType: "pitched", gridX: [0, 0.28, 0.54, 0.74, 1], gridY: [0, 0.46, 1],
-    features: ["Two cantilever balconies", "Pitched timber roof", "Entrance canopy", "Master suite"],
+    features: ["Two cantilever balconies", "Pitched timber roof with gable ends", "Entrance sheltered by the balcony above", "Master suite"],
   },
   "g-plus-2": {
     id: "g-plus-2", label: "G+2 Building", summary: "Three floors of equal area: two apartments on each side of a central stair core, with a flat roof. Floors are fixed at three.",
@@ -230,7 +231,7 @@ type Kind = "ground" | "first" | "second";
 type Names = Record<"a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i", string>;
 
 /** The nine-room plan the Existing Building uses, with its own names and windows: the modern house and villa are drawn on it. */
-function planOnFiveByThree(kind: Kind, p: LearningHouseParams, style: { names: Record<Kind, Names>; window: { width: number; height: number; sill: number }; open: [string, string][]; openUpper?: [string, string][]; entranceWidth: number; bathLength: number }): PlanSpec {
+function planOnFiveByThree(kind: Kind, p: LearningHouseParams, style: { names: Record<Kind, Names>; window: { width: number; height: number; sill: number }; open: [string, string][]; openUpper?: [string, string][]; entranceWidth: number; bathLength: number; balconyRooms?: { zones: string[]; width: number } }): PlanSpec {
   const [x0, x1, x2, x3, x4] = p.gridX as [number, number, number, number, number];
   const [y0, y1, y2] = p.gridY as [number, number, number];
   const bath = Math.min(style.bathLength, (x2 - x1) * 0.6);
@@ -276,9 +277,11 @@ function planOnFiveByThree(kind: Kind, p: LearningHouseParams, style: { names: R
       ];
   const small = { width: 600, height: 600, sill: 1500 };
   const big = style.window;
+  // A room that opens onto a balcony has a glazed door there, down to the floor, in place of its window: how else would anyone step out?
+  const front = (zone: string) => (kind === "first" && style.balconyRooms?.zones.includes(zone) ? { width: style.balconyRooms.width, height: 2100, sill: 0 } : big);
   const windows: WindowSpec[] = [
-    { zone: "a", side: "S", at: (x0 + x1) / 2, ...big }, { zone: "a", side: "W", at: (y0 + y1) / 2 },
-    { zone: "b", side: "S", at: (x1 + x2) / 2, ...big }, { zone: "c", side: "S", at: (x2 + x4) / 2, ...big }, { zone: "c", side: "E", at: (y0 + y1) / 2 },
+    { zone: "a", side: "S", at: (x0 + x1) / 2, ...front("a") }, { zone: "a", side: "W", at: (y0 + y1) / 2 },
+    { zone: "b", side: "S", at: (x1 + x2) / 2, ...front("b") }, { zone: "c", side: "S", at: (x2 + x4) / 2, ...front("c") }, { zone: "c", side: "E", at: (y0 + y1) / 2 },
     { zone: "d", side: "W", at: (y1 + y2) / 2 }, { zone: "d", side: "N", at: (x0 + x1) / 2 },
     { zone: "f", side: "N", at: (x1 + xb) / 2, ...small },
     { zone: "h", side: "N", at: (x2 + x3) / 2, width: 800, height: 1500, sill: 600 },
@@ -397,7 +400,7 @@ export type BuildingAreas = {
  * dimensions the roof generator draws from: a flat roof is the slab inside its parapet; a pitched
  * roof is measured along the slope, with its overhang.
  */
-export function roofAreaOf(outline: P2[], roofType: ModelOptions["roofType"]): { covering: number; plan: number } {
+export function roofAreaOf(outline: P2[], roofType: ModelOptions["roofType"], frameHalf = 0): { covering: number; plan: number } {
   const xs = outline.map((p) => p.x);
   const ys = outline.map((p) => p.y);
   const L = Math.max(...xs) - Math.min(...xs);
@@ -406,7 +409,8 @@ export function roofAreaOf(outline: P2[], roofType: ModelOptions["roofType"]): {
     const cover = pitchedCover(L, W);
     return { covering: cover.sloped, plan: cover.plan };
   }
-  const inner = (L - 2 * ASSUME.parapetThickness) * (W - 2 * ASSUME.parapetThickness) * 1e-6;
+  // The slab is cast out `frameHalf` past the outline and the parapet stands on its edge, so the roof surface is inside the parapet, `parapetThickness` in from the slab edge.
+  const inner = (L + 2 * (frameHalf - ASSUME.parapetThickness)) * (W + 2 * (frameHalf - ASSUME.parapetThickness)) * 1e-6;
   return { covering: inner, plan: polygonArea(outline) * 1e-6 };
 }
 
@@ -419,7 +423,8 @@ export function areasOf(project: HouseProject, roofType: ModelOptions["roofType"
   const balconyPerFloor = project.levels.map((level) => project.balconies.filter((b) => b.levelId === level.id).reduce((s, b) => s + b.width * b.depth * 1e-6, 0));
   const grossFloorArea = areaPerFloor.reduce((s, a) => s + a, 0);
   const outline = project.slabs.find((s) => s.levelId === project.levels[0]?.id)?.boundary ?? [];
-  const roof = roofAreaOf(outline, roofType);
+  const top = project.levels[project.levels.length - 1];
+  const roof = roofAreaOf(outline, roofType, top ? frameHalfOfProject(project, top.id) : 0);
   return {
     footprint: areaPerFloor[0] ?? 0, areaPerFloor, balconyPerFloor, grossFloorArea,
     totalSlabArea: grossFloorArea + balconyPerFloor.reduce((s, a) => s + a, 0), roofArea: roof.covering, roofPlanArea: roof.plan, roofType,
@@ -486,6 +491,8 @@ export function buildBuilding(input: Partial<BuildingConfig> & { template?: Buil
     openUpper: (modern ? [["d", "g"]] : []) as [string, string][],
     entranceWidth: modern ? 1200 : 1400,
     bathLength: 2400,
+    // The first-floor rooms behind the balconies: the master bedroom and the third bedroom of the villa, bedroom 2 of the Modern House.
+    balconyRooms: modern ? { zones: ["b"], width: 2400 } : { zones: ["a", "c"], width: 1800 },
   };
   const withHall: LearningHouseParams = { ...p, stairHall: hall };
   planOf = (index) => buildPlanFromSpec(planOnFiveByThree(kindAt(index), withHall, style), withHall);
@@ -503,5 +510,7 @@ export function buildBuilding(input: Partial<BuildingConfig> & { template?: Buil
 
 function finish(config: BuildingConfig, def: TemplateDef, p: LearningHouseParams, planOf: (index: number) => Room, hooks: BuildHooks, issues: (ConfigIssue | ParamIssue)[]): BuiltBuilding {
   const project = buildProjectFromPlans(p, planOf, hooks);
-  return { config, project, params: p, areas: areasOf(project, def.roofType), options: { roofType: def.roofType }, issues };
+  // A template that builds a flat roof says how high its parapet is; the existing building and the pitched villa leave it to the assumption.
+  const options: Partial<ModelOptions> = { roofType: def.roofType, ...(def.roofType === "flat" && hooks.parapet ? { parapetHeight: hooks.parapet } : {}) };
+  return { config, project, params: p, areas: areasOf(project, def.roofType), options, issues };
 }
