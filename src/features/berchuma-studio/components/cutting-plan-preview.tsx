@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { bandedSides } from "../services/banding-edges";
 import type { ProjectProductionSummary } from "../services/cabinet-project";
 
 export function CuttingPlanPreview({ layouts }: {
@@ -19,15 +20,6 @@ export function CuttingPlanPreview({ layouts }: {
   const waste = Math.max(0, area - used);
   const scale = Math.min(560 / current.length, 340 / current.width);
   const margin = 20;
-  const bandingEdges = (banding: string) => {
-    const value = banding.toLowerCase();
-    const all = value.includes("all edges");
-    return {
-      top: all || value.includes("top"), bottom: all || value.includes("bottom"),
-      left: all || value.includes("left") || value.includes("both ends"),
-      right: all || value.includes("right") || value.includes("both ends"),
-    };
-  };
   const viewWidth = current.length * scale + margin * 2;
   const viewHeight = current.width * scale + margin * 2;
 
@@ -55,9 +47,9 @@ export function CuttingPlanPreview({ layouts }: {
             const y = margin + part.y * scale;
             const w = part.width * scale;
             const h = part.height * scale;
-            const edges = bandingEdges(part.banding);
+            const edges = bandedSides(part.banding, part.rotated);
             const edgeStroke = "#e11d48";
-            const label = part.partId ? `#${index + 1} · ${part.partId}` : `#${index + 1}`;
+            const label = part.partId ? `${index + 1} · ${part.partId}` : `${index + 1}`;
             return <g key={`${part.partId}-${part.label}-${index}`}>
               <rect x={x} y={y} width={w} height={h} fill="currentColor" fillOpacity="0.13"
                 stroke="currentColor" strokeOpacity="0.75" strokeWidth="1"/>
@@ -128,11 +120,22 @@ export function CuttingPlanPreview({ layouts }: {
             <span className="block break-words font-semibold">#{index + 1} · {part.partId}</span>
             <span className="block break-words font-medium">{part.label}</span>
             <span className="block text-muted-foreground">{Math.round(part.width)} × {Math.round(part.height)} mm{part.rotated ? " · rotated" : ""}</span>
-            <span className="block text-rose-700 dark:text-rose-300">Banding: {part.banding || "—"}</span>
+            <BandingNote part={part} />
           </span>
         </li>)}
       </ol>
       <p className="text-[11px] text-muted-foreground">Diagram is a scale-based nesting preview. Confirm saw kerf, grain direction, trim, and machine setup before cutting.</p>
     </section>
+  );
+}
+
+function BandingNote({ part }: { part: ProjectProductionSummary["layouts"][number]["parts"][number] }) {
+  const sides = bandedSides(part.banding, part.rotated);
+  if (!sides.recognised) return <span className="block text-amber-700 dark:text-amber-300">Banding: {part.banding || "unknown"} — not drawn: check the cut list</span>;
+  return (
+    <span className="block text-rose-700 dark:text-rose-300">
+      Banding: {part.banding || "—"}
+      {sides.ambiguous.length ? <span className="text-muted-foreground"> — {sides.ambiguous.join(" and ")} not drawn: the cut list does not say which side</span> : null}
+    </span>
   );
 }

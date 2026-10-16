@@ -1,0 +1,74 @@
+[
+ {
+  "name": "layout ids lose the design prefix (shared sheets)",
+  "file": "src/features/berchuma-studio/services/cabinet-project.ts",
+  "from": "          partId: `${index + 1}-${row.partId}`,\n          index: ++globallyUniqueRow,",
+  "to": "          index: ++globallyUniqueRow,"
+ },
+ {
+  "name": "a panel is matched to the wrong cut-list row",
+  "file": "src/features/berchuma-studio/services/cabinet-project.ts",
+  "from": "            const row = group.rows.find(row => row.index === place.index);\n            return {",
+  "to": "            const row = group.rows.find(row => row.index === place.index + 1);\n            return {"
+ },
+ {
+  "name": "banding comes from a different row",
+  "file": "src/features/berchuma-studio/services/cabinet-project.ts",
+  "from": "partId: row?.partId ?? \"\", banding: row?.banding ?? \"Unknown\",\n              x: place.x, y: place.y, width: place.width, height: place.height, rotated: place.rotated,\n            };\n          }),\n        });\n      }\n    } else {",
+  "to": "partId: row?.partId ?? \"\", banding: \"Front\",\n              x: place.x, y: place.y, width: place.width, height: place.height, rotated: place.rotated,\n            };\n          }),\n        });\n      }\n    } else {"
+ },
+ {
+  "name": "all four edges is not recognised",
+  "file": "src/features/berchuma-studio/services/banding-edges.ts",
+  "from": "token === \"all four edges\"",
+  "to": "token === \"all edges\""
+ },
+ {
+  "name": "banding ignores the panel being turned",
+  "file": "src/features/berchuma-studio/services/banding-edges.ts",
+  "from": "    if (rotated) { sides.left = true; sides.right = true; } else { sides.top = true; sides.bottom = true; }",
+  "to": "    sides.top = true; sides.bottom = true;"
+ },
+ {
+  "name": "the ends ignore the panel being turned",
+  "file": "src/features/berchuma-studio/services/banding-edges.ts",
+  "from": "    if (rotated) { sides.top = true; sides.bottom = true; } else { sides.left = true; sides.right = true; }",
+  "to": "    sides.left = true; sides.right = true;"
+ },
+ {
+  "name": "a single long edge is drawn on a guessed side",
+  "file": "src/features/berchuma-studio/services/banding-edges.ts",
+  "from": "  } else if (longEdges === 1) sides.ambiguous.push(\"one long edge\");",
+  "to": "  } else if (longEdges === 1) { sides.top = true; sides.ambiguous.push(\"one long edge\"); }"
+ },
+ {
+  "name": "unknown banding words are read as no banding",
+  "file": "src/features/berchuma-studio/services/banding-edges.ts",
+  "from": "    else return { ...NONE, recognised: false };\n  }\n  if (allFour)",
+  "to": "    else return { ...NONE };\n  }\n  if (allFour)"
+ },
+ {
+  "name": "preview never draws the top edge",
+  "file": "src/features/berchuma-studio/components/cutting-plan-preview.tsx",
+  "from": "{edges.top && <line",
+  "to": "{false && <line"
+ },
+ {
+  "name": "preview ignores a turned panel",
+  "file": "src/features/berchuma-studio/components/cutting-plan-preview.tsx",
+  "from": "bandedSides(part.banding, part.rotated);\n            const edgeStroke",
+  "to": "bandedSides(part.banding, false);\n            const edgeStroke"
+ },
+ {
+  "name": "the doubled hash comes back",
+  "file": "src/features/berchuma-studio/components/cutting-plan-preview.tsx",
+  "from": "const label = part.partId ? `${index + 1} \u00b7 ${part.partId}` : `${index + 1}`;",
+  "to": "const label = part.partId ? `#${index + 1} \u00b7 ${part.partId}` : `#${index + 1}`;"
+ },
+ {
+  "name": "unrecognised banding is drawn as if confirmed",
+  "file": "src/features/berchuma-studio/components/cutting-plan-preview.tsx",
+  "from": "if (!sides.recognised) return",
+  "to": "if (false) return"
+ }
+]

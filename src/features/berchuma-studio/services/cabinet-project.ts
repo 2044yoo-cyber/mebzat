@@ -223,11 +223,14 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
       for (const row of board.rows) {
         grouped.rows.push({
           ...row,
+          // The id the exported cut list shows: unique across designs, which
+          // the bare part id is not.
+          partId: `${index + 1}-${row.partId}`,
           index: ++globallyUniqueRow,
           label: `${title} — ${row.partId} — ${row.label}`,
         });
       }
-      grouped.separate.push({ design: title, nesting: board.nesting, rows: board.rows });
+      grouped.separate.push({ design: title, nesting: board.nesting, rows: board.rows.map(row => ({ ...row, partId: `${index + 1}-${row.partId}` })) });
       sharedInputs.set(board.boardId, grouped);
     });
     cut.hardware.forEach(item => hardware.push([
@@ -285,29 +288,31 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
             const row = group.rows.find(row => row.index === place.index);
             return {
               label: row?.label ?? place.label, design: row?.cabinet ?? "",
-              partId: row?.partId ?? `CUT-${place.index}`, banding: row?.banding ?? "—",
+              partId: row?.partId ?? "", banding: row?.banding ?? "Unknown",
               x: place.x, y: place.y, width: place.width, height: place.height, rotated: place.rotated,
             };
           }),
         });
       }
     } else {
+      let layoutOffset = 0;
       for (const source of group.separate) {
         for (const sheet of source.nesting.sheets) {
           layouts.push({
-            board: item.board, sheet: sheet.number,
+            board: item.board, sheet: sheet.number + layoutOffset,
             length: source.nesting.sheet.length, width: source.nesting.sheet.width,
             utilisation: sheet.utilisation,
             parts: sheet.placements.map(place => {
               const row = source.rows.find(row => row.index === place.index);
               return {
                 label: row?.label ?? place.label, design: source.design,
-                partId: row?.partId ?? `CUT-${place.index}`, banding: row?.banding ?? "—",
+                partId: row?.partId ?? "", banding: row?.banding ?? "Unknown",
                 x: place.x, y: place.y, width: place.width, height: place.height, rotated: place.rotated,
               };
             }),
           });
         }
+        layoutOffset += source.nesting.sheets.length;
       }
     }
     if (useShared) {
