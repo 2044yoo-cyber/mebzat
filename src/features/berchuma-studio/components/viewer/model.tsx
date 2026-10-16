@@ -211,7 +211,8 @@ export default function Model({
       frameloop="demand"
       dpr={[1, 2]}
       camera={{ fov: 35, near: 0.05, far: 100 }}
-      gl={{ antialias: true, alpha: true, ...(renderQuality ? { shadows: true } : {}) }}
+      shadows={renderQuality}
+      gl={{ antialias: true, alpha: true }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = renderQuality ? 1.12 : 1;
