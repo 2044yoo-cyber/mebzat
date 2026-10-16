@@ -60,6 +60,16 @@ export function deleteHouseSelections(project: HouseProject, selections: readonl
           blocked.push("Exterior footprint walls must be removed in plan verification");
           continue;
         }
+        // The wall that arrives at the deleted corner is re-drawn to the next
+        // corner, so a locked one would be bent without anyone having moved it.
+        const corners = level!.plan!.corners;
+        const at = corners.findIndex((corner) => corner.id === sourceId);
+        const arriving = corners[(at + corners.length - 1) % corners.length];
+        const bent = next.walls.find((item) => item.levelId === level!.id && item.id !== wall!.id && item.sourceWallId === arriving?.id);
+        if (bent && next.objectInstances[bent.id]?.pinned) {
+          blocked.push("A locked exterior wall would be re-drawn by deleting this one. Unlock it first.");
+          continue;
+        }
         // Deleting one side of a closed footprint means deleting the corner
         // it starts from — there is no such thing as erasing a single wall
         // and leaving the shape open. removeFootprintCorner regenerates

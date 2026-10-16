@@ -1,0 +1,5 @@
+[
+ {"name":"a drawn rectangle is not widened by a wall thickness","file":"src/features/house-designer/services/freehand.ts","from":"  const centrelineWidth = width + wallThickness;","to":"  const centrelineWidth = width;"},
+ {"name":"the depth is not widened by a wall thickness","file":"src/features/house-designer/services/freehand.ts","from":"  const centrelineDepth = depth + wallThickness;","to":"  const centrelineDepth = depth;"},
+ {"name":"a calibrated rectangle is not converted to clear inside size","file":"src/features/house-designer/services/freehand.ts","from":"      next = dimensionRectangle(next, width, depth);","to":"      next = next;"}
+]

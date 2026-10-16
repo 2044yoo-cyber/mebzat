@@ -1,0 +1,5 @@
+[
+ {"name":"deleting a wall may re-draw a locked neighbour","file":"src/features/house-designer/services/model-commands.ts","from":"        if (bent && next.objectInstances[bent.id]?.pinned) {","to":"        if (false) {"},
+ {"name":"any locked wall blocks a delete","file":"src/features/house-designer/services/model-commands.ts","from":"item.sourceWallId === arriving?.id);","to":"item.sourceWallId !== undefined);"},
+ {"name":"the wrong neighbour is guarded","file":"src/features/house-designer/services/model-commands.ts","from":"const arriving = corners[(at + corners.length - 1) % corners.length];","to":"const arriving = corners[(at + 1) % corners.length];"}
+]

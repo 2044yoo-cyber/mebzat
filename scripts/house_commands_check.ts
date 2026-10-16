@@ -204,12 +204,22 @@ assert.ok(deleteHouseSelections(editable.project, [triangleWall], { footprintEdi
   assert.ok(lockConflict(lockedLeft, left), "a locked wall reports itself");
   const refused = moveHouseSelections(lockedLeft, [top], 0, -500, { footprintEditable: true });
   assert.equal(refused.project, lockedLeft, "a move that would stretch a locked wall does nothing");
-  assert.match(refused.blocked.join(" "), /locked wall joined to it/);
+  assert.match(refused.blocked.join(" "), /locked exterior wall shares a moved corner/);
   assert.equal(lockConflict(lockedLeft, right), null, "the lock reaches only the walls it touches");
   assert.deepEqual(moveHouseSelections(lockedLeft, [right], 300, 0, { footprintEditable: true }).blocked, []);
   const kept = deleteHouseSelections(pinHouseSelections(base, [top], true), [top], { footprintEditable: true });
   assert.equal(kept.project.walls.length, pinHouseSelections(base, [top], true).walls.length, "a locked wall cannot be deleted");
   assert.equal(deleteHouseSelections(lockedLeft, [top], { footprintEditable: true }).blocked.length, 1, "nor one whose removal would bend a locked neighbour");
+  const bendsLocked = deleteHouseSelections(lockedLeft, [top], { footprintEditable: true });
+  assert.equal(bendsLocked.project, lockedLeft, "and the plan is left exactly as it was");
+  assert.match(bendsLocked.blocked.join(" "), /locked exterior wall would be re-drawn/);
+  const geometry = (value: typeof base, id: string) => JSON.stringify(value.walls.find((wall) => wall.id === id)!.start) + JSON.stringify(value.walls.find((wall) => wall.id === id)!.end);
+  // A locked wall on the far side of the deleted one is not touched, so deleting is allowed and it stays put.
+  const lockedRight = pinHouseSelections(base, [right], true);
+  const farSide = deleteHouseSelections(lockedRight, [top], { footprintEditable: true });
+  assert.deepEqual(farSide.blocked, [], "a locked wall that deleting does not re-draw does not stop it");
+  assert.equal(geometry(farSide.project, right.id), geometry(lockedRight, right.id), "and it keeps its geometry");
+  assert.deepEqual(deleteHouseSelections(base, [top], { footprintEditable: true }).blocked, [], "nothing locked, nothing blocked");
 }
 
 {
