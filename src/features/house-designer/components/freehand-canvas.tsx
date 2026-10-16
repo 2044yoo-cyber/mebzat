@@ -17,6 +17,8 @@ import {
   Trash2,
   DoorOpen,
   AppWindow,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import type { HouseProject } from "../types/project";
 import {
@@ -68,6 +70,7 @@ export function FreehandCanvas({
     "Draw along the finished inside wall faces. Dimensions are clear inside measurements, not centreline or outside lengths. Calibrate with a known inside length; calibrated rectangles keep these dimensions after wall thickness is applied.",
   );
   const [review, setReview] = useState(false);
+  const [drawingLocked, setDrawingLocked] = useState(false);
   const [focusedIssue, setFocusedIssue] = useState<string | null>(null);
   const [rejectedRepairs, setRejectedRepairs] = useState<string[]>([]);
   const dialog = useRef<HTMLDivElement>(null);
@@ -599,6 +602,7 @@ export function FreehandCanvas({
           readOnly,
         )}
         {button("Set scale / distance", Ruler, calibrate, false, readOnly)}
+        {button(drawingLocked ? "Unlock sketch" : "Lock sketch", drawingLocked ? Unlock : Lock, () => { setDrawingLocked(value => { const next = !value; setTool(next ? "pan" : "draw"); return next; }); }, drawingLocked, readOnly)}
         {button("Door symbol", DoorOpen, () => setTool("door"), tool === "door", readOnly)}
         {button("Window symbol", AppWindow, () => setTool("window"), tool === "window", readOnly)}
         {button("Zoom in", ZoomIn, () => zoom(1.25))}
@@ -629,6 +633,7 @@ export function FreehandCanvas({
         style={{ touchAction: "none", overscrollBehavior: "none" }}
         onPointerDown={(e) => {
           if (e.pointerType === "mouse" && e.button !== 0) return;
+          if (drawingLocked) return;
           e.preventDefault();
           e.currentTarget.setPointerCapture(e.pointerId);
           contacts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
