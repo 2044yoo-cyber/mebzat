@@ -1603,7 +1603,7 @@ function PlanEditor({
             </div>
           </div>
         ) : tab === "3d" ? (
-          <ConstructionLearningView project={project} bottomActions={bottomActions} />
+          <ConstructionLearningView project={project} bottomActions={bottomActions} onOpenLearn={() => onTab("learn")} />
         ) : tab === "learn" ? (
           <ConstructionLab project={project} />
         ) : !link ? (
@@ -1637,7 +1637,7 @@ const CONSTRUCTION_LESSONS = [
   { title: "8. Services and finishes", materials: "Electrical conduits, plumbing pipes, plaster, screed, tiles, paint, doors and windows.", purpose: "Makes the building usable, weather-tight and finished.", caution: "Coordinate services before concrete pours and wall closure; test before covering.", kind: "finishes" as const },
 ];
 
-function ConstructionLearningView({ project, bottomActions }: { project: HouseProject; bottomActions: React.ReactNode }) {
+function ConstructionLearningView({ project, bottomActions, onOpenLearn }: { project: HouseProject; bottomActions: React.ReactNode; onOpenLearn: () => void }) {
   const [lessonIndex, setLessonIndex] = useState(0);
   const [showStructure, setShowStructure] = useState(false);
   const lesson = CONSTRUCTION_LESSONS[lessonIndex]!;
@@ -1656,9 +1656,14 @@ function ConstructionLearningView({ project, bottomActions }: { project: HousePr
   }, [lesson.kind, showStructure]);
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border bg-card p-3">
-        <h2 className="text-sm font-semibold">Construction Learning Mode</h2>
-        <p className="text-xs text-muted-foreground">Explore concrete-house elements, materials and construction sequence.</p>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold">Construction Learning Mode</h2>
+          <p className="text-xs text-muted-foreground">Explore concrete-house elements, materials and construction sequence.</p>
+        </div>
+        <button type="button" onClick={onOpenLearn} className="min-h-10 shrink-0 rounded-lg bg-brand px-3 text-xs font-semibold text-brand-foreground hover:opacity-90">
+          Open detailed Learn →
+        </button>
       </div>
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-2">
