@@ -133,6 +133,21 @@ export function FreehandCanvas({
       const kind = stroke.kind ?? "wall";
       const color = stroke.color ?? (kind === "kitchen" ? "#dc2626" : kind === "furniture" ? "#0d9488" : kind === "door" ? "#7c3aed" : kind === "window" ? "#0284c7" : "#bdc5cf");
       draw(stroke.points, color, kind === "wall" ? 1 : 1.5);
+      if ((kind === "door" || kind === "window") && stroke.points.length >= 2) {
+        const a = stroke.points[0]!, b = stroke.points[stroke.points.length - 1]!;
+        const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy) || 1;
+        const nx = -dy / length, ny = dx / length, mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        ctx.save(); ctx.lineWidth = 1.5 / v.zoom; ctx.strokeStyle = color;
+        if (kind === "window") {
+          for (const offset of [-3, 3]) { ctx.beginPath(); ctx.moveTo(a.x + nx * offset / v.zoom, a.y + ny * offset / v.zoom); ctx.lineTo(b.x + nx * offset / v.zoom, b.y + ny * offset / v.zoom); ctx.stroke(); }
+          ctx.beginPath(); ctx.moveTo(mx - nx * 5 / v.zoom, my - ny * 5 / v.zoom); ctx.lineTo(mx + nx * 5 / v.zoom, my + ny * 5 / v.zoom); ctx.stroke();
+        } else {
+          const radius = Math.min(length * 0.9, 28 / v.zoom), hx = a.x + dx / length * radius, hy = a.y + dy / length * radius;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(hx, hy); ctx.stroke();
+          const base = Math.atan2(dy, dx); ctx.beginPath(); ctx.arc(a.x, a.y, radius, base, base + Math.PI / 2, dy >= 0); ctx.stroke();
+        }
+        ctx.restore();
+      }
     }
     // Preview exactly the same joined, split wall graph used by Convert to Plan.
     // Cache while moving the pointer so drawing stays responsive on phones.
@@ -416,26 +431,26 @@ export function FreehandCanvas({
     }
     const units = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
     const answer = window.prompt(
-      `Clear inside length between finished wall faces for Wall ${wallIndex + 1} (metres). Measure inside the home, not centre-to-centre or outside. This calibrates the whole sketch.`,
-      sketch.calibrated ? ((units * sketch.mmPerUnit) / 1000).toFixed(3) : "",
+      `Known CLEAR INSIDE length for Wall ${wallIndex + 1}, in millimetres (mm). Measure finished inside face to inside face, not outside-to-outside or centre-to-centre. This sets the scale for the entire sketch.`,
+      sketch.calibrated ? (units * sketch.mmPerUnit).toFixed(1) : "",
     );
     if (answer === null) return;
-    const metres = Number(answer);
-    if (!Number.isFinite(metres) || metres <= 0) {
-      setMessage("Enter a positive length in metres, for example 4.00.");
+    const knownMm = Number(answer);
+    if (!Number.isFinite(knownMm) || knownMm < 100 || knownMm > 100000) {
+      setMessage("Enter a realistic positive inside length in millimetres, for example 4200.");
       return;
     }
     if (
       sketch.calibrated &&
-      Math.abs((metres * 1000) / units - sketch.mmPerUnit) > 0.001 &&
+      Math.abs(knownMm / units - sketch.mmPerUnit) > 0.001 &&
       !window.confirm(
         "This replaces your previous scale. Keep the old scale by choosing Cancel.",
       )
     )
       return;
-    commit({ ...sketch, mmPerUnit: (metres * 1000) / units, calibrated: true });
+    commit({ ...sketch, mmPerUnit: knownMm / units, calibrated: true });
     setMessage(
-      `Scale set from Wall ${wallIndex + 1} using its clear inside length. Calibrated rectangular rooms preserve inside dimensions when converted; complex plans retain the measured scale for review in Plan mode.`,
+      `Scale calibrated from Wall ${wallIndex + 1} using ${knownMm.toFixed(1)} mm clear inside length. Check at least one other known dimension before cost estimation.`,
     );
   }
   function zoom(factor: number) {
