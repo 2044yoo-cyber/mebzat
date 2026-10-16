@@ -55,6 +55,7 @@ export function FreehandCanvas({
   const [tool, setTool] = useState<"draw" | "erase" | "pan" | "point">(
     readOnly ? "pan" : "draw",
   );
+  const [markKind, setMarkKind] = useState<"wall" | "door" | "window" | "furniture" | "kitchen">("wall");
   const [selectedPoint, setSelectedPoint] = useState<{ strokeId: string; end: "start" | "end" } | null>(null);
   const pointStart = useRef<Point | null>(null);
   const [past, setPast] = useState<Sketch[]>([]),
@@ -128,7 +129,25 @@ export function FreehandCanvas({
       ctx.stroke();
     };
     for (const stroke of state.current.sketch.strokes) {
-      if (!gesture.current?.erase.has(stroke.id)) draw(stroke.points, "#bdc5cf", 1);
+      if (gesture.current?.erase.has(stroke.id)) continue;
+      const kind = stroke.kind ?? "wall";
+      const color = stroke.color ?? (kind === "kitchen" ? "#dc2626" : kind === "furniture" ? "#0d9488" : kind === "door" ? "#7c3aed" : kind === "window" ? "#0284c7" : "#bdc5cf");
+      draw(stroke.points, color, kind === "wall" ? 1 : 1.5);
+      if ((kind === "door" || kind === "window") && stroke.points.length >= 2) {
+        const a = stroke.points[0]!, b = stroke.points[stroke.points.length - 1]!;
+        const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy) || 1;
+        const nx = -dy / length, ny = dx / length, mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        ctx.save(); ctx.lineWidth = 1.5 / v.zoom; ctx.strokeStyle = color;
+        if (kind === "window") {
+          for (const offset of [-3, 3]) { ctx.beginPath(); ctx.moveTo(a.x + nx * offset / v.zoom, a.y + ny * offset / v.zoom); ctx.lineTo(b.x + nx * offset / v.zoom, b.y + ny * offset / v.zoom); ctx.stroke(); }
+          ctx.beginPath(); ctx.moveTo(mx - nx * 5 / v.zoom, my - ny * 5 / v.zoom); ctx.lineTo(mx + nx * 5 / v.zoom, my + ny * 5 / v.zoom); ctx.stroke();
+        } else {
+          const radius = Math.min(length * 0.9, 28 / v.zoom), hx = a.x + dx / length * radius, hy = a.y + dy / length * radius;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(hx, hy); ctx.stroke();
+          const base = Math.atan2(dy, dx); ctx.beginPath(); ctx.arc(a.x, a.y, radius, base, base + Math.PI / 2, dy >= 0); ctx.stroke();
+        }
+        ctx.restore();
+      }
     }
     // Preview exactly the same joined, split wall graph used by Convert to Plan.
     // Cache while moving the pointer so drawing stays responsive on phones.
@@ -305,7 +324,7 @@ export function FreehandCanvas({
   // Nearby wall endpoints become exact shared junctions.
   function alignWall(start: Point, end: Point): [Point, Point] {
     const radius = 18 / view.current.zoom;
-    const endpoints = sketch.strokes.flatMap(stroke => stroke.points.length < 2
+    const endpoints = sketch.strokes.flatMap(stroke => stroke.locked || stroke.points.length < 2
       ? [] : [stroke.points[0]!, stroke.points[stroke.points.length - 1]!]);
     const nearest = (p: Point) => {
       let best = p, distance = radius;
@@ -343,6 +362,7 @@ export function FreehandCanvas({
     if (!selectedPoint || readOnly) return;
     const target = sketch.strokes.find(stroke => stroke.id === selectedPoint.strokeId);
     if (!target || target.points.length < 2) return;
+    if (target.locked) { setMessage("This stroke is locked. Unlock it before editing."); return; }
     const first = selectedPoint.end === "start";
     const endpoint = first ? target.points[0]! : target.points[target.points.length - 1]!;
     const neighbour = first ? target.points[1]! : target.points[target.points.length - 2]!;
@@ -384,7 +404,8 @@ export function FreehandCanvas({
     setMessage("Extra wall extension trimmed to the junction. Undo to restore.");
   }
   function erase(p: Point) {
-    for (const s of sketch.strokes)
+    for (const s of sketch.strokes) {
+      if (s.locked) continue;
       for (let i = 1; i < s.points.length; i++) {
         const q = foot(p, s.points[i - 1]!, s.points[i]!);
         if (Math.hypot(p.x - q.x, p.y - q.y) < 14 / view.current.zoom) {
@@ -392,6 +413,7 @@ export function FreehandCanvas({
           break;
         }
       }
+    }
   }
   function calibrate(wallIndex = 0) {
     const segments = convertStrokes(
@@ -411,26 +433,26 @@ export function FreehandCanvas({
     }
     const units = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
     const answer = window.prompt(
-      `Clear inside length between finished wall faces for Wall ${wallIndex + 1} (metres). Measure inside the home, not centre-to-centre or outside. This calibrates the whole sketch.`,
-      sketch.calibrated ? ((units * sketch.mmPerUnit) / 1000).toFixed(3) : "",
+      `Known CLEAR INSIDE length for Wall ${wallIndex + 1}, in millimetres (mm). Measure finished inside face to inside face, not outside-to-outside or centre-to-centre. This sets the scale for the entire sketch.`,
+      sketch.calibrated ? (units * sketch.mmPerUnit).toFixed(1) : "",
     );
     if (answer === null) return;
-    const metres = Number(answer);
-    if (!Number.isFinite(metres) || metres <= 0) {
-      setMessage("Enter a positive length in metres, for example 4.00.");
+    const knownMm = Number(answer);
+    if (!Number.isFinite(knownMm) || knownMm < 100 || knownMm > 100000) {
+      setMessage("Enter a realistic positive inside length in millimetres, for example 4200.");
       return;
     }
     if (
       sketch.calibrated &&
-      Math.abs((metres * 1000) / units - sketch.mmPerUnit) > 0.001 &&
+      Math.abs(knownMm / units - sketch.mmPerUnit) > 0.001 &&
       !window.confirm(
         "This replaces your previous scale. Keep the old scale by choosing Cancel.",
       )
     )
       return;
-    commit({ ...sketch, mmPerUnit: (metres * 1000) / units, calibrated: true });
+    commit({ ...sketch, mmPerUnit: knownMm / units, calibrated: true });
     setMessage(
-      `Scale set from Wall ${wallIndex + 1} using its clear inside length. Calibrated rectangular rooms preserve inside dimensions when converted; complex plans retain the measured scale for review in Plan mode.`,
+      `Scale calibrated from Wall ${wallIndex + 1} using ${knownMm.toFixed(1)} mm clear inside length. Check at least one other known dimension before cost estimation.`,
     );
   }
   function zoom(factor: number) {
@@ -526,7 +548,7 @@ export function FreehandCanvas({
         {button("Save sketch", Save, () => {
           onSave(sketch);
           setMessage(
-            "Sketch added to your draft. Use Save project to sync it.",
+            "Sketch saved to this house-design draft. Use Save project to sync it to your saved project.",
           );
         })}
       </header>
@@ -535,13 +557,12 @@ export function FreehandCanvas({
         role="toolbar"
         aria-label="Sketch tools"
       >
-        {button(
-          "Draw wall",
-          Pencil,
-          () => setTool("draw"),
-          tool === "draw",
-          readOnly,
-        )}
+        {button(markKind === "wall" ? "Draw wall" : markKind === "door" ? "Mark door" : markKind === "window" ? "Mark window" : markKind === "kitchen" ? "Kitchen guide" : "Furniture guide", Pencil, () => setTool("draw"), tool === "draw", readOnly)}
+        <label className="flex items-center gap-1 whitespace-nowrap text-xs">Mark
+          <select aria-label="Sketch mark type" value={markKind} disabled={readOnly} onChange={e => setMarkKind(e.target.value as typeof markKind)} className="max-w-28 rounded border bg-white p-2">
+            <option value="wall">Wall</option><option value="door">Door</option><option value="window">Window</option><option value="furniture">Furniture</option><option value="kitchen">Kitchen (red)</option>
+          </select>
+        </label>
         {button("Edit endpoints", MousePointer2, () => { setTool("point"); setSelectedPoint(null); }, tool === "point", readOnly)}
         {tool === "point" ? button("Trim selected wall endpoint to nearest junction", Trash2, deleteSelectedPoint, false, !selectedPoint || readOnly) : null}
         {button(
@@ -567,6 +588,7 @@ export function FreehandCanvas({
           readOnly,
         )}
         {button("Set scale", Ruler, calibrate, false, readOnly)}
+        {selectedPoint ? (() => { const selected = sketch.strokes.find(s => s.id === selectedPoint.strokeId); return selected ? button(selected.locked ? "Unlock selected stroke" : "Lock selected stroke", selected.locked ? Check : Magnet, () => commit({ ...sketch, strokes: sketch.strokes.map(s => s.id === selected.id ? { ...s, locked: !s.locked } : s) }), !!selected.locked, readOnly) : null; })() : null}
         {button("Zoom in", ZoomIn, () => zoom(1.25))}
         {button("Zoom out", ZoomOut, () => zoom(0.8))}
         <label className="flex items-center gap-1 whitespace-nowrap text-xs">
@@ -666,7 +688,7 @@ export function FreehandCanvas({
               const to = point(e), from = pointStart.current;
               if (Math.hypot(to.x - from.x, to.y - from.y) > 5 / view.current.zoom) {
                 const target = sketch.strokes.find(stroke => stroke.id === selectedPoint.strokeId);
-                if (target) {
+                if (target && !target.locked) {
                   const next = sketch.strokes.map(stroke => {
                     if (stroke.id !== target.id) return stroke;
                     const pts = stroke.points.map(p => ({...p}));
@@ -677,7 +699,7 @@ export function FreehandCanvas({
                 }
               }
             } else if (tool === "draw" && live.current.length > 1 && sketch.strokes.length < 500) {
-              const stroke = { id: crypto.randomUUID(), points: alignWall(live.current[0]!, point(e)), thickness };
+              const stroke = { id: crypto.randomUUID(), points: alignWall(live.current[0]!, point(e)), thickness, kind: markKind, locked: false, color: markKind === "kitchen" ? "#dc2626" : markKind === "furniture" ? "#0d9488" : markKind === "door" ? "#7c3aed" : markKind === "window" ? "#0284c7" : undefined };
               if (strokeSegments(stroke).length)
                 commit({ ...sketch, strokes: [...sketch.strokes, stroke] });
             } else if (tool === "erase" && g.erase.size)

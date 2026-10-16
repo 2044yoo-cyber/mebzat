@@ -163,8 +163,9 @@ export function convertStrokes(
   if (!Number.isFinite(mmPerUnit) || mmPerUnit <= 0)
     throw new Error("Enter a positive drawing scale.");
   const tolerance = snapPixels * unitsPerPixel,
-    lines = strokes.flatMap((s) =>
-      strokeSegments(s, 3 * unitsPerPixel, snapPixels > 0),
+    // Non-wall marks are annotations and must never become structural walls.
+    lines = strokes.filter(s => (s.kind ?? "wall") === "wall").flatMap((s) =>
+      strokeSegments(s, 3 * unitsPerPixel, snapPixels > 0).map(line => ({ ...line, locked: !!s.locked })),
     );
   if (lines.length > 500)
     throw new Error("Convert up to 500 wall segments at a time.");
@@ -172,9 +173,9 @@ export function convertStrokes(
     // Square only near-horizontal/vertical walls. Use the SAME coordinate
     // for neighbouring parallel runs, otherwise every stroke remains slightly
     // crooked even when it was meant to share an architectural grid.
-    const horizontal = lines.filter(line => Math.abs(line.end.y - line.start.y) <=
+    const horizontal = lines.filter(line => !line.locked && Math.abs(line.end.y - line.start.y) <=
       Math.abs(line.end.x - line.start.x) * 0.12);
-    const vertical = lines.filter(line => Math.abs(line.end.x - line.start.x) <=
+    const vertical = lines.filter(line => !line.locked && Math.abs(line.end.x - line.start.x) <=
       Math.abs(line.end.y - line.start.y) * 0.12);
     const align = (group: Segment[], axis: "x" | "y") => {
       const positions = group.map(line => (line.start[axis] + line.end[axis]) / 2);
@@ -221,14 +222,22 @@ export function convertStrokes(
     const clusters = new Map<number, Point[]>();
     ends.forEach((end, i) => { const id = root(i); clusters.set(id, [...(clusters.get(id) ?? []), end.point]); });
     ends.forEach((end, i) => {
+      const line = lines[end.lineIndex]!;
+      if (line.locked) return; // Locked geometry is an immovable snap reference.
+      const members = ends.filter((_, j) => root(j) === root(i));
+      const fixed = members.filter(member => lines[member.lineIndex]!.locked);
       const group = clusters.get(root(i))!;
       const mean = { x: group.reduce((sum, p) => sum + p.x, 0) / group.length, y: group.reduce((sum, p) => sum + p.y, 0) / group.length };
-      const members = ends.filter((_, j) => root(j) === root(i));
       const vertical = members.filter(member => axes[member.lineIndex] === "vertical");
       const horizontal = members.filter(member => axes[member.lineIndex] === "horizontal");
-      if (vertical.length) mean.x = vertical.reduce((sum,member)=>sum+member.point.x,0)/vertical.length;
-      if (horizontal.length) mean.y = horizontal.reduce((sum,member)=>sum+member.point.y,0)/horizontal.length;
-      lines[end.lineIndex]![end.key] = mean;
+      if (fixed.length) {
+        if (vertical.length) mean.x = fixed.find(member => axes[member.lineIndex] === "vertical")?.point.x ?? mean.x;
+        if (horizontal.length) mean.y = fixed.find(member => axes[member.lineIndex] === "horizontal")?.point.y ?? mean.y;
+      } else {
+        if (vertical.length) mean.x = vertical.reduce((sum,member)=>sum+member.point.x,0)/vertical.length;
+        if (horizontal.length) mean.y = horizontal.reduce((sum,member)=>sum+member.point.y,0)/horizontal.length;
+      }
+      line[end.key] = mean;
     });
 
     // Snap unmatched endpoints to a nearby wall interior. This closes
@@ -236,7 +245,9 @@ export function convertStrokes(
     // Never pull an endpoint onto its own wall or across a long gap.
     for (let i = 0; i < lines.length; i++)
       for (const key of ["start", "end"] as const) {
-        const line = lines[i]!, p = line[key];
+        const line = lines[i]!;
+        if (line.locked) continue;
+        const p = line[key];
         if (lines.some((other, j) => j !== i &&
           (distance(p, other.start) < 1e-6 || distance(p, other.end) < 1e-6))) continue;
         const limit = Math.min(tolerance, distance(line.start, line.end) / 4);
