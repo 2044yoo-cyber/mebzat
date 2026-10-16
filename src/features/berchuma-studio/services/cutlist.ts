@@ -274,6 +274,67 @@ export function buildCutList(
   };
 }
 
+/** 
+ * Map each rendered part back to the exact shop tag used on the cut list.
+ * The model uses these tags in exploded/joint views so a board can be found
+ * on screen by reading the matching Part ID in the list.
+ */
+export function cutListPartTags(spec: DesignSpec, parts: Part[]): Map<string, string> {
+  const cutParts = parts.filter((part) => part.manufacture !== "purchased");
+  const codes = cabinetCodes(spec);
+  const shared = `${designLetter(spec)}00`;
+  const groups = new Map<string, { part: Part; cabinets: string[]; sourcePartIds: string[] }>();
+
+  for (const part of cutParts) {
+    const key = [
+      part.board.id,
+      part.length,
+      part.width,
+      part.edgeBand.id,
+      edgeKey(part),
+      part.role,
+      part.closure?.kind ?? "",
+      (part.operations ?? []).join(";"),
+      ...(part.module ? [part.module.name, part.label] : []),
+    ].join("|");
+    const code = (part.cabinetId && codes.get(part.cabinetId)) || shared;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.sourcePartIds.push(part.id);
+      if (!existing.cabinets.includes(code)) existing.cabinets.push(code);
+    } else {
+      groups.set(key, { part, cabinets: [code], sourcePartIds: [part.id] });
+    }
+  }
+
+  const rows = [...groups.values()]
+    .sort((a, b) => b.part.length * b.part.width - a.part.length * a.part.width)
+    .map((entry) => ({
+      entry,
+      boardId: entry.part.board.id,
+      partId: [entry.cabinets[0], ...(entry.part.module ? [`M${entry.part.module.index + 1}`] : []), partCode(entry.part)].join("-"),
+      index: 0,
+    }));
+  const boardIds = [...new Set(rows.map((row) => row.boardId))];
+  let sequence = 0;
+  for (const boardId of boardIds) {
+    for (const row of rows.filter((entry) => entry.boardId === boardId)) {
+      sequence += 1;
+      row.index = sequence;
+    }
+  }
+
+  const seen = new Map<string, number>();
+  const tags = new Map<string, string>();
+  for (const row of rows.sort((a, b) => a.index - b.index)) {
+    const count = (seen.get(row.partId) ?? 0) + 1;
+    seen.set(row.partId, count);
+    const tag = `${row.partId}${count > 1 ? count : ""}`;
+    for (const partId of row.entry.sourcePartIds) tags.set(partId, tag);
+  }
+  return tags;
+}
+
 /**
  * Each cabinet's short code: a letter for what it is and its place in the
  * design — W01 for the first wardrobe carcass, K02 for the second kitchen

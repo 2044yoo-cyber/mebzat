@@ -1588,17 +1588,7 @@ function PlanEditor({
             </div>
           </div>
         ) : tab === "3d" ? (
-          <div className="space-y-2">
-            <HousePreview
-              project={project}
-              visibleLevelIds={new Set(project.levels.map((level) => level.id))}
-              selected={null}
-              hiddenKinds={HIDDEN_IN_3D}
-              onSelect={() => undefined}
-              className="h-[calc(100dvh-14rem)] min-h-[360px] lg:h-[min(680px,68dvh)]"
-            />
-            {bottomActions}
-          </div>
+          <ConstructionLearningView project={project} bottomActions={bottomActions} />
         ) : tab === "learn" ? (
           <ConstructionLab project={project} />
         ) : !link ? (
@@ -1618,6 +1608,67 @@ function PlanEditor({
         {pinDialog ? <HousePinDialog initial={pinDialog.initial} onCancel={() => setPinDialog(null)} onSave={(details) => void placePlanPin(pinDialog.at, details)} /> : null}
       </section>
     </HouseUnitsContext.Provider>
+  );
+}
+
+const CONSTRUCTION_LESSONS = [
+  { title: "1. Site preparation", materials: "Setting-out pegs, string line, marking lime and compacted fill.", purpose: "Sets out the footprint and prepares stable ground.", caution: "Check boundaries, levels, drainage and underground services before excavation.", kind: "site" as const },
+  { title: "2. Excavation and foundation", materials: "Blinding concrete where specified, formwork, reinforcement steel and concrete.", purpose: "Transfers building loads safely into the ground.", caution: "Foundation sizes and reinforcement must follow soil investigation and approved structural drawings.", kind: "foundation" as const },
+  { title: "3. Ground beams and damp protection", materials: "Reinforced concrete, rebar, formwork and approved damp-proof membrane.", purpose: "Connects foundations where designed and helps limit rising moisture.", caution: "Details depend on groundwater, soil and local code.", kind: "beam" as const },
+  { title: "4. Reinforced-concrete columns", materials: "Reinforcing bars, ties, binding wire, spacers, formwork and concrete.", purpose: "Carries vertical loads to the foundations.", caution: "Bar size, spacing, anchorage and concrete cover must match approved drawings.", kind: "column" as const },
+  { title: "5. Beams and slab", materials: "Rebar, stirrups, slab reinforcement, props, soffit formwork and concrete.", purpose: "Beams transfer loads to columns; slabs form floors and roof decks.", caution: "Do not remove props or load fresh concrete before specified strength and engineer approval.", kind: "slab" as const },
+  { title: "6. Masonry walls and openings", materials: "Concrete blocks or bricks, mortar, lintels where specified and window/door frames.", purpose: "Forms the enclosure and room divisions.", caution: "Check drawings before altering any wall; never assume it is non-structural.", kind: "wall" as const },
+  { title: "7. Roof and waterproofing", materials: "Roof structure or slab, waterproof membrane, flashing, drainage and roof finish.", purpose: "Protects the building from rain and directs water to drainage.", caution: "Waterproof joints, edges and penetrations using compatible details.", kind: "roof" as const },
+  { title: "8. Services and finishes", materials: "Electrical conduits, plumbing pipes, plaster, screed, tiles, paint, doors and windows.", purpose: "Makes the building usable, weather-tight and finished.", caution: "Coordinate services before concrete pours and wall closure; test before covering.", kind: "finishes" as const },
+];
+
+function ConstructionLearningView({ project, bottomActions }: { project: HouseProject; bottomActions: React.ReactNode }) {
+  const [lessonIndex, setLessonIndex] = useState(0);
+  const [showStructure, setShowStructure] = useState(false);
+  const lesson = CONSTRUCTION_LESSONS[lessonIndex]!;
+  const hiddenKinds = useMemo(() => {
+    const hidden = new Set(HIDDEN_IN_3D);
+    if (lesson.kind === "foundation") hidden.delete("foundation");
+    if (lesson.kind === "beam") hidden.delete("beam");
+    if (lesson.kind === "column") hidden.delete("column");
+    if (lesson.kind === "slab") hidden.delete("slab");
+    if (lesson.kind === "wall") hidden.delete("wall");
+    if (lesson.kind === "roof") hidden.delete("roof");
+    if (lesson.kind === "site") hidden.delete("site");
+    if (lesson.kind === "finishes") { hidden.delete("facade"); hidden.delete("ceiling"); }
+    if (showStructure) { hidden.delete("foundation"); hidden.delete("beam"); hidden.delete("column"); hidden.delete("slab"); hidden.delete("wall"); }
+    return hidden;
+  }, [lesson.kind, showStructure]);
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl border bg-card p-3">
+        <h2 className="text-sm font-semibold">Construction Learning Mode</h2>
+        <p className="text-xs text-muted-foreground">Explore concrete-house elements, materials and construction sequence.</p>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 space-y-2">
+          <HousePreview project={project} visibleLevelIds={new Set(project.levels.map((level) => level.id))} selected={null} hiddenKinds={hiddenKinds} onSelect={() => undefined} className="h-[min(58dvh,560px)] min-h-[320px] lg:h-[min(680px,68dvh)]" />
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" disabled={lessonIndex === 0} onClick={() => setLessonIndex(i => Math.max(0, i - 1))} className="min-h-10 rounded-lg border px-3 text-xs disabled:opacity-40">Previous</button>
+            <span className="text-xs text-muted-foreground">Lesson {lessonIndex + 1} of {CONSTRUCTION_LESSONS.length}</span>
+            <button type="button" disabled={lessonIndex === CONSTRUCTION_LESSONS.length - 1} onClick={() => setLessonIndex(i => Math.min(CONSTRUCTION_LESSONS.length - 1, i + 1))} className="min-h-10 rounded-lg border px-3 text-xs disabled:opacity-40">Next lesson</button>
+            <label className="ml-auto flex items-center gap-2 text-xs"><input type="checkbox" checked={showStructure} onChange={event => setShowStructure(event.target.checked)} /> Show structure together</label>
+          </div>
+        </div>
+        <aside className="space-y-3 rounded-xl border bg-card p-3">
+          <label className="block space-y-1.5"><span className="text-xs font-medium">Construction stage</span>
+            <select value={lessonIndex} onChange={event => setLessonIndex(Number(event.target.value))} className="min-h-10 w-full rounded-lg border bg-background px-2 text-sm">
+              {CONSTRUCTION_LESSONS.map((item, index) => <option key={item.title} value={index}>{item.title}</option>)}
+            </select>
+          </label>
+          <div><h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Materials used</h3><p className="mt-1 text-sm leading-relaxed">{lesson.materials}</p></div>
+          <div><h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Purpose</h3><p className="mt-1 text-sm leading-relaxed">{lesson.purpose}</p></div>
+          <div className="rounded-lg bg-amber-500/10 p-3"><h3 className="text-xs font-semibold">Safety and design note</h3><p className="mt-1 text-xs leading-relaxed">{lesson.caution}</p></div>
+          <p className="text-[11px] text-muted-foreground">Learning guide only. The 3D view uses elements already present in your current model; it does not generate structural calculations or approve construction details.</p>
+        </aside>
+      </div>
+      {bottomActions}
+    </div>
   );
 }
 

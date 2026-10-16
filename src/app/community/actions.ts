@@ -123,6 +123,39 @@ export async function deletePost(postId: string): Promise<CommunityResult> {
   return {};
 }
 
+/** Read a post for its author to edit; never exposes another author's draft. */
+export async function getOwnPost(postId: string): Promise<{ post?: { title: string; body: string }; error?: string }> {
+  const { supabase, user } = await requireUser("/projects");
+  const { data, error } = await supabase.from("posts").select("title, body").eq("id", postId).eq("author_id", user.id).maybeSingle();
+  if (error || !data) return { error: "Could not load that post for editing." };
+  return { post: { title: data.title ?? "", body: data.body } };
+}
+
+/** Update a post owned by the signed-in author. */
+export async function updatePost(input: {
+  postId: string;
+  title?: string;
+  body: string;
+}): Promise<CommunityResult> {
+  const { supabase, user } = await requireUser(`/community/${input.postId}`);
+  const body = input.body.trim();
+  if (body.length < 2) return { error: "Write something first." };
+  if (body.length > 20_000) return { error: "That post is too long." };
+  const title = input.title?.trim().slice(0, 200) || null;
+  const { data, error } = await supabase
+    .from("posts")
+    .update({ title, body, edited_at: new Date().toISOString() })
+    .eq("id", input.postId)
+    .eq("author_id", user.id)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) return { error: "Could not update that post." };
+  revalidatePath("/community");
+  revalidatePath(`/community/${input.postId}`);
+  revalidatePath("/projects");
+  return { id: data.id };
+}
+
 /** Follows or unfollows a profile, company or hashtag. */
 export async function toggleFollow(
   targetType: "profile" | "company" | "hashtag",

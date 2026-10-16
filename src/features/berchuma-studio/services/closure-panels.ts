@@ -376,15 +376,8 @@ export function closurePanelsFor(input: ClosureInput): ClosureResult {
         `A ${Math.round(gap)} mm gap to the ${against === "wall" ? "wall" : "next cabinet"}`);
       continue;
     }
-    // An exposed end: flush with the doors if no door's hinge needs the room.
-    const x = side === "left" ? -tc : W;
-    const back = D + (rear ? tc : 0);
-    const flush: ClosureBox = { x, y: 0, z: -doorProud, sx: tc, sy: H, sz: back + doorProud };
-    const decorative = !doorSwingConflict(flush, swing) && !clashes(flush);
-    const box = decorative ? flush : { x, y: 0, z: 0, sx: tc, sy: H, sz: back };
-    add(decorative ? "decorative_end" : "end", side, box, "x", sideBoard(side),
-      { x: side === "left" ? 0 : W, y: H / 2, z: D / 2 },
-      decorative ? "An exposed end, flush with the doors" : "An exposed end; set back to clear the door hinges");
+    // Side cover panels are optional add-ons, not automatic closures.
+    // Leave exposed cabinet ends uncovered unless the user explicitly adds a panel.
   }
 
   // ---- Up to the ceiling --------------------------------------------------

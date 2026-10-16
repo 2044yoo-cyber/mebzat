@@ -1174,9 +1174,24 @@ export function setBayDoor(
     if (!bay) return;
     bay.door = door;
     delete bay.doorOverrides;
-    if (door === "hinged") {
-      bay.doorLeaves = bay.width > LIMITS.hingedLeafWidth ? 2 : 1;
-    }
+    bay.doorLeafMode = "auto";
+    if (door === "hinged") leavesFor(bay);
+  });
+}
+
+/** Set the door count for this section without changing its width or neighbours. */
+export function setBayDoorLeafMode(
+  spec: DesignSpec,
+  cabinetId: string,
+  bayId: string,
+  mode: NonNullable<Bay["doorLeafMode"]>,
+): DesignSpec {
+  return change(spec, (draft) => {
+    const bay = find(draft, cabinetId)?.bays.find((entry) => entry.id === bayId);
+    if (!bay || bay.door !== "hinged") return;
+    bay.doorLeafMode = mode;
+    delete bay.doorOverrides;
+    leavesFor(bay);
   });
 }
 
@@ -1692,7 +1707,10 @@ export type DisplayRef = { cabinetId: string; bayId: string; sectionId?: string 
 const DISPLAY_DEFAULTS = { back: true, lighting: "off" as const };
 
 function leavesFor(bay: Bay): void {
-  if (bay.door === "hinged") bay.doorLeaves = bay.width > LIMITS.hingedLeafWidth ? 2 : 1;
+  if (bay.door !== "hinged") return;
+  if (bay.doorLeafMode === "single") bay.doorLeaves = 1;
+  else if (bay.doorLeafMode === "double") bay.doorLeaves = 2;
+  else bay.doorLeaves = bay.width > LIMITS.hingedLeafWidth ? 2 : 1;
 }
 
 /**

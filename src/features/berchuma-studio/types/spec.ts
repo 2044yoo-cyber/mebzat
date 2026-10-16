@@ -450,7 +450,9 @@ export const baySchema = z.object({
   door: z.enum(doorStyles).default("hinged"),
   /** Visible front treatment, separate from how the door opens. Absent: the design's door hardware. */
   frontGrip: z.enum(frontGrips).optional(),
-  /** A pair of doors on one bay, for bays too wide for a single leaf. */
+  /** The number of door leaves: automatic preserves width-based sizing; single forces one leaf per section. */
+  doorLeafMode: z.enum(["auto", "single", "double"]).optional(),
+  /** The resolved number of door leaves on this bay. */
   doorLeaves: z.number().int().min(1).max(2).default(1),
   /**
    * Doors sized by hand. One entry per leaf that is: `run` counts a stacked
