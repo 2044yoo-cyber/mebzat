@@ -433,6 +433,7 @@ export const houseProjectSchema = z.object({
   freehandSketch: z.object({
     version: z.literal(1),
     strokes: z.array(z.object({ id: z.string(), points: z.array(z.object({ x: z.number().finite(), y: z.number().finite() })).max(10000), thickness: z.number().positive().max(600) })).max(500),
+    openings: z.array(z.object({ id: z.string(), type: z.enum(["door", "window"]), start: pointSchema, end: pointSchema, swing: z.enum(["left", "right"]).default("left") })).max(200).default([]),
     mmPerUnit: z.number().positive(),
     calibrated: z.boolean(),
   }).optional(),
