@@ -31,7 +31,7 @@ import { slabOpenings } from "../src/features/house-designer/construction/slab-o
 import { DEFAULT_OPTIONS, DEFAULT_RULES, DEFAULT_VIEW, SERVICE_VIEWS, type ComponentRecord, type ConstructionModel, type ViewState } from "../src/features/house-designer/construction/types";
 import { applyServiceView, indexModel, visibilityOf } from "../src/features/house-designer/construction/view";
 import { pointInPolygon, type Shape } from "../src/features/house-designer/construction/geometry";
-import { allObstacles, rectInsidePolygon, type Run } from "../src/features/house-designer/construction/service-routing";
+import { SlabLayers, allObstacles, rectInsidePolygon, type Run } from "../src/features/house-designer/construction/service-routing";
 
 let checks = 0;
 const ok = (value: unknown, message: string) => { assert.ok(value, message); checks += 1; };
@@ -486,6 +486,26 @@ for (const params of [{ storeys: 2 }, { storeys: 4 }, { floorToFloor: 3600, slab
   const waste = scratch.items.find((i) => i.id.endsWith(":waste"))!;
   const lowest = waste.runs.flatMap((r) => r.points).reduce((m, p) => (p.z < m.z ? p : m));
   ok(Math.hypot(lowest.x - scratch.stacks[0]!.centre.x, lowest.y - scratch.stacks[0]!.centre.y) < 80, "the waste is lowest at the stack");
+}
+
+// The two storeys that share a slab share its depth without ever sharing a line: the ceiling conduit of the one below and
+// the floor conduit of the one above are cast in the same slab, and one conduit must never be two.
+{
+  const along = [{ x: 0, y: 1000 }, { x: 4000, y: 1000 }];
+  const layers = new SlabLayers([3172, 3150, 3128]);
+  const first = layers.place(along, [], "ceiling");
+  ok(first === 2, `a ceiling conduit takes the layer nearest the soffit (${first})`);
+  const second = layers.place(along, [], "floor");
+  ok(second === 0, `a floor conduit on the same line takes the layer nearest the top, not the same one (${second})`);
+  const third = new SlabLayers([3172]);
+  third.place(along, [], "ceiling");
+  ok(third.place(along, [], "floor") === null, "with one layer only, a floor conduit cannot lie along the ceiling conduit");
+  ok(third.placeAt(0, along, [], "floor") === false, "nor tap into it as if it were its own");
+  ok(third.placed("floor").length === 0 && third.placed("ceiling").length === 1, "each face is shown only the runs it placed itself");
+  ok(third.placeAt(0, [{ x: 2000, y: 1000 }, { x: 2000, y: 3000 }], [], "ceiling") === true, "a face may branch off its own run");
+  const one = new SlabLayers([3172]);
+  one.place(along, [], "floor");
+  ok(one.place(along, [], "floor") === 0, "two runs of one face on one line are one conduit, which the drawing merges");
 }
 
 console.log(`Construction services: ${checks} checks passed.`);

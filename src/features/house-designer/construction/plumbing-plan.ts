@@ -272,7 +272,7 @@ function roofWater(ctx: Ctx, plan: PlumbingPlan, layoutOf: (room: RoomInfo) => R
   const wallT = ctx.walls.find((w) => w.exterior && w.levelId === ground.levelId)?.thickness ?? 200;
   const inner: Rect = { x0: b.minX + wallT / 2 + ASSUME.parapetThickness, y0: b.minY + wallT / 2 + ASSUME.parapetThickness, x1: b.maxX - wallT / 2 - ASSUME.parapetThickness, y1: b.maxY - wallT / 2 - ASSUME.parapetThickness };
   if (!plan.shafts.length) return;
-  const risers = plan.shafts.map((s) => { const { vC } = shaftPoints(s); const side = 0; void side; return { shaft: s, at: local(s.frame, 45, vC), vent: plan.stacks.find((k) => k.shaft === s)!.centre }; });
+  const risers = plan.shafts.map((s) => { const { vC } = shaftPoints(s); return { shaft: s, at: local(s.frame, s.exit?.side === 1 ? s.width - 45 : 45, vC), vent: plan.stacks.find((k) => k.shaft === s)!.centre }; });
 
   // The tank stands on the roof beside the first stack, clear of the other vents and inside the parapet.
   const first = risers[0]!;
@@ -348,7 +348,7 @@ function roofWater(ctx: Ctx, plan: PlumbingPlan, layoutOf: (room: RoomInfo) => R
     for (const step of [0, 150, -150, 300, -300, 600, -600, 900, -900, 1400, -1400]) {
       const s = cand.s + step;
       if (s < 400 || s > w.length - 400) continue;
-      const riserOff = w.thickness / 2 + 55;
+      const riserOff = faceHalf(ctx, w) + 55;
       const px = w.start.x + w.ux * s + out.x * riserOff;
       const py = w.start.y + w.uy * s + out.y * riserOff;
       // Clear of columns and of every opening on every storey along this line, and of the meter.
@@ -400,6 +400,18 @@ const RAIN_R = 45;
 const SOAK_RUN = 2500;
 const GULLY_OUT = 450;
 
+/** Half the width of what stands in the wall's line: the wall, or a beam wider than it. Nothing fixed to the outside may be closer to the centre line than this. */
+function faceHalf(ctx: Ctx, w: WallFrame): number {
+  let half = w.thickness / 2;
+  for (const beam of ctx.project.structuralBeams) {
+    const bl = Math.hypot(beam.end.x - beam.start.x, beam.end.y - beam.start.y) || 1;
+    const parallel = Math.abs(((beam.end.x - beam.start.x) * w.ux + (beam.end.y - beam.start.y) * w.uy) / bl) > 0.999;
+    const offLine = Math.abs((beam.start.x - w.start.x) * w.nx + (beam.start.y - w.start.y) * w.ny);
+    if (parallel && offLine < 5) half = Math.max(half, beam.width / 2);
+  }
+  return half;
+}
+
 type Stretch = { wall: WallFrame; out: P2; face: P2; pipe: P2; d: number };
 
 /**
@@ -417,13 +429,7 @@ function wallStretches(ctx: Ctx, plan: PlumbingPlan, prefer: P2, only: (w: WallF
     if (!w.exterior || w.levelId !== ground.levelId || !only(w)) continue;
     const sgn = Math.sign((w.start.x - mid.x) * w.nx + (w.start.y - mid.y) * w.ny) || 1;
     const out = { x: w.nx * sgn, y: w.ny * sgn };
-    let half = w.thickness / 2;
-    for (const beam of ctx.project.structuralBeams) {
-      const bl = Math.hypot(beam.end.x - beam.start.x, beam.end.y - beam.start.y) || 1;
-      const parallel = Math.abs(((beam.end.x - beam.start.x) * w.ux + (beam.end.y - beam.start.y) * w.uy) / bl) > 0.999;
-      const offLine = Math.abs((beam.start.x - w.start.x) * w.nx + (beam.start.y - w.start.y) * w.ny);
-      if (parallel && offLine < 5) half = Math.max(half, beam.width / 2);
-    }
+    const half = faceHalf(ctx, w);
     const standoff = half + RAIN_R + 25;
     for (let s = 400; s <= w.length - 400; s += 100) {
       const at = (off: number): P2 => ({ x: w.start.x + w.ux * s + out.x * off, y: w.start.y + w.uy * s + out.y * off });

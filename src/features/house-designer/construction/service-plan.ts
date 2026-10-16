@@ -3,7 +3,7 @@ import { pointInPolygon, polygonArea, rectPoly, type P2 } from "./geometry";
 import { roomLayout, type Edge, type RoomLayout } from "./layout";
 import { stairOpenings } from "./rooms";
 import { DUCT_DEPTH, DUCT_HEIGHT, local, type Frame } from "./service-frame";
-import { shaftProblem } from "./wet-room";
+import { shaftExit, type ExitKey } from "./wet-room";
 import { clipConvex } from "./geometry";
 import { atEdge, convexOverlap, inflate, levelObstacles, rectInsidePolygon, rectPolygon, rectsOverlap, type Rect } from "./service-routing";
 
@@ -42,6 +42,8 @@ export type Riser = {
   depth: number;
   /** How far the nearest beam over the wall stands out from its face, mm: nothing that goes through the slabs may be closer to the wall than this. */
   intrusion: number;
+  /** For a plumbing shaft: the one way its pipes leave it on every storey. Absent when no way serves every room. */
+  exit?: ExitKey;
 };
 
 export type Unresolved = { id: string; system: "electrical" | "plumbing"; level: number | null; where: string; reason: string };
@@ -165,9 +167,10 @@ function findRiser(ctx: Ctx, layoutOf: (room: RoomInfo) => RoomLayout, spec: Spe
         };
         // A shaft is only worth having where the fixtures can be placed and every pipe can reach them, in every wet room it serves.
         if (spec.kind === "plumbing") {
-          const unfit = shaftProblem(ctx, riser, layoutOf);
-          if (spec.debug) spec.debug(`${room.name} edge ${edge.index} t=${t}: ${unfit ?? "serves its rooms"}`);
-          if (unfit) { fallback ??= riser; continue; }
+          const found = shaftExit(ctx, riser, layoutOf);
+          if (spec.debug) spec.debug(`${room.name} edge ${edge.index} t=${t}: ${"problem" in found ? found.problem : "serves its rooms"}`);
+          if ("problem" in found) { fallback ??= riser; continue; }
+          riser.exit = found.key;
         }
         return riser;
       }

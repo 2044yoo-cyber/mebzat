@@ -430,6 +430,19 @@ const inTheWay = (p: Seg2, q: Seg2): boolean => {
   return gap > 0.5 && gap < 24 && overlap > 20;
 };
 
+/** The two faces of a slab: the top, which the floor of the storey above comes out of, and the soffit, which the ceiling below comes out of. */
+type SlabFace = "floor" | "ceiling";
+
+/** Two stretches on one line and sharing some length of it: runs of one face merge there, but those of two faces would be one conduit in two storeys. */
+const alongSameLine = (p: Seg2, q: Seg2): boolean => {
+  const vertical = (s: Seg2) => Math.abs(s.a.x - s.b.x) < 0.5;
+  if (vertical(p) !== vertical(q)) return false;
+  if (vertical(p)) {
+    return Math.abs(p.a.x - q.a.x) <= 0.5 && Math.min(Math.max(p.a.y, p.b.y), Math.max(q.a.y, q.b.y)) - Math.max(Math.min(p.a.y, p.b.y), Math.min(q.a.y, q.b.y)) > 20;
+  }
+  return Math.abs(p.a.y - q.a.y) <= 0.5 && Math.min(Math.max(p.a.x, p.b.x), Math.max(q.a.x, q.b.x)) - Math.max(Math.min(p.a.x, p.b.x), Math.min(q.a.x, q.b.x)) > 20;
+};
+
 const distToSeg = (p: P2, s: Seg2): number => {
   const dx = s.b.x - s.a.x; const dy = s.b.y - s.a.y;
   const l2 = dx * dx + dy * dy || 1;
@@ -446,35 +459,64 @@ const distToSeg = (p: P2, s: Seg2): number => {
  */
 export class SlabLayers {
   readonly z: number[];
-  private readonly segs: Seg2[][];
+  private readonly segs: (Seg2 & { side: SlabFace })[][];
   private readonly drops: P2[][];
   constructor(z: number[]) { this.z = z; this.segs = z.map(() => []); this.drops = z.map(() => []); }
 
+  /** Whether a new stretch from `side` cannot go in this layer: it crosses or crowds a neighbour, or lies along a run of the other face. */
+  private blocked(layer: number, mine: Seg2[], side: SlabFace): boolean {
+    return mine.some((m) => this.segs[layer]!.some((s) => inTheWay(m, s) || (s.side !== side && alongSameLine(m, s))));
+  }
+
   /** The same, but only in the given layer: a branch off a run that is already there. */
-  placeAt(layer: number, points: readonly P2[], drops: readonly P2[]): boolean {
+  placeAt(layer: number, points: readonly P2[], drops: readonly P2[], side: SlabFace = "floor"): boolean {
     const mine: Seg2[] = [];
     for (let i = 0; i + 1 < points.length; i += 1) mine.push({ a: points[i]!, b: points[i + 1]! });
-    if (mine.some((m) => this.segs[layer]!.some((s) => inTheWay(m, s)))) return false;
-    this.segs[layer]!.push(...mine);
+    if (this.blocked(layer, mine, side)) return false;
+    this.segs[layer]!.push(...mine.map((m) => ({ ...m, side })));
     this.drops[layer]!.push(...drops);
     return true;
   }
 
-  place(points: readonly P2[], drops: readonly P2[]): number | null {
+  /** Every stretch of conduit one face has placed so far, with its layer: what a new run of that face may be tapped off. */
+  placed(side: SlabFace): { layer: number; a: P2; b: P2 }[] {
+    return this.segs.flatMap((list, layer) => list.filter((s) => s.side === side).map((s) => ({ layer, a: s.a, b: s.b })));
+  }
+
+  /**
+   * A run for the top face of the slab (`floor`: the floor of the storey above, whose conduit comes up out of the
+   * top) or the bottom face (`ceiling`: the ceiling of the storey below, whose conduit comes down out of the soffit).
+   * Layers are listed from the top down; each run takes the first free layer from its own face, so the two
+   * storeys that share a slab share its depth without ever sharing a layer.
+   */
+  place(points: readonly P2[], drops: readonly P2[], side: SlabFace = "floor"): number | null {
     const mine: Seg2[] = [];
     for (let i = 0; i + 1 < points.length; i += 1) mine.push({ a: points[i]!, b: points[i + 1]! });
-    for (let layer = 0; layer < this.z.length; layer += 1) {
-      if (mine.some((m) => this.segs[layer]!.some((s) => inTheWay(m, s)))) continue;
-      // Coming out through layers nearer the face.
-      if (drops.some((d) => { for (let j = 0; j < layer; j += 1) if (this.segs[j]!.some((s) => distToSeg(d, s) < 26)) return true; return false; })) continue;
-      // Layers further in whose own drops come out through this one.
-      if (mine.some((m) => { for (let j = layer + 1; j < this.z.length; j += 1) if (this.drops[j]!.some((d) => distToSeg(d, m) < 26)) return true; return false; })) continue;
-      this.segs[layer]!.push(...mine);
+    const n = this.z.length;
+    const order = Array.from({ length: n }, (_, i) => (side === "floor" ? i : n - 1 - i));
+    for (const layer of order) {
+      if (this.blocked(layer, mine, side)) continue;
+      // The layers between this one and the face it comes out of: nothing of theirs may be where its drops pass.
+      const between = side === "floor" ? Array.from({ length: layer }, (_, j) => j) : Array.from({ length: n - 1 - layer }, (_, j) => layer + 1 + j);
+      if (drops.some((d) => between.some((j) => this.segs[j]!.some((s) => distToSeg(d, s) < 26)))) continue;
+      // Layers further in, on the same side, whose own drops come out through this one.
+      const further = side === "floor" ? Array.from({ length: n - 1 - layer }, (_, j) => layer + 1 + j) : Array.from({ length: layer }, (_, j) => j);
+      if (mine.some((m) => further.some((j) => this.drops[j]!.some((d) => distToSeg(d, m) < 26)))) continue;
+      this.segs[layer]!.push(...mine.map((m) => ({ ...m, side })));
       this.drops[layer]!.push(...drops);
       return layer;
     }
     return null;
   }
+}
+
+/** One face of a shared slab, as the electrical plan uses it. */
+export class SlabSide {
+  constructor(private readonly slab: SlabLayers, private readonly side: SlabFace) {}
+  get z(): number[] { return this.slab.z; }
+  place(points: readonly P2[], drops: readonly P2[]): number | null { return this.slab.place(points, drops, this.side); }
+  placeAt(layer: number, points: readonly P2[], drops: readonly P2[]): boolean { return this.slab.placeAt(layer, points, drops, this.side); }
+  placed(): { layer: number; a: P2; b: P2 }[] { return this.slab.placed(this.side); }
 }
 
 /**

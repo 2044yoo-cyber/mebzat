@@ -138,7 +138,7 @@ export function auditServices(ctx: Ctx, model: ConstructionModel, known: AuditCo
         if (p.z + seg.r <= o.z0 || p.z - seg.r >= o.z1) continue;
         if (!convexOverlap(rectPoly(plan.x - seg.r, plan.y - seg.r, plan.x + seg.r, plan.y + seg.r), o.poly)) continue;
         // A drain through a ground beam goes through a sleeve cast into it.
-        if (o.kind === "ground-beam" && known.sleeves.some((s) => Math.hypot(s.x - p.x, s.y - p.y) <= 200 && Math.abs(s.z - p.z) <= s.r + seg.r)) continue;
+        if (o.kind === "ground-beam" && known.sleeves.some((s) => Math.hypot(s.x - p.x, s.y - p.y) <= Math.hypot(o.poly[3]!.x - o.poly[0]!.x, o.poly[3]!.y - o.poly[0]!.y) / 2 + seg.r + 25 && Math.abs(s.z - p.z) <= s.r + seg.r)) continue;
         const key = `${o.kind}:${o.id}`;
         if (reported.has(key)) continue;
         reported.add(key);
@@ -150,6 +150,8 @@ export function auditServices(ctx: Ctx, model: ConstructionModel, known: AuditCo
         for (const wall of ctx.wallsOf(level.levelId)) {
           if (!inWall(wall, plan, -1)) continue;
           if (Math.abs(dirX * wall.nx + dirY * wall.ny) <= 0.9) continue;
+          // A short jog inside the thickness of the wall (a conduit stepping deeper into its chase) does not go through it.
+          if (len < wall.thickness * 0.6) continue;
           const sleeved = known.sleeves.some((s) => Math.hypot(s.x - p.x, s.y - p.y) <= wall.thickness && Math.abs(s.z - p.z) <= s.r + 25);
           const key = `wall:${wall.id}:${Math.round(p.x / 50)}:${Math.round(p.y / 50)}`;
           if (!sleeved && !reported.has(key)) {
@@ -172,6 +174,8 @@ export function auditServices(ctx: Ctx, model: ConstructionModel, known: AuditCo
       if (Math.min(a.a.y, a.b.y) - a.r > Math.max(b.a.y, b.b.y) + b.r || Math.min(b.a.y, b.b.y) - b.r > Math.max(a.a.y, a.b.y) + a.r) continue;
       const hit = segmentsCross(a, b);
       if (!hit) continue;
+      // A run that leaves the cupboard's vertical bundle at its own layer is a branch off it, not a crossing.
+      if (hit.kind === "cross" && (branchesOffBundle(a, b) || branchesOffBundle(b, a))) continue;
       const key = `${a.componentId}|${b.componentId}|${hit.kind}`;
       if (flagged.has(key)) continue;
       flagged.add(key);
@@ -179,6 +183,18 @@ export function auditServices(ctx: Ctx, model: ConstructionModel, known: AuditCo
     }
   }
   return { segments: segments.length, length, floating, collisions };
+}
+
+/** `bundle` is a vertical run of a riser bundle in the cupboard and `run` is one of the runs that start from it, at a layer of its own. */
+function branchesOffBundle(bundle: RouteSegment, run: RouteSegment): boolean {
+  if (!bundle.componentId.endsWith(":trunks") || run.system !== "electrical") return false;
+  if (Math.hypot(bundle.b.x - bundle.a.x, bundle.b.y - bundle.a.y) > 1) return false;
+  const x = bundle.a.x; const y = bundle.a.y;
+  const along = (run.b.x - run.a.x) * (x - run.a.x) + (run.b.y - run.a.y) * (y - run.a.y);
+  const len2 = (run.b.x - run.a.x) ** 2 + (run.b.y - run.a.y) ** 2;
+  if (len2 < 1 || along < 0 || along > len2) return false;
+  const t = along / len2;
+  return Math.hypot(run.a.x + (run.b.x - run.a.x) * t - x, run.a.y + (run.b.y - run.a.y) * t - y) < bundle.r + run.r + 2;
 }
 
 /** Do two runs meet other than end on? A T or an elbow where one ends on the other is a joint, not a crossing. */

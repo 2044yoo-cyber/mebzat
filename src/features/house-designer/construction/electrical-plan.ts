@@ -3,7 +3,7 @@ import { box, rectPoly, type P2, type Shape, type V3 } from "./geometry";
 import { roomLayout, type Edge, type RoomLayout } from "./layout";
 import { slabOpenings } from "./slab-openings";
 import { CUPBOARD, local, planServices, type Riser, type Unresolved } from "./service-plan";
-import { atEdge, clearRuns, convexOverlap, inflate, levelObstacles, ownRuns, rectInsidePolygon, rectsOverlap, routeAround, SlabLayers, type Rect, type Run } from "./service-routing";
+import { atEdge, clearRuns, convexOverlap, inflate, levelObstacles, ownRuns, rectInsidePolygon, rectsOverlap, routeAround, SlabLayers, SlabSide, type Rect, type Run } from "./service-routing";
 import { pointInPolygon } from "./geometry";
 import { planPlumbing } from "./plumbing-plan";
 
@@ -22,6 +22,8 @@ import { planPlumbing } from "./plumbing-plan";
 export const CONDUIT_R = 10;
 /** Where the conduit sits in the wall, behind the face, in its chase. */
 export const CHASE_INSET = 35;
+/** Where the conduit that chains one box to the next sits in the wall: behind the vertical drops. */
+export const CHAIN_INSET = 65;
 const SOCKETS: Record<string, number> = { bed: 4, living: 6, dining: 4, kitchen: 6, office: 4, circulation: 1, laundry: 3, bath: 1, wc: 0, store: 0, stair: 0, other: 2 };
 
 export type SleeveSpec = { id: string; system: "electrical" | "plumbing"; level: number; x: number; y: number; z: number; axis: "x" | "y"; diameter: number; length: number; wallId: string; note: string; /** What the sleeve is cast or built into: a wall unless stated. */ host?: "ground-beam" };
@@ -76,13 +78,27 @@ export function slabMid(ctx: Ctx, level: LevelInfo, which: "floor" | "ceiling"):
   return { z: level.soffitZ + t / 2, thickness: t };
 }
 
-/** The layers of conduit in one face of a slab: how many fit, and the height of each, nearest the exit face first. */
-function layersFor(ctx: Ctx, level: LevelInfo, which: "floor" | "ceiling"): SlabLayers {
-  const thickness = slabMid(ctx, level, which).thickness;
-  const count = thickness >= 180 || (which === "floor" && level.index === 0) ? 3 : 2;
-  const bottom = which === "floor" ? level.floorZ - thickness : level.soffitZ;
-  const top = bottom + thickness;
-  return new SlabLayers(Array.from({ length: count }, (_, i) => (which === "floor" ? top - 28 - 22 * i : bottom + 28 + 22 * i)));
+/**
+ * The conduit layers in a slab, shared by the two storeys that meet in it: the ceiling conduit of the one below
+ * and the floor conduit of the one above. Layers are 22 mm apart, the first 28 mm in from the top face, and stop
+ * 45 mm short of the bottom steel.
+ */
+function slabLayersOf(ctx: Ctx, slabIndex: number, cache: Map<number, SlabLayers>): SlabLayers {
+  const hit = cache.get(slabIndex);
+  if (hit) return hit;
+  const below = ctx.levels[slabIndex - 1];
+  const above = ctx.levels[slabIndex];
+  const top = above ? above.floorZ : (below?.soffitZ ?? 0) + (ctx.project.roofs[0]?.thickness ?? 200);
+  const thickness = above ? above.slabThickness : ctx.project.roofs[0]?.thickness ?? 200;
+  const count = Math.max(2, Math.min(7, Math.floor((thickness - 73) / 22) + 1));
+  const layers = new SlabLayers(Array.from({ length: count }, (_, i) => top - 28 - 22 * i));
+  cache.set(slabIndex, layers);
+  return layers;
+}
+
+/** One face of the slab: the floor of this storey, or the slab over it. */
+function layersFor(ctx: Ctx, level: LevelInfo, which: "floor" | "ceiling", cache: Map<number, SlabLayers>): SlabSide {
+  return new SlabSide(slabLayersOf(ctx, which === "floor" ? level.index : level.index + 1, cache), which);
 }
 
 export function planElectrical(ctx: Ctx): ElectricalPlan {
@@ -147,13 +163,14 @@ export function planElectrical(ctx: Ctx): ElectricalPlan {
   const floorEntries: { owner: string; run: Run }[] = [];
   const ceilingEntries: { owner: string; run: Run }[] = [];
   const byId = new Map<string, RoomElectrical>();
+  const slabCache = new Map<number, SlabLayers>();
   for (const level of ctx.levels) {
     // The floor slab of the lowest storey has the column pedestals standing through it.
     const holesFloor = [...slabOpenings(ctx, level.index).map(rectOf), ...(level.index === 0 ? columnsOnGround : [])];
     const holesCeiling = slabOpenings(ctx, level.index + 1).map(rectOf);
     const beamPolys = levelObstacles(ctx, level).filter((o) => o.kind === "beam").map((o) => o.poly);
-    const floorLayers = layersFor(ctx, level, "floor");
-    const ceilLayers = layersFor(ctx, level, "ceiling");
+    const floorLayers = layersFor(ctx, level, "floor", slabCache);
+    const ceilLayers = layersFor(ctx, level, "ceiling", slabCache);
     const startFloor = local(f, 60, laneV);
     const startCeil = local(f, 105, laneV + 30);
     for (const room of ctx.roomsOf(level.levelId)) {
@@ -264,10 +281,13 @@ export function planElectrical(ctx: Ctx): ElectricalPlan {
           const backBox = wallBoxOf(layout, w.edge, w.t, w.height, 75, 75, 45, -30);
           re.fits.push({ kind: w.kind, edge: w.edge, t: w.t, height: w.height, face: wallBoxOf(layout, w.edge, w.t, w.height, w.w, w.high, w.deep, 0), backBox, entry: { x: pos.x, y: pos.y, z: level.floorZ + w.height - 37 } });
           if (k > 0) {
+            // The chain between boxes runs deeper in the wall than the vertical drops, so that it passes behind the drop of any other group on the wall.
             const prev = list[k - 1]!;
-            const a = atEdge(prev.edge, prev.t, -CHASE_INSET);
-            const b = atEdge(w.edge, w.t, -CHASE_INSET);
-            re.wallRuns.push({ r: CONDUIT_R, points: [{ ...a, z: level.floorZ + w.height - 35 }, { ...b, z: level.floorZ + w.height - 35 }] });
+            const a = atEdge(prev.edge, prev.t, -CHAIN_INSET);
+            const b = atEdge(w.edge, w.t, -CHAIN_INSET);
+            const zc = level.floorZ + w.height - 35;
+            if (k === 1) re.wallRuns.push({ r: CONDUIT_R, points: [{ ...atEdge(first.edge, first.t, -CHASE_INSET), z: zc }, { ...a, z: zc }] });
+            re.wallRuns.push({ r: CONDUIT_R, points: [{ ...a, z: zc }, { ...b, z: zc }] });
           }
         }
       }
@@ -402,12 +422,31 @@ export function routeCandidates(a: P2, b: P2, holes: Rect[], outline: P2[]): P2[
 }
 
 /** The first route that a layer of the slab will take, as a run at that layer's height. */
-function placeRun(ctx: Ctx, layers: SlabLayers, a: P2, b: P2, holes: Rect[], drops: P2[]): { run: Run; layer: number } | null {
+function placeRun(ctx: Ctx, layers: SlabSide, a: P2, b: P2, holes: Rect[], drops: P2[]): { run: Run; layer: number } | null {
   for (const route of routeCandidates(a, b, holes, ctx.outline)) {
     const layer = layers.place(route, drops);
     if (layer !== null) return { layer, run: { r: CONDUIT_R, points: route.map((p) => ({ x: p.x, y: p.y, z: layers.z[layer]! })) } };
   }
+  // No clear way from the cupboard: tap the nearest conduit already laid, in its own layer, as a branch off it.
+  const taps = layers.placed()
+    .map((s) => { const p = nearestOnSegment(b, s.a, s.b); return { ...s, p, d: Math.hypot(p.x - b.x, p.y - b.y) }; })
+    .sort((x, y) => x.d - y.d)
+    .slice(0, 24);
+  for (const tap of taps) {
+    if (holes.some((h) => inside(h, tap.p, 20))) continue;
+    for (const route of routeCandidates(tap.p, b, holes, ctx.outline)) {
+      if (route.length < 2) continue;
+      if (layers.placeAt(tap.layer, route, drops)) return { layer: tap.layer, run: { r: CONDUIT_R, points: route.map((p) => ({ x: p.x, y: p.y, z: layers.z[tap.layer]! })) } };
+    }
+  }
   return null;
+}
+
+function nearestOnSegment(p: P2, a: P2, b: P2): P2 {
+  const dx = b.x - a.x; const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+  return { x: a.x + dx * t, y: a.y + dy * t };
 }
 
 const inside = (r: Rect, p: P2, slack: number) => p.x >= r.x0 - slack && p.x <= r.x1 + slack && p.y >= r.y0 - slack && p.y <= r.y1 + slack;

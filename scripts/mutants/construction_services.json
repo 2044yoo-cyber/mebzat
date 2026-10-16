@@ -184,5 +184,29 @@
     "file": "src/features/house-designer/construction/inspect.ts",
     "from": "from: c.service.from, to: c.service.to,",
     "to": "from: \"\", to: \"\","
+  },
+  {
+    "name": "opposite faces of a slab may share a line",
+    "file": "src/features/house-designer/construction/service-routing.ts",
+    "from": "inTheWay(m, s) || (s.side !== side && alongSameLine(m, s))",
+    "to": "inTheWay(m, s)"
+  },
+  {
+    "name": "a face taps the other face's conduit",
+    "file": "src/features/house-designer/construction/service-routing.ts",
+    "from": "list.filter((s) => s.side === side).map((s) => ({ layer, a: s.a, b: s.b }))",
+    "to": "list.map((s) => ({ layer, a: s.a, b: s.b }))"
+  },
+  {
+    "name": "a branch is not checked against the layer",
+    "file": "src/features/house-designer/construction/service-routing.ts",
+    "from": "    if (this.blocked(layer, mine, side)) return false;\n    this.segs[layer]!.push(...mine.map((m) => ({ ...m, side })));\n    this.drops[layer]!.push(...drops);\n    return true;",
+    "to": "    this.segs[layer]!.push(...mine.map((m) => ({ ...m, side })));\n    this.drops[layer]!.push(...drops);\n    return true;"
+  },
+  {
+    "name": "the ceiling face takes layers from the top",
+    "file": "src/features/house-designer/construction/service-routing.ts",
+    "from": "const order = Array.from({ length: n }, (_, i) => (side === \"floor\" ? i : n - 1 - i));",
+    "to": "const order = Array.from({ length: n }, (_, i) => i);"
   }
 ]

@@ -98,7 +98,17 @@ export function exitsOf(layout: RoomLayout, shaft: Riser): Exit[] {
   return exits;
 }
 
-export function placeRoom(ctx: Ctx, level: LevelInfo, room: RoomInfo, layout: RoomLayout, shaft: Riser): WetRoomPlan {
+/** A way out of a shaft that does not depend on which storey's walls it is read against: it is the same shaft on every floor. */
+export type ExitKey = { corner: boolean; side: 0 | 1 };
+
+export const exitKeyOf = (e: Exit): ExitKey => ({ corner: e.corner, side: e.side });
+
+/** The exits of `shaft` in this room's layout that match a key. */
+export function resolveExit(layout: RoomLayout, shaft: Riser, key: ExitKey): Exit | null {
+  return exitsOf(layout, shaft).find((e) => e.corner === key.corner && e.side === key.side) ?? null;
+}
+
+export function placeRoom(ctx: Ctx, level: LevelInfo, room: RoomInfo, layout: RoomLayout, shaft: Riser, key?: ExitKey): WetRoomPlan {
   const lane = laneOf(ctx);
   const ducted = room.kind === "bath" || room.kind === "wc";
   const { vS } = shaftPoints(shaft);
@@ -189,7 +199,8 @@ export function placeRoom(ctx: Ctx, level: LevelInfo, room: RoomInfo, layout: Ro
     return { exit, fixtures, heater, problems };
   };
 
-  const exits = exitsOf(layout, shaft);
+  const wanted = key ?? shaft.exit;
+  const exits = wanted ? [resolveExit(layout, shaft, wanted)].filter((e): e is Exit => !!e) : exitsOf(layout, shaft);
   const tries = (exits.length ? exits : [null]).map((exit) => attempt(exit));
   // The first way out that places everything; failing that, the one that places most.
   const best = tries.find((x) => x.problems.length === 0) ?? [...tries].sort((p, q) => p.problems.length - q.problems.length)[0]!;
@@ -324,7 +335,12 @@ export function branches(ctx: Ctx, plan: PlumbingPlan, wr: WetRoomPlan): void {
   // The vent stands beside the riser and clear of the 110 mm stack, a lane further into the shaft than the trunk, and ties into the stack at the top.
   const ventUp = local(f, uTee, vS + 95);
   const ventAcross = local(f, uS, vS + 95);
-  const ventRun: Run = { r: 25, points: [{ ...tee, z: teeZ }, { ...ventUp, z: teeZ }, { ...ventUp, z: tie }, { ...ventAcross, z: tie }, { x: stackPt.x, y: stackPt.y, z: tie }] };
+  // From a corner shaft the trunk runs forward along the wall the shaft is tucked against, so the vent rises from that stretch of it, well in front of the stack.
+  const cornerTee = local(f, cornerU(vS), 190);
+  const cornerTeeZ = zOnRuns(merged, cornerTee) ?? wasteZInlet;
+  const ventRun: Run = corner
+    ? { r: 25, points: [{ ...cornerTee, z: cornerTeeZ }, { ...cornerTee, z: tie }, { ...local(f, uS, 190), z: tie }, { x: stackPt.x, y: stackPt.y, z: tie }] }
+    : { r: 25, points: [{ ...tee, z: teeZ }, { ...ventUp, z: teeZ }, { ...ventUp, z: tie }, { ...ventAcross, z: tie }, { x: stackPt.x, y: stackPt.y, z: tie }] };
 
   const wasteRunsAll = [...merged, ...stubs];
   const wasteShapes = wasteRunsAll.flatMap((r) => runShapes(r));
@@ -460,22 +476,35 @@ export function zOnRuns(runs: Run[], p: P2): number | null {
 
 
 /**
- * Why a shaft cannot serve the wet rooms on its storeys, or null when it can: in each of them the fixtures
- * must find a place on the walls and the waste, the cold and the hot pipes must reach every one from the shaft.
+ * The way out of a shaft that works on every storey it serves, or why there is none. Every wet room in it must
+ * find a place for its fixtures and every pipe must reach them by that one way, because the riser and the
+ * vent stand in one place from the ground to the roof.
  */
-export function shaftProblem(ctx: Ctx, shaft: Riser, layoutOf: (room: RoomInfo) => RoomLayout): string | null {
+export function shaftExit(ctx: Ctx, shaft: Riser, layoutOf: (room: RoomInfo) => RoomLayout): { key: ExitKey } | { problem: string } {
   const { vS, uS } = shaftPoints(shaft);
   const centre = local(shaft.frame, uS, vS);
+  const rooms: { level: LevelInfo; room: RoomInfo; layout: RoomLayout }[] = [];
   for (const level of ctx.levels) {
     for (const room of ctx.roomsOf(level.levelId)) {
       if (!["bath", "wc", "kitchen", "laundry"].includes(room.kind)) continue;
       const layout = layoutOf(room);
-      if (!rectInsidePolygon(shaft.housing, layout.clear.poly)) continue;
-      const wr = placeRoom(ctx, level, room, layout, shaft);
-      const scratch = { items: [], shafts: [shaft], stacks: [{ shaft, centre, bottom: -900, top: 0 }] } as unknown as PlumbingPlan;
-      branches(ctx, scratch, wr);
-      if (wr.unresolved.length) return `${room.name}, ${level.name}: ${wr.unresolved[0]!.reason}`;
+      if (rectInsidePolygon(shaft.housing, layout.clear.poly)) rooms.push({ level, room, layout });
     }
   }
-  return null;
+  if (!rooms.length) return { problem: "no wet room stands round it" };
+  const keys = new Map<string, ExitKey>();
+  for (const r of rooms) for (const e of exitsOf(r.layout, shaft)) keys.set(`${e.corner}${e.side}`, exitKeyOf(e));
+  let first = "";
+  for (const key of keys.values()) {
+    let failed = "";
+    for (const r of rooms) {
+      const wr = placeRoom(ctx, r.level, r.room, r.layout, shaft, key);
+      const scratch = { items: [], shafts: [shaft], stacks: [{ shaft, centre, bottom: -900, top: 0 }] } as unknown as PlumbingPlan;
+      branches(ctx, scratch, wr);
+      if (wr.unresolved.length) { failed = `${r.room.name}, ${r.level.name}: ${wr.unresolved[0]!.reason}`; break; }
+    }
+    if (!failed) return { key };
+    first ||= failed;
+  }
+  return { problem: first || "it has no way out into the room" };
 }
