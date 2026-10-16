@@ -478,6 +478,14 @@ function PartMesh({
     Math.max(part.size.y * MM, 0.001),
     Math.max(part.size.z * MM, 0.001),
   ];
+  const woodTexture = useMemo(() => {
+    const finish = part.board.appearance?.colour ?? "";
+    const isBoardPart = part.role !== "leg" && part.role !== "rail" && part.role !== "led";
+    return renderQuality && surface === "material" && isBoardPart
+      ? createWoodGrainTexture(finish, part.board.appearance?.hex ?? spec.finish.hex ?? "#b58a5a")
+      : null;
+  }, [renderQuality, surface, part.board, part.role, spec.finish.hex]);
+
   const shapedGeometry = useMemo(() => {
     if (!part.footprint) return null;
     const shape = new THREE.Shape(part.footprint.map((p) => new THREE.Vector2(
@@ -536,7 +544,8 @@ function PartMesh({
     >
       {shapedGeometry ? <primitive object={shapedGeometry} attach="geometry" /> : <boxGeometry args={size} />}
       <meshStandardMaterial
-        color={visualMode === "connections" ? "#f5f5f2" : colourFor(part, spec, surface)}
+        map={woodTexture ?? undefined}
+        color={woodTexture ? "#ffffff" : visualMode === "connections" ? "#f5f5f2" : colourFor(part, spec, surface)}
         roughness={renderQuality ? Math.max(0.24, roughnessFor(part, spec) - 0.08) : roughnessFor(part, spec)}
         metalness={renderQuality ? 0.035 : 0.02}
         envMapIntensity={renderQuality ? 1.25 : 1}
@@ -694,6 +703,63 @@ function SelectionBox({
       <lineBasicMaterial color="#4c8dff" depthTest={false} transparent />
     </lineSegments>
   );
+}
+
+/**
+ * Lightweight procedural wood grain for Render mode. It is generated locally,
+ * cached by finish, and never changes the design spec or manufacturing data.
+ */
+const woodGrainCache = new Map<string, THREE.CanvasTexture>();
+
+function createWoodGrainTexture(finish: string, hex: string): THREE.CanvasTexture | null {
+  if (!/oak|walnut|birch|wood|ash|beech|maple/i.test(finish)) return null;
+  const key = `${finish.toLowerCase()}|${hex}`;
+  const cached = woodGrainCache.get(key);
+  if (cached) return cached;
+  if (typeof document === "undefined") return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 512;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.fillStyle = hex;
+  context.fillRect(0, 0, 512, 512);
+
+  const grain = context.createLinearGradient(0, 0, 512, 0);
+  grain.addColorStop(0, "rgba(40,22,10,0.13)");
+  grain.addColorStop(0.18, "rgba(255,235,205,0.10)");
+  grain.addColorStop(0.42, "rgba(55,28,12,0.08)");
+  grain.addColorStop(0.67, "rgba(255,235,205,0.08)");
+  grain.addColorStop(1, "rgba(35,20,10,0.12)");
+  context.fillStyle = grain;
+  context.fillRect(0, 0, 512, 512);
+
+  for (let i = 0; i < 100; i += 1) {
+    const x = (i / 100) * 512;
+    const alpha = 0.018 + (i % 7) * 0.006;
+    context.strokeStyle = i % 3 === 0
+      ? `rgba(42,24,12,${alpha})`
+      : `rgba(255,240,215,${alpha * 0.8})`;
+    context.lineWidth = i % 9 === 0 ? 2 : 1;
+    context.beginPath();
+    for (let y = 0; y <= 512; y += 16) {
+      const wave = Math.sin((y / 512) * Math.PI * 2 + i * 0.41) * (2 + (i % 4));
+      if (y === 0) context.moveTo(x + wave, y);
+      else context.lineTo(x + wave, y);
+    }
+    context.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(1, 1);
+  texture.anisotropy = 4;
+  texture.needsUpdate = true;
+  woodGrainCache.set(key, texture);
+  return texture;
 }
 
 /**
