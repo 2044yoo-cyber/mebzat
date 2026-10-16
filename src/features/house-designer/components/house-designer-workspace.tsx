@@ -262,6 +262,8 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
         strokes: payload.lines.map((line, index) => ({
           id: `image-wall-${index + 1}`,
           thickness: 200,
+          locked: false,
+          kind: "wall" as const,
           points: [
             { x: line.start.x, y: line.start.y },
             { x: line.end.x, y: line.end.y },

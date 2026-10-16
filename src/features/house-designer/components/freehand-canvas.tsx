@@ -820,7 +820,8 @@ export function FreehandCanvas({
                   <button type="button" className="rounded bg-green-700 px-3 py-2 text-white" onClick={() => {
                     const next: Sketch = {...sketch, strokes: [...sketch.strokes, {
                       id: crypto.randomUUID(), points: [proposal.start, proposal.end],
-                      thickness: sketch.strokes[0]?.thickness ?? thickness
+                      thickness: sketch.strokes[0]?.thickness ?? thickness,
+                      locked: false, kind: "wall" as const,
                     }]};
                     commit(next);
                     setReview(true);

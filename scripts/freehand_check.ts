@@ -45,6 +45,8 @@ const stroke = (points: number[][], id = "s"): Stroke => ({
   id,
   points: points.map(([x, y]) => ({ x: x!, y: y! })),
   thickness: 200,
+  locked: false,
+  kind: "wall",
 });
 const base = createHouseProject({
   title: "Test",
