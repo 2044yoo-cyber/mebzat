@@ -248,6 +248,7 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
       }
       const sketch: NonNullable<HouseProject["freehandSketch"]> = {
         version: 1,
+        openings: [],
         calibrated: true,
         mmPerUnit: payload.mmPerUnit!,
         strokes: payload.lines.map((line, index) => ({
