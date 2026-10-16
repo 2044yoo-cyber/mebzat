@@ -20,6 +20,8 @@ import {
   visibleComponents,
   type ComponentRecord, type ConstructionModel, type StageId, type ViewState,
 } from "../src/features/house-designer/construction";
+import { constructionTakeoffPackage } from "../src/features/house-designer/construction/takeoff-handoff";
+import { parseHouseTakeoffPackage } from "../src/features/house-designer/services/takeoff-adapter";
 import { layoutLabels } from "../src/features/house-designer/construction/label-layout";
 import type { Shape } from "../src/features/house-designer/construction/geometry";
 
@@ -551,6 +553,40 @@ function shapeVolumeM3(s: Shape): number {
   const loose = aggregateQuantities(model, model.options, "loose");
   ok(loose.length > 5 && loose.every((l) => l.items.every((i) => model.components.find((c) => c.id === i.componentId)!.loose)), "loose furniture is a separate list");
   ok(lines.every((l) => l.items.every((i) => !index.byId.get(i.componentId)!.loose)), "and out of the building quantities");
+}
+
+// ---------------------------------------------------------------------------
+// The hand-off to the takeoff page
+// ---------------------------------------------------------------------------
+{
+  const pkg = constructionTakeoffPackage(model);
+  const parsed = parseHouseTakeoffPackage(JSON.stringify(pkg));
+  ok(parsed, "the takeoff page's own parser accepts the package");
+  const elementIds = new Set(pkg.elements.map((e) => e.id));
+  ok(pkg.quantities.length > 100, "a hundred-odd bill lines are handed over");
+  ok(pkg.quantities.every((q) => elementIds.has(q.representativeElementId) && q.quantity.elementIds.length > 0 && q.quantity.elementIds.every((id) => elementIds.has(id))), "every line points at elements that are in the package, so a line can light up its parts");
+  for (const q of pkg.quantities) {
+    const l = line(q.id.split("|")[0]!);
+    ok(l && l.net !== null && q.quantity.value === l.net && q.quantity.unit === l.unit, `${q.id}: the quantity is the bill line's net figure`);
+  }
+  ok(!pkg.quantities.some((q) => q.section === "D" && q.quantity.unit === "kg"), "reinforcement with no approved schedule is not handed over as a weight");
+  ok(pkg.warnings.some((w) => /^Missing:.*approved bar schedule/i.test(w)), "and is listed as missing");
+  ok(pkg.warnings.some((w) => /no prices/i.test(w)), "the package says it carries no prices");
+  const concrete = pkg.quantities.find((q) => q.id === "concrete.column|m³")!;
+  ok(/allowance 5%/.test(concrete.quantity.formula) && /not in this figure/.test(concrete.quantity.formula), "the allowance is in the working, not in the number");
+  equal(concrete.quantity.value, line("concrete.column")!.net, "the concrete figure has no allowance added");
+  ok(JSON.stringify(pkg).indexOf('"rate"') === -1 && JSON.stringify(pkg).indexOf('"amount"') === -1, "no rate or amount anywhere in the package");
+  ok(pkg.quantities.every((q) => q.quantity.source === "bim" || q.quantity.source === "calculated"), "sources are the takeoff domain's own");
+  equal(line("openings.window-opening")!.status, "measured", "window openings are read from the project");
+  equal(pkg.quantities.find((q) => q.id === "openings.window-opening|piece")!.quantity.source, "bim", "a measured line is sourced from the model");
+  equal(pkg.quantities.find((q) => q.id === "masonry.blocks|piece")!.quantity.source, "calculated", "an assumed line is not passed off as measured");
+  ok(pkg.quantities.find((q) => q.id === "masonry.blocks|piece")!.quantity.confidence < pkg.quantities.find((q) => q.id === "openings.window-opening|piece")!.quantity.confidence, "and carries less confidence");
+  const roofs = constructionTakeoffPackage(model, { ...DEFAULT_OPTIONS, roofType: "pitched" });
+  ok(roofs.quantities.some((q) => q.id === "roof.covering|m²") && !pkg.quantities.some((q) => q.id === "roof.covering|m²"), "the roof alternative that is chosen is the one handed over");
+  const withBars = buildLearningModel({}, {}, {}, [{ componentId: model.components.find((c) => c.kind === "column-bars")!.id, mark: "A", diameterMm: 16, lengthMm: 3000, count: 8 }]).model;
+  ok(constructionTakeoffPackage(withBars).quantities.some((q) => q.quantity.unit === "kg"), "with an approved schedule the steel weight is handed over");
+  ok(constructionTakeoffPackage(model, model.options, "loose").quantities.every((q) => q.id.startsWith("furniture.") || q.id.includes("|")), "loose furniture can be handed over on its own");
+  ok(!pkg.quantities.some((q) => q.id.startsWith("furniture.chair")), "and is not in the building package");
 }
 
 // ---------------------------------------------------------------------------

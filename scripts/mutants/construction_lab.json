@@ -1,52 +1,338 @@
 [
-  { "name": "timeline: the current stage is hidden", "file": "src/features/house-designer/construction/view.ts", "from": "if (c.stage > view.stage) v = view.ghostFuture", "to": "if (c.stage >= view.stage) v = view.ghostFuture" },
-  { "name": "timeline: later stages show", "file": "src/features/house-designer/construction/view.ts", "from": "if (c.stage > view.stage) v = view.ghostFuture ? \"ghost\" : \"hidden\";", "to": "if (c.stage > view.stage + 20) v = view.ghostFuture ? \"ghost\" : \"hidden\";" },
-  { "name": "timeline: temporary works never go", "file": "src/features/house-designer/construction/view.ts", "from": "c.removedAfter < view.stage) return \"hidden\";", "to": "c.removedAfter > view.stage + 99) return \"hidden\";" },
-  { "name": "layers: hiding a layer does nothing", "file": "src/features/house-designer/construction/view.ts", "from": "if (view.layersOff.includes(c.layer)) return \"hidden\";", "to": "" },
-  { "name": "categories: hiding a category does nothing", "file": "src/features/house-designer/construction/view.ts", "from": "if (view.categoriesOff.includes(c.category)) return \"hidden\";", "to": "" },
-  { "name": "storeys: hiding a floor does nothing", "file": "src/features/house-designer/construction/view.ts", "from": "if (c.storeyId && view.storeysOff.includes(c.storeyId)) return \"hidden\";", "to": "" },
-  { "name": "hide one component does nothing", "file": "src/features/house-designer/construction/view.ts", "from": "if (view.hiddenIds.includes(c.id)) return \"hidden\";", "to": "" },
-  { "name": "roof alternative is inverted", "file": "src/features/house-designer/construction/view.ts", "from": "return view.options.roofType === c.variant.value;", "to": "return view.options.roofType !== c.variant.value;" },
-  { "name": "frame view: reinforcement-only still shows formwork", "file": "src/features/house-designer/construction/view.ts", "from": "if (isTemporary(c)) v = \"hidden\";\n          break;\n        case \"formwork\":", "to": "\n          break;\n        case \"formwork\":" },
-  { "name": "frame view: formwork-only still shows steel", "file": "src/features/house-designer/construction/view.ts", "from": "if (isSteel(c)) v = \"hidden\";\n          break;\n        case \"placement\"", "to": "\n          break;\n        case \"placement\"" },
-  { "name": "frame view: complete concrete is not see-through", "file": "src/features/house-designer/construction/view.ts", "from": "case \"complete\":\n          if (isConcrete(c)) v = worse(v, \"ghost\");", "to": "case \"complete\":\n          if (false) v = worse(v, \"ghost\");" },
-  { "name": "placement: one zone too late", "file": "src/features/house-designer/construction/view.ts", "from": "pour <= view.pourStep ? v : \"hidden\"", "to": "pour <= view.pourStep + 1 ? v : \"hidden\"" },
-  { "name": "placement: nothing is ever hidden", "file": "src/features/house-designer/construction/view.ts", "from": "pour <= view.pourStep ? v : \"hidden\"", "to": "v" },
-  { "name": "completed frame still shows the steel", "file": "src/features/house-designer/construction/view.ts", "from": "case \"completed\":\n          if (isSteel(c) || isTemporary(c)) v = \"hidden\";", "to": "case \"completed\":\n          if (false) v = \"hidden\";" },
-  { "name": "steel stays visible after its stage", "file": "src/features/house-designer/construction/view.ts", "from": "if (!view.showEmbedded) v = \"hidden\";", "to": "" },
-  { "name": "isolate shows the wrong set", "file": "src/features/house-designer/construction/view.ts", "from": "if (!set.has(c.id)) v = worse(v, view.transparentContext", "to": "if (set.has(c.id)) v = worse(v, view.transparentContext" },
-  { "name": "isolate ignores the transparent-context switch", "file": "src/features/house-designer/construction/view.ts", "from": "if (!set.has(c.id)) v = worse(v, view.transparentContext ? \"ghost\" : \"hidden\");", "to": "if (!set.has(c.id)) v = worse(v, \"ghost\");" },
-  { "name": "isolating drops the sub-assembly", "file": "src/features/house-designer/construction/view.ts", "from": "stack.push(...(index.children.get(next) ?? []));", "to": "" },
-  { "name": "concealed services stay visible when finished", "file": "src/features/house-designer/construction/view.ts", "from": "view.stage >= coverStage(c)) return \"hidden\";", "to": "view.stage >= 99) return \"hidden\";" },
-  { "name": "cut-away keeps the wrong side", "file": "src/features/house-designer/construction/view.ts", "from": "keep: \"below\" };", "to": "keep: \"above\" };" },
-  { "name": "walls ignore progress", "file": "src/features/house-designer/construction/view.ts", "from": "return z - floor.floorZ <= Math.max(0, view.wallProgress) * floor.height;", "to": "return true;" },
-  { "name": "walls build from the top down", "file": "src/features/house-designer/construction/view.ts", "from": "return z - floor.floorZ <= Math.max(0, view.wallProgress) * floor.height;", "to": "return z - floor.floorZ >= Math.max(0, view.wallProgress) * floor.height;" },
-  { "name": "moving stage keeps the old frame view", "file": "src/features/house-designer/construction/view.ts", "from": "stage, frameView: \"complete\", pourStep: 99", "to": "stage, pourStep: 99" },
-  { "name": "next stage can run past the end", "file": "src/features/house-designer/construction/view.ts", "from": "Math.min(STAGE_IDS.length - 1, STAGE_IDS.indexOf(view.stage) + by)", "to": "STAGE_IDS.indexOf(view.stage) + by" },
-  { "name": "explode: floors do not rise", "file": "src/features/house-designer/construction/explode.ts", "from": "const lift = c.storeyIndex < 0 ? -0.6 : c.storeyIndex;", "to": "const lift = 0;" },
-  { "name": "explode: floors switch ignored", "file": "src/features/house-designer/construction/explode.ts", "from": "if (view.explode.floors) {", "to": "if (true) {" },
-  { "name": "explode: categories move up", "file": "src/features/house-designer/construction/explode.ts", "from": "base = add(base, scale(DIAGONAL, rank * a * CATEGORY_STEP));", "to": "base = add(base, { x: 0, y: 0, z: rank * a * CATEGORY_STEP });" },
-  { "name": "explode: layers switch ignored", "file": "src/features/house-designer/construction/explode.ts", "from": "view.explode.layers ? c.explode.layerIndex * a * LAYER_STEP : 0", "to": "c.explode.layerIndex * a * LAYER_STEP" },
-  { "name": "explode: layer order lost", "file": "src/features/house-designer/construction/explode.ts", "from": "c.explode.layerIndex * a * LAYER_STEP", "to": "1 * a * LAYER_STEP" },
-  { "name": "explode: assembled model is left displaced", "file": "src/features/house-designer/construction/explode.ts", "from": "if (a === 0) return { base: ZERO, layerDistance: 0, dir: ZERO, radial: false };", "to": "if (a === 0) return { base: { x: 0, y: 0, z: 1 }, layerDistance: 0, dir: ZERO, radial: false };" },
-  { "name": "quantities: both roofs counted", "file": "src/features/house-designer/construction/quantities.ts", "from": "if (c.variant.group === \"roof\") return options.roofType === c.variant.value;", "to": "if (c.variant.group === \"roof\") return true;" },
-  { "name": "quantities: loose furniture counted in the building", "file": "src/features/house-designer/construction/quantities.ts", "from": "(scope === \"loose\") === !!c.loose", "to": "true" },
-  { "name": "quantities: allowance miscalculated", "file": "src/features/house-designer/construction/quantities.ts", "from": "i.value! * (i.allowance!.percent! / 100)", "to": "i.value! * (i.allowance!.percent! / 10)" },
-  { "name": "quantities: allowance added to the net", "file": "src/features/house-designer/construction/quantities.ts", "from": "else line.net = (line.net ?? 0) + item.value;", "to": "else line.net = (line.net ?? 0) + item.value * (item.allowance?.percent ? 1 + item.allowance.percent / 100 : 1);" },
-  { "name": "quantities: missing data not flagged", "file": "src/features/house-designer/construction/quantities.ts", "from": "if (line.missingItems > 0) line.status = \"missing\";", "to": "" },
-  { "name": "quantities: draft bill takes lines with no number", "file": "src/features/house-designer/construction/quantities.ts", "from": ".filter((l) => l.net !== null)\n    .map((l) => ({", "to": ".map((l) => ({" },
-  { "name": "steel: weight from d instead of d squared", "file": "src/features/house-designer/construction/helpers.ts", "from": "(Math.PI / 4) * d * d * STEEL_DENSITY", "to": "(Math.PI / 4) * d * STEEL_DENSITY" },
-  { "name": "steel: weighed without a schedule", "file": "src/features/house-designer/construction/helpers.ts", "from": "if (mine.length === 0) {", "to": "if (mine.length === -1) {" },
-  { "name": "steel: approved weight not marked for review", "file": "src/features/house-designer/construction/helpers.ts", "from": "inputs: Object.fromEntries(mine.map((bar) => [bar.mark, `${bar.count} × ⌀${bar.diameterMm} × ${bar.lengthMm} mm`])), status: \"review\"", "to": "inputs: Object.fromEntries(mine.map((bar) => [bar.mark, `${bar.count} × ⌀${bar.diameterMm} × ${bar.lengthMm} mm`])), status: \"calculated\"" },
-  { "name": "concrete: allowance dropped", "file": "src/features/house-designer/construction/helpers.ts", "from": "percent: ctx.rules.allowances.concrete }", "to": "percent: null }" },
-  { "name": "concrete: overlaps not removed", "file": "src/features/house-designer/construction/geometry.ts", "from": "out.push(Math.max(0, gross - overlap));", "to": "out.push(Math.max(0, gross));" },
-  { "name": "concrete: beam counted whole", "file": "src/features/house-designer/construction/generators/frame.ts", "from": "const net = nets[columns.length + bi]!;", "to": "const net = beamPrisms[bi]!.z1 > 0 ? (polygonArea(beamPrisms[bi]!.poly) * (beamPrisms[bi]!.z1 - beamPrisms[bi]!.z0)) : 0;" },
-  { "name": "masonry: block count per m² wrong", "file": "src/features/house-designer/construction/generators/masonry.ts", "from": "const perM2 = (1e6 / (pitch * (blockType === \"brick\" ? 75 : course))) * leaves;", "to": "const perM2 = (1e6 / (spec.length * (blockType === \"brick\" ? 75 : course))) * leaves;" },
-  { "name": "masonry: block allowance dropped", "file": "src/features/house-designer/construction/generators/masonry.ts", "from": "percent: rules.allowances.blocks }, assumptions: [blockNote", "to": "percent: null }, assumptions: [blockNote" },
-  { "name": "plaster: openings never deducted", "file": "src/features/house-designer/construction/generators/finishes.ts", "from": "return rule === \"all\" || (rule === \"over-threshold\"", "to": "return false && (rule === \"over-threshold\"" },
-  { "name": "roof: covering measured on plan", "file": "src/features/house-designer/construction/generators/roof.ts", "from": "const slopedCover = planCover / Math.cos(theta);", "to": "const slopedCover = planCover;" },
-  { "name": "joinery: a panel role dropped from the 3D model", "file": "src/features/house-designer/construction/generators/joinery.ts", "from": "roles: [\"gable\", \"divider\", \"top\", \"bottom\", \"shelf\", \"back\", \"rail\"]", "to": "roles: [\"gable\", \"divider\", \"top\", \"bottom\", \"back\", \"rail\"]" },
-  { "name": "panel: wrong stage reported", "file": "src/features/house-designer/construction/inspect.ts", "from": "stage: STAGE_BY_ID[c.stage],", "to": "stage: STAGE_BY_ID[1]," },
-  { "name": "panel: schematic parts labelled as measured", "file": "src/features/house-designer/construction/inspect.ts", "from": "geometryLabel: c.geometrySource === \"project\" ? \"Taken from the project's own geometry\" : \"Schematic illustration: not taken from the drawing\"", "to": "geometryLabel: \"Taken from the project's own geometry\"" },
-  { "name": "sample: floor-to-floor setting ignored", "file": "src/features/house-designer/construction/learning-house.ts", "from": "floorToFloorHeight: p.floorToFloor,", "to": "floorToFloorHeight: 3200," }
+ {
+  "name": "timeline: the current stage is hidden",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (c.stage > view.stage) v = view.ghostFuture",
+  "to": "if (c.stage >= view.stage) v = view.ghostFuture"
+ },
+ {
+  "name": "timeline: later stages show",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (c.stage > view.stage) v = view.ghostFuture ? \"ghost\" : \"hidden\";",
+  "to": "if (c.stage > view.stage + 20) v = view.ghostFuture ? \"ghost\" : \"hidden\";"
+ },
+ {
+  "name": "timeline: temporary works never go",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "c.removedAfter < view.stage) return \"hidden\";",
+  "to": "c.removedAfter > view.stage + 99) return \"hidden\";"
+ },
+ {
+  "name": "layers: hiding a layer does nothing",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (view.layersOff.includes(c.layer)) return \"hidden\";",
+  "to": ""
+ },
+ {
+  "name": "categories: hiding a category does nothing",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (view.categoriesOff.includes(c.category)) return \"hidden\";",
+  "to": ""
+ },
+ {
+  "name": "storeys: hiding a floor does nothing",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (c.storeyId && view.storeysOff.includes(c.storeyId)) return \"hidden\";",
+  "to": ""
+ },
+ {
+  "name": "hide one component does nothing",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (view.hiddenIds.includes(c.id)) return \"hidden\";",
+  "to": ""
+ },
+ {
+  "name": "roof alternative is inverted",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "return view.options.roofType === c.variant.value;",
+  "to": "return view.options.roofType !== c.variant.value;"
+ },
+ {
+  "name": "frame view: reinforcement-only still shows formwork",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (isTemporary(c)) v = \"hidden\";\n          break;\n        case \"formwork\":",
+  "to": "\n          break;\n        case \"formwork\":"
+ },
+ {
+  "name": "frame view: formwork-only still shows steel",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (isSteel(c)) v = \"hidden\";\n          break;\n        case \"placement\"",
+  "to": "\n          break;\n        case \"placement\""
+ },
+ {
+  "name": "frame view: complete concrete is not see-through",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "case \"complete\":\n          if (isConcrete(c)) v = worse(v, \"ghost\");",
+  "to": "case \"complete\":\n          if (false) v = worse(v, \"ghost\");"
+ },
+ {
+  "name": "placement: one zone too late",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "pour <= view.pourStep ? v : \"hidden\"",
+  "to": "pour <= view.pourStep + 1 ? v : \"hidden\""
+ },
+ {
+  "name": "placement: nothing is ever hidden",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "pour <= view.pourStep ? v : \"hidden\"",
+  "to": "v"
+ },
+ {
+  "name": "completed frame still shows the steel",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "case \"completed\":\n          if (isSteel(c) || isTemporary(c)) v = \"hidden\";",
+  "to": "case \"completed\":\n          if (false) v = \"hidden\";"
+ },
+ {
+  "name": "steel stays visible after its stage",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (!view.showEmbedded) v = \"hidden\";",
+  "to": ""
+ },
+ {
+  "name": "isolate shows the wrong set",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (!set.has(c.id)) v = worse(v, view.transparentContext",
+  "to": "if (set.has(c.id)) v = worse(v, view.transparentContext"
+ },
+ {
+  "name": "isolate ignores the transparent-context switch",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "if (!set.has(c.id)) v = worse(v, view.transparentContext ? \"ghost\" : \"hidden\");",
+  "to": "if (!set.has(c.id)) v = worse(v, \"ghost\");"
+ },
+ {
+  "name": "isolating drops the sub-assembly",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "stack.push(...(index.children.get(next) ?? []));",
+  "to": ""
+ },
+ {
+  "name": "concealed services stay visible when finished",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "view.stage >= coverStage(c)) return \"hidden\";",
+  "to": "view.stage >= 99) return \"hidden\";"
+ },
+ {
+  "name": "cut-away keeps the wrong side",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "keep: \"below\" };",
+  "to": "keep: \"above\" };"
+ },
+ {
+  "name": "walls ignore progress",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "return z - floor.floorZ <= Math.max(0, view.wallProgress) * floor.height;",
+  "to": "return true;"
+ },
+ {
+  "name": "walls build from the top down",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "return z - floor.floorZ <= Math.max(0, view.wallProgress) * floor.height;",
+  "to": "return z - floor.floorZ >= Math.max(0, view.wallProgress) * floor.height;"
+ },
+ {
+  "name": "moving stage keeps the old frame view",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "stage, frameView: \"complete\", pourStep: 99",
+  "to": "stage, pourStep: 99"
+ },
+ {
+  "name": "next stage can run past the end",
+  "file": "src/features/house-designer/construction/view.ts",
+  "from": "Math.min(STAGE_IDS.length - 1, STAGE_IDS.indexOf(view.stage) + by)",
+  "to": "STAGE_IDS.indexOf(view.stage) + by"
+ },
+ {
+  "name": "explode: floors do not rise",
+  "file": "src/features/house-designer/construction/explode.ts",
+  "from": "const lift = c.storeyIndex < 0 ? -0.6 : c.storeyIndex;",
+  "to": "const lift = 0;"
+ },
+ {
+  "name": "explode: floors switch ignored",
+  "file": "src/features/house-designer/construction/explode.ts",
+  "from": "if (view.explode.floors) {",
+  "to": "if (true) {"
+ },
+ {
+  "name": "explode: categories move up",
+  "file": "src/features/house-designer/construction/explode.ts",
+  "from": "base = add(base, scale(DIAGONAL, rank * a * CATEGORY_STEP));",
+  "to": "base = add(base, { x: 0, y: 0, z: rank * a * CATEGORY_STEP });"
+ },
+ {
+  "name": "explode: layers switch ignored",
+  "file": "src/features/house-designer/construction/explode.ts",
+  "from": "view.explode.layers ? c.explode.layerIndex * a * LAYER_STEP : 0",
+  "to": "c.explode.layerIndex * a * LAYER_STEP"
+ },
+ {
+  "name": "explode: layer order lost",
+  "file": "src/features/house-designer/construction/explode.ts",
+  "from": "c.explode.layerIndex * a * LAYER_STEP",
+  "to": "1 * a * LAYER_STEP"
+ },
+ {
+  "name": "explode: assembled model is left displaced",
+  "file": "src/features/house-designer/construction/explode.ts",
+  "from": "if (a === 0) return { base: ZERO, layerDistance: 0, dir: ZERO, radial: false };",
+  "to": "if (a === 0) return { base: { x: 0, y: 0, z: 1 }, layerDistance: 0, dir: ZERO, radial: false };"
+ },
+ {
+  "name": "quantities: both roofs counted",
+  "file": "src/features/house-designer/construction/quantities.ts",
+  "from": "if (c.variant.group === \"roof\") return options.roofType === c.variant.value;",
+  "to": "if (c.variant.group === \"roof\") return true;"
+ },
+ {
+  "name": "quantities: loose furniture counted in the building",
+  "file": "src/features/house-designer/construction/quantities.ts",
+  "from": "(scope === \"loose\") === !!c.loose",
+  "to": "true"
+ },
+ {
+  "name": "quantities: allowance miscalculated",
+  "file": "src/features/house-designer/construction/quantities.ts",
+  "from": "i.value! * (i.allowance!.percent! / 100)",
+  "to": "i.value! * (i.allowance!.percent! / 10)"
+ },
+ {
+  "name": "quantities: allowance added to the net",
+  "file": "src/features/house-designer/construction/quantities.ts",
+  "from": "else line.net = (line.net ?? 0) + item.value;",
+  "to": "else line.net = (line.net ?? 0) + item.value * (item.allowance?.percent ? 1 + item.allowance.percent / 100 : 1);"
+ },
+ {
+  "name": "quantities: missing data not flagged",
+  "file": "src/features/house-designer/construction/quantities.ts",
+  "from": "if (line.missingItems > 0) line.status = \"missing\";",
+  "to": ""
+ },
+ {
+  "name": "quantities: draft bill takes lines with no number",
+  "file": "src/features/house-designer/construction/quantities.ts",
+  "from": ".filter((l) => l.net !== null)\n    .map((l) => ({",
+  "to": ".map((l) => ({"
+ },
+ {
+  "name": "steel: weight from d instead of d squared",
+  "file": "src/features/house-designer/construction/helpers.ts",
+  "from": "(Math.PI / 4) * d * d * STEEL_DENSITY",
+  "to": "(Math.PI / 4) * d * STEEL_DENSITY"
+ },
+ {
+  "name": "steel: weighed without a schedule",
+  "file": "src/features/house-designer/construction/helpers.ts",
+  "from": "if (mine.length === 0) {",
+  "to": "if (mine.length === -1) {"
+ },
+ {
+  "name": "steel: approved weight not marked for review",
+  "file": "src/features/house-designer/construction/helpers.ts",
+  "from": "inputs: Object.fromEntries(mine.map((bar) => [bar.mark, `${bar.count} \u00d7 \u2300${bar.diameterMm} \u00d7 ${bar.lengthMm} mm`])), status: \"review\"",
+  "to": "inputs: Object.fromEntries(mine.map((bar) => [bar.mark, `${bar.count} \u00d7 \u2300${bar.diameterMm} \u00d7 ${bar.lengthMm} mm`])), status: \"calculated\""
+ },
+ {
+  "name": "concrete: allowance dropped",
+  "file": "src/features/house-designer/construction/helpers.ts",
+  "from": "percent: ctx.rules.allowances.concrete }",
+  "to": "percent: null }"
+ },
+ {
+  "name": "concrete: overlaps not removed",
+  "file": "src/features/house-designer/construction/geometry.ts",
+  "from": "out.push(Math.max(0, gross - overlap));",
+  "to": "out.push(Math.max(0, gross));"
+ },
+ {
+  "name": "concrete: beam counted whole",
+  "file": "src/features/house-designer/construction/generators/frame.ts",
+  "from": "const net = nets[columns.length + bi]!;",
+  "to": "const net = beamPrisms[bi]!.z1 > 0 ? (polygonArea(beamPrisms[bi]!.poly) * (beamPrisms[bi]!.z1 - beamPrisms[bi]!.z0)) : 0;"
+ },
+ {
+  "name": "masonry: block count per m\u00b2 wrong",
+  "file": "src/features/house-designer/construction/generators/masonry.ts",
+  "from": "const perM2 = (1e6 / (pitch * (blockType === \"brick\" ? 75 : course))) * leaves;",
+  "to": "const perM2 = (1e6 / (spec.length * (blockType === \"brick\" ? 75 : course))) * leaves;"
+ },
+ {
+  "name": "masonry: block allowance dropped",
+  "file": "src/features/house-designer/construction/generators/masonry.ts",
+  "from": "percent: rules.allowances.blocks }, assumptions: [blockNote",
+  "to": "percent: null }, assumptions: [blockNote"
+ },
+ {
+  "name": "plaster: openings never deducted",
+  "file": "src/features/house-designer/construction/generators/finishes.ts",
+  "from": "return rule === \"all\" || (rule === \"over-threshold\"",
+  "to": "return false && (rule === \"over-threshold\""
+ },
+ {
+  "name": "roof: covering measured on plan",
+  "file": "src/features/house-designer/construction/generators/roof.ts",
+  "from": "const slopedCover = planCover / Math.cos(theta);",
+  "to": "const slopedCover = planCover;"
+ },
+ {
+  "name": "joinery: a panel role dropped from the 3D model",
+  "file": "src/features/house-designer/construction/generators/joinery.ts",
+  "from": "roles: [\"gable\", \"divider\", \"top\", \"bottom\", \"shelf\", \"back\", \"rail\"]",
+  "to": "roles: [\"gable\", \"divider\", \"top\", \"bottom\", \"back\", \"rail\"]"
+ },
+ {
+  "name": "panel: wrong stage reported",
+  "file": "src/features/house-designer/construction/inspect.ts",
+  "from": "stage: STAGE_BY_ID[c.stage],",
+  "to": "stage: STAGE_BY_ID[1],"
+ },
+ {
+  "name": "panel: schematic parts labelled as measured",
+  "file": "src/features/house-designer/construction/inspect.ts",
+  "from": "geometryLabel: c.geometrySource === \"project\" ? \"Taken from the project's own geometry\" : \"Schematic illustration: not taken from the drawing\"",
+  "to": "geometryLabel: \"Taken from the project's own geometry\""
+ },
+ {
+  "name": "sample: floor-to-floor setting ignored",
+  "file": "src/features/house-designer/construction/learning-house.ts",
+  "from": "floorToFloorHeight: p.floorToFloor,",
+  "to": "floorToFloorHeight: 3200,"
+ },
+ {
+  "name": "hand-off: lines with no figure are handed over",
+  "file": "src/features/house-designer/construction/takeoff-handoff.ts",
+  "from": "missing.push(`${line.description}: ${line.formulas[0] ?? \"no figure yet\"}`); continue; }",
+  "to": "missing.push(`${line.description}: ${line.formulas[0] ?? \"no figure yet\"}`); }"
+ },
+ {
+  "name": "hand-off: the allowance is added to the figure",
+  "file": "src/features/house-designer/construction/takeoff-handoff.ts",
+  "from": "value: line.net, unit: line.unit",
+  "to": "value: line.net * 1.05, unit: line.unit"
+ },
+ {
+  "name": "hand-off: the parts behind a line are not sent",
+  "file": "src/features/house-designer/construction/takeoff-handoff.ts",
+  "from": "ids.forEach((id) => used.add(id));",
+  "to": ""
+ },
+ {
+  "name": "hand-off: the no-prices statement is dropped",
+  "file": "src/features/house-designer/construction/takeoff-handoff.ts",
+  "from": "and this package carries no prices.",
+  "to": "and nothing more."
+ },
+ {
+  "name": "hand-off: a line points at the wrong element",
+  "file": "src/features/house-designer/construction/takeoff-handoff.ts",
+  "from": "representativeElementId: ids[0]!,",
+  "to": "representativeElementId: \"nope\","
+ },
+ {
+  "name": "hand-off: assumed figures claimed as measured",
+  "file": "src/features/house-designer/construction/takeoff-handoff.ts",
+  "from": "source: line.status === \"measured\" ? \"bim\" : \"calculated\"",
+  "to": "source: \"bim\""
+ }
 ]

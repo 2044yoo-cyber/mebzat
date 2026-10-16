@@ -301,7 +301,17 @@ try {
   await page.getByLabel("Opening deduction rule").selectOption("none");
   await page.waitForTimeout(1500);
   ok(await quantities.isVisible(), "changing the opening rule rebuilds the quantities");
+  // Hand the quantities to the takeoff page: the package it reads is stored, unpriced, and the page opens.
+  await Promise.all([page.waitForURL(/\/takeoff\?source=house-design/), page.getByTestId("send-to-takeoff").click()]);
+  const handoff = await page.evaluate(() => JSON.parse(sessionStorage.getItem("medosha:house-takeoff:v1") ?? "null"));
+  ok(handoff && handoff.version === 1 && handoff.source === "house-designer", "the takeoff package is stored in the form the takeoff page reads");
+  ok(handoff.quantities.length > 50 && handoff.elements.length > 50, `with the bill lines and the parts behind them (${handoff.quantities.length} lines)`);
+  ok(!JSON.stringify(handoff).includes('"rate"') && handoff.warnings.some((w) => /no prices/i.test(w)), "and no prices");
+  await page.goto(url);
+  await page.getByTestId("construction-lab").waitFor();
+  await page.waitForFunction(() => window.__scenes?.size > 0, null, { timeout: 60000 });
   await page.getByTestId("construction-lab").getByRole("radio", { name: "Estimate cost" }).click();
+
   const estimate = page.getByTestId("estimate-panel");
   await estimate.waitFor();
   ok(/not built yet/i.test(await estimate.innerText()), "the estimate mode says it is a foundation, not a feature");

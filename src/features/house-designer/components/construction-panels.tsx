@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { CATEGORY_COLORS } from "../construction/catalogue";
 import { describeComponent } from "../construction/inspect";
 import { aggregateQuantities, missingData, toBoqDraft, type QuantityLine } from "../construction/quantities";
+import { constructionTakeoffPackage } from "../construction/takeoff-handoff";
+import { HOUSE_TAKEOFF_SESSION_KEY } from "../services/takeoff-adapter";
 import { STAGE_BY_ID } from "../construction/stages";
 import {
   CATEGORY_LABELS, LAYER_IDS, LAYER_LABELS, PROVENANCE_LABELS, STAGE_IDS,
@@ -304,6 +306,30 @@ export function LayersPanel({ model, view, onView }: { model: ConstructionModel;
   );
 }
 
+/** Hands the net quantities to the existing takeoff page, unpriced. */
+export function SendToTakeoff({ model, view }: { model: ConstructionModel; view: ViewState }) {
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        data-testid="send-to-takeoff"
+        onClick={() => {
+          try {
+            window.sessionStorage.setItem(HOUSE_TAKEOFF_SESSION_KEY, JSON.stringify(constructionTakeoffPackage(model, view.options)));
+            window.location.href = "/takeoff?source=house-design";
+          } catch {
+            setError("Could not prepare the quantities. Nothing was changed.");
+          }
+        }}
+        className="min-h-11 w-full rounded-xl border bg-brand px-4 text-sm font-semibold text-brand-foreground"
+      >Open these quantities in the takeoff page</button>
+      <p className="text-[11px] text-muted-foreground">Net quantities with their working and allowances kept apart. No prices are sent; lines with no figure are listed as missing.</p>
+      {error ? <p role="alert" className="text-xs text-red-700">{error}</p> : null}
+    </div>
+  );
+}
+
 /** Quantities ------------------------------------------------------------------ */
 
 export function QuantitiesPanel({ model, view, rules, onRules, onHighlight, onPick }: { model: ConstructionModel; view: ViewState; rules: EstimatingRules; onRules: (rules: EstimatingRules) => void; onHighlight: (ids: string[]) => void; onPick: (id: string) => void }) {
@@ -377,6 +403,7 @@ export function QuantitiesPanel({ model, view, rules, onRules, onHighlight, onPi
         </section>
       ))}
       <button type="button" onClick={copyCsv} className="min-h-10 rounded-xl border px-4 text-sm font-medium">Copy these lines as CSV</button>
+      <SendToTakeoff model={model} view={view} />
     </div>
   );
 }
@@ -415,6 +442,7 @@ export function EstimatePanel({ model, view }: { model: ConstructionModel; view:
         onClick={() => { void navigator.clipboard?.writeText(JSON.stringify(draft, null, 2)); setCopied(true); setTimeout(() => setCopied(false), 1800); }}
         className="min-h-11 w-full rounded-xl border px-4 text-sm font-medium"
       >{copied ? "Copied" : "Copy the unpriced draft bill (JSON)"}</button>
+      <SendToTakeoff model={model} view={view} />
     </div>
   );
 }

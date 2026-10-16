@@ -82,5 +82,11 @@
   "file": "src/features/house-designer/components/construction-lab.tsx",
   "from": "if (s === 3 || s === 5) {",
   "to": "if (s === -1) {"
+ },
+ {
+  "name": "the takeoff button sends nothing",
+  "file": "src/features/house-designer/components/construction-panels.tsx",
+  "from": "window.sessionStorage.setItem(HOUSE_TAKEOFF_SESSION_KEY, JSON.stringify(constructionTakeoffPackage(model, view.options)));",
+  "to": ""
  }
 ]

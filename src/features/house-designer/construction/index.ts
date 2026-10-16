@@ -16,6 +16,7 @@ export { explodeInfo, shapeOffset, isAssembled, FLOOR_STEP, CATEGORY_STEP, LAYER
 export { aggregateQuantities, countedComponents, missingData, toBoqDraft, totalOf, worstStatus } from "./quantities";
 export type { QuantityLine, QuantityScope } from "./quantities";
 export { describeComponent } from "./inspect";
+export { constructionTakeoffPackage, elementKindOf } from "./takeoff-handoff";
 export type { ComponentInfo } from "./inspect";
 export type { ApprovedBar } from "./helpers";
 export { steelKgPerMetre, steelWeightKg } from "./helpers";
