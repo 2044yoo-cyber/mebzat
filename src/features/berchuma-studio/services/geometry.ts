@@ -856,6 +856,26 @@ function cabinetParts(spec: DesignSpec, cabinet: Cabinet): Part[] {
       }).map((part) => ({ ...part, ...moduleTag(place.module) })),
     );
 
+    // A real upright board inside this bay, included in rendering and the cut list.
+    if (bay.verticalDivider) {
+      push({
+        id: `vertical-divider-${bay.id}`,
+        role: "divider",
+        label: `Vertical divider — ${bayLabelSuffix(cabinet, bay.id)}`,
+        cabinetId: cabinet.id,
+        bayId: bay.id,
+        board,
+        length: interiorHeight,
+        width: interiorDepth,
+        quantity: 1,
+        edges: { front: true, back: false, top: true, bottom: true },
+        placements: [{ x: bayX + (bay.width - t) / 2, y: plinth + t, z: 0 }],
+        size: { x: t, y: interiorHeight, z: interiorDepth },
+        axis: "x",
+        ...moduleTag(place.module),
+      });
+    }
+
     const x = bayX + bay.width;
 
     // A divider between this bay and the next.
