@@ -192,7 +192,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
   // layout without merging separately identifiable manufactured pieces.
   const sharedInputs = new Map<string, {
     rows: CutListRow[];
-    separate: { design: string; nesting: BoardNesting }[];
+    separate: { design: string; nesting: BoardNesting; rows: CutListRow[] }[];
   }>();
   let globallyUniqueRow = 0;
   const hardware: Cell[][] = [["Design", "Hardware", "Qty", "Unit", "Note"]];
@@ -227,7 +227,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
           label: `${title} — ${row.partId} — ${row.label}`,
         });
       }
-      grouped.separate.push({ design: title, nesting: board.nesting });
+      grouped.separate.push({ design: title, nesting: board.nesting, rows: board.rows });
       sharedInputs.set(board.boardId, grouped);
     });
     cut.hardware.forEach(item => hardware.push([
