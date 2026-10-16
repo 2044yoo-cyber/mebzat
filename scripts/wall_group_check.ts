@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { rectangularRoom, roomSchema } from "../src/features/berchuma-studio/types/room";
 import { moveHouseSelections } from "../src/features/house-designer/services/model-commands";
-import { rebuildLevel } from "../src/features/house-designer/services/project-edit";
+import { openSpace, rebuildLevel } from "../src/features/house-designer/services/project-edit";
 import { createHouseProject, houseProjectSchema, type HouseProject } from "../src/features/house-designer/types/project";
 
 function sample(freehand = false): HouseProject {
@@ -30,7 +30,11 @@ function sample(freehand = false): HouseProject {
     floorCount: 1,
     floorToFloorHeight: 3000,
   });
-  return rebuildLevel(project, project.levels[0]!.id, plan);
+  // A freehand plan always starts from a blank floor (applyFreehand refuses
+  // anything else). Rebuilding a floor that still has a footprint slab with a
+  // plan that has no outline leaves the slab with an empty boundary, a project
+  // the schema rejects, and the app cannot reach it.
+  return rebuildLevel(freehand ? openSpace(project) : project, project.levels[0]!.id, plan);
 }
 
 function source(project: HouseProject, id: string) {

@@ -1,0 +1,14 @@
+[
+ {
+  "name": "extending an unlinked outside wall moves its corner anyway",
+  "file": "src/features/house-designer/services/quick-edit.ts",
+  "from": "  if (outline && !wallJointLinked(project, wallId, end))\n    return blocked(project, \"This exterior wall belongs to the closed footprint. Turn on Link joints before moving its corner.\");\n  // A connected OUTER wall",
+  "to": "  // A connected OUTER wall"
+ },
+ {
+  "name": "the refusal no longer says to link joints",
+  "file": "src/features/house-designer/services/quick-edit.ts",
+  "from": "  if (outline && !wallJointLinked(project, wallId, end))\n    return blocked(project, \"This exterior wall belongs to the closed footprint. Turn on Link joints before moving its corner.\");",
+  "to": "  if (outline && !wallJointLinked(project, wallId, end))\n    return blocked(project, \"Not allowed.\");"
+ }
+]

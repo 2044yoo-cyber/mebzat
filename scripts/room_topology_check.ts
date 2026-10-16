@@ -26,7 +26,7 @@ import { PlanCanvas } from "../src/features/berchuma-studio/components/plan/plan
 import { rectangularRoom, roomSchema, type Room } from "../src/features/berchuma-studio/types/room";
 import { createHouseObjectFromGesture, createRoomFromGesture, moveHouseSelections, roomOutline, splitHouseSelection } from "../src/features/house-designer/services/model-commands";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
-import { establishLevelOutline, mergeRooms, openSpace, patchHouseObject } from "../src/features/house-designer/services/project-edit";
+import { establishLevelOutline, mergeRooms, openSpace, patchHouseObject, toggleWallJoints, wallJointsLinked } from "../src/features/house-designer/services/project-edit";
 import { moveWallEnd, splitRoom } from "../src/features/house-designer/services/quick-edit";
 import { deriveZones, planWallLines, signedArea, wallFaces } from "../src/features/house-designer/services/room-topology";
 import { applyModelingOptions, modelingPreset } from "../src/features/house-designer/services/workspace-options";
@@ -49,7 +49,9 @@ const area = (points: readonly Point[]) => Math.abs(signedArea(points));
 const wallAt = (project: HouseProject, test: (wall: Wall) => boolean) => { const found = wallsOf(project).find(test); assert.ok(found, "(the wall is there)"); return found; };
 const vertical = (x: number, from?: number, to?: number) => (wall: Wall) => Math.abs(wall.start.x - x) < 1 && Math.abs(wall.end.x - x) < 1 && (from === undefined || Math.abs(Math.min(wall.start.y, wall.end.y) - from) < 1) && (to === undefined || Math.abs(Math.max(wall.start.y, wall.end.y) - to) < 1);
 const horizontal = (y: number, from?: number, to?: number) => (wall: Wall) => Math.abs(wall.start.y - y) < 1 && Math.abs(wall.end.y - y) < 1 && (from === undefined || Math.abs(Math.min(wall.start.x, wall.end.x) - from) < 1) && (to === undefined || Math.abs(Math.max(wall.start.x, wall.end.x) - to) < 1);
-const moveWall = (project: HouseProject, wall: Wall, dx: number, dy: number) => moveHouseSelections(project, [{ kind: "wall", id: wall.id }], dx, dy, { footprintEditable: true }).project;
+// Walls move on their own unless their joints are linked on purpose (ac636a3,
+// 538dd07), so a move that keeps its neighbours attached links both ends first.
+const moveWall = (project: HouseProject, wall: Wall, dx: number, dy: number) => moveHouseSelections(wallJointsLinked(project, wall.id) ? project : toggleWallJoints(project, wall.id), [{ kind: "wall", id: wall.id }], dx, dy, { footprintEditable: true }).project;
 
 function onSegment(point: Point, a: Point, b: Point, tolerance = 1) {
   const dx = b.x - a.x; const dy = b.y - a.y; const length = Math.hypot(dx, dy);
@@ -186,6 +188,14 @@ sound(two, "two rooms");
   sound(wider, "two rooms, outside wall moved");
   const after = new Map(roomsOf(wider).map((room) => [room.id, room]));
   equal([box(after.get(westId)!.boundary), box(after.get(eastId)!.boundary)], ["0..3000 x 0..4000", "3000..7000 x 0..4000"], "two rooms, outside wall moved: only the room on it grows");
+  // The same edit made by typing the wall's coordinates (the properties panel), with both
+  // its joints linked: the corners follow and the rooms are traced again from the walls.
+  const sideWall = wallAt(two, vertical(6000));
+  const typed = patchHouseObject(toggleWallJoints(two, sideWall.id), { kind: "wall", id: sideWall.id }, { startX: 7000, endX: 7000 });
+  sound(typed, "two rooms, outside wall typed to a new place");
+  const typedRooms = new Map(roomsOf(typed).map((room) => [room.id, room]));
+  equal([box(typedRooms.get(westId)!.boundary), box(typedRooms.get(eastId)!.boundary)], ["0..3000 x 0..4000", "3000..7000 x 0..4000"], "typed: only the room on that wall grows");
+  equal(roomsOf(typed).map((room) => room.name).sort(), [...names.values()].sort(), "typed: both keep their names");
   // The partition moved across the whole room and back: still two rooms, the same two.
   const back = moveWall(moveWall(two, partition, 2000, 0), wallAt(moveWall(two, partition, 2000, 0), vertical(5000)), -2000, 0);
   equal(roomsOf(back).map((room) => [room.id, box(room.boundary)]).sort(), roomsOf(two).map((room) => [room.id, box(room.boundary)]).sort(), "moved there and back: the same rooms, the same outlines");
@@ -237,9 +247,15 @@ sound(quad, "four rooms");
   equal(roomsOf(both).map((room) => [room.name, box(room.boundary)]).sort(), [["North-east", "3800..6000 x 0..1500"], ["North-west", "0..3800 x 0..1500"], ["South-east", "3800..6000 x 1500..4000"], ["South-west", "0..3800 x 1500..4000"]], "and the other: the crossing point is wherever the two walls cross");
   ok(roomsOf(both).every((room) => isRectangle(room.boundary)), "no triangles at the crossing");
   // Selected and moved together: a crossing wall and the outside wall beside it.
+  // Only the selected walls move (d182d8d). The horizontal wall was not selected,
+  // so it stays 0..6000 and no longer reaches the outside wall now at 6500: the
+  // two rooms on that side are one space, and the two on the other side keep
+  // their names and move with the crossing wall.
   const together = moveHouseSelections(quad, [{ kind: "wall", id: wallAt(quad, vertical(3000)).id }, { kind: "wall", id: wallAt(quad, vertical(6000)).id }], 500, 0, { footprintEditable: true }).project;
   sound(together, "four rooms, two walls moved at once");
-  equal(roomsOf(together).map((room) => [room.name, box(room.boundary)]).sort(), [["North-east", "3500..6500 x 0..2000"], ["North-west", "0..3500 x 0..2000"], ["South-east", "3500..6500 x 2000..4000"], ["South-west", "0..3500 x 2000..4000"]], "two walls at once: the same four rooms, where the walls ended up");
+  const horizontalAfter = wallAt(together, horizontal(2000));
+  equal([horizontalAfter.start.x, horizontalAfter.end.x].sort((a, b) => a - b), [0, 6000], "two walls at once: the wall that was not selected stays where it was drawn");
+  equal(roomsOf(together).map((room) => [room.name, box(room.boundary)]).sort(), [["North-east", "3500..6500 x 0..4000"], ["North-west", "0..3500 x 0..2000"], ["South-west", "0..3500 x 2000..4000"]], "and the rooms are the ones the walls now enclose");
   // Both crossing walls moved diagonally: each slides along itself and one
   // end of each comes loose. One corner room still closes; the rest is one
   // L-shaped space — not four stretched floors.
