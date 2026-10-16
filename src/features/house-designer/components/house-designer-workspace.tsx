@@ -156,7 +156,7 @@ const drawingCommands = new Set<HouseCommandId>([
 
 const noSubscription = () => () => undefined;
 
-export function HouseDesignerWorkspace({ userId, planId = null, projectId = null, pinId = null, sketchId = null }: { userId: string; planId?: string | null; projectId?: string | null; pinId?: string | null; sketchId?: string | null }) {
+export function HouseDesignerWorkspace({ userId, planId = null, projectId = null, pinId = null, sketchId = null, initialTab = null }: { userId: string; planId?: string | null; projectId?: string | null; pinId?: string | null; sketchId?: string | null; initialTab?: "learn" | null }) {
   const [stage, setStage] = useState<Stage>(planId ? "loading" : "start");
   const [freehandOpen, setFreehandOpen] = useState(false);
   const [source, setSource] = useState<Source>("manual");
@@ -181,7 +181,10 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
   const [status, setStatus] = useState<SaveStatus>("device");
   const [saveOpen, setSaveOpen] = useState(false);
   const [savingChoice, setSavingChoice] = useState(false);
-  const [tab, setTab] = useState<WorkspaceTab>("plan");
+  const [tab, setTab] = useState<WorkspaceTab>(initialTab ?? "plan");
+  // /house-design?tab=learn with no plan to open: the learning view on its own,
+  // on the sample house, until somebody chooses to open a plan.
+  const [learnAlone, setLearnAlone] = useState(initialTab === "learn" && !planId && !projectId);
   const [recentPlans, setRecentPlans] = useState<PlanSummary[] | null>(null);
 
   // What the autosave reads when its timer fires: the latest, not the render
@@ -340,7 +343,7 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
     setStrict(restored.originalPlanStrict);
     setFloorPlans(toDraftPlans(restored, "floor-plan"));
     setStartTool("select");
-    setTab("plan");
+    setTab(initialTab ?? "plan");
     setStage("editor");
   }
 
@@ -546,6 +549,18 @@ export function HouseDesignerWorkspace({ userId, planId = null, projectId = null
     { id: "download", label: "Download plan data (JSON)", onSelect: download },
     { id: "new", label: "Start a new plan", onSelect: toStart },
   ] : [];
+
+  if (learnAlone && stage === "start") {
+    return (
+      <main className="mx-auto w-full min-w-0 max-w-[1500px] overflow-x-hidden px-2 pb-6 pt-2 sm:px-5 md:pb-8" data-testid="learn-alone">
+        <header className="mb-2 flex min-w-0 flex-wrap items-center gap-2 rounded-2xl border bg-card p-2 sm:mb-4 sm:p-4">
+          <h1 className="min-w-0 flex-1 truncate text-sm font-semibold sm:text-lg">Learn construction</h1>
+          <button type="button" onClick={() => { setLearnAlone(false); setTab("plan"); }} className="min-h-10 rounded-xl border px-4 text-sm font-semibold hover:bg-muted" data-testid="learn-open-plan">Open my house plan</button>
+        </header>
+        <ConstructionLab />
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto w-full min-w-0 max-w-[1500px] overflow-x-hidden px-2 pb-6 pt-2 sm:px-5 md:pb-8">

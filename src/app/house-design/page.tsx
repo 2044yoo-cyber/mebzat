@@ -26,5 +26,8 @@ export default async function HouseDesignPage({
     redirect(`/login?redirect=${encodeURIComponent(`/house-design${query ? `?${query}` : ""}`)}`);
   }
 
-  return <HouseDesignerWorkspace userId={profile.id} planId={id(params.plan)} projectId={id(params.project)} pinId={id(params.pin)} sketchId={id(params.sketch)} />;
+  // ?tab=learn opens the construction learning view; any other value is ignored.
+  const initialTab = params.tab === "learn" ? "learn" : null;
+
+  return <HouseDesignerWorkspace userId={profile.id} planId={id(params.plan)} projectId={id(params.project)} pinId={id(params.pin)} sketchId={id(params.sketch)} initialTab={initialTab} />;
 }

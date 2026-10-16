@@ -41,7 +41,8 @@ const MODES: { id: AppMode; label: string }[] = [
   { id: "estimate", label: "Estimate cost" },
 ];
 
-export function ConstructionLab({ project }: { project: HouseProject }) {
+/** `project` is the plan open in the editor; with none (opened from a link) only the sample house can be studied. */
+export function ConstructionLab({ project = null }: { project?: HouseProject | null }) {
   const [source, setSource] = useState<Source>("sample");
   const [params, setParams] = useState<Partial<LearningHouseParams>>({});
   const [options, setOptions] = useState<ModelOptions>(DEFAULT_OPTIONS);
@@ -66,7 +67,7 @@ export function ConstructionLab({ project }: { project: HouseProject }) {
   const built = useMemo<{ model: ConstructionModel; source: HouseProject } | null>(() => {
     if (!ready) return null;
     const buildOptions: ModelOptions = { ...DEFAULT_OPTIONS, blockType, floorFinish };
-    if (source === "sample") {
+    if (source === "sample" || !project) {
       const sample = buildLearningHouseProject(JSON.parse(paramsKey) as Partial<LearningHouseParams>);
       return { model: buildConstructionModel(sample.project, buildOptions, rules), source: sample.project };
     }
@@ -97,7 +98,7 @@ export function ConstructionLab({ project }: { project: HouseProject }) {
   return (
     <div className="min-w-0 space-y-2" data-testid="construction-lab">
       <div className="flex flex-wrap items-center gap-2">
-        <Segmented<Source> label="What to study" value={source} onChange={setSource} options={[{ id: "sample", label: "Sample house" }, { id: "project", label: "My project" }]} />
+        <Segmented<Source> label="What to study" value={source} onChange={setSource} options={project ? [{ id: "sample", label: "Sample house" }, { id: "project", label: "My project" }] : [{ id: "sample", label: "Sample house" }]} />
         <button type="button" onClick={() => setSettingsOpen((o) => !o)} aria-pressed={settingsOpen} data-testid="settings-toggle" className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium", settingsOpen && "border-brand bg-brand/10 text-brand")}><Settings2 className="size-4" />Dimensions and options</button>
       </div>
       <div className="rounded-xl border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950" data-testid="disclaimer">
