@@ -742,7 +742,7 @@ function Structure({
 
           <button
             type="button"
-            aria-pressed={bay.verticalDivider}
+            aria-pressed={Boolean(bay.verticalDivider)}
             onClick={() => onChange(setBayVerticalDivider(spec, cabinet.id, bay.id, !bay.verticalDivider))}
             className={cn(
               "w-full rounded-md border px-2 py-1.5 text-left text-xs transition-colors",

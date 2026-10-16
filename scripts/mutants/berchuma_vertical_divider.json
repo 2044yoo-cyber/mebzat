@@ -1,0 +1,7 @@
+[
+ {"name":"the divider is never drawn","file":"src/features/berchuma-studio/services/geometry.ts","from":"    if (bay.verticalDivider) {\n      push({","to":"    if (false && bay.verticalDivider) {\n      push({"},
+ {"name":"a divider is drawn when none was asked for","file":"src/features/berchuma-studio/services/geometry.ts","from":"    if (bay.verticalDivider) {\n      push({","to":"    if (bay.verticalDivider !== true) {\n      push({"},
+ {"name":"switching it off does not take it away","file":"src/features/berchuma-studio/services/operations.ts","from":"    bay.verticalDivider = enabled;","to":"    bay.verticalDivider = enabled || bay.verticalDivider;"},
+ {"name":"the divider goes in every section","file":"src/features/berchuma-studio/services/operations.ts","from":"    const bay = cabinet?.bays.find((entry) => entry.id === bayId);\n    if (!bay) return;\n    bay.verticalDivider = enabled;","to":"    const bay = cabinet?.bays.find((entry) => entry.id === bayId);\n    if (!bay) return;\n    cabinet!.bays.forEach((other) => { other.verticalDivider = enabled; });"},
+ {"name":"a saved divider is dropped when the design is reopened","file":"src/features/berchuma-studio/types/spec.ts","from":"  verticalDivider: z.boolean().optional(),","to":"  verticalDivider: z.boolean().optional().transform(() => undefined),"}
+]

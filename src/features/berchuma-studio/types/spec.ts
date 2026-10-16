@@ -447,8 +447,8 @@ export const baySchema = z.object({
   /** Nominal width of the bay in mm, measured between divider centres. */
   width: z.number().positive(),
   fitting: bayFittingSchema,
-  /** One optional full-height vertical divider inside this section. */
-  verticalDivider: z.boolean().default(false),
+  /** One optional full-height vertical divider inside this section. Absent means none. */
+  verticalDivider: z.boolean().optional(),
   door: z.enum(doorStyles).default("hinged"),
   /** Visible front treatment, separate from how the door opens. Absent: the design's door hardware. */
   frontGrip: z.enum(frontGrips).optional(),
