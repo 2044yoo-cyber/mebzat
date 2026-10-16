@@ -18,9 +18,37 @@ export type V3 = { x: number; y: number; z: number };
 export type Shape =
   | { t: "box"; c: V3; s: V3; rx?: number; ry?: number; rz?: number }
   | { t: "cyl"; c: V3; r: number; len: number; axis: "x" | "y" | "z"; tilt?: number }
-  | { t: "prism"; poly: P2[]; z0: number; z1: number; holes?: P2[][] };
+  | { t: "prism"; poly: P2[]; z0: number; z1: number; holes?: P2[][] }
+  | { t: "profile"; origin: P2; dir: P2; poly: { s: number; z: number }[]; thickness: number };
 
 export const v3 = (x: number, y: number, z: number): V3 => ({ x, y, z });
+
+/**
+ * A polygon standing in a vertical plane and extruded across `thickness`, centred on that plane: the side of a
+ * flight of stairs with its sloping soffit, a gable. Points are (s, z): `s` runs along `dir` (a unit vector in
+ * plan) from `origin`, `z` is up. It is what a plan outline extruded upward (a prism) cannot be.
+ */
+export function profile(origin: P2, dir: P2, poly: { s: number; z: number }[], thickness: number): Shape {
+  const len = Math.hypot(dir.x, dir.y) || 1;
+  return { t: "profile", origin: { x: origin.x, y: origin.y }, dir: { x: dir.x / len, y: dir.y / len }, poly: poly.map((p) => ({ s: p.s, z: p.z })), thickness };
+}
+
+/** The four corners in plan of a profile's footprint, and its z range: where it stands. */
+export function profileBox(shape: Extract<Shape, { t: "profile" }>): { corners: P2[]; z0: number; z1: number } {
+  const ss = shape.poly.map((q) => q.s);
+  const zs = shape.poly.map((q) => q.z);
+  const n = { x: shape.dir.y, y: -shape.dir.x };
+  const at = (s: number, w: number): P2 => ({ x: shape.origin.x + shape.dir.x * s + n.x * w, y: shape.origin.y + shape.dir.y * s + n.y * w });
+  const s0 = Math.min(...ss); const s1 = Math.max(...ss); const h = shape.thickness / 2;
+  return { corners: [at(s0, -h), at(s1, -h), at(s1, h), at(s0, h)], z0: Math.min(...zs), z1: Math.max(...zs) };
+}
+
+/** The volume of a profile, mm³: its polygon area (the shoelace formula in the s–z plane) times its thickness. */
+export function profileVolume(shape: Extract<Shape, { t: "profile" }>): number {
+  let twice = 0;
+  shape.poly.forEach((p, i) => { const q = shape.poly[(i + 1) % shape.poly.length]!; twice += p.s * q.z - q.s * p.z; });
+  return (Math.abs(twice) / 2) * shape.thickness;
+}
 
 export function box(cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, rz = 0): Shape {
   // A turn by a multiple of a quarter circle is the same box with its sides swapped: keep it axis-aligned.

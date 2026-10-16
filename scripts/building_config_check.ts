@@ -164,6 +164,7 @@ const ofKind = (model: ConstructionModel, kind: string) => model.components.filt
     const slabsOf = (levelId: string) => model.components.filter((x) => x.kind === "slab" && x.id.startsWith(`frame:slab:${levelId}:`));
     const drawnOn = (i: number) => (i === 0 ? model.components.filter((x) => x.kind === "ground-slab") : slabsOf(building.project.levels[i]!.id)).flatMap((x) => prisms(x).map((p) => p.poly));
     const t = building.params.externalWall;
+    const edge = Math.max(building.params.columnSize, building.params.beamWidth) / 2;
     for (let i = 0; i < config.floors; i += 1) {
       const drawn = drawnOn(i);
       ok(drawn.length >= 1, `${c.name}: floor ${i} has a slab`);
@@ -172,14 +173,14 @@ const ofKind = (model: ConstructionModel, kind: string) => model.components.filt
         near(unionArea(drawn) * 1e-6, ((config.length - t) * (config.width - t)) / 1e6, `${c.name}: the ground slab drawn fills the outline less half the wall thickness all round`, 0.01);
         ok(unionArea(drawn) * 1e-6 < building.areas.footprint, `${c.name}: so it is a little smaller than the footprint quoted to the outline`);
       } else {
-        // The zones tile the outline; the stairwell is a hole cut through them, listed with each zone it passes through.
-        near(unionArea(drawn) * 1e-6, building.areas.areaPerFloor[i]!, `${c.name}: the slab zones drawn on floor ${i} tile the area quoted`, 0.01);
+        // The zones tile the outline and run out past it to the outer face of the frame (half the widest column or beam); the stairwell is a hole cut through them.
+        near(unionArea(drawn) * 1e-6, ((config.length + 2 * edge) * (config.width + 2 * edge)) / 1e6, `${c.name}: the slab zones drawn on floor ${i} cover the outline out to the outer face of the frame`, 0.01);
         const holes = slabsOf(building.project.levels[i]!.id).flatMap((x) => prisms(x).flatMap((p) => p.holes ?? []));
         ok(holes.some((h) => polygonArea(h) > 3e6), `${c.name}: the stairwell, more than 3 m², is cut through floor ${i}`);
       }
     }
-    // The roof slab covers the same outline as the floors below it.
-    near(unionArea(model.components.filter((x) => x.kind === "slab" && x.id.startsWith("frame:slab:roof:")).flatMap((x) => prisms(x).map((p) => p.poly))) * 1e-6, building.areas.areaPerFloor[0]!, `${c.name}: and the roof slab the same`, 0.01);
+    // The roof slab is cast to the same edge as the floors below it.
+    near(unionArea(model.components.filter((x) => x.kind === "slab" && x.id.startsWith("frame:slab:roof:")).flatMap((x) => prisms(x).map((p) => p.poly))) * 1e-6, ((config.length + 2 * edge) * (config.width + 2 * edge)) / 1e6, `${c.name}: and the roof slab the same`, 0.01);
 
     // Storey heights are the floor-to-floor height: the floor levels are that far apart, and so are the slabs drawn.
     building.project.levels.forEach((level, i) => near(level.elevation, i * config.floorToFloor, `${c.name}: floor ${i} stands ${i * config.floorToFloor} mm above the ground floor`, 1e-6));

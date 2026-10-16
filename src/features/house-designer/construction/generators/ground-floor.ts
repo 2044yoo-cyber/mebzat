@@ -1,8 +1,10 @@
 import { ASSUME, UP, dim, type Ctx } from "../context";
-import { alongLine, boxAt, cyl, netVolumes, polygonArea, prism, prismOfShape, rectPoly, v3, type P2, type Prism, type Shape } from "../geometry";
-import { addQuantity, concreteQuantity, f2, f3, rebarQuantity, round, spaced } from "../helpers";
+import { alongLine, boxAt, netVolumes, polygonArea, prism, prismOfShape, rectPoly, v3, type P2, type Prism, type Shape } from "../geometry";
+import { addQuantity, concreteQuantity, f2, f3, rebarQuantity, round } from "../helpers";
 import { insetOutline, pedestalsOf } from "../structure-data";
+import { offsetPolygon } from "../region";
 import { serviceHoles } from "../service-plan";
+import { lattice } from "./slab-steel";
 
 /** The thicknesses of the ground-floor build-up, worked from the slab down. */
 export function groundFloorStack(ctx: Ctx) {
@@ -75,11 +77,11 @@ export function generateGroundFloor(ctx: Ctx): void {
   });
   addQuantity(ctx, turn, { workItem: "waterproofing.dpm-turnup", description: "Damp-proof membrane turn-up at walls", section: "G", unit: "m", value: round(perimeter / 1000, 3), formula: `perimeter ${f2(perimeter / 1000)} m`, inputs: { perimeter: round(perimeter, 0) }, status: "calculated" });
 
-  // Slab mesh (schematic).
-  const meshShapes: Shape[] = [];
+  // Slab mesh (schematic): bars each way, stopping short of the slab edge, of each column that comes up through the slab and of each opening.
   const mz = -st.slab / 2;
-  for (const y of spaced(b.minY + 100, b.maxY - 100, 150)) meshShapes.push(cyl((b.minX + b.maxX) / 2, y, mz, 3, b.maxX - b.minX - 200, "x"));
-  for (const x of spaced(b.minX + 100, b.maxX - 100, 150)) meshShapes.push(cyl(x, (b.minY + b.maxY) / 2, mz + 6, 3, b.maxY - b.minY - 200, "y"));
+  const meshRegion = offsetPolygon(inner.poly, -50);
+  const meshHoles = slabHoles.map((h) => offsetPolygon(h, 50));
+  const meshShapes: Shape[] = [...lattice(meshRegion, meshHoles, "x", 150, mz, 3), ...lattice(meshRegion, meshHoles, "y", 150, mz + 6, 3)];
   const mesh = ctx.add({
     id: "ground:mesh", name: "Slab reinforcement mesh (schematic, where specified)", kind: "floor-mesh", category: "substructure", subcategory: "Ground floor", stage: 4, layer: "reinforcement", materialId: "steel-mesh",
     shapes: meshShapes, repeated: { noun: "bar" }, source: "schematic", level: ground, explode: { layerIndex: 7, dir: UP }, note: "Mesh type and laps are specified by the designer; none is taken from this illustration.",

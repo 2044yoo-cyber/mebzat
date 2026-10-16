@@ -11,7 +11,8 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
-import { unionArea, type P2 } from "../src/features/house-designer/construction/geometry";
+import { polygonArea, unionArea, type P2 } from "../src/features/house-designer/construction/geometry";
+import { clipThrough, clipToRegion, offsetPolygon, rectRegion } from "../src/features/house-designer/construction/region";
 import { OVERHANG, PITCH_DEG, PLATE, pitchedCover } from "../src/features/house-designer/construction/roof-geometry";
 
 let checks = 0;
@@ -43,6 +44,44 @@ const near = (actual: number, expected: number, message: string, tolerance = 1e-
   const slanted: P2[] = [{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 0, y: 3000 }];
   near(unionArea([slanted, rect(2000, 0, 6000, 1000)]), 6e6 + 4e6 - 4e6 / 3, "a triangle and a rectangle that overlap it are not mistaken for two rectangles", 1);
   near(unionArea([slanted, rect(0, 0, 4000, 3000)]), 12e6, "and a triangle inside a rectangle adds nothing", 1e-3);
+}
+
+// ---------------------------------------------------------------------------
+// Regions: a polygon moved out or in, and lines drawn across it
+// ---------------------------------------------------------------------------
+{
+  const rect = rectRegion({ x0: 0, y0: 0, x1: 4000, y1: 3000 });
+  const grown = offsetPolygon(rect, 100);
+  near(polygonArea(grown), 4200 * 3200, "a rectangle moved out by 100 mm is 100 mm bigger on every side", 1e-6);
+  near(polygonArea(offsetPolygon(rect, -100)), 3800 * 2800, "and moved in by 100 mm 100 mm smaller", 1e-6);
+  near(polygonArea(offsetPolygon([...rect].reverse(), 100)), 4200 * 3200, "whichever way round it is drawn", 1e-6);
+  // An L, 12 m²: moved out by 100 mm it gains its perimeter × 100 mm, plus a square at each of its 5 outside corners, less one at its inside corner.
+  const ell: P2[] = [{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 4000, y: 2000 }, { x: 2000, y: 2000 }, { x: 2000, y: 4000 }, { x: 0, y: 4000 }];
+  near(polygonArea(ell), 12e6, "the L is 12 m²", 1e-6);
+  near(polygonArea(offsetPolygon(ell, 100)), 12e6 + 16000 * 100 + (5 - 1) * 100 * 100, "and moved out by 100 mm gains its perimeter times that, and a square at each outside corner less one at the inside corner", 1e-3);
+  near(polygonArea(offsetPolygon(ell, 0)), 12e6, "moved by nothing it is the same", 1e-6);
+  // A corner that is not a right angle is mitred: the edges stay a constant 100 mm from where they were. A right triangle with 4 m legs is 8 m², its
+  // perimeter 8 m + 4√2 m; each corner adds a kite of d² × tan(half the turn), and the turns are 90°, 135° and 135°: 1 + 2 × (1 + √2) = 3 + 2√2.
+  const triangle: P2[] = [{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 0, y: 4000 }];
+  near(polygonArea(offsetPolygon(triangle, 100)), 8e6 + (8000 + 4000 * Math.SQRT2) * 100 + (3 + 2 * Math.SQRT2) * 100 * 100, "a triangle moved out by 100 mm gains its perimeter times that and a kite at each corner", 1e-3);
+  // Moved in by 100 mm it is the same triangle smaller, in the ratio of (inradius − 100) to the inradius; the inradius is (4000 + 4000 − 4000√2) ÷ 2.
+  const inradius = 4000 - 2000 * Math.SQRT2;
+  near(polygonArea(offsetPolygon(triangle, -100)), 8e6 * ((inradius - 100) / inradius) ** 2, "and moved in by 100 mm it is the same triangle, smaller in the ratio of the inradius less 100 mm to the inradius", 1e-3);
+  // A needle: the mitre at its point is limited, not run out to a spike ten metres long.
+  const needle: P2[] = [{ x: 0, y: 0 }, { x: 10000, y: 0 }, { x: 10000, y: 200 }];
+  const grownNeedle = offsetPolygon(needle, 100);
+  ok(grownNeedle.every((p, i) => Math.hypot(p.x - needle[i]!.x, p.y - needle[i]!.y) < 400), `a needle moved out by 100 mm does not grow a spike (${grownNeedle.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(" ")})`);
+  // A line across a rectangle with a hole in it: the two parts either side of the hole, and nothing outside.
+  const hole = rectRegion({ x0: 1000, y0: 1000, x1: 2000, y1: 2000 });
+  const parts = clipToRegion({ x: -1000, y: 1500 }, { x: 5000, y: 1500 }, rect, [hole]);
+  ok(parts.length === 2 && Math.abs(parts[0]![0] - 1 / 6) < 1e-9 && Math.abs(parts[0]![1] - 2 / 6) < 1e-9 && Math.abs(parts[1]![0] - 3 / 6) < 1e-9 && Math.abs(parts[1]![1] - 5 / 6) < 1e-9, `a line across a rectangle with a hole in it is cut into the two parts that are in the concrete (${JSON.stringify(parts)})`);
+  ok(clipToRegion({ x: -1000, y: 5000 }, { x: 5000, y: 5000 }, rect).length === 0, "a line that misses the region gives nothing");
+  const through = clipThrough({ x: 3000, y: -500 }, { x: 3000, y: 3500 }, 0.5, rect, [hole]);
+  ok(through !== null && Math.abs(through[0] - 0.125) < 1e-9 && Math.abs(through[1] - 0.875) < 1e-9, "the part of a line through a point is the part that holds that point");
+  ok(clipThrough({ x: 1500, y: -500 }, { x: 1500, y: 3500 }, 0.5, rect, [hole]) === null, "and nothing when the point is in a hole");
+  // A line across an L is cut where the L is not.
+  const across = clipToRegion({ x: -500, y: 3000 }, { x: 4500, y: 3000 }, ell);
+  ok(across.length === 1 && Math.abs(across[0]![0] - 0.1) < 1e-9 && Math.abs(across[0]![1] - 0.5) < 1e-9, "a line across the arm of an L stops at the end of the arm");
 }
 
 // ---------------------------------------------------------------------------

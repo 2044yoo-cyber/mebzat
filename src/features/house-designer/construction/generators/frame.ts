@@ -1,24 +1,14 @@
 import { ASSUME, UP, dim, type Ctx, type LevelInfo } from "../context";
-import { alongLine, box, boxAt, clipConvex, cyl, netVolumes, polygonArea, prism, prismOfShape, rectPoly, unionArea, v3, type P2, type Prism, type Shape } from "../geometry";
+import { alongLine, box, boxAt, clipConvex, cyl, netVolumes, pointInPolygon, polygonArea, prism, prismOfShape, rectPoly, unionArea, v3, type P2, type Prism, type Shape } from "../geometry";
 import { addQuantity, barBetween, concreteQuantity, f2, f3, formworkQuantity, hoopXY, hoopXZ, hoopYZ, m3, rebarQuantity, round, spaced } from "../helpers";
+import { offsetPolygon } from "../region";
+import { slabCastOutline } from "../slab-cast";
 import { slabOpenings } from "../slab-openings";
+import { lattice, supportSteel } from "./slab-steel";
 
 /** Stage 5: the reinforced-concrete frame, storey by storey. */
 
 type Hole = { id: string; x0: number; y0: number; x1: number; y1: number };
-
-/** Split a horizontal bar line at the holes it crosses, keeping the parts outside them. */
-function cutLine(lo: number, hi: number, fixed: number, axis: "x" | "y", holes: Hole[], margin = 0): [number, number][] {
-  let parts: [number, number][] = [[lo, hi]];
-  for (const h of holes) {
-    const across = axis === "x" ? fixed > h.y0 - margin && fixed < h.y1 + margin : fixed > h.x0 - margin && fixed < h.x1 + margin;
-    if (!across) continue;
-    const a = (axis === "x" ? h.x0 : h.y0) - margin;
-    const b = (axis === "x" ? h.x1 : h.y1) + margin;
-    parts = parts.flatMap(([s, e]) => (b <= s || a >= e ? [[s, e] as [number, number]] : ([[s, Math.min(e, a)], [Math.max(s, b), e]] as [number, number][]).filter(([x, y]) => y - x > 1)));
-  }
-  return parts;
-}
 
 export function pourXCut(ctx: Ctx): number {
   const xs = ctx.project.structuralGrid.filter((g) => g.levelId === ctx.ground?.levelId && g.axis === "x").map((g) => g.position).sort((a, b) => a - b);
@@ -133,9 +123,23 @@ export function generateFrame(ctx: Ctx): void {
         shapes: bars, repeated: { noun: "bar" }, source: "schematic", grid: a, parentId: concrete.id, connectedIds: [concrete.id], explode: { layerIndex: 1, dir: UP },
       });
       rebarQuantity(ctx, bb, "Beam bars", approved);
-      const colHalf = 150;
+      // The column at each end, and how far into it the beam runs: half its width along the beam.
+      const columnAt = (p: P2) => columns.find((c) => Math.hypot(c.x - p.x, c.y - p.y) < 1);
+      const halfAlong = (c: { width: number; depth: number } | undefined) => (c ? Math.abs(ux) * (c.width / 2) + Math.abs(uy) * (c.depth / 2) : 150);
+      const colHalfStart = halfAlong(columnAt(beam.start));
+      const colHalfEnd = halfAlong(columnAt(beam.end));
+      // Support (negative) bars: two more top bars over each end, running a third of the clear span into the beam, where the beam hogs.
+      const clearSpan = Math.max(0, len - colHalfStart - colHalfEnd);
+      const supportReach = Math.max(600, 0.3 * clearSpan);
+      const supportZ = bz[1]! - 36;
+      const into = Math.max(0, Math.min(100, Math.min(colHalfStart, colHalfEnd) - cover - 10));
+      for (const [end, dir, half] of [[beam.start, 1, colHalfStart], [beam.end, -1, colHalfEnd]] as const) {
+        const a0 = { x: end.x - ux * dir * into, y: end.y - uy * dir * into };
+        const a1 = { x: end.x + ux * dir * (half + supportReach), y: end.y + uy * dir * (half + supportReach) };
+        for (const o of [-bx / 2, bx / 2]) bars.push(barBetween({ x: a0.x + nx * o, y: a0.y + ny * o }, { x: a1.x + nx * o, y: a1.y + ny * o }, supportZ, 16));
+      }
       const stir: Shape[] = [];
-      for (const s of spaced(colHalf + 60, len - colHalf - 60, ASSUME.stirrupSpacing)) {
+      for (const s of spaced(colHalfStart + 60, len - colHalfEnd - 60, ASSUME.stirrupSpacing)) {
         const cx = beam.start.x + ux * s;
         const cy = beam.start.y + uy * s;
         const cz = beam.elevation + beam.depth / 2;
@@ -149,20 +153,20 @@ export function generateFrame(ctx: Ctx): void {
       rebarQuantity(ctx, bs, "Beam stirrups", approved);
       // Formwork: soffit and both sides along the clear span.
       const f = 18;
-      const clear = Math.max(0, len - 2 * colHalf);
-      const p0 = { x: beam.start.x + ux * colHalf, y: beam.start.y + uy * colHalf };
-      const p1 = { x: beam.end.x - ux * colHalf, y: beam.end.y - uy * colHalf };
+      const clear = clearSpan;
+      const p0 = { x: beam.start.x + ux * colHalfStart, y: beam.start.y + uy * colHalfStart };
+      const p1 = { x: beam.end.x - ux * colHalfEnd, y: beam.end.y - uy * colHalfEnd };
       const side = (sgn: number): Shape => alongLine({ x: p0.x + nx * sgn * (beam.width / 2 + f / 2), y: p0.y + ny * sgn * (beam.width / 2 + f / 2) }, { x: p1.x + nx * sgn * (beam.width / 2 + f / 2), y: p1.y + ny * sgn * (beam.width / 2 + f / 2) }, f, beam.elevation - f, beam.elevation + beam.depth);
       const form = ctx.add({
         id: `frame:${sid}:form`, name: `Beam formwork ${a ?? ""}–${b ?? ""} — ${level.name}`, kind: "beam-formwork", category: "frame", subcategory: "Formwork", stage: 5, removedAfter: 5, level, layer: "formwork", materialId: "formwork",
         shapes: [alongLine(p0, p1, beam.width + 2 * f, beam.elevation - f, beam.elevation), side(1), side(-1)], source: "schematic", grid: a, parentId: concrete.id, explode: { layerIndex: 3, dir: UP },
       });
       const fa = (beam.width + 2 * beam.depth) * clear * 1e-6;
-      formworkQuantity(ctx, form, "formwork.beam", "Formwork to beams (soffit and sides)", fa, `(${f3(beam.width / 1000)} + 2 × ${f3(beam.depth / 1000)}) × ${f2(clear / 1000)} = ${f3(fa)} m²`, { width: beam.width, depth: beam.depth, clear: round(clear, 0) }, "calculated", ["Clear span taken as centre length less one column width."]);
+      formworkQuantity(ctx, form, "formwork.beam", "Formwork to beams (soffit and sides)", fa, `(${f3(beam.width / 1000)} + 2 × ${f3(beam.depth / 1000)}) × ${f2(clear / 1000)} = ${f3(fa)} m²`, { width: beam.width, depth: beam.depth, clear: round(clear, 0) }, "calculated", ["Clear span taken as centre length less half the width of the column at each end."]);
       // Props under the beam.
       const props: Shape[] = [];
       const propTop = beam.elevation - f;
-      for (const s of spaced(colHalf + 350, len - colHalf - 350, 1000)) props.push(cyl(beam.start.x + ux * s, beam.start.y + uy * s, (level.floorZ + propTop) / 2, 30, propTop - level.floorZ, "z"));
+      for (const s of spaced(colHalfStart + 350, len - colHalfEnd - 350, 1000)) props.push(cyl(beam.start.x + ux * s, beam.start.y + uy * s, (level.floorZ + propTop) / 2, 30, propTop - level.floorZ, "z"));
       ctx.add({
         id: `frame:${sid}:props`, name: `Beam props ${a ?? ""}–${b ?? ""} — ${level.name}`, kind: "prop", category: "frame", subcategory: "Props", stage: 5, removedAfter: 5, level, layer: "props", materialId: "prop",
         shapes: props, repeated: { noun: "prop" }, source: "schematic", grid: a, parentId: form.id, explode: { layerIndex: 4, dir: UP },
@@ -178,15 +182,18 @@ export function generateFrame(ctx: Ctx): void {
     const isRoof = !above;
     const holes: Hole[] = slabOpenings(ctx, slabLevel);
     const holePolys = holes.map((h) => rectPoly(h.x0, h.y0, h.x1, h.y1));
+    // The slab is cast out past the outline to the outer face of the frame (see slab-cast.ts).
+    const cast = slabCastOutline(ctx, level.levelId);
     const zones: { name: string; poly: P2[]; pour: number }[] = outlineConvex
-      ? [{ name: "west zone", poly: clipConvex(ctx.outline, halfPlane(cut, "west")), pour: baseBeamPour }, { name: "east zone", poly: clipConvex(ctx.outline, halfPlane(cut, "east")), pour: baseBeamPour + 1 }].filter((z) => z.poly.length >= 3)
-      : [{ name: "slab", poly: ctx.outline, pour: baseBeamPour }];
+      ? [{ name: "west zone", poly: clipConvex(cast, halfPlane(cut, "west")), pour: baseBeamPour }, { name: "east zone", poly: clipConvex(cast, halfPlane(cut, "east")), pour: baseBeamPour + 1 }].filter((z) => z.poly.length >= 3)
+      : [{ name: "slab", poly: cast, pour: baseBeamPour }];
     const slabName = isRoof ? "Roof slab" : `Suspended slab — ${above!.name} floor`;
     const slabSource = isRoof ? "main-roof" : `${above!.levelId}:slab`;
     const slabId = isRoof ? "roof" : above!.levelId;
     // Slab concrete: net of any beam or column that rises into it (none do here: beams hang below the soffit).
     for (const zone of zones) {
-      const zoneHoles = holePolys.filter((hp) => hp.every((p) => zone.poly.length && pointInZone(p, zone.poly)));
+      const looseZone = offsetPolygon(zone.poly, 1);
+      const zoneHoles = holePolys.filter((hp) => hp.every((p) => pointInPolygon(p, looseZone)));
       const zoneHoleRects = holes.filter((h) => zoneHoles.some((hp) => Math.abs(hp[0]!.x - h.x0) < 1 && Math.abs(hp[0]!.y - h.y0) < 1));
       const gross = polygonArea(zone.poly);
       const holeArea = zoneHoleRects.reduce((s, h) => s + (h.x1 - h.x0) * (h.y1 - h.y0), 0);
@@ -197,61 +204,45 @@ export function generateFrame(ctx: Ctx): void {
         shapes: [prism(zone.poly, z0, z1, zoneHoleRects.map((h) => rectPoly(h.x0, h.y0, h.x1, h.y1)))], source: "project", sourceRef: slabSource, pour: zone.pour, grid: null,
         dims: { thickness: dim(slabThickness, "mm", "measured"), area: dim(round(netArea * 1e-6, 2), "m²", "calculated", "Net of stair openings"), volume: dim(round(vol, 3), "m³", "calculated") },
         explode: { layerIndex: 0, dir: UP },
-        ...(zone.name !== "east zone" ? { label: { text: slabName, anchor: v3((zone.poly[0]!.x + zone.poly[2]!.x) / 2, (zone.poly[0]!.y + zone.poly[2]!.y) / 2, z1) } } : {}),
+        ...(zone.name !== "east zone" ? { label: { text: slabName, anchor: v3((polygonBoundsOf(zone.poly).minX + polygonBoundsOf(zone.poly).maxX) / 2, (polygonBoundsOf(zone.poly).minY + polygonBoundsOf(zone.poly).maxY) / 2, z1) } } : {}),
       });
       concreteQuantity(ctx, concrete, "concrete.slab", isRoof ? "Roof slab" : "Suspended slabs", vol, `(${f2(gross * 1e-6)} m² − openings ${f2(holeArea * 1e-6)} m²) × ${f3(slabThickness / 1000)} m = ${f3(vol)} m³`, { gross: round(gross * 1e-6, 3), openings: round(holeArea * 1e-6, 3), thickness: slabThickness }, "calculated", ["Beams hang below the soffit and are counted in their own lines, so the slab is not reduced by them.", "Stair openings are deducted."]);
-      // Reinforcement layers.
+      // Reinforcement layers. Every bar is cut where the concrete is: at the edge of the slab with its cover, and at each opening.
       const r = ASSUME.slabBar / 2;
       const b = polygonBoundsOf(zone.poly);
       const zb = z0 + cover + r;
-      const bottom: Shape[] = [];
-      for (const y of spaced(b.minY + cover, b.maxY - cover, ASSUME.slabSpacing)) for (const [s, e] of cutLine(b.minX + cover, b.maxX - cover, y, "x", zoneHoleRects, 0)) bottom.push(cyl((s + e) / 2, y, zb, r, e - s, "x"));
-      for (const x of spaced(b.minX + cover, b.maxX - cover, ASSUME.slabSpacing)) for (const [s, e] of cutLine(b.minY + cover, b.maxY - cover, x, "y", zoneHoleRects, 0)) bottom.push(cyl(x, (s + e) / 2, zb + 2 * r, r, e - s, "y"));
+      const region = offsetPolygon(zone.poly, -cover);
+      const holeRegions = zoneHoleRects.map((h) => offsetPolygon(rectPoly(h.x0, h.y0, h.x1, h.y1), cover));
+      const bottom: Shape[] = [...lattice(region, holeRegions, "x", ASSUME.slabSpacing, zb, r), ...lattice(region, holeRegions, "y", ASSUME.slabSpacing, zb + 2 * r, r)];
       const bm = ctx.add({
         id: `frame:slab:${slabId}:${zone.name.replace(/\W+/g, "-")}:bottom`, name: `${slabName} bottom reinforcement (schematic)${zones.length > 1 ? ` — ${zone.name}` : ""}`, kind: "slab-bars-bottom", category: "frame", subcategory: "Reinforcement", stage: 5, level, layer: "reinforcement", materialId: "steel-mesh",
         shapes: bottom, repeated: { noun: "bar" }, source: "schematic", parentId: concrete.id, connectedIds: [concrete.id], explode: { layerIndex: 1, dir: UP },
       });
       rebarQuantity(ctx, bm, `${slabName} bottom reinforcement`, approved);
-      // Top bars over the supports only: short bars either side of every beam line.
+      // Top bars over the supports (the negative steel): over every beam, reaching a third of the panel span into the slab each side, with the
+      // bars along the beam they rest on, and a leg turned down where the slab ends.
       const topZ = z1 - cover - r;
-      const top: Shape[] = [];
-      const inZone = beams.filter((bb) => { const m = { x: (bb.start.x + bb.end.x) / 2, y: (bb.start.y + bb.end.y) / 2 }; return pointInZone(m, zone.poly) || pointOnZoneEdge(m, zone.poly); });
-      for (const bb of inZone) {
-        const horizontal = Math.abs(bb.start.y - bb.end.y) < 1;
-        const lo = horizontal ? Math.min(bb.start.x, bb.end.x) : Math.min(bb.start.y, bb.end.y);
-        const hi = horizontal ? Math.max(bb.start.x, bb.end.x) : Math.max(bb.start.y, bb.end.y);
-        const fixed = horizontal ? bb.start.y : bb.start.x;
-        for (const u of spaced(lo + 150, hi - 150, ASSUME.slabSpacing)) {
-          if (horizontal) top.push(cyl(u, fixed, topZ, r, 1600, "y")); else top.push(cyl(fixed, u, topZ, r, 1600, "x"));
-        }
-      }
+      const steel = supportSteel({ beams: beams.map((bb) => ({ start: bb.start, end: bb.end, width: bb.width })), zone: zone.poly, outline: cast, holes: zoneHoleRects.map((h) => rectPoly(h.x0, h.y0, h.x1, h.y1)), spacing: ASSUME.slabSpacing, zTop: topZ, zBottomBars: zb + 2 * r, cover, r, thickness: slabThickness });
       const tm = ctx.add({
         id: `frame:slab:${slabId}:${zone.name.replace(/\W+/g, "-")}:top`, name: `${slabName} top reinforcement over supports (schematic)${zones.length > 1 ? ` — ${zone.name}` : ""}`, kind: "slab-bars-top", category: "frame", subcategory: "Reinforcement", stage: 5, level, layer: "reinforcement", materialId: "steel-mesh",
-        shapes: top, repeated: { noun: "bar" }, source: "schematic", parentId: concrete.id, connectedIds: [concrete.id], explode: { layerIndex: 2, dir: UP },
-        note: "Top bars sit over the beams where a slab needs them. Their size and length come from the design.",
+        shapes: [...steel.mains, ...steel.distribution, ...steel.hooks], repeated: { noun: "bar" }, source: "schematic", parentId: concrete.id, connectedIds: [concrete.id], explode: { layerIndex: 2, dir: UP },
+        note: `Top bars sit over the beams where a slab needs them, reaching 0.3 of the panel span into the slab each side (at least 600 mm), with distribution bars along the beam to hold them and a leg turned down at the slab edge. Size and length come from the design.`,
       });
       rebarQuantity(ctx, tm, `${slabName} top reinforcement`, approved);
       // Spacers under the bottom layer, chairs under the top bars.
       const spacers: Shape[] = [];
-      for (const x of spaced(b.minX + 400, b.maxX - 400, 1000)) for (const y of spaced(b.minY + 400, b.maxY - 400, 1000)) if (!zoneHoleRects.some((h) => x > h.x0 - 200 && x < h.x1 + 200 && y > h.y0 - 200 && y < h.y1 + 200)) spacers.push(box(x, y, z0 + cover / 2, 50, 50, cover));
+      for (const x of spaced(b.minX + 400, b.maxX - 400, 1000)) for (const y of spaced(b.minY + 400, b.maxY - 400, 1000)) if (pointInPolygon({ x, y }, region) && !zoneHoleRects.some((h) => x > h.x0 - 200 && x < h.x1 + 200 && y > h.y0 - 200 && y < h.y1 + 200)) spacers.push(box(x, y, z0 + cover / 2, 50, 50, cover));
       const sp = ctx.add({
         id: `frame:slab:${slabId}:${zone.name.replace(/\W+/g, "-")}:spacers`, name: `Spacers — ${slabName}${zones.length > 1 ? ` (${zone.name})` : ""}`, kind: "spacer", category: "frame", subcategory: "Cover & chairs", stage: 5, level, layer: "reinforcement", materialId: "spacer",
         shapes: spacers, repeated: { noun: "spacer" }, source: "schematic", parentId: concrete.id, explode: { layerIndex: 1, dir: UP },
       });
       addQuantity(ctx, sp, { workItem: "steel.spacers", description: "Cover spacers under slab steel", section: "D", unit: "piece", value: spacers.length, formula: `${spacers.length} spacers at 1000 mm centres`, inputs: { spacing: 1000 }, status: "assumed" }, { assumptions: ["Spacing 1000 mm and 40 mm cover are example values."] });
-      const chairs: Shape[] = [];
-      for (const bb of inZone) {
-        const horizontal = Math.abs(bb.start.y - bb.end.y) < 1;
-        const lo = horizontal ? Math.min(bb.start.x, bb.end.x) : Math.min(bb.start.y, bb.end.y);
-        const hi = horizontal ? Math.max(bb.start.x, bb.end.x) : Math.max(bb.start.y, bb.end.y);
-        for (const u of spaced(lo + 400, hi - 400, 1000)) chairs.push(horizontal ? box(u, bb.start.y, (zb + topZ) / 2, 40, 40, topZ - zb - r) : box(bb.start.x, u, (zb + topZ) / 2, 40, 40, topZ - zb - r));
-      }
-      if (chairs.length) {
+      if (steel.chairs.length) {
         const ch = ctx.add({
           id: `frame:slab:${slabId}:${zone.name.replace(/\W+/g, "-")}:chairs`, name: `Chairs for top steel — ${slabName}${zones.length > 1 ? ` (${zone.name})` : ""}`, kind: "spacer", category: "frame", subcategory: "Cover & chairs", stage: 5, level, layer: "reinforcement", materialId: "spacer",
-          shapes: chairs, repeated: { noun: "chair" }, source: "schematic", parentId: concrete.id, explode: { layerIndex: 2, dir: UP },
+          shapes: steel.chairs, repeated: { noun: "chair" }, source: "schematic", parentId: concrete.id, explode: { layerIndex: 2, dir: UP },
         });
-        addQuantity(ctx, ch, { workItem: "steel.chairs", description: "Chairs supporting top steel", section: "D", unit: "piece", value: chairs.length, formula: `${chairs.length} chairs at 1000 mm along the supports`, inputs: { spacing: 1000 }, status: "assumed" });
+        addQuantity(ctx, ch, { workItem: "steel.chairs", description: "Chairs supporting top steel", section: "D", unit: "piece", value: steel.chairs.length, formula: `${steel.chairs.length} chairs at 1000 mm along the supports`, inputs: { spacing: 1000 }, status: "assumed" });
       }
       // Slab formwork: deck, edges, and the props that carry it.
       const deckZ0 = z0 - 18;
@@ -272,7 +263,7 @@ export function generateFrame(ctx: Ctx): void {
       formworkQuantity(ctx, form, "formwork.slab", "Formwork to slab soffit and edges", fa, `soffit ${f2(soffit * 1e-6)} m² + edges ${f2(((edgeLen + holeEdge) * slabThickness) * 1e-6)} m² = ${f2(fa)} m²`, { soffit: round(soffit * 1e-6, 3), edge: round(edgeLen + holeEdge, 0), thickness: slabThickness }, "calculated", ["Soffit is the slab underside between beams and columns; the beam soffits and sides are in the beam lines.", "The side at the construction joint is not formed here (it meets the next zone's concrete)."]);
       const props: Shape[] = [];
       for (const x of spaced(b.minX + 600, b.maxX - 600, 1200)) for (const y of spaced(b.minY + 600, b.maxY - 600, 1200)) {
-        if (!pointInZone({ x, y }, zone.poly)) continue;
+        if (!pointInPolygon({ x, y }, zone.poly)) continue;
         const nearBeam = beams.some((bb) => distToSegment({ x, y }, bb.start, bb.end) < bb.width / 2 + 150);
         const nearCol = columns.some((c) => Math.abs(c.x - x) < c.width / 2 + 200 && Math.abs(c.y - y) < c.depth / 2 + 200);
         const nearHole = zoneHoleRects.some((h) => x > h.x0 - 300 && x < h.x1 + 300 && y > h.y0 - 300 && y < h.y1 + 300);
@@ -297,12 +288,6 @@ export function generateFrame(ctx: Ctx): void {
   }
   void (undefined as unknown as LevelInfo);
 }
-
-function pointInZone(p: P2, poly: P2[]): boolean {
-  const b = polygonBoundsOf(poly);
-  return p.x >= b.minX - 1e-6 && p.x <= b.maxX + 1e-6 && p.y >= b.minY - 1e-6 && p.y <= b.maxY + 1e-6;
-}
-const pointOnZoneEdge = pointInZone;
 
 function polygonBoundsOf(poly: P2[]) {
   const xs = poly.map((p) => p.x);

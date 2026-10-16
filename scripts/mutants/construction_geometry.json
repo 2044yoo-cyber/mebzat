@@ -46,5 +46,17 @@
     "file": "src/features/house-designer/construction/roof-geometry.ts",
     "from": "const plan = (lengthX + 2 * OVERHANG) * (spanY + 2 * OVERHANG) * 1e-6;",
     "to": "const plan = (lengthX + 2 * OVERHANG) * spanY * 1e-6;"
+  },
+  {
+    "name": "corners not mitred",
+    "file": "src/features/house-designer/construction/region.ts",
+    "from": "const k = Math.max(0.25, 1 + a.x * b.x + a.y * b.y);",
+    "to": "const k = 1;"
+  },
+  {
+    "name": "a sharp corner is run out to a spike",
+    "file": "src/features/house-designer/construction/region.ts",
+    "from": "const k = Math.max(0.25, 1 + a.x * b.x + a.y * b.y);",
+    "to": "const k = 1 + a.x * b.x + a.y * b.y;"
   }
 ]

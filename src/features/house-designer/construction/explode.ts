@@ -80,7 +80,7 @@ export function explodeInfo(c: ComponentRecord, view: ViewState, model: Construc
 export function shapeOffset(shape: Shape, info: ExplodeInfo, centre: V3): V3 {
   if (info.layerDistance === 0) return info.base;
   if (!info.radial) return add(info.base, scale(info.dir, info.layerDistance));
-  const p = shape.t === "prism" ? { x: shape.poly[0]!.x, y: shape.poly[0]!.y } : { x: shape.c.x, y: shape.c.y };
+  const p = shape.t === "prism" ? { x: shape.poly[0]!.x, y: shape.poly[0]!.y } : shape.t === "profile" ? { x: shape.origin.x, y: shape.origin.y } : { x: shape.c.x, y: shape.c.y };
   const dx = p.x - centre.x;
   const dy = p.y - centre.y;
   const len = Math.hypot(dx, dy) || 1;

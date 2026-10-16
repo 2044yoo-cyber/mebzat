@@ -18,7 +18,7 @@ import { generateOpenings } from "./generators/openings";
 import { generateJoinery } from "./generators/joinery";
 import { generateExternal } from "./generators/external";
 import { generateFurniture } from "./generators/furniture";
-import type { Shape, V3 } from "./geometry";
+import { profileBox, type Shape, type V3 } from "./geometry";
 
 export type BuildExtras = {
   /** Reinforcement is quantified only from an approved schedule supplied here. */
@@ -91,6 +91,9 @@ export function boundsOf(shapes: Shape[]): { min: V3; max: V3 } {
       const fall = Math.abs(Math.sin(tilt)) * h;
       const ex = s.axis === "x" ? run : s.r; const ey = s.axis === "y" ? run : s.r; const ez = s.axis === "z" ? h : s.r + fall;
       grow(s.c.x - ex, s.c.y - ey, s.c.z - ez); grow(s.c.x + ex, s.c.y + ey, s.c.z + ez);
+    } else if (s.t === "profile") {
+      const { corners, z0, z1 } = profileBox(s);
+      for (const p of corners) { grow(p.x, p.y, z0); grow(p.x, p.y, z1); }
     } else for (const p of s.poly) { grow(p.x, p.y, s.z0); grow(p.x, p.y, s.z1); }
   }
   if (!isFinite(min.x)) return { min: { x: 0, y: 0, z: 0 }, max: { x: 1, y: 1, z: 1 } };

@@ -23,7 +23,7 @@ import {
 import { constructionTakeoffPackage } from "../src/features/house-designer/construction/takeoff-handoff";
 import { parseHouseTakeoffPackage } from "../src/features/house-designer/services/takeoff-adapter";
 import { layoutLabels } from "../src/features/house-designer/construction/label-layout";
-import type { Shape } from "../src/features/house-designer/construction/geometry";
+import { profileBox, type Shape } from "../src/features/house-designer/construction/geometry";
 
 let checks = 0;
 const ok = (value: unknown, message: string) => { assert.ok(value, message); checks += 1; };
@@ -382,6 +382,7 @@ function bounds(s: Shape) {
     return r !== null ? { x0: s.c.x - r, x1: s.c.x + r, y0: s.c.y - r, y1: s.c.y + r, z0: s.c.z - s.s.z / 2, z1: s.c.z + s.s.z / 2 } : { x0: s.c.x - s.s.x / 2, x1: s.c.x + s.s.x / 2, y0: s.c.y - s.s.y / 2, y1: s.c.y + s.s.y / 2, z0: s.c.z - s.s.z / 2, z1: s.c.z + s.s.z / 2 };
   }
   if (s.t === "prism") { const xs = s.poly.map((p) => p.x); const ys = s.poly.map((p) => p.y); return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys), z0: s.z0, z1: s.z1 }; }
+  if (s.t === "profile") { const { corners, z0, z1 } = profileBox(s); const xs = corners.map((p) => p.x); const ys = corners.map((p) => p.y); return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys), z0, z1 }; }
   return { x0: s.c.x - s.r, x1: s.c.x + s.r, y0: s.c.y - s.r, y1: s.c.y + s.r, z0: s.c.z - s.len / 2, z1: s.c.z + s.len / 2 };
 }
 function covers(s: Shape, x: number, y: number, z: number): boolean {

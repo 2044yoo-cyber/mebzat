@@ -100,7 +100,7 @@ export function buildDrawList(model: ConstructionModel, index: ModelIndex, view:
     c.shapes.forEach((shape, i) => {
       if (!shapeVisible(c, i, view, index)) return;
       const highlight: Highlight = selectedComponent ? (view.selectedId === c.id && view.selectedInstance === i ? "instance" : "component") : "none";
-      if (shape.t === "prism") { prismShapes.push(i); return; }
+      if (shape.t === "prism" || shape.t === "profile") { prismShapes.push(i); return; }
       const off = shapeOffset(shape, info, modelCentre);
       const b = get(shape.t === "box" ? "box" : "cyl", c.materialId, ghost, highlight);
       POS.set((shape.c.x - centre.x + off.x) * MM, (shape.c.z + off.z) * MM, -(shape.c.y - centre.y + off.y) * MM);

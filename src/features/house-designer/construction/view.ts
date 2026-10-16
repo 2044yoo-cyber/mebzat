@@ -201,7 +201,7 @@ export function shapeVisible(c: ComponentRecord, shapeIndex: number, view: ViewS
   const floor = index.floors.get(c.storeyIndex);
   const shape = c.shapes[shapeIndex];
   if (!floor || !shape) return true;
-  const z = shape.t === "box" ? shape.c.z : shape.t === "cyl" ? shape.c.z : (shape.z0 + shape.z1) / 2;
+  const z = shape.t === "box" ? shape.c.z : shape.t === "cyl" ? shape.c.z : shape.t === "profile" ? shape.poly.reduce((sum, q) => sum + q.z, 0) / shape.poly.length : (shape.z0 + shape.z1) / 2;
   return z - floor.floorZ <= Math.max(0, view.wallProgress) * floor.height;
 }
 

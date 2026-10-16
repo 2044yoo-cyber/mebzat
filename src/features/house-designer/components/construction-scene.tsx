@@ -141,16 +141,38 @@ function InstancedGroup({ group, owners, plane, onPick }: { group: DrawGroup; ow
   );
 }
 
+const PROFILE_BASIS = { x: new THREE.Vector3(), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3() };
+
+/** A polygon standing in a vertical plane, extruded across its thickness, placed in the viewer's frame (X east, Y up, Z south). */
+function profileGeometry(shape: Extract<Shape, { t: "profile" }>, centre: { x: number; y: number }) {
+  const outline = new THREE.Shape(shape.poly.map((p) => new THREE.Vector2(p.s * MM, p.z * MM)));
+  const depth = Math.max(0.001, shape.thickness * MM);
+  const geometry = new THREE.ExtrudeGeometry(outline, { depth, bevelEnabled: false });
+  geometry.translate(0, 0, -depth / 2);
+  // Along `dir` in plan is the shape's own x; up is its y; across is the plan normal to the right of `dir`, which makes the turn a proper rotation.
+  PROFILE_BASIS.x.set(shape.dir.x, 0, -shape.dir.y);
+  PROFILE_BASIS.z.set(shape.dir.y, 0, shape.dir.x);
+  const matrix = new THREE.Matrix4().makeBasis(PROFILE_BASIS.x, PROFILE_BASIS.y, PROFILE_BASIS.z);
+  matrix.setPosition((shape.origin.x - centre.x) * MM, 0, -(shape.origin.y - centre.y) * MM);
+  geometry.applyMatrix4(matrix);
+  return geometry;
+}
+
 function prismGeometry(shapes: Shape[], centre: { x: number; y: number }) {
   const parts: THREE.BufferGeometry[] = [];
   const triangles: number[] = [];
   for (const shape of shapes) {
-    if (shape.t !== "prism" || shape.poly.length < 3) continue;
-    const outline = new THREE.Shape(shape.poly.map((p) => new THREE.Vector2((p.x - centre.x) * MM, (p.y - centre.y) * MM)));
-    for (const hole of shape.holes ?? []) outline.holes.push(new THREE.Path(hole.map((p) => new THREE.Vector2((p.x - centre.x) * MM, (p.y - centre.y) * MM))));
-    const geometry = new THREE.ExtrudeGeometry(outline, { depth: Math.max(0.001, (shape.z1 - shape.z0) * MM), bevelEnabled: false });
-    geometry.rotateX(-Math.PI / 2);
-    geometry.translate(0, shape.z0 * MM, 0);
+    let geometry: THREE.BufferGeometry;
+    if (shape.t === "profile") {
+      if (shape.poly.length < 3) continue;
+      geometry = profileGeometry(shape, centre);
+    } else if (shape.t === "prism" && shape.poly.length >= 3) {
+      const outline = new THREE.Shape(shape.poly.map((p) => new THREE.Vector2((p.x - centre.x) * MM, (p.y - centre.y) * MM)));
+      for (const hole of shape.holes ?? []) outline.holes.push(new THREE.Path(hole.map((p) => new THREE.Vector2((p.x - centre.x) * MM, (p.y - centre.y) * MM))));
+      geometry = new THREE.ExtrudeGeometry(outline, { depth: Math.max(0.001, (shape.z1 - shape.z0) * MM), bevelEnabled: false });
+      geometry.rotateX(-Math.PI / 2);
+      geometry.translate(0, shape.z0 * MM, 0);
+    } else continue;
     parts.push(geometry);
     triangles.push(geometry.getAttribute("position").count / 3);
   }

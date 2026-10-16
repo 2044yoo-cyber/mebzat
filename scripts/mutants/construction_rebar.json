@@ -1,0 +1,224 @@
+[
+  {
+    "name": "top bars reach a fifth of the span",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "export const NEGATIVE_BAR_REACH = 0.3;",
+    "to": "export const NEGATIVE_BAR_REACH = 0.2;"
+  },
+  {
+    "name": "top bars reach at least 300 mm",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "const MIN_REACH = 600;",
+    "to": "const MIN_REACH = 300;"
+  },
+  {
+    "name": "both layers of top bars at one height",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "const mainZ = alongX ? a.zTop - 2 * a.r : a.zTop;",
+    "to": "const mainZ = a.zTop;"
+  },
+  {
+    "name": "legs judged by the zone, not the slab",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "if (!a.outline.some((p, i) => distanceToSegment(end, p, a.outline[(i + 1) % a.outline.length]!) <= a.cover + 6)) continue;",
+    "to": "if (!a.zone.some((p, i) => distanceToSegment(end, p, a.zone[(i + 1) % a.zone.length]!) <= a.cover + 6)) continue;"
+  },
+  {
+    "name": "legs of one length",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "const leg = Math.max(60, a.thickness - 2 * a.cover - 3 * a.r - (alongX ? 2 * a.r : 0));",
+    "to": "const leg = 100;"
+  },
+  {
+    "name": "distribution bars far apart",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "const DISTRIBUTION_SPACING = 250;",
+    "to": "const DISTRIBUTION_SPACING = 500;"
+  },
+  {
+    "name": "chairs far apart",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "for (const t of spaced(400, len - 400, 1000)) {",
+    "to": "for (const t of spaced(400, len - 400, 2000)) {"
+  },
+  {
+    "name": "bars across a slab twice as far apart",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "for (const v of axis === \"x\" ? spaced(minY + 1, maxY - 1, spacing) : spaced(minX + 1, maxX - 1, spacing)) {",
+    "to": "for (const v of axis === \"x\" ? spaced(minY + 1, maxY - 1, spacing * 2) : spaced(minX + 1, maxX - 1, spacing * 2)) {"
+  },
+  {
+    "name": "a neighbour need not be parallel",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "    if (Math.abs(u.x * v.y - u.y * v.x) > 0.02) continue;\n",
+    "to": ""
+  },
+  {
+    "name": "a neighbour may be on either side",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "    if (offset * side <= 1) continue;\n",
+    "to": ""
+  },
+  {
+    "name": "a neighbour need not overlap",
+    "file": "src/features/house-designer/construction/generators/slab-steel.ts",
+    "from": "    if (overlap < 300) continue;\n",
+    "to": ""
+  },
+  {
+    "name": "a polygon moved the wrong way",
+    "file": "src/features/house-designer/construction/region.ts",
+    "from": "return { x: p.x + (d * (a.x + b.x)) / k, y: p.y + (d * (a.y + b.y)) / k };",
+    "to": "return { x: p.x - (d * (a.x + b.x)) / k, y: p.y - (d * (a.y + b.y)) / k };"
+  },
+  {
+    "name": "openings ignored when cutting a line",
+    "file": "src/features/house-designer/construction/region.ts",
+    "from": "if (!pointInPolygon(mid, outer) || holes.some((h) => pointInPolygon(mid, h))) continue;",
+    "to": "if (!pointInPolygon(mid, outer)) continue;"
+  },
+  {
+    "name": "the slab is cast to the outline",
+    "file": "src/features/house-designer/construction/slab-cast.ts",
+    "from": "return half > 0 ? offsetPolygon(ctx.outline, half) : ctx.outline;",
+    "to": "return ctx.outline;"
+  },
+  {
+    "name": "beams have no support bars",
+    "file": "src/features/house-designer/construction/generators/frame.ts",
+    "from": "const supportReach = Math.max(600, 0.3 * clearSpan);",
+    "to": "const supportReach = 0;"
+  },
+  {
+    "name": "support bars do not reach into the column",
+    "file": "src/features/house-designer/construction/generators/frame.ts",
+    "from": "const into = Math.max(0, Math.min(100, Math.min(colHalfStart, colHalfEnd) - cover - 10));",
+    "to": "const into = 0;"
+  },
+  {
+    "name": "the slab is cast to the outline in the frame",
+    "file": "src/features/house-designer/construction/generators/frame.ts",
+    "from": "const cast = slabCastOutline(ctx, level.levelId);",
+    "to": "const cast = ctx.outline;"
+  },
+  {
+    "name": "bottom bars not kept a cover from the edge",
+    "file": "src/features/house-designer/construction/generators/frame.ts",
+    "from": "const region = offsetPolygon(zone.poly, -cover);",
+    "to": "const region = offsetPolygon(zone.poly, cover);"
+  },
+  {
+    "name": "top bars run through openings",
+    "file": "src/features/house-designer/construction/generators/frame.ts",
+    "from": "holes: zoneHoleRects.map((h) => rectPoly(h.x0, h.y0, h.x1, h.y1)), spacing: ASSUME.slabSpacing,",
+    "to": "holes: [], spacing: ASSUME.slabSpacing,"
+  },
+  {
+    "name": "no wedge under the landing",
+    "file": "src/features/house-designer/construction/generators/stairs.ts",
+    "from": "const zJoin = onward ? (onward.landing ? topOf(onward) - (WAIST + 50) : null) : level.soffitZ;",
+    "to": "const zJoin = null;"
+  },
+  {
+    "name": "the waist is thinner",
+    "file": "src/features/house-designer/construction/generators/stairs.ts",
+    "from": "const WAIST = 150;",
+    "to": "const WAIST = 120;"
+  },
+  {
+    "name": "the stair has no props",
+    "file": "src/features/house-designer/construction/generators/stairs.ts",
+    "from": "propShapes.push(...flightProps(straight, stair.elevation, 18));",
+    "to": ""
+  },
+  {
+    "name": "the waist ignores the slope",
+    "file": "src/features/house-designer/construction/generators/stair-flight.ts",
+    "from": "const waistDepth = (f: Flight) => f.waist / slopeCos(f);",
+    "to": "const waistDepth = (f: Flight) => f.waist;"
+  },
+  {
+    "name": "the soffit above the steps",
+    "file": "src/features/house-designer/construction/generators/stair-flight.ts",
+    "from": "return f.zBase + (f.riser / f.going) * s - waistDepth(f);",
+    "to": "return f.zBase + (f.riser / f.going) * s + waistDepth(f);"
+  },
+  {
+    "name": "the soffit never meets the floor",
+    "file": "src/features/house-designer/construction/generators/stair-flight.ts",
+    "from": "export const footOf = (f: Flight): number => Math.min(f.treads * f.going * 0.9, (waistDepth(f) * f.going) / f.riser);",
+    "to": "export const footOf = (f: Flight): number => 0;"
+  },
+  {
+    "name": "the soffit stops at the last tread",
+    "file": "src/features/house-designer/construction/generators/stair-flight.ts",
+    "from": "return h > 1 ? (h * f.going) / f.riser : 0;",
+    "to": "return 0;"
+  },
+  {
+    "name": "the steps one riser low",
+    "file": "src/features/house-designer/construction/generators/stair-flight.ts",
+    "from": "out.push({ s: k * T, z: zBase + k * R }, { s: (k - 1) * T, z: zBase + k * R });",
+    "to": "out.push({ s: k * T, z: zBase + (k - 1) * R }, { s: (k - 1) * T, z: zBase + (k - 1) * R });"
+  },
+  {
+    "name": "main bars tilted the wrong way",
+    "file": "src/features/house-designer/construction/generators/stair-flight.ts",
+    "from": "out.push({ ...bar, ry: -theta, rz: phi });",
+    "to": "out.push({ ...bar, ry: theta, rz: phi });"
+  },
+  {
+    "name": "main bars on the soffit",
+    "file": "src/features/house-designer/construction/generators/stair-flight.ts",
+    "from": "const lift = (cover + mainDiameter / 2) / cosT;",
+    "to": "const lift = 0;"
+  },
+  {
+    "name": "props to the wrong height",
+    "file": "src/features/house-designer/construction/generators/stair-flight.ts",
+    "from": "const top = soffitAt(f, s) - drop;",
+    "to": "const top = soffitAt(f, s);"
+  },
+  {
+    "name": "the mesh runs through the shafts",
+    "file": "src/features/house-designer/construction/generators/ground-floor.ts",
+    "from": "const meshHoles = slabHoles.map((h) => offsetPolygon(h, 50));",
+    "to": "const meshHoles: P2[][] = [];"
+  },
+  {
+    "name": "the audit looks only at the ends of bars",
+    "file": "src/features/house-designer/construction/reinforcement-audit.ts",
+    "from": "export function auditReinforcement(model: ConstructionModel, step = 100): RebarAudit {",
+    "to": "export function auditReinforcement(model: ConstructionModel, step = 1e9): RebarAudit {"
+  },
+  {
+    "name": "the audit counts bars as concrete",
+    "file": "src/features/house-designer/construction/reinforcement-audit.ts",
+    "from": "    if (c.layer !== \"concrete\") continue;\n",
+    "to": ""
+  },
+  {
+    "name": "the audit looks at spacers",
+    "file": "src/features/house-designer/construction/reinforcement-audit.ts",
+    "from": "const isBar = (c: ComponentRecord) => c.layer === \"reinforcement\" && c.kind !== \"spacer\" && c.materialId.startsWith(\"steel\");",
+    "to": "const isBar = (c: ComponentRecord) => c.layer === \"reinforcement\" && c.materialId.startsWith(\"steel\") || c.kind === \"spacer\";"
+  },
+  {
+    "name": "the audit forgives anything",
+    "file": "src/features/house-designer/construction/reinforcement-audit.ts",
+    "from": "const TOL = 3;",
+    "to": "const TOL = 3000;"
+  },
+  {
+    "name": "the audit ignores the profile's thickness",
+    "file": "src/features/house-designer/construction/reinforcement-audit.ts",
+    "from": "  if (Math.abs(w) > solid.thickness / 2 + tol) return false;\n",
+    "to": ""
+  },
+  {
+    "name": "the audit forgets holes in a slab",
+    "file": "src/features/house-designer/construction/reinforcement-audit.ts",
+    "from": "const probe = (x: number, y: number) => inPoly(solid.poly, x, y) && !solid.holes.some((h) => inPoly(h, x, y));",
+    "to": "const probe = (x: number, y: number) => inPoly(solid.poly, x, y);"
+  }
+]
