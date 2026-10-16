@@ -1,0 +1,188 @@
+[
+  {
+    "name": "a fixture is put where its pipes cannot reach it",
+    "file": "src/features/house-designer/construction/wet-room.ts",
+    "from": "          if (!reachable(run.edge, t, kind)) continue;\n",
+    "to": ""
+  },
+  {
+    "name": "a shaft in a corner cannot send its pipes out of the front",
+    "file": "src/features/house-designer/construction/wet-room.ts",
+    "from": "  if (t0 <= 10 && square(before) && before.length > reachOut + 100) exits.push({ side: 1, corner: true, at: { edge: before, t: before.length - reachOut } });\n  if (t1 >= edge.length - 10 && square(after) && after.length > reachOut + 100) exits.push({ side: 0, corner: true, at: { edge: after, t: reachOut } });\n",
+    "to": ""
+  },
+  {
+    "name": "a fall steeper than 1 in 20 is allowed",
+    "file": "src/features/house-designer/construction/wet-room.ts",
+    "from": "1 / Math.min(200, Math.max(20, n))",
+    "to": "1 / Math.max(1, n)"
+  },
+  {
+    "name": "the fall setting is ignored",
+    "file": "src/features/house-designer/construction/wet-room.ts",
+    "from": "return { waste: ratio(f.waste, FALL_WASTE), soil: ratio(f.soil, FALL_SOIL), drain: ratio(f.drain, FALL_DRAIN) };",
+    "to": "return { waste: FALL_WASTE, soil: FALL_SOIL, drain: FALL_DRAIN };"
+  },
+  {
+    "name": "any shaft is taken, whether or not the fixtures can reach it",
+    "file": "src/features/house-designer/construction/wet-room.ts",
+    "from": "      if (wr.unresolved.length) return `${room.name}, ${level.name}: ${wr.unresolved[0]!.reason}`;",
+    "to": ""
+  },
+  {
+    "name": "the vent stands back where the riser's lane crosses it",
+    "file": "src/features/house-designer/construction/wet-room.ts",
+    "from": "const uTee = corner ? (side === 1 ? 100 : shaft.width - 100) : side === 0 ? 100 : shaft.width - 100;",
+    "to": "const uTee = side === 0 ? 50 : shaft.width - 50;"
+  },
+  {
+    "name": "a WC's cold feed comes down beside its 110 mm waste",
+    "file": "src/features/house-designer/construction/wet-room.ts",
+    "from": "(kind === \"wc\" ? 120 : 45)",
+    "to": "45"
+  },
+  {
+    "name": "the shower waste leaves below the trunk, so it climbs to it",
+    "file": "src/features/house-designer/construction/wet-room.ts",
+    "from": "shower: { w: 900, d: 900, h: 360, supplyZ: 1100, outletZ: 300,",
+    "to": "shower: { w: 900, d: 900, h: 360, supplyZ: 1100, outletZ: 70,"
+  },
+  {
+    "name": "a waste pipe that would have to climb is let through",
+    "file": "src/features/house-designer/construction/wet-room.ts",
+    "from": "    if (trunkZ > z0 + spec.outletZ - 60) {",
+    "to": "    if (trunkZ > 1e9) {"
+  },
+  {
+    "name": "the waste trunk starts so high that fixtures cannot fall to it",
+    "file": "src/features/house-designer/construction/wet-room.ts",
+    "from": "const wasteZInlet = z0 + 120;",
+    "to": "const wasteZInlet = z0 + 300;"
+  },
+  {
+    "name": "the drain gives up sleeves and runs deep through the beams",
+    "file": "src/features/house-designer/construction/plumbing-plan.ts",
+    "from": "const shallow = [-740, -780, -820, -860];",
+    "to": "const shallow = [-1000];"
+  },
+  {
+    "name": "the down-feed on the roof ignores the vent stacks",
+    "file": "src/features/house-designer/construction/plumbing-plan.ts",
+    "from": "...openings.filter((h) => !contains(inflate(h, 20), rs.at)), ...stackRects]",
+    "to": "...openings.filter((h) => !contains(inflate(h, 20), rs.at))]"
+  },
+  {
+    "name": "the pump has no pad to stand on",
+    "file": "src/features/house-designer/construction/plumbing-plan.ts",
+    "from": "      plan.supports.push({ x0: pumpAt.x - 350,",
+    "to": "      void ({ x0: pumpAt.x - 350,"
+  },
+  {
+    "name": "a shower tray carries nothing",
+    "file": "src/features/house-designer/construction/plumbing-plan.ts",
+    "from": "for (const fx of wr.fixtures.filter((x) => x.kind === \"shower\")) plan.supports.push(",
+    "to": "for (const fx of wr.fixtures.filter((x) => x.kind === \"shower\")) void ("
+  },
+  {
+    "name": "a unresolved room is not reported",
+    "file": "src/features/house-designer/construction/plumbing-plan.ts",
+    "from": "    plan.unresolved.push(...wr.unresolved);\n  }",
+    "to": "  }"
+  },
+  {
+    "name": "the drain does not go through the beam at the sleeve's height",
+    "file": "src/features/house-designer/construction/plumbing-plan.ts",
+    "from": "diameter: 160, length: x.width,",
+    "to": "diameter: 160, length: 40,"
+  },
+  {
+    "name": "the sleeve through the wall sits at the face, half out of it",
+    "file": "src/features/house-designer/construction/electrical-plan.ts",
+    "from": "x: local(f, boardU, -t / 2).x, y: local(f, boardU, -t / 2).y, z, axis",
+    "to": "x: local(f, boardU, 40).x, y: local(f, boardU, 40).y, z, axis"
+  },
+  {
+    "name": "the switch height setting is ignored",
+    "file": "src/features/house-designer/construction/electrical-plan.ts",
+    "from": "H = { switch: ctx.rules.services.switchHeight,",
+    "to": "H = { switch: 1200,"
+  },
+  {
+    "name": "ground slab keeps no opening for the stack",
+    "file": "src/features/house-designer/construction/generators/ground-floor.ts",
+    "from": "const slabHoles: P2[][] = [...holes, ...shaftHoles];",
+    "to": "const slabHoles: P2[][] = [...holes];"
+  },
+  {
+    "name": "the ceiling is cut at the room's middle, not at the light",
+    "file": "src/features/house-designer/construction/generators/finishes.ts",
+    "from": "if (electrical?.lightPoint) heads.push({ at: electrical.lightPoint,",
+    "to": "if (electrical?.lightPoint) heads.push({ at: room.centre,"
+  },
+  {
+    "name": "the flat roof outlets ignore the downpipes",
+    "file": "src/features/house-designer/construction/generators/roof.ts",
+    "from": "const outlets = planned.length ? planned :",
+    "to": "const outlets = false ? planned :"
+  },
+  {
+    "name": "an installation is not moved as one piece",
+    "file": "src/features/house-designer/construction/explode.ts",
+    "from": "  if (isInstallation(c)) {",
+    "to": "  if (false as boolean) {"
+  },
+  {
+    "name": "chases slide on their own layer",
+    "file": "src/features/house-designer/construction/explode.ts",
+    "from": "view.explode.layers && !followsHost ?",
+    "to": "view.explode.layers ?"
+  },
+  {
+    "name": "a fall is drawn the wrong way round",
+    "file": "src/features/house-designer/construction/draw-list.ts",
+    "from": "TILT.setFromAxisAngle(shape.axis === \"x\" ? TILT_AXIS_Z : TILT_AXIS_X, -tilt);",
+    "to": "TILT.setFromAxisAngle(shape.axis === \"x\" ? TILT_AXIS_Z : TILT_AXIS_X, tilt);"
+  },
+  {
+    "name": "plumbing only still shows the electrical installation",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "      if (installation) return mine ? current : \"hidden\";",
+    "to": "      if (installation) return current;"
+  },
+  {
+    "name": "the finished building shows the concealed pipes",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "      return c.concealed && view.stage >= coverStage(c) ? \"hidden\" : current;",
+    "to": "      return current;"
+  },
+  {
+    "name": "a service view that needs later work leaves the stage where it is",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "const stage = mode === \"finished\" ? 18 : (Math.max(view.stage, SERVICE_VIEW_STAGE[mode]) as StageId);",
+    "to": "const stage = view.stage;"
+  },
+  {
+    "name": "the legend gives hot and cold the same colour",
+    "file": "src/features/house-designer/construction/catalogue.ts",
+    "from": "{ id: \"hot\", label: \"Hot water\", systems: [\"hot\"], materialId: \"pipe-hot\" }",
+    "to": "{ id: \"hot\", label: \"Hot water\", systems: [\"hot\"], materialId: \"pipe-cold\" }"
+  },
+  {
+    "name": "chases are cut when the roof is built",
+    "file": "src/features/house-designer/construction/generators/service-structure.ts",
+    "from": "kind: \"wall-chase\", category: \"electrical\", subcategory: \"Builder's work\", stage: 7,",
+    "to": "kind: \"wall-chase\", category: \"electrical\", subcategory: \"Builder's work\", stage: 8,"
+  },
+  {
+    "name": "the covers go on before the plaster",
+    "file": "src/features/house-designer/construction/generators/service-structure.ts",
+    "from": "kind: \"shaft-cover\", category: system === \"electrical\" ? \"electrical\" : \"plumbing\", subcategory: \"Covers\", stage: 11,",
+    "to": "kind: \"shaft-cover\", category: system === \"electrical\" ? \"electrical\" : \"plumbing\", subcategory: \"Covers\", stage: 9,"
+  },
+  {
+    "name": "a pipe's inspector panel loses where it goes",
+    "file": "src/features/house-designer/construction/inspect.ts",
+    "from": "from: c.service.from, to: c.service.to,",
+    "to": "from: \"\", to: \"\","
+  }
+]
