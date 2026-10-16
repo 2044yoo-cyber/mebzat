@@ -181,6 +181,20 @@ export function StudioWorkspace({
     if (!design.spec) return;
     design.set(updateProjectDesign(design.spec, activeItemId, next));
   }, [design.spec, design.set, activeItemId]);
+  const renameProjectItem = useCallback((itemId: string, currentTitle: string) => {
+    const entered = window.prompt("Rename this cabinet or design:", currentTitle);
+    if (entered === null) return;
+    const title = entered.trim();
+    if (!title) {
+      setProjectMessage("Name cannot be empty.");
+      return;
+    }
+    if (!design.spec) return;
+    const item = projectDesigns(design.spec).find((entry) => entry.id === itemId);
+    if (!item) return;
+    design.set(updateProjectDesign(design.spec, itemId, { ...item.spec, title }));
+    setProjectMessage(`Renamed to “${title}”. Save the project to keep the change.`);
+  }, [design.spec, design.set]);
   const addAnotherCabinet = () => {
     if (!design.spec) return;
     try {
@@ -726,12 +740,20 @@ export function StudioWorkspace({
                 </div>
                 <div role="tablist" aria-label="Cabinet designs" className="flex gap-2 overflow-x-auto pb-1">
                   {projectItems.map((item, index) => (
-                    <button key={item.id} type="button" role="tab" aria-selected={activeItemId === item.id}
-                      onClick={() => { setActiveItemId(item.id); setProjectMessage(null); }}
-                      className={cn("max-w-[180px] shrink-0 truncate rounded-lg border px-3 py-2 text-xs",
-                        activeItemId === item.id ? "border-primary bg-primary/10 font-semibold text-primary" : "bg-muted/30")}>
-                      {index + 1}. {item.spec.title}
-                    </button>
+                    <div key={item.id} className={cn("flex max-w-[220px] shrink-0 items-center gap-1 rounded-lg border px-1.5 py-1",
+                      activeItemId === item.id ? "border-primary bg-primary/10" : "bg-muted/30")}>
+                      <button type="button" role="tab" aria-selected={activeItemId === item.id}
+                        onClick={() => { setActiveItemId(item.id); setProjectMessage(null); }}
+                        className={cn("min-w-0 truncate px-1.5 py-1 text-xs",
+                          activeItemId === item.id ? "font-semibold text-primary" : "")}>
+                        {index + 1}. {item.spec.title}
+                      </button>
+                      <button type="button" title="Rename cabinet" aria-label={`Rename ${item.spec.title}`}
+                        onClick={() => renameProjectItem(item.id, item.spec.title)}
+                        className="shrink-0 rounded border bg-background px-1.5 py-1 text-[10px] leading-tight">
+                        Rename
+                      </button>
+                    </div>
                   ))}
                 </div>
                 {projectItems.length > 1 ? (

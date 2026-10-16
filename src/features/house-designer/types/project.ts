@@ -432,7 +432,11 @@ export const houseProjectSchema = z.object({
   measuredWalls: z.array(z.object({ id: z.string(), length: z.number().positive() })).optional(),
   freehandSketch: z.object({
     version: z.literal(1),
-    strokes: z.array(z.object({ id: z.string(), points: z.array(z.object({ x: z.number().finite(), y: z.number().finite() })).max(10000), thickness: z.number().positive().max(600) })).max(500),
+    strokes: z.array(z.object({
+      id: z.string(), points: z.array(z.object({ x: z.number().finite(), y: z.number().finite() })).max(10000),
+      thickness: z.number().positive().max(600), locked: z.boolean().default(false),
+      kind: z.enum(["wall", "door", "window", "furniture", "kitchen"]).default("wall"), color: z.string().optional(),
+    })).max(500),
     mmPerUnit: z.number().positive(),
     calibrated: z.boolean(),
   }).optional(),

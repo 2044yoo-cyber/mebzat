@@ -3,12 +3,14 @@ import Link from "next/link";
 import { Check, Pencil } from "lucide-react";
 
 import { DeleteAccountSection } from "@/components/settings/delete-account-section";
+import { FeedPreferencesForm } from "@/components/settings/feed-preferences-form";
 import { FontSettingsForm } from "@/components/settings/font-settings-form";
 import { RoleSettingsForm } from "@/components/settings/role-settings-form";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import { WatermarkSettingsForm } from "@/components/settings/watermark-settings-form";
 import { buttonVariants } from "@/components/ui/button";
 import { toFontChoice } from "@/lib/constants/fonts";
+import { isFeedTopic, type FeedTopic } from "@/lib/feed/constants";
 import { getProfileCompletion } from "@/lib/profile/completion";
 import { primaryRoleOf, rolesOf } from "@/lib/profile/roles";
 import {
@@ -28,7 +30,7 @@ export default async function SettingsPage() {
   const viewer = await requireViewer("/settings");
   const supabase = await createClient();
 
-  const [{ data: watermark }, { data: profile }] = await Promise.all([
+  const [{ data: watermark }, { data: profile }, { data: feedPreferences }] = await Promise.all([
     supabase
       .from("watermark_settings")
       .select(
@@ -40,6 +42,14 @@ export default async function SettingsPage() {
       .from("profiles")
       .select("*")
       .eq("id", viewer.id)
+      .maybeSingle(),
+    // 0109's table, not yet in the generated types. Absent before that
+    // migration runs, which reads as "nothing chosen yet".
+    (supabase.from as unknown as (table: string) => {
+      select: (columns: string) => { eq: (column: string, value: string) => { maybeSingle: () => PromiseLike<{ data: { topics: string[] | null; personalised: boolean | null } | null }> } };
+    }).call(supabase, "feed_interests")
+      .select("topics, personalised")
+      .eq("user_id", viewer.id)
       .maybeSingle(),
   ]);
 
@@ -80,6 +90,19 @@ export default async function SettingsPage() {
           />
         </section>
       )}
+
+      <section id="feed" className="scroll-mt-4 space-y-3 rounded-2xl border p-4 sm:p-6">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight">Your Home feed</h2>
+          <p className="text-sm text-muted-foreground">
+            What comes up more often on Home, and what the feed may learn from.
+          </p>
+        </div>
+        <FeedPreferencesForm
+          initialTopics={(feedPreferences?.topics ?? []).filter(isFeedTopic) as FeedTopic[]}
+          initialPersonalised={feedPreferences?.personalised ?? true}
+        />
+      </section>
 
       <FontSettingsForm initial={toFontChoice(profile?.font_preference)} />
 

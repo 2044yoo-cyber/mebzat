@@ -14,6 +14,9 @@ export function createDetailedKitchen(options: KitchenSetup): DesignSpec {
   spec.title = `${options.shape.replaceAll("_", " ")} kitchen · ${options.roomWidth / 1000} × ${options.roomDepth / 1000} m`;
   spec.carcass.plinthHeight = d.plinthHeight;
   spec.carcass.doorGap = 3;
+  // The reference kitchen is a replica of a supplied model, door gap and all:
+  // its doors are sized as that model has them until a hinge type is chosen.
+  delete spec.doorSizing;
   const run = (id: string, label: string, length: number): RunSpec => ({ id, label, length, depth: d.baseDepth, height: d.baseHeight });
   spec.runs = options.shape === "straight" || options.shape === "island" ? [run("kitchen-back", "Back wall", options.roomWidth)]
     : options.shape === "l_shaped" ? [run("kitchen-back", "Back wall", options.roomWidth), run("kitchen-right", "Right wall", options.roomDepth)]

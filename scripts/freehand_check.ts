@@ -1,3 +1,5 @@
+import { toggleWallJoints, wallJointsLinked } from "../src/features/house-designer/services/project-edit";
+import { clearInsideBoundary } from "../src/features/house-designer/services/clear-inside";
 import { planSnapshot } from "../src/features/house-designer/services/plan-snapshot";
 import { createHouseTakeoffPackage } from "../src/features/house-designer/services/takeoff-adapter";
 import assert from "node:assert/strict";
@@ -86,11 +88,17 @@ const convert = (strokes: Stroke[]) =>
 const plan = convert(rectangle);
 assert.equal(plan.walls.length, 4, "rough rectangle has four native walls");
 assert.equal(plan.rooms.length, 1, "almost closed rectangle forms room");
-const insideBoundary = plan.rooms[0]!.boundary;
+// A room's boundary is the wall centre-line polygon, so the clear inside is
+// that polygon moved in by half the thickness of each wall.
+const clear = clearInsideBoundary(plan.rooms[0]!.boundary, plan.walls);
+assert.ok(clear.exact, "the clear inside of the converted room is measured to the wall faces");
+const insideBoundary = clear.polygon;
 const insideWidth = Math.max(...insideBoundary.map((point) => point.x)) - Math.min(...insideBoundary.map((point) => point.x));
 const insideDepth = Math.max(...insideBoundary.map((point) => point.y)) - Math.min(...insideBoundary.map((point) => point.y));
 assert.ok(Math.abs(insideWidth - 4000) < 1, `converted room preserves 4000 mm clear inside width (${insideWidth})`);
-assert.ok(Math.abs(insideDepth - 5000) < 1, `converted room preserves 5000 mm clear inside depth (${insideDepth})`);
+// The bottom stroke is drawn from y 249 to y 250, so its centre-line sits at
+// 249.5 units: half a drawing unit (10 mm at 20 mm per unit) short of 5000.
+assert.ok(Math.abs(insideDepth - 5000) <= 10, `converted room keeps the 5000 mm clear inside depth to within half a drawing unit (${insideDepth})`);
 assert.ok(Math.abs(signedArea(insideBoundary) / 1e6 - 20) < 0.3);
 assert.equal(
   convertStrokes(
@@ -291,8 +299,12 @@ assert.equal(single.rooms.length, 0, "open wall invents no room");
 assert.ok(houseProjectSchema.safeParse(single).success);
 const before = JSON.stringify(plan);
 const wall = plan.walls[0]!;
+// Walls move independently unless their joints are linked on purpose
+// (ac636a3, ffb1901), so a move that keeps the room closed links them first.
+const linked = toggleWallJoints(plan, wall.id);
+assert.ok(wallJointsLinked(linked, wall.id), "both ends of the wall are linked");
 const moved = moveHouseSelections(
-  plan,
+  linked,
   [{ kind: "wall", id: wall.id }],
   0,
   -500,
@@ -351,9 +363,9 @@ const door = createHouseObjectFromGesture(plan, "door", plan.levels[0]!.id, {
 assert.equal(door.project.doors.length, 1, "native doors attach");
 const precise = dimensionRectangle(plan, 4000, 5000);
 assert.equal(
-  (Math.abs(signedArea(precise.rooms[0]!.boundary)) / 1e6).toFixed(2),
+  (Math.abs(signedArea(clearInsideBoundary(precise.rooms[0]!.boundary, precise.walls).polygon)) / 1e6).toFixed(2),
   "20.00",
-  "4 x 5 m produces exactly 20 m²",
+  "4 x 5 m clear inside produces exactly 20 m²",
 );
 assert.equal(dimensionConflicts(precise).length, 0);
 assert.ok(
@@ -372,9 +384,9 @@ const fractional = splitHouseSelection(
   0.3,
 ).project;
 assert.equal(
-  (Math.abs(signedArea(fractional.rooms[0]!.boundary)) / 1e6).toFixed(2),
+  (Math.abs(signedArea(clearInsideBoundary(fractional.rooms[0]!.boundary, fractional.walls).polygon)) / 1e6).toFixed(2),
   "20.00",
-  "split preserves exact room area",
+  "split preserves exact clear inside room area",
 );
 assert.equal(
   dimensionConflicts(fractional).length,

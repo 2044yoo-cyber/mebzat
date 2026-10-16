@@ -87,6 +87,8 @@ const MUST_BE_PUBLIC = [
   "/(dashboard)/help",
   "/(dashboard)/map",
   "/",
+  // An invitation link lands here signed out; it says to sign in, then joins.
+  "/(dashboard)/agenda/join",
 ];
 
 for (const target of MUST_BE_PUBLIC) {
@@ -141,6 +143,9 @@ const MUST_BE_PRIVATE = [
   "/(dashboard)/agenda/calendar",
   "/(dashboard)/agenda/projects",
   "/(dashboard)/agenda/projects/[projectId]",
+  "/(dashboard)/agenda/collaborate",
+  "/(dashboard)/agenda/projects/[projectId]/collaborate",
+  "/(dashboard)/agenda/projects/[projectId]/plan",
   "/(dashboard)/agenda/projects/[projectId]/activity",
   "/(dashboard)/agenda/projects/[projectId]/bidding",
   "/(dashboard)/agenda/projects/[projectId]/boq",

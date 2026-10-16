@@ -147,7 +147,7 @@ export type ProjectProductionSummary = {
   pieces: number;
   sheets: { boardId: string; board: string; sheets: number; separateSheets: number; pieces: number; area: number }[];
   workbook: Uint8Array;
-  layouts: { board: string; sheet: number; length: number; width: number; utilisation: number; parts: { label: string; design: string; x: number; y: number; width: number; height: number; rotated: boolean }[] }[];
+  layouts: { board: string; sheet: number; length: number; width: number; utilisation: number; parts: { label: string; design: string; partId: string; banding: string; x: number; y: number; width: number; height: number; rotated: boolean }[] }[];
   offcuts: { boardId: string; board: string; thicknessMm: number | null; sheet: number; x: number; y: number; length: number; width: number; areaM2: number; reusable: boolean }[];
   rows: { design: string; partId: string; cabinet: string; label: string; board: string;
     length: number; width: number; thickness: number; quantity: number; banding: string }[];
@@ -192,7 +192,7 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
   // layout without merging separately identifiable manufactured pieces.
   const sharedInputs = new Map<string, {
     rows: CutListRow[];
-    separate: { design: string; nesting: BoardNesting }[];
+    separate: { design: string; nesting: BoardNesting; rows: CutListRow[] }[];
   }>();
   let globallyUniqueRow = 0;
   const hardware: Cell[][] = [["Design", "Hardware", "Qty", "Unit", "Note"]];
@@ -201,12 +201,12 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     cut.rows.forEach(row => {
       printable.push({
         design: title, partId: `${index + 1}-${row.partId}`,
-        cabinet: row.cabinet, label: row.label, board: row.boardLabel,
+        cabinet: row.cabinet, label: row.operations?.length ? `${row.label} — ${row.operations.join("; ")}` : row.label, board: row.boardLabel,
         length: row.length, width: row.width, thickness: row.thickness,
         quantity: row.quantity, banding: row.banding,
       });
       cutting.push([
-      index + 1, title, `${index + 1}-${row.partId}`, row.cabinet, row.label,
+      index + 1, title, `${index + 1}-${row.partId}`, row.cabinet, row.operations?.length ? `${row.label} — ${row.operations.join("; ")}` : row.label,
       row.boardLabel, row.length, row.width, row.thickness, row.quantity,
       row.banding, row.bandLabel, row.grainLocked ? "Yes" : "No", row.area,
       ]);
@@ -223,11 +223,14 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
       for (const row of board.rows) {
         grouped.rows.push({
           ...row,
+          // The id the exported cut list shows: unique across designs, which
+          // the bare part id is not.
+          partId: `${index + 1}-${row.partId}`,
           index: ++globallyUniqueRow,
           label: `${title} — ${row.partId} — ${row.label}`,
         });
       }
-      grouped.separate.push({ design: title, nesting: board.nesting });
+      grouped.separate.push({ design: title, nesting: board.nesting, rows: board.rows.map(row => ({ ...row, partId: `${index + 1}-${row.partId}` })) });
       sharedInputs.set(board.boardId, grouped);
     });
     cut.hardware.forEach(item => hardware.push([
@@ -281,27 +284,35 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
           board: item.board, sheet: sheet.number,
           length: shared!.sheet.length, width: shared!.sheet.width,
           utilisation: sheet.utilisation,
-          parts: sheet.placements.map(place => ({
-            label: group.rows.find(row => row.index === place.index)?.label ?? place.label,
-            design: group.rows.find(row => row.index === place.index)?.cabinet ?? "",
-            x: place.x, y: place.y, width: place.width, height: place.height,
-            rotated: place.rotated,
-          })),
+          parts: sheet.placements.map(place => {
+            const row = group.rows.find(row => row.index === place.index);
+            return {
+              label: row?.label ?? place.label, design: row?.cabinet ?? "",
+              partId: row?.partId ?? "", banding: row?.banding ?? "Unknown",
+              x: place.x, y: place.y, width: place.width, height: place.height, rotated: place.rotated,
+            };
+          }),
         });
       }
     } else {
+      let layoutOffset = 0;
       for (const source of group.separate) {
         for (const sheet of source.nesting.sheets) {
           layouts.push({
-            board: item.board, sheet: sheet.number,
+            board: item.board, sheet: sheet.number + layoutOffset,
             length: source.nesting.sheet.length, width: source.nesting.sheet.width,
             utilisation: sheet.utilisation,
-            parts: sheet.placements.map(place => ({
-              label: place.label, design: source.design, x: place.x, y: place.y,
-              width: place.width, height: place.height, rotated: place.rotated,
-            })),
+            parts: sheet.placements.map(place => {
+              const row = source.rows.find(row => row.index === place.index);
+              return {
+                label: row?.label ?? place.label, design: source.design,
+                partId: row?.partId ?? "", banding: row?.banding ?? "Unknown",
+                x: place.x, y: place.y, width: place.width, height: place.height, rotated: place.rotated,
+              };
+            }),
           });
         }
+        layoutOffset += source.nesting.sheets.length;
       }
     }
     if (useShared) {
@@ -370,9 +381,12 @@ export function buildProjectCutList(primary: DesignSpec): ProjectProductionSumma
     { name: "Combined cut list", rows: cutting, widths: [11, 32, 22, 32, 25, 23, 16, 16, 17, 12, 24, 20, 14, 14] },
     { name: "Board totals", rows: sheetSummary, widths: [36, 21, 25, 16, 14, 19] },
     { name: "Cutting layout", rows: layout, widths: [32, 10, 55, 12, 12, 18, 19, 12] },
+    { name: "Offcut inventory", rows: offcutRows, widths: [34, 10, 12, 12, 17, 17, 14, 28] },
     { name: "Hardware", rows: hardware, widths: [34, 32, 12, 12, 50] },
+    { name: "Design summary", rows: summary, widths: [35, 17, 15, 19, 13] },
     { name: "Finished dimensions", rows: [["Design", "Width (mm)", "Height (mm)", "Depth (mm)"], ...designs.map(item => [item.spec.title, item.spec.envelope.width, item.spec.envelope.height, item.spec.envelope.depth])], widths: [38, 16, 16, 16] },
     { name: "Validation report", rows: validationRows, widths: [13, 30, 27, 30, 64, 68] },
+    { name: "Assembly steps", rows: assemblyRows, widths: [32, 10, 90, 12] },
   ];
   const purchasingHardware = new Map<string, {
     item: string; quantity: number; unit: string; designs: string[]; notes: string[];

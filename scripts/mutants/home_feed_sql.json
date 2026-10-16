@@ -1,0 +1,182 @@
+[
+ {
+  "name": "views count as interest (the root cause)",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  where x.user_id = (select uid from viewer) and x.first_interacted_at <= p_now\n),",
+  "to": "  where x.user_id = (select uid from viewer) and x.first_interacted_at <= p_now\n  union all\n  select p.topic, p.kind, least(v.seen_count, 3) from public.feed_views v\n  join public.feed_posts p on p.id = v.post_id where v.user_id = (select uid from viewer)\n),"
+ },
+ {
+  "name": "no kind penalty",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "      - least(8.0 * sqrt(row_number() over (partition by s.kind order by s.merit desc, s.id desc) - 1), 80)\n",
+  "to": ""
+ },
+ {
+  "name": "seen by last sighting, even mid-reading",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "    case when v.last_seen_at > p_now then coalesce(v.previous_seen_at, v.first_seen_at) else v.last_seen_at end seen_at",
+  "to": "    v.last_seen_at seen_at"
+ },
+ {
+  "name": "seen falls back to first sighting",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "coalesce(v.previous_seen_at, v.first_seen_at) else v.last_seen_at end seen_at",
+  "to": "v.first_seen_at else v.last_seen_at end seen_at"
+ },
+ {
+  "name": "previous sighting not kept",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "          previous_seen_at = case\n            when public.feed_views.last_seen_at <= coalesce(p_session, now()) then public.feed_views.last_seen_at\n            else public.feed_views.previous_seen_at end,",
+  "to": "          previous_seen_at = public.feed_views.last_seen_at,"
+ },
+ {
+  "name": "views counted every time",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  from upserted u where f.id = u.post_id and u.inserted;",
+  "to": "  from upserted u where f.id = u.post_id;"
+ },
+ {
+  "name": "hidden mid-reading drops out",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": " and h.user_id = (select uid from viewer) and h.created_at <= p_now)",
+  "to": " and h.user_id = (select uid from viewer))"
+ },
+ {
+  "name": "repeated interaction drops out",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  where x.user_id = (select uid from viewer) and x.first_interacted_at <= p_now",
+  "to": "  where x.user_id = (select uid from viewer) and x.last_interacted_at <= p_now"
+ },
+ {
+  "name": "posts written mid-reading join it",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": " and p.published_at <= p_now and p.created_at <= p_now\n",
+  "to": " and p.published_at <= p_now\n"
+ },
+ {
+  "name": "unpublished posts ranked",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  where p.status = 'published' and p.published_at <= p_now",
+  "to": "  where p.status in ('published', 'hidden') and p.published_at <= p_now"
+ },
+ {
+  "name": "author may boost",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "    new.boost := 0;\n",
+  "to": ""
+ },
+ {
+  "name": "author may count",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  new.like_count := old.like_count;\n",
+  "to": ""
+ },
+ {
+  "name": "author may date ahead",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "    new.published_at := least(coalesce(new.published_at, now()), now());",
+  "to": "    new.published_at := coalesce(new.published_at, now());"
+ },
+ {
+  "name": "author may backdate creation",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "    new.created_at := now();\n",
+  "to": ""
+ },
+ {
+  "name": "author may post as someone",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "      new.author_key := 'profile:' || new.author_id;",
+  "to": "      null;"
+ },
+ {
+  "name": "author may self-verify",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  new.author_verified := coalesce(verified, false);",
+  "to": "  new.author_verified := coalesce(new.author_verified, verified, false);"
+ },
+ {
+  "name": "private jobs shared",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "    new.status::text = 'open' and new.visibility::text = 'public',\n    'professional', 'community', new.poster_id",
+  "to": "    new.status::text = 'open',\n    'professional', 'community', new.poster_id"
+ },
+ {
+  "name": "unlisted designs shared",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "    new.visibility::text = 'public' and new.published_at is not null,\n    'ai_design'",
+  "to": "    new.published_at is not null,\n    'ai_design'"
+ },
+ {
+  "name": "digital floor plan filed as a document",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  k := case when digital and new.digital_kind::text = 'floor_plan' then 'floor_plan'::public.feed_kind",
+  "to": "  k := case when digital and new.digital_kind::text = 'floor_plan' then 'document'::public.feed_kind"
+ },
+ {
+  "name": "samples not marked",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  update public.feed_posts set is_demo = new.is_sample\n",
+  "to": "  update public.feed_posts set is_demo = false\n"
+ },
+ {
+  "name": "switch off ignored",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  select least((select w from total) / 15.0, 1.0) * case when (select personalised from pref) then 1 else 0 end c",
+  "to": "  select least((select w from total) / 15.0, 1.0) c"
+ },
+ {
+  "name": "visitor ranking reads the table",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  select coalesce((select i.personalised from public.feed_viewer_preferences() i), true) personalised",
+  "to": "  select coalesce((select i.personalised from public.feed_interests i where i.user_id = (select uid from viewer)), true) personalised"
+ },
+ {
+  "name": "featured unlimited",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "             then least((row_number() over (partition by (s.boost > 0 and not s.is_demo) order by s.merit desc, s.id desc) - 1) * 12.0, 60)",
+  "to": "             then 0"
+ },
+ {
+  "name": "samples labelled featured",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  r.boost > 0 and not r.is_demo\nfrom mixed r",
+  "to": "  r.boost > 0\nfrom mixed r"
+ },
+ {
+  "name": "visitor memory ignored",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  select s.id, p_now from unnest(coalesce(p_seen_ids, '{}'::uuid[])) s(id)\n  where (select uid from viewer) is null",
+  "to": "  select s.id, p_now from unnest('{}'::uuid[]) s(id)\n  where (select uid from viewer) is null"
+ },
+ {
+  "name": "visitors may record views",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "revoke execute on function public.feed_record_views(uuid[], timestamptz) from public, anon;",
+  "to": "grant execute on function public.feed_record_views(uuid[], timestamptz) to anon;"
+ },
+ {
+  "name": "interests open to all",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  using (user_id = auth.uid())\n  with check (user_id = auth.uid());\nrevoke all on public.feed_interests",
+  "to": "  using (true)\n  with check (true);\nrevoke all on public.feed_interests"
+ },
+ {
+  "name": "own fresh post not lifted",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "      + case when c.id = (select l.id from latest_own l) then 30 else 0 end\n",
+  "to": ""
+ },
+ {
+  "name": "everyone's fresh posts lifted",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "  where c.author_id = (select uid from viewer) and c.published_at > p_now - interval '6 hours'\n  order by c.published_at desc, c.id desc limit 1",
+  "to": "  where c.published_at > p_now - interval '6 hours'\n  order by c.published_at desc, c.id desc limit 1"
+ },
+ {
+  "name": "chosen topics barely count",
+  "file": "supabase/migrations/0109_home_feed_mix.sql",
+  "from": "x.topic = c.topic) then 16 else 0 end",
+  "to": "x.topic = c.topic) then 4 else 0 end"
+ }
+]

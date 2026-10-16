@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
   RAIL_SHELF_HEIGHTS,
   cabinetFronts,
+  closureReport,
+  type DoorLeaf,
   evenShelfHeights,
   hingesPerLeaf,
   sectionBands,
@@ -38,6 +40,8 @@ import {
 import { findBoard } from "../../types/catalogue";
 import { moduleLabel, modulesOf, stackRoleOf } from "../../services/transport-modules";
 import { snapValue } from "../../services/door-layout";
+import { fingerPullOf, gripEdgeOf } from "../../services/door-grip";
+import type { ClosurePanel } from "../../services/closure-panels";
 import type { DisplayOptions } from "../../types/spec";
 import type { Bay, Cabinet, DesignSpec } from "../../types/spec";
 
@@ -122,6 +126,8 @@ export function Elevation({
   const [mmPerPixel, setMmPerPixel] = useState(4);
   const { envelope } = spec;
   const resolved = resolveDesign(spec);
+  // Every cabinet's closure panels, worked out once for the drawing.
+  const closures = useMemo(() => (spec.closurePanels?.enabled ? closureReport(spec).panels : []), [spec]);
   // A front elevation is an orthographic view of one wall. Projecting an L or
   // U onto the same x axis would overlap its turned return and omit its real
   // corner module, which is worse than offering no drawing at all. The 3D
@@ -210,6 +216,7 @@ export function Elevation({
           <CabinetDrawing
             spec={spec}
             cabinet={cabinet}
+            closures={closures}
             gradientId={gradientId}
             selected={cabinet.id === selectedCabinetId}
             selectedDoor={selectedDoor?.cabinetId === cabinet.id ? selectedDoor : null}
@@ -310,6 +317,7 @@ export function Elevation({
 function CabinetDrawing({
   spec,
   cabinet,
+  closures,
   gradientId,
   selected,
   selectedDoor,
@@ -326,6 +334,8 @@ function CabinetDrawing({
 }: {
   spec: DesignSpec;
   cabinet: Cabinet;
+  /** The design's closure panels, from the same service its parts come from. */
+  closures: ClosurePanel[];
   gradientId: string;
   selected: boolean;
   selectedDoor: DoorRef | null;
@@ -418,6 +428,14 @@ function CabinetDrawing({
         snap={snap}
         mmPerPixel={mmPerPixel}
       />
+
+      {spec.closurePanels?.enabled ? (
+        <ClosureLayer
+          panels={closures.filter((panel) => panel.cabinetId === cabinet.id && panel.enabled)}
+          top={top}
+          colour={boardColour(materials.fronts, spec)}
+        />
+      ) : null}
 
       {/* Over the doors: a joint is tapped where the doors meet. */}
       <TransportJoints
@@ -1170,13 +1188,18 @@ function DoorLeaves({
             {leaf.style === "hinged" ? (
               <Hinges x={hingeLeft ? rect.x + 14 : rect.x + rect.width - 14} y={svgTop - offset} height={rect.height} />
             ) : null}
-            {/* Handle: on the meeting stile for a pair, on the leading edge for a single. */}
-            <circle
-              cx={hingeLeft ? rect.x + rect.width - 60 : rect.x + 60}
-              cy={svgTop + rect.height / 2}
-              r={26}
-              className="fill-foreground/45"
-            />
+            {/* Handle: on the meeting stile for a pair, on the leading edge for a single — only where there is one. */}
+            {leaf.frontGrip === "handle" ? (
+              <circle
+                data-door-handle-mark
+                cx={hingeLeft ? rect.x + rect.width - 60 : rect.x + 60}
+                cy={svgTop + rect.height / 2}
+                r={26}
+                className="fill-foreground/45"
+              />
+            ) : (
+              <GripMark spec={spec} cabinet={cabinet} leaf={leaf} svgTop={svgTop} />
+            )}
           </g>
         );
       })}
@@ -1192,6 +1215,56 @@ function DoorLeaves({
           onDrag={(rect) => onDoorResize(selectedDoor, rect)}
         />
       ) : null}
+    </g>
+  );
+}
+
+/**
+ * What a handleless door shows on the drawing, along its grip edge: a groove
+ * as a line just inside it, a G or J profile as the aluminium strip standing
+ * where the board was cut back, a channel as the dark gap. Push-to-open and
+ * the older styles show nothing on the face, which is the point of them.
+ */
+function GripMark({ spec, cabinet, leaf, svgTop }: { spec: DesignSpec; cabinet: Cabinet; leaf: DoorLeaf; svgTop: number }) {
+  const grip = leaf.frontGrip;
+  if (!["groove", "g-profile", "j-profile", "channel"].includes(grip)) return null;
+  const edge = gripEdgeOf(cabinet);
+  const { height } = fingerPullOf(spec, grip);
+  const edgeY = edge === "top" ? svgTop : svgTop + leaf.height;
+  if (grip === "groove") {
+    return <rect data-grip-mark={grip} x={leaf.x + 10} y={edge === "top" ? edgeY + 8 : edgeY - 14} width={leaf.width - 20} height={6} className="fill-foreground/55" />;
+  }
+  const y = edge === "top" ? edgeY - height : edgeY;
+  return grip === "channel"
+    ? <rect data-grip-mark={grip} x={leaf.x} y={y} width={leaf.width} height={height} className="fill-foreground/70" />
+    : <rect data-grip-mark={grip} x={leaf.x} y={y} width={leaf.width} height={height} fill="#c9ced4" className="stroke-foreground/40" strokeWidth={3} />;
+}
+
+/**
+ * The Smart Closure Panels of one cabinet, seen from the front: each in the
+ * fronts' colour with a dashed outline, so a panel the geometry added is told
+ * apart from a door at a glance. Their sizes are the parts' sizes.
+ */
+function ClosureLayer({ panels, top, colour }: { panels: ClosurePanel[]; top: (y: number) => number; colour: string }) {
+  return (
+    <g>
+      {panels.map((panel) => (
+        <rect
+          key={panel.id}
+          data-closure={panel.kind}
+          x={panel.box.x}
+          y={top(panel.box.y + panel.box.sy)}
+          width={panel.box.sx}
+          height={panel.box.sy}
+          fill={colour}
+          fillOpacity={0.9}
+          stroke="#f4a63a"
+          strokeWidth={6}
+          strokeDasharray="24 12"
+        >
+          <title>{`${panel.label}: ${Math.round(panel.width)} × ${Math.round(panel.height)} mm`}</title>
+        </rect>
+      ))}
     </g>
   );
 }

@@ -173,7 +173,10 @@ begin
            'agenda_guard_member_update|A membership stays with its person and its project'),
       (107, '0107_collab_invite_links', 'table',  'collab_invites'),
       (108, '0108_agenda_authorship',  'body',
-           'agenda_studio_viewer_guard|to_regclass(''public.collab_access'')')
+           'agenda_studio_viewer_guard|to_regclass(''public.collab_access'')'),
+      -- 0109 is one transaction, so its ranking's final body stands for all of it.
+      (109, '0109_home_feed_mix',      'body',
+           'feed_page_mixed|feed_viewer_preferences()')
     ) as t (ordering, migration, kind, object)
   loop
     present := case row.kind

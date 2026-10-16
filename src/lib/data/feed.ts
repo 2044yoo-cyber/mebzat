@@ -23,7 +23,7 @@ import { diversifyFeed } from "@/lib/feed/ranking";
 /**
  * Reading the Smart Discovery Feed.
  *
- * All of the ranking lives in `feed_page` in the database, which is where it
+ * All of the ranking lives in `feed_page_mixed` in the database, which is where it
  * belongs: the score depends on the reader's likes, saves, follows and view
  * history, and pulling all of that to the server to sort in JavaScript would
  * mean four extra round trips per page of twelve cards.
@@ -79,6 +79,8 @@ type FeedPageRow = {
   viewer_follows: boolean;
   seen: boolean;
   score: string | number;
+  /** Only `feed_page_mixed` (0109) returns it; absent from the older ranking. */
+  featured?: boolean | null;
 };
 
 /** Numerics arrive as strings from PostgREST to avoid float rounding. */
@@ -190,6 +192,7 @@ function normalize(row: FeedPageRow): FeedPost | null {
     viewerFollows: row.viewer_follows,
     seen: row.seen === true,
     score: String(row.score),
+    featured: row.featured === true,
   };
 }
 
@@ -216,6 +219,16 @@ export type FeedQuery = {
  *  being a memory and starts being a way to make the database sort a list
  *  somebody else chose. */
 const SEEN_LIMIT = 400;
+
+/** Whether an error says the function is not installed, rather than that it failed. */
+function isMissing(error: { code?: string; message: string }): boolean {
+  return (
+    error.code === UNDEFINED_FUNCTION ||
+    error.code === UNDEFINED_TABLE ||
+    error.code === "PGRST202" ||
+    /could not find the function|schema cache/i.test(error.message)
+  );
+}
 
 /**
  * The tie-breaker seed for one reading session.
@@ -257,12 +270,11 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
   // ranking cannot reshuffle underneath a reader who is halfway down it.
   const seed = cursor?.seed ?? seedFor(user?.id ?? null);
 
-  // Runtime RPC is installed by migration 0101; the generated database type
-  // is refreshed separately after deployment and shares feed_page's shape.
-  const { data, error } = await supabase.rpc("feed_page_personalized" as "feed_page", {
+  const args = {
     p_limit: limit,
-    // The first page fixes the clock; every page after it reuses that value
-    // so the age term cannot move a post across a page boundary mid-scroll.
+    // The first page fixes the clock; every page after it reuses that value,
+    // so nothing that happens while somebody scrolls — a view, a like, a post
+    // published a minute ago — moves a card across the cursor.
     p_now: cursor?.now ?? new Date().toISOString(),
     // The cursor carries the score as a string so it survives the query
     // string unchanged; p_after_score is numeric.
@@ -274,16 +286,28 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
     p_saved_only: savedOnly,
     p_following_only: followingOnly,
     p_search: search && search.trim().length > 1 ? search.trim() : null,
-    // Only honoured for a signed-out reader; feed_page ignores it otherwise.
+    // Only honoured for a signed-out reader; the ranking ignores it otherwise.
     p_seen_ids: user ? null : (seenIds ?? []).slice(0, SEEN_LIMIT),
     p_seed: seed,
-  });
+  };
+
+  // `feed_page_mixed` (0109) is the Home feed. Until that migration is run the
+  // older ranking answers instead, so deploying this code first does not
+  // empty anybody's homepage. Neither is in the generated database types yet.
+  // Bound: `rpc` reads the client's own REST settings through `this`.
+  const rpc = supabase.rpc.bind(supabase) as unknown as (
+    name: string,
+    params: typeof args,
+  ) => PromiseLike<{ data: unknown; error: { code?: string; message: string; details?: string } | null }>;
+  let ranking: "mixed" | "legacy" = "mixed";
+  let { data, error } = await rpc("feed_page_mixed", args);
+  if (error && isMissing(error)) {
+    ranking = "legacy";
+    ({ data, error } = await rpc("feed_page_personalized", args));
+  }
 
   if (error) {
-    const missing =
-      error.code === UNDEFINED_FUNCTION ||
-      error.code === UNDEFINED_TABLE ||
-      /could not find the function|schema cache/i.test(error.message);
+    const missing = isMissing(error);
 
     // A transport failure and a database failure look the same in the log
     // otherwise, and they have nothing in common. supabase-js reports a
@@ -307,7 +331,7 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
       );
     }
 
-    return { posts: [], cursor: null, available: !missing };
+    return { posts: [], cursor: null, available: !missing, failed: !missing };
   }
 
   const rows = (data ?? []) as FeedPageRow[];
@@ -327,11 +351,13 @@ export async function getFeedPage(query: FeedQuery = {}): Promise<FeedPage> {
       ? {
           score: String(last.score),
           id: last.id,
-          now: cursor?.now ?? new Date().toISOString(),
+          now: args.p_now,
           seed,
         }
       : null,
     available: true,
+    session: args.p_now,
+    ranking,
   };
 }
 

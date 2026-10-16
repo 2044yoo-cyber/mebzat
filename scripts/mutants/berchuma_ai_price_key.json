@@ -1,0 +1,8 @@
+[
+ {
+  "name": "a board from a model's reply is not looked up in the catalogue",
+  "file": "src/features/berchuma-studio/services/hydrate.ts",
+  "from": "  if (typeof value === \"string\") return find(value);",
+  "to": "  if (typeof value === \"string\") return { ...find(value), priceKey: \"\" } as T;"
+ }
+]

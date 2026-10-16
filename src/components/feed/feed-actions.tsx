@@ -23,7 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { feedApi } from "@/lib/feed/client";
+import { announceChange, feedApi } from "@/lib/feed/client";
 import type { FeedPost } from "@/lib/feed/types";
 import { cn } from "@/lib/utils";
 
@@ -83,6 +83,10 @@ export function FeedActions({
     // The server's count is authoritative — it includes everyone else's
     // likes since this card was rendered.
     if (typeof result.count === "number") setLikes(result.count);
+    announceChange({
+      postId: post.id,
+      patch: { viewerLiked: next, ...(typeof result.count === "number" ? { likeCount: result.count } : {}) },
+    });
   }
 
   async function toggleSave() {
@@ -100,6 +104,7 @@ export function FeedActions({
       toast.error(result.error);
       return;
     }
+    announceChange({ postId: post.id, patch: { viewerSaved: next } });
     toast.success(next ? "Saved" : "Removed from saved");
   }
 

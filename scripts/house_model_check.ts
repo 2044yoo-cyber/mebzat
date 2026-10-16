@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room.ts";
-import { patchHouseObject } from "../src/features/house-designer/services/project-edit.ts";
+import { patchHouseObject, toggleWallJoints } from "../src/features/house-designer/services/project-edit.ts";
 import { applyHouseRemodelCommand } from "../src/features/house-designer/services/remodel.ts";
 import { detectedPlanToRoom } from "../src/features/house-designer/services/plan-analysis.ts";
 import {
@@ -48,7 +48,11 @@ assert(project.site);
 assert.equal(project.verandas.length, 1);
 assert.equal(project.balconies.length, 1);
 
-project = patchHouseObject(project, { kind: "wall", id: "ground-floor:wall:c1" }, { endX: 8200, thickness: 200 });
+// A footprint corner moves only when that end of the wall is linked on purpose
+// (ac636a3, ffb1901). Unlinked, the edit is refused and nothing changes.
+const unlinked = patchHouseObject(project, { kind: "wall", id: "ground-floor:wall:c1" }, { endX: 8200, thickness: 200 });
+assert.equal(unlinked, project, "moving an unlinked footprint corner changes nothing");
+project = patchHouseObject(toggleWallJoints(project, "ground-floor:wall:c1", "end"), { kind: "wall", id: "ground-floor:wall:c1" }, { endX: 8200, thickness: 200 });
 assert.equal(project.levels[0]?.plan?.corners[1]?.x, 8200);
 assert.equal(project.walls.find((wall) => wall.id === "ground-floor:wall:c1")?.thickness, 200);
 

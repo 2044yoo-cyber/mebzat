@@ -1,0 +1,10 @@
+[
+ {"name":"the offset is not applied","file":"src/features/house-designer/services/clear-inside.ts","from":"const half = wallThicknessOn(from, to, walls) / 2;","to":"const half = 0;"},
+ {"name":"a whole thickness instead of half","file":"src/features/house-designer/services/clear-inside.ts","from":"const half = wallThicknessOn(from, to, walls) / 2;","to":"const half = wallThicknessOn(from, to, walls);"},
+ {"name":"every edge takes the first wall's thickness","file":"src/features/house-designer/services/clear-inside.ts","from":"const half = wallThicknessOn(from, to, walls) / 2;","to":"const half = (walls[0]?.thickness ?? 0) / 2;"},
+ {"name":"an open edge is offset anyway","file":"src/features/house-designer/services/clear-inside.ts","from":"  let best = 0;","to":"  let best = 150;"},
+ {"name":"a room eaten by its walls is reported as exact","file":"src/features/house-designer/services/clear-inside.ts","from":"  if (reversed) return { polygon: original, exact: false };","to":""},
+ {"name":"the winding of the boundary matters","file":"src/features/house-designer/services/clear-inside.ts","from":"const normal = { x: -direction.y * orientation, y: direction.x * orientation };","to":"const normal = { x: -direction.y, y: direction.x };"},
+ {"name":"the quantity goes back to the centre-line polygon","file":"src/features/house-designer/services/quantities.ts","from":"sum + clearInsideArea(room.boundary, project.walls.filter((wall) => wall.levelId === room.levelId)).area,","to":"sum + polygonArea(room.boundary) / 1_000_000,"},
+ {"name":"walls of other levels are used","file":"src/features/house-designer/services/quantities.ts","from":"project.walls.filter((wall) => wall.levelId === room.levelId)","to":"project.walls.filter((wall) => wall.levelId !== room.levelId)"}
+]

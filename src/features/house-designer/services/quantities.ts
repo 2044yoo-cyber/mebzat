@@ -1,4 +1,5 @@
 import type { HouseProject } from "../types/project";
+import { clearInsideArea } from "./clear-inside";
 
 export type HouseQuantityRow = {
   code: string;
@@ -38,7 +39,12 @@ export function calculateHouseQuantities(project: HouseProject): HouseQuantityRo
   const balconyConcrete = project.balconies.reduce((sum, balcony) => sum + balcony.width * balcony.depth * balcony.thickness / 1_000_000_000, 0);
   const foundationConcrete = project.foundations.reduce((sum, foundation) => sum + foundation.width * foundation.depth * foundation.thickness / 1_000_000_000, 0);
   const railingLength = project.railings.reduce((sum, railing) => sum + Math.hypot(railing.end.x - railing.start.x, railing.end.y - railing.start.y) / 1000, 0);
-  const floorFinish = project.rooms.reduce((sum, room) => sum + polygonArea(room.boundary) / 1_000_000, 0);
+  // Finishes are laid between wall faces, not out to the centre-lines a room
+  // boundary follows, so each room is measured clear inside its walls.
+  const floorFinish = project.rooms.reduce(
+    (sum, room) => sum + clearInsideArea(room.boundary, project.walls.filter((wall) => wall.levelId === room.levelId)).area,
+    0,
+  );
   const verandaFloor = project.verandas.reduce((sum, veranda) => sum + veranda.width * veranda.depth / 1_000_000, 0);
   const ceilingArea = project.ceilings.reduce((sum, ceiling) => sum + polygonArea(ceiling.boundary) / 1_000_000, 0);
   const siteArea = project.site ? polygonArea(project.site.boundary) / 1_000_000 : 0;

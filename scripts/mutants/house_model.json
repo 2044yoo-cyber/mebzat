@@ -1,0 +1,4 @@
+[
+ {"name":"an unlinked footprint corner moves anyway","file":"src/features/house-designer/services/project-edit.ts","from":"  if (startIndex >= 0 && ((movingStart && !linkedStart) || (movingEnd && !linkedEnd))) return project;","to":"  if (false) return project;"},
+ {"name":"a linked end does not move the corner","file":"src/features/house-designer/services/project-edit.ts","from":"  const linkedEnd = wallJointLinked(project, id, \"end\");","to":"  const linkedEnd = false;"}
+]

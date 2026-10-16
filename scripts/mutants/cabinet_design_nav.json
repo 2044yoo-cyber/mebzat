@@ -1,0 +1,26 @@
+[
+ {
+  "name": "the Cabinet Design entry gets the armchair",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "        label: \"Cabinet Design\",\n        icon: Cabinet,",
+  "to": "        label: \"Cabinet Design\",\n        icon: Armchair,"
+ },
+ {
+  "name": "the Cabinet Design entry points elsewhere",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "        href: \"/studio\",\n        private: true,\n        hint: \"Kitchens, wardrobes, vanities and cabinets\",",
+  "to": "        href: \"/design\",\n        private: true,\n        hint: \"Kitchens, wardrobes, vanities and cabinets\","
+ },
+ {
+  "name": "parts ignore the chosen view",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "colourFor(part, spec, surface)}",
+  "to": "colourFor(part, spec)}"
+ },
+ {
+  "name": "the editor does not pass the view on",
+  "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+  "from": "              surface={surface}",
+  "to": "              surface={\"model\"}"
+ }
+]

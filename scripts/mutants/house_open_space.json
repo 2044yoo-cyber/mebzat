@@ -1,0 +1,14 @@
+[
+ {
+  "name": "moving outside walls drags every inside wall",
+  "file": "src/features/house-designer/services/model-commands.ts",
+  "from": "      selectedInterior.has(wall.id) ? {",
+  "to": "      true ? {"
+ },
+ {
+  "name": "a linked wall's lock does not reach a wall meeting it",
+  "file": "src/features/house-designer/services/model-commands.ts",
+  "from": "  return attached.some((item) => project.objectInstances[item.id]?.pinned)",
+  "to": "  return false && attached.some((item) => project.objectInstances[item.id]?.pinned)"
+ }
+]

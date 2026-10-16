@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { KitchenSetup } from "../kitchen-setup";
+import { verticalDividerBlocker } from "../../services/vertical-divider";
 import { addKitchenUpper } from "../../services/kitchen-setup";
 import {
   Boxes,
@@ -23,6 +24,7 @@ import { LengthField, LengthInput } from "../ui/length-field";
 import { DisplayPanel, WardrobeDisplayTools, ZoneEditor } from "./display-panel";
 import { HeightModulesPanel } from "./height-modules-panel";
 import { ZekoloDesignPanel, ZekoloPanel } from "./zekolo-panel";
+import { ClosurePanelSection, DoorFitting } from "./closure-panel";
 import { JointPanel, TransportPanel, type JointRef } from "./transport-panel";
 import { isSideDisplay } from "../../services/geometry";
 
@@ -62,7 +64,9 @@ import {
   resizeCabinet,
   setBayDisplay,
   setBayDoor,
+  setBayDoorLeafMode,
   setBayFitting,
+  setBayVerticalDivider,
   setBayWidth,
   setCabinetKind,
   addTopCabinet,
@@ -124,6 +128,9 @@ export type ControlPanelProps = {
   /** A wardrobe's height boundary tapped in the elevation: its lower cabinet. */
   partition?: string | null;
   onSelectPartition?: (lowerId: string | null) => void;
+  /** A Smart Closure Panel, tapped in the 3D view or chosen in the list. */
+  closure?: string | null;
+  onSelectClosure?: (id: string | null) => void;
 };
 
 export function ControlPanel({
@@ -143,6 +150,8 @@ export function ControlPanel({
   onSelectJoint = () => undefined,
   partition = null,
   onSelectPartition = () => undefined,
+  closure = null,
+  onSelectClosure = () => undefined,
 }: ControlPanelProps) {
   const selected =
     spec.cabinets.find((cabinet) => cabinet.id === selectedId) ?? null;
@@ -215,6 +224,16 @@ export function ControlPanel({
 
         {/* Zekolo for the whole design: all on, all off, or cabinet by cabinet. */}
         <ZekoloDesignPanel spec={spec} onChange={onChange} />
+
+        {/* Door hardware and Smart Closure Panels: the design's, and the selected cabinet's. */}
+        <ClosurePanelSection
+          key={closure ?? "closure"}
+          spec={spec}
+          selectedCabinetId={selectedId}
+          selectedClosureId={closure}
+          onSelectClosure={onSelectClosure}
+          onChange={onChange}
+        />
 
 
         {selected ? (
@@ -356,7 +375,7 @@ function DoorSizing({
     );
 
   return (
-    <Section title="Door" icon={DoorOpen} defaultOpen>
+    <Section title="Door options" icon={DoorOpen} defaultOpen>
       <p className="text-[11px] text-muted-foreground">
         {leaf.style === "sliding" ? "Sliding" : leaf.style === "bifold" ? "Bifold" : "Hinged"} door
         {leaf.leaves > 1 ? ` · leaf ${leaf.leaf + 1} of ${leaf.leaves}` : ""}
@@ -722,6 +741,34 @@ function Structure({
             <ZoneEditor spec={spec} cabinet={cabinet} bay={bay} onChange={onChange} onSelectDisplay={onSelectDisplay} />
           ) : null}
 
+          {(() => {
+            const blocker = verticalDividerBlocker(bay);
+            const on = Boolean(bay.verticalDivider);
+            const disabled = !on && blocker !== null;
+            return (
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  aria-pressed={on}
+                  disabled={disabled}
+                  data-vertical-divider
+                  onClick={() => onChange(setBayVerticalDivider(spec, cabinet.id, bay.id, !on))}
+                  className={cn(
+                    "w-full rounded-md border px-2 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                    on ? "border-brand bg-brand/10 text-brand" : "text-muted-foreground hover:border-brand/50",
+                  )}
+                >
+                  {on ? "Remove vertical divider" : "Add vertical divider"}
+                </button>
+                {blocker && (disabled || on) ? (
+                  <p role="note" className="text-[11px] text-muted-foreground">
+                    {on ? "This divider is not built. " : ""}{blocker}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })()}
+
           {bay.fitting.kind === "drawers" ? (
             <DrawerList
               spec={spec}
@@ -750,6 +797,21 @@ function Structure({
               </button>
             ))}
           </div>
+          {!bay.display && bay.door === "hinged" ? (
+            <label className="block space-y-1 pt-1">
+              <span className="text-[11px] text-muted-foreground">Doors per section</span>
+              <select
+                aria-label={`Doors per section ${index + 1}`}
+                className="w-full rounded-md border bg-background px-2 py-1.5 text-[11px]"
+                value={bay.doorLeafMode ?? "auto"}
+                onChange={(event) => onChange(setBayDoorLeafMode(spec, cabinet.id, bay.id, event.target.value as "auto" | "single" | "double"))}
+              >
+                <option value="single">1 door per section</option>
+                <option value="double">2 doors per section</option>
+                <option value="auto">Automatic door count</option>
+              </select>
+            </label>
+          ) : null}
         </div>
       ))}
 

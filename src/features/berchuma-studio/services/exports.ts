@@ -109,7 +109,8 @@ function cutSheet(cutList: CutList): Sheet {
       rows.push([
         row.index,
         row.partId,
-        row.label,
+        // The machining goes with the part, so the router sees it on the same line.
+        row.operations?.length ? `${row.label} — ${row.operations.join("; ")}` : row.label,
         [row.cabinet, row.module].filter(Boolean).join(" · "),
         row.boardLabel,
         row.length,

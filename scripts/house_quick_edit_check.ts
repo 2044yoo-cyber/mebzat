@@ -4,7 +4,7 @@ import { rectangularRoom } from "../src/features/berchuma-studio/types/room";
 import { createHouseObjectFromGesture, createRoomFromGesture, deleteHouseSelections, moveHouseSelections, roomOutline } from "../src/features/house-designer/services/model-commands";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
 import { establishLevelOutline, openSpace } from "../src/features/house-designer/services/project-edit";
-import { duplicateWallParallel, extendWall, levelChains, moveWallEnd, roomRectangle, rotateWall90, setWallDistance, setWallLength, splitRoom, wallChain } from "../src/features/house-designer/services/quick-edit";
+import { duplicateWallParallel, extendWall, levelChains, moveWallEnd, toggleWallJoints, roomRectangle, rotateWall90, setWallDistance, setWallLength, splitRoom, wallChain } from "../src/features/house-designer/services/quick-edit";
 import { applyModelingOptions, modelingPreset } from "../src/features/house-designer/services/workspace-options";
 import { createHouseProject, type HouseProject } from "../src/features/house-designer/types/project";
 
@@ -65,17 +65,23 @@ assert.equal(setWallDistance(project, copy.id, wallAt(project, horizontal(0)).id
 
 // Extending an outside wall moves its neighbour, keeping the corner square.
 const top = wallAt(project, (wall) => wall.start.y === 0 && wall.end.y === 0 && wall.start.x === 0);
-step = extendWall(project, top.id, "end", 1000);
+// A footprint corner moves only when that end is linked on purpose (ad0a387):
+// refused with a message that says what to turn on, then allowed once linked.
+const unlinkedExtend = extendWall(project, top.id, "end", 1000);
+assert.equal(unlinkedExtend.blocked.length, 1, "an unlinked outside corner is not moved");
+assert.match(unlinkedExtend.blocked[0] ?? "", /Link joints/, "and the message says to link joints");
+assert.equal(unlinkedExtend.project, project, "with nothing changed");
+step = extendWall(toggleWallJoints(project, top.id, "end"), top.id, "end", 1000);
 assert.deepEqual(step.blocked, []);
 const wider = step.project;
 assert.ok(wallAt(wider, vertical(10000)), "+ at the end of the top wall moves the right wall out");
 assert.equal(Math.hypot(wallAt(wider, (wall) => wall.id === top.id).end.x - 0, 0), 10000, "the top wall is 1000 longer");
 assert.ok(wallAt(wider, vertical(0)), "and its other end stayed put");
-const narrower = extendWall(project, top.id, "start", -500).project;
+const narrower = extendWall(toggleWallJoints(project, top.id, "start"), top.id, "start", -500).project;
 assert.ok(wallAt(narrower, vertical(500)), "− at the start pulls the left wall in");
 assert.ok(wallAt(narrower, vertical(9000)), "the right wall untouched");
 assert.equal(extendWall(project, top.id, "end", -9000).blocked[0], "A wall cannot be shorter than 200 mm");
-assert.ok(wallAt(setWallLength(project, top.id, "end", 9500).project, vertical(9500)), "a typed length, from the end chosen");
+assert.ok(wallAt(setWallLength(toggleWallJoints(project, top.id, "end"), top.id, "end", 9500).project, vertical(9500)), "a typed length, from the end chosen");
 
 // An inside wall shortened from its start: what meets it further along stays.
 const across = wallAt(project, horizontal(5500));

@@ -1,0 +1,100 @@
+[
+ {
+  "name": "loader asks the old ranking",
+  "file": "src/lib/data/feed.ts",
+  "from": "  let { data, error } = await rpc(\"feed_page_mixed\", args);",
+  "to": "  let { data, error } = await rpc(\"feed_page_personalized\", args);",
+  "checks": "2,3"
+ },
+ {
+  "name": "view batches rejected again (the root cause)",
+  "file": "src/app/api/feed/interact/route.ts",
+  "from": "  if (ABOUT_ONE_POST.includes(action) && !UUID.test(postId ?? \"\")) {",
+  "to": "  if (action !== \"follow\" && action !== \"comment-like\" && !UUID.test(postId ?? \"\")) {",
+  "checks": "7"
+ },
+ {
+  "name": "a failed page ends the feed",
+  "file": "src/components/feed/feed.tsx",
+  "from": "    if (page.failed) {\n      failedNow.current = true;\n      setFailed(true);\n    } else {",
+  "to": "    if (page.failed) {\n      setExhausted(true);\n    } else {",
+  "checks": "4"
+ },
+ {
+  "name": "no return to where the reader was",
+  "file": "src/components/feed/feed.tsx",
+  "from": "  const [restored] = useState(() => takeSnapshot(scope));",
+  "to": "  const [restored] = useState(() => (scope ? null : takeSnapshot(scope)));",
+  "checks": "6"
+ },
+ {
+  "name": "returns to the cards but not the place",
+  "file": "src/components/feed/feed.tsx",
+  "from": "      workspace.scrollTop += card.getBoundingClientRect().top - top - restored.anchor!.offset;\n",
+  "to": "      void top;\n",
+  "checks": "6"
+ },
+ {
+  "name": "visitor's seen list grows mid-reading",
+  "file": "src/components/feed/feed.tsx",
+  "from": "      seenIds: signedIn ? null : (sessionSeen.current ?? []),",
+  "to": "      seenIds: signedIn ? null : recallSeen(),",
+  "checks": "14"
+ },
+ {
+  "name": "featured not labelled",
+  "file": "src/components/feed/feed-card.tsx",
+  "from": "          {post.featured && (",
+  "to": "          {false && (",
+  "checks": "13"
+ },
+ {
+  "name": "a service called Professional",
+  "file": "src/components/feed/feed-card.tsx",
+  "from": "  return (post.entityType && ENTITY_LABEL[post.entityType]) || KIND_LABEL[post.kind];",
+  "to": "  return KIND_LABEL[post.kind];",
+  "checks": "11"
+ },
+ {
+  "name": "chosen topics not saved",
+  "file": "src/app/(dashboard)/settings/feed-actions.ts",
+  "from": "    { user_id: user.id, topics, personalised: input.personalised, updated_at: new Date().toISOString() },",
+  "to": "    { user_id: user.id, topics: [], personalised: input.personalised, updated_at: new Date().toISOString() },",
+  "checks": "12"
+ },
+ {
+  "name": "no end to the feed",
+  "file": "src/components/feed/feed.tsx",
+  "from": "      {exhausted && !failed && posts.length > 0 && (",
+  "to": "      {false && (",
+  "checks": "10"
+ },
+ {
+  "name": "chip bar bleeds past the screen",
+  "file": "src/components/feed/feed.tsx",
+  "from": "className=\"sticky top-0 z-20 mb-3 flex gap-2",
+  "to": "className=\"sticky top-0 z-20 -mx-3 mb-3 flex gap-2",
+  "checks": "1"
+ },
+ {
+  "name": "no way to tune the feed",
+  "file": "src/components/feed/feed.tsx",
+  "from": "        Tune your feed\n",
+  "to": "        Feed\n",
+  "checks": "2"
+ },
+ {
+  "name": "sightings sent to the older ranking",
+  "file": "src/components/feed/feed.tsx",
+  "from": "          if (ranking.current === \"mixed\") void feedApi.view(batch, clock.current);",
+  "to": "          void feedApi.view(batch, clock.current);",
+  "checks": "16"
+ },
+ {
+  "name": "no fallback before 0109",
+  "file": "src/lib/data/feed.ts",
+  "from": "    ({ data, error } = await rpc(\"feed_page_personalized\", args));",
+  "to": "    void 0;",
+  "checks": "16"
+ }
+]

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { rectangularRoom } from "../src/features/berchuma-studio/types/room";
 import { createHouseObjectFromGesture, createRoomFromGesture, lockConflict, moveHouseSelections, pinHouseSelections, roomOutline } from "../src/features/house-designer/services/model-commands";
 import { ensureHouseBimState } from "../src/features/house-designer/services/model-state";
-import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong } from "../src/features/house-designer/services/project-edit";
+import { addHouseFloor, establishLevelOutline, mergeRooms, openSpace, patchHouseObject, splitRoomAlong, toggleWallJoints } from "../src/features/house-designer/services/project-edit";
 import { generateStructureFromGrid, hasGeneratedStructure, withoutStructure } from "../src/features/house-designer/services/structure";
 import { PLAN_TEMPLATES } from "../src/features/house-designer/services/plan-templates";
 import { pitchedRise, roofRectangles } from "../src/features/house-designer/components/house-preview";
@@ -103,27 +103,40 @@ assert.deepEqual(moved.blocked, [], "and its walls move");
   const tee = wall(across.project, { x: 3000, y: 3000 }, { x: 8000, y: 3000 });
   assert.deepEqual(boxes(tee.project), ["0..3000 x 0..6500", "3000..8000 x 0..3000", "3000..8000 x 3000..6500"], "and a wall between two walls splits again");
 
-  const moved = moveHouseSelections(tee.project, [{ kind: "wall", id: across.id }], 1000, 0).project;
+  // A wall meeting it follows only when the moved wall's joints are linked on
+  // purpose (ac636a3, 538dd07); unlinked, it stays where it was.
+  const stayed = moveHouseSelections(tee.project, [{ kind: "wall", id: across.id }], 1000, 0).project;
+  assert.deepEqual([stayed.walls.find((item) => item.id === tee.id)!.start.x, stayed.walls.find((item) => item.id === tee.id)!.end.x], [3000, 8000], "unlinked, the wall that meets it stays put");
+  const moved = moveHouseSelections(toggleWallJoints(tee.project, across.id), [{ kind: "wall", id: across.id }], 1000, 0).project;
   const find = (value: typeof drawn, id: string) => value.walls.find((item) => item.id === id)!;
   assert.deepEqual([find(moved, across.id).start, find(moved, across.id).end], [{ x: 4000, y: 0 }, { x: 4000, y: 6500 }], "an inside wall moves");
   assert.deepEqual([find(moved, tee.id).start, find(moved, tee.id).end], [{ x: 4000, y: 3000 }, { x: 8000, y: 3000 }], "the wall that meets it follows");
   assert.deepEqual(boxes(moved), ["0..4000 x 0..6500", "4000..8000 x 0..3000", "4000..8000 x 3000..6500"], "and the rooms it bounds");
   assert.deepEqual(moved.levels[0]!.plan!.corners, tee.project.levels[0]!.plan!.corners, "the outside corners stay where they were");
 
-  // An outside wall carries what is joined to it too.
+  // Moving an outside wall moves that wall and the two corners it shares, and
+  // nothing else: an inside wall that meets it stays where it was drawn
+  // (d182d8d, "without dragging unrelated interior walls"). Joining them again
+  // is a choice, made by linking the joints.
   const topWall = tee.project.walls.find((item) => item.levelId === ground && item.start.y === 0 && item.end.y === 0 && item.sourceWallId === "c1")!;
   const raised = moveHouseSelections(tee.project, [{ kind: "wall", id: topWall.id }], 0, -500, { footprintEditable: true }).project;
-  assert.deepEqual(find(raised, across.id).start, { x: 3000, y: -500 }, "moving an outside wall carries the inside wall joined to it");
-  assert.deepEqual(boxes(raised), ["0..3000 x -500..6500", "3000..8000 x -500..3000", "3000..8000 x 3000..6500"], "and the rooms along it");
+  assert.deepEqual(find(raised, topWall.id).start.y, -500, "the outside wall moves");
+  assert.deepEqual(find(raised, across.id).start, { x: 3000, y: 0 }, "an inside wall that meets it is not dragged along");
+  assert.deepEqual(find(raised, across.id).end, { x: 3000, y: 6500 }, "at either end");
   const longer = patchHouseObject(tee.project, { kind: "wall", id: topWall.id }, { length: 9000 });
   assert.deepEqual(find(longer, across.id).start, { x: 3000, y: 0 }, "lengthening a wall leaves a joined wall where it was measured from");
 
   // A lock holds for walls joined in a T as well as at corners.
-  const lockedInside = pinHouseSelections(tee.project, [{ kind: "wall", id: across.id }], true);
-  assert.ok(lockConflict(lockedInside, { kind: "wall", id: topWall.id }), "an outside wall cannot drag a locked inside wall");
+  // Linked, an outside wall's joints reach the inside wall meeting it, so a
+  // lock on that wall holds; unlinked, nothing of the inside wall is touched.
+  const linkedTop = toggleWallJoints(tee.project, topWall.id);
+  const lockedInside = pinHouseSelections(linkedTop, [{ kind: "wall", id: across.id }], true);
+  assert.ok(lockConflict(lockedInside, { kind: "wall", id: topWall.id }), "a linked outside wall cannot drag a locked inside wall");
   assert.equal(moveHouseSelections(lockedInside, [{ kind: "wall", id: topWall.id }], 0, -500, { footprintEditable: true }).blocked.length, 1);
+  assert.equal(lockConflict(pinHouseSelections(tee.project, [{ kind: "wall", id: across.id }], true), { kind: "wall", id: topWall.id }), null, "an unlinked one touches nothing, so nothing is in its way");
   const lockedTee = pinHouseSelections(tee.project, [{ kind: "wall", id: tee.id }], true);
-  assert.equal(moveHouseSelections(lockedTee, [{ kind: "wall", id: across.id }], 1000, 0).blocked.length, 1, "nor an inside wall a locked wall meeting it");
+  assert.equal(moveHouseSelections(lockedTee, [{ kind: "wall", id: across.id }], 1000, 0).blocked.length, 0, "an unlinked inside wall moves without touching the locked wall meeting it");
+  assert.equal(moveHouseSelections(toggleWallJoints(lockedTee, across.id), [{ kind: "wall", id: across.id }], 1000, 0).blocked.length, 1, "linked, it cannot drag a locked wall meeting it");
   assert.equal(lockConflict(lockedTee, { kind: "wall", id: topWall.id }), null, "but a wall the locked one does not touch is free");
 
   const right = moved.rooms.filter((item) => item.levelId === ground && item.boundary.some((point) => point.x === 8000));

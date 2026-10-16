@@ -1,0 +1,8 @@
+[
+ {"name":"any tab value is accepted","file":"src/app/house-design/page.tsx","from":"params.tab === \"learn\" ? \"learn\" : null","to":"typeof params.tab === \"string\" ? \"learn\" : null"},
+ {"name":"the page drops the tab","file":"src/app/house-design/page.tsx","from":"sketchId={id(params.sketch)} initialTab={initialTab} />","to":"sketchId={id(params.sketch)} />"},
+ {"name":"the workspace ignores the tab","file":"src/features/house-designer/components/house-designer-workspace.tsx","from":"useState<WorkspaceTab>(initialTab ?? \"plan\")","to":"useState<WorkspaceTab>(\"plan\")"},
+ {"name":"the lab is shown alone even when a plan is named","file":"src/features/house-designer/components/house-designer-workspace.tsx","from":"useState(initialTab === \"learn\" && !planId && !projectId)","to":"useState(initialTab === \"learn\")"},
+ {"name":"a saved plan opens on the plan tab","file":"src/features/house-designer/components/house-designer-workspace.tsx","from":"    setTab(initialTab ?? \"plan\");\n    setStage(\"editor\");\n  }","to":"    setTab(\"plan\");\n    setStage(\"editor\");\n  }"},
+ {"name":"the lab offers a project that is not there","file":"src/features/house-designer/components/construction-lab.tsx","from":"options={project ? [{ id: \"sample\", label: \"Sample house\" }, { id: \"project\", label: \"My project\" }] : [{ id: \"sample\", label: \"Sample house\" }]}","to":"options={[{ id: \"sample\", label: \"Sample house\" }, { id: \"project\", label: \"My project\" }]}"}
+]

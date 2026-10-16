@@ -1,0 +1,56 @@
+[
+ {
+  "name": "ties not broken",
+  "file": "src/lib/portfolio/model.ts",
+  "from": "  return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;",
+  "to": "  return 0;"
+ },
+ {
+  "name": "milliseconds only",
+  "file": "src/lib/portfolio/model.ts",
+  "from": "  return whole * 1000 + fraction;",
+  "to": "  return whole * 1000;"
+ },
+ {
+  "name": "cursor direction reversed",
+  "file": "src/lib/portfolio/model.ts",
+  "from": "  return compareCards({ createdAt: cursor.at, id: cursor.id }, card) < 0;",
+  "to": "  return compareCards({ createdAt: cursor.at, id: cursor.id }, card) > 0;"
+ },
+ {
+  "name": "left-over rows forgotten",
+  "file": "src/lib/portfolio/model.ts",
+  "from": "  const more = leftOver || lists.some((list) => list.full);",
+  "to": "  const more = lists.some((list) => list.full);"
+ },
+ {
+  "name": "merge keeps repeats",
+  "file": "src/lib/portfolio/model.ts",
+  "from": "      if (seen.has(card.key) || !isAfter(card, cursor)) continue;",
+  "to": "      if (!isAfter(card, cursor)) continue;"
+ },
+ {
+  "name": "pages not limited",
+  "file": "src/lib/portfolio/model.ts",
+  "from": "  const cards = all.slice(0, limit);",
+  "to": "  const cards = all;"
+ },
+ {
+  "name": "append keeps repeats",
+  "file": "src/lib/portfolio/model.ts",
+  "from": "  return [...shown, ...page.filter((card) => !keys.has(card.key))];",
+  "to": "  return [...shown, ...page];"
+ },
+ {
+  "name": "any cursor accepted",
+  "file": "src/lib/portfolio/model.ts",
+  "from": "  if (!at || !id || Number.isNaN(microseconds(at)) || !/^[0-9a-f-]{36}$/i.test(id)) return null;",
+  "to": "  if (!at || !id) return null;"
+ },
+ {
+  "name": "offset ignored",
+  "file": "src/lib/portfolio/model.ts",
+  "from": "  const zone = (match[3] ?? \"Z\").replace(/^([+-]\\d{2})$/, \"$1:00\").replace(/^([+-]\\d{2})(\\d{2})$/, \"$1:$2\");",
+  "to": "  const zone = \"Z\";"
+ }
+]

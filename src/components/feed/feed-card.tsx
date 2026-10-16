@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -22,7 +22,7 @@ import { FeedComments } from "@/components/feed/feed-comments";
 import { FeedMedia } from "@/components/feed/feed-media";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DemoBadge } from "@/components/ui/demo-badge";
-import { feedApi } from "@/lib/feed/client";
+import { announceChange, FEED_CHANGE, feedApi, type FeedChange } from "@/lib/feed/client";
 import { samplePostMedia } from "@/lib/feed/sample-photos";
 import { FILE_LABEL, KIND_LABEL } from "@/lib/feed/constants";
 import type { FeedFile, FeedPost } from "@/lib/feed/types";
@@ -67,6 +67,8 @@ export function FeedCard({
   return (
     <article
       data-feed-post={post.id}
+      data-feed-kind={post.kind}
+      data-feed-featured={post.featured ? "" : undefined}
       className="overflow-hidden border-b border-border bg-background @lg/ws:rounded-2xl @lg/ws:border"
     >
       <Header post={post} signedIn={signedIn} />
@@ -145,8 +147,19 @@ function Header({ post, signedIn }: { post: FeedPost; signedIn: boolean }) {
       toast.error(result.error);
       return;
     }
+    announceChange({ authorKey: post.authorKey, patch: { viewerFollows: next } });
     toast.success(next ? `Following ${post.authorName}` : "Unfollowed");
   }
+
+  // The same author's other cards follow along.
+  useEffect(() => {
+    const listen = (event: Event) => {
+      const change = (event as CustomEvent<FeedChange>).detail;
+      if ("authorKey" in change && change.authorKey === post.authorKey) setFollowing(change.patch.viewerFollows);
+    };
+    window.addEventListener(FEED_CHANGE, listen);
+    return () => window.removeEventListener(FEED_CHANGE, listen);
+  }, [post.authorKey]);
 
   // Real members have a profile page, keyed on their username. A seeded
   // author does not, so their name is text rather than a link that would 404.
@@ -185,6 +198,19 @@ function Header({ post, signedIn }: { post: FeedPost; signedIn: boolean }) {
           {post.authorRole && <span className="truncate">{post.authorRole}</span>}
           <span aria-hidden>·</span>
           <span className="shrink-0">{formatRelativeTime(post.publishedAt)}</span>
+          {post.featured && (
+            <>
+              <span aria-hidden>·</span>
+              {/* Promoted by Medosha. Said on the card so a featured listing
+                  is never mistaken for one the ranking chose on its merits. */}
+              <span
+                className="shrink-0 rounded bg-amber-500/15 px-1.5 py-px text-[10px] font-semibold tracking-wide text-amber-700 uppercase dark:text-amber-300"
+                title="Featured by Medosha"
+              >
+                Featured
+              </span>
+            </>
+          )}
           {post.isDemo && (
             <>
               <span aria-hidden>·</span>
@@ -199,7 +225,7 @@ function Header({ post, signedIn }: { post: FeedPost; signedIn: boolean }) {
 
       <div className="flex shrink-0 items-center gap-2">
         <span className="hidden rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground @lg/ws:inline">
-          {KIND_LABEL[post.kind]}
+          {cardLabel(post)}
         </span>
         <button
           type="button"
@@ -217,6 +243,23 @@ function Header({ post, signedIn }: { post: FeedPost; signedIn: boolean }) {
       </div>
     </header>
   );
+}
+
+/**
+ * What the badge calls a card. Mostly its kind; a few sources share a kind
+ * with something else (a service and a job are both "professional") and are
+ * better named for what they are.
+ */
+const ENTITY_LABEL: Record<string, string> = {
+  service: "Service",
+  job: "Job",
+  design: "Berchuma design",
+  invest: "Investment",
+  tour: "360° tour",
+};
+
+function cardLabel(post: Pick<FeedPost, "kind" | "entityType">): string {
+  return (post.entityType && ENTITY_LABEL[post.entityType]) || KIND_LABEL[post.kind];
 }
 
 // ---------------------------------------------------------------------------

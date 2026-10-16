@@ -171,7 +171,9 @@ const BRIEF = "A walnut wardrobe about 1.8 m wide for a bedroom in Bahir Dar.";
     );
     check(
       "the price key came with it",
-      spec.carcass.board.priceKey === "MDF 18mm walnut",
+      // The key is whatever the catalogue says for that stock id (it was
+      // "MDF 18mm walnut" before the 12 September price update, 5ac452f).
+      spec.carcass.board.priceKey === BOARDS.find((board) => board.id === "mdf-18-walnut")!.priceKey,
     );
     check(
       "each wardrobe material zone is hydrated from its stock id",

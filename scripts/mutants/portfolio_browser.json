@@ -1,0 +1,116 @@
+[
+ {
+  "name": "digital files listed in marketplace",
+  "file": "src/lib/portfolio/sources.ts",
+  "from": "    only: (query) => query.neq(\"fulfilment\", \"digital\"),\n",
+  "to": "\n"
+ },
+ {
+  "name": "somebody else's rows read",
+  "file": "src/lib/portfolio/sources.ts",
+  "from": ".select(source.columns).eq(source.owner, owner);",
+  "to": ".select(source.columns);"
+ },
+ {
+  "name": "pages ignore the cursor",
+  "file": "src/lib/portfolio/sources.ts",
+  "from": "  if (cursor) {\n    // Quoted",
+  "to": "  if (false) {\n    // Quoted"
+ },
+ {
+  "name": "no id tie-break in the query",
+  "file": "src/lib/portfolio/sources.ts",
+  "from": ".order(\"created_at\", { ascending: false }).order(\"id\", { ascending: false }).limit(limit);",
+  "to": ".order(\"created_at\", { ascending: false }).limit(limit);"
+ },
+ {
+  "name": "coming back starts over",
+  "file": "src/components/portfolio/portfolio-feed.tsx",
+  "from": "    if (!saved || Date.now() - saved.at > SNAPSHOT_TTL || saved.view !== initialView) return;",
+  "to": "    if (true) return;"
+ },
+ {
+  "name": "opening a card is not remembered",
+  "file": "src/components/portfolio/portfolio-feed.tsx",
+  "from": "onOpen={remember}",
+  "to": "onOpen={() => {}}"
+ },
+ {
+  "name": "skipped sections never load",
+  "file": "src/components/portfolio/portfolio-feed.tsx",
+  "from": "      if (counts[entry.id] > 0 && (!slice || (slice.status === \"idle\"))) void load(entry.id);\n      if (entry.id === section) break;",
+  "to": "      if (entry.id === section) { void load(section); break; }"
+ },
+ {
+  "name": "previews show everything",
+  "file": "src/components/portfolio/portfolio-feed.tsx",
+  "from": "  const shown = full ? cards : cards.slice(0, PREVIEW_SIZE);",
+  "to": "  const shown = cards;"
+ },
+ {
+  "name": "everything fetched at once",
+  "file": "src/components/portfolio/portfolio-feed.tsx",
+  "from": "}, { root: document.getElementById(\"workspace\"), rootMargin: \"600px 0px\" });",
+  "to": "}, { root: document.getElementById(\"workspace\"), rootMargin: \"100000px 0px\" });"
+ },
+ {
+  "name": "failures show nothing",
+  "file": "src/components/portfolio/portfolio-feed.tsx",
+  "from": "          {slice?.status === \"error\" ? (",
+  "to": "          {false ? ("
+ },
+ {
+  "name": "eager images",
+  "file": "src/components/portfolio/portfolio-card.tsx",
+  "from": "<img src={src} alt={alt} loading=\"lazy\" decoding=\"async\"",
+  "to": "<img src={src} alt={alt} decoding=\"async\""
+ },
+ {
+  "name": "every host sent to the optimiser",
+  "file": "src/components/portfolio/portfolio-card.tsx",
+  "from": "  try { return OPTIMISED.has(new URL(src).host); } catch { return false; }",
+  "to": "  try { return Boolean(new URL(src).host); } catch { return false; }"
+ },
+ {
+  "name": "share copies this page",
+  "file": "src/components/portfolio/share-profile-button.tsx",
+  "from": "    const url = `${window.location.origin}/u/${encodeURIComponent(username)}`;",
+  "to": "    const url = window.location.href;"
+ },
+ {
+  "name": "no digital entry in the + menu",
+  "file": "src/components/shell/quick-actions.tsx",
+  "from": "    href: \"/products/new?fulfilment=digital\",",
+  "to": "    href: \"/products/new\","
+ },
+ {
+  "name": "big empty states",
+  "file": "src/components/portfolio/portfolio-feed.tsx",
+  "from": "        <div className=\"flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-dashed px-3 py-2.5 text-sm\">",
+  "to": "        <div className=\"flex min-h-64 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-dashed px-3 py-2.5 text-sm\">"
+ },
+ {
+  "name": "prefetch measured against the window",
+  "file": "src/components/portfolio/portfolio-feed.tsx",
+  "from": "}, { root: document.getElementById(\"workspace\"), rootMargin: \"600px 0px\" });",
+  "to": "}, { rootMargin: \"600px 0px\" });"
+ },
+ {
+  "name": "design drawing not made",
+  "file": "src/lib/portfolio/sources.ts",
+  "from": "      drawing: text(row.cover_url) ? null : designDrawing(row.spec),",
+  "to": "      drawing: null,"
+ },
+ {
+  "name": "design spec not read",
+  "file": "src/lib/portfolio/sources.ts",
+  "from": "remix_count, created_at, spec\",",
+  "to": "remix_count, created_at\","
+ },
+ {
+  "name": "drawing never shown",
+  "file": "src/components/portfolio/portfolio-card.tsx",
+  "from": "      {!src && drawing ? (",
+  "to": "      {false ? ("
+ }
+]

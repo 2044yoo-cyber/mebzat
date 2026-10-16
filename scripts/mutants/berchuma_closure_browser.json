@@ -1,0 +1,68 @@
+[
+ {
+  "name": "handle drawn on every door",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "            {leaf.frontGrip === \"handle\" ? (",
+  "to": "            {true ? ("
+ },
+ {
+  "name": "no grip mark",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "  if (![\"groove\", \"g-profile\", \"j-profile\", \"channel\"].includes(grip)) return null;",
+  "to": "  return null;"
+ },
+ {
+  "name": "closure panels not drawn",
+  "file": "src/features/berchuma-studio/components/viewer/elevation.tsx",
+  "from": "      {spec.closurePanels?.enabled ? (\n        <ClosureLayer",
+  "to": "      {false ? (\n        <ClosureLayer"
+ },
+ {
+  "name": "switch-off ignored",
+  "file": "src/features/berchuma-studio/components/editor/closure-panel.tsx",
+  "from": "onChange={(event) => onChange(setClosurePanel(spec, panel.id, { enabled: event.target.checked }))}",
+  "to": "onChange={() => undefined}"
+ },
+ {
+  "name": "hide ignored",
+  "file": "src/features/berchuma-studio/components/editor/closure-panel.tsx",
+  "from": "onClick={() => onChange(setClosurePanel(spec, panel.id, { hidden: !panel.hidden }))}",
+  "to": "onClick={() => undefined}"
+ },
+ {
+  "name": "closure toggle dead",
+  "file": "src/features/berchuma-studio/components/editor/closure-panel.tsx",
+  "from": "onChange={(on) => onChange(setClosureSettings(spec, { enabled: on }))}",
+  "to": "onChange={() => undefined}"
+ },
+ {
+  "name": "no profile controls",
+  "file": "src/features/berchuma-studio/components/editor/closure-panel.tsx",
+  "from": "          {hasProfile ? (",
+  "to": "          {false ? ("
+ },
+ {
+  "name": "hidden panels drawn",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "    const shown = allParts.filter((part) => !part.closure?.hidden);",
+  "to": "    const shown = allParts;"
+ },
+ {
+  "name": "no joints drawn",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "        {outlines || exploded ? joins.map((join) => {",
+  "to": "        {false ? joins.map((join) => {"
+ },
+ {
+  "name": "explosion not applied",
+  "file": "src/features/berchuma-studio/components/viewer/model.tsx",
+  "from": "              offset={exploded ? explodedOffset(part, placement, centres.get(part.cabinetId ?? \"\") ?? placement, 1) : null}",
+  "to": "              offset={null}"
+ },
+ {
+  "name": "no exploded toggle",
+  "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+  "from": "<button type=\"button\" aria-pressed={exploded} onClick={() => setExploded((value) => !value)}",
+  "to": "<button type=\"button\" aria-pressed={exploded} onClick={() => undefined}"
+ }
+]

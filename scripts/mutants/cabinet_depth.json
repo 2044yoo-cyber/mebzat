@@ -1,0 +1,74 @@
+[
+ {
+  "name": "side boards shortened by the back again",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "const shellDepth = depth;",
+  "to": "const shellDepth = depth - backThickness;"
+ },
+ {
+  "name": "usable depth loses the back when overlaid",
+  "file": "src/features/berchuma-studio/services/wardrobe-materials.ts",
+  "from": "? depth - constructionMaterials(spec).back.thickness : depth;\n}\n\n/** Where a back",
+  "to": "? depth - constructionMaterials(spec).back.thickness : depth - constructionMaterials(spec).back.thickness;\n}\n\n/** Where a back"
+ },
+ {
+  "name": "inset back does not stop the usable depth",
+  "file": "src/features/berchuma-studio/services/wardrobe-materials.ts",
+  "from": "? depth - constructionMaterials(spec).back.thickness : depth;\n}\n\n/** Where a back",
+  "to": "? depth : depth;\n}\n\n/** Where a back"
+ },
+ {
+  "name": "overlaid back placed inside the carcass",
+  "file": "src/features/berchuma-studio/services/wardrobe-materials.ts",
+  "from": ": depth;\n}\n\nexport type ConstructionMethods",
+  "to": ": depth - constructionMaterials(spec).back.thickness;\n}\n\nexport type ConstructionMethods"
+ },
+ {
+  "name": "inset back placed behind the carcass",
+  "file": "src/features/berchuma-studio/services/wardrobe-materials.ts",
+  "from": "? depth - constructionMaterials(spec).back.thickness : depth;\n}\n\nexport type ConstructionMethods",
+  "to": "? depth : depth;\n}\n\nexport type ConstructionMethods"
+ },
+ {
+  "name": "back placed by the old rule",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "z: backPanelStart(spec, depth) }],",
+  "to": "z: depth - backThickness }],"
+ },
+ {
+  "name": "shelves measured by the old rule",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "const interiorDepth = carcassInteriorDepth(spec, depth);",
+  "to": "const interiorDepth = depth - backThickness;"
+ },
+ {
+  "name": "drawer faces measured by the old depth",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "const interiorDepth = carcassInteriorDepth(spec, cabinet.size.depth);\n  const sizing",
+  "to": "const interiorDepth = cabinet.size.depth - constructionMaterials(spec).back.thickness;\n  const sizing"
+ },
+ {
+  "name": "kitchen rear stretcher by the old rule",
+  "file": "src/features/berchuma-studio/services/kitchen-construction.ts",
+  "from": "carcassInteriorDepth(spec, depth) - t]]",
+  "to": "depth - materials.back.thickness - t]]"
+ },
+ {
+  "name": "offcut sheet missing from the workbook",
+  "file": "src/features/berchuma-studio/services/cabinet-project.ts",
+  "from": "    { name: \"Offcut inventory\", rows: offcutRows, widths: [34, 10, 12, 12, 17, 17, 14, 28] },\n",
+  "to": ""
+ },
+ {
+  "name": "assembly sheet missing from the workbook",
+  "file": "src/features/berchuma-studio/services/cabinet-project.ts",
+  "from": "    { name: \"Assembly steps\", rows: assemblyRows, widths: [32, 10, 90, 12] },\n",
+  "to": ""
+ },
+ {
+  "name": "design summary sheet missing from the workbook",
+  "file": "src/features/berchuma-studio/services/cabinet-project.ts",
+  "from": "    { name: \"Design summary\", rows: summary, widths: [35, 17, 15, 19, 13] },\n",
+  "to": ""
+ }
+]

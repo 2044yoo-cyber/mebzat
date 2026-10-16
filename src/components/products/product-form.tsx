@@ -50,6 +50,8 @@ export function ProductForm({
   initialSpecs = {},
   /** Preset by the page somebody arrived from — Used Items opens on Used. */
   initialCondition,
+  /** Likewise: "Sell a digital product" opens on Digital. */
+  initialFulfilment,
 }: {
   userId: string;
   categories: Pick<ProductCategory, "id" | "name">[];
@@ -57,6 +59,7 @@ export function ProductForm({
   initialImageUrls?: string[];
   initialSpecs?: Record<string, string>;
   initialCondition?: ProductCondition;
+  initialFulfilment?: ProductFulfilment;
 }) {
   const action = product
     ? updateProduct.bind(null, product.id)
@@ -82,7 +85,7 @@ export function ProductForm({
   // questions away rather than leaving a seller to answer two that no longer
   // apply and then meet a constraint error.
   const [fulfilment, setFulfilment] = useState<ProductFulfilment>(
-    (product?.fulfilment as ProductFulfilment | undefined) ?? "physical",
+    (product?.fulfilment as ProductFulfilment | undefined) ?? initialFulfilment ?? "physical",
   );
   const digital = fulfilment === "digital";
   const rental = fulfilment === "rental";

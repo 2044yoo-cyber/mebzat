@@ -305,6 +305,22 @@ export const HARDWARE: Hardware[] = [
     fallbackRate: 85,
   },
   {
+    id: "hinge-half-overlay",
+    label: "Concealed hinge, half overlay, 110°",
+    kind: "hinge",
+    unit: "each",
+    priceKey: "Concealed hinge half overlay",
+    fallbackRate: 90,
+  },
+  {
+    id: "hinge-inset",
+    label: "Concealed hinge, inset, 110°",
+    kind: "hinge",
+    unit: "each",
+    priceKey: "Concealed hinge inset",
+    fallbackRate: 95,
+  },
+  {
     id: "hinge-corner-165",
     label: "Wide-opening corner hinge, 165°",
     kind: "hinge",

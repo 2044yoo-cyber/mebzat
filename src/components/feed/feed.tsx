@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { RefreshCw, SlidersHorizontal } from "lucide-react";
 
 import { FeedCard } from "@/components/feed/feed-card";
 import { FeedSkeleton } from "@/components/feed/feed-skeleton";
-import { fetchFeedPage, feedApi, recallSeen, rememberSeen } from "@/lib/feed/client";
+import { FEED_CHANGE, fetchFeedPage, feedApi, recallSeen, rememberSeen, type FeedChange } from "@/lib/feed/client";
+import { entryKey, feedScope, markBooted, saveSnapshot, takeSnapshot } from "@/lib/feed/restore";
 import { FEED_FILTERS } from "@/lib/feed/constants";
 import type { FeedPage, FeedPost } from "@/lib/feed/types";
 import { cn } from "@/lib/utils";
@@ -81,23 +84,62 @@ export function Feed({
    */
   showDiagnostics?: boolean;
 }) {
-  const [filter, setFilter] = useState(initialFilter);
-  const [posts, setPosts] = useState<FeedPost[]>(initial.posts);
-  const [cursor, setCursor] = useState(initial.cursor);
+  const pathname = usePathname() ?? "/";
+  const scope = feedScope({ path: pathname, savedOnly, followingOnly, authorKey, signedIn });
+
+  // Coming back from a card picks up where the reader was: the same cards, the
+  // same cursor, the same place on the screen. Anything else is a new reading
+  // and starts from the page the server just ranked.
+  const [restored] = useState(() => takeSnapshot(scope));
+
+  const [filter, setFilter] = useState(restored?.filter ?? initialFilter);
+  const [posts, setPosts] = useState<FeedPost[]>(restored?.posts ?? initial.posts);
+  const [cursor, setCursor] = useState(restored ? restored.cursor : initial.cursor);
   const [loading, setLoading] = useState(false);
   const [switching, setSwitching] = useState(false);
-  const [exhausted, setExhausted] = useState(initial.cursor === null);
+  // A page that could not be read. Not the end: the cursor is kept and the
+  // reader is offered another try, where an empty answer used to end the feed.
+  const [failed, setFailed] = useState(restored ? false : initial.failed === true);
+  const [exhausted, setExhausted] = useState(
+    restored ? restored.exhausted : initial.cursor === null && initial.failed !== true,
+  );
 
   const root = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   // Guards against the observer firing twice before the first request has
   // updated `loading` — React batches that update, the observer does not wait.
   const inFlight = useRef(false);
+  const failedNow = useRef(failed);
+  const request = useRef<AbortController | null>(null);
+
+  /**
+   * The signed-out reader's seen list, frozen for one reading.
+   *
+   * The ranking treats these as already shown. Sending the list as it grows
+   * would re-rank every page against a different list, and a card read on
+   * page one would sink below the cursor and come round again. It is taken
+   * when a reading starts and sent unchanged with every page of it; what is
+   * read meanwhile goes to the next reading.
+   */
+  const sessionSeen = useRef<string[] | null>(restored?.seen ?? null);
+  // When this reading began, as the server ranked it.
+  const clock = useRef<string | null>(restored ? restored.session : (initial.session ?? null));
+  // Which ranking it came from. See FeedPage.ranking: only 0109's may be told
+  // what was seen.
+  const ranking = useRef(restored ? restored.ranking : (initial.ranking ?? null));
+
+  // Card heights, kept with the snapshot so the cards above the one being
+  // returned to hold their real space and the scroll lands where it was.
+  const heights = useRef(new Map<string, number>(restored?.heights ?? []));
+  const anchor = useRef(restored?.anchor ?? null);
+  const entry = useRef<string | null>(restored?.entry ?? null);
 
   const loadMore = useCallback(async () => {
-    if (inFlight.current || exhausted || !cursor) return;
+    if (inFlight.current || failedNow.current || exhausted || !cursor) return;
     inFlight.current = true;
     setLoading(true);
+    const controller = new AbortController();
+    request.current = controller;
 
     const page = await fetchFeedPage({
       cursor,
@@ -105,23 +147,90 @@ export function Feed({
       savedOnly,
       followingOnly,
       authorKey,
-      // Signed out, the browser is the only memory there is. Signed in the
-      // server ignores this and reads feed_views, which is the real history.
-      seenIds: signedIn ? null : recallSeen(),
+      // Signed in, the server ignores this and reads feed_views.
+      seenIds: signedIn ? null : (sessionSeen.current ?? []),
+      signal: controller.signal,
     });
+    // Superseded by a filter change or a refresh, which started its own.
+    if (controller.signal.aborted) return;
 
-    setPosts((current) => {
-      // A post can arrive twice when its score moved between pages. Cheaper
-      // to drop the duplicate here than to make the ranking immutable.
-      const seen = new Set(current.map((post) => post.id));
-      return [...current, ...page.posts.filter((post) => !seen.has(post.id))];
-    });
-    setCursor(page.cursor);
-    if (!page.cursor) setExhausted(true);
+    if (page.failed) {
+      failedNow.current = true;
+      setFailed(true);
+    } else {
+      setPosts((current) => {
+        // The ranking is pinned for the reading, so a page does not repeat
+        // the one before it; this is the belt to that's braces.
+        const shown = new Set(current.map((post) => post.id));
+        return [...current, ...page.posts.filter((post) => !shown.has(post.id))];
+      });
+      setCursor(page.cursor);
+      if (!page.cursor) setExhausted(true);
+    }
 
     setLoading(false);
     inFlight.current = false;
   }, [cursor, exhausted, filter, savedOnly, followingOnly, authorKey, signedIn]);
+
+  /**
+   * A new reading from the top: a different chip, a refresh, a retry of a
+   * first page that failed. A fresh clock, so whatever was published since
+   * the last one is in it.
+   */
+  const restart = useCallback(async (next: string) => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    inFlight.current = true;
+    failedNow.current = false;
+    setFilter(next);
+    setSwitching(true);
+    setFailed(false);
+    setExhausted(false);
+    setLoading(false);
+
+    const seenIds = signedIn ? null : recallSeen();
+    sessionSeen.current = seenIds;
+
+    const page = await fetchFeedPage({
+      filter: next,
+      savedOnly,
+      followingOnly,
+      authorKey,
+      seenIds,
+      signal: controller.signal,
+    });
+    if (controller.signal.aborted) return;
+
+    if (page.failed) {
+      failedNow.current = true;
+      setFailed(true);
+      setPosts([]);
+      setCursor(null);
+    } else {
+      clock.current = page.session ?? null;
+      ranking.current = page.ranking ?? null;
+      setPosts(page.posts);
+      setCursor(page.cursor);
+      setExhausted(page.cursor === null);
+    }
+    setSwitching(false);
+    inFlight.current = false;
+
+    // Back to the top of the new feed. `scrollIntoView` rather than
+    // `window.scrollTo`: the workspace column scrolls, not the window.
+    root.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [signedIn, savedOnly, followingOnly, authorKey]);
+
+  function retry() {
+    if (posts.length === 0 && !cursor) {
+      void restart(filter);
+      return;
+    }
+    failedNow.current = false;
+    setFailed(false);
+    void loadMore();
+  }
 
   /**
    * The first page, again, for a signed-out reader who has been here already.
@@ -132,16 +241,18 @@ export function Feed({
    * only when there is something in the session memory to act on, so a first
    * visit pays nothing and does not flicker.
    */
-  const swapped = useRef(false);
   useEffect(() => {
-    if (signedIn || swapped.current) return;
-    swapped.current = true;
+    markBooted();
+    if (!restored) entry.current = entryKey();
+    if (signedIn || restored) return;
 
     const seenIds = recallSeen();
+    sessionSeen.current = seenIds;
     if (seenIds.length === 0) return;
 
-    let live = true;
-    const abort = new AbortController();
+    const controller = new AbortController();
+    request.current = controller;
+    inFlight.current = true;
 
     void fetchFeedPage({
       filter,
@@ -149,77 +260,168 @@ export function Feed({
       followingOnly,
       authorKey,
       seenIds,
-      signal: abort.signal,
+      signal: controller.signal,
     }).then((page) => {
-      if (!live || page.posts.length === 0) return;
+      if (controller.signal.aborted) return;
+      inFlight.current = false;
+      if (page.failed || page.posts.length === 0) return;
+      clock.current = page.session ?? null;
+      ranking.current = page.ranking ?? null;
       setPosts(page.posts);
       setCursor(page.cursor);
       setExhausted(page.cursor === null);
     });
 
-    return () => {
-      live = false;
-      abort.abort();
-    };
-    // Mount only: re-running this on a filter change would fight changeFilter.
+    return () => controller.abort();
+    // Mount only: re-running this on a filter change would fight restart.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Back to where the reader was, before the restored page is painted.
+  useLayoutEffect(() => {
+    if (!restored?.anchor) return;
+    const place = () => {
+      const workspace = scroller();
+      const card = root.current?.querySelector<HTMLElement>(`[data-post-id="${CSS.escape(restored.anchor!.id)}"]`);
+      if (!workspace || !card) return;
+      const top = workspace === document.scrollingElement ? 0 : workspace.getBoundingClientRect().top;
+      workspace.scrollTop += card.getBoundingClientRect().top - top - restored.anchor!.offset;
+    };
+    place();
+    // And again while the cards above it mount and their pictures take their
+    // size, for about a second — unless the reader starts scrolling first, at
+    // which point where they are is theirs.
+    let moved = false;
+    const stop = () => { moved = true; };
+    const events = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    for (const name of events) window.addEventListener(name, stop, { passive: true, once: true });
+    const frame = requestAnimationFrame(() => { if (!moved) place(); });
+    const timers = [100, 250, 500, 900].map((ms) => setTimeout(() => { if (!moved) place(); }, ms));
+    return () => {
+      cancelAnimationFrame(frame);
+      for (const timer of timers) clearTimeout(timer);
+      for (const name of events) window.removeEventListener(name, stop);
+    };
+    // Mount only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Which card is at the top of the screen, kept up to date as the reader
+  // scrolls, so the snapshot can be written without reading the page as it is
+  // being taken down.
+  useEffect(() => {
+    const workspace = scroller();
+    if (!workspace) return;
+    const target: EventTarget = workspace === document.scrollingElement ? window : workspace;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const measure = () => {
+      timer = null;
+      const top = workspace === document.scrollingElement ? 0 : workspace.getBoundingClientRect().top;
+      for (const slot of root.current?.querySelectorAll<HTMLElement>("[data-post-id]") ?? []) {
+        const box = slot.getBoundingClientRect();
+        if (box.bottom > top) {
+          anchor.current = { id: slot.dataset.postId!, offset: box.top - top };
+          return;
+        }
+      }
+    };
+    const onScroll = () => {
+      if (timer === null) timer = setTimeout(measure, 120);
+    };
+    // And at the moment of leaving. The page can move without a scroll — a
+    // card above settling to its real height — and an anchor measured at the
+    // last scroll would then put the reader back somewhere they never were.
+    // Capture phase, so it runs before the link's own click navigates.
+    const leaving = () => {
+      if (timer !== null) clearTimeout(timer);
+      measure();
+    };
+    target.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("pointerdown", leaving, { capture: true, passive: true });
+    window.addEventListener("click", leaving, { capture: true });
+    window.addEventListener("pagehide", leaving);
+    return () => {
+      target.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pointerdown", leaving, { capture: true });
+      window.removeEventListener("click", leaving, { capture: true });
+      window.removeEventListener("pagehide", leaving);
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, []);
+
+  // The snapshot itself: written when the feed is left, by navigation or by
+  // the tab going away. Everything it needs is in refs by then.
+  const latest = useRef({ posts, cursor, exhausted, filter });
+  useEffect(() => {
+    latest.current = { posts, cursor, exhausted, filter };
+  }, [posts, cursor, exhausted, filter]);
+  useEffect(() => {
+    const write = () =>
+      saveSnapshot({
+        scope,
+        entry: entry.current,
+        ...latest.current,
+        seen: sessionSeen.current,
+        session: clock.current,
+        ranking: ranking.current,
+        anchor: anchor.current,
+        heights: [...heights.current].filter(([id]) => latest.current.posts.some((post) => post.id === id)),
+      });
+    window.addEventListener("pagehide", write);
+    return () => {
+      window.removeEventListener("pagehide", write);
+      request.current?.abort();
+      write();
+    };
+  }, [scope]);
+
   // Infinite scroll. `rootMargin` starts the request a screen and a half
   // early, which is roughly how far a fast thumb travels while a request is
-  // in flight on a 3G connection.
+  // in flight on a 3G connection. Measured against the workspace column,
+  // which is what scrolls; against the viewport the margin means nothing.
   useEffect(() => {
     const node = sentinel.current;
     if (!node || typeof IntersectionObserver === "undefined") return;
 
+    const workspace = scroller();
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) void loadMore();
       },
-      { rootMargin: "150% 0px" },
+      { root: workspace === document.scrollingElement ? null : workspace, rootMargin: "150% 0px" },
     );
 
     observer.observe(node);
     return () => observer.disconnect();
   }, [loadMore]);
 
-  async function changeFilter(next: string) {
-    if (next === filter) return;
-    setFilter(next);
-    setSwitching(true);
-    setExhausted(false);
-
-    const page = await fetchFeedPage({
-      filter: next,
-      savedOnly,
-      followingOnly,
-      authorKey,
-      seenIds: signedIn ? null : recallSeen(),
-    });
-
-    setPosts(page.posts);
-    setCursor(page.cursor);
-    if (!page.cursor) setExhausted(true);
-    setSwitching(false);
-
-    // Back to the top of the new feed. Keeping the old scroll position after
-    // a filter change lands the reader in the middle of content they have
-    // never seen.
-    //
-    // `scrollIntoView` rather than `window.scrollTo`: the workspace column
-    // scrolls, not the window, and scrolling the window would do nothing at
-    // all on any route inside the shell.
-    root.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  // Confirmed likes, saves and follows, so the feed's own copy — which is
+  // what a return restores — says what the cards say.
+  useEffect(() => {
+    const listen = (event: Event) => {
+      const change = (event as CustomEvent<FeedChange>).detail;
+      setPosts((current) =>
+        current.map((post) =>
+          "postId" in change
+            ? post.id === change.postId ? { ...post, ...change.patch } : post
+            : post.authorKey === change.authorKey ? { ...post, ...change.patch } : post,
+        ),
+      );
+    };
+    window.addEventListener(FEED_CHANGE, listen);
+    return () => window.removeEventListener(FEED_CHANGE, listen);
+  }, []);
 
   function hide(postId: string) {
     setPosts((current) => current.filter((post) => post.id !== postId));
   }
 
+  const restoredIndex = restored?.anchor ? Math.max(0, posts.findIndex((post) => post.id === restored.anchor!.id)) : 0;
+
   return (
     <div ref={root}>
       {showFilters && (
-        <FilterChips value={filter} onChange={(next) => void changeFilter(next)} />
+        <FilterChips value={filter} signedIn={signedIn} onChange={(next) => { if (next !== filter) void restart(next); }} />
       )}
 
       {beforePosts}
@@ -227,20 +429,24 @@ export function Feed({
       {switching ? (
         <FeedSkeleton count={3} />
       ) : posts.length === 0 ? (
-        <Empty
-          available={initial.available}
-          savedOnly={savedOnly}
-          followingOnly={followingOnly}
-          showDiagnostics={showDiagnostics}
-        />
+        failed ? null : (
+          <Empty
+            available={initial.available}
+            savedOnly={savedOnly}
+            followingOnly={followingOnly}
+            showDiagnostics={showDiagnostics}
+          />
+        )
       ) : (
         <>
-          <ImpressionTracker posts={posts} signedIn={signedIn} />
+          <ImpressionTracker posts={posts} signedIn={signedIn} clock={clock} ranking={ranking} />
           <VirtualList
             posts={posts}
             signedIn={signedIn}
             viewer={viewer}
             onHidden={hide}
+            heights={heights}
+            startAt={restoredIndex}
           />
         </>
       )}
@@ -248,20 +454,46 @@ export function Feed({
       <div ref={sentinel} aria-hidden className="h-px" />
 
       {loading && (
-        <p className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Finding more for you…
-        </p>
+        <div aria-busy="true" aria-label="Loading more" className="mt-3">
+          <FeedSkeleton count={2} />
+        </div>
       )}
 
-      {exhausted && posts.length > 0 && (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          That is everything for now. Check back later — the feed changes
-          through the day.
-        </p>
+      {failed && !switching && (
+        <div role="alert" className="flex flex-col items-center gap-3 py-8 text-center text-sm text-muted-foreground">
+          <p>{posts.length > 0 ? "More could not be loaded just now." : "The feed could not be loaded just now."}</p>
+          <button
+            type="button"
+            onClick={retry}
+            className="flex h-10 items-center gap-2 rounded-full bg-muted px-4 text-sm font-medium text-foreground hover:bg-muted/70"
+          >
+            <RefreshCw className="size-4" aria-hidden />
+            Try again
+          </button>
+        </div>
+      )}
+
+      {exhausted && !failed && posts.length > 0 && (
+        <div className="flex flex-col items-center gap-3 py-8 text-center text-sm text-muted-foreground">
+          <p>That is everything for now.</p>
+          <button
+            type="button"
+            onClick={() => void restart(filter)}
+            className="flex h-10 items-center gap-2 rounded-full bg-muted px-4 text-sm font-medium text-foreground hover:bg-muted/70"
+          >
+            <RefreshCw className="size-4" aria-hidden />
+            Refresh the feed
+          </button>
+        </div>
       )}
     </div>
   );
+}
+
+/** What scrolls: the workspace column inside the shell, the page outside it. */
+function scroller(): HTMLElement | null {
+  if (typeof document === "undefined") return null;
+  return document.getElementById("workspace") ?? (document.scrollingElement as HTMLElement | null);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,14 +517,19 @@ function VirtualList({
   signedIn,
   viewer,
   onHidden,
+  heights,
+  startAt = 0,
 }: {
   posts: FeedPost[];
   signedIn: boolean;
   viewer: { name: string; avatarUrl: string | null } | null;
   onHidden: (postId: string) => void;
+  /** Owned by the feed, so they outlive this list and go into the snapshot. */
+  heights: { current: Map<string, number> };
+  /** The card a returning reader was at: mounted first, so it can be scrolled to. */
+  startAt?: number;
 }) {
-  const [visible, setVisible] = useState({ first: 0, last: WINDOW * 2 });
-  const heights = useRef(new Map<string, number>());
+  const [visible, setVisible] = useState(() => ({ first: Math.max(0, startAt - WINDOW), last: startAt + WINDOW * 2 }));
   const container = useRef<HTMLDivElement>(null);
 
   /**
@@ -324,7 +561,7 @@ function VirtualList({
       }
     });
     return sizes.current;
-  }, []);
+  }, [heights]);
 
   useEffect(() => () => sizes.current?.disconnect(), []);
 
@@ -444,9 +681,15 @@ function VirtualList({
 function ImpressionTracker({
   posts,
   signedIn,
+  clock,
+  ranking,
 }: {
   posts: FeedPost[];
   signedIn: boolean;
+  /** The reading's start, sent with each batch. */
+  clock: { current: string | null };
+  /** Which ranking the reading came from; the older one is not told what was seen. */
+  ranking: { current: "mixed" | "legacy" | null };
 }) {
   const pending = useRef(new Set<string>());
   const sent = useRef(new Set<string>());
@@ -467,7 +710,9 @@ function ImpressionTracker({
       if (batch.length === 0) return;
 
       const send = () => {
-        if (signedIn) void feedApi.view(batch);
+        if (signedIn) {
+          if (ranking.current === "mixed") void feedApi.view(batch, clock.current);
+        }
         else rememberSeen(batch);
       };
       if (typeof requestIdleCallback === "function") {
@@ -517,7 +762,7 @@ function ImpressionTracker({
       if (timer !== null) clearTimeout(timer);
       flush();
     };
-  }, [posts.length, signedIn]);
+  }, [posts.length, signedIn, clock, ranking]);
 
   return null;
 }
@@ -528,16 +773,18 @@ function ImpressionTracker({
 
 function FilterChips({
   value,
+  signedIn,
   onChange,
 }: {
   value: string;
+  signedIn: boolean;
   onChange: (next: string) => void;
 }) {
   return (
     <div
       role="tablist"
       aria-label="Filter the feed"
-      className="sticky top-0 z-20 -mx-3 mb-3 flex gap-2 overflow-x-auto bg-background/85 px-3 py-2 backdrop-blur [scrollbar-width:none] @lg/ws:mx-0 @lg/ws:rounded-2xl @lg/ws:px-2 [&::-webkit-scrollbar]:hidden"
+      className="sticky top-0 z-20 mb-3 flex gap-2 overflow-x-auto bg-background/85 px-3 py-2 backdrop-blur [scrollbar-width:none] @lg/ws:rounded-2xl @lg/ws:px-2 [&::-webkit-scrollbar]:hidden"
     >
       {FEED_FILTERS.map((chip) => (
         <button
@@ -557,6 +804,15 @@ function FilterChips({
           {chip.label}
         </button>
       ))}
+      {/* The topics a reader asked for, and whether their activity may lean
+          the feed, live in Settings beside the rest of their account. */}
+      <Link
+        href={signedIn ? "/settings#feed" : `/login?redirect=${encodeURIComponent("/settings#feed")}`}
+        className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border px-3.5 text-sm font-medium whitespace-nowrap text-muted-foreground hover:text-foreground"
+      >
+        <SlidersHorizontal className="size-4" aria-hidden />
+        Tune your feed
+      </Link>
     </div>
   );
 }

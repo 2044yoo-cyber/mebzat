@@ -97,9 +97,14 @@ async function page(params: URLSearchParams, seenIds: string[] | null) {
 // hand one reader another reader's feed.
 const HEADERS = { "Cache-Control": "private, no-store" };
 
+/** A page that could not be read is a 503, so the client retries it rather than taking it for the end. */
+function reply(result: Awaited<ReturnType<typeof page>>) {
+  return NextResponse.json(result, { status: result.failed ? 503 : 200, headers: HEADERS });
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  return NextResponse.json(await page(searchParams, null), { headers: HEADERS });
+  return reply(await page(searchParams, null));
 }
 
 export async function POST(request: Request) {
@@ -120,7 +125,5 @@ export async function POST(request: Request) {
       )
     : [];
 
-  return NextResponse.json(await page(searchParams, seenIds), {
-    headers: HEADERS,
-  });
+  return reply(await page(searchParams, seenIds));
 }

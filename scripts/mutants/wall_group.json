@@ -1,0 +1,5 @@
+[
+ {"name":"an unselected inside wall moves with the group","file":"src/features/house-designer/services/model-commands.ts","from":"      selectedInterior.has(wall.id) ? {","to":"      true ? {"},
+ {"name":"the group move drops the selection","file":"src/features/house-designer/services/model-commands.ts","from":"  return { project: result, selections: [...selections], blocked: [] };\n}\n\nexport function moveHouseSelections","to":"  return { project: result, selections: [], blocked: [] };\n}\n\nexport function moveHouseSelections"},
+ {"name":"a locked wall in the group does not stop it","file":"src/features/house-designer/services/model-commands.ts","from":"  if (conflicts.length)\n    return { project, selections: [...selections], blocked: conflicts };\n  const chosenIds","to":"  const chosenIds"}
+]
