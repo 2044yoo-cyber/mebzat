@@ -19,6 +19,15 @@ export function CuttingPlanPreview({ layouts }: {
   const waste = Math.max(0, area - used);
   const scale = Math.min(560 / current.length, 340 / current.width);
   const margin = 20;
+  const bandingEdges = (banding: string) => {
+    const value = banding.toLowerCase();
+    const all = value.includes("all edges");
+    return {
+      top: all || value.includes("top"), bottom: all || value.includes("bottom"),
+      left: all || value.includes("left") || value.includes("both ends"),
+      right: all || value.includes("right") || value.includes("both ends"),
+    };
+  };
   const viewWidth = current.length * scale + margin * 2;
   const viewHeight = current.width * scale + margin * 2;
 
@@ -46,9 +55,16 @@ export function CuttingPlanPreview({ layouts }: {
             const y = margin + part.y * scale;
             const w = part.width * scale;
             const h = part.height * scale;
-            return <g key={`${part.label}-${index}`}>
+            const edges = bandingEdges(part.banding);
+            const edgeStroke = "#e11d48";
+            const label = part.partId ? `#${index + 1} · ${part.partId}` : `#${index + 1}`;
+            return <g key={`${part.partId}-${part.label}-${index}`}>
               <rect x={x} y={y} width={w} height={h} fill="currentColor" fillOpacity="0.13"
                 stroke="currentColor" strokeOpacity="0.75" strokeWidth="1"/>
+              {edges.top && <line x1={x + 1} y1={y + 1} x2={x + w - 1} y2={y + 1} stroke={edgeStroke} strokeWidth="3" />}
+              {edges.bottom && <line x1={x + 1} y1={y + h - 1} x2={x + w - 1} y2={y + h - 1} stroke={edgeStroke} strokeWidth="3" />}
+              {edges.left && <line x1={x + 1} y1={y + 1} x2={x + 1} y2={y + h - 1} stroke={edgeStroke} strokeWidth="3" />}
+              {edges.right && <line x1={x + w - 1} y1={y + 1} x2={x + w - 1} y2={y + h - 1} stroke={edgeStroke} strokeWidth="3" />}
               {/* Dimension graphics are drawn inside each panel so they are
                   never clipped by the sheet boundary or hidden off-canvas. */}
               {w > 30 && h > 24 ? (
@@ -86,12 +102,17 @@ export function CuttingPlanPreview({ layouts }: {
               ) : (
                 <text x={x + w / 2} y={y + h / 2} textAnchor="middle"
                   dominantBaseline="middle" fill="currentColor" fontSize="8">
-                  #{index + 1}
+                  #{label}
                 </text>
               )}
             </g>;
           })}
         </svg>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background px-2 py-2 text-[11px]">
+        <span className="inline-block h-1 w-7 rounded bg-rose-600" aria-hidden="true" />
+        <span className="font-semibold">Red edge = edge banding</span>
+        <span className="text-muted-foreground">Follow the red-marked edges for each panel.</span>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="rounded-lg bg-muted/30 p-2"><p className="text-[11px] text-muted-foreground">Sheet size</p><p className="text-xs font-semibold">{current.length} × {current.width} mm</p></div>
@@ -104,8 +125,10 @@ export function CuttingPlanPreview({ layouts }: {
           className="flex min-w-0 items-start gap-2 rounded-md border px-2 py-1.5 text-xs">
           <span className="flex size-5 shrink-0 items-center justify-center rounded bg-muted font-semibold">{index + 1}</span>
           <span className="min-w-0 flex-1">
+            <span className="block break-words font-semibold">#{index + 1} · {part.partId}</span>
             <span className="block break-words font-medium">{part.label}</span>
-            <span className="text-muted-foreground">{Math.round(part.width)} × {Math.round(part.height)} mm{part.rotated ? " · rotated" : ""}</span>
+            <span className="block text-muted-foreground">{Math.round(part.width)} × {Math.round(part.height)} mm{part.rotated ? " · rotated" : ""}</span>
+            <span className="block text-rose-700 dark:text-rose-300">Banding: {part.banding || "—"}</span>
           </span>
         </li>)}
       </ol>
