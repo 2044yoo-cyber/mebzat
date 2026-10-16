@@ -15,6 +15,8 @@ import {
   Check,
   MousePointer2,
   Trash2,
+  DoorOpen,
+  AppWindow,
 } from "lucide-react";
 import type { HouseProject } from "../types/project";
 import {
@@ -35,6 +37,7 @@ type Sketch = NonNullable<HouseProject["freehandSketch"]>;
 const empty: Sketch = {
   version: 1,
   strokes: [],
+  openings: [],
   mmPerUnit: 20,
   calibrated: false,
 };
@@ -52,7 +55,7 @@ export function FreehandCanvas({
   onConvert: (sketch: Sketch, snap: number, unitsPerPixel: number) => void;
 }) {
   const [sketch, setSketch] = useState<Sketch>(initial ?? empty);
-  const [tool, setTool] = useState<"draw" | "erase" | "pan" | "point">(
+  const [tool, setTool] = useState<"draw" | "erase" | "pan" | "point" | "door" | "window">(
     readOnly ? "pan" : "draw",
   );
   const [selectedPoint, setSelectedPoint] = useState<{ strokeId: string; end: "start" | "end" } | null>(null);
@@ -129,6 +132,35 @@ export function FreehandCanvas({
     };
     for (const stroke of state.current.sketch.strokes) {
       if (!gesture.current?.erase.has(stroke.id)) draw(stroke.points, "#bdc5cf", 1);
+    }
+    // Door/window markers remain separate from wall strokes, so conversion never mistakes an opening for a wall.
+    for (const opening of state.current.sketch.openings ?? []) {
+      const a = opening.start, b = opening.end;
+      const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
+      if (length < 2) continue;
+      const nx = -dy / length, ny = dx / length;
+      const offset = opening.type === "window" ? 4 / v.zoom : 0;
+      ctx.save();
+      ctx.strokeStyle = opening.type === "window" ? "#0284c7" : "#0f766e";
+      ctx.lineWidth = 2 / v.zoom;
+      ctx.beginPath();
+      ctx.moveTo(a.x + nx * offset, a.y + ny * offset);
+      ctx.lineTo(b.x + nx * offset, b.y + ny * offset);
+      if (opening.type === "window") {
+        ctx.moveTo(a.x - nx * offset, a.y - ny * offset);
+        ctx.lineTo(b.x - nx * offset, b.y - ny * offset);
+      } else {
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      }
+      ctx.stroke();
+      if (opening.type === "door") {
+        const sign = opening.swing === "left" ? 1 : -1;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, length, Math.atan2(dy, dx), Math.atan2(dy, dx) + sign * Math.PI / 2, sign < 0);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
     // Preview exactly the same joined, split wall graph used by Convert to Plan.
     // Cache while moving the pointer so drawing stays responsive on phones.
@@ -531,7 +563,7 @@ export function FreehandCanvas({
         })}
       </header>
       <div
-        className="flex items-center gap-1 overflow-x-auto border-b px-2 py-1"
+        className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain border-b px-2 py-1 [scrollbar-width:thin]"
         role="toolbar"
         aria-label="Sketch tools"
       >
@@ -566,7 +598,9 @@ export function FreehandCanvas({
           snap,
           readOnly,
         )}
-        {button("Set scale", Ruler, calibrate, false, readOnly)}
+        {button("Set scale / distance", Ruler, calibrate, false, readOnly)}
+        {button("Door symbol", DoorOpen, () => setTool("door"), tool === "door", readOnly)}
+        {button("Window symbol", AppWindow, () => setTool("window"), tool === "window", readOnly)}
         {button("Zoom in", ZoomIn, () => zoom(1.25))}
         {button("Zoom out", ZoomOut, () => zoom(0.8))}
         <label className="flex items-center gap-1 whitespace-nowrap text-xs">
@@ -614,7 +648,7 @@ export function FreehandCanvas({
               setSelectedPoint(nearestEndpoint(point(e)));
               pointStart.current = point(e);
             }
-            if (tool === "draw") live.current = [point(e)];
+            if (tool === "draw" || tool === "door" || tool === "window") live.current = [point(e)];
             if (tool === "erase") erase(point(e));
           }
           schedule();
@@ -651,7 +685,7 @@ export function FreehandCanvas({
             view.current.y += e.clientY - g.last.y;
             g.last = { x: e.clientX, y: e.clientY };
           } else if (tool === "erase") erase(point(e));
-          else if (tool === "draw" && live.current.length) {
+          else if ((tool === "draw" || tool === "door" || tool === "window") && live.current.length) {
             live.current = alignWall(live.current[0]!, point(e));
           }
           schedule();
@@ -675,6 +709,13 @@ export function FreehandCanvas({
                   });
                   commit({ ...sketch, strokes: next });
                 }
+              }
+            } else if ((tool === "door" || tool === "window") && live.current.length > 1) {
+              const [start, end] = alignWall(live.current[0]!, point(e));
+              if (Math.hypot(end.x - start.x, end.y - start.y) > 12 / view.current.zoom) {
+                const opening = { id: crypto.randomUUID(), type: tool, start, end, swing: "left" as const };
+                commit({ ...sketch, openings: [...(sketch.openings ?? []), opening].slice(-200) });
+                setMessage(`${tool === "door" ? "Door swing" : "Window"} symbol added. Use Plan mode to create editable door/window objects.`);
               }
             } else if (tool === "draw" && live.current.length > 1 && sketch.strokes.length < 500) {
               const stroke = { id: crypto.randomUUID(), points: alignWall(live.current[0]!, point(e)), thickness };
@@ -710,13 +751,13 @@ export function FreehandCanvas({
           schedule();
         }}
       />
-      <footer className="space-y-2 border-t p-3">
+      <footer className="max-h-[34dvh] shrink-0 space-y-2 overflow-y-auto border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <p className="text-xs text-slate-500" role="status">
           {message} <span ref={status} />
         </p>
-        {dimensionSegments.length ? <details className="rounded-lg border border-slate-200 bg-slate-50 text-xs" open>
+        {dimensionSegments.length ? <details className="rounded-lg border border-slate-200 bg-slate-50 text-xs">
           <summary className="cursor-pointer p-2 font-semibold text-slate-700">Inside wall dimensions · {dimensionSegments.length} wall(s) · {sketch.calibrated ? "calibrated" : "approximate"}</summary>
-          <div className="max-h-[30dvh] space-y-1 overflow-y-auto px-2 pb-2">
+          <div className="max-h-[16dvh] space-y-1 overflow-y-auto px-2 pb-2">
             {dimensionSegments.map((wall, index) => {
               const metres = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y) / 1000;
               return <div key={`${index}-${wall.start.x}-${wall.start.y}-${wall.end.x}-${wall.end.y}`} className="flex items-center justify-between gap-2 rounded border bg-white px-2 py-1.5">
@@ -851,10 +892,7 @@ export function FreehandCanvas({
           {readOnly ? "Return to editable plan" : review ? "Confirm Conversion" : "Review & Repair Plan"}
         </button>
         {review && !readOnly ? <button type="button" onClick={() => { setReview(false); setFocusedIssue(null); setTool("draw"); }} className="w-full rounded-lg border p-2 text-sm">Back to Drawing</button> : null}
-        <p className="text-center text-[11px] text-slate-500">
-          Select, split, doors/windows and exact dimensions are available in
-          Plan mode.
-        </p>
+        <p className="text-center text-[11px] text-slate-500">Door/window symbols are visual sketch markers. Use Plan mode to place editable openings.</p>
       </footer>
     </div>
   );
