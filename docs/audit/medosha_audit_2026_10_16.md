@@ -16,16 +16,16 @@ Counted over the 100 slots at the bottom (one root cause per slot):
 
 | Status | Slots |
 | --- | --- |
-| Confirmed defect, fixed (D1 to D6, plus the lint fix) | 7 |
+| Confirmed defect, fixed (D1 to D6, D10, D11, plus the lint fix) | 9 |
 | Confirmed defect, not fixed (D7, D8, D9) | 4 |
 | Owner decision needed | 1 |
 | Improvement | 4 |
 | Missing feature (no CI) | 1 |
-| Inspected, behaviour verified by a passing check | 12 |
+| Inspected, behaviour verified by a passing check | 14 |
 | Inspected, no defect found | 8 |
-| Unverified | 63 |
+| Unverified | 59 |
 
-D1 to D9 below are the defects themselves; the slot table maps them to areas, so a defect can appear in more than one slot. The counts add to 100.
+D1 to D11 below are the defects themselves; the slot table maps them to areas, so a defect can appear in more than one slot. The counts add to 100.
 
 Verification actually run on the final tree (tsc, the checks named in each item, `npm run build`, results on the last commit) is in the last section.
 
@@ -79,19 +79,44 @@ Verification actually run on the final tree (tsc, the checks named in each item,
   - 1 `react/no-unescaped-entities` in `image-to-3d-importer.tsx:745`.
 - **Why not fixed.** The `image-to-3d-importer` refs are in code the owner wrote and need a behavioural check of the importer to change safely. I did not want to touch it without one.
 
-### D8. 17 existing checks fail, and a further check fails after the owner's recent change (J, Medium, not fixed)
-- **Evidence.** The sweep (`runall.sh`, 52 checks) gave 33 pass, 19 fail on this branch. The same 17 failed on the starting baseline, and `berchuma_closure_check` now fails too.
-- **Failing:** `berchuma-ai-check` (1), `berchuma-check` (57), `berchuma_dimensions_check`, `berchuma_display_check`, `berchuma_doors_check`, `cabinet_design_check`, `calculator_check` (1), `freehand_check`, `house_commands_check`, `house_model_check`, `house_open_space_check`, `house_quick_edit_check`, `layout-check` (5), `map_check` (9), `room_topology_check`, `studio_controls_check` (6), `wall_group_check`, `berchuma_closure_check`.
-- **What I established.**
-  - `berchuma_closure_check` encodes automatic end panels that the owner deliberately removed. The failure is identical with my changes stashed. **Needs an owner decision**, not mine to rewrite.
-  - `calculator_check`: the home page no longer renders `<CalculatorRail />` (removed in `dc51c4e`, the homepage redesign). The component still exists but nothing uses it. This looks like an owner decision, not a bug.
-  - `wall_group_check`: the freehand fixture builds a plan with no corners, so the project fails `houseProjectSchema` with or without the move (empty slab and roof boundary). That points to the fixture, not the move command. Whether the app can produce such a plan is **unverified**.
-  - The other failures I did not diagnose.
-- **Why this matters.** Each red check hides whether a real regression is in there. I cannot call them defects or call them stale without a root cause for each.
+### D8. Nine checks are still red (J, Medium, not fixed)
+- **Evidence.** The regression sweep (52 checks) was 33 pass / 19 fail at the start of this audit and is **42 pass / 9 fail** after the second pass (D12). Nine remain: `berchuma-check` (57 assertions), `berchuma_dimensions_check`, `berchuma_display_check`, `berchuma_doors_check`, `calculator_check` (1), `layout-check` (5), `map_check` (9), `studio_controls_check` (6), `berchuma_closure_check`.
+- **What I established for each of the nine.**
+  - `berchuma_closure_check`: encodes automatic end panels that the owner deliberately removed. Identical failure with my changes stashed. **Owner decision.**
+  - `calculator_check`: the home page no longer renders `<CalculatorRail />` (removed in `dc51c4e`, the homepage redesign). The component still exists, unused. Owner decision, not a bug.
+  - `berchuma_dimensions_check`: two things changed. Drawer fronts are now 201 mm with 25 mm gaps between them (the finger-gap work, `69cb526`, `badec66`) where the check expects 218 mm with none. More important, with the check's arithmetic corrected for the gaps, the wardrobe's middle column still sums to **2294 mm, not 2300**: the top drawer front ends at y 772 and the fixed shelf above starts at y 778, a 6 mm sliver that the dimension chain does not list. It may be an intended reveal; the old check treated "the chain adds up" as a rule. **Needs the owner's call** on whether the 6 mm is deliberate (then list it) or a rounding fault in the drawer band (then fix it). Not changed.
+  - `berchuma_display_check`: compares a hash of the three-bay wardrobe's parts "exactly as before". The hash differs because of the deliberate geometry changes of 11 to 15 October. A golden hash cannot say whether anything is wrong; refreshing it means accepting the new output. Needs the owner.
+  - `berchuma_doors_check`: after "prefer practical kitchen cabinet door widths" (`2612c65`) a 764 mm wall unit whose left leaf is set to 300 mm gets two more leaves of 204 and 252 mm instead of one of 379 mm. A 204 mm door is narrow; whether that is intended is unknown. Not changed.
+  - `layout-check`: the five failures all test the note that fires when a wall is "barely longer than the corner". Since the dedicated corner modules (`08ba749`) the corner module shrinks instead, to keep a 300 mm run: probe of an L layout with wall A at 320, 400, 500, 800 and 1000 mm gives corner widths of 20, 100, 200, 500 and 600 mm and **no note at all**. A 20 mm wide corner module is not buildable. Whether a wall that short is a realistic input is the open question; not changed.
+  - `map_check` (9) and `studio_controls_check` (6): regexes over CSS classes and component source for scrolling, sticky drawing and draft handling. They need a browser to say whether the behaviour is still right. Unverified.
+  - `berchuma-check` (57): not diagnosed.
+- **Why this matters.** Each red check hides whether a regression is inside it. Those marked "needs the owner" are decisions, not defects I can close.
 
 ### D9. Tarballs and patches committed to the repo root (I, Low, not fixed)
 - **Evidence.** `git ls-files` lists `errorboundaries.patch`, `medoshafixes.patch`, `medoshamessaging.tar.gz`, `medoshaupdate.tar.gz`, `update.tar.gz`.
 - **Why not fixed.** Deleting tracked files is the owner's call, and I did not open the archives to learn what they hold.
+
+### D10. Floor finishes were measured to the wall centre-lines (B, Medium, fixed)
+- **Where.** `src/features/house-designer/services/quantities.ts`, row `FIN-02` ("Floor finishes"), which feeds the takeoff hand-off.
+- **Evidence.** A room's boundary runs along wall centre-lines: a native 4000 x 5000 room with 150 mm walls has a boundary of exactly 4000 x 5000. The row summed that polygon, so the room was 20.00 m² of floor finish; the floor between the wall faces is 3.85 x 4.85 = 18.67 m². Walls are drawn centred on the boundary, so half of every surrounding wall was being priced as floor.
+- **Correction.** New `services/clear-inside.ts` moves each boundary edge inward by half the thickness of the wall standing on it (an edge with no wall stays put), and falls back to the boundary with `exact: false` when the walls would swallow the room. `FIN-02` uses it per room and per level.
+- **Not changed.** The Measurements drawer still reports room size and area from the boundary (the owner's `house_measure_check` pins "27.30 m²"). That is a centre-line convention, and the BOQ row now differs from it on purpose.
+- **Re-test.** `house_clear_inside_check` (14 checks: rectangle, either winding, walls of different thickness, open side, L shape, collinear point, room eaten by its walls, input not mutated, one level and two). 8 mutants, all caught. Commit `26a3eb3`.
+
+### D11. Deleting a wall silently bent a locked neighbour (C, High, fixed)
+- **Where.** `src/features/house-designer/services/model-commands.ts`, `deleteHouseSelections`, footprint branch.
+- **Evidence.** In the default 8000 x 6500 house, lock the left wall and delete the top wall: nothing is blocked and the locked wall changes from (0, 6500)→(0, 0) to (0, 6500)→(8000, 0), a diagonal. Deleting a corner re-draws the wall that arrives at it, and the lock check only looked at linked joints, which are off by default.
+- **Correction.** The delete is refused, with the plan returned unchanged, when the wall arriving at the deleted corner is locked. A locked wall on the other side of the deleted one is not touched and does not stop it.
+- **Re-test.** Three new assertions in `house_commands_check` (plan unchanged, message, far side free) and a 3 mutant plan, all caught. Commit `26a3eb3`.
+
+### D12. Nine house-plan and menu checks were stale, not the code (J, Medium, fixed)
+`house_model_check`, `freehand_check`, `house_commands_check`, `house_quick_edit_check`, `house_open_space_check`, `room_topology_check`, `wall_group_check`, `berchuma-ai-check` and `cabinet_design_check` all failed because they encode behaviour the owner changed on purpose, each time with a commit that says so:
+- A footprint corner moves only when that end of the wall is linked (`ac636a3`, `538dd07`, `ad0a387`); a group move touches only the selected walls (`d182d8d`). The checks now assert that rule, including the refusal message, instead of the old "neighbours follow".
+- `freehand_check` measured a room's centre-line boundary as if it were the clear inside; it now measures clear inside with the D10 helper. Its depth tolerance is half a drawing unit because the bottom stroke is drawn from y 249 to 250.
+- `wall_group_check` built a freehand plan on top of a footprint slab, which leaves the slab with an empty boundary and fails the schema; `applyFreehand` refuses that start ("Convert on a blank plan"), so the app cannot produce it. The fixture now starts from a blank floor.
+- `berchuma-ai-check` expected the price key "MDF 18mm walnut"; the catalogue says "MDF 18mm melamine" since the 12 September price update (`5ac452f`). It now compares with the catalogue.
+- `cabinet_design_check` looked for the old `berchuma` menu section and a Studio link in the menu bar; the menu was reorganised (`6b76718`, `b5e6c3a`). It now looks at the `cabinet-design` and `furniture-design` entries, and at the view-aware colour in `PartMesh`.
+Every changed check has mutants that fail it (`house_model.json`, `freehand_inside.json`, `house_commands.json`, `house_quick_edit.json`, `house_open_space.json`, `room_topology_group_move.json`, `wall_group.json`, `berchuma_ai_price_key.json`, `cabinet_design_nav.json`). Two plans were trimmed of mutants that are equivalent for what the check exercises. Two mutants in the owner's existing `room_topology.json` plan now **survive** ("outside wall drags room corners again", "walls moved together not reconciled"): the code they break is no longer reached by moves in that check. Left as is. Commits `26a3eb3`, `52fff27` and the one after it.
 
 ---
 
@@ -138,15 +163,16 @@ Each slot is one root cause. "U" means Unverified and the reason is in the right
 | B12 | Calculator arithmetic | U | `calculator_check` 344 pass, 1 fail (see D8) |
 | B13 | Calculator page reachable | Improvement | `CalculatorRail` dead code |
 | B14 | Rounding rules | U | Not inspected |
-| B15–B20 | Other calculators | U | Not inspected individually |
+| B15 | Floor finish quantity (house BOQ) | Fixed | D10 |
+| B16–B20 | Other calculators | U | Not inspected individually |
 | C21 | Vertical divider collisions | Fixed | D1 |
 | C22 | Split shelf geometry | Verified | Arithmetic in `berchuma_vertical_divider_check` |
 | C23 | Hinge door sizing | Verified | `berchuma_hinge_check` 6,113 pass |
 | C24 | Closure / end panels | Owner decision | D8 |
 | C25 | Saved designs load | Verified | divider and cutting plan checks reopen saved designs |
-| C26 | Wall move on freehand plan | U | D8, fixture suspect |
-| C27 | Room topology checks | U | D8, failing, undiagnosed |
-| C28 | House model dimensions | U | D8, `house_model_check` 8000 vs 8200, undiagnosed |
+| C26 | Locked wall re-drawn by deleting its neighbour | Fixed | D11 |
+| C27 | Room topology and group move | Verified | D12; `room_topology_check` 1,096 pass, `wall_group_check` pass |
+| C28 | House model, quick edit, open space, freehand | Verified | D12; all four checks pass after aligning them with the linked-joint rule |
 | C29 | Berchuma core | U | D8, `berchuma-check` 57 fail, undiagnosed |
 | C30 | House Designer on mobile | Verified (partly) | `house_mobile_check` passes; construction lab browser check passed 96 checks when last run |
 | D31 | Construction learning model | Verified | `construction_lab_check` 16,793 pass |
@@ -193,7 +219,7 @@ Each slot is one root cause. "U" means Unverified and the reason is in the right
 
 ---
 
-## Files changed in this pass (all on `claude/last-job-stopping-point-ovz31u`)
+## Files changed (all on `claude/last-job-stopping-point-ovz31u`)
 
 | Commit | Content |
 | --- | --- |
@@ -201,27 +227,32 @@ Each slot is one root cause. "U" means Unverified and the reason is in the right
 | `3bd8880` | `verticalDivider` optional in the schema |
 | `e938074` | Cutting plan IDs, banding edges, sheet numbers; `banding-edges.ts`, `cutting_plan_check.ts` + 12 mutants |
 | `063a384` | Divider only in shelf sections; `vertical-divider.ts`, updated check + 12 mutants |
-| this commit | Construction scene lint fix; this report |
+| `d24f5f2`, `b62382b` | Construction scene lint fix; this report |
+| `26a3eb3` | Floor finishes between wall faces (`clear-inside.ts`); deleting a wall no longer bends a locked neighbour; three checks aligned |
+| `52fff27` | Four house-plan checks aligned with linked joints and one-shot group moves |
+| next | `berchuma-ai-check` and `cabinet_design_check` aligned; this report updated |
 
 ## Verification run on the final tree
 
 - `npx tsc --noEmit`: clean.
-- `npm run build`: passed at `063a384`. Re-run result for the last commit is stated in the final message.
-- `npx eslint`: 25 errors before, 24 after my fix; the remaining ones are listed in D7.
-- Checks, this branch: `cutting_plan_check` 4,636 pass, `construction_lab_check` 16,793 pass, `berchuma_vertical_divider_check` 248 pass, `berchuma_hinge_check` 6,113 pass, `i18n_check` pass. Regression sweep 33 pass / 19 fail; the 19 are D8.
-- Mutation testing: both mutant plans for the divider and the cutting plan report all mutants caught.
-- Vercel: "Deployment has completed" for `063a384`. There is no other CI to inspect.
+- `npx eslint`: 24 errors, 23 warnings (was 25 errors); the errors are the ones in D7.
+- Regression sweep, 52 checks: **42 pass, 9 fail** (was 33 / 19 at the start of the audit). The nine are D8.
+- Checks of this audit, run again on the final tree: `cutting_plan_check` 4,636, `construction_lab_check` 16,793, `berchuma_vertical_divider_check` 248, `house_clear_inside_check` 14, `berchuma_hinge_check` 6,113, `i18n_check` pass.
+- Mutation testing: every plan added or changed in this audit reports all its mutants caught, except the two survivors in the owner's `room_topology.json` described under D12.
+- `npm run build` and Vercel: see the final message for the last commit; a pending Vercel status is not a pass.
 
 ## External verification still required
 
 1. A signed-in pass over the live site on desktop and phone (navigation, mobile, accessibility, performance).
 2. A Postgres run of the policies with a non-superuser `authenticated` role, per AGENTS.md.
 3. A Chapa sandbox payment through checkout and webhook.
-4. Owner decisions: the removed automatic end panels (`berchuma_closure_check`), the homepage calculator section, the committed tarballs.
+4. Owner decisions: the removed automatic end panels (`berchuma_closure_check`), the homepage calculator section, the committed tarballs, the 6 mm sliver above the top drawer, the 204 mm wall-unit door, the corner module that shrinks without a note, whether to refresh the golden hash in `berchuma_display_check`.
+5. A browser run for `map_check` and `studio_controls_check`.
 
 ## Recommended next batch
 
-1. Diagnose each of the 17 older red checks one at a time (stale test or real regression) and record the answer here.
+1. Diagnose `berchuma-check` (57 assertions), the largest red check left.
 2. Fix the 15 `react-hooks/refs` errors in `image-to-3d-importer.tsx` behind a behavioural check.
-3. Add a GitHub Actions workflow that runs `tsc`, `eslint`, and the checks that pass today, so a regression is caught before Vercel.
+3. Add a GitHub Actions workflow that runs `tsc`, `eslint` and the checks that pass today, so a regression is caught before Vercel.
 4. Run the RLS policy tests against Postgres 16.
+5. Decide D8's "needs the owner" items, then turn each answer into a check that cannot go stale (assert the rule, not the number).
