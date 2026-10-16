@@ -79,6 +79,7 @@ const convert = (strokes: Stroke[]) =>
     applyFreehand(empty, {
       version: 1,
       strokes,
+      openings: [],
       mmPerUnit: 20,
       calibrated: true,
     }),
@@ -332,6 +333,7 @@ const unsnapped = applyFreehand(
         [200, 8],
       ]),
     ],
+    openings: [],
     mmPerUnit: 20,
     calibrated: true,
   },
