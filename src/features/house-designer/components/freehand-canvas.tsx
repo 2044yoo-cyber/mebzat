@@ -324,7 +324,7 @@ export function FreehandCanvas({
   // Nearby wall endpoints become exact shared junctions.
   function alignWall(start: Point, end: Point): [Point, Point] {
     const radius = 18 / view.current.zoom;
-    const endpoints = sketch.strokes.flatMap(stroke => stroke.points.length < 2
+    const endpoints = sketch.strokes.flatMap(stroke => stroke.locked || stroke.points.length < 2
       ? [] : [stroke.points[0]!, stroke.points[stroke.points.length - 1]!]);
     const nearest = (p: Point) => {
       let best = p, distance = radius;
@@ -404,7 +404,8 @@ export function FreehandCanvas({
     setMessage("Extra wall extension trimmed to the junction. Undo to restore.");
   }
   function erase(p: Point) {
-    for (const s of sketch.strokes)
+    for (const s of sketch.strokes) {
+      if (s.locked) continue;
       for (let i = 1; i < s.points.length; i++) {
         const q = foot(p, s.points[i - 1]!, s.points[i]!);
         if (Math.hypot(p.x - q.x, p.y - q.y) < 14 / view.current.zoom) {
@@ -412,6 +413,7 @@ export function FreehandCanvas({
           break;
         }
       }
+    }
   }
   function calibrate(wallIndex = 0) {
     const segments = convertStrokes(
@@ -546,7 +548,7 @@ export function FreehandCanvas({
         {button("Save sketch", Save, () => {
           onSave(sketch);
           setMessage(
-            "Sketch added to your draft. Use Save project to sync it.",
+            "Sketch saved to this house-design draft. Use Save project to sync it to your saved project.",
           );
         })}
       </header>
