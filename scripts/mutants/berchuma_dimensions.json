@@ -1,0 +1,20 @@
+[
+  {
+    "name": "drawer fronts a finger gap apart are measured one by one",
+    "file": "src/features/berchuma-studio/services/interior-dimensions.ts",
+    "from": "const FINGER_GAP_MAX = 40;",
+    "to": "const FINGER_GAP_MAX = 10;"
+  },
+  {
+    "name": "a drawer bank is not told from the boards round it",
+    "file": "src/features/berchuma-studio/services/interior-dimensions.ts",
+    "from": "const reach = last?.front && obstacle.front ? FINGER_GAP_MAX : TOUCHING;",
+    "to": "const reach = TOUCHING;"
+  },
+  {
+    "name": "the drawer fronts are measured at the wrong height",
+    "file": "src/features/berchuma-studio/services/interior-dimensions.ts",
+    "from": "drawers: fronts.map((box) => span(box.minY, box.maxY))",
+    "to": "drawers: fronts.map((box) => span(box.minY, box.maxY + 10))"
+  }
+]

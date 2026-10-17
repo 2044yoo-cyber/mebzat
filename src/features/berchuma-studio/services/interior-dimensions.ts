@@ -25,6 +25,11 @@ type Box = { role: Part["role"]; minX: number; maxX: number; minY: number; maxY:
 
 const span = (from: number, to: number): Span => ({ from, to, size: Math.round(to - from) });
 
+/** The most a finger gap between two drawer fronts may be (see drawerFaceRects), mm. Fronts this far apart are still one bank. */
+const FINGER_GAP_MAX = 40;
+/** Boards a few millimetres apart touch for the purpose of the clear spaces between them. */
+const TOUCHING = 10;
+
 export function cabinetDimensions(cabinet: Pick<Cabinet, "id" | "position" | "size">, parts: readonly Part[]): CabinetDimensions | null {
   const own = parts.filter((part) => part.cabinetId === cabinet.id);
   if (!own.length || own.some((part) => (part.rotationY ?? 0) % 360 !== 0)) return null;
@@ -44,15 +49,19 @@ export function cabinetDimensions(cabinet: Pick<Cabinet, "id" | "position" | "si
     // drawers taken as one block (the fronts are measured on their own).
     const fronts = boxes.filter((box) => box.role === "drawer_front" && across(box)).sort((a, b) => a.minY - b.minY);
     const obstacles = [
-      ...boxes.filter((box) => (box.role === "top" || box.role === "bottom" || box.role === "shelf") && across(box)).map((box) => ({ minY: box.minY, maxY: box.maxY })),
-      ...fronts.map((box) => ({ minY: box.minY, maxY: box.maxY })),
+      ...boxes.filter((box) => (box.role === "top" || box.role === "bottom" || box.role === "shelf") && across(box)).map((box) => ({ minY: box.minY, maxY: box.maxY, front: false })),
+      ...fronts.map((box) => ({ minY: box.minY, maxY: box.maxY, front: true })),
     ].sort((a, b) => a.minY - b.minY);
-    const merged: { minY: number; maxY: number }[] = [];
+    const merged: { minY: number; maxY: number; front: boolean }[] = [];
     for (const obstacle of obstacles) {
       const last = merged.at(-1);
-      // Drawer fronts stand a few millimetres apart: one block, not five gaps.
-      if (last && obstacle.minY <= last.maxY + 10) last.maxY = Math.max(last.maxY, obstacle.maxY);
-      else merged.push({ ...obstacle });
+      // Drawer fronts stand a few millimetres apart, or a finger gap apart when the grip is a finger gap (25 mm unless it was set): one block either way, not a
+      // gap between each. Anything else this close is touching.
+      const reach = last?.front && obstacle.front ? FINGER_GAP_MAX : TOUCHING;
+      if (last && obstacle.minY <= last.maxY + reach) {
+        last.maxY = Math.max(last.maxY, obstacle.maxY);
+        last.front = obstacle.front;
+      } else merged.push({ ...obstacle });
     }
     const gaps: Span[] = [];
     for (let at = 0; at + 1 < merged.length; at += 1) if (merged[at + 1]!.minY - merged[at]!.maxY > 20) gaps.push(span(merged[at]!.maxY, merged[at + 1]!.minY));
