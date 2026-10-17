@@ -1,0 +1,56 @@
+[
+ {
+  "name": "a rail link loses its accessible name",
+  "file": "src/components/shell/sidebar.tsx",
+  "from": "              title={t(navigationKey(section.id))}\n              aria-label={t(navigationKey(section.id))}\n              aria-current",
+  "to": "              title={t(navigationKey(section.id))}\n              aria-current"
+ },
+ {
+  "name": "a rail link loses its tooltip",
+  "file": "src/components/shell/sidebar.tsx",
+  "from": "              title={t(navigationKey(section.id))}\n              aria-label={t(navigationKey(section.id))}\n              aria-current",
+  "to": "              aria-label={t(navigationKey(section.id))}\n              aria-current"
+ },
+ {
+  "name": "the section button forgets how many pages it opens",
+  "file": "src/components/shell/sidebar.tsx",
+  "from": "aria-label={`${t(navigationKey(section.id))} \u2014 ${section.items.length}`}",
+  "to": "aria-label={t(navigationKey(section.id))}"
+ },
+ {
+  "name": "the home badge shrinks to 36px",
+  "file": "src/components/shell/sidebar.tsx",
+  "from": "mb-2 flex size-11 items-center justify-center",
+  "to": "mb-2 flex size-9 items-center justify-center"
+ },
+ {
+  "name": "a section target loses padding",
+  "file": "src/components/shell/sidebar.tsx",
+  "from": "gap-1 rounded-lg px-1 py-1.5 transition-colors",
+  "to": "gap-1 rounded-lg px-1 py-1 transition-colors"
+ },
+ {
+  "name": "a section target loses its gap",
+  "file": "src/components/shell/sidebar.tsx",
+  "from": "flex w-full flex-col items-center justify-center gap-1 rounded-lg",
+  "to": "flex w-full flex-col items-center justify-center gap-0 rounded-lg"
+ },
+ {
+  "name": "a section icon shrinks",
+  "file": "src/components/shell/sidebar.tsx",
+  "from": "<section.icon className=\"size-4.5\" />",
+  "to": "<section.icon className=\"size-4\" />"
+ },
+ {
+  "name": "an unbuilt module becomes a link",
+  "file": "src/components/shell/section-panel.tsx",
+  "from": "<span className=\"flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground/60\">",
+  "to": "<Link href=\"/\" className=\"flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground/60\">"
+ },
+ {
+  "name": "the chip is not translated",
+  "file": "src/components/shell/section-panel.tsx",
+  "from": "{t(\"navigation.soon\")}",
+  "to": "{\"Soon\"}"
+ }
+]

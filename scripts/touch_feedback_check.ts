@@ -209,22 +209,31 @@ check("and is hidden from assistive technology", /aria-hidden data-nav-pending/.
   );
   check("and the rail accepts the override", /collapsed \?\? storedCollapsed/.test(rail));
 
-  // Icons with no text beside them have to carry their name some other way.
-  check("every icon in the rail is named", /aria-label=\{section\.label\}/.test(rail));
-  check("and titled, for a pointer", /title=\{section\.label\}/.test(rail));
+  // Icons with no text beside them have to carry their name some other way. The names are the language's now (bacce6d), asked of `t` by the section's id.
+  check(
+    "every icon in the rail is named",
+    /aria-label=\{t\(navigationKey\(section\.id\)\)\}/.test(rail) && /aria-label=\{`\$\{t\(navigationKey\(section\.id\)\)\} — \$\{section\.items\.length\}`\}/.test(rail),
+    "the link, and the button that opens a section's pages with how many there are",
+  );
+  check("and titled, for a pointer", /title=\{t\(navigationKey\(section\.id\)\)\}/.test(rail));
   // 36px is under what a thumb hits reliably, and this rail is now the whole
   // drawer on a phone rather than a desktop convenience.
   // Every target in the rail, not just the section links: the home badge was
   // still 36px after the sections were raised, and a measurement in the
   // browser is what caught it rather than reading the class list back.
+  // The home badge is a box of its own. A section's target is a column, an icon over a label, which is as tall as what is in it: the icon, the gap, one line of the
+  // label at its line height, and the padding above and below. That is worked out here from the classes, with the label at its shortest (one line, when it clamps at two).
+  // It is still the class list read back, which is what the paragraph above warns about; the browser is where the real height is measured.
   {
-    const collapsedBranch = rail.slice(rail.indexOf("if (navCollapsed)"), rail.indexOf("return (\n    <nav\n      aria-label=\"Workspace\""));
-    const sizes = [...collapsedBranch.matchAll(/flex size-(\d+) items-center justify-center rounded-lg/g)].map((m) => Number(m[1]));
-    check(
-      "every target in the rail is 44px",
-      sizes.length > 0 && sizes.every((n) => n >= 11),
-      `sizes found: ${sizes.map((n) => n * 4).join(", ")}px`,
-    );
+    const collapsedBranch = rail.slice(rail.indexOf("if (navCollapsed)"), rail.indexOf("<nav\n      aria-label={t(\"navigation.allMedosha\")}\n      className=\"flex h-full flex-col overflow-hidden\""));
+    const badge = collapsedBranch.match(/mb-2 flex size-(\d+) items-center justify-center/);
+    check("the home badge is 44px", Number(badge?.[1]) * 4 >= 44, `found ${Number(badge?.[1]) * 4}px`);
+    const column = collapsedBranch.match(/"flex w-full flex-col items-center justify-center gap-(\d+) rounded-lg px-\d+ py-(\d+(?:\.\d+)?) transition-colors"/);
+    const icon = collapsedBranch.match(/<section\.icon className="size-(\d+(?:\.\d+)?)"/);
+    const label = collapsedBranch.match(/line-clamp-2 text-center text-\[(\d+)px\] leading-\[(\d+(?:\.\d+)?)\]/);
+    check("a section's target is found in the rail", column !== null && icon !== null && label !== null);
+    const height = Number(icon?.[1]) * 4 + Number(column?.[1]) * 4 + Number(label?.[1]) * Number(label?.[2]) + 2 * Number(column?.[2]) * 4;
+    check("every section target in the rail is 44px, with one line of label", height >= 44, `${height.toFixed(2)}px`);
   }
 }
 
@@ -260,7 +269,11 @@ check("and is hidden from assistive technology", /aria-hidden data-nav-pending/.
   // holds about it, which is the part that makes a new site choosable.
   check("the panel lists a section's pages", /section\.items\.map/.test(panel));
   check("with the manifest's own one-line hint", /\{item\.hint\}/.test(panel));
-  check("an unbuilt module is a disabled row, not a link into nothing", /Soon/.test(panel) && /if \(!item\.href\)/.test(panel));
+  check(
+    "an unbuilt module is a disabled row, not a link into nothing",
+    /if \(!item\.href\) \{\s*return \(\s*<li key=\{item\.id\}>\s*<span /.test(panel) && /\{t\("navigation\.soon"\)\}/.test(panel),
+    "a row with no destination is a span with the chip that says so",
+  );
   check("a private page sends a signed-out reader to sign in", /item\.private && !signedIn/.test(panel));
   check("its rows are 44px", /min-h-11/.test(panel));
 
