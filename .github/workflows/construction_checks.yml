@@ -1,0 +1,76 @@
+# The checks of the construction learning mode, the building configurator, the bill of quantities, the cost estimate and the exports.
+#
+# They run on every push and pull request that touches that code. Nothing here needs a database, a network or a browser: the model is built in memory and
+# read back, the workbook is unzipped and the PDF is read by pdf.js. The two browser checks (a real Chromium at phone width, against a production build) are
+# slower and run when asked: Actions, "construction checks", Run workflow.
+name: construction checks
+
+on:
+  push:
+    paths:
+      - "src/features/house-designer/**"
+      - "src/features/berchuma-studio/services/xlsx.ts"
+      - "src/lib/takeoff/boq.ts"
+      - "scripts/construction_*"
+      - "scripts/building_config*"
+      - "scripts/run_construction_checks.mjs"
+      - "scripts/mutate.mjs"
+      - "scripts/mutants/construction_*"
+      - "scripts/mutants/building_config.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/construction_checks.yml"
+  pull_request:
+    paths:
+      - "src/features/house-designer/**"
+      - "src/features/berchuma-studio/services/xlsx.ts"
+      - "src/lib/takeoff/boq.ts"
+      - "scripts/construction_*"
+      - "scripts/building_config*"
+      - "scripts/run_construction_checks.mjs"
+      - "scripts/mutate.mjs"
+      - "scripts/mutants/construction_*"
+      - "scripts/mutants/building_config.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/construction_checks.yml"
+  workflow_dispatch:
+    inputs:
+      browser:
+        description: "Also run the two browser checks (builds the app and installs Chromium)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Types, and every check that needs no browser
+        run: node scripts/run_construction_checks.mjs
+
+  browser:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.browser }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: The two browser checks
+        run: node scripts/run_construction_checks.mjs --browser
