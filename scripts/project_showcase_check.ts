@@ -884,22 +884,23 @@ const fieldIds = (category: ProjectCategory) =>
 
   // The card cannot show a column nobody selected. The profile's portfolio draws the full card; the Projects tab became the person's own profile and everything they
   // have made (ed8c399), whose project rows are a line of category and place under the title and no description, so it needs the category and no more.
-  for (const [name, path, wantsDescription] of [
-    ["the portfolio", "src/components/projects/profile-projects.tsx", true],
-    ["the Projects tab", "src/lib/portfolio/sources.ts", false],
+  // The Projects tab's file lists every kind of thing a person makes, each with its own columns; only the project's are the card's. The columns are read from the
+  // query itself, as a list of names: a pattern for the word "category" between any two quotation marks was satisfied by the code between two strings.
+  const whole = (text: string) => text;
+  const projectSource = (text: string) => text.slice(text.indexOf("  project: {"), text.indexOf("  product: {"));
+  for (const [name, path, wantsDescription, scope, query] of [
+    ["the portfolio", "src/components/projects/profile-projects.tsx", true, whole, /\.select\(\s*"([^"]*)"/],
+    ["the Projects tab", "src/lib/portfolio/sources.ts", false, projectSource, /columns: "([^"]*)"/],
   ] as const) {
-    const source = sourceOf(path);
+    const found = scope(sourceOf(path)).match(query);
+    check(`${name} has a query for projects`, found !== null);
+    const columns = (found?.[1] ?? "").split(",").map((column) => column.trim());
     check(
       `${name} selects the category`,
-      /"[^"]*\bcategory\b[^"]*"/.test(source),
+      columns.includes("category"),
       "the card reads project.category; a query that does not fetch it renders no badge",
     );
-    if (wantsDescription) {
-      check(
-        `${name} selects the description`,
-        /"[^"]*\bdescription\b[^"]*"/.test(source),
-      );
-    }
+    if (wantsDescription) check(`${name} selects the description`, columns.includes("description"));
   }
 }
 

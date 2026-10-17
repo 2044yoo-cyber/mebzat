@@ -1,0 +1,20 @@
+[
+ {
+  "name": "the portfolio stops selecting the description",
+  "file": "src/components/projects/profile-projects.tsx",
+  "from": "\"id, title, cover_image_url, category, description, location_city, location_country, status\"",
+  "to": "\"id, title, cover_image_url, category, location_city, location_country, status\""
+ },
+ {
+  "name": "the portfolio stops selecting the category",
+  "file": "src/components/projects/profile-projects.tsx",
+  "from": "\"id, title, cover_image_url, category, description, location_city, location_country, status\"",
+  "to": "\"id, title, cover_image_url, description, location_city, location_country, status\""
+ },
+ {
+  "name": "the projects tab stops selecting the category",
+  "file": "src/lib/portfolio/sources.ts",
+  "from": "columns: \"id, title, category, location_city, cover_image_url, status, views, created_at\",",
+  "to": "columns: \"id, title, location_city, cover_image_url, status, views, created_at\","
+ }
+]
