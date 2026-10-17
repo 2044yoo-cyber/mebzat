@@ -1,0 +1,320 @@
+[
+  {
+    "name": "formwork and props are never taken away",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "else if (c.removedAfter !== undefined && c.removedAfter < view.stage) return \"hidden\";",
+    "to": "else if (false as boolean) return \"hidden\";"
+  },
+  {
+    "name": "the next stage is built a stage early",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "if (c.stage > view.stage) v = view.ghostFuture ? \"ghost\" : \"hidden\";",
+    "to": "if (c.stage > view.stage + 1) v = view.ghostFuture ? \"ghost\" : \"hidden\";"
+  },
+  {
+    "name": "every stage is built from the start",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "if (c.stage > view.stage) v = view.ghostFuture ? \"ghost\" : \"hidden\";",
+    "to": "if (false as boolean) v = view.ghostFuture ? \"ghost\" : \"hidden\";"
+  },
+  {
+    "name": "only the stage in hand is on show; what was built before disappears",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "if (c.stage > view.stage) v = view.ghostFuture ? \"ghost\" : \"hidden\";",
+    "to": "if (c.stage !== view.stage) v = view.ghostFuture ? \"ghost\" : \"hidden\";"
+  },
+  {
+    "name": "the work to come is never shown faint",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "v = view.ghostFuture ? \"ghost\" : \"hidden\";",
+    "to": "v = \"hidden\";"
+  },
+  {
+    "name": "the work to come is always shown faint",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "v = view.ghostFuture ? \"ghost\" : \"hidden\";",
+    "to": "v = \"ghost\";"
+  },
+  {
+    "name": "the paint is lost for one stage",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "  if (view.categoriesOff.includes(c.category)) return \"hidden\";",
+    "to": "  if (view.categoriesOff.includes(c.category)) return \"hidden\";\n  if (c.layer === \"paint\" && view.stage === 16) return \"hidden\";"
+  },
+  {
+    "name": "the finished building loses its plumbing",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "  if (view.categoriesOff.includes(c.category)) return \"hidden\";",
+    "to": "  if (view.categoriesOff.includes(c.category)) return \"hidden\";\n  if (view.stage === 18 && isInstallation(c)) return \"hidden\";"
+  },
+  {
+    "name": "formwork is not shown while the frame is cast",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "        case \"complete\":\n          if (isConcrete(c)) v = worse(v, \"ghost\");",
+    "to": "        case \"complete\":\n          if (isConcrete(c)) v = worse(v, \"ghost\");\n          if (isTemporary(c)) v = \"hidden\";"
+  },
+  {
+    "name": "a floor switched off still shows",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "if (c.storeyId && view.storeysOff.includes(c.storeyId)) return \"hidden\";",
+    "to": "if (false as boolean) return \"hidden\";"
+  },
+  {
+    "name": "a kind of work switched off still shows",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "if (view.layersOff.includes(c.layer)) return \"hidden\";",
+    "to": ""
+  },
+  {
+    "name": "isolating a kind of work leaves the others",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "layersOff: LAYER_IDS.filter((l) => l !== layer), showEmbedded: true",
+    "to": "layersOff: [], showEmbedded: true"
+  },
+  {
+    "name": "isolating steel does not show it inside the concrete",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "layersOff: LAYER_IDS.filter((l) => l !== layer), showEmbedded: true",
+    "to": "layersOff: LAYER_IDS.filter((l) => l !== layer), showEmbedded: false"
+  },
+  {
+    "name": "steel stays in view after its stage",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "if (!view.showEmbedded) v = \"hidden\";",
+    "to": "if (false as boolean) v = \"hidden\";"
+  },
+  {
+    "name": "one stage alone is ignored",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "if (view.onlyThisStage && c.stage !== view.stage)",
+    "to": "if (false as boolean && c.stage !== view.stage)"
+  },
+  {
+    "name": "one stage alone leaves nothing faint round it",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "if (view.onlyThisStage && c.stage !== view.stage) v = worse(v, view.transparentContext ? \"ghost\" : \"hidden\");",
+    "to": "if (view.onlyThisStage && c.stage !== view.stage) v = worse(v, \"hidden\");"
+  },
+  {
+    "name": "every course of a wall shows at once",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "if (view.stage !== 7 || view.wallProgress >= 1) return true;",
+    "to": "if (true as boolean) return true;"
+  },
+  {
+    "name": "a wall goes up from the top",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "return z - floor.floorZ <= Math.max(0, view.wallProgress) * floor.height;",
+    "to": "return z - floor.floorZ >= Math.max(0, view.wallProgress) * floor.height;"
+  },
+  {
+    "name": "the height of the wall ignores the slider",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "return z - floor.floorZ <= Math.max(0, view.wallProgress) * floor.height;",
+    "to": "return z - floor.floorZ <= 0.5 * floor.height;"
+  },
+  {
+    "name": "the cut-away is always on",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "  if (mode === \"off\") return null;\n",
+    "to": ""
+  },
+  {
+    "name": "the cut-away ignores the slider",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "const f = Math.max(0, Math.min(1, view.cutaway.position));",
+    "to": "const f = 0.5;"
+  },
+  {
+    "name": "the cut-away slider goes beyond the building",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "const f = Math.max(0, Math.min(1, view.cutaway.position));",
+    "to": "const f = view.cutaway.position;"
+  },
+  {
+    "name": "the level cut keeps what is above",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "value: min.z + (max.z - min.z) * f, keep: \"below\" }",
+    "to": "value: min.z + (max.z - min.z) * f, keep: \"above\" }"
+  },
+  {
+    "name": "the section across x is taken across y",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "if (mode === \"section-x\") return { axis: \"x\",",
+    "to": "if (mode === \"section-x\") return { axis: \"y\","
+  },
+  {
+    "name": "a floor at a time shows the floors above instead",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "model.storeys.filter((s) => s.index > index)",
+    "to": "model.storeys.filter((s) => s.index < index)"
+  },
+  {
+    "name": "a floor at a time hides the floor chosen",
+    "file": "src/features/house-designer/construction/view.ts",
+    "from": "model.storeys.filter((s) => s.index > index)",
+    "to": "model.storeys.filter((s) => s.index >= index)"
+  },
+  {
+    "name": "the floors never lift apart",
+    "file": "src/features/house-designer/construction/explode.ts",
+    "from": "const lift = c.storeyIndex < 0 ? -0.6 : c.storeyIndex;",
+    "to": "const lift = 0;"
+  },
+  {
+    "name": "the upper floors sink instead of lifting",
+    "file": "src/features/house-designer/construction/explode.ts",
+    "from": ": c.storeyIndex;",
+    "to": ": -c.storeyIndex;"
+  },
+  {
+    "name": "the kinds of work never part",
+    "file": "src/features/house-designer/construction/explode.ts",
+    "from": "base = add(base, scale(DIAGONAL, rank * a * CATEGORY_STEP));",
+    "to": "base = add(base, ZERO);"
+  },
+  {
+    "name": "the layers never slide apart",
+    "file": "src/features/house-designer/construction/explode.ts",
+    "from": "const layerDistance = view.explode.layers && !followsHost ? c.explode.layerIndex * a * LAYER_STEP : 0;",
+    "to": "const layerDistance = 0;"
+  },
+  {
+    "name": "the explosion goes past all the way",
+    "file": "src/features/house-designer/construction/explode.ts",
+    "from": "const a = Math.max(0, Math.min(1, view.explode.amount));",
+    "to": "const a = Math.max(0, view.explode.amount);"
+  },
+  {
+    "name": "the explosion goes below nothing",
+    "file": "src/features/house-designer/construction/explode.ts",
+    "from": "const a = Math.max(0, Math.min(1, view.explode.amount));",
+    "to": "const a = Math.min(1, view.explode.amount);"
+  },
+  {
+    "name": "nothing can be looked into",
+    "file": "src/features/house-designer/construction/inspect.ts",
+    "from": "  if (!c) return null;",
+    "to": "  if (true as boolean) return null;"
+  },
+  {
+    "name": "a part is said to be of the first stage",
+    "file": "src/features/house-designer/construction/inspect.ts",
+    "from": "stage: STAGE_BY_ID[c.stage],",
+    "to": "stage: STAGE_BY_ID[1],"
+  },
+  {
+    "name": "a part is called by its kind",
+    "file": "src/features/house-designer/construction/inspect.ts",
+    "from": "id: c.id, name: c.name, title: knowledge.title,",
+    "to": "id: c.id, name: c.kind, title: knowledge.title,"
+  },
+  {
+    "name": "a part has no title for its lesson",
+    "file": "src/features/house-designer/construction/inspect.ts",
+    "from": "id: c.id, name: c.name, title: knowledge.title,",
+    "to": "id: c.id, name: c.name, title: \"\","
+  },
+  {
+    "name": "a part is said to be of no material",
+    "file": "src/features/house-designer/construction/inspect.ts",
+    "from": "material: materialOf(c.materialId).name, stage:",
+    "to": "material: \"\", stage:"
+  },
+  {
+    "name": "a part's quantities are not given",
+    "file": "src/features/house-designer/construction/inspect.ts",
+    "from": "quantities: c.quantities, quantityMethod",
+    "to": "quantities: [], quantityMethod"
+  },
+  {
+    "name": "there is no lesson for the drainage layer",
+    "file": "src/features/house-designer/construction/catalogue.ts",
+    "from": "[\"drainage-layer\", \"substructure\", {",
+    "to": "[\"drainage-layer-x\", \"substructure\", {"
+  },
+  {
+    "name": "there is no lesson for the wall blocks",
+    "file": "src/features/house-designer/construction/catalogue.ts",
+    "from": "return KNOWLEDGE[kind] ?? null;",
+    "to": "return kind === \"wall-blocks\" ? null : (KNOWLEDGE[kind] ?? null);"
+  },
+  {
+    "name": "a stage is renamed",
+    "file": "src/features/house-designer/construction/stages.ts",
+    "from": "title: \"Site preparation\"",
+    "to": "title: \"Site preparations\""
+  },
+  {
+    "name": "the last stage is dropped",
+    "file": "src/features/house-designer/construction/types.ts",
+    "from": "14, 15, 16, 17, 18] as const",
+    "to": "14, 15, 16, 17] as const"
+  },
+  {
+    "name": "the area asked is not the area drawn",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "const target = areaM2 * 1e6;",
+    "to": "const target = areaM2 * 1.1e6;"
+  },
+  {
+    "name": "the gross floor area is the ground floor only",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "const grossFloorArea = areaPerFloor.reduce((s, a) => s + a, 0);",
+    "to": "const grossFloorArea = areaPerFloor[0] ?? 0;"
+  },
+  {
+    "name": "the footprint is all the floors",
+    "file": "src/features/house-designer/construction/building-config.ts",
+    "from": "footprint: areaPerFloor[0] ?? 0,",
+    "to": "footprint: grossFloorArea,"
+  },
+  {
+    "name": "a bill up to a stage is the whole bill",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "const found = aggregateQuantities(model, options, scope, filter);",
+    "to": "const found = aggregateQuantities(model, options, scope);"
+  },
+  {
+    "name": "the cost of the last stage falls nowhere",
+    "file": "src/features/house-designer/construction/boq.ts",
+    "from": "if (by === \"stage\") return String(part.stage);",
+    "to": "if (by === \"stage\") return String(part.stage + (part.stage === 18 ? 1 : 0));"
+  },
+  {
+    "name": "the cost by floor leaves out a group",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "e.groups[by].map((g): ReportCell[] =>",
+    "to": "e.groups[by].slice(1).map((g): ReportCell[] =>"
+  },
+  {
+    "name": "the cost summary ends on the direct cost",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "[\"TOTAL\", r2(e.total)],",
+    "to": "[\"TOTAL\", r2(e.direct)],"
+  },
+  {
+    "name": "the key facts give the direct cost as the total",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "`${CURRENCY} ${fmt(e.total)}`]",
+    "to": "`${CURRENCY} ${fmt(e.direct)}`]"
+  },
+  {
+    "name": "the workbook leaves out its first table",
+    "file": "src/features/house-designer/construction/report-xlsx.ts",
+    "from": "...report.tables.map(tableSheet),",
+    "to": "...report.tables.slice(1).map(tableSheet),"
+  },
+  {
+    "name": "the PDF leaves out its first table",
+    "file": "src/features/house-designer/construction/report-pdf.ts",
+    "from": "...ORDER.flatMap((id) =>",
+    "to": "...ORDER.slice(1).flatMap((id) =>"
+  },
+  {
+    "name": "the PDF leaves out its last table",
+    "file": "src/features/house-designer/construction/report-pdf.ts",
+    "from": "...ORDER.flatMap((id) =>",
+    "to": "...ORDER.slice(0, -1).flatMap((id) =>"
+  }
+]
