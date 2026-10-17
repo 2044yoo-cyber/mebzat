@@ -5,6 +5,7 @@ import {
   findBoard,
   findEdgeBand,
 } from "../types/catalogue";
+import { DEFAULT_DOOR_SIZING } from "./door-sizing";
 import {
   LIMITS,
   boundingBox,
@@ -258,6 +259,10 @@ function shell(
     ),
     finish: { colour: colour.name, hex: colour.hex, sheen: "satin" },
     lighting: { ledStrip: false, colourTemperature: 3000 },
+    // A new design hangs its doors on full-overlay hinges with the standard
+    // gap between them; every design saved before this carries none and is
+    // sized as it always was.
+    doorSizing: { ...DEFAULT_DOOR_SIZING },
     sketchObjects: [],
     sketchMode: false,
     meta: {
