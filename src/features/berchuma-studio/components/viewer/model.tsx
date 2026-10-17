@@ -627,7 +627,6 @@ function PartMesh({
         roughness={renderQuality ? Math.max(0.24, roughnessFor(part, spec) - 0.08) : roughnessFor(part, spec)}
         metalness={renderQuality ? 0.035 : 0.02}
         envMapIntensity={renderQuality ? 1.25 : 1}
-        metalness={0.02}
         // Lit rather than tinted. Tinting the selection changed what the
         // material looked like, which is the one thing somebody choosing a
         // finish must be able to trust.
