@@ -1,0 +1,140 @@
+[
+  {
+    "name": "drawer fronts are stacked first-at-the-bottom again",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "  let y = floor;\n  return [...construction.faces]\n    .reverse()\n    .map((face, step, reversed) => {\n      const height = originalTotal > 0 ? face.height * heightBudget / originalTotal : face.height;\n      const rect = { index: face.index, y, height };\n      y += height + (step < reversed.length - 1 ? between : 0);\n      return rect;\n    })\n    .reverse();\n}",
+    "to": "  let y = floor;\n  return construction.faces.map((face, index) => {\n    const height = originalTotal > 0 ? face.height * heightBudget / originalTotal : face.height;\n    const rect = { index: face.index, y, height };\n    y += height + (index < construction.faces.length - 1 ? between : 0);\n    return rect;\n  });\n}"
+  },
+  {
+    "name": "an overlaid back takes its thickness from the depth",
+    "file": "src/features/berchuma-studio/services/wardrobe-materials.ts",
+    "from": "export function carcassInteriorDepth(spec: DesignSpec, depth: number): number {\n  return constructionMethods(spec).backFixing === \"inset\" ? depth - constructionMaterials(spec).back.thickness : depth;",
+    "to": "export function carcassInteriorDepth(spec: DesignSpec, depth: number): number {\n  return depth - constructionMaterials(spec).back.thickness;"
+  },
+  {
+    "name": "an inset back takes nothing from the depth",
+    "file": "src/features/berchuma-studio/services/wardrobe-materials.ts",
+    "from": "export function carcassInteriorDepth(spec: DesignSpec, depth: number): number {\n  return constructionMethods(spec).backFixing === \"inset\" ? depth - constructionMaterials(spec).back.thickness : depth;",
+    "to": "export function carcassInteriorDepth(spec: DesignSpec, depth: number): number {\n  return depth;"
+  },
+  {
+    "name": "every leaf takes the hinges of a full-height one",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "total + door.quantity * hingesForLeaf(door.length),",
+    "to": "total + door.quantity * hingesForLeaf(2300),"
+  },
+  {
+    "name": "drawers in a stack get a handle each",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "return bay?.fitting.kind === \"drawers\" ? bay.fitting.grip ?? \"finger-gap\" : \"finger-gap\";",
+    "to": "return bay?.fitting.kind === \"drawers\" ? bay.fitting.grip ?? \"finger-gap\" : \"handle\";"
+  },
+  {
+    "name": "a drawer with no grip chosen gets no finger gap",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "  const grip = bay.fitting.kind === \"drawers\" ? bay.fitting.grip ?? \"finger-gap\" : \"finger-gap\";\n  const fingerGap = grip === \"finger-gap\" && count > 1",
+    "to": "  const grip = bay.fitting.kind === \"drawers\" ? bay.fitting.grip ?? \"handle\" : \"handle\";\n  const fingerGap = grip === \"finger-gap\" && count > 1"
+  },
+  {
+    "name": "the part count includes what is bought",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "      partCount: parts\n        .filter((part) => part.manufacture !== \"purchased\")\n        .reduce(",
+    "to": "      partCount: parts\n        .reduce("
+  },
+  {
+    "name": "the cut list includes what is bought",
+    "file": "src/features/berchuma-studio/services/cutlist.ts",
+    "from": "  const cutParts = breakdown.parts.filter(\n    (part) => part.manufacture !== \"purchased\",\n  );\n  const boards",
+    "to": "  const cutParts = breakdown.parts;\n  const boards"
+  },
+  {
+    "name": "board area includes what is bought",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "    if (part.manufacture === \"purchased\") continue;\n\n    // Square metres, from millimetres.",
+    "to": "    // Square metres, from millimetres."
+  },
+  {
+    "name": "a hanging rail is cut from board",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "          label: `Hanging rail${bayName}`,\n          bayId: bay.id,\n          board,\n          manufacture: \"purchased\",",
+    "to": "          label: `Hanging rail${bayName}`,\n          bayId: bay.id,\n          board,"
+  },
+  {
+    "name": "the rails are left off the hardware list",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": ".filter((part) => part.role === \"rail\" && part.manufacture !== \"cut\")",
+    "to": ".filter((part) => part.role === \"rail\" && part.manufacture === \"cut\")"
+  },
+  {
+    "name": "the plinth has no rear",
+    "file": "src/features/berchuma-studio/services/wardrobe-plinth.ts",
+    "from": "    ...rearSpans.map((span, index) => ({",
+    "to": "    ...rearSpans.slice(0, 0).map((span, index) => ({"
+  },
+  {
+    "name": "the plinth has two left sides",
+    "file": "src/features/berchuma-studio/services/wardrobe-plinth.ts",
+    "from": "{ x: safeWidth - t, y: 0, z: frontRecess + t },\n      ],\n      size: { x: t, y: safeHeight, z: sideDepth },",
+    "to": "{ x: 0, y: 0, z: frontRecess + t },\n      ],\n      size: { x: t, y: safeHeight, z: sideDepth },"
+  },
+  {
+    "name": "a wide unit gets legs at the corners only",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "const spans = Math.max(0, Math.ceil(envelope.width / 900) - 1);",
+    "to": "const spans = 0;"
+  },
+  {
+    "name": "fewer legs are ordered than are drawn",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "total + Math.max(2, Math.ceil(cabinet.size.width / 500) + 1) * 2,",
+    "to": "total + Math.max(2, Math.ceil(cabinet.size.width / 500) + 1) * 1,"
+  },
+  {
+    "name": "a wardrobe may be as tall as 2700 again",
+    "file": "src/features/berchuma-studio/types/spec.ts",
+    "from": "return Math.min(LIMITS.maxHeight, Math.floor(plinthHeight + usable));",
+    "to": "return LIMITS.maxHeight;"
+  },
+  {
+    "name": "a wide wardrobe bay is not divided",
+    "file": "src/features/berchuma-studio/types/spec.ts",
+    "from": "wardrobeBayWidth: 900,",
+    "to": "wardrobeBayWidth: 9000,"
+  },
+  {
+    "name": "a shelf too long for its board is not flagged",
+    "file": "src/features/berchuma-studio/types/spec.ts",
+    "from": "if (hasShelves && bay.width > span) {",
+    "to": "if (false as boolean) {"
+  },
+  {
+    "name": "a single leaf past 600 mm is left alone",
+    "file": "src/features/berchuma-studio/types/spec.ts",
+    "from": "bay.doorLeaves === 1 &&\n      bay.width > LIMITS.hingedLeafWidth",
+    "to": "bay.doorLeaves === 1 &&\n      bay.width > 100000"
+  },
+  {
+    "name": "the door of a stack covers its drawers",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "  if (section.kind === \"drawers\") return section.internal === true;",
+    "to": "  if (section.kind === \"drawers\") return true;"
+  },
+  {
+    "name": "the heights of drawer fronts ignore the gaps between them",
+    "file": "src/features/berchuma-studio/services/drawer-construction.ts",
+    "from": "Math.floor(input.openingHeight - (count - 1) * gap),",
+    "to": "Math.floor(input.openingHeight),"
+  },
+  {
+    "name": "a chest may have drawers down to a 30 mm front",
+    "file": "src/features/berchuma-studio/types/spec.ts",
+    "from": "      Math.floor(\n        (height + DRAWER_FRONT_GAP) /\n          (LIMITS.minDrawerFront + DRAWER_FRONT_GAP),\n      ),",
+    "to": "      Math.floor(\n        (height + DRAWER_FRONT_GAP) /\n          (30 + DRAWER_FRONT_GAP),\n      ),"
+  },
+  {
+    "name": "the release checklist is keyed on its text again",
+    "file": "src/app/designs/[slug]/cut-list/page.tsx",
+    "from": "<div key={`${index}-${item}`} className=\"flex min-h-9 items-start gap-2 border-b py-2 text-sm\">",
+    "to": "<div key={item} className=\"flex min-h-9 items-start gap-2 border-b py-2 text-sm\">"
+  }
+]

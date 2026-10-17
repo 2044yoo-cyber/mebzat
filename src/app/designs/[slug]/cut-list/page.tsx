@@ -145,7 +145,7 @@ export default async function CutListPage({
                 <p className="text-xs text-muted-foreground">
                   Estimate for all {projectCosts.designs.length} cabinets, including boards, edge banding, hardware,
                   workshop labour, finishing, installation and transport. Lowest cabinet rate confidence: {Math.round(projectCosts.confidence)}%.
-                  Cabinet prices are calculated separately using each cabinet's own sheet nesting, so this total may be more conservative than the shared-sheet purchasing list below. Confirm supplier prices and assumptions before treating this as a final quote.
+                  Cabinet prices are calculated separately using each cabinet&apos;s own sheet nesting, so this total may be more conservative than the shared-sheet purchasing list below. Confirm supplier prices and assumptions before treating this as a final quote.
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
                   {[
@@ -253,7 +253,7 @@ export default async function CutListPage({
                   "Confirm transport modules, assembly access and installation site",
                   "Workshop lead authorises cutting",
                 ].map((item, index) => (
-                  <div key={item} className="flex min-h-9 items-start gap-2 border-b py-2 text-sm">
+                  <div key={`${index}-${item}`} className="flex min-h-9 items-start gap-2 border-b py-2 text-sm">
                     <span aria-hidden className="mt-0.5 inline-block size-4 shrink-0 border border-current" />
                     <span>{index + 1}. {item}</span>
                   </div>

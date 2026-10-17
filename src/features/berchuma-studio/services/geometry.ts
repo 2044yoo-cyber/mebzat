@@ -1778,13 +1778,19 @@ function drawerFaceRects(
   // up to, as it always did; one sized by hinge type shares out the span its
   // hinge gives the run.
   const heightBudget = Math.max(0, (sizing.legacy ? originalTotal : span) - totalGap);
+  // The faces run top to bottom, as the boxes do and as the editor's list does: the first drawer is the top one. Stacked up from the floor, the last face is
+  // the lowest, so they are worked through in reverse and handed back in their own order. Stacked the other way round the first front stood at the bottom over
+  // the last box, and an unequal bank (the bottom drawer deeper) was drawn, cut and priced with its fronts upside down against its boxes.
   let y = floor;
-  return construction.faces.map((face, index) => {
-    const height = originalTotal > 0 ? face.height * heightBudget / originalTotal : face.height;
-    const rect = { index: face.index, y, height };
-    y += height + (index < construction.faces.length - 1 ? between : 0);
-    return rect;
-  });
+  return [...construction.faces]
+    .reverse()
+    .map((face, step, reversed) => {
+      const height = originalTotal > 0 ? face.height * heightBudget / originalTotal : face.height;
+      const rect = { index: face.index, y, height };
+      y += height + (step < reversed.length - 1 ? between : 0);
+      return rect;
+    })
+    .reverse();
 }
 
 export type CabinetFronts = {
