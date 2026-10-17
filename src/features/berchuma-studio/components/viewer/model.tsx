@@ -68,6 +68,7 @@ const MM = 0.001;
 export default function Model({
   spec,
   visualMode = "normal",
+  renderQuality = false,
   explodeDistance = 0.35,
   hideFronts = false,
   surface = "model",
