@@ -80,6 +80,14 @@ for (const shape of ["straight", "l_shaped", "u_shaped", "g_shaped", "island"] a
   const fridge = spec.cabinets.find((c) => c.kitchenRole === "fridge")!;
   const enclosure = kitchenConstruction(spec, fridge, []);
   assert.equal(enclosure.filter((p) => p.role === "door").length, 2);
+  // A kitchen with no door sizing stored (the old way, which every new one still is) hangs the two doors over the fridge side by side across its housing: equal, the
+  // design's door gap between them and half of it at each outer edge, so that they add up to the housing exactly.
+  const overhead = kitchenConstruction({ ...spec, doorSizing: undefined }, fridge, []).filter((p) => p.role === "door").sort((a, b) => a.placements[0]!.x - b.placements[0]!.x);
+  const doorGap = spec.carcass.doorGap;
+  assert.equal(overhead[0]!.size.x, overhead[1]!.size.x, `${shape}: the two doors over the fridge are equal`);
+  assert.equal(overhead[0]!.placements[0]!.x, doorGap / 2, `${shape}: the first leaves half a gap at the edge`);
+  assert.equal(overhead[1]!.placements[0]!.x - (overhead[0]!.placements[0]!.x + overhead[0]!.size.x), doorGap, `${shape}: a gap between the two`);
+  assert.equal(overhead[1]!.placements[0]!.x + overhead[1]!.size.x, fridge.size.width - doorGap / 2, `${shape}: and half a gap at the other edge`);
   for (const p of enclosure) for (const at of p.placements) {
     if (at.y < 1800) assert.ok(at.x + p.size.x <= 18 || at.x >= fridge.size.width - 18, "Fridge clear opening has no blocking boards");
   }

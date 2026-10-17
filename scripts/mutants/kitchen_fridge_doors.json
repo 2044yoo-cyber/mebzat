@@ -1,0 +1,20 @@
+[
+ {
+  "name": "the fridge doors ignore the gap",
+  "file": "src/features/berchuma-studio/services/kitchen-construction.ts",
+  "from": "const leafWidth = (width - 2 * gap) / 2;",
+  "to": "const leafWidth = width / 2;"
+ },
+ {
+  "name": "the fridge doors start at the edge",
+  "file": "src/features/berchuma-studio/services/kitchen-construction.ts",
+  "from": "x: gap / 2 + i * (leafWidth + gap)",
+  "to": "x: i * (leafWidth + gap)"
+ },
+ {
+  "name": "the fridge doors touch",
+  "file": "src/features/berchuma-studio/services/kitchen-construction.ts",
+  "from": "x: gap / 2 + i * (leafWidth + gap)",
+  "to": "x: gap / 2 + i * leafWidth"
+ }
+]

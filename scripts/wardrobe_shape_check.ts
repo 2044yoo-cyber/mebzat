@@ -38,6 +38,7 @@ import { modulesOf } from "../src/features/berchuma-studio/services/transport-mo
 import {
   partCentre,
   partRotationRadians,
+  partWorldBounds,
   rotatedRectBounds,
 } from "../src/features/berchuma-studio/services/part-transform.ts";
 import { readFileSync } from "node:fs";
@@ -758,6 +759,40 @@ for (const shape of ["l_shaped", "u_shaped"] as const) {
   check(`${shape}: each corner has an owning run`, resolved.layout.corners.filter((corner) => corner.ownerRunId).length === count);
   check(`${shape}: exact requested dimensions have no board overlaps`, clashes(spec).length === 0, clashes(spec).slice(0, 3).join("; "));
   if (shape === "u_shaped") check("3000 × 1800 U gives both 600 mm corners to its shorter sides", resolved.layout.placements.map((p) => p.usableLength).join() === "1800,1800,1800");
+}
+
+// A corner that no run hosts (the connected L, which the shorter run owns, or a blind or diagonal one, which nobody does) is reached from the cabinets beside it: the
+// gable at the end of a run that meets it keeps 60 mm at the back and the rest of its depth is open. An L has one such corner, a U two; the connected L opens only
+// the end of the run that does not own it, the others open both ends that meet them.
+for (const [kind, ofL] of [["connected_l", 1], ["blind", 2], ["diagonal", 2]] as const) {
+  for (const shape of ["l_shaped", "u_shaped"] as const) {
+    const spec = { ...build(shape, shape === "u_shaped" ? [1800, 3000, 1800] : [3000, 1800]), cornerKind: kind };
+    const supports = buildParts(spec).parts.filter((part) => part.label === "Corner access rear support");
+    const expected = shape === "u_shaped" ? ofL * 2 : ofL;
+    check(`${shape} with a ${kind} corner: the ends that meet it open into it`, supports.length === expected, `${supports.length} rear supports, ${expected} expected`);
+    check(`${shape} with a ${kind} corner: each keeps 60 mm of its gable at the back`, supports.length > 0 && supports.every((part) => part.size.z === 60));
+  }
+}
+
+// A diagonal corner is a module of its own with one gable, on the side against the room's wall: on the right for an L and for the right-hand corner of a U, on the left
+// for the left-hand corner of a U. The room is as wide as its back wall (3000 mm), so that is where the gable ends, or starts.
+{
+  const gableOf = (spec: DesignSpec, corner: string) =>
+    buildParts(spec).parts.filter((part) => part.id === `${corner}/gable-left`).flatMap((part) => part.placements.map((at) => partWorldBounds(part, at)));
+  const [l] = gableOf({ ...build("l_shaped", [3000, 1800]), cornerKind: "diagonal" }, "corner-ab");
+  check("an L with a diagonal corner has its gable against the wall on the right", l !== undefined && Math.abs(l.max.x - 3000) < 0.5, `ends at ${l?.max.x}`);
+  const diagonalU = { ...build("u_shaped", [1800, 3000, 1800]), cornerKind: "diagonal" as const };
+  const [left] = gableOf(diagonalU, "corner-left");
+  const [right] = gableOf(diagonalU, "corner-right");
+  check("a U's left corner has its gable against the wall on the left", left !== undefined && Math.abs(left.min.x) < 0.5, `starts at ${left?.min.x}`);
+  check("and its right corner has it on the right", right !== undefined && Math.abs(right.max.x - 3000) < 0.5, `ends at ${right?.max.x}`);
+}
+
+// One corner can be a different kind from the layout's. The L's only corner becomes a module of its own when it says so, and is hosted by a run when it does not.
+{
+  const mixed = { ...build("l_shaped", [3000, 1800]), cornerKinds: { "corner-ab": "diagonal" as const } };
+  check("a corner's own kind overrides the layout's", buildParts(mixed).parts.some((part) => part.id.startsWith("corner-ab/")));
+  check("and without one the layout's kind hosts it in a run", !buildParts(build("l_shaped", [3000, 1800])).parts.some((part) => part.id.startsWith("corner-ab/")));
 }
 
 if (failures.length > 0) {

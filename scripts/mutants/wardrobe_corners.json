@@ -1,0 +1,50 @@
+[
+ {
+  "name": "the ends that meet a corner no run hosts stay closed",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "if (joinsWardrobeCorner) {",
+  "to": "if (false) {"
+ },
+ {
+  "name": "a connected L never opens the end of the run that does not own it",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "(!corner.ownerRunId || (corner.kind === \"connected_l\" && corner.ownerRunId !== placed.runId)) &&",
+  "to": "(!corner.ownerRunId) &&"
+ },
+ {
+  "name": "the rear support is not 60 mm",
+  "file": "src/features/berchuma-studio/services/geometry.ts",
+  "from": "const supportDepth = Math.min(60, part.size.z);",
+  "to": "const supportDepth = Math.min(40, part.size.z);"
+ },
+ {
+  "name": "a right-hand corner is built as a left-hand one",
+  "file": "src/features/berchuma-studio/services/corners.ts",
+  "from": "const exteriorRight = wardrobeShelving && corner.id !== \"corner-left\";",
+  "to": "const exteriorRight = false;"
+ },
+ {
+  "name": "corners are built on the wrong sides",
+  "file": "src/features/berchuma-studio/services/corners.ts",
+  "from": "const exteriorRight = wardrobeShelving && corner.id !== \"corner-left\";",
+  "to": "const exteriorRight = wardrobeShelving && corner.id === \"corner-left\";"
+ },
+ {
+  "name": "the L's own corner kind is ignored",
+  "file": "src/features/berchuma-studio/services/layout.ts",
+  "from": "const kind = cornerKinds?.[\"corner-ab\"] ?? cornerKind;",
+  "to": "const kind = cornerKind;"
+ },
+ {
+  "name": "the U's left corner kind is ignored",
+  "file": "src/features/berchuma-studio/services/layout.ts",
+  "from": "const leftKind = cornerKinds?.[\"corner-left\"] ?? cornerKind;",
+  "to": "const leftKind = cornerKind;"
+ },
+ {
+  "name": "the U's right corner kind is ignored",
+  "file": "src/features/berchuma-studio/services/layout.ts",
+  "from": "const rightKind = cornerKinds?.[\"corner-right\"] ?? cornerKind;",
+  "to": "const rightKind = cornerKind;"
+ }
+]
