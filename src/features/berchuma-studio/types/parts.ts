@@ -1,4 +1,4 @@
-import type { Board, EdgeBand, Hardware } from "./spec";
+import type { Board, ClosurePanelKind, EdgeBand, FrontGrip, Hardware } from "./spec";
 
 /**
  * What a design is once it has been taken apart.
@@ -30,7 +30,9 @@ export type PartRole =
   | "backsplash"
   | "rail"
   /** An LED strip in an open display. Bought by the metre, never cut. */
-  | "led";
+  | "led"
+  /** A Smart Closure Panel: see `closure` on the part. */
+  | "closure";
 
 /** Which edges of a part are visible and therefore banded. */
 export type BandedEdges = {
@@ -79,7 +81,30 @@ export type Part = {
    */
   doorStyle?: "hinged" | "sliding" | "bifold" | "corner" | "fixed";
   /** Physical grip treatment rendered on the front and counted in the hardware schedule. */
-  frontGrip?: "handle" | "push-to-open" | "recessed-pull" | "finger-gap";
+  frontGrip?: FrontGrip;
+  /**
+   * Where the grip is and how big, for a handleless front: the edge it runs
+   * along, its height and depth. The groove is routed, the profile fitted, the
+   * channel left as a gap — the viewer and the drawings show each.
+   */
+  grip?: { edge: "top" | "bottom"; height: number; depth: number };
+  /** Machining a shop must do to this part, in its own words. */
+  operations?: string[];
+  /**
+   * A Smart Closure Panel. `id` is stable across edits, so a panel switched
+   * off or sized by hand stays so. `auto` is the worked-out face size, for
+   * Reset; `fixedTo` is the part it is screwed to, and `join` where — what the
+   * exploded and connection views draw.
+   */
+  closure?: {
+    id: string;
+    kind: ClosurePanelKind;
+    auto: { width: number; height: number };
+    manual: boolean;
+    hidden: boolean;
+    fixedTo: string;
+    join: Vec3;
+  };
   /**
    * Only shelves carried on adjustable pins consume shelf-pin hardware.
    * Fixed stack dividers and rail support shelves are real boards, but they
