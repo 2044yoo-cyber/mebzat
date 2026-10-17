@@ -610,8 +610,8 @@ check("the mapping reverses", calculatorSlugForKind("wardrobe") === "wardrobe");
   const entry = nav.slice(nav.indexOf('id: "calculators"'), nav.indexOf('id: "takeoff"'));
   check("and not gated behind a sign-in", !/private: true/.test(entry));
 
-  const home = code("src/app/page.tsx");
-  check("the home page carries a calculators section", /<CalculatorRail \/>/.test(home));
+  // The home page used to carry a rail of calculators. It was dropped when the page was made to match the blue construction reference (dc51c4e, 19 September), so the
+  // calculators are reached from the navigation above, the sitemap below, and the hub itself. The component is still there; the page no longer places it.
 
   const sitemap = code("src/app/sitemap.ts");
   check("every calculator is in the sitemap", /CALCULATOR_ROUTES/.test(sitemap));

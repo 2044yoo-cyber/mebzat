@@ -141,8 +141,10 @@ for (const width of [900, 1600, 2400, 3200]) {
 // 5. Doors still open: the swing rule, and every panel against every door.
 // ---------------------------------------------------------------------------
 const leaf = { x: 100, y: 0, width: 400, height: 700, leaf: 0, leaves: 1, style: "hinged", thickness: 18, maxAngle: 110 };
-ok(doorSwingConflict({ x: 100 - HINGE_SIDE_CLEARANCE + 1 - 18, y: 0, z: -18, sx: 18, sy: 700, sz: 600 }, [leaf]), "a panel flush with the door, 1 mm from its hinge edge, is in the way");
-ok(!doorSwingConflict({ x: 100 - HINGE_SIDE_CLEARANCE - 18, y: 0, z: -18, sx: 18, sy: 700, sz: 600 }, [leaf]), `from ${HINGE_SIDE_CLEARANCE} mm it is clear`);
+// A hinge's cranked arm needs 2 mm beside it. The numbers are written out rather than taken from the constant, which would move with a change to it.
+equal(HINGE_SIDE_CLEARANCE, 2, "a hinge needs 2 mm beside it");
+ok(doorSwingConflict({ x: 100 - 2 + 1 - 18, y: 0, z: -18, sx: 18, sy: 700, sz: 600 }, [leaf]), "a panel flush with the door, 1 mm from its hinge edge, is in the way");
+ok(!doorSwingConflict({ x: 100 - 2 - 18, y: 0, z: -18, sx: 18, sy: 700, sz: 600 }, [leaf]), "from 2 mm it is clear");
 ok(!doorSwingConflict({ x: 100 + 400 + 1, y: 0, z: -18, sx: 18, sy: 700, sz: 600 }, [leaf]), "beside the opening edge a flush panel is clear");
 ok(doorSwingConflict({ x: 300, y: 0, z: -300, sx: 18, sy: 700, sz: 100 }, [leaf]), "a panel standing proud in the door's arc is hit");
 ok(!doorSwingConflict({ x: 300, y: 0, z: -300, sx: 18, sy: 700, sz: 100 }, [{ ...leaf, style: "sliding" }]), "a sliding door sweeps nothing");
@@ -183,7 +185,9 @@ equal(Math.round(masking[0]!.height), 300 + wardrobe.carcass.doorGap - wardrobe.
 // 7. Ends, fillers, ceiling, kickboards, an island's back.
 // ---------------------------------------------------------------------------
 const kitchenReport = closureReport(on(kitchen)).panels;
-ok(kitchenReport.filter((panel) => panel.kind === "decorative_end").length >= 2, "wall units beside the hood gap get end panels");
+// The ends of wall units beside the hood gap stand uncovered: since commits d82c64d and bfe2292 no end panel is made on its own, decorative or side cover.
+// "Side cover panels are optional add-ons, not automatic closures."
+ok(!kitchenReport.some((panel) => panel.kind === "decorative_end" || panel.kind === "end"), "wall units beside the hood gap are left with their ends bare: no end panel is added on its own");
 ok(!kitchenReport.some((panel) => panel.kind === "filler"), "a run filled wall to wall has no filler");
 ok(kitchenReport.filter((panel) => panel.kind === "bottom").length === kitchen.cabinets.filter((entry) => entry.kind !== "wall" && entry.plinthHeight > 0).length, "a kickboard under every base unit on legs");
 {
@@ -195,13 +199,26 @@ ok(kitchenReport.filter((panel) => panel.kind === "bottom").length === kitchen.c
     }
   }
 }
-// A gap to the wall: a filler up to FILLER_MAX, an end panel beyond.
-for (const [gap, kind] of [[50, "filler"], [FILLER_MAX + 50, "end"]] as const) {
+// A gap to the wall: a filler up to FILLER_MAX, and beyond it nothing — the end is left bare, as any exposed end is.
+for (const [gap, kind] of [[50, "filler"], [FILLER_MAX + 50, "nothing"]] as const) {
   const spec = on(structuredClone(wardrobe));
   spec.runs = spec.runs.map((run) => ({ ...run, length: run.length + gap }));
   const right = closureReport(spec).panels.filter((panel) => panel.id.endsWith("-right"));
-  ok(right.some((panel) => panel.kind === kind || (kind === "end" && panel.kind === "decorative_end")), `a ${gap} mm gap to the wall gets a ${kind}`);
-  if (kind === "filler") equal(Math.round(right.find((panel) => panel.kind === "filler")!.width), gap, "the filler is the gap");
+  if (kind === "filler") {
+    ok(right.some((panel) => panel.kind === "filler"), `a ${gap} mm gap to the wall gets a filler`);
+    equal(Math.round(right.find((panel) => panel.kind === "filler")!.width), gap, "the filler is the gap");
+  } else {
+    ok(right.length === 0, `a ${gap} mm gap to the wall, past the ${FILLER_MAX} mm a filler may close, gets no panel (${right.map((panel) => panel.kind).join(", ")})`);
+  }
+}
+// An end that stands in the room has no wall beside it to close against, so a gap there is no gap to fill; the same gap beside a wall is.
+{
+  const room = on(structuredClone(wardrobe));
+  room.runs = room.runs.map((run) => ({ ...run, length: run.length + 50 }));
+  room.wardrobePlan = { priority: "balanced", leftEnd: "wall", rightEnd: "open" };
+  ok(!closureReport(room).panels.some((panel) => panel.id.endsWith("-right")), "50 mm beside an end that stands in the room is not closed with a filler");
+  room.wardrobePlan = { priority: "balanced", leftEnd: "wall", rightEnd: "wall" };
+  ok(closureReport(room).panels.some((panel) => panel.id.endsWith("-right") && panel.kind === "filler"), "the same 50 mm beside a wall is");
 }
 // Up to the ceiling.
 {
@@ -212,17 +229,15 @@ for (const [gap, kind] of [[50, "filler"], [FILLER_MAX + 50, "end"]] as const) {
   roomy.room = { ...rectangularRoom(), ceilingHeight: cabinet.size.height + 900 };
   ok(!closureReport(roomy).panels.some((panel) => panel.kind === "top"), "a 900 mm gap is a space, not a closure");
 }
-// An island: its back and both ends, meeting without overlap.
+// An island: its back, and nothing at its ends, meeting without overlap.
 {
   const island = on(structuredClone(kitchen));
   const base = island.cabinets.find((entry) => entry.kind === "base")!;
   island.cabinets = [{ ...base, id: "island-1", label: "Island", kind: "island", runId: undefined, offset: undefined, position: { x: 0, y: 0, z: 3000 } }];
   const report = closureReport(validateSpec(island).spec).panels.filter((panel) => panel.cabinetId === "island-1");
   const kinds = report.map((panel) => panel.kind).sort();
-  ok(kinds.includes("rear") && kinds.filter((kind) => kind.endsWith("end")).length === 2, `an island gets a rear panel and two ends (${kinds.join(", ")})`);
+  ok(kinds.includes("rear") && kinds.filter((kind) => kind.endsWith("end")).length === 0, `an island gets a rear panel, and its ends are left bare (${kinds.join(", ")})`);
   for (const panel of report) for (const other of report) if (panel !== other) ok(!boxesOverlap(panel.box, other.box), `${panel.kind} and ${other.kind} meet without overlapping`);
-  const rearPanel = report.find((panel) => panel.kind === "rear")!;
-  ok(report.filter((panel) => panel.kind.endsWith("end")).every((end) => Math.abs(end.box.z + end.box.sz - (rearPanel.box.z + rearPanel.box.sz)) < 0.01), "the end panels run back over the rear panel's edge, so the corner is closed");
 }
 
 // Two cabinets a small gap apart: one filler between them, made once.
@@ -235,37 +250,23 @@ for (const [gap, kind] of [[50, "filler"], [FILLER_MAX + 50, "end"]] as const) {
   equal(between.length, 1, "a 40 mm gap between two cabinets gets one filler, not two");
   equal(Math.round(between[0]!.width), 40, "the width of the gap");
 }
-// An end beside a hinge: flush with the doors only if the hinge has its
-// clearance. The first leaf is hinged on its left, so the left end is beside one.
+// An end standing in the room is left bare, wherever the hinge is. It used to be closed with a panel flush with the doors, or set back to clear a hinge that
+// came within HINGE_SIDE_CLEARANCE of it; no end panel is made on its own now, so how near the hinge is makes no difference.
 {
   const exposed = on(structuredClone(wardrobe));
   exposed.wardrobePlan = { priority: "balanced", leftEnd: "open", rightEnd: "wall" };
-  const roomy = closureReport(exposed).panels.find((panel) => panel.id.endsWith("-left"))!;
-  equal(roomy.kind, "decorative_end", `a ${exposed.carcass.doorGap} mm door gap leaves the hinge its ${HINGE_SIDE_CLEARANCE} mm: flush with the doors`);
-  ok(roomy.box.z < 0, "and it comes forward to the door face");
-  // The first door widened by hand to 1 mm from the cabinet's edge: its hinge
-  // now needs the room a flush panel would take.
+  const ends = (spec: typeof exposed) => closureReport(spec).panels.filter((panel) => panel.kind.endsWith("end"));
+  equal(ends(exposed).length, 0, "a wardrobe whose left end stands in the room gets no end panel there");
+  // The first door widened by hand to 1 mm from the cabinet's edge, its hinge as near as it can be.
   const leftRef = { cabinetId: cabinet.id, bayId: cabinet.bays[0]!.id, run: 0, leaf: 0 };
   const firstLeaf = cabinetFronts(exposed, cabinet).leaves[0]!;
   const widened = setDoorSize(exposed, leftRef, { x: 1, width: firstLeaf.width + firstLeaf.x - 1 });
   equal(widened.problem, null, "a door can be widened to 1 mm from the edge");
   ok(cabinetFronts(widened.spec, widened.spec.cabinets[0]!).leaves[0]!.x === 1, "and is");
-  const set = closureReport(widened.spec).panels.find((panel) => panel.id.endsWith("-left"))!;
-  equal(set.kind, "end", "1 mm from a hinge edge is too close: the end panel is set back to the carcass");
-  ok(set.box.z >= 0, "behind the door's swing");
-  // The same 1 mm beside the door's opening edge is clear: that edge swings away.
-  const rightRef = { cabinetId: cabinet.id, bayId: cabinet.bays.at(-1)!.id, run: 0, leaf: cabinetFronts(exposed, cabinet).leaves.filter((entry) => entry.bayId === cabinet.bays.at(-1)!.id).length - 1 };
-  const lastLeaf = cabinetFronts(exposed, cabinet).leaves.at(-1)!;
-  const openSide = structuredClone(exposed);
-  openSide.wardrobePlan = { priority: "balanced", leftEnd: "wall", rightEnd: "open" };
-  // Grown to the right: with a partner on its left, a width alone grows a leaf leftwards.
-  const reached = setDoorSize(openSide, rightRef, { x: lastLeaf.x, width: cabinet.size.width - 1 - lastLeaf.x });
-  equal(reached.problem, null, "the last door reaches 1 mm from the right edge");
-  const rightPanel = closureReport(reached.spec).panels.find((panel) => panel.id.endsWith("-right"))!;
-  equal(rightPanel.kind, lastLeaf.leaves === 1 ? "decorative_end" : "end", "beside the last door's own edge the end panel follows that door's hinge");
+  equal(ends(widened.spec).length, 0, "and still no end panel is made beside its hinge");
   const open = on(structuredClone(wardrobe));
   open.wardrobePlan = { priority: "balanced", leftEnd: "wall", rightEnd: "open" };
-  ok(closureReport(open).panels.some((panel) => panel.id.endsWith("-right") && panel.kind.endsWith("end")), "a wardrobe whose right end stands in the room gets an end panel there");
+  equal(ends(open).length, 0, "nor on a right end standing in the room");
   ok(!closureReport(open).panels.some((panel) => panel.id.endsWith("-left")), "and none against the wall");
 }
 // A wall unit is gripped from below.
@@ -314,10 +315,7 @@ ok(closureReport(tooBig).warnings.some((warning) => /larger than a sheet|into /.
 {
   const exposed = on(structuredClone(wardrobe));
   exposed.runs = exposed.runs.map((run) => ({ ...run, length: run.length + 400 }));
-  const end = closureReport(exposed).panels.find((panel) => panel.id.endsWith("-right") && panel.kind.endsWith("end"))!;
-  ok(end, "an exposed end has a panel");
-  const proud = setClosurePanel(exposed, end.id, { width: end.width + 400 });
-  ok(closureReport(proud).warnings.some((warning) => /in the way of door|hinge side/.test(warning)), "an end panel pulled out into a door's swing is refused");
+  ok(!closureReport(exposed).panels.some((panel) => panel.id.endsWith("-right") && panel.kind.endsWith("end")), "400 mm of wall past a wardrobe is left bare, so there is no end panel to pull out into a door's swing");
 }
 
 // ---------------------------------------------------------------------------

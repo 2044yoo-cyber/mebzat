@@ -1,176 +1,176 @@
 [
- {
-  "name": "profile does not cover",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "      const profile = profileOf(leaf);",
-  "to": "      const profile = 0;"
- },
- {
-  "name": "channel rail not set back",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "      let setback = channel ? fingerPullOf(spec, \"channel\", ft).depth : 0;",
-  "to": "      let setback = 0;"
- },
- {
-  "name": "channel rail called masking",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "&& leaf.frontGrip === \"channel\"",
-  "to": "&& leaf.frontGrip === \"none\""
- },
- {
-  "name": "openings never found",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": ".filter((rect) => rect.width >= sliver && rect.height >= sliver);",
-  "to": ".filter(() => false);"
- },
- {
-  "name": "filler made by both cabinets",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "      if (against === \"cabinet\" && side === \"left\") continue;\n",
-  "to": ""
- },
- {
-  "name": "filler limit ignored",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "    if (gap <= FILLER_MAX && against !== \"nothing\") {",
-  "to": "    if (gap <= 10 && against !== \"nothing\") {"
- },
- {
-  "name": "end flush whatever the hinge",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "    const decorative = !doorSwingConflict(flush, swing) && !clashes(flush);",
-  "to": "    const decorative = !clashes(flush);"
- },
- {
-  "name": "no hinge clearance",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "export const HINGE_SIDE_CLEARANCE = 2;",
-  "to": "export const HINGE_SIDE_CLEARANCE = 0;"
- },
- {
-  "name": "arc not swept",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "    if (minZ < face) {",
-  "to": "    if (false) {"
- },
- {
-  "name": "sliding doors swing",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "    if (leaf.style !== \"hinged\" && leaf.style !== \"bifold\") continue;",
-  "to": "    if (leaf.style === \"none\") continue;"
- },
- {
-  "name": "island ends stop short",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "    const back = D + (rear ? tc : 0);",
-  "to": "    const back = D;"
- },
- {
-  "name": "no island back",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "  const rear = cabinet.kind === \"island\";",
-  "to": "  const rear = false;"
- },
- {
-  "name": "ceiling closed however far",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "gap <= TOP_CLOSURE_MAX",
-  "to": "gap <= 5000"
- },
- {
-  "name": "kickboard under a plinth",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "!parts.some((part) => part.role === \"plinth\" && part.manufacture !== \"purchased\")",
-  "to": "true"
- },
- {
-  "name": "open wardrobe end ignored",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "const rightOpen = wardrobe && spec.wardrobePlan?.rightEnd === \"open\";",
-  "to": "const rightOpen = false;"
- },
- {
-  "name": "manual sizes never refused",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "    if (problem) {\n      warnings.push(",
-  "to": "    if (false) {\n      warnings.push("
- },
- {
-  "name": "switched-off panels made",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "  return panels.filter((panel) => panel.enabled).map((panel) => {",
-  "to": "  return panels.map((panel) => {"
- },
- {
-  "name": "hidden flag lost",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "manual: panel.manual, hidden: panel.hidden,",
-  "to": "manual: panel.manual, hidden: false,"
- },
- {
-  "name": "panels made with closure off",
-  "file": "src/features/berchuma-studio/services/geometry.ts",
-  "from": "const closures = spec.closurePanels?.enabled ? closurePartsOf",
-  "to": "const closures = true ? closurePartsOf"
- },
- {
-  "name": "profile doors not cut short",
-  "file": "src/features/berchuma-studio/services/geometry.ts",
-  "from": "    const cut = frontShortening(spec, grip, materials.fronts.thickness);",
-  "to": "    const cut = 0;"
- },
- {
-  "name": "wall units gripped at the top",
-  "file": "src/features/berchuma-studio/services/door-grip.ts",
-  "from": "return cabinet.kind === \"wall\" ? \"bottom\" : \"top\";",
-  "to": "return \"top\";"
- },
- {
-  "name": "design grip beats the cabinet's",
-  "file": "src/features/berchuma-studio/services/door-grip.ts",
-  "from": "return bay.frontGrip ?? spec.doorHardware?.grip ?? \"handle\";",
-  "to": "return spec.doorHardware?.grip ?? bay.frontGrip ?? \"handle\";"
- },
- {
-  "name": "groove too deep",
-  "file": "src/features/berchuma-studio/services/door-grip.ts",
-  "from": "? Math.min(typed.depth ?? base.depth, Math.max(0, doorThickness - 6))",
-  "to": "? typed.depth ?? base.depth"
- },
- {
-  "name": "handles for handleless doors",
-  "file": "src/features/berchuma-studio/services/geometry.ts",
-  "from": "  const handleCount = countDoorGrip(\"handle\") + countDrawerGrip(\"handle\");",
-  "to": "  const handleCount = doors.reduce((total, door) => total + door.quantity, 0) + countDrawerGrip(\"handle\");"
- },
- {
-  "name": "no profile ordered",
-  "file": "src/features/berchuma-studio/services/geometry.ts",
-  "from": "    if (!profileHandle || count === 0) continue;",
-  "to": "    continue;"
- },
- {
-  "name": "grooved and plain doors merged",
-  "file": "src/features/berchuma-studio/services/cutlist.ts",
-  "from": "      (part.operations ?? []).join(\";\"),\n",
-  "to": ""
- },
- {
-  "name": "closure rows not coded",
-  "file": "src/features/berchuma-studio/services/cutlist.ts",
-  "from": "      return /finger-pull/i.test(label) ? \"FPR\"",
-  "to": "      return /never/i.test(label) ? \"FPR\""
- },
- {
-  "name": "doors explode backwards",
-  "file": "src/features/berchuma-studio/services/exploded.ts",
-  "from": "  if (part.role === \"door\" || part.role === \"drawer_front\") return { x: 0, y: 0, z: -1, distance: DISTANCE.front };",
-  "to": "  if (part.role === \"door\" || part.role === \"drawer_front\") return { x: 0, y: 0, z: 1, distance: DISTANCE.front };"
- },
- {
-  "name": "design grip keeps cabinet grips",
-  "file": "src/features/berchuma-studio/services/closure-operations.ts",
-  "from": "    cabinets: spec.cabinets.map((cabinet) => ({ ...cabinet, bays: cabinet.bays.map(({ frontGrip: _drop, ...bay }) => { void _drop; return bay; }) })),\n",
-  "to": ""
- }
+  {
+    "name": "profile does not cover",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "      const profile = profileOf(leaf);",
+    "to": "      const profile = 0;"
+  },
+  {
+    "name": "channel rail not set back",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "      let setback = channel ? fingerPullOf(spec, \"channel\", ft).depth : 0;",
+    "to": "      let setback = 0;"
+  },
+  {
+    "name": "channel rail called masking",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "&& leaf.frontGrip === \"channel\"",
+    "to": "&& leaf.frontGrip === \"none\""
+  },
+  {
+    "name": "openings never found",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": ".filter((rect) => rect.width >= sliver && rect.height >= sliver);",
+    "to": ".filter(() => false);"
+  },
+  {
+    "name": "filler made by both cabinets",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "      if (against === \"cabinet\" && side === \"left\") continue;\n",
+    "to": ""
+  },
+  {
+    "name": "filler limit ignored",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "    if (gap <= FILLER_MAX && against !== \"nothing\") {",
+    "to": "    if (gap <= 10 && against !== \"nothing\") {"
+  },
+  {
+    "name": "no hinge clearance",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "export const HINGE_SIDE_CLEARANCE = 2;",
+    "to": "export const HINGE_SIDE_CLEARANCE = 0;"
+  },
+  {
+    "name": "arc not swept",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "    if (minZ < face) {",
+    "to": "    if (false) {"
+  },
+  {
+    "name": "sliding doors swing",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "    if (leaf.style !== \"hinged\" && leaf.style !== \"bifold\") continue;",
+    "to": "    if (leaf.style === \"none\") continue;"
+  },
+  {
+    "name": "no island back",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "  const rear = cabinet.kind === \"island\";",
+    "to": "  const rear = false;"
+  },
+  {
+    "name": "ceiling closed however far",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "gap <= TOP_CLOSURE_MAX",
+    "to": "gap <= 5000"
+  },
+  {
+    "name": "kickboard under a plinth",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "!parts.some((part) => part.role === \"plinth\" && part.manufacture !== \"purchased\")",
+    "to": "true"
+  },
+  {
+    "name": "open wardrobe end ignored",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "const rightOpen = wardrobe && spec.wardrobePlan?.rightEnd === \"open\";",
+    "to": "const rightOpen = false;"
+  },
+  {
+    "name": "manual sizes never refused",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "    if (problem) {\n      warnings.push(",
+    "to": "    if (false) {\n      warnings.push("
+  },
+  {
+    "name": "switched-off panels made",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "  return panels.filter((panel) => panel.enabled).map((panel) => {",
+    "to": "  return panels.map((panel) => {"
+  },
+  {
+    "name": "hidden flag lost",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "manual: panel.manual, hidden: panel.hidden,",
+    "to": "manual: panel.manual, hidden: false,"
+  },
+  {
+    "name": "panels made with closure off",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "const closures = spec.closurePanels?.enabled ? closurePartsOf",
+    "to": "const closures = true ? closurePartsOf"
+  },
+  {
+    "name": "profile doors not cut short",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "    const cut = frontShortening(spec, grip, materials.fronts.thickness);",
+    "to": "    const cut = 0;"
+  },
+  {
+    "name": "wall units gripped at the top",
+    "file": "src/features/berchuma-studio/services/door-grip.ts",
+    "from": "return cabinet.kind === \"wall\" ? \"bottom\" : \"top\";",
+    "to": "return \"top\";"
+  },
+  {
+    "name": "design grip beats the cabinet's",
+    "file": "src/features/berchuma-studio/services/door-grip.ts",
+    "from": "return bay.frontGrip ?? spec.doorHardware?.grip ?? \"handle\";",
+    "to": "return spec.doorHardware?.grip ?? bay.frontGrip ?? \"handle\";"
+  },
+  {
+    "name": "groove too deep",
+    "file": "src/features/berchuma-studio/services/door-grip.ts",
+    "from": "? Math.min(typed.depth ?? base.depth, Math.max(0, doorThickness - 6))",
+    "to": "? typed.depth ?? base.depth"
+  },
+  {
+    "name": "handles for handleless doors",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "  const handleCount = countDoorGrip(\"handle\") + countDrawerGrip(\"handle\");",
+    "to": "  const handleCount = doors.reduce((total, door) => total + door.quantity, 0) + countDrawerGrip(\"handle\");"
+  },
+  {
+    "name": "no profile ordered",
+    "file": "src/features/berchuma-studio/services/geometry.ts",
+    "from": "    if (!profileHandle || count === 0) continue;",
+    "to": "    continue;"
+  },
+  {
+    "name": "grooved and plain doors merged",
+    "file": "src/features/berchuma-studio/services/cutlist.ts",
+    "from": "      (part.operations ?? []).join(\";\"),\n",
+    "to": ""
+  },
+  {
+    "name": "closure rows not coded",
+    "file": "src/features/berchuma-studio/services/cutlist.ts",
+    "from": "      return /finger-pull/i.test(label) ? \"FPR\"",
+    "to": "      return /never/i.test(label) ? \"FPR\""
+  },
+  {
+    "name": "doors explode backwards",
+    "file": "src/features/berchuma-studio/services/exploded.ts",
+    "from": "  if (part.role === \"door\" || part.role === \"drawer_front\") return { x: 0, y: 0, z: -1, distance: DISTANCE.front };",
+    "to": "  if (part.role === \"door\" || part.role === \"drawer_front\") return { x: 0, y: 0, z: 1, distance: DISTANCE.front };"
+  },
+  {
+    "name": "design grip keeps cabinet grips",
+    "file": "src/features/berchuma-studio/services/closure-operations.ts",
+    "from": "    cabinets: spec.cabinets.map((cabinet) => ({ ...cabinet, bays: cabinet.bays.map(({ frontGrip: _drop, ...bay }) => { void _drop; return bay; }) })),\n",
+    "to": ""
+  },
+  {
+    "name": "an exposed end is covered on its own again, set back",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "    // Side cover panels are optional add-ons, not automatic closures.\n    // Leave exposed cabinet ends uncovered unless the user explicitly adds a panel.\n  }",
+    "to": "    const x = side === \"left\" ? -tc : W;\n    const back = D + (rear ? tc : 0);\n    const box: ClosureBox = { x, y: 0, z: 0, sx: tc, sy: H, sz: back };\n    add(\"end\", side, box, \"x\", sideBoard(side),\n      { x: side === \"left\" ? 0 : W, y: H / 2, z: D / 2 },\n      \"An exposed end; functional side cover panel set back to clear the door hinges\");\n  }"
+  },
+  {
+    "name": "an exposed end is covered on its own again, flush with the doors",
+    "file": "src/features/berchuma-studio/services/closure-panels.ts",
+    "from": "    // Side cover panels are optional add-ons, not automatic closures.\n    // Leave exposed cabinet ends uncovered unless the user explicitly adds a panel.\n  }",
+    "to": "    const x = side === \"left\" ? -tc : W;\n    const back = D + (rear ? tc : 0);\n    const flush: ClosureBox = { x, y: 0, z: -doorProud, sx: tc, sy: H, sz: back + doorProud };\n    const decorative = !doorSwingConflict(flush, swing) && !clashes(flush);\n    const box = decorative ? flush : { x, y: 0, z: 0, sx: tc, sy: H, sz: back };\n    add(decorative ? \"decorative_end\" : \"end\", side, box, \"x\", sideBoard(side),\n      { x: side === \"left\" ? 0 : W, y: H / 2, z: D / 2 },\n      decorative ? \"An exposed end, flush with the doors\" : \"An exposed end; set back to clear the door hinges\");\n  }"
+  }
 ]

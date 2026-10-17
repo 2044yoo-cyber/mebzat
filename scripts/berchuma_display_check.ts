@@ -65,7 +65,8 @@ function cutListHoldsEveryPanel(spec: DesignSpec, message: string) {
     for (const entry of entries) map.set(`${entry.board}|${entry.length}|${entry.width}`, (map.get(`${entry.board}|${entry.length}|${entry.width}`) ?? 0) + entry.quantity);
     return [...map.entries()].sort();
   };
-  const cut = breakdown.parts.filter((part) => part.manufacture !== "purchased").map((part) => ({ board: part.board.id, length: part.length, width: part.width, quantity: part.quantity }));
+  // The cut list shows whole millimetres, as a saw is set: a drawer front with a finger gap is 201.33 mm in the model and 201 on the list.
+  const cut = breakdown.parts.filter((part) => part.manufacture !== "purchased").map((part) => ({ board: part.board.id, length: Math.round(part.length), width: Math.round(part.width), quantity: part.quantity }));
   const rows = buildCutList(spec, breakdown).rows.map((row) => ({ board: row.boardId, length: row.length, width: row.width, quantity: row.quantity }));
   equal(tally(rows), tally(cut), `${message}: every panel is on the cut list, board, size and quantity`);
 }
@@ -77,8 +78,12 @@ const wardrobe = base.cabinets[0]!;
 // ---------------------------------------------------------------------------
 // H — an old wardrobe project builds exactly what it always built.
 // ---------------------------------------------------------------------------
-// Fingerprints of what main built before any of this existed: parts, hardware,
-// totals and cut list. A change here changes somebody's saved quote.
+// Fingerprints of what these designs build: parts, hardware, totals and cut list. A change here changes somebody's saved quote.
+//
+// The table was recorded on 5 October 2026 (e230482), of what main built before the display sections existed, and held until 69cb526 (11 October), which gave
+// every drawer bank without a grip a 25 mm finger gap and so changed the fronts of every saved wardrobe, the kitchen and the TV unit. Door sizing (82ab9ad), the
+// depth rule (a37d17c), and putting the drawer fronts in the order of their boxes (see "Editing one drawer" in berchuma-check.ts) each moved it again. It was
+// recorded afresh on 17 October 2026 from the code as it stood, each of those changes being deliberate; from here it is the guard it was meant to be.
 const fingerprint = (spec: DesignSpec) => {
   const breakdown = buildParts(spec);
   return createHash("sha256").update(JSON.stringify({ parts: strip(breakdown.parts), hardware: breakdown.hardware, totals: breakdown.totals, // Part IDs and the cabinet column were added to each row by Cabinet
@@ -91,12 +96,12 @@ const fingerprint = (spec: DesignSpec) => {
 const savedProjects = JSON.parse(readFileSync("scripts/data/berchuma_saved_wardrobes.json", "utf8")) as Record<string, DesignSpec>;
 const openSaved = (name: string) => () => validateSpec(JSON.parse(JSON.stringify(savedProjects[name]))).spec;
 const OLD: Record<string, [() => DesignSpec, string]> = {
-  "three-bay wardrobe": [() => wardrobeExample(), "0eb1c2ea7f5f915a"],
-  "saved starting wardrobe, 2400": [openSaved("starting wardrobe 2400"), "f3f6822a54e6b7de"],
-  "saved starting wardrobe, 3600": [openSaved("starting wardrobe 3600"), "07d746a96249ff0f"],
-  "saved L-shaped wardrobe": [openSaved("L-shaped wardrobe"), "9d1a8ae84ac62e99"],
-  "kitchen": [() => kitchenExample(), "84440007294f88db"],
-  "TV unit": [() => tvUnitExample(), "a604fe6c94f6fafe"],
+  "three-bay wardrobe": [() => wardrobeExample(), "ef6c0d477f5e0e17"],
+  "saved starting wardrobe, 2400": [openSaved("starting wardrobe 2400"), "f250851dd8dccc5d"],
+  "saved starting wardrobe, 3600": [openSaved("starting wardrobe 3600"), "befc8af0812650d1"],
+  "saved L-shaped wardrobe": [openSaved("L-shaped wardrobe"), "5dafd36710bd599e"],
+  "kitchen": [() => kitchenExample(), "e3729daad1709322"],
+  "TV unit": [() => tvUnitExample(), "e6b520ba0798224c"],
 };
 for (const [name, [make, expected]] of Object.entries(OLD)) equal(fingerprint(make()), expected, `${name}: parts, hardware and cut list exactly as before`);
 const saved = validateSpec(JSON.parse(JSON.stringify(wardrobeExample()))).spec;
@@ -134,6 +139,19 @@ cutListHoldsEveryPanel(testA, "A");
 // Internal drawers for a whole bay: the bay keeps its door.
 const wholeInternal = setBayInternalDrawers(setBayFitting(base, wardrobe.id, "bay-3", { kind: "drawers", count: 4 }), wardrobe.id, "bay-3", true);
 equal(cabinetFronts(wholeInternal, wholeInternal.cabinets[0]!).leaves.filter((leaf) => leaf.bayId === "bay-3").length, 2, "internal drawers in a whole bay: a pair of doors in front");
+// The inner fronts are pulled by a finger-grip behind the doors, even where the bay's grip is a handle: only the doors in front of them take handles. (With the grip
+// left alone a drawer has a finger gap and buys no handle either way, which would leave this unable to tell the two apart.)
+const handled: DesignSpec = {
+  ...wholeInternal,
+  cabinets: wholeInternal.cabinets.map((cabinet) => cabinet.id !== wardrobe.id ? cabinet : {
+    ...cabinet,
+    bays: cabinet.bays.map((bay) => bay.id === "bay-3" && bay.fitting.kind === "drawers" ? { ...bay, fitting: { ...bay.fitting, grip: "handle" as const } } : bay),
+  }),
+};
+ok(handled.cabinets[0]!.bays.some((bay) => bay.id === "bay-3" && bay.fitting.kind === "drawers" && bay.fitting.grip === "handle" && bay.fitting.internal === true), "internal drawers in a bay whose grip is a handle");
+equal(hardware(handled, "handle"), hardware(wholeInternal, "handle"), "and no handle is bought for the inner fronts, only for the doors");
+const exteriorHandled: DesignSpec = { ...handled, cabinets: handled.cabinets.map((cabinet) => ({ ...cabinet, bays: cabinet.bays.map((bay) => bay.id === "bay-3" && bay.fitting.kind === "drawers" ? { ...bay, fitting: { ...bay.fitting, internal: false } } : bay) })) };
+ok(hardware(exteriorHandled, "handle") > hardware(handled, "handle"), `while the same drawers on show, with the same grip, take handles (${hardware(exteriorHandled, "handle")} against ${hardware(handled, "handle")})`);
 const exterior = setBayFitting(base, wardrobe.id, "bay-3", { kind: "drawers", count: 4 });
 equal(cabinetFronts(exterior, exterior.cabinets[0]!).leaves.filter((leaf) => leaf.bayId === "bay-3").length, 0, "exterior drawers: no door over the drawer fronts");
 // Depth and inner-front board are real.

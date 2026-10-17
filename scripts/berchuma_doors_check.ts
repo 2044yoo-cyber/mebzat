@@ -233,7 +233,9 @@ for (const [label, kitchen, expected] of [
 const kitchen = asSavedBefore(kitchenNew);
 const wallRef: DoorRef = { cabinetId: "wall-14", bayId: "bay-13", run: 0, leaf: 0 };
 const wallSized = setDoorSize(kitchen, wallRef, { width: 300 });
-equal(doors(wallSized.spec, "wall-14").map((part) => [part.width, part.length]), [[300, 716], [379, 716]], "a wall unit's left leaf at 300");
+// A wall unit's doors are 300 mm wide by preference (a base unit's 400), so the 764 mm bay is hung with three leaves of 252, the nearest to 300 that fit, and not
+// the two of 379 it was drawn with. Typing 300 for the left leaf grows it by 48 and its neighbour gives way by as much, to 204; the third is not touched.
+equal(doors(wallSized.spec, "wall-14").map((part) => [part.width, part.length]), [[300, 716], [204, 716], [252, 716]], "a wall unit's left leaf at 300: the neighbour gives way, the third leaf stays");
 
 const detailed = createKitchenDesign({ ...DEFAULT_KITCHEN_SETUP, shape: "l_shaped", wallHeight: 1000, topHeight: 0, details: structuredClone(REFERENCE_KITCHEN_DETAILS) });
 const sink = detailed.cabinets.find((item) => item.kitchenRole === "sink")!;
