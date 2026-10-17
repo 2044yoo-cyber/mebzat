@@ -10,7 +10,7 @@ import { buildBill, groupBill, type BillGrouping } from "../construction/boq";
 import { auditBill } from "../construction/boq-audit";
 import { CATEGORY_COLORS, SERVICE_LEGEND, materialOf } from "../construction/catalogue";
 import { describeComponent } from "../construction/inspect";
-import { aggregateQuantities, missingData, toBoqDraft } from "../construction/quantities";
+import { missingData } from "../construction/quantities";
 import { constructionTakeoffPackage } from "../construction/takeoff-handoff";
 import { HOUSE_TAKEOFF_SESSION_KEY } from "../services/takeoff-adapter";
 import { STAGE_BY_ID } from "../construction/stages";
@@ -528,45 +528,6 @@ export function QuantitiesPanel({ model, view, rules, onRules, onHighlight, onPi
         </section>
       ))}
       <button type="button" onClick={copyCsv} className="min-h-10 rounded-xl border px-4 text-sm font-medium">Copy these lines as CSV</button>
-      <SendToTakeoff model={model} view={view} />
-    </div>
-  );
-}
-
-/** Estimate: the foundation only ------------------------------------------------ */
-
-export function EstimatePanel({ model, view }: { model: ConstructionModel; view: ViewState }) {
-  const lines = useMemo(() => aggregateQuantities(model, view.options), [model, view.options]);
-  const draft = useMemo(() => toBoqDraft(lines), [lines]);
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="space-y-2" data-testid="estimate-panel">
-      <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-        <p className="font-semibold">Cost estimating is not built yet</p>
-        <p className="mt-1 text-xs">This mode shows what is ready for it. There are no rates, no totals and no prices here, and none are guessed.</p>
-      </div>
-      <Section title="What is ready">
-        <ul className="list-disc space-y-1 pl-4 text-sm">
-          <li>{draft.length} bill lines have a net quantity, a formula, a source and the components behind them.</li>
-          <li>{lines.length - draft.length} line{lines.length - draft.length === 1 ? "" : "s"} still have no figure (reinforcement needs an approved bar schedule).</li>
-          <li>Every item carries empty fields for unit material, labour and equipment cost, currency, price source and price date.</li>
-          <li>Allowances are separate from net quantities, so waste can be priced on its own.</li>
-        </ul>
-      </Section>
-      <Section title="What is still to build" defaultOpen={false}>
-        <ul className="list-disc space-y-1 pl-4 text-sm">
-          <li>A price book with a source and date for each rate.</li>
-          <li>Rate build-ups for labour, equipment and overheads.</li>
-          <li>Totals, contingency and tax, kept visibly apart from net work.</li>
-          <li>Supplier quotations and approved bar schedules.</li>
-        </ul>
-      </Section>
-      <button type="button" disabled className="min-h-11 w-full rounded-xl border bg-muted px-4 text-sm font-medium text-muted-foreground">Price this bill (not available yet)</button>
-      <button
-        type="button"
-        onClick={() => { void navigator.clipboard?.writeText(JSON.stringify(draft, null, 2)); setCopied(true); setTimeout(() => setCopied(false), 1800); }}
-        className="min-h-11 w-full rounded-xl border px-4 text-sm font-medium"
-      >{copied ? "Copied" : "Copy the unpriced draft bill (JSON)"}</button>
       <SendToTakeoff model={model} view={view} />
     </div>
   );

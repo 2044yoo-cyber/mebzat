@@ -1,0 +1,386 @@
+[
+  {
+    "name": "waste is not bought",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "(p.net + (p.allowance ?? 0)) * mat",
+    "to": "p.net * mat"
+  },
+  {
+    "name": "labour is paid on the waste too",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "p.net === null || lab === null ? 0 : p.net * lab",
+    "to": "p.net === null || lab === null ? 0 : (p.net + (p.allowance ?? 0)) * lab"
+  },
+  {
+    "name": "the direct cost is the materials alone",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "const direct = materials + labour;",
+    "to": "const direct = materials;"
+  },
+  {
+    "name": "an additional percentage is a fraction",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": ": (base * a.value) / 100;",
+    "to": ": base * a.value;"
+  },
+  {
+    "name": "the running total is the direct cost",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "a.basis === \"running\" ? running : 1",
+    "to": "a.basis === \"running\" ? direct : 1"
+  },
+  {
+    "name": "the running total does not grow",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "    running += amount;\n",
+    "to": ""
+  },
+  {
+    "name": "a switched off item is charged",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "const amount = !a.enabled ? 0 : a.basis === \"fixed\" ? a.value : (base * a.value) / 100;",
+    "to": "const amount = a.basis === \"fixed\" ? a.value : (base * a.value) / 100;"
+  },
+  {
+    "name": "labour on-costs are on the materials",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "a.basis === \"labour\" ? labour",
+    "to": "a.basis === \"labour\" ? materials"
+  },
+  {
+    "name": "transport is on the labour",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "a.basis === \"materials\" ? materials",
+    "to": "a.basis === \"materials\" ? labour"
+  },
+  {
+    "name": "a fixed sum is a percentage",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "a.basis === \"fixed\" ? a.value : (base * a.value) / 100",
+    "to": "(base * a.value) / 100"
+  },
+  {
+    "name": "contingency is on the direct cost",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "const contingency = { percent: rules.contingencyPercent, base: subtotal, amount: (subtotal * rules.contingencyPercent) / 100 };",
+    "to": "const contingency = { percent: rules.contingencyPercent, base: direct, amount: (direct * rules.contingencyPercent) / 100 };"
+  },
+  {
+    "name": "contingency is a fraction",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "amount: (subtotal * rules.contingencyPercent) / 100",
+    "to": "amount: subtotal * rules.contingencyPercent"
+  },
+  {
+    "name": "tax is on the subtotal",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "amount: t.enabled ? (taxable * t.percent) / 100 : 0",
+    "to": "amount: t.enabled ? (subtotal * t.percent) / 100 : 0"
+  },
+  {
+    "name": "a tax switched off is charged",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "amount: t.enabled ? (taxable * t.percent) / 100 : 0",
+    "to": "amount: (taxable * t.percent) / 100"
+  },
+  {
+    "name": "tax is left out of the total",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "const total = taxable + taxTotal;",
+    "to": "const total = taxable;"
+  },
+  {
+    "name": "the total leaves out the contingency",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "const taxable = subtotal + contingency.amount;",
+    "to": "const taxable = subtotal;"
+  },
+  {
+    "name": "the cost per metre is the direct cost",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "perM2: areas.grossFloor > 0 ? total / areas.grossFloor : null,",
+    "to": "perM2: areas.grossFloor > 0 ? direct / areas.grossFloor : null,"
+  },
+  {
+    "name": "the cost per metre of slab is of floor",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "perM2Slab: areas.totalSlab > 0 ? total / areas.totalSlab : null",
+    "to": "perM2Slab: areas.grossFloor > 0 ? total / areas.grossFloor : null"
+  },
+  {
+    "name": "a line with one rate is priced",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "pricing: mat === null && lab === null ? \"unpriced\" : mat === null || lab === null ? \"partial\" : \"priced\"",
+    "to": "pricing: mat === null && lab === null ? \"unpriced\" : \"priced\""
+  },
+  {
+    "name": "a line with no rate is partly priced",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "pricing: mat === null && lab === null ? \"unpriced\" : mat === null || lab === null ? \"partial\" : \"priced\"",
+    "to": "pricing: mat === null || lab === null ? \"partial\" : \"priced\""
+  },
+  {
+    "name": "a line included in another is priced",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "if (entry.includedIn) return empty(\"included\", [\"included\"], entry.includedIn);",
+    "to": ""
+  },
+  {
+    "name": "a price in the wrong unit prices the line",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "if (entry.unit !== line.unit) { quantityFlags(); return empty(\"unpriced\", [\"unit-differs\"]); }",
+    "to": ""
+  },
+  {
+    "name": "a line with no quantity is called priced",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "if (line.net === null) return empty(\"no-quantity\", [\"no-quantity\"]);",
+    "to": ""
+  },
+  {
+    "name": "work with no entry is priced as nothing without saying",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "if (!entry) { quantityFlags(); return empty(\"unpriced\", [\"no-price-entry\"]); }",
+    "to": "if (!entry) { quantityFlags(); return empty(\"unpriced\", []); }"
+  },
+  {
+    "name": "a rate of nothing is an example",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "const materialRateStatus = mat !== null && mat > 0 ? entry.material.status : null;",
+    "to": "const materialRateStatus = mat !== null ? entry.material.status : null;"
+  },
+  {
+    "name": "a rate of nothing for labour is an example",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "const labourRateStatus = lab !== null && lab > 0 ? entry.labour.status : null;",
+    "to": "const labourRateStatus = lab !== null ? entry.labour.status : null;"
+  },
+  {
+    "name": "the example share is of the entered",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "exampleShare: direct > 0 ? directByRate.assumed / direct : 0",
+    "to": "exampleShare: direct > 0 ? directByRate.entered / direct : 0"
+  },
+  {
+    "name": "the cost on rates counts the whole line",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "if (l.materialRateStatus) directByRate[l.materialRateStatus] += l.material;",
+    "to": "if (l.materialRateStatus) directByRate[l.materialRateStatus] += l.total;"
+  },
+  {
+    "name": "the cost on labour rates counts the materials",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "if (l.labourRateStatus) directByRate[l.labourRateStatus] += l.labour;",
+    "to": "if (l.labourRateStatus) directByRate[l.labourRateStatus] += l.material;"
+  },
+  {
+    "name": "the cost on quantities is by line",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "for (const p of l.parts) directByQuantity[p.quantityStatus] += p.material + p.labour;",
+    "to": "for (const p of l.parts) directByQuantity[l.quantityStatus] += p.material + p.labour;"
+  },
+  {
+    "name": "a group counts every part as a line",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "add(key, label, p.material, p.labour, !seen.has(key));",
+    "to": "add(key, label, p.material, p.labour, true);"
+  },
+  {
+    "name": "a group forgets the labour",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "g.total += material + labour;",
+    "to": "g.total += material;"
+  },
+  {
+    "name": "a group's materials include labour",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "g.material += material;",
+    "to": "g.material += material + labour;"
+  },
+  {
+    "name": "a problem is not listed",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "if (detail) problems.push(",
+    "to": "if (false as boolean) problems.push("
+  },
+  {
+    "name": "the groups of a floor are filed under the stage",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "const key = by === \"section\" ? l.section : groupKeyOf(part, by);",
+    "to": "const key = by === \"section\" ? l.section : by === \"floor\" ? String(part.stage) : groupKeyOf(part, by);"
+  },
+  {
+    "name": "an incomplete line is not noticed",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "if (line.net !== null && line.missingItems > 0) flags.push(\"quantity-incomplete\");",
+    "to": ""
+  },
+  {
+    "name": "an assumed quantity is not noticed",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "if (line.status === \"assumed\") flags.push(\"quantity-assumed\");",
+    "to": ""
+  },
+  {
+    "name": "a quantity for review is not noticed",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "if (line.status === \"review\") flags.push(\"quantity-review\");",
+    "to": ""
+  },
+  {
+    "name": "an entered rate is called an example",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "status === \"assumed\" ? \"example-rate\" : status === \"entered\" ? \"entered-rate\" : \"quoted-rate\"",
+    "to": "status === \"assumed\" || status === \"entered\" ? \"example-rate\" : \"quoted-rate\""
+  },
+  {
+    "name": "cost rules over 100 percent are kept",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "contingencyPercent: finite(r.contingencyPercent, base.contingencyPercent, 0, 100)",
+    "to": "contingencyPercent: finite(r.contingencyPercent, base.contingencyPercent, 0, 100000)"
+  },
+  {
+    "name": "a switched off item comes back on",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "enabled: x.enabled !== false, note: typeof x.note === \"string\" ? x.note.slice(0, 200) : \"\" }];\n      })\n    : structuredClone(base.additional);",
+    "to": "enabled: true, note: typeof x.note === \"string\" ? x.note.slice(0, 200) : \"\" }];\n      })\n    : structuredClone(base.additional);"
+  },
+  {
+    "name": "an unknown basis is trusted",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "const basis = bases.includes(x.basis as AdditionalBasis) ? (x.basis as AdditionalBasis) : \"direct\";",
+    "to": "const basis = x.basis as AdditionalBasis;"
+  },
+  {
+    "name": "a negative percentage is kept",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "value: finite(x.value, 0, 0, basis === \"fixed\" ? 1e10 : 1000)",
+    "to": "value: finite(x.value, 0, -1000, basis === \"fixed\" ? 1e10 : 1000)"
+  },
+  {
+    "name": "a negative tax is kept",
+    "file": "src/features/house-designer/construction/estimate.ts",
+    "from": "percent: finite(x.percent, 0, 0, 100)",
+    "to": "percent: finite(x.percent, 0, -100, 100)"
+  },
+  {
+    "name": "a rate is not kept to the centime",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "Math.round(value * 100) / 100;\n  const status",
+    "to": "value;\n  const status"
+  },
+  {
+    "name": "a negative rate is a rate",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "value === null || !Number.isFinite(value) || value < 0 ? null",
+    "to": "value === null || !Number.isFinite(value) ? null"
+  },
+  {
+    "name": "not a number is a rate",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "value === null || !Number.isFinite(value) || value < 0 ? null",
+    "to": "value === null || value < 0 ? null"
+  },
+  {
+    "name": "a line included in another can be priced",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "const entry = book.entries[workItem];\n  if (!entry || entry.includedIn) return book;\n  const clean",
+    "to": "const entry = book.entries[workItem];\n  if (!entry) return book;\n  const clean"
+  },
+  {
+    "name": "a rate typed in is an example",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "const status = how.status ?? \"entered\";",
+    "to": "const status = how.status ?? \"assumed\";"
+  },
+  {
+    "name": "a rate typed in has no source",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "(status === \"quoted\" ? \"Quotation\" : \"Entered by you\")",
+    "to": "(status === \"quoted\" ? \"Quotation\" : \"\")"
+  },
+  {
+    "name": "a rate typed in has no date",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "date: how.date === undefined ? today() : how.date }",
+    "to": "date: how.date === undefined ? null : how.date }"
+  },
+  {
+    "name": "a rate reset is not the example",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "const original = defaultPriceBook().entries[workItem];\n  if (!original) return book;\n  return { ...book, entries: { ...book.entries, [workItem]: original } };",
+    "to": "const original = book.entries[workItem];\n  if (!original) return book;\n  return { ...book, entries: { ...book.entries, [workItem]: original } };"
+  },
+  {
+    "name": "a note on a rate changes its figure",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "{ ...rate, status: how.status ?? rate.status, source: how.source ?? rate.source, date: how.date === undefined ? rate.date : how.date }",
+    "to": "{ ...rate, value: null, status: how.status ?? rate.status, source: how.source ?? rate.source, date: how.date === undefined ? rate.date : how.date }"
+  },
+  {
+    "name": "a rate that is not a number is kept",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "typeof raw.value === \"number\" && Number.isFinite(raw.value) && raw.value >= 0 ? Math.round(raw.value * 100) / 100 : fallback.value",
+    "to": "typeof raw.value === \"number\" ? raw.value : fallback.value"
+  },
+  {
+    "name": "a negative saved rate is kept",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "typeof raw.value === \"number\" && Number.isFinite(raw.value) && raw.value >= 0 ?",
+    "to": "typeof raw.value === \"number\" && Number.isFinite(raw.value) ?"
+  },
+  {
+    "name": "a status that is not a status is kept",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "const status = RATE_STATUSES.includes(raw.status as RateStatus) ? (raw.status as RateStatus) : fallback.status;",
+    "to": "const status = raw.status as RateStatus;"
+  },
+  {
+    "name": "a date that is not a date is kept",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "typeof raw.date === \"string\" && /^\\d{4}-\\d{2}-\\d{2}$/.test(raw.date) ? raw.date",
+    "to": "typeof raw.date === \"string\" ? raw.date"
+  },
+  {
+    "name": "saved work takes its own unit",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "unit: known ? known.unit : unit, includedIn,",
+    "to": "unit, includedIn,"
+  },
+  {
+    "name": "saved work takes its own inclusion",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "const includedIn = known ? known.includedIn : typeof value.includedIn === \"string\" ? value.includedIn : null;",
+    "to": "const includedIn = typeof value.includedIn === \"string\" ? value.includedIn : null;"
+  },
+  {
+    "name": "a saved rate for included work is kept",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "material: includedIn ? { ...NONE } : readRate(value.material, known?.material ?? example(null)),",
+    "to": "material: readRate(value.material, known?.material ?? example(null)),"
+  },
+  {
+    "name": "unknown units are accepted",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "const unit = (QUANTITY_UNITS as readonly string[]).includes(value.unit as string) ? (value.unit as QuantityUnit) : known?.unit;",
+    "to": "const unit = (value.unit as QuantityUnit) ?? known?.unit;"
+  },
+  {
+    "name": "the name is not trimmed",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "raw.name.trim().slice(0, 80)",
+    "to": "raw.name.slice(0, 80)"
+  },
+  {
+    "name": "every book shares its entries",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "export function defaultPriceBook(): PriceBook {\n  const entries: Record<string, PriceEntry> = {};",
+    "to": "const SHARED: Record<string, PriceEntry> = {};\nexport function defaultPriceBook(): PriceBook {\n  const entries: Record<string, PriceEntry> = SHARED;"
+  },
+  {
+    "name": "a changed entry is not noticed",
+    "file": "src/features/house-designer/construction/price-book.ts",
+    "from": "return Object.values(book.entries).filter((e) => JSON.stringify(e) !== JSON.stringify(base[e.workItem]));",
+    "to": "return [];"
+  }
+]

@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 
 import { buildConstructionModel } from "../construction/model";
 import { TEMPLATES, areasOf, buildBuilding, configForArea, defaultConfig, type BuildingAreas, type BuildingConfig, type BuildingTemplateId, type BuiltBuilding, type StructureOverrides } from "../construction/building-config";
+import { DEFAULT_COST_RULES, type CostRules } from "../construction/estimate";
+import { defaultPriceBook, type PriceBook } from "../construction/price-book";
 import { STAGES, STAGE_BY_ID, ENGINEERING_DISCLAIMER } from "../construction/stages";
 import {
   DEFAULT_OPTIONS, DEFAULT_RULES, DEFAULT_VIEW, STAGE_IDS,
@@ -18,7 +20,8 @@ import type { HouseProject } from "../types/project";
 import { layoutLabels } from "../construction/label-layout";
 import type { CameraPreset, ScreenLabel } from "./construction-scene";
 import { BuildingPanel, AreaTable, buildingSummary } from "./building-panel";
-import { EstimatePanel, InspectorPanel, LayersPanel, LessonPanel, PartsPanel, QuantitiesPanel, Section, Segmented, ServiceViewPanel, stageCounts } from "./construction-panels";
+import { InspectorPanel, LayersPanel, LessonPanel, PartsPanel, QuantitiesPanel, Section, Segmented, ServiceViewPanel, stageCounts } from "./construction-panels";
+import { EstimatePanel, RatesPanel } from "./estimate-panel";
 
 // Like the 3D tab, three.js loads only when somebody opens this one.
 const ConstructionScene = dynamic(() => import("./construction-scene").then((m) => m.ConstructionScene), {
@@ -27,13 +30,13 @@ const ConstructionScene = dynamic(() => import("./construction-scene").then((m) 
 });
 
 type Source = "sample" | "project";
-type Tab = "lesson" | "selected" | "parts" | "layers" | "quantities" | "estimate" | "settings";
+type Tab = "lesson" | "selected" | "parts" | "layers" | "quantities" | "estimate" | "rates" | "settings";
 
 const MODE_TABS: Record<AppMode, { id: Tab; label: string }[]> = {
   learn: [{ id: "lesson", label: "Lesson" }, { id: "selected", label: "Selected part" }, { id: "layers", label: "Layers" }],
   inspect: [{ id: "selected", label: "Selected part" }, { id: "parts", label: "Parts" }, { id: "layers", label: "Layers" }],
   quantities: [{ id: "quantities", label: "Quantities" }, { id: "selected", label: "Selected part" }, { id: "layers", label: "Layers" }],
-  estimate: [{ id: "estimate", label: "Estimate" }],
+  estimate: [{ id: "estimate", label: "Estimate" }, { id: "rates", label: "Rates" }],
 };
 const MODES: { id: AppMode; label: string }[] = [
   { id: "learn", label: "Learn" },
@@ -61,6 +64,9 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
   const [overrides, setOverrides] = useState<StructureOverrides>({});
   const [options, setOptions] = useState<ModelOptions>(DEFAULT_OPTIONS);
   const [rules, setRules] = useState<EstimatingRules>(DEFAULT_RULES);
+  // The prices and the costs that are not work on site. They are not part of the building: changing them works the estimate out again and nothing else.
+  const [priceBook, setPriceBook] = useState<PriceBook>(() => defaultPriceBook());
+  const [costRules, setCostRules] = useState<CostRules>(() => structuredClone(DEFAULT_COST_RULES));
   const [view, setView] = useState<ViewState>({ ...DEFAULT_VIEW });
   const [tab, setTab] = useState<Tab>("lesson");
   const [preset, setPreset] = useState<CameraPreset>("orbit");
@@ -92,7 +98,13 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
     return { model: buildConstructionModel(buildProject, buildOptions, rules), source: buildProject };
   }, [ready, buildProject, blockType, floorFinish, rules, source, project, parapetHeight]);
   const areas = useMemo(() => areasOf(sourceProject, options.roofType), [sourceProject, options.roofType]);
+  // The estimate is for the model on screen, so its areas are the model's (the settled project), not the ones still being typed.
+  const modelAreas = useMemo(() => areasOf(built?.source ?? sourceProject, options.roofType), [built, sourceProject, options.roofType]);
   const model = built?.model ?? null;
+  // For the browser check, which has to show that a price changed does not draw the building again.
+  useEffect(() => {
+    if (model && typeof window !== "undefined" && "__scenes" in window) Object.assign(window, { __modelBuilds: ((window as unknown as { __modelBuilds?: number }).__modelBuilds ?? 0) + 1 });
+  }, [model]);
   const index = useMemo(() => (model ? indexModel(model) : null), [model]);
   const counts = useMemo(() => (model ? stageCounts(model) : null), [model]);
 
@@ -210,7 +222,8 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
               : activeTab === "parts" ? <PartsPanel model={model} view={viewWithOptions} selectedId={view.selectedId} onPick={pickById} hiddenIds={view.hiddenIds} onToggleHidden={(id) => patch({ hiddenIds: view.hiddenIds.includes(id) ? view.hiddenIds.filter((x) => x !== id) : [...view.hiddenIds, id] })} />
               : activeTab === "layers" ? <LayersPanel model={model} view={viewWithOptions} onView={patch} />
               : activeTab === "quantities" ? <QuantitiesPanel model={model} view={viewWithOptions} rules={rules} onRules={setRules} onHighlight={(ids) => patch({ highlightIds: ids })} onPick={pickById} />
-              : activeTab === "estimate" ? <EstimatePanel model={model} view={viewWithOptions} />
+              : activeTab === "estimate" ? <EstimatePanel model={model} view={viewWithOptions} areas={modelAreas} book={priceBook} costRules={costRules} onCostRules={setCostRules} onHighlight={(ids) => patch({ highlightIds: ids })} onPick={pickById} />
+              : activeTab === "rates" ? <RatesPanel model={model} view={viewWithOptions} areas={modelAreas} book={priceBook} onBook={setPriceBook} costRules={costRules} />
               : <SettingsPanel source={source} building={building} areas={areas} onPatch={patchConfig} onArea={setAreaPerFloor} onTemplate={chooseTemplate} onOverrides={(p) => setOverrides((old) => ({ ...old, ...p }))} onReset={() => { chooseTemplate(building.config.template); }} options={options} onOptions={patchOptions} />}
           </div>
         </aside>

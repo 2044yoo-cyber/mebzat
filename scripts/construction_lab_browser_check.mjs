@@ -354,9 +354,76 @@ try {
 
   const estimate = page.getByTestId("estimate-panel");
   await estimate.waitFor();
-  ok(/not built yet/i.test(await estimate.innerText()), "the estimate mode says it is a foundation, not a feature");
-  ok(await estimate.getByRole("button", { name: /Price this bill/ }).isDisabled(), "and cannot price anything");
-  ok(!/[$€£]\s?\d/.test(await estimate.innerText()), "no price here either");
+  ok(/indicative estimate in Ethiopian birr, not a quotation/i.test(await page.getByTestId("estimate-disclaimer").innerText()), "the estimate says it is indicative, in birr, and not a quotation");
+  ok(/rests on example rates/i.test(await page.getByTestId("estimate-disclaimer").innerText()), "and how much of it rests on example rates");
+  const valueOf = async (id) => Number(await page.getByTestId(id).first().getAttribute("data-value"));
+  const total0 = await valueOf("estimate-total");
+  const direct0 = await valueOf("estimate-direct");
+  ok(total0 > 5e6 && direct0 > 3e6 && total0 > direct0, `the whole building has a cost: ${Math.round(direct0).toLocaleString("en")} ETB direct, ${Math.round(total0).toLocaleString("en")} ETB with additions and tax`);
+  ok(Math.abs((await valueOf("estimate-materials")) + (await valueOf("estimate-labour")) - direct0) < 1, "materials and labour make the direct cost");
+  const perM2 = await valueOf("estimate-per-m2");
+  ok(perM2 > 15000 && perM2 < 90000, `with a cost per square metre (${Math.round(perM2).toLocaleString("en")} ETB)`);
+  ok(await page.getByTestId("estimate-no-problems").isVisible(), "every line of the bill has a quantity and a price, or is included in another's");
+  ok(!/[$€£]\s?\d/.test(await estimate.innerText()), "no price in another currency");
+  // Where the cost falls: every grouping adds up to the direct cost.
+  for (const label of ["Section", "Floor", "Stage", "Category"]) {
+    await page.getByTestId("estimate-breakdown").getByRole("radio", { name: label, exact: true }).click();
+    const text = await page.getByTestId("breakdown-sum").innerText();
+    const [shown, whole] = text.match(/: ([\d,]+) of ([\d,]+)/).slice(1).map((n) => Number(n.replaceAll(",", "")));
+    ok(Math.abs(shown - whole) <= 1 && Math.abs(whole - direct0) <= 1, `by ${label.toLowerCase()} the costs add up to the direct cost (${shown.toLocaleString("en")} of ${whole.toLocaleString("en")})`);
+  }
+  await page.getByTestId("estimate-breakdown").getByRole("radio", { name: "Floor", exact: true }).click();
+  const costFloors = await estimate.locator('[data-grouping="floor"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-group")));
+  ok(costFloors[0] === "site" && costFloors.at(-1) === "roof", `by floor the foundations come first and the roof last (${costFloors.join(", ")})`);
+
+  // A price changed works the estimate out again; the building is not drawn again.
+  const buildsBefore = await page.evaluate(() => window.__modelBuilds);
+  const sceneBefore = await stats(page);
+  const exampleBefore = await page.getByTestId("estimate-flags").innerText();
+  await page.getByRole("tab", { name: "Rates" }).click();
+  const rates = page.getByTestId("rates-panel");
+  await rates.waitFor();
+  ok(/assumptions, not quotations and not market prices/i.test(await rates.innerText()), "the rates say they are examples, not quotations and not market prices");
+  await page.getByLabel("Search rates").fill("concrete.slab");
+  ok(Number(await page.getByTestId("rate-concrete.slab-material").inputValue()) > 0, "each line of work has a material rate");
+  await page.getByTestId("rate-concrete.slab-material").fill("20000");
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  const total1 = await valueOf("estimate-total");
+  ok(total1 > total0 + 100000, `a dearer cubic metre of slab makes a dearer building at once (${Math.round(total1 - total0).toLocaleString("en")} ETB more)`);
+  ok((await page.evaluate(() => window.__modelBuilds)) === buildsBefore, "and the model was not built again");
+  const sceneAfter = await stats(page);
+  ok(sceneAfter.instances === sceneBefore.instances && sceneAfter.sum === sceneBefore.sum, "nor is the building on screen any different");
+  ok(!(await page.getByTestId("model-updating").count()), "and it never said it was updating the model");
+  ok((await page.getByTestId("estimate-flags").innerText()) !== exampleBefore, "and the estimate now says some of the cost rests on a rate you entered");
+  const direct1 = await valueOf("estimate-direct");
+  await page.getByRole("tab", { name: "Rates" }).click();
+  await page.getByLabel("Search rates").fill("concrete.slab");
+  await page.getByTestId("rate-concrete.slab-material").fill("14500");
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  ok(Math.abs((await valueOf("estimate-direct")) - direct0) < 0.5 && direct1 > direct0, "the old rate gives the old cost back");
+  // A rate left empty is missing, not nothing.
+  await page.getByRole("tab", { name: "Rates" }).click();
+  await page.getByLabel("Search rates").fill("concrete.beam");
+  await page.getByTestId("rate-concrete.beam-labour").fill("");
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  const problems = page.getByTestId("estimate-problems");
+  await problems.waitFor();
+  ok(/concrete|Beams/i.test(await problems.innerText()) && /no labour rate/i.test(await problems.innerText()), "a labour rate left empty is listed as a problem");
+  ok((await valueOf("estimate-direct")) < direct0 - 1000, "and what it cost leaves the total");
+  await page.getByRole("tab", { name: "Rates" }).click();
+  await page.getByTestId("reset-rates").click();
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  ok(Math.abs((await valueOf("estimate-direct")) - direct0) < 0.5, "putting every rate back gives the first estimate back");
+  // The costs that are not work on site.
+  await page.getByTestId("contingency-percent").fill("0");
+  const noContingency = await valueOf("estimate-total");
+  ok(noContingency < total0 - 1000, "with no contingency the total is lower");
+  await page.getByTestId("contingency-percent").fill("5");
+  await page.getByRole("checkbox", { name: "Include Value added tax" }).uncheck();
+  ok((await valueOf("estimate-total")) < total0 - 1000 && (await valueOf("estimate-tax-total")) === 0, "and with no tax");
+  await page.getByRole("checkbox", { name: "Include Value added tax" }).check();
+  ok(Math.abs((await valueOf("estimate-total")) - total0) < 0.5, "tax put back, the first total is back");
+  ok((await page.evaluate(() => window.__modelBuilds)) === buildsBefore, "and none of it drew the building again");
 
   // ---- Sample dimensions ------------------------------------------------------------------------------------------------
   await page.getByTestId("construction-lab").getByRole("radio", { name: "Learn" }).click();
