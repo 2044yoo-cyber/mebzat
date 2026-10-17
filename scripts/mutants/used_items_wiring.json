@@ -1,0 +1,32 @@
+[
+ {
+  "name": "the sign in form renders whatever the URL says",
+  "file": "src/app/(auth)/login/login-form.tsx",
+  "from": "const redirectTo = safeRedirect(searchParams.get(\"redirect\") ?? searchParams.get(\"next\"));",
+  "to": "const redirectTo = (searchParams.get(\"redirect\") ?? searchParams.get(\"next\") ?? \"/dashboard\");"
+ },
+ {
+  "name": "the sign in form forgets where the pages that use next send people",
+  "file": "src/app/(auth)/login/login-form.tsx",
+  "from": "const redirectTo = safeRedirect(searchParams.get(\"redirect\") ?? searchParams.get(\"next\"));",
+  "to": "const redirectTo = safeRedirect(searchParams.get(\"redirect\"));"
+ },
+ {
+  "name": "the hidden input carries the raw value",
+  "file": "src/app/(auth)/login/login-form.tsx",
+  "from": "<input type=\"hidden\" name=\"redirect\" value={redirectTo} />",
+  "to": "<input type=\"hidden\" name=\"redirect\" value={searchParams.get(\"redirect\") ?? \"\"} />"
+ },
+ {
+  "name": "a sample listing is not marked on the card",
+  "file": "src/components/products/product-card.tsx",
+  "from": "demo={product.is_sample}",
+  "to": "demo={false}"
+ },
+ {
+  "name": "the sample column can be null",
+  "file": "supabase/migrations/0075_digital_products.sql",
+  "from": "add column if not exists is_sample boolean not null default false;",
+  "to": "add column if not exists is_sample boolean;"
+ }
+]

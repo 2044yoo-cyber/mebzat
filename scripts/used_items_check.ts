@@ -741,9 +741,12 @@ for (const [path, expected, what] of [
     "it redirected to the hidden input's value, and that value came from the URL",
   );
   const form = code("src/app/(auth)/login/login-form.tsx");
+  // `redirect` is what the proxy sends and `next` is what a dozen pages and the Google round trip use; both go through the rule before anything is rendered.
   check(
     "and the form never renders an off-site destination in the first place",
-    /safeRedirect\(searchParams\.get\("redirect"\)\)/.test(form),
+    /const redirectTo = safeRedirect\(searchParams\.get\("redirect"\) \?\? searchParams\.get\("next"\)\);/.test(form) &&
+      /<input type="hidden" name="redirect" value=\{redirectTo\} \/>/.test(form),
+    "the hidden input carries the sanitised value, not the one in the URL",
   );
   const callback = code("src/app/auth/callback/route.ts");
   check(
@@ -885,7 +888,8 @@ for (const [path, expected, what] of [
   check(
     "marked so nobody mistakes one for a listing they can buy",
     /is_sample boolean not null default false/.test(digitalMigration) &&
-      /Sample/.test(code("src/components/products/product-card.tsx")),
+      /<DemoBadge\s+demo=\{product\.is_sample\}/.test(code("src/components/products/product-card.tsx")),
+    "the card shows the shared demo badge for a sample, from the column",
   );
   check(
     "and registered under a batch so they can be removed",
