@@ -1,0 +1,28 @@
+# Every check script of the repository that needs no browser (scripts/run_repository_checks.mjs): on pull requests, on pushes to main, and by hand.
+#
+# A wardrobe check that nobody ran went from 559 passing to 57 failing over a month of deliberate changes, and nothing noticed. The checks that are red on
+# purpose are listed in that script with the reason; they still run and are still reported, and anything else that fails stops the job.
+name: repository checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Every check that needs no browser
+        run: node scripts/run_repository_checks.mjs
