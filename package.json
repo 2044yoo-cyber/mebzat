@@ -19,7 +19,9 @@
     "check:image-objects": "tsx scripts/image_object_import_check.ts",
     "check:berchuma-manufacturing": "tsx scripts/berchuma_manufacturing_check.ts",
     "check:berchuma-offcuts": "node scripts/berchuma_offcut_inventory_check.mjs",
-    "check:construction": "node scripts/run_construction_checks.mjs"
+    "check:construction": "node scripts/run_construction_checks.mjs",
+    "check:berchuma": "tsx scripts/berchuma-check.ts",
+    "check:repository": "node scripts/run_repository_checks.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
