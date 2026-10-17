@@ -68,6 +68,7 @@ const MM = 0.001;
 export default function Model({
   spec,
   visualMode = "normal",
+  renderQuality = false,
   explodeDistance = 0.35,
   hideFronts = false,
   surface = "model",
@@ -95,6 +96,8 @@ export default function Model({
 }: {
   spec: DesignSpec;
   visualMode?: "normal" | "connections" | "exploded";
+  /** Enable higher-quality lighting and physically based material response in Render mode. */
+  renderQuality?: boolean;
   /** Normalized visual separation, applied only in exploded view. */
   explodeDistance?: number;
   /** Takes the doors and drawer fronts off, to show what is inside. */
@@ -232,9 +235,13 @@ export default function Model({
       frameloop="demand"
       dpr={[1, 2]}
       camera={{ fov: 35, near: 0.05, far: 100 }}
+      shadows={renderQuality}
       gl={{ antialias: true, alpha: true }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
+        gl.toneMappingExposure = renderQuality ? 1.12 : 1;
+        gl.shadowMap.enabled = renderQuality;
+        gl.shadowMap.type = THREE.PCFSoftShadowMap;
         onReady?.();
       }}
       style={{ touchAction: "none", width: "100%", maxWidth: "100%", minWidth: 0 }}
@@ -246,7 +253,7 @@ export default function Model({
         onSelectSketch?.(null);
       }}
     >
-      <Lighting height={height * MM} reach={reach} />
+      <Lighting height={height * MM} reach={reach} renderQuality={renderQuality} />
 
       {/* The room, when the design was drawn in one. Placed with the same
           offset as the cabinets, so the walls land where the units stand
@@ -276,6 +283,7 @@ export default function Model({
               spec={spec}
               surface={surface}
               visualMode={visualMode}
+              renderQuality={renderQuality}
               explodeDistance={explodeDistance}
               modelBounds={{ x: originX + width / 2, y: height / 2, z: originZ + depth / 2 }}
               selected={
@@ -453,6 +461,7 @@ export default function Model({
         onDraw={drawing ? placeSketch : undefined}
         onMove={sketchTool === "move" && selectedSketchId ? (point) => onMoveSketch?.(designPosition(point)) : undefined}
       />
+      {renderQuality ? <RenderFloor reach={reach} /> : null}
       <Frame
         width={width * MM}
         height={height * MM}
@@ -510,6 +519,7 @@ function PartMesh({
   spec,
   surface = "model",
   visualMode = "normal",
+  renderQuality = false,
   explodeDistance = 0.35,
   modelBounds = { x: 1000, y: 1000, z: 600 },
   selected,
@@ -530,6 +540,7 @@ function PartMesh({
   spec: DesignSpec;
   surface?: SurfaceView;
   visualMode?: "normal" | "connections" | "exploded";
+  renderQuality?: boolean;
   explodeDistance?: number;
   modelBounds?: { x: number; y: number; z: number };
   selected: boolean;
@@ -582,6 +593,8 @@ function PartMesh({
   return (
     <mesh
       position={position}
+      castShadow={renderQuality}
+      receiveShadow={renderQuality}
       rotation={[0, partRotationRadians(part), 0]}
       onPointerDown={
         onSelect || onDraw
@@ -611,8 +624,9 @@ function PartMesh({
       ) : null}
       <meshStandardMaterial
         color={visualMode === "connections" ? "#f5f5f2" : colourFor(part, spec, surface)}
-        roughness={roughnessFor(part, spec)}
-        metalness={0.02}
+        roughness={renderQuality ? Math.max(0.24, roughnessFor(part, spec) - 0.08) : roughnessFor(part, spec)}
+        metalness={renderQuality ? 0.035 : 0.02}
+        envMapIntensity={renderQuality ? 1.25 : 1}
         // Lit rather than tinted. Tinting the selection changed what the
         // material looked like, which is the one thing somebody choosing a
         // finish must be able to trust.
@@ -856,22 +870,28 @@ function roughnessFor(part: Part, spec: DesignSpec): number {
  * lit the old way: a key, a fill and a rim, positioned off the unit's own size
  * so a 3.6 m kitchen is lit like a 1.2 m vanity.
  */
-function Lighting({ height, reach }: { height: number; reach: number }) {
+function Lighting({ height, reach, renderQuality = false }: { height: number; reach: number; renderQuality?: boolean }) {
   return (
     <>
       <ambientLight intensity={0.55} />
       <directionalLight
         position={[reach * 1.2, height * 2.2, reach * 1.6]}
-        intensity={1.5}
+        intensity={renderQuality ? 2.0 : 1.5}
+        castShadow={renderQuality}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-near={0.1}
+        shadow-camera-far={20}
+        shadow-bias={-0.00015}
       />
       <directionalLight
         position={[-reach * 1.4, height * 1.1, reach * 0.8]}
-        intensity={0.45}
+        intensity={renderQuality ? 0.65 : 0.45}
       />
       {/* Behind and above, to separate the carcass from the background. */}
       <directionalLight
         position={[0, height * 1.6, -reach * 2]}
-        intensity={0.3}
+        intensity={renderQuality ? 0.55 : 0.3}
       />
     </>
   );
@@ -885,6 +905,15 @@ function Lighting({ height, reach }: { height: number; reach: number }) {
  * and it buys one thing: the sense that the unit is standing on something.
  * A blurred dark ellipse buys the same thing for nothing.
  */
+function RenderFloor({ reach }: { reach: number }) {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.004, 0]} receiveShadow raycast={() => null}>
+      <planeGeometry args={[reach * 4, reach * 4]} />
+      <meshStandardMaterial color="#e8e3da" roughness={0.92} metalness={0} />
+    </mesh>
+  );
+}
+
 function Ground({ reach, onDraw, onMove }: {
   reach: number;
   onDraw?: (point: THREE.Vector3, normal: THREE.Vector3) => void;
