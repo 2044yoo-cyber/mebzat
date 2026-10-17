@@ -1,3 +1,4 @@
+import { verticalDividerBlocker } from "./vertical-divider";
 import { MIN_HEIGHT_MODULE, PREFERRED_LOWER, heightStackOf, planHeights } from "./height-modules";
 import { findModule } from "./kitchen-modules";
 import { placeOnRun, solveLayout } from "./layout";
@@ -7,6 +8,7 @@ import type { Bay, Cabinet, CabinetKind, DesignSpec } from "../types/spec";
 import { drawerFrontHeights } from "./drawer-construction";
 import { cabinetFaceBoards, cabinetFronts, isSideDisplay, sectionBands as sectionBandsOf, type DoorLeaf } from "./geometry";
 import { doorRectProblem, doorSnapTargets, equalLeaves, MIN_DOOR, type FrontRect } from "./door-layout";
+import { doorGapOf, doorSizingOf } from "./door-sizing";
 import { bayLayout, bayModules, carcassInterior, defaultJoints, jointSnapTargets, MIN_MODULE, moduleInterior, modulesOf } from "./transport-modules";
 
 /**
@@ -1094,6 +1096,23 @@ export function setBayWidth(
   });
 }
 
+/** Add or remove a full-height vertical divider inside one selected section. */
+export function setBayVerticalDivider(
+  spec: DesignSpec,
+  cabinetId: string,
+  bayId: string,
+  enabled: boolean,
+): DesignSpec {
+  return change(spec, (draft) => {
+    const cabinet = find(draft, cabinetId);
+    const bay = cabinet?.bays.find((entry) => entry.id === bayId);
+    if (!bay) return;
+    // Switching it off is always allowed; switching it on only where it can stand.
+    if (enabled && verticalDividerBlocker(bay)) return;
+    bay.verticalDivider = enabled;
+  });
+}
+
 export function setBayFitting(
   spec: DesignSpec,
   cabinetId: string,
@@ -1173,9 +1192,24 @@ export function setBayDoor(
     if (!bay) return;
     bay.door = door;
     delete bay.doorOverrides;
-    if (door === "hinged") {
-      bay.doorLeaves = bay.width > LIMITS.hingedLeafWidth ? 2 : 1;
-    }
+    bay.doorLeafMode = "auto";
+    if (door === "hinged") leavesFor(bay);
+  });
+}
+
+/** Set the door count for this section without changing its width or neighbours. */
+export function setBayDoorLeafMode(
+  spec: DesignSpec,
+  cabinetId: string,
+  bayId: string,
+  mode: NonNullable<Bay["doorLeafMode"]>,
+): DesignSpec {
+  return change(spec, (draft) => {
+    const bay = find(draft, cabinetId)?.bays.find((entry) => entry.id === bayId);
+    if (!bay || bay.door !== "hinged") return;
+    bay.doorLeafMode = mode;
+    delete bay.doorOverrides;
+    leavesFor(bay);
   });
 }
 
@@ -1553,7 +1587,10 @@ function setDoorRects(spec: DesignSpec, cabinetId: string, changes: { ref: Pick<
   for (const entry of changes) {
     const index = fronts.leaves.findIndex((leaf) => sameLeaf(leaf, entry.ref));
     if (index < 0) return { spec, problem: "That door is not on the design" };
-    const problem = doorRectProblem(entry.rect, cabinet.size, [...fronts.drawers, ...after.filter((_, other) => other !== index)]);
+    // A design sized by hinge type keeps its clearance between fronts; one
+    // sized the old way refuses only an overlap, as it always did.
+    const minGap = doorSizingOf(spec).legacy ? 0 : doorGapOf(spec);
+    const problem = doorRectProblem(entry.rect, cabinet.size, [...fronts.drawers, ...after.filter((_, other) => other !== index)], minGap);
     if (problem) return { spec, problem };
   }
   const next = change(spec, (draft) => {
@@ -1586,7 +1623,8 @@ export function setDoorSize(spec: DesignSpec, ref: DoorRef, size: Partial<FrontR
   const width = size.width ?? leaf.width;
   const x = size.x ?? (size.width !== undefined && partnerLeft ? leaf.x + leaf.width - width : leaf.x);
   const rect = { x, y: size.y ?? leaf.y, width, height: size.height ?? leaf.height };
-  const gap = spec.carcass.doorGap;
+  // The gap between doors: the clearance the design is sized by.
+  const gap = doorGapOf(spec);
   const changes: { ref: Pick<DoorRef, "bayId" | "run" | "leaf">; rect: FrontRect }[] = [{ ref, rect }];
   for (const partner of partners) {
     const sharesHeight = Math.min(partner.y + partner.height, rect.y + rect.height) > Math.max(partner.y, rect.y);
@@ -1612,7 +1650,7 @@ export function doorSnapTargetsOf(spec: DesignSpec, ref: DoorRef): { x: number[]
   const row = doorRowOf(spec, ref);
   return doorSnapTargets({
     cabinet: cabinet.size,
-    gap: spec.carcass.doorGap,
+    gap: doorGapOf(spec),
     boards: cabinetFaceBoards(spec, cabinet),
     others: [...fronts.drawers, ...fronts.leaves.filter((item) => item !== leaf)],
     row: row.length > 1 ? { left: row[0]!.x, right: row.at(-1)!.x + row.at(-1)!.width, count: row.length } : null,
@@ -1670,7 +1708,7 @@ export function makeDoorsEqual(spec: DesignSpec, ref: DoorRef): { spec: DesignSp
   if (row.length < 2) return { spec, problem: "There is no other door beside this one to share with" };
   const left = row[0]!.x;
   const right = row.at(-1)!.x + row.at(-1)!.width;
-  const shares = equalLeaves(left, right, row.length, spec.carcass.doorGap);
+  const shares = equalLeaves(left, right, row.length, doorGapOf(spec));
   return setDoorRects(spec, ref.cabinetId, row.map((leaf, index) => ({ ref: leaf, rect: { x: shares[index]!.x, y: leaf.y, width: shares[index]!.width, height: leaf.height } })));
 }
 
@@ -1687,7 +1725,10 @@ export type DisplayRef = { cabinetId: string; bayId: string; sectionId?: string 
 const DISPLAY_DEFAULTS = { back: true, lighting: "off" as const };
 
 function leavesFor(bay: Bay): void {
-  if (bay.door === "hinged") bay.doorLeaves = bay.width > LIMITS.hingedLeafWidth ? 2 : 1;
+  if (bay.door !== "hinged") return;
+  if (bay.doorLeafMode === "single") bay.doorLeaves = 1;
+  else if (bay.doorLeafMode === "double") bay.doorLeaves = 2;
+  else bay.doorLeaves = bay.width > LIMITS.hingedLeafWidth ? 2 : 1;
 }
 
 /**

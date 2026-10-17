@@ -17,18 +17,26 @@ export function rectsOverlap(a: FrontRect, b: FrontRect, tolerance = 0.5): boole
   return a.x < b.x + b.width - tolerance && b.x < a.x + a.width - tolerance && a.y < b.y + b.height - tolerance && b.y < a.y + a.height - tolerance;
 }
 
+/** Whether two fronts are closer than `gap` — overlapping, or in the space a gap must keep clear. */
+export function rectsTooClose(a: FrontRect, b: FrontRect, gap: number): boolean {
+  const slack = gap - 0.05;
+  return a.x < b.x + b.width + slack && b.x < a.x + a.width + slack && a.y < b.y + b.height + slack && b.y < a.y + a.height + slack;
+}
+
 /**
  * Why a door cannot have this size and place, or null when it can: not
  * smaller than a door, not outside its cabinet, not over another door or a
- * drawer front.
+ * drawer front. With `minGap` — a design sized by hinge type, which keeps a
+ * clearance between fronts — also not nearer one than that.
  */
-export function doorRectProblem(rect: FrontRect, cabinet: { width: number; height: number }, others: readonly FrontRect[]): string | null {
+export function doorRectProblem(rect: FrontRect, cabinet: { width: number; height: number }, others: readonly FrontRect[], minGap = 0): string | null {
   if (![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) return "That is not a size";
   if (rect.width < MIN_DOOR || rect.height < MIN_DOOR) return `A door must be at least ${MIN_DOOR} × ${MIN_DOOR} mm`;
   if (rect.width > cabinet.width + 0.5) return `Wider than the cabinet — at most ${Math.round(cabinet.width)} mm`;
   if (rect.height > cabinet.height + 0.5) return `Taller than the cabinet — at most ${Math.round(cabinet.height)} mm`;
   if (rect.x < -0.5 || rect.y < -0.5 || rect.x + rect.width > cabinet.width + 0.5 || rect.y + rect.height > cabinet.height + 0.5) return "A door cannot reach outside its cabinet";
   if (others.some((other) => rectsOverlap(rect, other))) return "It would overlap another door or drawer front";
+  if (minGap > 0 && others.some((other) => rectsTooClose(rect, other, minGap))) return `Doors keep a ${Math.round(minGap * 10) / 10} mm gap between them`;
   return null;
 }
 
