@@ -1,0 +1,38 @@
+[
+ {
+  "name": "the actions ask about the wrong area",
+  "file": "src/app/admin/prices/actions.ts",
+  "from": "if (!(await canAdmin(\"prices\"))) {",
+  "to": "if (!(await canAdmin(\"users\"))) {"
+ },
+ {
+  "name": "the actions let anyone through",
+  "file": "src/app/admin/prices/actions.ts",
+  "from": "if (!(await canAdmin(\"prices\"))) {",
+  "to": "if (false) {"
+ },
+ {
+  "name": "verifying does not ask first",
+  "file": "src/app/admin/prices/actions.ts",
+  "from": "export async function verifyPrice(id: string) {\n  const gate = await requireAdmin();\n  if (!gate.ok) return gate;",
+  "to": "export async function verifyPrice(id: string) {\n  const gate = await requireAdmin();"
+ },
+ {
+  "name": "rejecting does not ask first",
+  "file": "src/app/admin/prices/actions.ts",
+  "from": "export async function rejectPrice(id: string, note?: string) {\n  const gate = await requireAdmin();\n  if (!gate.ok) return gate;",
+  "to": "export async function rejectPrice(id: string, note?: string) {\n  const gate = await requireAdmin();"
+ },
+ {
+  "name": "the page shows the queue to anyone",
+  "file": "src/app/admin/prices/page.tsx",
+  "from": "if (!(await canAdmin(\"prices\"))) notFound();",
+  "to": "if (false) notFound();"
+ },
+ {
+  "name": "the page asks about the wrong area",
+  "file": "src/app/admin/prices/page.tsx",
+  "from": "if (!(await canAdmin(\"prices\"))) notFound();",
+  "to": "if (!(await canAdmin(\"users\"))) notFound();"
+ }
+]

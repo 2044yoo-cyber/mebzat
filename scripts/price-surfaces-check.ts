@@ -144,13 +144,33 @@ check(
 /* Verifying is guarded, and rejecting destroys nothing                       */
 /* -------------------------------------------------------------------------- */
 
+// Who counts as an administrator is the control room's decision now (0558dfe): somebody who may administer the prices area, not a flag on the profile. Comments are
+// stripped first, since the explanation beside each guard names the same call.
+const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+const pricesGuard = /if \(!\(await canAdmin\("prices"\)\)\)/;
+// One function at a time, for the reason given further down: a guard in a sibling would satisfy a check against the whole file.
+const topLevel = (source: string, name: string) => {
+  const start = source.search(new RegExp(`^(export )?async function ${name}\\b`, "m"));
+  if (start === -1) return "";
+  const rest = source.slice(start + 1);
+  const next = rest.search(/^(export )?(async )?function /m);
+  return next === -1 ? rest : rest.slice(0, next);
+};
 check(
-  "the actions check for an administrator",
-  /is_admin/.test(actions),
+  "the actions ask the control room whether this is an administrator of the prices",
+  pricesGuard.test(topLevel(code(actions), "requireAdmin")),
+  "the prices area specifically: somebody brought in to clear the report queue has no business promoting a figure",
 );
+for (const name of ["verifyPrice", "rejectPrice"]) {
+  check(
+    `${name} asks before it writes`,
+    /const gate = await requireAdmin\(\);\s*if \(!gate\.ok\) return gate;/.test(topLevel(code(actions), name)),
+    "the one that grants authority is verifyPrice, and a check against the whole file would pass with it unguarded",
+  );
+}
 check(
   "and the page checks too",
-  /is_admin/.test(page),
+  /if \(!\(await canAdmin\("prices"\)\)\) notFound\(\);/.test(code(page)),
   "a page that renders the queue to anyone has already leaked it",
 );
 check(
