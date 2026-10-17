@@ -75,7 +75,9 @@ assert.match(importer, /"door", "window", "stair", "furniture"/, "arch objects t
 assert.match(importer, /symbols,/, "annotated geometry sent through native import hand-off");
 assert.match(importer, /Walls only \(recommended\)/, "structural-only raster scan is enabled by default");
 assert.match(importer, /Black CAD background/, "can force dark CAD scanning");
-assert.match(importer, /detectOrthogonalWalls\(ctx\.getImageData\(0, 0, width, height\), minLength, polarity\)/, "initial scan uses selected polarity");
+// The scan takes the walls-only choice as well as the polarity (the line above is what turns it on by default).
+assert.match(importer, /const detected = detectOrthogonalWalls\(ctx\.getImageData\(0, 0, width, height\), minLength, polarity, structuralOnly\);/, "initial scan uses selected polarity and the walls-only choice");
+assert.match(importer, /const cropped = detectOrthogonalWalls\(ctx\.getImageData\(0, 0, width, height\), minLength, polarity, structuralOnly\);/, "and so does the scan after a crop");
 
 assert.match(importer, /renderPdfPage\(/, "local PDF rasterization");
 assert.match(importer, /onPointerMove=\{pointerMove\}/, "touch endpoint drag");

@@ -1,0 +1,26 @@
+[
+ {
+  "name": "the first scan ignores the background choice",
+  "file": "src/features/house-designer/components/image-to-3d-importer.tsx",
+  "from": "const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity, structuralOnly);",
+  "to": "const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, \"light\", structuralOnly);"
+ },
+ {
+  "name": "the first scan ignores the walls-only choice",
+  "file": "src/features/house-designer/components/image-to-3d-importer.tsx",
+  "from": "const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity, structuralOnly);",
+  "to": "const detected = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity);"
+ },
+ {
+  "name": "the scan after a crop ignores the walls-only choice",
+  "file": "src/features/house-designer/components/image-to-3d-importer.tsx",
+  "from": "const cropped = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity, structuralOnly);",
+  "to": "const cropped = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity);"
+ },
+ {
+  "name": "the scan after a crop ignores the background choice",
+  "file": "src/features/house-designer/components/image-to-3d-importer.tsx",
+  "from": "const cropped = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, polarity, structuralOnly);",
+  "to": "const cropped = detectOrthogonalWalls(ctx.getImageData(0, 0, width, height), minLength, \"light\", structuralOnly);"
+ }
+]
