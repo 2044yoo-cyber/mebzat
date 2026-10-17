@@ -118,7 +118,7 @@ function SketchInspector({ object, spec, onChange, onPushPull, onDuplicate, onDe
   const number = (value: string, fallback: number) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 
   return (
-    <div className="max-h-[30dvh] overflow-y-auto border-t pt-2 text-[11px]">
+    <div className="max-h-60 overflow-y-auto border-t pt-2 text-[11px]">
       <div className="grid grid-cols-3 gap-1">
         {(["x", "y", "z"] as const).map((axis) => (
           <NumberField key={`p-${axis}`} label={axis.toUpperCase()} value={object.position[axis]}

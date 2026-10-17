@@ -156,7 +156,8 @@ check(
 
 // Below lg the rail floats over the page rather than taking a column from it.
 check("on a phone the rail is a drawer", /fixed inset-0 z-60 lg:hidden/.test(shell));
-check("with a backdrop that closes it", /aria-label="Close navigation"/.test(shell));
+// The labels are translated now (common.closeNavigation and its neighbours), so they are asked for by key; the English words are checked where the dictionary is.
+check("with a backdrop that closes it", /aria-label=\{t\("common\.closeNavigation"\)\}/.test(shell));
 
 // Navigating closes it. This was the bug: only the backdrop closed the drawer,
 // so tapping a nav item navigated underneath a sheet that stayed put.
@@ -175,9 +176,14 @@ const topbar = code("src/components/shell/topbar.tsx");
 // exist — it type-errors rather than misbehaving, which is the good outcome.
 check(
   "the toggle says which way it goes",
-  /Expand navigation/.test(topbar) && /Collapse navigation/.test(topbar),
+  /t\("common\.expandNavigation"\)/.test(topbar) && /t\("common\.collapseNavigation"\)/.test(topbar),
 );
 check("and reports its state to a screen reader", /aria-pressed=\{navCollapsed\}/.test(topbar));
+const dictionary = code("src/lib/i18n/translations.ts");
+check(
+  "and in English those keys say what they say",
+  /closeNavigation: "Close navigation"/.test(dictionary) && /expandNavigation: "Expand navigation"/.test(dictionary) && /collapseNavigation: "Collapse navigation"/.test(dictionary),
+);
 
 // ---------------------------------------------------------------------------
 // The phone's bottom bar, and what has to clear it
@@ -212,7 +218,8 @@ check(
 );
 check(
   "and the floating buttons sit above it",
-  /fixed right-0 bottom-\[var\(--bottom-nav-h\)\]/.test(shell),
+  // A rem above the bar, not flush with it: bottom-[calc(var(--bottom-nav-h)+1rem)].
+  /fixed right-4 bottom-\[calc\(var\(--bottom-nav-h\)\+1rem\)\]/.test(shell),
 );
 check(
   "neither of them hardcodes 56px any more",
@@ -231,9 +238,11 @@ check(
 
 const start = code("src/features/berchuma-studio/components/start-panel.tsx");
 
+// On a phone and a tablet the studio is one column that flows, so the page itself scrolls to the end of the panel; from @4xl/ws the panel is a column of its own
+// of the fixed-height application and scrolls inside itself.
 check(
   "the opening panel scrolls",
-  /overflow-y-auto overscroll-contain/.test(start),
+  /@4xl\/ws:overflow-y-auto @4xl\/ws:overscroll-contain/.test(start),
 );
 check(
   "it centres by min-height rather than by cropping",
@@ -241,7 +250,7 @@ check(
 );
 check(
   "the scroll container is the outer element, not the centred column",
-  /h-full w-full max-w-2xl overflow-y-auto/.test(start),
+  /@4xl\/ws:h-full @4xl\/ws:overflow-y-auto/.test(start) && !/min-h-full[^"]*overflow-y-auto/.test(start),
 );
 check(
   "and it no longer centres a column it cannot contain",
@@ -278,19 +287,20 @@ for (const path of studioFiles) {
   check(`${path} sizes itself against its box, not the viewport`, offenders.length === 0, offenders.join(" "));
 }
 
+// The controls used to be a bottom sheet of their own (a flex column of a header and a scrolling list capped at 70% of its box), and its last controls were once
+// out of reach. It is gone: there is one panel, under a drawing that stays at the top of the page (see studio_controls_check), and the page scrolls to the last
+// control. So nothing here may cap the panel's height or give it a scroll of its own on a phone, or the last controls would be cropped all over again; only from
+// @4xl/ws, beside the drawing, does it take the height of the workspace.
 const sheet = code("src/features/berchuma-studio/components/editor/design-editor.tsx");
+const panelOpens = sheet.indexOf("data-editor-panel");
+const panelClasses = sheet.slice(panelOpens, sheet.indexOf("<ControlPanel", panelOpens));
+check("the controls are one panel, not a column and a sheet", (sheet.match(/<ControlPanel/g) ?? []).length === 1 && panelOpens > 0);
 check(
-  "the control sheet is a flex column",
-  /flex max-h-\[70%\] flex-col overflow-hidden/.test(sheet),
+  "with no height cap and no scroll of its own on a phone",
+  !/max-h-|overflow-y-/.test(panelClasses.replace(/@[46]xl\/ws:[^\s"]+/g, "")),
+  panelClasses.replace(/\s+/g, " ").slice(0, 200),
 );
-check(
-  "its header does not shrink",
-  /flex shrink-0 items-center justify-between border-b/.test(sheet),
-);
-check(
-  "and the list takes the rest and scrolls",
-  /min-h-0 flex-1 overflow-y-auto overscroll-contain/.test(sheet),
-);
+check("and the height of the workspace only beside the drawing", /@4xl\/ws:h-full @4xl\/ws:min-h-0/.test(panelClasses));
 
 // ---------------------------------------------------------------------------
 // Full screen actually means full screen

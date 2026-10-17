@@ -1,0 +1,38 @@
+[
+  {
+    "name": "the corner shelf count is a raw number input again",
+    "file": "src/features/berchuma-studio/components/editor/control-panel.tsx",
+    "from": "                <Stepper\n                  label=\"Number of shelves\"",
+    "to": "                <input type=\"number\" />\n                <Stepper\n                  label=\"Number of shelves\""
+  },
+  {
+    "name": "the studio opens on the chat",
+    "file": "src/features/berchuma-studio/components/studio-workspace.tsx",
+    "from": "useState<Tab>(\"design\")",
+    "to": "useState<Tab>(\"chat\")"
+  },
+  {
+    "name": "a draft is not keyed to who is signed in",
+    "file": "src/features/berchuma-studio/components/studio-workspace.tsx",
+    "from": "const key = userId ? draftKey(userId, freshProject ? null : editing?.designId ?? null) : null;",
+    "to": "const key = draftKey(\"anyone\", freshProject ? null : editing?.designId ?? null);"
+  },
+  {
+    "name": "the studio is not fixed-height on a wide screen",
+    "file": "src/features/berchuma-studio/components/studio-workspace.tsx",
+    "from": "\"flex w-full min-w-0 max-w-full flex-col overflow-x-hidden @4xl/ws:h-full\",",
+    "to": "\"flex w-full min-w-0 max-w-full flex-col overflow-x-hidden\","
+  },
+  {
+    "name": "the drawing scrolls away with the page",
+    "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+    "from": "\"sticky top-0 z-10 w-full min-w-0 max-w-full overflow-hidden bg-background\"",
+    "to": "\"relative z-10 w-full min-w-0 max-w-full overflow-hidden bg-background\""
+  },
+  {
+    "name": "starting a new project leaves the old draft to be offered back",
+    "file": "src/features/berchuma-studio/components/studio-workspace.tsx",
+    "from": "if (key) clearDraft(window.localStorage, key);\n                        setDismissed(true);\n                        setFreshProject(true);",
+    "to": "setDismissed(true);\n                        setFreshProject(true);"
+  }
+]

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "the navigation drawer has no labelled backdrop",
+    "file": "src/components/shell/app-shell.tsx",
+    "from": "aria-label={t(\"common.closeNavigation\")}",
+    "to": "aria-label=\"\""
+  },
+  {
+    "name": "the floating buttons sit on the bar",
+    "file": "src/components/shell/app-shell.tsx",
+    "from": "bottom-[calc(var(--bottom-nav-h)+1rem)]",
+    "to": "bottom-0"
+  },
+  {
+    "name": "the opening panel cannot be scrolled on a wide screen",
+    "file": "src/features/berchuma-studio/components/start-panel.tsx",
+    "from": "@4xl/ws:overflow-y-auto @4xl/ws:overscroll-contain",
+    "to": "@4xl/ws:overscroll-contain"
+  },
+  {
+    "name": "the opening panel is not the scroll container",
+    "file": "src/features/berchuma-studio/components/start-panel.tsx",
+    "from": "@4xl/ws:h-full @4xl/ws:overflow-y-auto",
+    "to": "@4xl/ws:overflow-y-auto"
+  },
+  {
+    "name": "the sketch list is sized against the viewport again",
+    "file": "src/features/berchuma-studio/components/editor/sketch-toolbar.tsx",
+    "from": "className=\"max-h-60 overflow-y-auto border-t pt-2 text-[11px]\"",
+    "to": "className=\"max-h-[30dvh] overflow-y-auto border-t pt-2 text-[11px]\""
+  },
+  {
+    "name": "the controls panel is capped on a phone",
+    "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+    "from": "\"w-full min-w-0 max-w-full overflow-x-hidden border-t\",",
+    "to": "\"w-full min-w-0 max-w-full overflow-x-hidden border-t max-h-96 overflow-y-auto\","
+  },
+  {
+    "name": "the controls panel takes no height beside the drawing",
+    "file": "src/features/berchuma-studio/components/editor/design-editor.tsx",
+    "from": "\"@4xl/ws:h-full @4xl/ws:min-h-0 @4xl/ws:w-[300px] @4xl/ws:shrink-0\",",
+    "to": "\"@4xl/ws:min-h-0 @4xl/ws:w-[300px] @4xl/ws:shrink-0\","
+  }
+]

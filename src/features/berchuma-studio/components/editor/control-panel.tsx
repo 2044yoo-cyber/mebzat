@@ -310,10 +310,13 @@ export function ControlPanel({
               <LengthField label="Width" value={selectedCorner.width ?? selectedCorner.size} min={selectedCornerMinimum} max={3000} step={10} onChange={(width) => updateCorner({ width })} />
               <LengthField label="Depth" value={selectedCorner.depth ?? selectedCorner.size} min={selectedCornerMinimum} max={3000} step={10} onChange={(depth) => updateCorner({ depth })} />
               <LengthField label="Height" value={selectedCorner.height} min={200} max={LIMITS.maxHeight} step={10} onChange={(height) => updateCorner({ height })} />
-              {["l_corner", "connected_l", "custom"].includes(spec.cornerKinds?.[selectedCornerId] ?? spec.cornerKind) ? <label className="space-y-1 text-xs">
-                <span className="font-medium">Number of shelves</span>
-                <input type="number" min={0} max={20} value={cornerSettings?.shelves ?? 3} onChange={(event) => updateCorner({ shelves: Math.max(0, Math.min(20, Number(event.target.value))) })} className="w-full rounded-md border bg-background px-2 py-2" />
-              </label> : null}
+              {["l_corner", "connected_l", "custom"].includes(spec.cornerKinds?.[selectedCornerId] ?? spec.cornerKind) ? (
+                <Stepper
+                  label="Number of shelves"
+                  value={cornerSettings?.shelves ?? 3}
+                  onStep={(delta) => updateCorner({ shelves: Math.max(0, Math.min(20, (cornerSettings?.shelves ?? 3) + delta)) })}
+                />
+              ) : null}
             </> : null}
           </Section>
         ) : (

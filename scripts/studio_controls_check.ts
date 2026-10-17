@@ -507,8 +507,8 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   );
   check(
     "and lands on the Design tab, not the chat",
-    // A gallery template opens on the Design tab as well, at the start steps.
-    /editing \|\| opening\?\.kind === "kitchen" \|\| opening\?\.template \? "design" : "chat"/.test(workspace),
+    // The studio opens on the Design tab whatever it is opened with: the chat is no longer where it lands (a template, a kitchen and a saved design all begin there).
+    /useState<Tab>\("design"\)/.test(workspace) && !/\? "design" : "chat"/.test(workspace),
     "somebody who pressed Open in Studio is looking at a design, not starting a conversation",
   );
   check(
@@ -721,7 +721,7 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   );
   check(
     "the draft is keyed to who is signed in",
-    /userId \? draftKey\(userId, editing\?\.designId \?\? null\) : null/.test(
+    /userId \? draftKey\(userId, freshProject \? null : editing\?\.designId \?\? null\) : null/.test(
       workspace,
     ) && /userId=\{session\.state === "signed-in" \? session\.userId : null\}/.test(studio),
   );
@@ -1393,12 +1393,12 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   );
   check(
     "the studio is a fixed-height application again on a wide screen",
-    /"flex flex-col @4xl\/ws:h-full"/.test(workspace),
+    /"flex w-full min-w-0 max-w-full flex-col overflow-x-hidden @4xl\/ws:h-full"/.test(workspace),
   );
 
   check(
     "the drawing sticks to the top of the page",
-    /"sticky top-0 z-10 w-full bg-background"/.test(editor),
+    /"sticky top-0 z-10 w-full[^"]*bg-background"/.test(editor),
     "this is the whole request: the chrome scrolls away and the model does not",
   );
   check(
@@ -1682,7 +1682,7 @@ const MODEL = "src/features/berchuma-studio/components/viewer/model.tsx";
   );
   check(
     "and clears the stored draft with it",
-    /if \(key\) clearDraft\(window\.localStorage, key\);\s*\n\s*setDismissed\(true\);\s*\n\s*design\.clear\(\);/.test(
+    /if \(key\) clearDraft\(window\.localStorage, key\);\s*\n\s*setDismissed\(true\);\s*\n(?:\s*setFreshProject\(true\);\s*\n)?\s*design\.clear\(\);/.test(
       workspace,
     ),
     "a draft left behind has the restore bar offer the discarded design straight back, which looks broken",
