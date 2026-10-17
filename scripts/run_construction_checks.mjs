@@ -2,7 +2,7 @@
  * Runs every check of the construction learning mode and the building configurator, four at a time, and says which passed.
  *
  *   node scripts/run_construction_checks.mjs            the checks that need no browser
- *   node scripts/run_construction_checks.mjs --browser  and the two browser checks (they need `npm run build` first, and Playwright)
+ *   node scripts/run_construction_checks.mjs --browser  and the three browser checks (they need `npm run build` first, and Playwright)
  *
  * It exits 1 if any check fails, with the tail of that check's output, so that a pipeline stops on it. Nothing is skipped quietly: a check whose script is not
  * there is a failure.
@@ -31,6 +31,7 @@ const CHECKS = [
 const BROWSER = [
   ["building configurator in a browser", "node", ["scripts/building_config_browser_check.mjs"]],
   ["construction mode in a browser", "node", ["scripts/construction_lab_browser_check.mjs"]],
+  ["construction in the phone's menu, in a browser", "node", ["scripts/construction_menu_browser_check.mjs"]],
 ];
 
 const wantBrowser = process.argv.includes("--browser");

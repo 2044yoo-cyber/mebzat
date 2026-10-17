@@ -15,6 +15,7 @@ import {
   Compass,
   Contact,
   CreditCard,
+  Cuboid,
   FileSpreadsheet,
   FileText,
   Gavel,
@@ -578,6 +579,24 @@ export const NAV_SPEC: NavSection[] = [
         private: true,
         hint: "Budget a build with stated assumptions",
         keywords: ["estimate", "budget", "cost"],
+      },
+      // The construction learning mode of the House Designer (its Learn tab): a
+      // building in 3D that goes up in eighteen stages, with its bill of
+      // quantities and its cost in birr. It opens on its own, on a building of
+      // the size chosen there, with no plan to open first. Second, not first:
+      // a collapsed rail sends a tap on Construction to the first row.
+      {
+        id: "construction-3d",
+        label: "Construction 3D",
+        icon: Cuboid,
+        href: "/house-design?tab=learn",
+        private: true,
+        hint: "Watch a building go up in 3D, with its BOQ and cost",
+        keywords: [
+          "3d", "learn", "learning", "stages", "building", "house", "villa", "g+2",
+          "foundation", "frame", "structure", "rebar", "steel", "boq",
+          "bill of quantities", "estimate", "cost", "configurator", "model",
+        ],
       },
       {
         id: "calculators",

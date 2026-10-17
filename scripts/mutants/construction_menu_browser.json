@@ -1,0 +1,38 @@
+[
+ {
+  "name": "the row has nowhere to go, so the menu leaves it out",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "href: \"/house-design?tab=learn\",\n        private: true,\n        hint: \"Watch",
+  "to": "private: true,\n        hint: \"Watch"
+ },
+ {
+  "name": "the row opens the plan, not the learning view",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "href: \"/house-design?tab=learn\",",
+  "to": "href: \"/house-design\","
+ },
+ {
+  "name": "a signed-out reader is not sent to sign in first",
+  "file": "src/components/shell/section-panel.tsx",
+  "from": "item.private && !signedIn",
+  "to": "false"
+ },
+ {
+  "name": "the row says nothing about itself",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "hint: \"Watch a building go up in 3D, with its BOQ and cost\",",
+  "to": "hint: \"3D\","
+ },
+ {
+  "name": "the Amharic menu falls back to English for it",
+  "file": "src/lib/i18n/translations.ts",
+  "from": "\"construction-3d\": \"\u12e8\u130d\u1295\u1263\u1273 3D\",",
+  "to": ""
+ },
+ {
+  "name": "the Oromo menu falls back to English for it",
+  "file": "src/lib/i18n/translations.ts",
+  "from": "\"construction-3d\": \"Ijaarsaa 3D\",",
+  "to": ""
+ }
+]

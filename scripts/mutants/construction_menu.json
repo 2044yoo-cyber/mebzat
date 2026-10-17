@@ -1,0 +1,38 @@
+[
+ {
+  "name": "the row opens the plan, not the learning view",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "href: \"/house-design?tab=learn\",",
+  "to": "href: \"/house-design\","
+ },
+ {
+  "name": "the row names a tab the page does not know",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "href: \"/house-design?tab=learn\",",
+  "to": "href: \"/house-design?tab=study\","
+ },
+ {
+  "name": "the row is open to a signed-out reader",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "href: \"/house-design?tab=learn\",\n        private: true,",
+  "to": "href: \"/house-design?tab=learn\","
+ },
+ {
+  "name": "the row says nothing about itself",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "hint: \"Watch a building go up in 3D, with its BOQ and cost\",",
+  "to": "hint: \"3D\","
+ },
+ {
+  "name": "the row is not the one the checks and the translations look for",
+  "file": "src/lib/workspace/navigation.ts",
+  "from": "id: \"construction-3d\",",
+  "to": "id: \"construction-learn\","
+ },
+ {
+  "name": "the page no longer opens the learning view",
+  "file": "src/app/house-design/page.tsx",
+  "from": "params.tab === \"learn\"",
+  "to": "params.tab === \"study\""
+ }
+]

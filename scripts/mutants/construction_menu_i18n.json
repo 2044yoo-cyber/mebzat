@@ -1,0 +1,20 @@
+[
+ {
+  "name": "the Amharic menu has no name for it",
+  "file": "src/lib/i18n/translations.ts",
+  "from": "\"construction-3d\": \"\u12e8\u130d\u1295\u1263\u1273 3D\",",
+  "to": ""
+ },
+ {
+  "name": "the Oromo menu has no name for it",
+  "file": "src/lib/i18n/translations.ts",
+  "from": "\"construction-3d\": \"Ijaarsaa 3D\",",
+  "to": ""
+ },
+ {
+  "name": "the English menu has no name for it",
+  "file": "src/lib/i18n/translations.ts",
+  "from": "\"construction-3d\": \"Construction 3D\",",
+  "to": ""
+ }
+]

@@ -64,7 +64,7 @@ Engineering note: every dimension, rate and ratio here is a stated example for l
 
 ## 6. Result: what was built, and how it was checked
 
-The plan in section 5 was carried out. The files are listed in `src/features/house-designer/construction/README.md`; this section is about the checks.
+The plan in section 5 was carried out. The files are listed in `src/features/house-designer/construction/README.md`; this section is about the checks. It is opened from the menu, Construction → Construction 3D (`/house-design?tab=learn`): `navigation_check` checks the row and `construction_menu_browser_check` checks it as a phone shows it.
 
 | Check | What it looks at | Checks |
 | --- | --- | --- |
@@ -81,8 +81,9 @@ The plan in section 5 was carried out. The files are listed in `src/features/hou
 | `construction_export_check` | studies saved and reopened, the workbook read back cell by cell, the PDF read by pdf.js | 12,431 |
 | `construction_acceptance_check` | four buildings × 150 and 200 m² × eighteen stages × every viewer control × the bill, the cost and the two documents | 4,766 |
 | `building_config_browser_check`, `construction_lab_browser_check` | a real Chromium at phone width, against a production build | 45 and 182 |
+| `construction_menu_browser_check` | the row under Construction in the phone's menu: listed near the top, 44 px to press, in three languages, going to the learning view (by way of sign-in when signed out) | 18 |
 
-`node scripts/run_construction_checks.mjs` (`npm run check:construction`) runs the type check and every one of them four at a time; `--browser` adds the two browser checks. `.github/workflows/construction_checks.yml` runs it on every push and pull request that touches that code. Each check has a mutation plan in `scripts/mutants/` (`construction_*.json`, `building_config.json`) that breaks the code on purpose and insists the check notices.
+`node scripts/run_construction_checks.mjs` (`npm run check:construction`) runs the type check and every one of them four at a time; `--browser` adds the three browser checks. `.github/workflows/construction_checks.yml` runs it on every push and pull request that touches that code. Each check has a mutation plan in `scripts/mutants/` (`construction_*.json`, `building_config.json`) that breaks the code on purpose and insists the check notices.
 
 ## 7. The 57 failing `berchuma-check` assertions
 

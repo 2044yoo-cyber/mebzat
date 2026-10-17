@@ -1,6 +1,6 @@
 # Construction learning mode, building configurator, bill of quantities and cost estimate
 
-An interactive, 18-stage construction simulator inside the House Designer (the **Learn** tab). It shows how a
+An interactive, 18-stage construction simulator inside the House Designer (the **Learn** tab). Open it from the menu, **Construction → Construction 3D**, or at `/house-design?tab=learn`. It shows how a
 building is built, from setting out to handover, as a true exploded 3D model; it reads the bill of quantities off
 that model; and it prices the bill in Ethiopian birr from a price book you can edit, live.
 
@@ -176,7 +176,7 @@ Cabinets, wardrobes, storage and the TV unit are real Berchuma parts: one 3D pan
 
 ```
 node scripts/run_construction_checks.mjs              # every check below that needs no browser, four at a time
-node scripts/run_construction_checks.mjs --browser    # and the two browser checks (npm run build first)
+node scripts/run_construction_checks.mjs --browser    # and the three browser checks (npm run build first)
 ```
 
 | Check | What it proves |
@@ -190,6 +190,7 @@ node scripts/run_construction_checks.mjs --browser    # and the two browser chec
 | `construction_export_check.ts` | studies saved, listed, replaced, opened identically; the workbook read back cell by cell; the PDF read by pdf.js |
 | `construction_acceptance_check.ts` | four buildings × 150 and 200 m² × eighteen stages × the viewer's controls × the bill, the cost and the two documents |
 | `construction_lab_browser_check.mjs` | a real browser at phone width: stages, controls, quantities, rates, a price change that does not rebuild, saving and opening, downloads |
+| `construction_menu_browser_check.mjs`, and the menu rows in `navigation_check.ts` | the row under Construction in the phone's menu: listed near the top, big enough to press, in three languages, going to the learning view (by way of sign-in when signed out) |
 
 Every check is mutation-tested: `node scripts/mutate.mjs "npx tsx scripts/<check>.ts" scripts/mutants/<plan>.json` breaks the
 code on purpose and insists the check notices (plans: `construction_boq.json`, `construction_estimate.json`,

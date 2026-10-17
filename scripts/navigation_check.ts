@@ -12,7 +12,7 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 
-import { NAV_ITEMS, NAV_SECTIONS, NAV_SPEC } from "../src/lib/workspace/navigation.ts";
+import { NAV_ITEMS, NAV_SECTIONS, NAV_SPEC, breadcrumbsFor, matchNavItem } from "../src/lib/workspace/navigation.ts";
 import { QUICK_CREATE } from "../src/components/shell/quick-actions.tsx";
 
 const GREEN = "\x1b[32m";
@@ -155,6 +155,50 @@ function routeExists(href: string): boolean {
     "every menu row goes to a page that exists",
     broken.length === 0,
     broken.join("; "),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Construction 3D
+//
+// The construction learning mode is the Learn tab of the House Designer, and the only way to it was to know to open House Design and press a tab: it could not be found in
+// the menu. It is a row under Construction now, and it opens the tab, not the plan. Which tab a link may name is the page's to say, so the row is compared with the page.
+// ---------------------------------------------------------------------------
+
+{
+  const construction = NAV_SECTIONS.find((section) => section.id === "construction");
+  const row = construction?.items.find((item) => item.id === "construction-3d");
+  check("Construction 3D is a row under Construction", row !== undefined);
+  check("it opens the learning view and not the plan", row?.href === "/house-design?tab=learn", row?.href);
+  check(
+    "it asks a signed-out reader to sign in first, as House Design does",
+    row?.private === true && NAV_ITEMS.find((item) => item.id === "house-design")?.private === true,
+  );
+  check("it says what it is", (row?.hint?.length ?? 0) > 20, row?.hint);
+
+  const page = readFileSync("src/app/house-design/page.tsx", "utf8")
+    .replace(/(^|[\s;,{(=])\/\*[\s\S]*?\*\//g, "$1")
+    .replace(/^\s*\/\/.*$/gm, "");
+  const accepted = /params\.tab === "([a-z]+)"/.exec(page)?.[1];
+  check(
+    "the tab it names is the one the page opens",
+    accepted !== undefined && new URL(row?.href ?? "/", "https://medosha.test").searchParams.get("tab") === accepted,
+    `the page accepts ${accepted}`,
+  );
+
+  check(
+    "the learning view is the highlighted row at its address",
+    matchNavItem("/house-design", new URLSearchParams("tab=learn"))?.id === "construction-3d",
+  );
+  check(
+    "and House Design is the one at the plan, with or without a plan open",
+    matchNavItem("/house-design", new URLSearchParams())?.id === "house-design" &&
+      matchNavItem("/house-design", new URLSearchParams("plan=0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f"))?.id === "house-design",
+    "a plan being edited is not the learning view",
+  );
+  check(
+    "the trail reads Construction, then Construction 3D",
+    breadcrumbsFor("/house-design", new URLSearchParams("tab=learn")).map((crumb) => crumb.label).join(" > ") === "Home > Construction > Construction 3D",
   );
 }
 
