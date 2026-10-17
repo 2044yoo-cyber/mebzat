@@ -10,6 +10,10 @@ import {
   Copy,
   Loader2,
   Grid2x2,
+  Layers3,
+  Network,
+  RotateCcw,
+  Sun,
   Minus,
   Move,
   Plus,
@@ -110,7 +114,7 @@ const Model = dynamic(() => import("../viewer/model"), {
   loading: () => <Loading />,
 });
 
-type View = "solid" | "flat" | "plan";
+type View = "solid" | "flat" | "plan" | "render" | "connections" | "exploded";
 
 export function DesignEditor({
   spec,
@@ -160,6 +164,8 @@ export function DesignEditor({
   // A cabinet copied, to paste after another — in this design or the next.
   const [clip, setClip] = useState<CabinetClip | null>(null);
   const [showCountertop, setShowCountertop] = useState(false);
+  const [explodeDistance, setExplodeDistance] = useState(0.35);
+  const renderMode = view === "render";
 
   // ---- how tall the drawing is on a phone ---------------------------------
   //
@@ -374,12 +380,15 @@ export function DesignEditor({
         )}
       >
         <div className="absolute inset-0 w-full min-w-0 max-w-full overflow-hidden">
-          {view === "solid" ? (
+          {view === "solid" || view === "render" || view === "connections" || view === "exploded" ? (
             <Model
               spec={spec}
+              renderQuality={renderMode}
+              visualMode={view === "connections" ? "connections" : view === "exploded" ? "exploded" : "normal"}
+              explodeDistance={explodeDistance}
               hideFronts={hideFronts}
-              surface={surface}
-              hideCountertop={spec.furnitureType === "kitchen" && !showCountertop}
+              surface={renderMode ? "material" : surface}
+              hideCountertop={spec.furnitureType === "kitchen" && !showCountertop && !renderMode}
               selectedCabinetId={selectedId}
               selectedDoor={door}
               onSelectDoor={selectDoor}
@@ -512,6 +521,9 @@ export function DesignEditor({
                 icon={Ruler}
                 label="Elevation"
               />
+              <ViewTab active={view === "render"} onClick={() => setView("render")} icon={Sun} label="Render" />
+              <ViewTab active={view === "connections"} onClick={() => setView("connections")} icon={Network} label="MDF Connections" />
+              <ViewTab active={view === "exploded"} onClick={() => setView("exploded")} icon={Layers3} label="Exploded View" />
               {/*
                 Only where there is a corner to look at. On a straight wardrobe
                 the plan is one rectangle and says nothing the elevation does
@@ -572,7 +584,7 @@ export function DesignEditor({
             ) : null}
           </div>
 
-          {view === "solid" ? (
+          {view === "solid" || view === "connections" || view === "exploded" ? (
             <div className="pointer-events-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
             <button type="button" onClick={() => {
               const enabled = !sketchEnabled;
@@ -593,10 +605,12 @@ export function DesignEditor({
             </label>
             </div>
           ) : null}
-          {view === "solid" && spec.furnitureType === "kitchen" ? <label className="pointer-events-auto flex items-center gap-1.5 rounded-lg border bg-background/80 px-2 py-1.5 text-[11px]">
+          {(view === "solid" || view === "connections" || view === "exploded") && spec.furnitureType === "kitchen" ? <label className="pointer-events-auto flex items-center gap-1.5 rounded-lg border bg-background/80 px-2 py-1.5 text-[11px]">
             <input type="checkbox" checked={showCountertop} onChange={(event) => setShowCountertop(event.target.checked)} />Show countertop
           </label> : null}
         </div>
+
+        {view === "exploded" ? <div className="pointer-events-auto absolute left-2 top-12 z-10 flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-lg border bg-background/90 px-2 py-1.5 text-[11px] shadow-sm backdrop-blur"><label htmlFor="studio-explode-distance" className="shrink-0">Explode</label><input id="studio-explode-distance" aria-label="Exploded view distance" type="range" min="0.1" max="0.9" step="0.05" value={explodeDistance} onChange={(event) => setExplodeDistance(Number(event.target.value))} className="min-w-0 w-24 accent-primary" /><span className="w-8 text-right tabular-nums">{Math.round(explodeDistance * 100)}%</span><button type="button" aria-label="Reset exploded view distance" title="Reset exploded view distance" onClick={() => setExplodeDistance(0.35)} className="rounded border p-1"><RotateCcw className="size-3" aria-hidden /></button></div> : null}
 
         {view === "solid" && sketchEnabled ? (
           <SketchToolbar
@@ -766,7 +780,7 @@ export function DesignEditor({
 
           {/* Bottom right, clear of the toolbar along the top, which is full
               on a phone: Model or Material view. */}
-          {view === "solid" ? <SurfaceToggle value={surface} onChange={setSurface} className="pointer-events-auto shrink-0" /> : null}
+          {view === "solid" || view === "connections" || view === "exploded" ? <SurfaceToggle value={surface} onChange={setSurface} className="pointer-events-auto shrink-0" /> : null}
         </div>
       </div>
 
