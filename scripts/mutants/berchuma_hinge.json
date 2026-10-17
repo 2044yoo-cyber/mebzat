@@ -324,12 +324,6 @@
   "to": "z: -ft }"
  },
  {
-  "name": "closure swing ignores inset",
-  "file": "src/features/berchuma-studio/services/closure-panels.ts",
-  "from": "const doorProud = doorFrontOffset(spec, ft, \"hinged\");",
-  "to": "const doorProud = ft;"
- },
- {
   "name": "clearance allowed to 100",
   "file": "src/features/berchuma-studio/types/spec.ts",
   "from": "z.number().min(0).max(20).default(5)",

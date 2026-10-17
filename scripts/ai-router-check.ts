@@ -461,13 +461,16 @@ check(
   "Cabinet Design (Berchuma) is its own section",
   nav.includes('label: "Cabinet Design"'),
 );
-for (const row of ["Design Studio", "My Projects", "Gallery"]) {
-  check(`with a ${row} row`, nav.includes(`label: "${row}"`));
+// The Design section's rows were regrouped: the studio is the Cabinet Design row itself, the saved designs are "Saved Cabinet Designs" and the gallery is the
+// "Design Gallery", each to the place it always went.
+for (const [row, href] of [["Cabinet Design", "/studio"], ["Saved Cabinet Designs", "/designs?mine=1"], ["Design Gallery", "/designs"]] as const) {
+  const entry = nav.slice(nav.indexOf(`label: "${row}"`), nav.indexOf(`label: "${row}"`) + 260);
+  check(`with a ${row} row, to ${href}`, nav.includes(`label: "${row}"`) && entry.includes(`href: "${href}"`));
 }
 
 for (const row of [
-  "Cost Estimator",
-  "BOQ Generator",
+  "AI Cost Estimator",
+  "AI BOQ Generator",
   "Material Advisor",
   "Supplier Finder",
   "AI Document Reader",

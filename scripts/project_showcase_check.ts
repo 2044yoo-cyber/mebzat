@@ -882,10 +882,11 @@ const fieldIds = (category: ProjectCategory) =>
     /HIDDEN_LABELS\[/.test(card),
   );
 
-  // The card cannot show a column nobody selected.
-  for (const [name, path] of [
-    ["the portfolio", "src/components/projects/profile-projects.tsx"],
-    ["the projects page", "src/app/(dashboard)/projects/page.tsx"],
+  // The card cannot show a column nobody selected. The profile's portfolio draws the full card; the Projects tab became the person's own profile and everything they
+  // have made (ed8c399), whose project rows are a line of category and place under the title and no description, so it needs the category and no more.
+  for (const [name, path, wantsDescription] of [
+    ["the portfolio", "src/components/projects/profile-projects.tsx", true],
+    ["the Projects tab", "src/lib/portfolio/sources.ts", false],
   ] as const) {
     const source = sourceOf(path);
     check(
@@ -893,10 +894,12 @@ const fieldIds = (category: ProjectCategory) =>
       /"[^"]*\bcategory\b[^"]*"/.test(source),
       "the card reads project.category; a query that does not fetch it renders no badge",
     );
-    check(
-      `${name} selects the description`,
-      /"[^"]*\bdescription\b[^"]*"/.test(source),
-    );
+    if (wantsDescription) {
+      check(
+        `${name} selects the description`,
+        /"[^"]*\bdescription\b[^"]*"/.test(source),
+      );
+    }
   }
 }
 

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "the studio row goes to the picker",
+    "file": "src/lib/workspace/navigation.ts",
+    "from": "href: \"/studio\",\n        private: true,\n        hint: \"Kitchens, wardrobes, vanities and cabinets\",",
+    "to": "href: \"/designs\",\n        private: true,\n        hint: \"Kitchens, wardrobes, vanities and cabinets\","
+  },
+  {
+    "name": "the saved designs row is gone",
+    "file": "src/lib/workspace/navigation.ts",
+    "from": "label: \"Saved Cabinet Designs\",",
+    "to": "label: \"Saved\","
+  },
+  {
+    "name": "the saved designs row lists everyone's designs",
+    "file": "src/lib/workspace/navigation.ts",
+    "from": "href: \"/designs?mine=1\",",
+    "to": "href: \"/designs\","
+  },
+  {
+    "name": "the gallery row is renamed",
+    "file": "src/lib/workspace/navigation.ts",
+    "from": "label: \"Design Gallery\",",
+    "to": "label: \"Gallery\","
+  },
+  {
+    "name": "the cost estimator is renamed",
+    "file": "src/lib/workspace/navigation.ts",
+    "from": "label: \"AI Cost Estimator\",",
+    "to": "label: \"Estimator\","
+  },
+  {
+    "name": "the BOQ generator is renamed",
+    "file": "src/lib/workspace/navigation.ts",
+    "from": "label: \"AI BOQ Generator\",",
+    "to": "label: \"BOQ\","
+  }
+]
