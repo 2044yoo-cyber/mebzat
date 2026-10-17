@@ -7,7 +7,7 @@ const cases=[
  [join,'if(from>EPS)clip(from,1);','if(false)clip(from,1);','wall_joins_check.ts','opening trim'],
  [join,'>limit)continue;','>Infinity)continue;','wall_joins_check.ts','acute corner limit'],
  ['src/features/berchuma-studio/components/plan/plan-canvas.tsx','joins?.footprints.has(wall.id)','false','wall_joins_check.ts','plan renderer binding'],
- ['src/features/house-designer/services/freehand.ts','if (horizontal.length) mean.y','if (false) mean.y','freehand_check.ts','orthogonal snap'],
+ ['src/features/house-designer/services/freehand.ts','if (horizontal.length) mean.y = horizontal.reduce','if (false) mean.y = horizontal.reduce','freehand_check.ts','orthogonal snap'],
 ];
 for(const [path,from,to,test,label] of cases){
  const original=readFileSync(path,'utf8');if(!original.includes(from))throw Error('Missing mutation: '+label);

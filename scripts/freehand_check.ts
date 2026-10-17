@@ -87,6 +87,45 @@ const convert = (strokes: Stroke[]) =>
       calibrated: true,
     }),
   );
+// Locked strokes are immovable snap references (3f8fbeb). A locked wall keeps its ends exactly where they were drawn, and a loose stroke that ends beside it is
+// pulled onto its line, not to the middle between the two (30 mm off here).
+{
+  const lockedAcross = { ...stroke([[0, 0], [200, 0]], "locked-across"), locked: true };
+  const looseDown = stroke([[201, 3], [201, 250]], "loose-down"); // 3 units (60 mm) under the locked wall's line and 1 unit (20 mm) past its end
+  const acrossWalls = convert([lockedAcross, looseDown]).walls;
+  assert.equal(acrossWalls.length, 2, "a locked wall and a loose one beside it make two walls");
+  const across = acrossWalls.find((wall) => wall.start.y === wall.end.y)!;
+  assert.deepEqual([across.start.x, across.start.y, across.end.x, across.end.y], [0, 0, 4000, 0], "the locked horizontal wall is where it was drawn");
+  assert.equal(acrossWalls.find((wall) => wall !== across)!.start.y, 0, "and the loose wall starts on its line");
+
+  const lockedDown = { ...stroke([[200, 0], [200, 250]], "locked-down"), locked: true };
+  const looseAcross = stroke([[0, 2], [199, 2]], "loose-across"); // 1 unit (20 mm) short of the locked wall's line
+  const downWalls = convert([lockedDown, looseAcross]).walls;
+  assert.ok(downWalls.filter((wall) => wall.start.x === 4000 && wall.end.x === 4000).length >= 1, "the locked vertical wall stays on x = 4000");
+  assert.ok(downWalls.some((wall) => wall.end.x === 4000 && wall.start.x === 0), "and the loose wall ends on its line, not 10 mm short of it");
+}
+// A single loose end beside a wall is pulled onto the nearest wall in a later pass whatever the first pass did with it, so the block above cannot tell the first pass
+// from that one. Two loose ends that already meet are left alone by the later pass: the corner they make below is the first pass's work and nothing else's.
+{
+  const wallsOf = (strokes: Stroke[]) => convertStrokes(strokes, 20).map((wall) => [wall.start.x, wall.start.y, wall.end.x, wall.end.y].map((n) => Math.round(n * 100) / 100));
+  const same = (actual: number[][], expected: number[][], message: string) => {
+    const text = (rows: number[][]) => rows.map((row) => row.join(",")).sort();
+    assert.deepEqual(text(actual), text(expected), message);
+  };
+  const locked = (points: number[][], id: string): Stroke => ({ ...stroke(points, id), locked: true });
+  // A locked vertical wall ends at (300, 100); a loose wall carries on from (302, 103) and another goes off from (303, 101). Their corner takes the locked wall's x
+  // (6000 mm: the mean of the three ends would be 6033, and of the two vertical ones 6020) and the mean of the three ends' y, (100 + 103 + 101) / 3 = 101.33 (2026.67 mm).
+  same(wallsOf([locked([[300, 0], [300, 100]], "locked"), stroke([[302, 103], [302, 200]], "carries-on"), stroke([[303, 101], [400, 101]], "off")]),
+    [[6000, 0, 6000, 2000], [6000, 2026.67, 6040, 4000], [6000, 2026.67, 8000, 2020]], "a corner at the end of a locked vertical wall stays on its line");
+  // The same turned over: a locked horizontal wall ends at (100, 300).
+  same(wallsOf([locked([[0, 300], [100, 300]], "locked"), stroke([[103, 302], [200, 302]], "carries-on"), stroke([[101, 303], [101, 400]], "off")]),
+    [[0, 6000, 2000, 6000], [2026.67, 6000, 4000, 6040], [2026.67, 6000, 2020, 8000]], "a corner at the end of a locked horizontal wall stays on its line");
+  // Loose walls drawn in a row, a little off one another, share one line; a locked wall in the row does not move to meet them, and they do not move to meet it.
+  same(wallsOf([stroke([[0, 0], [100, 0]], "left"), stroke([[120, 5], [220, 5]], "right")]), [[0, 100, 2000, 100], [2400, 100, 4400, 100]], "two horizontal walls in a row are on one line");
+  same(wallsOf([stroke([[300, 0], [300, 100]], "above"), stroke([[305, 120], [305, 220]], "below")]), [[6100, 0, 6100, 2000], [6100, 2400, 6100, 4400]], "two vertical walls in a row are on one line");
+  same(wallsOf([locked([[0, 0], [100, 0]], "locked"), stroke([[120, 5], [220, 5]], "loose")]), [[0, 0, 2000, 0], [2400, 100, 4400, 100]], "a locked horizontal wall stays where it was drawn beside a loose one in its row");
+  same(wallsOf([locked([[300, 0], [300, 100]], "locked"), stroke([[305, 120], [305, 220]], "loose")]), [[6000, 0, 6000, 2000], [6100, 2400, 6100, 4400]], "and a locked vertical one");
+}
 const plan = convert(rectangle);
 assert.equal(plan.walls.length, 4, "rough rectangle has four native walls");
 assert.equal(plan.rooms.length, 1, "almost closed rectangle forms room");
