@@ -2,14 +2,17 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, RotateCcw, Settings2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, RotateCcw, Save, Settings2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 import { buildConstructionModel } from "../construction/model";
-import { TEMPLATES, areasOf, buildBuilding, configForArea, defaultConfig, type BuildingAreas, type BuildingConfig, type BuildingTemplateId, type BuiltBuilding, type StructureOverrides } from "../construction/building-config";
-import { DEFAULT_COST_RULES, type CostRules } from "../construction/estimate";
+import { TEMPLATES, areasOf, buildBuilding, configForArea, defaultConfig, normalizeConfig, type BuildingAreas, type BuildingConfig, type BuildingTemplateId, type BuiltBuilding, type StructureOverrides } from "../construction/building-config";
+import { buildBill } from "../construction/boq";
+import { DEFAULT_COST_RULES, estimateCost, type CostRules } from "../construction/estimate";
 import { defaultPriceBook, type PriceBook } from "../construction/price-book";
+import { buildReport } from "../construction/report";
+import { makeStudy, type Study } from "../construction/study";
 import { STAGES, STAGE_BY_ID, ENGINEERING_DISCLAIMER } from "../construction/stages";
 import {
   DEFAULT_OPTIONS, DEFAULT_RULES, DEFAULT_VIEW, STAGE_IDS,
@@ -22,6 +25,7 @@ import type { CameraPreset, ScreenLabel } from "./construction-scene";
 import { BuildingPanel, AreaTable, buildingSummary } from "./building-panel";
 import { InspectorPanel, LayersPanel, LessonPanel, PartsPanel, QuantitiesPanel, Section, Segmented, ServiceViewPanel, stageCounts } from "./construction-panels";
 import { EstimatePanel, RatesPanel } from "./estimate-panel";
+import { StudyPanel, downloadReport } from "./study-panel";
 
 // Like the 3D tab, three.js loads only when somebody opens this one.
 const ConstructionScene = dynamic(() => import("./construction-scene").then((m) => m.ConstructionScene), {
@@ -75,6 +79,10 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
   const [labels, setLabels] = useState<ScreenLabel[]>([]);
   const [showLabels, setShowLabels] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [studyOpen, setStudyOpen] = useState(false);
+  // The study the learner has opened or saved, so that saving again replaces it.
+  const [studyId, setStudyId] = useState<string | null>(null);
+  const [studyName, setStudyName] = useState("");
   const [noteOpen, setNoteOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const detailsRef = useRef<HTMLElement | null>(null);
@@ -106,6 +114,7 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
     if (model && typeof window !== "undefined" && "__scenes" in window) Object.assign(window, { __modelBuilds: ((window as unknown as { __modelBuilds?: number }).__modelBuilds ?? 0) + 1 });
   }, [model]);
   const index = useMemo(() => (model ? indexModel(model) : null), [model]);
+  const ownProject = source === "project" && !!project;
   const counts = useMemo(() => (model ? stageCounts(model) : null), [model]);
 
   // The options the learner can flip without rebuilding live in the view.
@@ -118,8 +127,26 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
   }, []);
   const pickById = useCallback((id: string) => { pick(id, null); setFocusKey((k) => k + 1); }, [pick]);
   const clearSelection = useCallback(() => setView((v) => ({ ...v, selectedId: null, selectedInstance: null })), []);
-  const chooseMode = (mode: AppMode) => { setView((v) => ({ ...v, mode })); setTab(MODE_TABS[mode][0]!.id); setSettingsOpen(false); };
+  const chooseMode = (mode: AppMode) => { setView((v) => ({ ...v, mode })); setTab(MODE_TABS[mode][0]!.id); setSettingsOpen(false); setStudyOpen(false); };
   const goStage = (stage: StageId) => setView((v) => setStage(v, stage));
+
+  // Studies: what has been set, saved under a name and opened again; and the documents made from the model on screen.
+  const snapshot = useCallback((name: string, id: string | null): Study => {
+    const study = makeStudy({ id: id ?? undefined, name, building: normalizeConfig(config).config, overrides, options, rules, priceBook, costRules, stage: view.stage });
+    setStudyId(study.id);
+    return study;
+  }, [config, overrides, options, rules, priceBook, costRules, view.stage]);
+  const openStudy = useCallback((study: Study) => {
+    setSource("sample");
+    setConfig(study.building);
+    setOverrides(study.overrides);
+    setOptions(study.options);
+    setRules(study.rules);
+    setPriceBook(study.priceBook);
+    setCostRules(study.costRules);
+    setStudyId(study.id);
+    setView((v) => ({ ...setStage(v, study.stage), selectedId: null, selectedInstance: null, isolateId: null, hiddenIds: [], highlightIds: [] }));
+  }, []);
 
   // A new template is a different building: part ids from the old one mean nothing, and its own roof is the roof to show.
   const chooseTemplate = useCallback((id: BuildingTemplateId) => {
@@ -136,6 +163,14 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
     if (settingsOpen && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1023px)").matches) detailsRef.current?.scrollIntoView({ block: "start" });
   }, [settingsOpen]);
 
+  const exportReport = useCallback((kind: "xlsx" | "pdf") => {
+    if (!model) return;
+    const bill = buildBill(model, viewWithOptions.options, "building");
+    const estimate = estimateCost(bill, priceBook, costRules, { grossFloor: modelAreas.grossFloorArea, totalSlab: modelAreas.totalSlabArea });
+    const report = buildReport({ model, building: ownProject ? null : normalizeConfig(config).config, areas: modelAreas, options: viewWithOptions.options, rules, bill, estimate, book: priceBook, costRules, generatedAt: new Date().toISOString() });
+    downloadReport(kind, report, priceBook, model.title);
+  }, [model, viewWithOptions.options, priceBook, costRules, modelAreas, ownProject, config, rules]);
+
   const noPlan = !!model && model.components.length === 0;
   const stageDef = STAGE_BY_ID[view.stage];
   const tabs = MODE_TABS[view.mode];
@@ -145,7 +180,8 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
     <div className="min-w-0 space-y-2" data-testid="construction-lab">
       <div className="flex flex-wrap items-center gap-2">
         <Segmented<Source> label="What to study" value={source} onChange={setSource} options={project ? [{ id: "sample", label: "Sample house" }, { id: "project", label: "My project" }] : [{ id: "sample", label: "Sample house" }]} />
-        <button type="button" onClick={() => setSettingsOpen((o) => !o)} aria-pressed={settingsOpen} data-testid="settings-toggle" className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium", settingsOpen && "border-brand bg-brand/10 text-brand")}><Settings2 className="size-4" />Building and dimensions</button>
+        <button type="button" onClick={() => { setStudyOpen((o) => !o); setSettingsOpen(false); }} aria-pressed={studyOpen} data-testid="study-toggle" className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium", studyOpen && "border-brand bg-brand/10 text-brand")}><Save className="size-4" />Save and export</button>
+        <button type="button" onClick={() => { setSettingsOpen((o) => !o); setStudyOpen(false); }} aria-pressed={settingsOpen} data-testid="settings-toggle" className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium", settingsOpen && "border-brand bg-brand/10 text-brand")}><Settings2 className="size-4" />Building and dimensions</button>
       </div>
       {source === "sample" || !project ? <p className="text-xs text-muted-foreground" data-testid="building-summary">{buildingSummary(building)}</p> : null}
       <div className="rounded-xl border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950" data-testid="disclaimer">
@@ -207,11 +243,12 @@ export function ConstructionLab({ project = null }: { project?: HouseProject | n
         <aside ref={detailsRef} className="min-w-0 space-y-2" aria-label="Details">
           <div role="tablist" aria-label="Panels" className="relative flex gap-1 overflow-x-auto rounded-xl bg-muted p-1">
             {tabs.map((t) => (
-              <button key={t.id} type="button" role="tab" aria-selected={activeTab === t.id} onClick={() => { setTab(t.id); setSettingsOpen(false); }} data-tab={t.id} className={cn("min-h-9 shrink-0 flex-1 rounded-lg px-3 text-xs font-semibold", activeTab === t.id ? "bg-background text-brand shadow-sm" : "text-muted-foreground")}>{t.id === "selected" && view.selectedId ? "Selected part •" : t.label}</button>
+              <button key={t.id} type="button" role="tab" aria-selected={activeTab === t.id} onClick={() => { setTab(t.id); setSettingsOpen(false); setStudyOpen(false); }} data-tab={t.id} className={cn("min-h-9 shrink-0 flex-1 rounded-lg px-3 text-xs font-semibold", activeTab === t.id ? "bg-background text-brand shadow-sm" : "text-muted-foreground")}>{t.id === "selected" && view.selectedId ? "Selected part •" : t.label}</button>
             ))}
           </div>
           <div className="min-w-0 lg:max-h-[calc(66dvh+9rem)] lg:overflow-y-auto lg:pr-1" data-testid="panel-body">
-            {!model || !index ? <p className="rounded-xl border p-4 text-sm text-muted-foreground">Building the model…</p>
+            {studyOpen ? <StudyPanel title={building.project.metadata.title} name={studyName} onName={setStudyName} hasStudy={!ownProject} studyId={studyId} onSnapshot={snapshot} onOpen={openStudy} onExport={exportReport} exportDisabled={!model || pending || noPlan} ownProject={ownProject} />
+              : !model || !index ? <p className="rounded-xl border p-4 text-sm text-muted-foreground">Building the model…</p>
               : noPlan ? <p className="rounded-xl border p-4 text-sm" data-testid="empty-project">{model.warnings[0] ?? "This project has nothing to build yet."} Switch to the sample house to explore every stage.</p>
               : activeTab === "lesson" ? (
                 <LessonPanel stage={view.stage} model={model} index={index} view={viewWithOptions} onPick={pickById}>

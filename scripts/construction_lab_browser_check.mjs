@@ -425,6 +425,123 @@ try {
   ok(Math.abs((await valueOf("estimate-total")) - total0) < 0.5, "tax put back, the first total is back");
   ok((await page.evaluate(() => window.__modelBuilds)) === buildsBefore, "and none of it drew the building again");
 
+  // ---- Saving a study, opening it again, and the documents made from it --------------------------------------------------
+  const readDownload = async (download) => readFileSync(await download.path());
+  await page.getByRole("tab", { name: "Rates" }).click();
+  await page.getByLabel("Search rates").fill("concrete.slab");
+  await page.getByTestId("rate-concrete.slab-material").fill("20000");
+  await page.getByLabel("Search rates").fill("");
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  const savedTotal = await valueOf("estimate-total");
+  ok(Math.abs(savedTotal - total0) > 1000, "a study is saved with a price of its own in it");
+  await page.getByTestId("study-toggle").click();
+  await page.getByTestId("study-panel").waitFor();
+  ok((await page.getByTestId("study-list").locator("[data-study-id]").count()) === 0, "no study is saved yet");
+  await page.getByTestId("study-name").fill("Browser study");
+  await page.getByTestId("study-save").click();
+  ok(/Saved .Browser study./.test(await page.getByTestId("study-message").innerText()) && (await page.getByTestId("study-message").getAttribute("data-ok")) === "true", "saving says it is saved");
+  ok((await page.getByTestId("study-list").locator("[data-study-id]").count()) === 1 && /Browser study/.test(await page.getByTestId("study-list").innerText()), "and the study is listed");
+  // The learner goes on and changes things.
+  await page.getByTestId("study-toggle").click();
+  await page.getByRole("tab", { name: "Rates" }).click();
+  await page.getByLabel("Search rates").fill("concrete.slab");
+  await page.getByTestId("rate-concrete.slab-material").fill("14500");
+  await page.getByLabel("Search rates").fill("");
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  ok(Math.abs((await valueOf("estimate-total")) - total0) < 0.5, "the price put back, the first total is back");
+  // Opening the study brings back what was saved.
+  await page.getByTestId("study-toggle").click();
+  await page.getByTestId("study-open").click();
+  await page.getByTestId("study-toggle").click();
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  ok(Math.abs((await valueOf("estimate-total")) - savedTotal) < 0.5, "opening the study brings back its price and its total, to the last digit");
+  // The study is still there after the page is loaded again.
+  await page.goto(url);
+  await page.getByTestId("construction-lab").waitFor();
+  await page.waitForFunction(() => window.__scenes?.size > 0, null, { timeout: 60000 });
+  await page.getByTestId("construction-lab").getByRole("radio", { name: "Estimate cost" }).click();
+  await page.getByTestId("estimate-panel").waitFor();
+  ok(Math.abs((await valueOf("estimate-total")) - total0) < 0.5, "a page loaded afresh starts from the examples");
+  await page.getByTestId("study-toggle").click();
+  ok((await page.getByTestId("study-list").locator("[data-study-id]").count()) === 1, "and the saved study is still listed: it is kept by the browser");
+  await page.getByTestId("study-open").click();
+  await page.getByTestId("study-toggle").click();
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  ok(Math.abs((await valueOf("estimate-total")) - savedTotal) < 0.5, "and opens as it was saved");
+  // As a file.
+  await page.getByTestId("study-toggle").click();
+  const [fileDownload] = await Promise.all([page.waitForEvent("download"), page.getByTestId("study-to-file").click()]);
+  ok(/^medosha_house_browser_study_study\.json$/.test(fileDownload.suggestedFilename()), `a study can be downloaded as a file (${fileDownload.suggestedFilename()})`);
+  const saved = JSON.parse((await readDownload(fileDownload)).toString("utf8"));
+  ok(saved.version === 1 && saved.name === "Browser study" && saved.priceBook.entries["concrete.slab"].material.value === 20000 && saved.building.template, "with the building and the price book in it");
+  await page.getByTestId("study-delete").click();
+  ok((await page.getByTestId("study-list").locator("[data-study-id]").count()) === 0, "a study can be deleted");
+  await page.getByTestId("study-file-input").setInputFiles(await fileDownload.path());
+  await page.waitForFunction(() => /Opened/.test(document.querySelector('[data-testid="study-message"]')?.textContent ?? ""));
+  await page.getByTestId("study-toggle").click();
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  ok(Math.abs((await valueOf("estimate-total")) - savedTotal) < 0.5, "and opened from the file it is the same study again");
+  await page.getByTestId("study-toggle").click();
+  await page.getByTestId("study-file-input").setInputFiles({ name: "rubbish.json", mimeType: "application/json", buffer: Buffer.from("{not json") });
+  await page.waitForFunction(() => /not readable/.test(document.querySelector('[data-testid="study-message"]')?.textContent ?? ""));
+  ok((await page.getByTestId("study-message").getAttribute("data-ok")) === "false", "a file that is not a study is refused, with the reason");
+  // The documents.
+  const [xlsx] = await Promise.all([page.waitForEvent("download"), page.getByTestId("export-xlsx").click()]);
+  ok(/^medosha_house_[a-z0-9_]+_estimate\.xlsx$/.test(xlsx.suggestedFilename()), `the workbook is named with underscores (${xlsx.suggestedFilename()})`);
+  const sheet = await readDownload(xlsx);
+  const sheetText = sheet.toString("latin1");
+  ok(sheet[0] === 0x50 && sheet[1] === 0x4b && sheet[2] === 0x03 && sheet[3] === 0x04 && /xl\/workbook\.xml/.test(sheetText), "the workbook is a zip with a workbook in it");
+  ok(["BOQ by floor", "BOQ by stage", "BOQ by category", "Cost summary", "Cost by group", "Price book"].every((n) => sheetText.includes(`name="${n}"`)), "with a sheet for the bill by floor, stage and category, the cost, and the price book");
+  ok(new TextDecoder().decode(sheet).includes(`ETB ${Math.round(savedTotal).toLocaleString("en")}`), "and the total in it is the total on the screen");
+  const [pdf] = await Promise.all([page.waitForEvent("download"), page.getByTestId("export-pdf").click()]);
+  ok(/^medosha_house_[a-z0-9_]+_estimate\.pdf$/.test(pdf.suggestedFilename()), `the PDF is named the same way (${pdf.suggestedFilename()})`);
+  const pdfBytes = await readDownload(pdf);
+  const pdfText = pdfBytes.toString("latin1");
+  ok(pdfText.startsWith("%PDF-1.4") && pdfText.trimEnd().endsWith("%%EOF") && (pdfText.match(/\/Type \/Page /g) ?? []).length >= 12 && /Page 1 of \d+/.test(pdfText), "the PDF is a document of a dozen pages or more");
+  ok(pdfText.includes(`ETB ${Math.round(savedTotal).toLocaleString("en")}`), "with the same total in it");
+  await page.getByTestId("study-toggle").click();
+
+  // A study of another building brings that building back: its plan, its structure and its 3D model.
+  await page.getByTestId("settings-toggle").click();
+  await page.getByRole("radiogroup", { name: "Building template" }).locator('[data-template="modern-villa"]').click();
+  await page.waitForFunction(() => /^Modern Villa/.test(document.querySelector('[data-testid="building-summary"]')?.textContent ?? ""));
+  await page.waitForFunction(() => !document.querySelector('[data-testid="model-updating"]'), null, { timeout: 60000 });
+  await page.getByTestId("settings-toggle").click();
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  await page.waitForFunction((was) => Math.abs(Number(document.querySelector('[data-testid="estimate-total"]')?.getAttribute("data-value")) - was) > 1000, savedTotal, { timeout: 60000 });
+  const villaTotal = await valueOf("estimate-total");
+  const villaScene = await stats(page);
+  await page.getByTestId("study-toggle").click();
+  await page.getByTestId("study-name").fill("Villa");
+  await page.getByTestId("study-save").click();
+  await page.getByTestId("study-toggle").click();
+  await page.getByTestId("settings-toggle").click();
+  await page.getByRole("radiogroup", { name: "Building template" }).locator('[data-template="existing"]').click();
+  await page.waitForFunction(() => /^Medosha|^Existing|^Learning/.test(document.querySelector('[data-testid="building-summary"]')?.textContent ?? "") || !/Modern Villa/.test(document.querySelector('[data-testid="building-summary"]')?.textContent ?? ""));
+  await page.waitForFunction(() => !document.querySelector('[data-testid="model-updating"]'), null, { timeout: 60000 });
+  await page.getByTestId("settings-toggle").click();
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  await page.waitForFunction((was) => Math.abs(Number(document.querySelector('[data-testid="estimate-total"]')?.getAttribute("data-value")) - was) > 1000, villaTotal, { timeout: 60000 });
+  ok(Math.abs((await valueOf("estimate-total")) - villaTotal) > 1000, "the Existing Building costs something other than the villa");
+  await page.getByTestId("study-toggle").click();
+  await page.getByTestId("study-open").click();
+  await page.waitForFunction(() => /^Modern Villa/.test(document.querySelector('[data-testid="building-summary"]')?.textContent ?? ""));
+  await page.getByTestId("study-toggle").click();
+  await page.waitForFunction(() => !document.querySelector('[data-testid="model-updating"]'), null, { timeout: 60000 });
+  await page.getByRole("tab", { name: "Estimate" }).click();
+  await page.waitForFunction((want) => Math.abs(Number(document.querySelector('[data-testid="estimate-total"]')?.getAttribute("data-value")) - want) < 0.5, villaTotal, { timeout: 60000 });
+  ok(Math.abs((await valueOf("estimate-total")) - villaTotal) < 0.5, "opening the villa's study brings the villa back, with its cost to the last digit");
+  const sameScene = async () => { for (let i = 0; i < 60; i += 1) { const now = await stats(page); if (now.instances === villaScene.instances && now.sum === villaScene.sum) return true; await page.waitForTimeout(500); } return false; };
+  ok(await sameScene(), "and its 3D model is the same model");
+  // Back to the Existing Building for the rest of the check, and the study put away.
+  await page.getByTestId("study-toggle").click();
+  await page.getByTestId("study-delete").click();
+  await page.getByTestId("study-toggle").click();
+  await page.getByTestId("settings-toggle").click();
+  await page.getByRole("radiogroup", { name: "Building template" }).locator('[data-template="existing"]').click();
+  await page.waitForFunction(() => !document.querySelector('[data-testid="model-updating"]'), null, { timeout: 60000 });
+  await page.getByTestId("settings-toggle").click();
+
   // ---- Sample dimensions ------------------------------------------------------------------------------------------------
   await page.getByTestId("construction-lab").getByRole("radio", { name: "Learn" }).click();
   await page.locator('[role=tab][data-stage="5"]').click();

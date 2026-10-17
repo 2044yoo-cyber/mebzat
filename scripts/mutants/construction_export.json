@@ -1,0 +1,416 @@
+[
+  {
+    "name": "more studies are kept than the most",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": ".slice(0, MAX_STUDIES));",
+    "to": ".slice(0, MAX_STUDIES + 5));"
+  },
+  {
+    "name": "a study saved again is kept twice",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "const others = listStudies(storage).filter((s) => s.id !== study.id);",
+    "to": "const others = listStudies(storage);"
+  },
+  {
+    "name": "the oldest study is listed first",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "return (raw.studies as unknown[]).map(readStudy).filter((s): s is Study => s !== null).sort((a, b) => b.savedAt.localeCompare(a.savedAt));",
+    "to": "return (raw.studies as unknown[]).map(readStudy).filter((s): s is Study => s !== null).sort((a, b) => a.savedAt.localeCompare(b.savedAt));"
+  },
+  {
+    "name": "a store that refuses is thought to have kept it",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "catch { return { ok: false, reason: \"This browser would not keep it (it may be full, or saving may be turned off). Download the study as a file instead.\" }; }",
+    "to": "catch { /* ignored */ }"
+  },
+  {
+    "name": "too much stored is let through",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "if (json.length > MAX_STORED_CHARS)",
+    "to": "if (false as boolean)"
+  },
+  {
+    "name": "any version of a study is opened",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "raw.version !== STUDY_VERSION",
+    "to": "false"
+  },
+  {
+    "name": "any template is accepted",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "!BUILDING_TEMPLATES.includes(raw.building.template as (typeof BUILDING_TEMPLATES)[number])",
+    "to": "false"
+  },
+  {
+    "name": "an id of any kind is kept",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "/^[\\w.-]{3,64}$/.test(raw.id)",
+    "to": "typeof raw.id === \"string\""
+  },
+  {
+    "name": "a name is not trimmed",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "(typeof v === \"string\" && v.trim() ? v.trim().slice(0, max) : fallback)",
+    "to": "(typeof v === \"string\" && v.trim() ? v.slice(0, max) : fallback)"
+  },
+  {
+    "name": "a date that is not a date is kept",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "typeof raw.savedAt === \"string\" && !Number.isNaN(Date.parse(raw.savedAt))",
+    "to": "typeof raw.savedAt === \"string\""
+  },
+  {
+    "name": "a building outside its limits is kept",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "building: normalizeConfig(raw.building as Partial<BuildingConfig>).config,",
+    "to": "building: raw.building as BuildingConfig,"
+  },
+  {
+    "name": "a threshold is not limited",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "openingThresholdM2: num(r.openingThresholdM2, base.openingThresholdM2, 0, 10),",
+    "to": "openingThresholdM2: num(r.openingThresholdM2, base.openingThresholdM2, -100, 1000),"
+  },
+  {
+    "name": "a joint is not limited",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "jointMm: num(r.jointMm, base.jointMm, 0, 50),",
+    "to": "jointMm: num(r.jointMm, base.jointMm, 0, 5000),"
+  },
+  {
+    "name": "a ratio for anything is kept",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "/^concrete\\.[a-z-]+$/.test(k)",
+    "to": "true"
+  },
+  {
+    "name": "a ratio is not limited",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "ratios[k] = Math.min(1000, Math.max(0, v));",
+    "to": "ratios[k] = v;"
+  },
+  {
+    "name": "a reinforcement rule is trusted",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "basis: oneOf(rein.basis, [\"ratio\", \"schedule\"] as const, base.reinforcement.basis)",
+    "to": "basis: rein.basis as \"ratio\" | \"schedule\""
+  },
+  {
+    "name": "an allowance is not limited",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "num(al[k], v, 0, 100)",
+    "to": "num(al[k], v, 0, 100000)"
+  },
+  {
+    "name": "a fall is not limited",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "waste: num(fall.waste, base.services.fall.waste, 20, 200)",
+    "to": "waste: num(fall.waste, base.services.fall.waste, 1, 200)"
+  },
+  {
+    "name": "a height is not limited",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "coldHeight: num(sv.coldHeight, base.services.coldHeight, 100, 2200)",
+    "to": "coldHeight: num(sv.coldHeight, base.services.coldHeight, 100, 220000)"
+  },
+  {
+    "name": "structure sizes of any name are kept",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "for (const key of OVERRIDE_KEYS) { const v = raw[key];",
+    "to": "for (const key of Object.keys(raw) as (typeof OVERRIDE_KEYS)[number][]) { const v = raw[key];"
+  },
+  {
+    "name": "a stage that does not exist is kept",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "(STAGE_IDS as readonly number[]).includes(raw.stage as number) ? (raw.stage as StageId) : 1",
+    "to": "(raw.stage as StageId)"
+  },
+  {
+    "name": "a parapet is not limited",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "Math.min(2000, Math.max(300, r.parapetHeight))",
+    "to": "r.parapetHeight"
+  },
+  {
+    "name": "file names have hyphens",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": ".replace(/[^a-z0-9]+/g, \"_\")",
+    "to": ".replace(/[^a-z0-9]+/g, \"-\")"
+  },
+  {
+    "name": "file names are as long as the name",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": ".replace(/^_+|_+$/g, \"\").slice(0, 40);",
+    "to": ".replace(/^_+|_+$/g, \"\");"
+  },
+  {
+    "name": "a name is not trimmed when a study is made",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "name: input.name.trim().slice(0, 80) || \"Untitled study\",",
+    "to": "name: input.name.slice(0, 80) || \"Untitled study\","
+  },
+  {
+    "name": "a file of any size is read",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "if (content.length > MAX_STORED_CHARS) return",
+    "to": "if (false as boolean) return"
+  },
+  {
+    "name": "a study takes the time of the one it was made from",
+    "file": "src/features/house-designer/construction/study.ts",
+    "from": "savedAt: now.toISOString(),\n    building: input.building,",
+    "to": "savedAt: (input as unknown as { savedAt?: string }).savedAt ?? now.toISOString(),\n    building: input.building,"
+  },
+  {
+    "name": "the foot of the priced bill is the total",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "[\"Total\", \"\", \"\", \"\", null, null, null, r2(e.materials), r2(e.labour), r2(e.direct), \"\"],",
+    "to": "[\"Total\", \"\", \"\", \"\", null, null, null, r2(e.materials), r2(e.labour), r2(e.total), \"\"],"
+  },
+  {
+    "name": "the build-up ends in the direct cost",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "[\"TOTAL\", r2(e.total)],",
+    "to": "[\"TOTAL\", r2(e.direct)],"
+  },
+  {
+    "name": "the bill by floor gives the whole line in each floor",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "row.net === null ? null : r3(row.net), row.allowance === null ? null : r3(row.allowance), row.status]));",
+    "to": "row.line.net === null ? null : r3(row.line.net), row.allowance === null ? null : r3(row.allowance), row.status]));"
+  },
+  {
+    "name": "the share is of the total",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "e.direct > 0 ? r3(g.total / e.direct) : null]",
+    "to": "e.total > 0 ? r3(g.total / e.total) : null]"
+  },
+  {
+    "name": "the rates include lines priced with another",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "rows: e.lines.filter((l) => l.pricing !== \"included\").map((l): ReportCell[] => {",
+    "to": "rows: e.lines.map((l): ReportCell[] => {"
+  },
+  {
+    "name": "the problems are left out",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "rows: e.summary.problems.map((p): ReportCell[]",
+    "to": "rows: [].map((p: { ref: string; description: string; flag: keyof typeof COST_FLAG_LABELS; detail: string }): ReportCell[]"
+  },
+  {
+    "name": "a rate of nothing is called an example",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "(status === null ? (rate === 0 ? \"nothing to pay\" : has ? \"no rate\" : \"no entry\")",
+    "to": "(status === null ? (rate === 0 ? \"example\" : has ? \"no rate\" : \"no entry\")"
+  },
+  {
+    "name": "the per metre figure is the direct cost",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "[\"Per m\u00b2 of gross floor area\", e.area.perM2 === null ? \"\u2014\" : `${CURRENCY} ${fmt(e.area.perM2)}`],",
+    "to": "[\"Per m\u00b2 of gross floor area\", e.area.directPerM2 === null ? \"\u2014\" : `${CURRENCY} ${fmt(e.area.directPerM2)}`],"
+  },
+  {
+    "name": "the slab figure is of floor",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "[\"Per m\u00b2 of slab, balconies included\", e.area.perM2Slab === null ? \"\u2014\" : `${CURRENCY} ${fmt(e.area.perM2Slab)}`],",
+    "to": "[\"Per m\u00b2 of slab, balconies included\", e.area.perM2 === null ? \"\u2014\" : `${CURRENCY} ${fmt(e.area.perM2)}`],"
+  },
+  {
+    "name": "the notes leave out the disclaimer",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "    ENGINEERING_DISCLAIMER,\n",
+    "to": ""
+  },
+  {
+    "name": "the notes leave out the steel",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "    \"Reinforcement is estimated from a typical weight of steel for each cubic metre of concrete, not from a bar schedule: the structural design replaces it.\",\n",
+    "to": ""
+  },
+  {
+    "name": "the cost lines show the material rate as the labour rate",
+    "file": "src/features/house-designer/construction/report.ts",
+    "from": "l.net === null ? null : r3(l.net), l.materialRate, l.labourRate,",
+    "to": "l.net === null ? null : r3(l.net), l.labourRate, l.labourRate,"
+  },
+  {
+    "name": "a sheet is left out",
+    "file": "src/features/house-designer/construction/report-xlsx.ts",
+    "from": "...report.tables.map(tableSheet),",
+    "to": "...report.tables.slice(1).map(tableSheet),"
+  },
+  {
+    "name": "a sheet has no headings",
+    "file": "src/features/house-designer/construction/report-xlsx.ts",
+    "from": "rows: [table.columns.map((c) => c.header), ...table.rows.map((row) => row.map((cell): Cell => cell))],",
+    "to": "rows: [...table.rows.map((row) => row.map((cell): Cell => cell))],"
+  },
+  {
+    "name": "the price book calls an example a name",
+    "file": "src/features/house-designer/construction/report-xlsx.ts",
+    "from": "e.includedIn ? \"\" : e.material.status === \"assumed\" ? \"example\" : e.material.status, e.includedIn ? \"\" : e.material.source",
+    "to": "e.includedIn ? \"\" : e.material.status, e.includedIn ? \"\" : e.material.source"
+  },
+  {
+    "name": "an included line has a rate in the price book",
+    "file": "src/features/house-designer/construction/report-xlsx.ts",
+    "from": "Object.values(book.entries).sort((a, b) => a.workItem.localeCompare(b.workItem)).map((e): Cell[] => [\n          e.workItem, e.unit, e.material.value,",
+    "to": "Object.values(book.entries).sort((a, b) => a.workItem.localeCompare(b.workItem)).map((e): Cell[] => [\n          e.workItem, e.unit, e.material.value ?? 0,"
+  },
+  {
+    "name": "the summary leaves out the notes",
+    "file": "src/features/house-designer/construction/report-xlsx.ts",
+    "from": "...report.notes.map((n): Cell[] => [\"\", n]),",
+    "to": ""
+  },
+  {
+    "name": "what is wrong is left out of the PDF",
+    "file": "src/features/house-designer/construction/report-pdf.ts",
+    "from": "const ORDER = [\"cost-summary\", \"problems\",",
+    "to": "const ORDER = [\"cost-summary\","
+  },
+  {
+    "name": "every table is upright",
+    "file": "src/features/house-designer/construction/report-pdf.ts",
+    "from": "landscape: table.columns.length >= 8,",
+    "to": "landscape: table.columns.length >= 80,"
+  },
+  {
+    "name": "the total is not in bold",
+    "file": "src/features/house-designer/construction/report-pdf.ts",
+    "from": "\"cost-summary\": [\"Direct cost\", \"Additional costs\", \"Subtotal\", \"Taxes\", \"TOTAL\"],",
+    "to": "\"cost-summary\": [\"Direct cost\", \"Additional costs\", \"Subtotal\", \"Taxes\"],"
+  },
+  {
+    "name": "numbers are printed whole",
+    "file": "src/features/house-designer/construction/report-pdf.ts",
+    "from": "minimumFractionDigits: digits ?? 0, maximumFractionDigits: digits ?? 0",
+    "to": "minimumFractionDigits: 0, maximumFractionDigits: 0"
+  },
+  {
+    "name": "the bill by category is left out",
+    "file": "src/features/house-designer/construction/report-pdf.ts",
+    "from": "\"bill-stage\", \"bill-category\", \"cost-lines\"",
+    "to": "\"bill-stage\", \"cost-lines\""
+  },
+  {
+    "name": "the footer does not say it is not a quotation",
+    "file": "src/features/house-designer/construction/report-pdf.ts",
+    "from": " \u00b7 indicative estimate, not a quotation",
+    "to": ""
+  },
+  {
+    "name": "the notes are left out",
+    "file": "src/features/house-designer/construction/report-pdf.ts",
+    "from": "...report.notes.map((text): PdfBlock => ({ t: \"paragraph\", text })),",
+    "to": ""
+  },
+  {
+    "name": "a line as wide as the space does not fit",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "if (textWidth(candidate, size, bold) <= max) { line = candidate; continue; }",
+    "to": "if (textWidth(candidate, size, bold) < max) { line = candidate; continue; }"
+  },
+  {
+    "name": "a character with no width is not counted",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "return WIDE[code] ?? 556;",
+    "to": "return WIDE[code] ?? 0;"
+  },
+  {
+    "name": "the superscript two is as wide as a digit",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "0xb2: 333,",
+    "to": "0xb2: 556,"
+  },
+  {
+    "name": "the multiplication sign is a letter wide",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "0xd7: 584,",
+    "to": "0xd7: 1000,"
+  },
+  {
+    "name": "bold is as wide as regular",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "return (bold ? BOLD : REGULAR)[code - 32]!;",
+    "to": "return REGULAR[code - 32]!;"
+  },
+  {
+    "name": "the en dash is not in WinAnsi",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "0x2013: 0x96,",
+    "to": ""
+  },
+  {
+    "name": "accented letters are question marks",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "else if (code >= 0xa0 && code <= 0xff) out += ch;",
+    "to": ""
+  },
+  {
+    "name": "tabs are kept",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "if (code === 9 || code === 10 || code === 13) out += \" \";",
+    "to": "if (false as boolean) out += \" \";"
+  },
+  {
+    "name": "a long word is not broken",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "while (textWidth(rest, size, bold) > max && rest.length > 1) {",
+    "to": "while (false as boolean && rest.length > 1) {"
+  },
+  {
+    "name": "the headings are not repeated on a new page",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "if (!room(h + (g !== null && g !== lastGroup ? headingH : 0) + 2)) { startPage(landscape); heading(); lastGroup = null; }",
+    "to": "if (!room(h + (g !== null && g !== lastGroup ? headingH : 0) + 2)) { startPage(landscape); lastGroup = null; }"
+  },
+  {
+    "name": "a group is not named again on the next page",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "{ startPage(landscape); heading(); lastGroup = null; }",
+    "to": "{ startPage(landscape); heading(); }"
+  },
+  {
+    "name": "the page numbers are wrong",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "`Page ${i + 1} of ${count}`",
+    "to": "`Page ${i} of ${count}`"
+  },
+  {
+    "name": "a stream is longer than it says",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "<< /Length ${content.length} >>",
+    "to": "<< /Length ${content.length + 1} >>"
+  },
+  {
+    "name": "the table points at the wrong place",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "const xref = length;",
+    "to": "const xref = length + 1;"
+  },
+  {
+    "name": "the title is read as WinAnsi",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "/Title ${infoString(doc.title)}",
+    "to": "/Title ${literal(winAnsi(doc.title))}"
+  },
+  {
+    "name": "a table that needs a wide page is put on an upright one",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "if (!!block.landscape !== landscape) startPage(!!block.landscape);",
+    "to": "if (false as boolean) startPage(!!block.landscape);"
+  },
+  {
+    "name": "the column that names the group stays in the table",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": ".filter((c) => c.i !== group);",
+    "to": ".filter(() => true);"
+  },
+  {
+    "name": "the date is the beginning of time",
+    "file": "src/features/house-designer/construction/pdf.ts",
+    "from": "const created = stamp ?",
+    "to": "const created = false as boolean ?"
+  }
+]
