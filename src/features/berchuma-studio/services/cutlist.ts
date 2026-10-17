@@ -45,6 +45,8 @@ export type CutListRow = {
   grainLocked: boolean;
   /** Square metres for this row, all pieces. */
   area: number;
+  /** Machining beyond the cut: a finger-pull groove, a profile to fit. */
+  operations?: string[];
 };
 
 export type CutList = {
@@ -106,6 +108,10 @@ export function buildCutList(
       part.edgeBand.id,
       edgeKey(part),
       part.role,
+      // A rail and a masking panel of the same size are different pieces, and
+      // a grooved door is not a plain one: it goes to the router.
+      part.closure?.kind ?? "",
+      (part.operations ?? []).join(";"),
       // Parts of different transport modules are made and stacked apart, and
       // within a module each is listed by name — left side, right side, top.
       ...(part.module ? [part.module.name, part.label] : []),
@@ -145,6 +151,7 @@ export function buildCutList(
         (entry.part.length * entry.part.width * entry.quantity) / 1_000_000,
         3,
       ),
+      ...(entry.part.operations?.length ? { operations: entry.part.operations } : {}),
     }));
 
   // One block per board, because collecting material is one trip to the rack
@@ -267,6 +274,67 @@ export function buildCutList(
   };
 }
 
+/** 
+ * Map each rendered part back to the exact shop tag used on the cut list.
+ * The model uses these tags in exploded/joint views so a board can be found
+ * on screen by reading the matching Part ID in the list.
+ */
+export function cutListPartTags(spec: DesignSpec, parts: Part[]): Map<string, string> {
+  const cutParts = parts.filter((part) => part.manufacture !== "purchased");
+  const codes = cabinetCodes(spec);
+  const shared = `${designLetter(spec)}00`;
+  const groups = new Map<string, { part: Part; cabinets: string[]; sourcePartIds: string[] }>();
+
+  for (const part of cutParts) {
+    const key = [
+      part.board.id,
+      part.length,
+      part.width,
+      part.edgeBand.id,
+      edgeKey(part),
+      part.role,
+      part.closure?.kind ?? "",
+      (part.operations ?? []).join(";"),
+      ...(part.module ? [part.module.name, part.label] : []),
+    ].join("|");
+    const code = (part.cabinetId && codes.get(part.cabinetId)) || shared;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.sourcePartIds.push(part.id);
+      if (!existing.cabinets.includes(code)) existing.cabinets.push(code);
+    } else {
+      groups.set(key, { part, cabinets: [code], sourcePartIds: [part.id] });
+    }
+  }
+
+  const rows = [...groups.values()]
+    .sort((a, b) => b.part.length * b.part.width - a.part.length * a.part.width)
+    .map((entry) => ({
+      entry,
+      boardId: entry.part.board.id,
+      partId: [entry.cabinets[0], ...(entry.part.module ? [`M${entry.part.module.index + 1}`] : []), partCode(entry.part)].join("-"),
+      index: 0,
+    }));
+  const boardIds = [...new Set(rows.map((row) => row.boardId))];
+  let sequence = 0;
+  for (const boardId of boardIds) {
+    for (const row of rows.filter((entry) => entry.boardId === boardId)) {
+      sequence += 1;
+      row.index = sequence;
+    }
+  }
+
+  const seen = new Map<string, number>();
+  const tags = new Map<string, string>();
+  for (const row of rows.sort((a, b) => a.index - b.index)) {
+    const count = (seen.get(row.partId) ?? 0) + 1;
+    seen.set(row.partId, count);
+    const tag = `${row.partId}${count > 1 ? count : ""}`;
+    for (const partId of row.entry.sourcePartIds) tags.set(partId, tag);
+  }
+  return tags;
+}
+
 /**
  * Each cabinet's short code: a letter for what it is and its place in the
  * design — W01 for the first wardrobe carcass, K02 for the second kitchen
@@ -331,6 +399,15 @@ export function partCode(part: Pick<Part, "role" | "label">): string {
       return "LG";
     case "led":
       return "LED";
+    case "closure":
+      return /finger-pull/i.test(label) ? "FPR"
+        : /masking/i.test(label) ? "MK"
+        : /filler/i.test(label) ? "FL"
+        : /decorative/i.test(label) ? "EP"
+        : /side cover/i.test(label) ? "SC"
+        : /top closure/i.test(label) ? "TC"
+        : /kickboard/i.test(label) ? "KB"
+        : /rear closure/i.test(label) ? "RC" : "CP";
     default:
       return "PT";
   }
